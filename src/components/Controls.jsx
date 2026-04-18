@@ -49,8 +49,8 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
         case 'KeyD': movePan( PAN_SPEED, 0, 0); break
 
         // ── Tilt ─────────────────────────────────────────────────────────────
-        case 'KeyY': levaSet({ tilt: Math.max(0,   (v.tilt ?? 60) - TILT_STEP) }); break
-        case 'KeyX': levaSet({ tilt: Math.min(180, (v.tilt ?? 60) + TILT_STEP) }); break
+        case 'KeyY': levaSet({ tilt: Math.max(-90, (v.tilt ?? 0) - TILT_STEP) }); break
+        case 'KeyX': levaSet({ tilt: Math.min( 90, (v.tilt ?? 0) + TILT_STEP) }); break
 
         // ── Rotation ─────────────────────────────────────────────────────────
         case 'KeyE': levaSet({ rotation: (v.rotation ?? 0) + ROT_STEP }); break

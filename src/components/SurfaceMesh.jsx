@@ -64,8 +64,13 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,
     fragmentShader: SURFACE_FRAG,
-    side:       THREE.DoubleSide,
-    depthWrite: true,
+    side:           THREE.DoubleSide,
+    depthWrite:     true,
+    // Push the occluder surface slightly back in depth so coplanar line
+    // segments consistently pass the depth test (prevents z-fighting flicker).
+    polygonOffset:       true,
+    polygonOffsetFactor: 2,
+    polygonOffsetUnits:  2,
     uniforms: {
       uBgColor:   { value: new THREE.Vector3(1, 1, 1) },
       uFillLow:   { value: new THREE.Vector3(1, 1, 1) },
@@ -101,11 +106,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   // Wireframe material — plain line material, recolored on change
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color:      new THREE.Color(p.lineColor),
-    wireframe:  true,
-    transparent: true,
-    opacity:    0.25,
-    depthWrite: false,
+    color:               new THREE.Color(p.lineColor),
+    wireframe:           true,
+    transparent:         true,
+    opacity:             0.25,
+    depthWrite:          false,
+    polygonOffset:       true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits:  1,
   }), []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

@@ -53,10 +53,10 @@ const STYLE_DEF = {
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
   animateParticles: false, particleNoise: 1, particleDamping: 0.92,
-  particleGravity: false, showTrails: false,
+  particleGravity: false, particleGravityStr: 1,
 }
 const VIEW_DEF = {
-  tilt: 60, rotation: 0, zoom: 1,
+  tilt: 0, rotation: 0, zoom: 1,
   autoRotate: false, autoRotateSpeed: 1,
   showGuides: false,
 }
@@ -83,7 +83,6 @@ export default function App() {
   const [svgTrigger,  setSvgTrigger]  = useState(0)
   const [dxfTrigger,  setDxfTrigger]  = useState(0)
   const [pngTrigger,  setPngTrigger]  = useState(0)
-  const [pngScale,    setPngScale]    = useState(1)
   const [webmActive,  setWebmActive]  = useState(false)
 
   const orbitRef = useRef()
@@ -149,15 +148,15 @@ export default function App() {
       label: 'Noise',   render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
     particleDamping:  { value: POINTS_DEF.particleDamping,  min: 0.5, max: 0.99, step: 0.01,
       label: 'Damping', render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
-    particleGravity:  { value: POINTS_DEF.particleGravity,  label: 'Gravity',
+    particleGravity:    { value: POINTS_DEF.particleGravity,    label: 'Gravity',
       render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
-    showTrails:       { value: POINTS_DEF.showTrails,        label: 'Trails',
-      render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
+    particleGravityStr: { value: POINTS_DEF.particleGravityStr, min: 0.1, max: 10, step: 0.1,
+      label: 'Gravity str', render: (get) => get('Points.showPoints') && get('Points.animateParticles') && get('Points.particleGravity') },
   }))
 
   // ── View ──────────────────────────────────────────────────────────────────
   const [view, setView] = useControls('View', () => ({
-    tilt:       { value: VIEW_DEF.tilt,   min: 0, max: 180, step: 1, label: 'Tilt' },
+    tilt:       { value: VIEW_DEF.tilt,   min: -90, max: 90, step: 1, label: 'Tilt' },
     rotation:   { value: VIEW_DEF.rotation, min: -180, max: 180, step: 1, label: 'Rotation' },
     zoom:       { value: VIEW_DEF.zoom,   min: 0.1, max: 4, step: 0.05, label: 'Zoom' },
     autoRotate:      { value: VIEW_DEF.autoRotate,      label: 'Auto-rotate' },
@@ -176,6 +175,15 @@ export default function App() {
     },
   }))
 
+  // When elevation gradient is first enabled, default to Topo
+  const prevLineGradient = useRef(false)
+  useEffect(() => {
+    if (style.lineGradient && !prevLineGradient.current) {
+      setGradientStops(GRADIENT_PRESETS['Topo'])
+    }
+    prevLineGradient.current = style.lineGradient
+  }, [style.lineGradient]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Heightmap ─────────────────────────────────────────────────────────────
   useControls('Heightmap', () => ({
     'Load image': button(() => loadFromPicker()),
@@ -183,11 +191,9 @@ export default function App() {
 
   // ── Export ────────────────────────────────────────────────────────────────
   const [webmDuration] = useControls('Export', () => ({
-    'SVG — A4 (1)':   button(() => setSvgTrigger((n) => n + 1)),
+    'SVG (1)':         button(() => setSvgTrigger((n) => n + 1)),
     'DXF — A4 (2)':   button(() => setDxfTrigger((n) => n + 1)),
-    'PNG 1× (3)':     button(() => { setPngScale(1); setPngTrigger((n) => n + 1) }),
-    'PNG 2×':         button(() => { setPngScale(2); setPngTrigger((n) => n + 1) }),
-    'PNG 4×':         button(() => { setPngScale(4); setPngTrigger((n) => n + 1) }),
+    'PNG (3)':         button(() => setPngTrigger((n) => n + 1)),
     webmDuration:     { value: 5, min: 1, max: 60, step: 1, label: 'WebM duration (s)' },
     'WebM record (4)': button((get) => {
       const canvas = document.querySelector('canvas')
@@ -261,7 +267,7 @@ export default function App() {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if (e.code === 'Digit1') setSvgTrigger((n) => n + 1)
       if (e.code === 'Digit2') setDxfTrigger((n) => n + 1)
-      if (e.code === 'Digit3') { setPngScale(1); setPngTrigger((n) => n + 1) }
+      if (e.code === 'Digit3') setPngTrigger((n) => n + 1)
       if (e.code === 'Digit4') {
         const canvas = document.querySelector('canvas')
         if (!canvas) return
@@ -370,7 +376,6 @@ export default function App() {
           svgTrigger={svgTrigger}
           dxfTrigger={dxfTrigger}
           pngTrigger={pngTrigger}
-          pngScale={pngScale}
           webmRecording={webmActive}
         />
       </Canvas>

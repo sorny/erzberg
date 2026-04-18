@@ -18,11 +18,12 @@ import { ParticleSystem }  from './ParticleSystem'
 import { Controls }        from './Controls'
 import { exportSVG }  from '../utils/svgExport'
 import { exportDXF }  from '../utils/dxfExport'
+import { exportPNG }  from '../utils/pngExport'
 
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   levaGet, levaSet, orbitRef,
-  svgTrigger, dxfTrigger, pngTrigger, pngScale,
+  svgTrigger, dxfTrigger, pngTrigger,
   webmRecording,
 }) {
   const { camera, gl, scene } = useThree()
@@ -48,7 +49,7 @@ export function Scene({
       zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
     }
 
-    groupRef.current.rotation.x = THREE.MathUtils.degToRad(p.tilt ?? 60)
+    groupRef.current.rotation.x = THREE.MathUtils.degToRad(p.tilt ?? 0)
     groupRef.current.rotation.z = zRotRef.current
     groupRef.current.scale.setScalar(p.zoom ?? 1)
 
@@ -69,30 +70,11 @@ export function Scene({
     exportDXF({ positions: lineGeo.positions, camera })
   }, [dxfTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // PNG export (1×/2×/4×)
+  // PNG export — trimmed to content bounding box
   useEffect(() => {
     if (!pngTrigger) return
-    const scale = pngScale ?? 1
-    const canvas = gl.domElement
-
-    if (scale === 1) {
-      gl.render(scene, camera)
-      triggerDownload(canvas.toDataURL('image/png'), 'heightmap.png')
-      return
-    }
-
-    // Higher resolution: temporarily resize, re-render, restore
-    const origW = canvas.width, origH = canvas.height
-    gl.setSize(origW * scale, origH * scale)
-    camera.aspect = (origW * scale) / (origH * scale)
-    camera.updateProjectionMatrix()
     gl.render(scene, camera)
-
-    triggerDownload(canvas.toDataURL('image/png'), `heightmap_${scale}x.png`)
-
-    gl.setSize(origW, origH)
-    camera.aspect = origW / origH
-    camera.updateProjectionMatrix()
+    exportPNG(gl.domElement, p.bgColor)
   }, [pngTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
