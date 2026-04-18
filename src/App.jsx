@@ -1,41 +1,18 @@
 /**
  * Root component — heightmap-r3f
  *
- * Features:
- *   • All original p5 controls ported to Leva
- *   • View: explicit Tilt / Rotation / Zoom sliders (terrain group transforms)
- *   • Export: SVG (A4), DXF (A4), PNG 1×/2×/4×, WebM recording
- *   • Keyboard shortcuts 1–4 for exports, G for guides
- *   • Preset save/load with embedded heightmap
- *   • Levels histogram with drag handles
- *   • Multi-stop gradient picker
- *   • Center guides crosshair overlay
- *   • Draw mode indicator HUD
- *   • Empty-state prompt when no heightmap is loaded
+ * All tweakable params live in plain React state (no Leva).
+ * The custom <Sidebar> renders the right-hand control panel.
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { useControls, button, Leva } from 'leva'
-import { Scene }           from './components/Scene'
-import { Histogram }       from './components/Histogram'
-import { GradientPicker }  from './components/GradientPicker'
-import { StatsOverlay }    from './components/StatsOverlay'
-import { useHeightmap }    from './hooks/useHeightmap'
+import { Scene }         from './components/Scene'
+import { Sidebar }       from './components/Sidebar'
+import { useHeightmap }  from './hooks/useHeightmap'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
-import { useStore }        from './store/useStore'
+import { useStore }      from './store/useStore'
+import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { startWebM, stopWebM, isRecording } from './utils/webmRecorder'
-
-// ── Gradient presets ──────────────────────────────────────────────────────────
-export const GRADIENT_PRESETS = {
-  Mono:    [{ pos: 0, color: '#000000' }, { pos: 1, color: '#000000' }],
-  Classic: [{ pos: 0, color: '#1a1a2e' }, { pos: 0.5, color: '#888888' }, { pos: 1, color: '#ffffff' }],
-  Fire:    [{ pos: 0, color: '#1a0000' }, { pos: 0.4, color: '#ff4400' }, { pos: 0.7, color: '#ffaa00' }, { pos: 1, color: '#ffffff' }],
-  Ocean:   [{ pos: 0, color: '#001433' }, { pos: 0.5, color: '#0066cc' }, { pos: 1, color: '#00eeff' }],
-  Topo:    [{ pos: 0, color: '#0d3b00' }, { pos: 0.3, color: '#5a8c00' }, { pos: 0.6, color: '#c8a800' }, { pos: 0.85, color: '#8b4513' }, { pos: 1, color: '#ffffff' }],
-  Jet:     [{ pos: 0, color: '#000080' }, { pos: 0.25, color: '#00ffff' }, { pos: 0.5, color: '#00ff00' }, { pos: 0.75, color: '#ff8800' }, { pos: 1, color: '#800000' }],
-  Cyber:   [{ pos: 0, color: '#0d0221' }, { pos: 0.5, color: '#b000ff' }, { pos: 1, color: '#00ffe7' }],
-  Sunset:  [{ pos: 0, color: '#0a0020' }, { pos: 0.4, color: '#c62a6b' }, { pos: 0.7, color: '#ff7b3a' }, { pos: 1, color: '#ffe066' }],
-}
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
@@ -61,121 +38,61 @@ const VIEW_DEF = {
   showGuides: false,
 }
 
-// ── BgSync: clears the WebGL canvas to match bgColor ─────────────────────────
+// ── BgSync: keeps WebGL clear colour in sync with bgColor ────────────────────
 function BgSync({ color }) {
   const { gl } = useThree()
   useEffect(() => { gl.setClearColor(color, 1) }, [gl, color])
   return null
 }
 
+// ── Loading overlay ───────────────────────────────────────────────────────────
+function LoadingOverlay({ msg }) {
+  return (
+    <div style={{
+      position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
+      display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000,
+    }}>
+      <div style={{
+        display:'flex', flexDirection:'column', alignItems:'center', gap:14,
+        background:'#18181b', border:'1px solid #3f3f46', borderRadius:10, padding:'28px 40px',
+      }}>
+        <div style={{
+          width:32, height:32, border:'3px solid rgba(255,255,255,.12)',
+          borderTopColor:'#3b82f6', borderRadius:'50%',
+          animation:'hm-spin .7s linear infinite',
+        }} />
+        <span style={{ fontSize:14, color:'#e4e4e7', fontFamily:'system-ui,sans-serif' }}>{msg}</span>
+      </div>
+      <style>{`@keyframes hm-spin { to { transform:rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker } = useHeightmap()
-  const heightmapPixels  = useStore((s) => s.heightmapPixels)
-  const heightmapWidth   = useStore((s) => s.heightmapWidth)
-  const heightmapHeight  = useStore((s) => s.heightmapHeight)
+  const { load, loadFromPicker, isLoading, loadingMsg } = useHeightmap()
+  const heightmapPixels   = useStore((s) => s.heightmapPixels)
+  const heightmapWidth    = useStore((s) => s.heightmapWidth)
+  const heightmapHeight   = useStore((s) => s.heightmapHeight)
   const heightmapFilename = useStore((s) => s.heightmapFilename)
 
-  // gradientStops live outside Leva (array-of-objects unsupported)
+  // ── All tweakable state ───────────────────────────────────────────────────
+  const [terrain, setTerrain] = useState(TERRAIN_DEF)
+  const [style,   setStyle]   = useState(STYLE_DEF)
+  const [points,  setPoints]  = useState(POINTS_DEF)
+  const [view,    setView]    = useState(VIEW_DEF)
   const [gradientStops, setGradientStops] = useState(GRADIENT_PRESETS['Mono'])
+  const [webmDuration, setWebmDuration]   = useState(5)
 
-  // Export triggers
-  const [svgTrigger,  setSvgTrigger]  = useState(0)
-  const [dxfTrigger,  setDxfTrigger]  = useState(0)
-  const [pngTrigger,  setPngTrigger]  = useState(0)
-  const [webmActive,  setWebmActive]  = useState(false)
+  // ── Export triggers ───────────────────────────────────────────────────────
+  const [svgTrigger, setSvgTrigger] = useState(0)
+  const [dxfTrigger, setDxfTrigger] = useState(0)
+  const [pngTrigger, setPngTrigger] = useState(0)
+  const [webmActive, setWebmActive] = useState(false)
 
   const orbitRef = useRef()
 
-  // ── Terrain ───────────────────────────────────────────────────────────────
-  const [terrain, setTerrain] = useControls('Terrain', () => ({
-    resolution:      { value: TERRAIN_DEF.resolution,      min: 1,   max: 20,  step: 1,   label: 'Resolution' },
-    lineSpacing:     { value: TERRAIN_DEF.lineSpacing,      min: 1,   max: 100, step: 1,   label: 'Line spacing' },
-    elevScale:       { value: TERRAIN_DEF.elevScale,        min: 0,   max: 5,   step: 0.1, label: 'Elev scale' },
-    blurRadius:      { value: TERRAIN_DEF.blurRadius,       min: 0,   max: 10,  step: 1,   label: 'Blur' },
-    shiftLines:      { value: TERRAIN_DEF.shiftLines,       min: 0,   max: 19,  step: 1,   label: 'Shift lines' },
-    shiftPeaks:      { value: TERRAIN_DEF.shiftPeaks,       min: 0,   max: 19,  step: 1,   label: 'Shift peaks' },
-    elevMinCut:      { value: TERRAIN_DEF.elevMinCut,       min: 0,   max: 100, step: 1,   label: 'Elev min cut' },
-    elevMaxCut:      { value: TERRAIN_DEF.elevMaxCut,       min: 0,   max: 100, step: 1,   label: 'Elev max cut' },
-    blackPoint:      { value: TERRAIN_DEF.blackPoint,       min: 0,   max: 255, step: 1,   label: 'Shadows' },
-    whitePoint:      { value: TERRAIN_DEF.whitePoint,       min: 0,   max: 255, step: 1,   label: 'Highlights' },
-    jitterAmt:       { value: TERRAIN_DEF.jitterAmt,        min: 0,   max: 20,  step: 0.5, label: 'Jitter' },
-    slopeSpacing:    { value: TERRAIN_DEF.slopeSpacing,     label: 'Slope spacing' },
-    slopeSpacingStr: { value: TERRAIN_DEF.slopeSpacingStr,  min: 1, max: 10, step: 1,
-      label: 'Spacing strength', render: (get) => get('Terrain.slopeSpacing') },
-  }))
-
-  // ── Style ─────────────────────────────────────────────────────────────────
-  const [style, setStyle] = useControls('Style', () => ({
-    drawMode: {
-      value: STYLE_DEF.drawMode,
-      options: ['lines-x', 'lines-y', 'curves', 'crosshatch', 'hachure', 'contours'],
-      label: 'Draw mode',
-    },
-    tightness:       { value: STYLE_DEF.tightness,       min: -5, max: 5,  step: 0.1,
-      label: 'Curve tightness', render: (get) => get('Style.drawMode') === 'curves' },
-    hachureLength:   { value: STYLE_DEF.hachureLength,   min: 0.1, max: 5, step: 0.1,
-      label: 'Hachure length',  render: (get) => get('Style.drawMode') === 'hachure' },
-    contourInterval: { value: STYLE_DEF.contourInterval, min: 0.5, max: 30, step: 0.5,
-      label: 'Contour interval',render: (get) => get('Style.drawMode') === 'contours' },
-    showLines:    { value: STYLE_DEF.showLines,    label: 'Lines' },
-    lineColor:    { value: STYLE_DEF.lineColor,    label: 'Line color' },
-    strokeWeight: { value: STYLE_DEF.strokeWeight, min: 0.5, max: 10, step: 0.5, label: 'Stroke weight' },
-    showFill:     { value: STYLE_DEF.showFill,     label: 'Fill' },
-    showMesh:     { value: STYLE_DEF.showMesh,     label: 'Mesh' },
-    bgColor:      { value: STYLE_DEF.bgColor,      label: 'Background' },
-    lineGradient: { value: STYLE_DEF.lineGradient, label: 'Elev gradient' },
-    lineColorHigh:{ value: STYLE_DEF.lineColorHigh, label: 'High color',
-      render: (get) => get('Style.lineGradient') },
-    strokeByElev: { value: STYLE_DEF.strokeByElev, label: 'Wt by elev' },
-    strokeElevLow: { value: STYLE_DEF.strokeElevLow, min: 0, max: 1, step: 0.01,
-      label: 'Wt low',  render: (get) => get('Style.strokeByElev') },
-    strokeElevHigh:{ value: STYLE_DEF.strokeElevHigh, min: 0, max: 1, step: 0.01,
-      label: 'Wt high', render: (get) => get('Style.strokeByElev') },
-    slopeOpacity: { value: STYLE_DEF.slopeOpacity, label: 'Opacity/slope' },
-  }))
-
-  // ── Points & Particles ────────────────────────────────────────────────────
-  const [points, setPoints] = useControls('Points', () => ({
-    showPoints:       { value: POINTS_DEF.showPoints,       label: 'Show points' },
-    pointColor:       { value: POINTS_DEF.pointColor,       label: 'Point color',
-      render: (get) => get('Points.showPoints') },
-    pointSize:        { value: POINTS_DEF.pointSize,        min: 0.5, max: 20, step: 0.5,
-      label: 'Point size', render: (get) => get('Points.showPoints') },
-    animateParticles: { value: POINTS_DEF.animateParticles, label: 'Animate',
-      render: (get) => get('Points.showPoints') },
-    particleNoise:    { value: POINTS_DEF.particleNoise,    min: 0, max: 5, step: 0.1,
-      label: 'Noise',   render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
-    particleDamping:  { value: POINTS_DEF.particleDamping,  min: 0.5, max: 0.99, step: 0.01,
-      label: 'Damping', render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
-    particleGravity:    { value: POINTS_DEF.particleGravity,    label: 'Gravity',
-      render: (get) => get('Points.showPoints') && get('Points.animateParticles') },
-    particleGravityStr: { value: POINTS_DEF.particleGravityStr, min: 0.1, max: 10, step: 0.1,
-      label: 'Gravity str', render: (get) => get('Points.showPoints') && get('Points.animateParticles') && get('Points.particleGravity') },
-  }))
-
-  // ── View ──────────────────────────────────────────────────────────────────
-  const [view, setView] = useControls('View', () => ({
-    tilt:       { value: VIEW_DEF.tilt,   min: -90, max: 90, step: 1, label: 'Tilt' },
-    rotation:   { value: VIEW_DEF.rotation, min: -180, max: 180, step: 1, label: 'Rotation' },
-    zoom:       { value: VIEW_DEF.zoom,   min: 0.1, max: 4, step: 0.05, label: 'Zoom' },
-    autoRotate:      { value: VIEW_DEF.autoRotate,      label: 'Auto-rotate' },
-    autoRotateSpeed: { value: VIEW_DEF.autoRotateSpeed, min: 0.1, max: 10, step: 0.1,
-      label: 'Rotate speed', render: (get) => get('View.autoRotate') },
-    showGuides: { value: VIEW_DEF.showGuides, label: 'Center guides' },
-  }))
-
-  // ── Gradient preset selector ───────────────────────────────────────────────
-  useControls('Gradient', () => ({
-    preset: {
-      options: Object.keys(GRADIENT_PRESETS),
-      value: 'Mono',
-      label: 'Preset',
-      onChange: (v) => { if (GRADIENT_PRESETS[v]) setGradientStops(GRADIENT_PRESETS[v]) },
-    },
-  }))
-
-  // When elevation gradient is first enabled, default to Topo
+  // ── When elevation gradient is first enabled → switch to Topo ────────────
   const prevLineGradient = useRef(false)
   useEffect(() => {
     if (style.lineGradient && !prevLineGradient.current) {
@@ -184,45 +101,8 @@ export default function App() {
     prevLineGradient.current = style.lineGradient
   }, [style.lineGradient]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Heightmap ─────────────────────────────────────────────────────────────
-  useControls('Heightmap', () => ({
-    'Load image': button(() => loadFromPicker()),
-  }))
-
-  // ── Export ────────────────────────────────────────────────────────────────
-  const [webmDuration] = useControls('Export', () => ({
-    'SVG (1)':         button(() => setSvgTrigger((n) => n + 1)),
-    'DXF — A4 (2)':   button(() => setDxfTrigger((n) => n + 1)),
-    'PNG (3)':         button(() => setPngTrigger((n) => n + 1)),
-    webmDuration:     { value: 5, min: 1, max: 60, step: 1, label: 'WebM duration (s)' },
-    'WebM record (4)': button((get) => {
-      const canvas = document.querySelector('canvas')
-      if (!canvas) return
-      const dur = get('Export.webmDuration')
-      if (isRecording()) {
-        stopWebM(() => setWebmActive(false))
-      } else {
-        startWebM(canvas, dur, setWebmActive)
-      }
-    }),
-    'Save preset':    button(() => savePreset()),
-    'Load preset':    button(() => loadPresetFromFile()),
-  }))
-
-  // ── Reset ─────────────────────────────────────────────────────────────────
-  useControls('Settings', () => ({
-    'Reset all': button(() => {
-      setTerrain(TERRAIN_DEF)
-      setStyle(STYLE_DEF)
-      setPoints(POINTS_DEF)
-      setView(VIEW_DEF)
-      setGradientStops(GRADIENT_PRESETS['Mono'])
-    }),
-  }))
-
   // ── Preset helpers ────────────────────────────────────────────────────────
   const savePreset = useCallback(() => {
-    // Re-encode the heightmap pixels as base64 PNG for self-contained preset
     let heightmapDataURL = null
     if (heightmapPixels && heightmapWidth && heightmapHeight) {
       const c = document.createElement('canvas')
@@ -231,8 +111,7 @@ export default function App() {
       const img = ctx.createImageData(heightmapWidth, heightmapHeight)
       for (let i = 0; i < heightmapPixels.length; i++) {
         const v = Math.round(heightmapPixels[i] * 255)
-        img.data[i * 4] = v; img.data[i * 4 + 1] = v
-        img.data[i * 4 + 2] = v; img.data[i * 4 + 3] = 255
+        img.data[i*4]=v; img.data[i*4+1]=v; img.data[i*4+2]=v; img.data[i*4+3]=255
       }
       ctx.putImageData(img, 0, 0)
       heightmapDataURL = c.toDataURL('image/png')
@@ -245,41 +124,23 @@ export default function App() {
   }, [terrain, style, points, view, gradientStops, heightmapPixels, heightmapWidth, heightmapHeight])
 
   const loadPresetFromFile = useCallback(() => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.json' })
+    const input = Object.assign(document.createElement('input'), { type:'file', accept:'.json' })
     input.onchange = async (e) => {
       const file = e.target.files[0]; if (!file) return
       try {
         const d = JSON.parse(await file.text())
-        if (d.terrain)       setTerrain(d.terrain)
-        if (d.style)         setStyle(d.style)
-        if (d.points)        setPoints(d.points)
-        if (d.view)          setView(d.view)
+        if (d.terrain)       setTerrain(prev => ({ ...prev, ...d.terrain }))
+        if (d.style)         setStyle(prev   => ({ ...prev, ...d.style }))
+        if (d.points)        setPoints(prev  => ({ ...prev, ...d.points }))
+        if (d.view)          setView(prev    => ({ ...prev, ...d.view }))
         if (d.gradientStops) setGradientStops(d.gradientStops)
         if (d.heightmapDataURL) load(d.heightmapDataURL)
       } catch { alert('Invalid preset file.') }
     }
     input.click()
-  }, [setTerrain, setStyle, setPoints, setView, load])
+  }, [load])
 
-  // ── Keyboard shortcuts for exports & guides ───────────────────────────────
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.code === 'Digit1') setSvgTrigger((n) => n + 1)
-      if (e.code === 'Digit2') setDxfTrigger((n) => n + 1)
-      if (e.code === 'Digit3') setPngTrigger((n) => n + 1)
-      if (e.code === 'Digit4') {
-        const canvas = document.querySelector('canvas')
-        if (!canvas) return
-        if (isRecording()) stopWebM(() => setWebmActive(false))
-        else startWebM(canvas, webmDuration ?? 5, setWebmActive)
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [webmDuration])
-
-  // ── Keyboard bridge for Controls.jsx ─────────────────────────────────────
+  // ── Keyboard bridge for Controls.jsx (keyboard shortcuts inside Canvas) ───
   const levaGet = useCallback(
     () => ({ ...terrain, ...style, ...points, ...view }),
     [terrain, style, points, view]
@@ -301,26 +162,49 @@ export default function App() {
     if (vals.zoom         != null) v.zoom          = vals.zoom
     if (vals.autoRotate   != null) v.autoRotate    = vals.autoRotate
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
-    if (Object.keys(t).length) setTerrain(t)
-    if (Object.keys(s).length) setStyle(s)
-    if (Object.keys(v).length) setView(v)
+    if (Object.keys(t).length) setTerrain(prev => ({ ...prev, ...t }))
+    if (Object.keys(s).length) setStyle(prev   => ({ ...prev, ...s }))
+    if (Object.keys(v).length) setView(prev    => ({ ...prev, ...v }))
   }, [setTerrain, setStyle, setView])
+
+  // ── Export keyboard shortcuts ─────────────────────────────────────────────
+  const handleWebmToggle = useCallback(() => {
+    const canvas = document.querySelector('canvas')
+    if (!canvas) return
+    if (isRecording()) stopWebM(() => setWebmActive(false))
+    else startWebM(canvas, webmDuration, setWebmActive)
+  }, [webmDuration])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.code === 'Digit1') setSvgTrigger(n => n + 1)
+      if (e.code === 'Digit2') setDxfTrigger(n => n + 1)
+      if (e.code === 'Digit3') setPngTrigger(n => n + 1)
+      if (e.code === 'Digit4') handleWebmToggle()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleWebmToggle])
 
   // ── Merged params ─────────────────────────────────────────────────────────
   const p = { ...terrain, ...style, ...points, ...view, gradientStops }
 
-  // ── Terrain geometry (lifted so StatsOverlay can read it) ─────────────────
+  // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo } = useTerrainGeometry(p)
 
-  // ── Load default heightmap ────────────────────────────────────────────────
+  // Geometry-computing indicator: pixels loaded but geometry not ready yet
+  const isComputing = !!heightmapPixels && !lineGeo
+
+  // ── Load default heightmap on mount ───────────────────────────────────────
   useEffect(() => {
     load('/Heightmap.png').catch(() =>
-      console.warn('[App] Default heightmap not found — use Load image.')
+      console.warn('[App] Default heightmap not found — use Load Heightmap.')
     )
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const bgColor = style.bgColor || '#ffffff'
-  const noHeightmap = !heightmapPixels
+  const bgColor   = style.bgColor || '#ffffff'
+  const noHmap    = !heightmapPixels
 
   const DRAW_MODE_LABELS = {
     'lines-x': 'X Ridge Lines', 'lines-y': 'Y Ridge Lines',
@@ -330,39 +214,12 @@ export default function App() {
 
   return (
     <div className="w-full h-full" style={{ background: bgColor }}>
-      <Leva collapsed={false} theme={{ sizes: { rootWidth: '310px' } }} />
-
-      {/* ── Left sidebar: Levels + Gradient picker ──────────────────────── */}
-      <div style={{
-        position: 'fixed', top: 8, left: 8, zIndex: 1000,
-        width: 264, display: 'flex', flexDirection: 'column', gap: 8,
-      }}>
-        <Panel title="Levels">
-          <Histogram
-            pixels={heightmapPixels}
-            blackPoint={terrain.blackPoint}
-            whitePoint={terrain.whitePoint}
-            onBlackChange={(v) => setTerrain({ blackPoint: v })}
-            onWhiteChange={(v) => setTerrain({ whitePoint: v })}
-          />
-          <div style={{ display:'flex', justifyContent:'space-between', marginTop:5, fontSize:11, color:'#666' }}>
-            <span>Shadows: {terrain.blackPoint}</span>
-            <span>Highlights: {terrain.whitePoint}</span>
-          </div>
-        </Panel>
-
-        {style.lineGradient && (
-          <Panel title="Gradient editor">
-            <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-          </Panel>
-        )}
-      </div>
 
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <Canvas
         gl={{ preserveDrawingBuffer: true, antialias: true }}
         camera={{ position: [0, 400, 500], fov: 60, near: 1, far: 50000 }}
-        style={{ width: '100%', height: '100%' }}
+        style={{ width:'100%', height:'100%' }}
       >
         <BgSync color={bgColor} />
         <Scene
@@ -380,10 +237,38 @@ export default function App() {
         />
       </Canvas>
 
-      {/* ── Center guides ───────────────────────────────────────────────── */}
+      {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      <Sidebar
+        terrain={terrain}   setTerrain={setTerrain}
+        style={style}       setStyle={setStyle}
+        points={points}     setPoints={setPoints}
+        view={view}         setView={setView}
+        gradientStops={gradientStops}  setGradientStops={setGradientStops}
+        heightmapPixels={heightmapPixels}
+        heightmapFilename={heightmapFilename}
+        loadFromPicker={loadFromPicker}
+        onSvg={() => setSvgTrigger(n => n + 1)}
+        onDxf={() => setDxfTrigger(n => n + 1)}
+        onPng={() => setPngTrigger(n => n + 1)}
+        onWebmToggle={handleWebmToggle}
+        webmActive={webmActive}
+        webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
+        onSavePreset={savePreset}
+        onLoadPreset={loadPresetFromFile}
+        onReset={() => {
+          setTerrain(TERRAIN_DEF); setStyle(STYLE_DEF)
+          setPoints(POINTS_DEF);   setView(VIEW_DEF)
+          setGradientStops(GRADIENT_PRESETS['Mono'])
+        }}
+        lineGeo={lineGeo}
+        surfaceGeo={surfaceGeo}
+        terrainData={terrainData}
+      />
+
+      {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
 
-      {/* ── WebM recording indicator ────────────────────────────────────── */}
+      {/* ── WebM REC badge ───────────────────────────────────────────────── */}
       {webmActive && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
@@ -396,8 +281,8 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Draw mode indicator ─────────────────────────────────────────── */}
-      {!noHeightmap && !webmActive && (
+      {/* ── Draw mode HUD ────────────────────────────────────────────────── */}
+      {!noHmap && !webmActive && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
           background:'rgba(20,20,24,0.65)', backdropFilter:'blur(4px)',
@@ -409,67 +294,26 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Stats bar ───────────────────────────────────────────────────── */}
-      <StatsOverlay lineGeo={lineGeo} surfaceGeo={surfaceGeo} terrain={terrainData} />
+      {/* ── Loading overlays ─────────────────────────────────────────────── */}
+      {isLoading  && <LoadingOverlay msg={loadingMsg} />}
+      {isComputing && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
 
-      {/* ── Filename ────────────────────────────────────────────────────── */}
-      {heightmapFilename && (
-        <div style={{
-          position:'fixed', bottom:36, left:'50%', transform:'translateX(-50%)',
-          fontSize:11, color:'#999', pointerEvents:'none', zIndex:999,
-        }}>
-          {heightmapFilename}
-        </div>
-      )}
-
-      {/* ── Keyboard hints ──────────────────────────────────────────────── */}
-      <div style={{
-        position:'fixed', bottom:8, right:8,
-        fontSize:10, color:'#aaa', pointerEvents:'none', zIndex:999,
-        lineHeight:1.7, textAlign:'right',
-        fontFamily:'"JetBrains Mono","Fira Code",monospace',
-      }}>
-        WASD pan · YX tilt · ER rotate · Q auto · T reset<br/>
-        F mode · IK res · JL spacing · BN weight · P fill · O mesh · G guides<br/>
-        1 SVG · 2 DXF · 3 PNG · 4 WebM
-      </div>
-
-      {/* ── Empty state ─────────────────────────────────────────────────── */}
-      {noHeightmap && <EmptyState onLoad={loadFromPicker} />}
+      {/* ── Empty state ──────────────────────────────────────────────────── */}
+      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} />}
     </div>
   )
 }
 
 // ── UI helper components ──────────────────────────────────────────────────────
 
-function Panel({ title, children }) {
-  return (
-    <div style={{
-      background:'#1b1b1f', border:'1px solid rgba(255,255,255,0.08)',
-      borderRadius:8, padding:'8px 10px',
-      fontFamily:'"JetBrains Mono","Fira Code",monospace',
-      fontSize:11, color:'#aaa',
-    }}>
-      <div style={{ marginBottom:6, fontWeight:700, color:'#ddd', letterSpacing:'0.05em', fontSize:10 }}>
-        {title.toUpperCase()}
-      </div>
-      {children}
-    </div>
-  )
-}
-
 function CenterGuides({ bgColor }) {
-  // Adapt guide colour to background brightness
   const rgb = bgColor.match(/\w\w/g)?.map(h => parseInt(h, 16)) ?? [255,255,255]
-  const brightness = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
-  const lineColor = brightness > 128
-    ? 'rgba(0,0,0,0.25)'
-    : 'rgba(255,255,255,0.25)'
-
+  const brightness = (rgb[0]*299 + rgb[1]*587 + rgb[2]*114) / 1000
+  const lc = brightness > 128 ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)'
   return (
     <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:500 }}>
-      <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:1, background:lineColor }} />
-      <div style={{ position:'absolute', top:'50%', left:0, right:0, height:1, background:lineColor }} />
+      <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:1, background:lc }} />
+      <div style={{ position:'absolute', top:'50%', left:0, right:0, height:1, background:lc }} />
     </div>
   )
 }
@@ -479,25 +323,19 @@ function EmptyState({ onLoad }) {
     <div style={{
       position:'fixed', inset:0, zIndex:3000,
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-      background:'rgba(255,255,255,0.9)', backdropFilter:'blur(8px)',
+      background:'rgba(255,255,255,0.92)', backdropFilter:'blur(8px)',
     }}>
       <div style={{ fontSize:56, marginBottom:16, lineHeight:1 }}>⛰</div>
-      <div style={{ fontSize:22, fontWeight:700, color:'#111', marginBottom:8 }}>
-        No heightmap loaded
-      </div>
+      <div style={{ fontSize:22, fontWeight:700, color:'#111', marginBottom:8 }}>No heightmap loaded</div>
       <div style={{ fontSize:14, color:'#666', marginBottom:28, textAlign:'center', maxWidth:320 }}>
         Load any greyscale PNG.<br/>
         <a href="https://tangrams.github.io/heightmapper" target="_blank" rel="noreferrer"
           style={{ color:'#444' }}>Tangrams Heightmapper</a> exports OSM-based heightmaps.
       </div>
-      <button
-        onClick={onLoad}
-        style={{
-          background:'#111', color:'#fff', border:'none', borderRadius:10,
-          padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
-          letterSpacing:'0.02em',
-        }}
-      >
+      <button onClick={onLoad} style={{
+        background:'#111', color:'#fff', border:'none', borderRadius:10,
+        padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
+      }}>
         Load Heightmap
       </button>
     </div>

@@ -11,7 +11,7 @@
  */
 import { useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei'
 import * as THREE from 'three'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem }  from './ParticleSystem'
@@ -87,6 +87,16 @@ export function Scene({
       />
 
       <Controls levaGet={levaGet} levaSet={levaSet} orbitRef={orbitRef} />
+
+      {/* 3-D orientation gizmo — bottom-left, hidden during WebM recording */}
+      {!webmRecording && (
+        <GizmoHelper alignment="bottom-left" margin={[72, 72]}>
+          <GizmoViewport
+            axisColors={['#ff4444', '#44dd44', '#4488ff']}
+            labelColor="#ffffff"
+          />
+        </GizmoHelper>
+      )}
 
       <group ref={groupRef}>
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} />

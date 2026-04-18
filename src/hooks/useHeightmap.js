@@ -2,20 +2,25 @@
  * Loads a heightmap image (File or URL string) and extracts per-pixel brightness
  * into a Float32Array stored in the Zustand store.
  *
- * Brightness = (r + g + b) / (3 × 255), matching the original sketch's logic.
+ * Returns { load, loadFromPicker, isLoading, loadingMsg }.
  */
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
 
 export function useHeightmap() {
   const setHeightmap = useStore((s) => s.setHeightmap)
+  const [isLoading,  setIsLoading]  = useState(false)
+  const [loadingMsg, setLoadingMsg] = useState('')
 
   const load = useCallback((source) => {
+    setIsLoading(true)
+    setLoadingMsg('Loading heightmap…')
     return new Promise((resolve, reject) => {
       const img = new Image()
       img.crossOrigin = 'anonymous'
 
       img.onload = () => {
+        setLoadingMsg('Extracting pixels…')
         const { naturalWidth: w, naturalHeight: h } = img
         const canvas = document.createElement('canvas')
         canvas.width = w; canvas.height = h
@@ -34,10 +39,16 @@ export function useHeightmap() {
           : source.name
 
         setHeightmap(pixels, w, h, filename)
+        setIsLoading(false)
+        setLoadingMsg('')
         resolve({ pixels, width: w, height: h })
       }
 
-      img.onerror = reject
+      img.onerror = (err) => {
+        setIsLoading(false)
+        setLoadingMsg('')
+        reject(err)
+      }
 
       if (typeof source === 'string') {
         img.src = source
@@ -47,7 +58,6 @@ export function useHeightmap() {
     })
   }, [setHeightmap])
 
-  /** Open a file picker and load the chosen image */
   const loadFromPicker = useCallback(() => {
     const input = Object.assign(document.createElement('input'), {
       type: 'file',
@@ -60,5 +70,5 @@ export function useHeightmap() {
     input.click()
   }, [load])
 
-  return { load, loadFromPicker }
+  return { load, loadFromPicker, isLoading, loadingMsg }
 }
