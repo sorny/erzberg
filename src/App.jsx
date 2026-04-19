@@ -99,6 +99,7 @@ export default function App() {
   const [pngTrigger,        setPngTrigger]         = useState(0)
   const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
   const [webmActive, setWebmActive] = useState(false)
+  const [cameraPreset, setCameraPreset] = useState(null)
 
   const orbitRef = useRef()
 
@@ -200,6 +201,14 @@ export default function App() {
     exportSTL({ surfaceGeo, terrain: terrainData })
   }, [surfaceGeo, terrainData])
 
+  // ── Camera presets ────────────────────────────────────────────────────────
+  const handleCameraPreset = useCallback((name) => {
+    const rotations = { top: 0, front: 0, iso: 45, reset: 0 }
+    const tilts     = { top: 0, front: 0, iso: 0,  reset: 0 }
+    setView(prev => ({ ...prev, tilt: tilts[name] ?? 0, rotation: rotations[name] ?? 0 }))
+    setCameraPreset({ name, ts: Date.now() })
+  }, [])
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
@@ -258,6 +267,7 @@ export default function App() {
           pngTrigger={pngTrigger}
           pngAlphaTrigger={pngAlphaTrigger}
           bgGradientStops={bgGradientStops}
+          cameraPreset={cameraPreset}
           webmRecording={webmActive}
         />
       </Canvas>
@@ -281,6 +291,7 @@ export default function App() {
         })}
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
+        onCameraPreset={handleCameraPreset}
         onSvg={() => setSvgTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
         onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}

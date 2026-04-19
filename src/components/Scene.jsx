@@ -24,6 +24,7 @@ export function Scene({
   levaGet, levaSet, orbitRef,
   svgTrigger, pngTrigger, pngAlphaTrigger,
   bgGradientStops,
+  cameraPreset,
   webmRecording,
 }) {
   const { camera, gl, scene } = useThree()
@@ -84,6 +85,24 @@ export function Scene({
 
     if (orbitRef.current) orbitRef.current.update()
   })
+
+  // Camera presets
+  useEffect(() => {
+    if (!cameraPreset?.name) return
+    const positions = {
+      top:   [0, 1800, 5],
+      front: [0, 0,    800],
+      iso:   [550, 550, 550],
+      reset: [0, 400,  500],
+    }
+    const [x, y, z] = positions[cameraPreset.name] ?? positions.reset
+    camera.position.set(x, y, z)
+    camera.lookAt(0, 0, 0)
+    if (orbitRef?.current) {
+      orbitRef.current.target.set(0, 0, 0)
+      orbitRef.current.update()
+    }
+  }, [cameraPreset]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // SVG export — software z-buffer occlusion, no GPU readback required
   useEffect(() => {

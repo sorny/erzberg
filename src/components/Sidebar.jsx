@@ -192,6 +192,7 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   loadFromPicker, loadGeoTiffFromPicker,
   geoTiffElevMin, geoTiffElevMax,
+  onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
@@ -351,6 +352,17 @@ export function Sidebar({
 
           {/* ── View ──────────────────────────────────────────────────────── */}
           <Section title="View" open={sec.view} onToggle={() => tog('view')}>
+            {/* Camera presets */}
+            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+              {[['Top', 'top'], ['Front', 'front'], ['Iso', 'iso'], ['Reset', 'reset']].map(([label, name]) => (
+                <button key={name} onClick={() => onCameraPreset(name)} style={{
+                  flex:1, fontSize:10, padding:'3px 0', border:`1px solid ${BORDER}`,
+                  borderRadius:3, cursor:'pointer', background: SURF, color: MUTED,
+                }}>
+                  {label}
+                </button>
+              ))}
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
               <Sl label="Tilt" hint="y/x" min={-90} max={90} value={view.tilt}
                 onChange={v => sv({ tilt: v })} fmt={v => v+'°'} />
