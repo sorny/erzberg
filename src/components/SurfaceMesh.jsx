@@ -16,6 +16,25 @@ import { useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { hexToRgb, sampleGradient } from '../utils/colorUtils'
 
+// ── Gradient texture ──────────────────────────────────────────────────────────
+
+const GRAD_TEX_SIZE = 256
+
+/** Build a 256×1 RGB DataTexture from gradient stops. */
+function buildGradientTexture(gradientStops) {
+  const data = new Uint8Array(GRAD_TEX_SIZE * 3)
+  for (let i = 0; i < GRAD_TEX_SIZE; i++) {
+    const t = i / (GRAD_TEX_SIZE - 1)
+    const [r, g, b] = sampleGradient(gradientStops, t)
+    data[i * 3]     = Math.round(r * 255)
+    data[i * 3 + 1] = Math.round(g * 255)
+    data[i * 3 + 2] = Math.round(b * 255)
+  }
+  const tex = new THREE.DataTexture(data, GRAD_TEX_SIZE, 1, THREE.RGBFormat)
+  tex.needsUpdate = true
+  return tex
+}
+
 // ── Shaders ───────────────────────────────────────────────────────────────────
 // Vertex: identity — positions already have correct Y elevation.
 const SURFACE_VERT = /* glsl */ `
@@ -26,21 +45,22 @@ const SURFACE_VERT = /* glsl */ `
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
-// Fragment: bgColor when fill is off, fillColor/gradient when fill is on.
+// Fragment: bgColor when fill is off; white or full-gradient when fill is on.
 const SURFACE_FRAG = /* glsl */ `
-  uniform vec3  uBgColor;
-  uniform vec3  uFillLow;
-  uniform vec3  uFillHigh;
-  uniform bool  uShowFill;
-  uniform bool  uGradient;
-  varying float vBrightness;
+  uniform vec3      uBgColor;
+  uniform bool      uShowFill;
+  uniform bool      uGradient;
+  uniform sampler2D uGradientTex;
+  varying float     vBrightness;
 
   void main() {
     if (!uShowFill) {
       gl_FragColor = vec4(uBgColor, 1.0);
       return;
     }
-    vec3 col = uGradient ? mix(uFillLow, uFillHigh, vBrightness) : uFillLow;
+    vec3 col = uGradient
+      ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
+      : vec3(1.0);
     gl_FragColor = vec4(col, 1.0);
   }
 `
@@ -60,23 +80,35 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
-  // Surface shader material — created once
+  // Gradient texture — rebuilt whenever gradient stops change
+  const gradTexRef = useRef(null)
+  const gradientTex = useMemo(() => {
+    gradTexRef.current?.dispose()
+    const tex = buildGradientTexture(
+      p.lineGradient && p.gradientStops?.length > 1
+        ? p.gradientStops
+        : [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#ffffff' }]
+    )
+    gradTexRef.current = tex
+    return tex
+  }, [p.lineGradient, p.gradientStops])
+
+  useEffect(() => () => gradTexRef.current?.dispose(), [])
+
+  // Surface shader material — created once, uniforms updated reactively
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,
     fragmentShader: SURFACE_FRAG,
     side:           THREE.DoubleSide,
     depthWrite:     true,
-    // Push the occluder surface slightly back in depth so coplanar line
-    // segments consistently pass the depth test (prevents z-fighting flicker).
     polygonOffset:       true,
     polygonOffsetFactor: 2,
     polygonOffsetUnits:  2,
     uniforms: {
-      uBgColor:   { value: new THREE.Vector3(1, 1, 1) },
-      uFillLow:   { value: new THREE.Vector3(1, 1, 1) },
-      uFillHigh:  { value: new THREE.Vector3(1, 1, 1) },
-      uShowFill:  { value: false },
-      uGradient:  { value: false },
+      uBgColor:     { value: new THREE.Vector3(1, 1, 1) },
+      uShowFill:    { value: false },
+      uGradient:    { value: false },
+      uGradientTex: { value: null },
     },
   }), [])
 
@@ -87,20 +119,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uBgColor.value.set(...bg)
     surfMat.uniforms.uShowFill.value = p.showFill
     surfMat.uniforms.uGradient.value = p.lineGradient && p.showFill
-
-    // Fill gradient colors — low = base line color, high = lineColorHigh (or gradient sample)
-    const gradStops = p.gradientStops
-    if (p.lineGradient && gradStops?.length) {
-      const low  = sampleGradient(gradStops, 0)
-      const high = sampleGradient(gradStops, 1)
-      surfMat.uniforms.uFillLow.value.set(...low)
-      surfMat.uniforms.uFillHigh.value.set(...high)
-    } else {
-      surfMat.uniforms.uFillLow.value.set(1, 1, 1)  // plain white fill
-      surfMat.uniforms.uFillHigh.value.set(1, 1, 1)
-    }
     surfMat.needsUpdate = true
-  }, [surfMat, p.bgColor, p.showFill, p.lineGradient, p.gradientStops])
+  }, [surfMat, p.bgColor, p.showFill, p.lineGradient])
+
+  useEffect(() => {
+    if (!surfMat) return
+    surfMat.uniforms.uGradientTex.value = gradientTex
+    surfMat.needsUpdate = true
+  }, [surfMat, gradientTex])
 
   useEffect(() => () => surfMat?.dispose(), [surfMat])
 
