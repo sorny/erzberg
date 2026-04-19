@@ -20,17 +20,18 @@ import { hexToRgb, sampleGradient } from '../utils/colorUtils'
 
 const GRAD_TEX_SIZE = 256
 
-/** Build a 256×1 RGB DataTexture from gradient stops. */
+/** Build a 256×1 RGBA DataTexture from gradient stops. */
 function buildGradientTexture(gradientStops) {
-  const data = new Uint8Array(GRAD_TEX_SIZE * 3)
+  const data = new Uint8Array(GRAD_TEX_SIZE * 4)
   for (let i = 0; i < GRAD_TEX_SIZE; i++) {
     const t = i / (GRAD_TEX_SIZE - 1)
     const [r, g, b] = sampleGradient(gradientStops, t)
-    data[i * 3]     = Math.round(r * 255)
-    data[i * 3 + 1] = Math.round(g * 255)
-    data[i * 3 + 2] = Math.round(b * 255)
+    data[i * 4]     = Math.round(r * 255)
+    data[i * 4 + 1] = Math.round(g * 255)
+    data[i * 4 + 2] = Math.round(b * 255)
+    data[i * 4 + 3] = 255
   }
-  const tex = new THREE.DataTexture(data, GRAD_TEX_SIZE, 1, THREE.RGBFormat)
+  const tex = new THREE.DataTexture(data, GRAD_TEX_SIZE, 1, THREE.RGBAFormat)
   tex.needsUpdate = true
   return tex
 }
