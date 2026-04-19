@@ -448,7 +448,10 @@ export function Sidebar({
                 value={Math.min(style.lineShift ?? 0, lineStep - 1)}
                 onChange={v => ss({ lineShift: v })} />
             )}
-            {style.drawMode === 'hachure'  && <InlineSl label="Length"   min={0.1} max={5}   step={0.1} value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
+            {style.drawMode === 'hachure' && <>
+              <InlineSl label="Tick spacing" min={1} max={100} value={style.hachureSpacing ?? 4} onChange={v => ss({ hachureSpacing: v })} />
+              <InlineSl label="Tick length"  min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} fmt={v => v.toFixed(1)} />
+            </>}
             {style.drawMode === 'contours' && <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
             {style.drawMode === 'flow' && (<>
               <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />

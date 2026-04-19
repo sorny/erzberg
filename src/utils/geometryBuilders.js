@@ -120,9 +120,9 @@ function buildCrosshatch(terrain, p) {
 
 function buildHachure(terrain, p) {
   const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
-  const { lineSpacing, elevScale, hachureLength, elevMinCut, elevMaxCut, jitterAmt } = p
+  const { hachureSpacing, elevScale, hachureLength, elevMinCut, elevMaxCut, jitterAmt } = p
 
-  const lineStep = Math.max(1, Math.round(lineSpacing / scl))
+  const lineStep = Math.max(1, Math.round((hachureSpacing ?? 4) / scl))
   const positions = []
   const colors = []
 
