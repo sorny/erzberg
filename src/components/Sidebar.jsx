@@ -458,10 +458,8 @@ export function Sidebar({
             </>)}
 
             {/* Fill + Mesh */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Tog label="Fill"  hint="p" checked={style.showFill} onChange={v => ss({ showFill: v })} />
-              <Tog label="Mesh"  hint="m" checked={style.showMesh} onChange={v => ss({ showMesh: v })} />
-            </div>
+            <TogColor label="Fill"  hint="p" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor ?? '#ffffff'} onColor={v => ss({ fillColor: v })} />
+            <TogColor label="Mesh"  hint="m" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
 
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
 

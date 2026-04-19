@@ -49,6 +49,7 @@ const SURFACE_VERT = /* glsl */ `
 // Fragment: bgColor when fill is off; white or full-gradient when fill is on.
 const SURFACE_FRAG = /* glsl */ `
   uniform vec3      uBgColor;
+  uniform vec3      uFillColor;
   uniform bool      uShowFill;
   uniform bool      uGradient;
   uniform sampler2D uGradientTex;
@@ -61,7 +62,7 @@ const SURFACE_FRAG = /* glsl */ `
     }
     vec3 col = uGradient
       ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
-      : vec3(1.0);
+      : uFillColor;
     gl_FragColor = vec4(col, 1.0);
   }
 `
@@ -107,6 +108,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     polygonOffsetUnits:  2,
     uniforms: {
       uBgColor:     { value: new THREE.Vector3(1, 1, 1) },
+      uFillColor:   { value: new THREE.Vector3(1, 1, 1) },
       uShowFill:    { value: false },
       uGradient:    { value: false },
       uGradientTex: { value: null },
@@ -116,12 +118,12 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   // Update uniforms reactively (no material recreation needed)
   useEffect(() => {
     if (!surfMat) return
-    const bg = hexToRgb(p.bgColor)
-    surfMat.uniforms.uBgColor.value.set(...bg)
+    surfMat.uniforms.uBgColor.value.set(...hexToRgb(p.bgColor))
+    surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
     surfMat.uniforms.uShowFill.value = p.showFill
     surfMat.uniforms.uGradient.value = p.lineGradient && p.showFill
     surfMat.needsUpdate = true
-  }, [surfMat, p.bgColor, p.showFill, p.lineGradient])
+  }, [surfMat, p.bgColor, p.fillColor, p.showFill, p.lineGradient])
 
   useEffect(() => {
     if (!surfMat) return
@@ -133,7 +135,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   // Wireframe material — plain line material, recolored on change
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color:               new THREE.Color(p.lineColor),
+    color:               new THREE.Color(p.meshColor ?? '#888888'),
     wireframe:           true,
     transparent:         true,
     opacity:             0.25,
@@ -145,8 +147,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   useEffect(() => {
     if (!wireMat) return
-    wireMat.color.set(p.lineColor)
-  }, [wireMat, p.lineColor])
+    wireMat.color.set(p.meshColor ?? '#888888')
+  }, [wireMat, p.meshColor])
 
   useEffect(() => () => wireMat?.dispose(), [wireMat])
 
