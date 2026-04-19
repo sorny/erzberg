@@ -16,13 +16,14 @@ import * as THREE from 'three'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem }  from './ParticleSystem'
 import { Controls }        from './Controls'
-import { exportSVG }  from '../utils/svgExport'
-import { exportPNG }  from '../utils/pngExport'
+import { exportSVG }              from '../utils/svgExport'
+import { exportPNG, exportPNGAlpha } from '../utils/pngExport'
 
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   levaGet, levaSet, orbitRef,
-  svgTrigger, pngTrigger,
+  svgTrigger, pngTrigger, pngAlphaTrigger,
+  bgGradientStops,
   webmRecording,
 }) {
   const { camera, gl, scene } = useThree()
@@ -94,6 +95,8 @@ export function Scene({
       colors: lineGeo.colors,
       camera, width, height,
       bgColor: p.bgColor,
+      bgGradient: p.bgGradient,
+      bgGradientStops,
       lineColor: p.lineColor,
       strokeWeight: p.strokeWeight,
       lineDash: p.lineDash,
@@ -114,8 +117,15 @@ export function Scene({
   useEffect(() => {
     if (!pngTrigger) return
     gl.render(scene, camera)
-    exportPNG(gl.domElement, p.bgColor)
+    exportPNG(gl.domElement, p.bgColor, p.bgGradient ? bgGradientStops : null)
   }, [pngTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // PNG alpha export — transparent background
+  useEffect(() => {
+    if (!pngAlphaTrigger) return
+    gl.render(scene, camera)
+    exportPNGAlpha(gl.domElement, p.bgColor, p.bgGradient)
+  }, [pngAlphaTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <>

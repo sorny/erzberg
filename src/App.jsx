@@ -27,6 +27,7 @@ const STYLE_DEF = {
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
   showFill: false, fillColor: '#ffffff', showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
+  bgGradient: false,
   lineGradient: false,
 }
 const POINTS_DEF = {
@@ -41,10 +42,13 @@ const VIEW_DEF = {
   showGuides: false, showRawTerrain: false,
 }
 
-// ── BgSync: keeps WebGL clear colour in sync with bgColor ────────────────────
-function BgSync({ color }) {
+// ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
+function BgSync({ color, gradient }) {
   const { gl } = useThree()
-  useEffect(() => { gl.setClearColor(color, 1) }, [gl, color])
+  useEffect(() => {
+    if (gradient) gl.setClearColor(0, 0)
+    else          gl.setClearColor(color, 1)
+  }, [gl, color, gradient])
   return null
 }
 
@@ -86,12 +90,14 @@ export default function App() {
   const [style,   setStyle]   = useState(STYLE_DEF)
   const [points,  setPoints]  = useState(POINTS_DEF)
   const [view,    setView]    = useState(VIEW_DEF)
-  const [gradientStops, setGradientStops] = useState(GRADIENT_PRESETS['Jet'])
+  const [gradientStops,   setGradientStops]   = useState(GRADIENT_PRESETS['Jet'])
+  const [bgGradientStops, setBgGradientStops] = useState([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
   const [webmDuration, setWebmDuration]   = useState(5)
 
   // ── Export triggers ───────────────────────────────────────────────────────
-  const [svgTrigger, setSvgTrigger] = useState(0)
-  const [pngTrigger, setPngTrigger] = useState(0)
+  const [svgTrigger,        setSvgTrigger]        = useState(0)
+  const [pngTrigger,        setPngTrigger]         = useState(0)
+  const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
   const [webmActive, setWebmActive] = useState(false)
 
   const orbitRef = useRef()
@@ -217,6 +223,9 @@ export default function App() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bgColor   = style.bgColor || '#ffffff'
+  const bgCss     = style.bgGradient && bgGradientStops?.length > 1
+    ? `linear-gradient(to bottom, ${bgGradientStops.map(s => `${s.color} ${Math.round(s.pos * 100)}%`).join(', ')})`
+    : bgColor
   const noHmap    = !heightmapPixels
 
   const DRAW_MODE_LABELS = {
@@ -227,15 +236,15 @@ export default function App() {
   }
 
   return (
-    <div className="w-full h-full" style={{ background: bgColor }}>
+    <div className="w-full h-full" style={{ background: bgCss }}>
 
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <Canvas
-        gl={{ preserveDrawingBuffer: true, antialias: true }}
+        gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
         camera={{ position: [0, 400, 500], fov: 60, near: 1, far: 50000 }}
         style={{ width:'100%', height:'100%' }}
       >
-        <BgSync color={bgColor} />
+        <BgSync color={bgColor} gradient={style.bgGradient} />
         <Scene
           terrain={terrainData}
           lineGeo={lineGeo}
@@ -246,6 +255,8 @@ export default function App() {
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
           pngTrigger={pngTrigger}
+          pngAlphaTrigger={pngAlphaTrigger}
+          bgGradientStops={bgGradientStops}
           webmRecording={webmActive}
         />
       </Canvas>
@@ -256,7 +267,8 @@ export default function App() {
         style={style}       setStyle={setStyle}
         points={points}     setPoints={setPoints}
         view={view}         setView={setView}
-        gradientStops={gradientStops}  setGradientStops={setGradientStops}
+        gradientStops={gradientStops}         setGradientStops={setGradientStops}
+        bgGradientStops={bgGradientStops}     setBgGradientStops={setBgGradientStops}
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
         loadFromPicker={() => loadFromPicker(autoZoom)}
@@ -270,6 +282,7 @@ export default function App() {
         geoTiffElevMax={geoTiffElevMax}
         onSvg={() => setSvgTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
+        onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}
         onStl={handleStl}
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
@@ -280,6 +293,7 @@ export default function App() {
           setTerrain(TERRAIN_DEF); setStyle(STYLE_DEF)
           setPoints(POINTS_DEF);   setView(VIEW_DEF)
           setGradientStops(GRADIENT_PRESETS['Jet'])
+          setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
         }}
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}

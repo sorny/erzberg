@@ -188,10 +188,11 @@ export function Sidebar({
   points,  setPoints,
   view,    setView,
   gradientStops, setGradientStops,
+  bgGradientStops, setBgGradientStops,
   heightmapPixels, heightmapFilename,
   loadFromPicker, loadGeoTiffFromPicker,
   geoTiffElevMin, geoTiffElevMax,
-  onSvg, onPng, onStl,
+  onSvg, onPng, onPngAlpha, onStl,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
@@ -437,7 +438,7 @@ export function Sidebar({
               </div>
             </div>
 
-            {style.drawMode !== 'contours' && (
+            {!['contours', 'hachure'].includes(style.drawMode) && (
               <InlineSl
                 label={style.drawMode === 'flow' ? 'Seed spacing' : 'Line spacing'}
                 min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
@@ -483,6 +484,12 @@ export function Sidebar({
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
 
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
+            <Tog label="Background gradient" checked={style.bgGradient ?? false} onChange={v => ss({ bgGradient: v })} />
+            {style.bgGradient && (
+              <div style={{ marginBottom: 10 }}>
+                <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />
+              </div>
+            )}
 
             {/* Elevation gradient */}
             <Tog label="Elevation gradient" checked={style.lineGradient} onChange={v => ss({ lineGradient: v })} />
@@ -527,9 +534,10 @@ export function Sidebar({
           {/* ── Export ────────────────────────────────────────────────────── */}
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label="SVG"  hint="key 1" onClick={onSvg} />
-              <ExpBtn label="PNG"  hint="key 2" onClick={onPng} />
-              <ExpBtn label="STL"  hint="key 4" onClick={onStl} />
+              <ExpBtn label="SVG"   hint="key 1" onClick={onSvg} />
+              <ExpBtn label="PNG"   hint="key 2" onClick={onPng} />
+              <ExpBtn label="PNG α"             onClick={onPngAlpha} />
+              <ExpBtn label="STL"   hint="key 4" onClick={onStl} />
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? 'recording' : 'key 3'} onClick={onWebmToggle} active={webmActive} />

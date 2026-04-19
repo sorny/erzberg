@@ -178,7 +178,8 @@ function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, lineGradient, 
 
 export function exportSVG({
   positions, colors, camera, width, height,
-  bgColor, lineColor, strokeWeight, lineDash,
+  bgColor, bgGradient, bgGradientStops,
+  lineColor, strokeWeight, lineDash,
   surfaceGeo, groupMatrix,
   showFill, lineGradient, gradientStops,
   showLines,
@@ -345,12 +346,22 @@ export function exportSVG({
     `    <circle cx="${(cx - vx).toFixed(1)}" cy="${(cy - vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`
   )
 
+  const useBgGrad = bgGradient && bgGradientStops?.length > 1
+  const bgGradDefs = useBgGrad ? [
+    `  <defs>`,
+    `    <linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">`,
+    ...bgGradientStops.map(s => `      <stop offset="${Math.round(s.pos * 100)}%" stop-color="${s.color}"/>`),
+    `    </linearGradient>`,
+    `  </defs>`,
+  ] : []
+
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg"`,
     `     width="${vw.toFixed(0)}" height="${vh.toFixed(0)}"`,
     `     viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
-    `  <rect width="100%" height="100%" fill="${bgColor}"/>`,
+    ...bgGradDefs,
+    `  <rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...(fillEls.length > 0 ? [`  <g>`, ...fillEls, `  </g>`] : []),
     ...(lines.length > 0
       ? [`  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>`, ...lines, `  </g>`]
