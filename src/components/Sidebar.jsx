@@ -438,6 +438,10 @@ export function Sidebar({
                 min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
               />
             )}
+            {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && (
+              <InlineSl label="Line shift" min={0} max={100} value={style.lineShift ?? 0}
+                onChange={v => ss({ lineShift: v })} fmt={v => v + '%'} />
+            )}
             {style.drawMode === 'hachure'  && <InlineSl label="Length"   min={0.1} max={5}   step={0.1} value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
             {style.drawMode === 'contours' && <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
             {style.drawMode === 'flow' && (<>

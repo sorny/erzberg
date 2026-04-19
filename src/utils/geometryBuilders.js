@@ -51,20 +51,20 @@ function empty() {
 function buildRidgelines(terrain, p, isY) {
   const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const {
-    lineSpacing, elevScale,
+    lineSpacing, lineShift, elevScale,
     elevMinCut, elevMaxCut,
     jitterAmt,
   } = p
 
-  const lineStep = Math.max(1, Math.round(lineSpacing / scl))
+  const lineStep   = Math.max(1, Math.round(lineSpacing / scl))
+  const lineOffset = Math.round(((lineShift ?? 0) / 100) * lineStep) % lineStep
   const outerCount = isY ? cols : rows
   const innerCount = isY ? rows : cols
 
   const positions = []
   const colors = []
 
-  for (let outer = 0; outer < outerCount; outer++) {
-    if (outer % lineStep !== 0) continue
+  for (let outer = lineOffset; outer < outerCount; outer += lineStep) {
 
     const outerPos = outer * scl - (isY ? halfW : halfH)
 

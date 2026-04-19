@@ -29,7 +29,7 @@ export function useTerrainGeometry(p) {
     return buildLineGeometry(terrain, p)
   }, [
     terrain,
-    p.drawMode, p.lineSpacing, p.hachureLength, p.contourInterval,
+    p.drawMode, p.lineSpacing, p.lineShift, p.hachureLength, p.contourInterval,
     p.flowStep, p.flowMaxLen,
     p.elevMinCut, p.elevMaxCut,
     p.jitterAmt,

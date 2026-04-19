@@ -22,7 +22,7 @@ const TERRAIN_DEF = {
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
 const STYLE_DEF = {
-  drawMode: 'lines-x', lineSpacing: 4, hachureLength: 1, contourInterval: 5,
+  drawMode: 'lines-x', lineSpacing: 4, lineShift: 0, hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
