@@ -205,8 +205,9 @@ export default function App() {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
       if (e.code === 'Digit1') setSvgTrigger(n => n + 1)
       if (e.code === 'Digit2') setPngTrigger(n => n + 1)
-      if (e.code === 'Digit3') handleWebmToggle()
+      if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
       if (e.code === 'Digit4') handleStl()
+      if (e.code === 'Digit5') handleWebmToggle()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)

@@ -536,11 +536,11 @@ export function Sidebar({
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
               <ExpBtn label="SVG"   hint="key 1" onClick={onSvg} />
               <ExpBtn label="PNG"   hint="key 2" onClick={onPng} />
-              <ExpBtn label="PNG α"             onClick={onPngAlpha} />
+              <ExpBtn label="PNG α" hint="key 3"  onClick={onPngAlpha} />
               <ExpBtn label="STL"   hint="key 4" onClick={onStl} />
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? 'recording' : 'key 3'} onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? 'recording' : 'key 5'} onClick={onWebmToggle} active={webmActive} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
               <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
             </div>
