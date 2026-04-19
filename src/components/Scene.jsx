@@ -28,28 +28,55 @@ export function Scene({
 }) {
   const { camera, gl, scene } = useThree()
   const groupRef      = useRef()
-  const zRotRef       = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))
-  const prevRotRef    = useRef(p.rotation ?? 0)
+  const zRotRef    = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))
+  const xRotRef    = useRef(THREE.MathUtils.degToRad(p.tilt ?? 0))
+  const yRotRef    = useRef(0)
+  const prevRotRef = useRef(p.rotation ?? 0)
 
-  // Keep zRotRef in sync when the Leva rotation slider changes (but not from auto-rotate drift)
+  // Keep manual-control refs in sync when sliders change (but not while auto-rotating on that axis)
   useEffect(() => {
-    if (!p.autoRotate) {
+    if (!p.autoRotate || p.autoRotateAxis !== 'Z') {
       zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
     }
     prevRotRef.current = p.rotation ?? 0
-  }, [p.rotation, p.autoRotate])
+  }, [p.rotation, p.autoRotate, p.autoRotateAxis])
+
+  useEffect(() => {
+    if (!p.autoRotate || p.autoRotateAxis !== 'X') {
+      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
+    }
+  }, [p.tilt, p.autoRotate, p.autoRotateAxis])
+
+  // Reset accumulated angle when axis changes
+  const prevAxisRef = useRef(p.autoRotateAxis ?? 'Z')
+  useEffect(() => {
+    if (p.autoRotateAxis !== prevAxisRef.current) {
+      yRotRef.current = 0
+      zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
+      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
+      prevAxisRef.current = p.autoRotateAxis
+    }
+  }, [p.autoRotateAxis, p.rotation, p.tilt])
 
   // Per-frame: apply tilt/rotation/zoom to group; handle auto-rotate
   useFrame((_, delta) => {
     if (!groupRef.current) return
 
+    const step = THREE.MathUtils.degToRad((p.autoRotateSpeed ?? 1) * delta * 40)
+
     if (p.autoRotate) {
-      zRotRef.current += THREE.MathUtils.degToRad((p.autoRotateSpeed ?? 1) * delta * 40)
+      const axis = p.autoRotateAxis ?? 'Z'
+      if (axis === 'Z') zRotRef.current += step
+      else if (axis === 'X') xRotRef.current += step
+      else if (axis === 'Y') yRotRef.current += step
     } else {
       zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
+      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
+      yRotRef.current = 0
     }
 
-    groupRef.current.rotation.x = THREE.MathUtils.degToRad(p.tilt ?? 0)
+    groupRef.current.rotation.x = xRotRef.current
+    groupRef.current.rotation.y = yRotRef.current
     groupRef.current.rotation.z = zRotRef.current
     groupRef.current.scale.setScalar(p.zoom ?? 1)
 

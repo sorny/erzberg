@@ -16,7 +16,7 @@
  *   Custom ShaderMaterial with gl_PointCoord circular clip + soft falloff.
  *   depthTest: false so particles always render on top of the terrain surface.
  */
-import { useRef, useMemo, useEffect } from 'react'
+import { useRef, useState, useMemo, useEffect } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
@@ -54,9 +54,9 @@ export function ParticleSystem({ terrain, p }) {
     velocities: null,
     home:       null,
     floor:      -Infinity,
-    pointsGeo:  null,
     count:      0,
   })
+  const [pointsGeo, setPointsGeo] = useState(null)
 
   // Particle material — created once, uniforms updated reactively
   const particleMat = useMemo(() => new THREE.ShaderMaterial({
@@ -113,16 +113,21 @@ export function ParticleSystem({ terrain, p }) {
     const positions  = homePositions.slice()
     const velocities = new Float32Array(n * 3)
 
-    const pointsGeo = new THREE.BufferGeometry()
-    pointsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+    const newGeo = new THREE.BufferGeometry()
+    newGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
 
-    ps.current.pointsGeo?.dispose()
-    ps.current = { positions, velocities, home: homePositions, floor, pointsGeo, count: n }
+    setPointsGeo(prev => { prev?.dispose(); return newGeo })
+    ps.current = { positions, velocities, home: homePositions, floor, count: n }
   }, [homePositions])
+
+  // Keep a ref to the current geo so useFrame always sees the latest
+  const pointsGeoRef = useRef(null)
+  useEffect(() => { pointsGeoRef.current = pointsGeo }, [pointsGeo])
 
   // Per-frame physics
   useFrame(() => {
-    const { positions, velocities, home, floor, pointsGeo, count } = ps.current
+    const { positions, velocities, home, floor, count } = ps.current
+    const pointsGeo = pointsGeoRef.current
     if (!positions || !pointsGeo) return
 
     if (p.animateParticles) {
@@ -194,9 +199,9 @@ export function ParticleSystem({ terrain, p }) {
     }
   })
 
-  if (!p.showPoints || !ps.current.pointsGeo) return null
+  if (!p.showPoints || !pointsGeo) return null
 
   return (
-    <points geometry={ps.current.pointsGeo} material={particleMat} />
+    <points geometry={pointsGeo} material={particleMat} />
   )
 }

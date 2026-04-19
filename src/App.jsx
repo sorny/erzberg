@@ -33,7 +33,7 @@ const POINTS_DEF = {
 }
 const VIEW_DEF = {
   tilt: 0, rotation: 0, zoom: 1,
-  autoRotate: false, autoRotateSpeed: 1,
+  autoRotate: false, autoRotateSpeed: 1, autoRotateAxis: 'Z',
   showGuides: false,
 }
 
@@ -151,7 +151,8 @@ export default function App() {
     if (vals.tilt         != null) v.tilt          = vals.tilt
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
-    if (vals.autoRotate   != null) v.autoRotate    = vals.autoRotate
+    if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
+    if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
     if (Object.keys(t).length) setTerrain(prev => ({ ...prev, ...t }))
     if (Object.keys(s).length) setStyle(prev   => ({ ...prev, ...s }))

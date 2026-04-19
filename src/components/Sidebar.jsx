@@ -323,10 +323,24 @@ export function Sidebar({
             <Sl label="Rotation" hint="e/r" min={-180} max={180} value={view.rotation}
               onChange={v => sv({ rotation: v })} fmt={v => v+'°'} />
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
-            {view.autoRotate && (
+            {view.autoRotate && (<>
               <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed}
                 onChange={v => sv({ autoRotateSpeed: v })} fmt={v => v.toFixed(1)} />
-            )}
+              <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
+                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
+                {['Z','X','Y'].map(ax => (
+                  <button key={ax} onClick={() => sv({ autoRotateAxis: ax })}
+                    style={{
+                      fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
+                      borderRadius:3, cursor:'pointer',
+                      background: (view.autoRotateAxis ?? 'Z') === ax ? ACCENT : SURF,
+                      color: (view.autoRotateAxis ?? 'Z') === ax ? '#fff' : MUTED,
+                    }}>
+                    {ax}
+                  </button>
+                ))}
+              </div>
+            </>)}
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
