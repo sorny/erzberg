@@ -73,10 +73,6 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
         case 'KeyI': levaSet({ resolution: Math.max(1,  (v.resolution ?? 4) - 1) }); break
         case 'KeyK': levaSet({ resolution: Math.min(20, (v.resolution ?? 4) + 1) }); break
 
-        // ── Line spacing ─────────────────────────────────────────────────────
-        case 'KeyJ': levaSet({ lineSpacing: Math.max(1,   (v.lineSpacing ?? 8) - 1) }); break
-        case 'KeyL': levaSet({ lineSpacing: Math.min(100, (v.lineSpacing ?? 8) + 1) }); break
-
         // ── Stroke weight ────────────────────────────────────────────────────
         case 'KeyB': levaSet({ strokeWeight: Math.min(10,  (v.strokeWeight ?? 1) + 0.5) }); break
         case 'KeyN': levaSet({ strokeWeight: Math.max(0.5, (v.strokeWeight ?? 1) - 0.5) }); break
