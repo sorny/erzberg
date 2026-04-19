@@ -328,15 +328,29 @@ export function Sidebar({
                 onChange={v => sv({ autoRotateSpeed: v })} fmt={v => v.toFixed(1)} />
               <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
                 <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
-                {['Z','X','Y'].map(ax => (
+                {['X','Y','Z'].map(ax => (
                   <button key={ax} onClick={() => sv({ autoRotateAxis: ax })}
                     style={{
                       fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
                       borderRadius:3, cursor:'pointer',
-                      background: (view.autoRotateAxis ?? 'Z') === ax ? ACCENT : SURF,
-                      color: (view.autoRotateAxis ?? 'Z') === ax ? '#fff' : MUTED,
+                      background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF,
+                      color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED,
                     }}>
                     {ax}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
+                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
+                {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
+                  <button key={label} onClick={() => sv({ autoRotateDir: dir })}
+                    style={{
+                      fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
+                      borderRadius:3, cursor:'pointer',
+                      background: (view.autoRotateDir ?? 1) === dir ? ACCENT : SURF,
+                      color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED,
+                    }}>
+                    {label}
                   </button>
                 ))}
               </div>

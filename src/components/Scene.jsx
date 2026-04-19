@@ -62,10 +62,10 @@ export function Scene({
   useFrame((_, delta) => {
     if (!groupRef.current) return
 
-    const step = THREE.MathUtils.degToRad((p.autoRotateSpeed ?? 1) * delta * 40)
+    const step = THREE.MathUtils.degToRad((p.autoRotateSpeed ?? 0.5) * delta * 40) * (p.autoRotateDir ?? 1)
 
     if (p.autoRotate) {
-      const axis = p.autoRotateAxis ?? 'Z'
+      const axis = p.autoRotateAxis ?? 'Y'
       if (axis === 'Z') zRotRef.current += step
       else if (axis === 'X') xRotRef.current += step
       else if (axis === 'Y') yRotRef.current += step
