@@ -1,16 +1,26 @@
 /**
- * Binary STL export — produces a closed, watertight solid ready for 3D printing.
+ * Binary STL export — closed, watertight solid for 3D printing.
  *
- * The mesh is built from three parts:
- *   1. Top surface  — terrain triangles with elevation baked into Y
- *   2. Bottom plate — flat rectangle at baseY (2 world-units below terrain minimum)
- *   3. Side walls   — quads connecting the perimeter top edge to the base
+ * Three-part mesh:
+ *   1. Top surface  — terrain triangles (elevation in Y_world)
+ *   2. Side walls   — quads from every perimeter edge down to the base
+ *   3. Base plate   — center fan over ALL perimeter base vertices
  *
- * Coordinate system: X/Z horizontal, Y vertical (up). Most slicers let you
- * re-orient on import; the model lands flat-side-down if left as-is.
+ * Manifold guarantee: each edge is shared by exactly 2 faces.
+ *   • Top surface interior edges: shared by 2 top triangles (grid).
+ *   • Top surface boundary edges: shared with the corresponding wall tri.
+ *   • Wall vertical corner edges: shared by the two adjacent wall quads.
+ *   • Wall base edges: shared between wall tri and the adjacent base fan tri.
+ *   • Base fan spoke edges: shared by the two adjacent fan tris.
  *
- * Winding: right-hand rule, normals computed per-triangle and written into
- * the STL so slicers with strict manifold checks accept the file.
+ * Coordinate mapping  (world → STL):
+ *   stl_x =  world_x      (terrain column, right)
+ *   stl_y = -world_z      (negated row → negate Z preserves handedness, det = +1)
+ *   stl_z =  world_y      (elevation, build direction in Z-up slicers)
+ *
+ * With this mapping the perimeter is still CW in stl XY, so ALL original
+ * windings remain correct — no face flipping required.
+ * The model lays flat on the print bed (XY) with peaks pointing up (+Z).
  */
 
 export function exportSTL({ surfaceGeo, terrain }) {
@@ -19,75 +29,75 @@ export function exportSTL({ surfaceGeo, terrain }) {
   const { positions, indices } = surfaceGeo
   const { rows, cols } = terrain
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Coordinate mapping ────────────────────────────────────────────────────
+  const spx = (i) =>  positions[i * 3]        //  world X  → stl X
+  const spy = (i) => -positions[i * 3 + 2]    // -world Z  → stl Y  (preserves handedness)
+  const spz = (i) =>  positions[i * 3 + 1]    //  world Y  → stl Z  (elevation = build dir)
 
-  const vx = (i) => positions[i * 3]
-  const vy = (i) => positions[i * 3 + 1]
-  const vz = (i) => positions[i * 3 + 2]
+  // Base in stl Z = world minY − 2
+  let minWorldY = Infinity
+  for (let i = 1; i < positions.length; i += 3) {
+    if (positions[i] < minWorldY) minWorldY = positions[i]
+  }
+  const baseZ = minWorldY - 2   // 2-unit solid base below lowest terrain point
 
-  // 9-float triangle buffer (ax,ay,az, bx,by,bz, cx,cy,cz)
+  // Triangle accumulator: flat [ax,ay,az, bx,by,bz, cx,cy,cz, ...]
   const tris = []
   const add = (ax, ay, az, bx, by, bz, cx, cy, cz) =>
     tris.push(ax, ay, az, bx, by, bz, cx, cy, cz)
 
-  // ── Base Y ────────────────────────────────────────────────────────────────────
-
-  let minY = Infinity
-  for (let i = 1; i < positions.length; i += 3) {
-    if (positions[i] < minY) minY = positions[i]
-  }
-  const baseY = minY - 2   // 2 world-unit solid base below lowest terrain point
-
-  // ── 1. Top surface ────────────────────────────────────────────────────────────
-  // Winding from buildSurfaceGeometry gives normals pointing +Y (up) — correct.
+  // ── 1. Top surface ────────────────────────────────────────────────────────
+  // buildSurfaceGeometry winding → +Y_world normals.
+  // After (x, -z, y) remap, +Y_world becomes +Z_stl (up). ✓
 
   const nTri = indices.length / 3
   for (let t = 0; t < nTri; t++) {
     const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
-    add(vx(a), vy(a), vz(a),
-        vx(b), vy(b), vz(b),
-        vx(c), vy(c), vz(c))
+    add(spx(a), spy(a), spz(a),
+        spx(b), spy(b), spz(b),
+        spx(c), spy(c), spz(c))
   }
 
-  // ── 2. Bottom plate ───────────────────────────────────────────────────────────
-  // Winding tl→tr→bl and tr→br→bl gives normal pointing −Y (down).
-
-  const tlx = vx(0),                     tlz = vz(0)
-  const trx = vx(cols - 1),              trz = vz(cols - 1)
-  const blx = vx((rows - 1) * cols),     blz = vz((rows - 1) * cols)
-  const brx = vx((rows - 1) * cols + cols - 1)
-  const brz = vz((rows - 1) * cols + cols - 1)
-
-  add(tlx, baseY, tlz,  trx, baseY, trz,  blx, baseY, blz)
-  add(trx, baseY, trz,  brx, baseY, brz,  blx, baseY, blz)
-
-  // ── 3. Side walls ─────────────────────────────────────────────────────────────
-  // Perimeter is traversed clockwise from above so that (top, next, base) gives
-  // outward-pointing normals on each wall quad.
-
+  // ── Perimeter (CW in stl XY after the -Z remap) ──────────────────────────
   const perim = []
-  for (let c = 0; c < cols; c++)        perim.push(c)                           // top edge →
-  for (let r = 1; r < rows; r++)        perim.push(r * cols + cols - 1)         // right edge ↓
-  for (let c = cols - 2; c >= 0; c--)  perim.push((rows - 1) * cols + c)       // bottom edge ←
-  for (let r = rows - 2; r >= 1; r--)  perim.push(r * cols)                     // left edge ↑
+  for (let c = 0; c < cols; c++)       perim.push(c)                         // top    →
+  for (let r = 1; r < rows; r++)       perim.push(r * cols + cols - 1)       // right  ↓
+  for (let c = cols - 2; c >= 0; c--) perim.push((rows - 1) * cols + c)     // bottom ←
+  for (let r = rows - 2; r >= 1; r--) perim.push(r * cols)                   // left   ↑
 
   const n = perim.length
+
+  // ── 2. Side walls ─────────────────────────────────────────────────────────
+  // (top-curr, top-next, base-curr) and (top-next, base-next, base-curr)
+  // With CW perimeter this winding gives outward-pointing normals. ✓
+
   for (let i = 0; i < n; i++) {
     const i0 = perim[i], i1 = perim[(i + 1) % n]
-    const ax = vx(i0), ay = vy(i0), az = vz(i0)   // top  — current
-    const bx = vx(i1), by = vy(i1), bz = vz(i1)   // top  — next
-    // (top-curr, top-next, base-curr) and (top-next, base-next, base-curr)
-    add(ax, ay, az,   bx, by, bz,   ax, baseY, az)
-    add(bx, by, bz,   bx, baseY, bz,  ax, baseY, az)
+    const ax = spx(i0), ay = spy(i0), az = spz(i0)   // top current
+    const bx = spx(i1), by = spy(i1), bz = spz(i1)   // top next
+    add(ax, ay, az,  bx, by, bz,  ax, ay, baseZ)      // quad tri 1
+    add(bx, by, bz,  bx, by, baseZ,  ax, ay, baseZ)   // quad tri 2
   }
 
-  // ── Write binary STL ──────────────────────────────────────────────────────────
+  // ── 3. Base plate — center fan ────────────────────────────────────────────
+  // One fan triangle per perimeter edge, all meeting at (0, 0, baseZ).
+  // Terrain is centred at world origin → stl centre = (0, 0).
+  // Winding (centre, p0, p1) with CW perimeter → −Z_stl normal (down). ✓
+  // Every wall-base edge is now shared with exactly one fan triangle. ✓
+
+  for (let i = 0; i < n; i++) {
+    const i0 = perim[i], i1 = perim[(i + 1) % n]
+    add(0, 0, baseZ,
+        spx(i0), spy(i0), baseZ,
+        spx(i1), spy(i1), baseZ)
+  }
+
+  // ── Write binary STL ──────────────────────────────────────────────────────
 
   const triCount = tris.length / 9
   const buf = new ArrayBuffer(84 + triCount * 50)
   const dv  = new DataView(buf)
 
-  // 80-byte ASCII header (not used by most slicers, but nice to have)
   const hdr = 'Heightmap Lines STL Export'
   for (let i = 0; i < Math.min(hdr.length, 80); i++) dv.setUint8(i, hdr.charCodeAt(i))
   dv.setUint32(80, triCount, true)
@@ -99,7 +109,7 @@ export function exportSTL({ surfaceGeo, terrain }) {
     const bx = tris[b+3], by = tris[b+4], bz = tris[b+5]
     const cx = tris[b+6], cy = tris[b+7], cz = tris[b+8]
 
-    // Face normal via cross product (B−A) × (C−A), normalised
+    // Face normal: (B−A) × (C−A), normalised
     const ex = bx-ax, ey = by-ay, ez = bz-az
     const fx = cx-ax, fy = cy-ay, fz = cz-az
     let nx = ey*fz - ez*fy

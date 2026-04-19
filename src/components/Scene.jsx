@@ -3,10 +3,10 @@
  *
  * Terrain transforms (tilt, rotation, zoom) are applied to a scene group rather
  * than the camera, matching the original sketch's transform stack:
- *   scale(zoom) → rotateX(tilt) → rotateZ(rotation) → terrain
+ *   scale(zoom) → rotateX(tilt) → rotateY(rotation) → terrain
  *
  * OrbitControls handles free camera orbit/pan on top of these transforms.
- * Auto-rotate increments the group Z rotation in useFrame without touching
+ * Auto-rotate increments the group rotation in useFrame without touching
  * React state (avoids a setState per frame).
  */
 import { useRef, useEffect } from 'react'
@@ -17,29 +17,29 @@ import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem }  from './ParticleSystem'
 import { Controls }        from './Controls'
 import { exportSVG }  from '../utils/svgExport'
-import { exportDXF }  from '../utils/dxfExport'
 import { exportPNG }  from '../utils/pngExport'
 
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   levaGet, levaSet, orbitRef,
-  svgTrigger, dxfTrigger, pngTrigger,
+  svgTrigger, pngTrigger,
   webmRecording,
 }) {
   const { camera, gl, scene } = useThree()
-  const groupRef      = useRef()
-  const particleRef   = useRef()
-  const zRotRef    = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))
-  const xRotRef    = useRef(THREE.MathUtils.degToRad(p.tilt ?? 0))
-  const yRotRef    = useRef(0)
-  const prevRotRef = useRef(p.rotation ?? 0)
+  const groupRef    = useRef()
+  const particleRef = useRef()
 
-  // Keep manual-control refs in sync when sliders change (but not while auto-rotating on that axis)
+  // Rotation refs — driven by sliders when not auto-rotating,
+  // accumulated by auto-rotate when active on that axis.
+  const xRotRef = useRef(THREE.MathUtils.degToRad(p.tilt     ?? 0))
+  const yRotRef = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))  // rotation slider → Y
+  const zRotRef = useRef(0)                                            // auto-rotate Z only
+
+  // Keep manual slider refs in sync (skip if auto-rotating on that axis)
   useEffect(() => {
-    if (!p.autoRotate || p.autoRotateAxis !== 'Z') {
-      zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
+    if (!p.autoRotate || p.autoRotateAxis !== 'Y') {
+      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
     }
-    prevRotRef.current = p.rotation ?? 0
   }, [p.rotation, p.autoRotate, p.autoRotateAxis])
 
   useEffect(() => {
@@ -48,13 +48,13 @@ export function Scene({
     }
   }, [p.tilt, p.autoRotate, p.autoRotateAxis])
 
-  // Reset accumulated angle when axis changes
-  const prevAxisRef = useRef(p.autoRotateAxis ?? 'Z')
+  // Reset accumulated angle when auto-rotate axis changes
+  const prevAxisRef = useRef(p.autoRotateAxis ?? 'Y')
   useEffect(() => {
     if (p.autoRotateAxis !== prevAxisRef.current) {
-      yRotRef.current = 0
-      zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
-      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
+      xRotRef.current = THREE.MathUtils.degToRad(p.tilt     ?? 0)
+      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
+      zRotRef.current = 0
       prevAxisRef.current = p.autoRotateAxis
     }
   }, [p.autoRotateAxis, p.rotation, p.tilt])
@@ -67,13 +67,13 @@ export function Scene({
 
     if (p.autoRotate) {
       const axis = p.autoRotateAxis ?? 'Y'
-      if (axis === 'Z') zRotRef.current += step
-      else if (axis === 'X') xRotRef.current += step
+      if (axis === 'X') xRotRef.current += step
       else if (axis === 'Y') yRotRef.current += step
+      else if (axis === 'Z') zRotRef.current += step
     } else {
-      zRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
-      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
-      yRotRef.current = 0
+      xRotRef.current = THREE.MathUtils.degToRad(p.tilt     ?? 0)
+      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
+      zRotRef.current = 0
     }
 
     groupRef.current.rotation.x = xRotRef.current
@@ -110,12 +110,6 @@ export function Scene({
     })
   }, [svgTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // DXF export
-  useEffect(() => {
-    if (!dxfTrigger || !lineGeo) return
-    exportDXF({ positions: lineGeo.positions, camera })
-  }, [dxfTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
-
   // PNG export — trimmed to content bounding box
   useEffect(() => {
     if (!pngTrigger) return
@@ -150,10 +144,4 @@ export function Scene({
       </group>
     </>
   )
-}
-
-function triggerDownload(dataURL, filename) {
-  Object.assign(document.createElement('a'), {
-    href: dataURL, download: filename,
-  }).click()
 }

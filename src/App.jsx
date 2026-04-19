@@ -90,7 +90,6 @@ export default function App() {
 
   // ── Export triggers ───────────────────────────────────────────────────────
   const [svgTrigger, setSvgTrigger] = useState(0)
-  const [dxfTrigger, setDxfTrigger] = useState(0)
   const [pngTrigger, setPngTrigger] = useState(0)
   const [webmActive, setWebmActive] = useState(false)
 
@@ -175,11 +174,6 @@ export default function App() {
     setView(prev => ({ ...prev, zoom }))
   }, [])
 
-  // ── STL export ────────────────────────────────────────────────────────────
-  const handleStl = useCallback(() => {
-    exportSTL({ surfaceGeo, terrain: terrainData })
-  }, [surfaceGeo, terrainData])
-
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
@@ -188,24 +182,28 @@ export default function App() {
     else startWebM(canvas, webmDuration, setWebmActive)
   }, [webmDuration])
 
-  useEffect(() => {
-    const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.code === 'Digit1') setSvgTrigger(n => n + 1)
-      if (e.code === 'Digit2') setDxfTrigger(n => n + 1)
-      if (e.code === 'Digit3') setPngTrigger(n => n + 1)
-      if (e.code === 'Digit4') handleWebmToggle()
-      if (e.code === 'Digit5') handleStl()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [handleWebmToggle, handleStl])
-
   // ── Merged params ─────────────────────────────────────────────────────────
   const p = { ...terrain, ...style, ...points, ...view, gradientStops }
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo } = useTerrainGeometry(p)
+
+  // ── STL export ────────────────────────────────────────────────────────────
+  const handleStl = useCallback(() => {
+    exportSTL({ surfaceGeo, terrain: terrainData })
+  }, [surfaceGeo, terrainData])
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.code === 'Digit1') setSvgTrigger(n => n + 1)
+      if (e.code === 'Digit2') setPngTrigger(n => n + 1)
+      if (e.code === 'Digit3') handleWebmToggle()
+      if (e.code === 'Digit4') handleStl()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [handleWebmToggle, handleStl])
 
   // Geometry-computing indicator: pixels loaded but geometry not ready yet
   const isComputing = !!heightmapPixels && !lineGeo
@@ -246,7 +244,6 @@ export default function App() {
           levaSet={levaSet}
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
-          dxfTrigger={dxfTrigger}
           pngTrigger={pngTrigger}
           webmRecording={webmActive}
         />
@@ -271,7 +268,6 @@ export default function App() {
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
         onSvg={() => setSvgTrigger(n => n + 1)}
-        onDxf={() => setDxfTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
         onStl={handleStl}
         onWebmToggle={handleWebmToggle}
