@@ -310,13 +310,13 @@ export function Sidebar({
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
             <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Resolution" hint="i/k" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
+              <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
               <Sl label="Elev scale" min={0} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => v.toFixed(1)+'×'} />
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
               {terrain.resolution > 1 && (<>
-                <Sl label="Grid offset X" hint="←→" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
-                <Sl label="Grid offset Y" hint="↑↓" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
+                <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
+                <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </>)}
               {hasGeoTiff ? (<>
                 <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
@@ -452,7 +452,7 @@ export function Sidebar({
             </>)}
 
             {/* Lines row: label + color + toggle */}
-            <TogColor label="Lines" hint="p" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
+            <TogColor label="Lines" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
             {style.showLines && (<>
               <InlineSl label="Weight  b/n" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
               <div style={{ display:'flex', alignItems:'center', padding:'0 0 8px', gap:4 }}>
@@ -472,8 +472,8 @@ export function Sidebar({
             </>)}
 
             {/* Fill + Mesh */}
-            <TogColor label="Fill"  hint="p" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor ?? '#ffffff'} onColor={v => ss({ fillColor: v })} />
-            <TogColor label="Mesh"  hint="m" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
+            <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor ?? '#ffffff'} onColor={v => ss({ fillColor: v })} />
+            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
 
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
 

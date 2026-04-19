@@ -1,31 +1,18 @@
 /**
- * Keyboard controls — all mapped to Leva setters so state stays in sync.
+ * Keyboard controls — navigation and view only.
  *
- * W A S D      → pan OrbitControls target
- * Y / X        → tilt up / down  (via levaSet tilt)
- * Q            → toggle auto-rotate
- * E            → rotate +45°
- * R            → rotate -45°
- * T            → reset camera
- * I / K        → resolution −/+
- * J / L        → line spacing −/+
- * B / N        → stroke weight +/−
- * F            → cycle draw mode
- * O            → toggle mesh stroke (showMesh)
- * P            → toggle fill
- * M            → toggle mesh
- * G            → toggle center guides
- * ↑ ↓          → shift lines
- * ← →          → shift peaks
+ * W A S D  → pan OrbitControls target
+ * Y / X    → tilt up / down (5° steps)
+ * E / R    → rotate +45° / −45°
+ * Q        → toggle auto-rotate
+ * T        → reset camera
+ * G        → toggle center guides
  *
- * Export shortcuts (1/2/3/4) are handled in App.jsx to avoid needing
- * camera/canvas access inside the Canvas context.
+ * Export shortcuts (1/2/3/4) are handled in App.jsx.
  */
 import { useEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
-
-const DRAW_MODES = ['lines-x', 'lines-y', 'crosshatch', 'hachure', 'contours', 'flow']
 
 export function Controls({ levaGet, levaSet, orbitRef }) {
   const { camera } = useThree()
@@ -69,32 +56,8 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
         // ── Auto-rotate ──────────────────────────────────────────────────────
         case 'KeyQ': levaSet({ autoRotate: !(v.autoRotate) }); break
 
-        // ── Resolution ───────────────────────────────────────────────────────
-        case 'KeyI': levaSet({ resolution: Math.max(1,  (v.resolution ?? 4) - 1) }); break
-        case 'KeyK': levaSet({ resolution: Math.min(20, (v.resolution ?? 4) + 1) }); break
-
-        // ── Stroke weight ────────────────────────────────────────────────────
-        case 'KeyB': levaSet({ strokeWeight: Math.min(10,  (v.strokeWeight ?? 1) + 0.5) }); break
-        case 'KeyN': levaSet({ strokeWeight: Math.max(0.5, (v.strokeWeight ?? 1) - 0.5) }); break
-
-        // ── Draw mode ────────────────────────────────────────────────────────
-        case 'KeyF': {
-          const idx = DRAW_MODES.indexOf(v.drawMode ?? 'lines-x')
-          levaSet({ drawMode: DRAW_MODES[(idx + 1) % DRAW_MODES.length] })
-          break
-        }
-
         // ── Toggles ──────────────────────────────────────────────────────────
-        case 'KeyO': levaSet({ showMesh:   !(v.showMesh) });   break
-        case 'KeyP': levaSet({ showFill:   !(v.showFill) });   break
-        case 'KeyM': levaSet({ showMesh:   !(v.showMesh) });   break
         case 'KeyG': levaSet({ showGuides: !(v.showGuides) }); break
-
-        // ── Sub-pixel offsets ────────────────────────────────────────────────
-        case 'ArrowUp':    levaSet({ gridOffsetY: ((v.gridOffsetY ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowDown':  levaSet({ gridOffsetY: (((v.gridOffsetY ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowRight': levaSet({ gridOffsetX: ((v.gridOffsetX ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowLeft':  levaSet({ gridOffsetX: (((v.gridOffsetX ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
 
         default: return
       }
