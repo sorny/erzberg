@@ -9,8 +9,12 @@
  *   - Excludes nodata pixels (from metadata or common sentinel values)
  *   - Normalises the valid range to [0, 1] via min-max
  *   - Nodata pixels are clamped to 0 (lowest elevation)
+ *   - Computes suggestedElevScale for real-world proportions:
+ *       elevScale = elevRange_m / (pixelSize_m × 100)
+ *     At elevScale=1.0 and this scale, 100 world-units of terrain height
+ *     corresponds to the same real-world ratio as 1 world-unit per pixel.
  *
- * Returns { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg }.
+ * Returns { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg }.
  */
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
@@ -39,7 +43,6 @@ function loadImagePixels(source) {
     }
 
     img.onerror = reject
-
     img.src = typeof source === 'string' ? source : URL.createObjectURL(source)
   })
 }
@@ -61,27 +64,27 @@ async function loadGeoTiffPixels(file) {
   const width  = image.getWidth()
   const height = image.getHeight()
 
-  // Read all bands so we can pick the best one
+  // Read all bands; use band 0 (elevation convention for single-band DEMs)
   const rasters = await image.readRasters()
+  const band    = rasters[0]
 
-  // Prefer a single-band file; for multi-band take band 0 (elevation convention)
-  const band = rasters[0]
-
-  // Determine the nodata value from TIFF metadata (GDAL stores it in the
-  // TIFFTAG_GDAL_METADATA XML or as a per-sample value in the file directory).
-  let nodataValue = null
-  const fileDir = image.fileDirectory
+  // Determine the nodata value from TIFF metadata
+  const fileDir    = image.fileDirectory
+  let nodataValue  = null
   if (fileDir.GDAL_NODATA != null) {
     nodataValue = parseFloat(fileDir.GDAL_NODATA)
   }
 
-  // Pass 1: find valid min/max (exclude nodata and common sentinel values)
+  const isNodata = (v) =>
+    !isFinite(v)
+    || (nodataValue !== null && v === nodataValue)
+    || NODATA_SENTINELS.has(v)
+
+  // Pass 1: find valid min/max (exclude nodata and sentinels)
   let min = Infinity, max = -Infinity
   for (let i = 0; i < band.length; i++) {
     const v = band[i]
-    if (!isFinite(v)) continue
-    if (nodataValue !== null && v === nodataValue) continue
-    if (NODATA_SENTINELS.has(v)) continue
+    if (isNodata(v)) continue
     if (v < min) min = v
     if (v > max) max = v
   }
@@ -95,28 +98,51 @@ async function loadGeoTiffPixels(file) {
   // Pass 2: normalise to [0, 1]; clamp nodata to 0
   const pixels = new Float32Array(band.length)
   for (let i = 0; i < band.length; i++) {
-    const v = band[i]
-    const isNodata = !isFinite(v)
-      || (nodataValue !== null && v === nodataValue)
-      || NODATA_SENTINELS.has(v)
-    pixels[i] = isNodata ? 0 : (v - min) / range
+    pixels[i] = isNodata(band[i]) ? 0 : (band[i] - min) / range
   }
 
-  return { pixels, width, height }
+  // ── Compute suggested elevScale for real-world proportions ────────────────
+  //
+  // The terrain pipeline maps brightness to elevation as:
+  //   elev = (brightness − 0.5) × 100 × elevScale   (world units)
+  // so the full elevation range in world units = 100 × elevScale.
+  //
+  // The horizontal extent in world units ≈ imageWidth  (1 world unit per pixel).
+  //
+  // For 1:1 real-world proportions:
+  //   elevRange_worldUnits / width_worldUnits = elevRange_m / width_m
+  //   (100 × elevScale) / width = range_m / (width × pixelSize_m)
+  //   elevScale = range_m / (pixelSize_m × 100)
+  //
+  // If pixelSize is in degrees (geographic CRS, typically < 1), convert to
+  // metres using 1° ≈ 111 320 m (good enough for visualisation purposes).
+
+  let suggestedElevScale = null
+  try {
+    const resolution = image.getResolution()   // [xRes, yRes] in CRS units/pixel
+    let pixelSizeM   = Math.abs(resolution[0])
+    if (pixelSizeM > 0) {
+      if (pixelSizeM < 1.0) {
+        // Likely geographic CRS (degrees) — convert to approximate metres
+        pixelSizeM = pixelSizeM * 111_320
+      }
+      suggestedElevScale = range / (pixelSizeM * 100)
+      // Clamp to a sensible UI range
+      suggestedElevScale = Math.max(0.1, Math.min(50, +suggestedElevScale.toFixed(2)))
+    }
+  } catch (_) { /* resolution not available — leave null */ }
+
+  return { pixels, width, height, realElevMin: min, realElevMax: max, suggestedElevScale }
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useHeightmap() {
-  const setHeightmap = useStore((s) => s.setHeightmap)
+  const setHeightmap    = useStore((s) => s.setHeightmap)
+  const setGeoTiffMeta  = useStore((s) => s.setGeoTiffMeta)
+  const clearGeoTiffMeta = useStore((s) => s.clearGeoTiffMeta)
   const [isLoading,  setIsLoading]  = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
-
-  const finalize = useCallback((pixels, width, height, filename) => {
-    setHeightmap(pixels, width, height, filename)
-    setIsLoading(false)
-    setLoadingMsg('')
-  }, [setHeightmap])
 
   // ── Load image (File object or URL string) ──────────────────────────────
   const load = useCallback((source) => {
@@ -127,7 +153,10 @@ export function useHeightmap() {
         const filename = typeof source === 'string'
           ? source.split('/').pop()
           : source.name
-        finalize(pixels, width, height, filename)
+        clearGeoTiffMeta()   // clear any previous GeoTIFF metadata
+        setHeightmap(pixels, width, height, filename)
+        setIsLoading(false)
+        setLoadingMsg('')
         return { pixels, width, height }
       })
       .catch(err => {
@@ -135,7 +164,7 @@ export function useHeightmap() {
         setLoadingMsg('')
         throw err
       })
-  }, [finalize])
+  }, [setHeightmap, clearGeoTiffMeta])
 
   const loadFromPicker = useCallback(() => {
     const input = Object.assign(document.createElement('input'), {
@@ -147,13 +176,19 @@ export function useHeightmap() {
   }, [load])
 
   // ── Load GeoTIFF ─────────────────────────────────────────────────────────
+  //
+  // Resolves with { pixels, width, height, realElevMin, realElevMax, suggestedElevScale }
+  // so the caller (App.jsx) can auto-apply the suggested elevScale.
   const loadGeoTiff = useCallback((file) => {
     setIsLoading(true)
     setLoadingMsg('Parsing GeoTIFF…')
     return loadGeoTiffPixels(file)
-      .then(({ pixels, width, height }) => {
-        finalize(pixels, width, height, file.name)
-        return { pixels, width, height }
+      .then(({ pixels, width, height, realElevMin, realElevMax, suggestedElevScale }) => {
+        setGeoTiffMeta(realElevMin, realElevMax)
+        setHeightmap(pixels, width, height, file.name)
+        setIsLoading(false)
+        setLoadingMsg('')
+        return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale }
       })
       .catch(err => {
         setIsLoading(false)
@@ -162,14 +197,18 @@ export function useHeightmap() {
         alert(`GeoTIFF load failed: ${err.message}`)
         throw err
       })
-  }, [finalize])
+  }, [setHeightmap, setGeoTiffMeta])
 
-  const loadGeoTiffFromPicker = useCallback(() => {
+  const loadGeoTiffFromPicker = useCallback((onLoaded) => {
     const input = Object.assign(document.createElement('input'), {
       type: 'file',
       accept: '.tif,.tiff,.geotiff',
     })
-    input.onchange = (e) => { if (e.target.files[0]) loadGeoTiff(e.target.files[0]) }
+    input.onchange = (e) => {
+      if (e.target.files[0]) {
+        loadGeoTiff(e.target.files[0]).then(onLoaded).catch(() => {})
+      }
+    }
     input.click()
   }, [loadGeoTiff])
 

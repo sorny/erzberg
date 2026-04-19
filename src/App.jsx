@@ -74,6 +74,8 @@ export default function App() {
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
   const heightmapFilename = useStore((s) => s.heightmapFilename)
+  const geoTiffElevMin    = useStore((s) => s.geoTiffElevMin)
+  const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
 
   // ── All tweakable state ───────────────────────────────────────────────────
   const [terrain, setTerrain] = useState(TERRAIN_DEF)
@@ -240,7 +242,13 @@ export default function App() {
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
         loadFromPicker={loadFromPicker}
-        loadGeoTiffFromPicker={loadGeoTiffFromPicker}
+        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ suggestedElevScale }) => {
+          if (suggestedElevScale != null) {
+            setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
+          }
+        })}
+        geoTiffElevMin={geoTiffElevMin}
+        geoTiffElevMax={geoTiffElevMax}
         onSvg={() => setSvgTrigger(n => n + 1)}
         onDxf={() => setDxfTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
@@ -293,7 +301,9 @@ export default function App() {
       {isComputing && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
-      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} onLoadGeoTiff={loadGeoTiffFromPicker} />}
+      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} onLoadGeoTiff={() => loadGeoTiffFromPicker(({ suggestedElevScale }) => {
+          if (suggestedElevScale != null) setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
+        })} />}
     </div>
   )
 }

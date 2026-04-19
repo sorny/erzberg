@@ -15,9 +15,20 @@ export const useStore = create((set) => ({
   heightmapHeight: 0,
   heightmapFilename: '',
 
+  // Real-world elevation metadata — only populated when a GeoTIFF is loaded
+  geoTiffElevMin: null,   // metres (or native unit)
+  geoTiffElevMax: null,
+
   setHeightmap: (pixels, width, height, filename) =>
     set({ heightmapPixels: pixels, heightmapWidth: width, heightmapHeight: height, heightmapFilename: filename }),
 
+  setGeoTiffMeta: (elevMin, elevMax) =>
+    set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax }),
+
+  clearGeoTiffMeta: () =>
+    set({ geoTiffElevMin: null, geoTiffElevMax: null }),
+
   clearHeightmap: () =>
-    set({ heightmapPixels: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '' }),
+    set({ heightmapPixels: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
+          geoTiffElevMin: null, geoTiffElevMax: null }),
 }))

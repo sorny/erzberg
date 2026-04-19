@@ -187,6 +187,7 @@ export function Sidebar({
   gradientStops, setGradientStops,
   heightmapPixels, heightmapFilename,
   loadFromPicker, loadGeoTiffFromPicker,
+  geoTiffElevMin, geoTiffElevMax,
   onSvg, onDxf, onPng,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
@@ -468,6 +469,12 @@ export function Sidebar({
           <div style={{ padding:'10px 14px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
             <div>Segments: {segs} · Verts: {verts}</div>
             <div>Triangles: {tris} · Grid: {grid}</div>
+            {geoTiffElevMin != null && geoTiffElevMax != null && (
+              <div style={{ marginTop:3, color: MUTED }}>
+                Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m
+                &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
+              </div>
+            )}
           </div>
 
           {/* ── Keyboard hints ─────────────────────────────────────────────── */}
