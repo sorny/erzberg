@@ -56,12 +56,21 @@ export function Scene({
     if (orbitRef.current) orbitRef.current.update()
   })
 
-  // SVG export
+  // SVG export — software z-buffer occlusion, no GPU readback required
   useEffect(() => {
-    if (!svgTrigger || !lineGeo) return
+    if (!svgTrigger || !lineGeo || !surfaceGeo) return
     const { width, height } = gl.domElement
-    exportSVG({ positions: lineGeo.positions, colors: lineGeo.colors, camera, width, height,
-      bgColor: p.bgColor, lineColor: p.lineColor, strokeWeight: p.strokeWeight })
+    const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
+    exportSVG({
+      positions: lineGeo.positions,
+      colors: lineGeo.colors,
+      camera, width, height,
+      bgColor: p.bgColor,
+      lineColor: p.lineColor,
+      strokeWeight: p.strokeWeight,
+      surfaceGeo,
+      groupMatrix,
+    })
   }, [svgTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // DXF export
