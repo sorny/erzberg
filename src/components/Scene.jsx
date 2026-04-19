@@ -70,6 +70,9 @@ export function Scene({
       strokeWeight: p.strokeWeight,
       surfaceGeo,
       groupMatrix,
+      showFill: p.showFill,
+      lineGradient: p.lineGradient,
+      gradientStops: p.gradientStops,
     })
   }, [svgTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 

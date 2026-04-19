@@ -15,6 +15,7 @@
  * simply 50 units closer — clean and precise.
  */
 import * as THREE from 'three'
+import { sampleGradient } from './colorUtils'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 32   // depth-test samples per segment
@@ -123,10 +124,62 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+/**
+ * Project surface triangles to screen space and sort back-to-front
+ * for painter's-algorithm fill rendering in SVG.
+ * Returns array of { pts: [[x,y],[x,y],[x,y]], fill: 'rgb(...)' }.
+ */
+function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, lineGradient, gradientStops) {
+  const { positions, indices, brightnessBuf } = surfaceGeo
+  const nVerts  = positions.length / 3
+  const camInv  = camera.matrixWorldInverse
+
+  const sx = new Float32Array(nVerts)
+  const sy = new Float32Array(nVerts)
+  const sz = new Float32Array(nVerts)   // view-space Z (negative = in front)
+
+  const wld = new THREE.Vector3()
+  const viw = new THREE.Vector3()
+
+  for (let i = 0; i < nVerts; i++) {
+    wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+    if (groupMatrix) wld.applyMatrix4(groupMatrix)
+    viw.copy(wld).applyMatrix4(camInv)
+    sz[i] = viw.z
+    wld.project(camera)
+    sx[i] = ( wld.x + 1) * 0.5 * W
+    sy[i] = (-wld.y + 1) * 0.5 * H
+  }
+
+  const nTri = indices.length / 3
+  const polys = []
+
+  for (let t = 0; t < nTri; t++) {
+    const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
+    const avgZ = (sz[a] + sz[b] + sz[c]) / 3
+
+    let fill
+    if (lineGradient && gradientStops?.length > 1) {
+      const brightness = (brightnessBuf[a] + brightnessBuf[b] + brightnessBuf[c]) / 3
+      const [r, g, bl] = sampleGradient(gradientStops, brightness)
+      fill = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(bl*255)})`
+    } else {
+      fill = '#ffffff'
+    }
+
+    polys.push({ pts: [[sx[a], sy[a]], [sx[b], sy[b]], [sx[c], sy[c]]], avgZ, fill })
+  }
+
+  // Back-to-front (more negative viewZ = further from camera = render first)
+  polys.sort((a, b) => a.avgZ - b.avgZ)
+  return polys
+}
+
 export function exportSVG({
   positions, colors, camera, width, height,
   bgColor, lineColor, strokeWeight,
   surfaceGeo, groupMatrix,
+  showFill, lineGradient, gradientStops,
 }) {
   if (!positions || positions.length === 0) {
     console.warn('[SVG] No geometry to export.')
@@ -244,6 +297,18 @@ export function exportSVG({
   const vh = (maxY - minY) + MARGIN * 2
   const sw = (strokeWeight * 0.5).toFixed(3)
 
+  // Fill polygons (painter's algorithm, back-to-front, below lines)
+  const fillPolygons = (showFill && surfaceGeo && groupMatrix)
+    ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, lineGradient, gradientStops)
+    : []
+
+  const fillEls = fillPolygons.map(({ pts, fill }) => {
+    const pointsStr = pts.map(([px, py]) =>
+      `${(px - vx).toFixed(1)},${(py - vy).toFixed(1)}`
+    ).join(' ')
+    return `    <polygon points="${pointsStr}" fill="${fill}" stroke="none"/>`
+  })
+
   const lines = allSegs.map(({ x0, y0, x1, y1, stroke }) =>
     `    <line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" ` +
     `x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" stroke="${stroke}"/>`
@@ -255,6 +320,7 @@ export function exportSVG({
     `     width="${vw.toFixed(0)}" height="${vh.toFixed(0)}"`,
     `     viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     `  <rect width="100%" height="100%" fill="${bgColor}"/>`,
+    ...(fillEls.length > 0 ? [`  <g>`, ...fillEls, `  </g>`] : []),
     `  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`,
     ...lines,
     `  </g>`,
