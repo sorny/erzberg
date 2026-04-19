@@ -16,6 +16,7 @@
  */
 import * as THREE from 'three'
 import { sampleGradient } from './colorUtils'
+import { DASH_SVG } from './stylePresets'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 32   // depth-test samples per segment
@@ -177,7 +178,7 @@ function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, lineGradient, 
 
 export function exportSVG({
   positions, colors, camera, width, height,
-  bgColor, lineColor, strokeWeight,
+  bgColor, lineColor, strokeWeight, lineDash,
   surfaceGeo, groupMatrix,
   showFill, lineGradient, gradientStops,
   showLines,
@@ -332,6 +333,7 @@ export function exportSVG({
     return `    <polygon points="${pointsStr}" fill="${fill}" stroke="none"/>`
   })
 
+  const dashArray = DASH_SVG[lineDash ?? 'solid'] ?? ''
   const lines = allSegs.map(({ x0, y0, x1, y1, stroke }) =>
     `    <line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" ` +
     `x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" stroke="${stroke}"/>`
@@ -351,7 +353,7 @@ export function exportSVG({
     `  <rect width="100%" height="100%" fill="${bgColor}"/>`,
     ...(fillEls.length > 0 ? [`  <g>`, ...fillEls, `  </g>`] : []),
     ...(lines.length > 0
-      ? [`  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`, ...lines, `  </g>`]
+      ? [`  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>`, ...lines, `  </g>`]
       : []),
     ...(circleEls.length > 0 ? [`  <g stroke="none">`, ...circleEls, `  </g>`] : []),
     `</svg>`,

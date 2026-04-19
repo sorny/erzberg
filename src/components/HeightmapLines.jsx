@@ -4,13 +4,14 @@
  * Uses Three.js LineSegments2 + LineMaterial for cross-browser thick-line support.
  * Per-vertex RGB colors handle gradient, slope-opacity, and stroke-by-elevation effects.
  */
-import { useRef, useMemo, useEffect } from 'react'
+import { useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
+import { DASH_CONFIGS } from '../utils/stylePresets'
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
   const { size } = useThree()
@@ -29,8 +30,12 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
     if (!lineMaterial) return
     lineMaterial.linewidth = p.strokeWeight
     lineMaterial.resolution.set(size.width, size.height)
+    const dash = DASH_CONFIGS[p.lineDash ?? 'solid'] ?? DASH_CONFIGS.solid
+    lineMaterial.dashed   = dash.dashed
+    lineMaterial.dashSize = dash.dashSize
+    lineMaterial.gapSize  = dash.gapSize
     lineMaterial.needsUpdate = true
-  }, [lineMaterial, p.strokeWeight, size.width, size.height])
+  }, [lineMaterial, p.strokeWeight, p.lineDash, size.width, size.height])
 
   useEffect(() => () => lineMaterial?.dispose(), [lineMaterial])
 

@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { Histogram }      from './Histogram'
 import { GradientPicker } from './GradientPicker'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
+import { STYLE_PRESETS } from '../utils/stylePresets'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BG     = '#18181b'
@@ -208,6 +209,12 @@ export function Sidebar({
   const sp = (v) => setPoints(p => ({ ...p, ...v }))
   const sv = (v) => setView(p => ({ ...p, ...v }))
 
+  // Apply a style preset
+  const applyPreset = (preset) => {
+    setStyle(prev => ({ ...prev, ...preset.style }))
+    if (preset.gradientStops) setGradientStops(preset.gradientStops)
+  }
+
   // Draw modes
   const MODES = [
     { id:'lines-x',    label:'X' },
@@ -371,6 +378,23 @@ export function Sidebar({
 
           {/* ── Style ─────────────────────────────────────────────────────── */}
           <Section title="Style" open={sec.style} onToggle={() => tog('style')}>
+            {/* Style presets */}
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Presets</span>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                {Object.entries(STYLE_PRESETS).map(([name, preset]) => (
+                  <button key={name} onClick={() => applyPreset(preset)}
+                    style={{
+                      padding:'6px 4px', fontSize:10, fontWeight:500, textAlign:'center',
+                      background: SURF, color: DIM, border:`1px solid ${BORDER}`,
+                      borderRadius:4, cursor:'pointer',
+                    }}>
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Draw mode segmented buttons */}
             <div style={{ marginBottom: 10 }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
@@ -404,9 +428,23 @@ export function Sidebar({
 
             {/* Lines row: label + color + toggle */}
             <TogColor label="Lines" hint="p" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
-            {style.showLines && (
+            {style.showLines && (<>
               <InlineSl label="Weight  b/n" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
-            )}
+              <div style={{ display:'flex', alignItems:'center', padding:'0 0 8px', gap:4 }}>
+                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Dash</span>
+                {[['solid', 'solid'], ['dash', 'dashed'], ['dot', 'dotted'], ['long', 'long-dash']].map(([lbl, val]) => (
+                  <button key={val} onClick={() => ss({ lineDash: val })}
+                    style={{
+                      fontSize:10, padding:'2px 7px', border:`1px solid ${BORDER}`,
+                      borderRadius:3, cursor:'pointer',
+                      background: (style.lineDash ?? 'solid') === val ? ACCENT : SURF,
+                      color:      (style.lineDash ?? 'solid') === val ? '#fff'  : MUTED,
+                    }}>
+                    {lbl}
+                  </button>
+                ))}
+              </div>
+            </>)}
 
             {/* Fill + Mesh */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>

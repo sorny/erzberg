@@ -24,6 +24,7 @@ const STYLE_DEF = {
   drawMode: 'lines-x', tightness: 0, hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
+  lineDash: 'solid',
   showFill: false, showMesh: false, bgColor: '#ffffff',
   lineGradient: false,
 }
@@ -151,6 +152,7 @@ export default function App() {
     if (vals.flowStep     != null) s.flowStep      = vals.flowStep
     if (vals.flowMaxLen   != null) s.flowMaxLen    = vals.flowMaxLen
     if (vals.strokeWeight != null) s.strokeWeight  = vals.strokeWeight
+    if (vals.lineDash     != null) s.lineDash      = vals.lineDash
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
     if (vals.tilt         != null) v.tilt          = vals.tilt

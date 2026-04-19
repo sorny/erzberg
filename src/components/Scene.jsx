@@ -96,6 +96,7 @@ export function Scene({
       bgColor: p.bgColor,
       lineColor: p.lineColor,
       strokeWeight: p.strokeWeight,
+      lineDash: p.lineDash,
       surfaceGeo,
       groupMatrix,
       showLines: p.showLines,
