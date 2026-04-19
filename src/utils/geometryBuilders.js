@@ -39,6 +39,7 @@ export function buildLineGeometry(terrain, p) {
     case 'crosshatch': return buildCrosshatch(terrain, p)
     case 'hachure':    return buildHachure(terrain, p)
     case 'contours':   return buildContours(terrain, p)
+    case 'flow':       return buildFlowLines(terrain, p)
     default:           return empty()
   }
 }
@@ -344,6 +345,84 @@ function interpElev(grid, rows, cols, r, c, elevScale) {
     grid[r1 * cols + c1] * fr * fc
   )
   return (b - 0.5) * 100 * elevScale
+}
+
+// ─── Flow lines (gradient-descent streamlines) ───────────────────────────────
+
+/** Bilinear brightness sample at continuous grid coords (fr=row, fc=col) */
+function sampleBrightness(grid, rows, cols, fr, fc) {
+  const r0 = Math.max(0, Math.min(rows - 1, Math.floor(fr)))
+  const c0 = Math.max(0, Math.min(cols - 1, Math.floor(fc)))
+  const r1 = Math.min(rows - 1, r0 + 1)
+  const c1 = Math.min(cols - 1, c0 + 1)
+  const dr = fr - r0, dc = fc - c0
+  return (
+    grid[r0 * cols + c0] * (1 - dr) * (1 - dc) +
+    grid[r0 * cols + c1] * (1 - dr) * dc +
+    grid[r1 * cols + c0] * dr * (1 - dc) +
+    grid[r1 * cols + c1] * dr * dc
+  )
+}
+
+function buildFlowLines(terrain, p) {
+  const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+  const {
+    lineSpacing, elevScale,
+    flowStep = 0.5, flowMaxLen = 100,
+    elevMinCut, elevMaxCut,
+  } = p
+
+  const lineStep = Math.max(1, Math.round(lineSpacing / scl))
+  const positions = []
+  const colors = []
+
+  for (let r = 0; r < rows; r += lineStep) {
+    for (let c = 0; c < cols; c += lineStep) {
+      let fr = r, fc = c
+
+      for (let step = 0; step < flowMaxLen; step++) {
+        // Out of bounds guard (leave a margin for central-diff sampling)
+        if (fr < 0.5 || fr > rows - 1.5 || fc < 0.5 || fc > cols - 1.5) break
+
+        // Central-difference gradient (col = X direction, row = Z direction)
+        const eps = 0.5
+        const gx = sampleBrightness(grid, rows, cols, fr, fc + eps) - sampleBrightness(grid, rows, cols, fr, fc - eps)
+        const gz = sampleBrightness(grid, rows, cols, fr + eps, fc) - sampleBrightness(grid, rows, cols, fr - eps, fc)
+
+        const mag = Math.sqrt(gx * gx + gz * gz)
+        if (mag < 0.0005) break   // nearly flat — stop this streamline
+
+        // Move one step downhill (negative gradient direction)
+        const nfc = fc - (gx / mag) * flowStep
+        const nfr = fr - (gz / mag) * flowStep
+
+        if (nfr < 0 || nfr >= rows || nfc < 0 || nfc >= cols) break
+
+        const b0 = sampleBrightness(grid, rows, cols, fr, fc)
+        const b1 = sampleBrightness(grid, rows, cols, nfr, nfc)
+        const e0 = (b0 - 0.5) * 100 * elevScale
+        const e1 = (b1 - 0.5) * 100 * elevScale
+
+        if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) { fr = nfr; fc = nfc; continue }
+        if (!inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) break
+
+        const x0 = fc  * scl - halfW, z0 = fr  * scl - halfH
+        const x1 = nfc * scl - halfW, z1 = nfr * scl - halfH
+
+        positions.push(x0, e0, z0, x1, e1, z1)
+
+        const slopeNorm = Math.min(1, mag / 0.02)   // normalise slope for colour
+        const col0 = computeVertexColor(normElev(e0, minZ, maxZ), slopeNorm, p, terrain)
+        const col1 = computeVertexColor(normElev(e1, minZ, maxZ), slopeNorm, p, terrain)
+        colors.push(...col0, ...col1)
+
+        fr = nfr
+        fc = nfc
+      }
+    }
+  }
+
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
 // ─── Surface mesh geometry (triangle grid) ────────────────────────────────────

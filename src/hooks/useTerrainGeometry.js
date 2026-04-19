@@ -30,6 +30,7 @@ export function useTerrainGeometry(p) {
   }, [
     terrain,
     p.drawMode, p.lineSpacing, p.tightness, p.hachureLength, p.contourInterval,
+    p.flowStep, p.flowMaxLen,
     p.elevMinCut, p.elevMaxCut,
     p.jitterAmt,
     p.lineColor, p.lineGradient, p.gradientStops,

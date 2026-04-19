@@ -216,6 +216,7 @@ export function Sidebar({
     { id:'crosshatch', label:'Cross' },
     { id:'hachure',    label:'Hachure' },
     { id:'contours',   label:'Contours' },
+    { id:'flow',       label:'Flow' },
   ]
 
   // Stats
@@ -393,9 +394,13 @@ export function Sidebar({
               </div>
             </div>
 
-            {style.drawMode === 'curves'   && <InlineSl label="Tightness"  min={-5}  max={5}  step={0.1} value={style.tightness}       onChange={v => ss({ tightness: v })}       fmt={v => v.toFixed(1)} />}
-            {style.drawMode === 'hachure'  && <InlineSl label="Length"     min={0.1} max={5}  step={0.1} value={style.hachureLength}    onChange={v => ss({ hachureLength: v })}    fmt={v => v.toFixed(1)} />}
-            {style.drawMode === 'contours' && <InlineSl label="Interval"   min={0.5} max={30} step={0.5} value={style.contourInterval}  onChange={v => ss({ contourInterval: v })}  fmt={v => v} />}
+            {style.drawMode === 'curves'   && <InlineSl label="Tightness"  min={-5}  max={5}   step={0.1}  value={style.tightness}      onChange={v => ss({ tightness: v })}      fmt={v => v.toFixed(1)} />}
+            {style.drawMode === 'hachure'  && <InlineSl label="Length"     min={0.1} max={5}   step={0.1}  value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
+            {style.drawMode === 'contours' && <InlineSl label="Interval"   min={0.5} max={30}  step={0.5}  value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
+            {style.drawMode === 'flow' && (<>
+              <InlineSl label="Step"     min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}    onChange={v => ss({ flowStep: v })}    fmt={v => v.toFixed(1)} />
+              <InlineSl label="Max len"  min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100}   onChange={v => ss({ flowMaxLen: v })} />
+            </>)}
 
             {/* Lines row: label + color + toggle */}
             <TogColor label="Lines" hint="p" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />

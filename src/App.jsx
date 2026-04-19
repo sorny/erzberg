@@ -22,6 +22,7 @@ const TERRAIN_DEF = {
 }
 const STYLE_DEF = {
   drawMode: 'lines-x', tightness: 0, hachureLength: 1, contourInterval: 5,
+  flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   showFill: false, showMesh: false, bgColor: '#ffffff',
   lineGradient: false,
@@ -147,6 +148,8 @@ export default function App() {
     if (vals.blackPoint   != null) t.blackPoint    = vals.blackPoint
     if (vals.whitePoint   != null) t.whitePoint    = vals.whitePoint
     if (vals.drawMode     != null) s.drawMode      = vals.drawMode
+    if (vals.flowStep     != null) s.flowStep      = vals.flowStep
+    if (vals.flowMaxLen   != null) s.flowMaxLen    = vals.flowMaxLen
     if (vals.strokeWeight != null) s.strokeWeight  = vals.strokeWeight
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
@@ -205,6 +208,7 @@ export default function App() {
     'lines-x': 'X Ridge Lines', 'lines-y': 'Y Ridge Lines',
     curves: 'Curves', crosshatch: 'Cross-Hatch',
     hachure: 'Hachure', contours: 'Contours',
+    flow: 'Flow Lines',
   }
 
   return (
