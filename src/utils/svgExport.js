@@ -180,16 +180,12 @@ export function exportSVG({
   bgColor, lineColor, strokeWeight,
   surfaceGeo, groupMatrix,
   showFill, lineGradient, gradientStops,
+  showLines,
   particlePositions, particleCount, particleColor, particleSize,
 }) {
-  if (!positions || positions.length === 0) {
-    console.warn('[SVG] No geometry to export.')
-    return
-  }
-
   const camInv = camera.matrixWorldInverse
-  const wld2 = new THREE.Vector3()  // reusable world-space
-  const viw2 = new THREE.Vector3()  // reusable view-space
+  const wld2 = new THREE.Vector3()
+  const viw2 = new THREE.Vector3()
 
   /**
    * Project a local-space point →
@@ -200,7 +196,7 @@ export function exportSVG({
     wld2.set(x, y, z)
     if (groupMatrix) wld2.applyMatrix4(groupMatrix)
     viw2.copy(wld2).applyMatrix4(camInv)
-    const viewZ = viw2.z                        // negative = in front
+    const viewZ = viw2.z
     wld2.project(camera)
     return [
       ( wld2.x + 1) * 0.5 * width,
@@ -214,79 +210,105 @@ export function exportSVG({
     ? buildZBuffer(surfaceGeo, groupMatrix, camera, width, height)
     : null
 
-  // ── Collect visible (sub-)segments ────────────────────────────────────────
+  // ── Shared bounding box ───────────────────────────────────────────────────
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+
+  const expandBB = (x, y) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x
+    if (y < minY) minY = y; if (y > maxY) maxY = y
+  }
+
+  // ── Collect visible line segments (skipped when lines are off) ────────────
 
   const allSegs = []
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
 
   const addSeg = (x0, y0, x1, y1, stroke) => {
     if (Math.hypot(x1 - x0, y1 - y0) < 0.1) return
     allSegs.push({ x0, y0, x1, y1, stroke })
-    if (x0 < minX) minX = x0; if (x0 > maxX) maxX = x0
-    if (y0 < minY) minY = y0; if (y0 > maxY) maxY = y0
-    if (x1 < minX) minX = x1; if (x1 > maxX) maxX = x1
-    if (y1 < minY) minY = y1; if (y1 > maxY) maxY = y1
+    expandBB(x0, y0); expandBB(x1, y1)
   }
 
-  const segCount = positions.length / 6
-  for (let s = 0; s < segCount; s++) {
-    const i = s * 6
-    const ax = positions[i],     ay = positions[i + 1], az = positions[i + 2]
-    const bx = positions[i + 3], by = positions[i + 4], bz = positions[i + 5]
+  if (showLines && positions && positions.length > 0) {
+    const segCount = positions.length / 6
+    for (let s = 0; s < segCount; s++) {
+      const i = s * 6
+      const ax = positions[i],     ay = positions[i + 1], az = positions[i + 2]
+      const bx = positions[i + 3], by = positions[i + 4], bz = positions[i + 5]
 
-    // Segment color (use start-vertex color)
-    let stroke = lineColor
-    if (colors && colors.length > i + 2) {
-      const r = Math.round(colors[i]     * 255)
-      const g = Math.round(colors[i + 1] * 255)
-      const b = Math.round(colors[i + 2] * 255)
-      stroke = `rgb(${r},${g},${b})`
-    }
+      let stroke = lineColor
+      if (colors && colors.length > i + 2) {
+        const r = Math.round(colors[i]     * 255)
+        const g = Math.round(colors[i + 1] * 255)
+        const b = Math.round(colors[i + 2] * 255)
+        stroke = `rgb(${r},${g},${b})`
+      }
 
-    if (!surfViewZ) {
-      // No depth buffer — emit full segment without occlusion
-      const [x0, y0] = project(ax, ay, az)
-      const [x1, y1] = project(bx, by, bz)
-      addSeg(x0, y0, x1, y1, stroke)
-      continue
-    }
+      if (!surfViewZ) {
+        const [x0, y0] = project(ax, ay, az)
+        const [x1, y1] = project(bx, by, bz)
+        addSeg(x0, y0, x1, y1, stroke)
+        continue
+      }
 
-    // ── Occlusion: sample N+1 points, collect visible runs ──
-    const pts = []
-    for (let t = 0; t <= N_SAMPLES; t++) {
-      const f  = t / N_SAMPLES
-      const px = ax + (bx - ax) * f
-      const py = ay + (by - ay) * f
-      const pz = az + (bz - az) * f
-      const [sx, sy, lineZ] = project(px, py, pz)
-      const surfZ = surfViewZ(sx, sy)
-      // surfZ is the view-space Z of the closest surface (-Infinity = sky).
-      // lineZ is the view-space Z of this line sample.
-      // Visible when the line is at or in front of the surface (within EPS_VIEW).
-      const visible = surfZ === -Infinity || lineZ >= surfZ - EPS_VIEW
-      pts.push({ sx, sy, visible })
-    }
+      const pts = []
+      for (let t = 0; t <= N_SAMPLES; t++) {
+        const f  = t / N_SAMPLES
+        const px = ax + (bx - ax) * f
+        const py = ay + (by - ay) * f
+        const pz = az + (bz - az) * f
+        const [sx, sy, lineZ] = project(px, py, pz)
+        const surfZ = surfViewZ(sx, sy)
+        const visible = surfZ === -Infinity || lineZ >= surfZ - EPS_VIEW
+        pts.push({ sx, sy, visible })
+      }
 
-    // Emit visible sub-segments
-    let runStart = null
-    for (let t = 0; t <= N_SAMPLES; t++) {
-      const { visible } = pts[t]
-      if (visible && runStart === null) {
-        runStart = t
-      } else if (!visible && runStart !== null) {
-        const p0 = pts[runStart], p1 = pts[t - 1]
+      let runStart = null
+      for (let t = 0; t <= N_SAMPLES; t++) {
+        const { visible } = pts[t]
+        if (visible && runStart === null) {
+          runStart = t
+        } else if (!visible && runStart !== null) {
+          const p0 = pts[runStart], p1 = pts[t - 1]
+          addSeg(p0.sx, p0.sy, p1.sx, p1.sy, stroke)
+          runStart = null
+        }
+      }
+      if (runStart !== null) {
+        const p0 = pts[runStart], p1 = pts[N_SAMPLES]
         addSeg(p0.sx, p0.sy, p1.sx, p1.sy, stroke)
-        runStart = null
       }
     }
-    if (runStart !== null) {
-      const p0 = pts[runStart], p1 = pts[N_SAMPLES]
-      addSeg(p0.sx, p0.sy, p1.sx, p1.sy, stroke)
+  }
+
+  // ── Project particles (pass 1: expand bounding box) ─────────────────────
+
+  const wldP = new THREE.Vector3()
+  const viwP = new THREE.Vector3()
+  const projectedParticles = []   // { cx, cy, r }
+
+  if (particlePositions && particleCount > 0) {
+    for (let i = 0; i < particleCount; i++) {
+      wldP.set(
+        particlePositions[i * 3],
+        particlePositions[i * 3 + 1],
+        particlePositions[i * 3 + 2],
+      )
+      if (groupMatrix) wldP.applyMatrix4(groupMatrix)
+      viwP.copy(wldP).applyMatrix4(camInv)
+      const viewZ = viwP.z
+      if (viewZ >= 0) continue   // behind camera
+      const r = ((particleSize ?? 4) * 300 / (-viewZ)) * 0.5
+      wldP.project(camera)
+      const cx = ( wldP.x + 1) * 0.5 * width
+      const cy = (-wldP.y + 1) * 0.5 * height
+      projectedParticles.push({ cx, cy, r })
+      expandBB(cx - r, cy - r); expandBB(cx + r, cy + r)
     }
   }
 
-  if (allSegs.length === 0) {
-    console.warn('[SVG] All segments were occluded or degenerate.')
+  if (allSegs.length === 0 && projectedParticles.length === 0) {
+    console.warn('[SVG] Nothing visible to export.')
     return
   }
 
@@ -315,33 +337,11 @@ export function exportSVG({
     `x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" stroke="${stroke}"/>`
   )
 
-  // Particles — project each position and emit a circle
-  const camInvP = camera.matrixWorldInverse
-  const wldP    = new THREE.Vector3()
-  const viwP    = new THREE.Vector3()
-  const circleEls = []
-  if (particlePositions && particleCount > 0) {
-    const pColor = particleColor ?? lineColor
-    for (let i = 0; i < particleCount; i++) {
-      wldP.set(
-        particlePositions[i * 3],
-        particlePositions[i * 3 + 1],
-        particlePositions[i * 3 + 2],
-      )
-      if (groupMatrix) wldP.applyMatrix4(groupMatrix)
-      viwP.copy(wldP).applyMatrix4(camInvP)
-      const viewZ = viwP.z   // negative in front
-      if (viewZ >= 0) continue   // behind camera
-      // Mirror gl_PointSize = uSize * (300 / -viewZ); convert px → viewBox units
-      const r = ((particleSize ?? 4) * 300 / (-viewZ)) * 0.5
-      wldP.project(camera)
-      const cx = ( wldP.x + 1) * 0.5 * width  - vx
-      const cy = (-wldP.y + 1) * 0.5 * height - vy
-      circleEls.push(
-        `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`
-      )
-    }
-  }
+  // Particles (pass 2: emit circles with viewBox offset applied)
+  const pColor = particleColor ?? lineColor
+  const circleEls = projectedParticles.map(({ cx, cy, r }) =>
+    `    <circle cx="${(cx - vx).toFixed(1)}" cy="${(cy - vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`
+  )
 
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -350,9 +350,9 @@ export function exportSVG({
     `     viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     `  <rect width="100%" height="100%" fill="${bgColor}"/>`,
     ...(fillEls.length > 0 ? [`  <g>`, ...fillEls, `  </g>`] : []),
-    `  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`,
-    ...lines,
-    `  </g>`,
+    ...(lines.length > 0
+      ? [`  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`, ...lines, `  </g>`]
+      : []),
     ...(circleEls.length > 0 ? [`  <g stroke="none">`, ...circleEls, `  </g>`] : []),
     `</svg>`,
   ].join('\n')

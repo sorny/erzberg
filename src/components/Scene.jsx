@@ -86,7 +86,7 @@ export function Scene({
 
   // SVG export — software z-buffer occlusion, no GPU readback required
   useEffect(() => {
-    if (!svgTrigger || !lineGeo || !surfaceGeo) return
+    if (!svgTrigger) return
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     exportSVG({
@@ -98,6 +98,7 @@ export function Scene({
       strokeWeight: p.strokeWeight,
       surfaceGeo,
       groupMatrix,
+      showLines: p.showLines,
       showFill: p.showFill,
       lineGradient: p.lineGradient,
       gradientStops: p.gradientStops,
