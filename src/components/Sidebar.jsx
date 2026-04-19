@@ -197,7 +197,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, points: false, export: true,
+    terrain: true, levels: true, view: true, style: true, points: true, export: true,
   })
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -475,13 +475,6 @@ export function Sidebar({
                 &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
               </div>
             )}
-          </div>
-
-          {/* ── Keyboard hints ─────────────────────────────────────────────── */}
-          <div style={{ padding:'4px 14px 16px', fontSize:9, color:'#3f3f46', lineHeight:1.8, fontFamily:'monospace' }}>
-            WASD pan · YX tilt · ER rotate · Q auto · T reset<br />
-            F mode · IK res · JL spacing · BN weight<br />
-            P fill · M mesh · G guides · 1 SVG · 2 DXF · 3 PNG · 4 WebM
           </div>
 
         </div>
