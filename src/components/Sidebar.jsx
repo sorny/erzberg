@@ -342,13 +342,13 @@ export function Sidebar({
               </div>
               <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
                 <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
+                {[['CW', -1],['CCW', 1]].map(([label, dir]) => (
                   <button key={label} onClick={() => sv({ autoRotateDir: dir })}
                     style={{
                       fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
                       borderRadius:3, cursor:'pointer',
-                      background: (view.autoRotateDir ?? 1) === dir ? ACCENT : SURF,
-                      color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED,
+                      background: (view.autoRotateDir ?? -1) === dir ? ACCENT : SURF,
+                      color: (view.autoRotateDir ?? -1) === dir ? '#fff' : MUTED,
                     }}>
                     {label}
                   </button>

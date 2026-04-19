@@ -28,6 +28,7 @@ export function Scene({
 }) {
   const { camera, gl, scene } = useThree()
   const groupRef      = useRef()
+  const particleRef   = useRef()
   const zRotRef    = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))
   const xRotRef    = useRef(THREE.MathUtils.degToRad(p.tilt ?? 0))
   const yRotRef    = useRef(0)
@@ -100,6 +101,10 @@ export function Scene({
       showFill: p.showFill,
       lineGradient: p.lineGradient,
       gradientStops: p.gradientStops,
+      particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
+      particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
+      particleColor:     p.pointColor ?? p.lineColor,
+      particleSize:      p.pointSize ?? 4,
     })
   }, [svgTrigger]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -139,7 +144,7 @@ export function Scene({
 
       <group ref={groupRef}>
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} />
-        <ParticleSystem terrain={terrain} p={p} />
+        <ParticleSystem ref={particleRef} terrain={terrain} p={p} />
       </group>
     </>
   )

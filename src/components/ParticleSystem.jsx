@@ -16,7 +16,7 @@
  *   Custom ShaderMaterial with gl_PointCoord circular clip + soft falloff.
  *   depthTest: false so particles always render on top of the terrain surface.
  */
-import { useRef, useState, useMemo, useEffect } from 'react'
+import { useRef, useState, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
@@ -48,7 +48,7 @@ const PARTICLE_FRAG = /* glsl */ `
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function ParticleSystem({ terrain, p }) {
+export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p }, ref) {
   const ps = useRef({
     positions:  null,
     velocities: null,
@@ -123,6 +123,12 @@ export function ParticleSystem({ terrain, p }) {
   // Keep a ref to the current geo so useFrame always sees the latest
   const pointsGeoRef = useRef(null)
   useEffect(() => { pointsGeoRef.current = pointsGeo }, [pointsGeo])
+
+  // Expose current particle positions for SVG export
+  useImperativeHandle(ref, () => ({
+    getPositions: () => ps.current.positions,
+    getCount:     () => ps.current.count,
+  }))
 
   // Per-frame physics
   useFrame(() => {
@@ -204,4 +210,4 @@ export function ParticleSystem({ terrain, p }) {
   return (
     <points geometry={pointsGeo} material={particleMat} />
   )
-}
+})

@@ -180,6 +180,7 @@ export function exportSVG({
   bgColor, lineColor, strokeWeight,
   surfaceGeo, groupMatrix,
   showFill, lineGradient, gradientStops,
+  particlePositions, particleCount, particleColor, particleSize,
 }) {
   if (!positions || positions.length === 0) {
     console.warn('[SVG] No geometry to export.')
@@ -314,6 +315,34 @@ export function exportSVG({
     `x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" stroke="${stroke}"/>`
   )
 
+  // Particles — project each position and emit a circle
+  const camInvP = camera.matrixWorldInverse
+  const wldP    = new THREE.Vector3()
+  const viwP    = new THREE.Vector3()
+  const circleEls = []
+  if (particlePositions && particleCount > 0) {
+    const pColor = particleColor ?? lineColor
+    for (let i = 0; i < particleCount; i++) {
+      wldP.set(
+        particlePositions[i * 3],
+        particlePositions[i * 3 + 1],
+        particlePositions[i * 3 + 2],
+      )
+      if (groupMatrix) wldP.applyMatrix4(groupMatrix)
+      viwP.copy(wldP).applyMatrix4(camInvP)
+      const viewZ = viwP.z   // negative in front
+      if (viewZ >= 0) continue   // behind camera
+      // Mirror gl_PointSize = uSize * (300 / -viewZ); convert px → viewBox units
+      const r = ((particleSize ?? 4) * 300 / (-viewZ)) * 0.5
+      wldP.project(camera)
+      const cx = ( wldP.x + 1) * 0.5 * width  - vx
+      const cy = (-wldP.y + 1) * 0.5 * height - vy
+      circleEls.push(
+        `    <circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`
+      )
+    }
+  }
+
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg"`,
@@ -324,6 +353,7 @@ export function exportSVG({
     `  <g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round">`,
     ...lines,
     `  </g>`,
+    ...(circleEls.length > 0 ? [`  <g stroke="none">`, ...circleEls, `  </g>`] : []),
     `</svg>`,
   ].join('\n')
 
