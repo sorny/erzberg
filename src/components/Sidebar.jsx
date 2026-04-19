@@ -189,7 +189,7 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   loadFromPicker, loadGeoTiffFromPicker,
   geoTiffElevMin, geoTiffElevMax,
-  onSvg, onDxf, onPng,
+  onSvg, onDxf, onPng, onStl,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
@@ -499,6 +499,7 @@ export function Sidebar({
               <ExpBtn label="SVG"  hint="key 1" onClick={onSvg} />
               <ExpBtn label="DXF"  hint="key 2" onClick={onDxf} />
               <ExpBtn label="PNG"  hint="key 3" onClick={onPng} />
+              <ExpBtn label="STL"  hint="key 5" onClick={onStl} />
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? 'recording' : 'key 4'} onClick={onWebmToggle} active={webmActive} />

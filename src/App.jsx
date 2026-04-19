@@ -13,6 +13,7 @@ import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore }      from './store/useStore'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { startWebM, stopWebM, isRecording } from './utils/webmRecorder'
+import { exportSTL } from './utils/stlExport'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
@@ -167,6 +168,18 @@ export default function App() {
     if (Object.keys(v).length) setView(prev    => ({ ...prev, ...v }))
   }, [setTerrain, setStyle, setView])
 
+  // ── Auto-zoom to fit terrain on load ─────────────────────────────────────
+  // zoom = 500 / max(image_width, image_height) keeps any size terrain on screen.
+  const autoZoom = useCallback(({ width, height }) => {
+    const zoom = Math.max(0.05, Math.min(4, 500 / Math.max(width, height)))
+    setView(prev => ({ ...prev, zoom }))
+  }, [])
+
+  // ── STL export ────────────────────────────────────────────────────────────
+  const handleStl = useCallback(() => {
+    exportSTL({ surfaceGeo, terrain: terrainData })
+  }, [surfaceGeo, terrainData])
+
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
@@ -182,10 +195,11 @@ export default function App() {
       if (e.code === 'Digit2') setDxfTrigger(n => n + 1)
       if (e.code === 'Digit3') setPngTrigger(n => n + 1)
       if (e.code === 'Digit4') handleWebmToggle()
+      if (e.code === 'Digit5') handleStl()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [handleWebmToggle])
+  }, [handleWebmToggle, handleStl])
 
   // ── Merged params ─────────────────────────────────────────────────────────
   const p = { ...terrain, ...style, ...points, ...view, gradientStops }
@@ -247,8 +261,9 @@ export default function App() {
         gradientStops={gradientStops}  setGradientStops={setGradientStops}
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
-        loadFromPicker={loadFromPicker}
-        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ suggestedElevScale }) => {
+        loadFromPicker={() => loadFromPicker(autoZoom)}
+        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, suggestedElevScale }) => {
+          autoZoom({ width, height })
           if (suggestedElevScale != null) {
             setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
           }
@@ -258,6 +273,7 @@ export default function App() {
         onSvg={() => setSvgTrigger(n => n + 1)}
         onDxf={() => setDxfTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
+        onStl={handleStl}
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
@@ -307,7 +323,10 @@ export default function App() {
       {isComputing && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
-      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} onLoadGeoTiff={() => loadGeoTiffFromPicker(({ suggestedElevScale }) => {
+      {noHmap && !isLoading && <EmptyState
+        onLoad={() => loadFromPicker(autoZoom)}
+        onLoadGeoTiff={() => loadGeoTiffFromPicker(({ width, height, suggestedElevScale }) => {
+          autoZoom({ width, height })
           if (suggestedElevScale != null) setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
         })} />}
     </div>

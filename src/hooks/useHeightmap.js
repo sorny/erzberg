@@ -166,12 +166,14 @@ export function useHeightmap() {
       })
   }, [setHeightmap, clearGeoTiffMeta])
 
-  const loadFromPicker = useCallback(() => {
+  const loadFromPicker = useCallback((onLoaded) => {
     const input = Object.assign(document.createElement('input'), {
       type: 'file',
       accept: 'image/*',
     })
-    input.onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]) }
+    input.onchange = (e) => {
+      if (e.target.files[0]) load(e.target.files[0]).then(onLoaded).catch(() => {})
+    }
     input.click()
   }, [load])
 
