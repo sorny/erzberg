@@ -314,8 +314,10 @@ export function Sidebar({
               <Sl label="Elev scale" min={0} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => v.toFixed(1)+'×'} />
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
-              <Sl label="Grid offset X" hint="←→" min={0} max={19} value={terrain.gridOffsetX ?? 0} onChange={v => st({ gridOffsetX: v })} />
-              <Sl label="Grid offset Y" hint="↑↓" min={0} max={19} value={terrain.gridOffsetY ?? 0} onChange={v => st({ gridOffsetY: v })} />
+              {terrain.resolution > 1 && (<>
+                <Sl label="Grid offset X" hint="←→" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
+                <Sl label="Grid offset Y" hint="↑↓" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
+              </>)}
               {hasGeoTiff ? (<>
                 <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
                   value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
