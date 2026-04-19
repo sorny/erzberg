@@ -19,7 +19,7 @@ export function useTerrainGeometry(p) {
     return buildTerrain(heightmapPixels, heightmapWidth, heightmapHeight, p)
   }, [
     heightmapPixels, heightmapWidth, heightmapHeight,
-    p.resolution, p.blurRadius, p.shiftLines, p.shiftPeaks,
+    p.resolution, p.blurRadius, p.gridOffsetX, p.gridOffsetY,
     p.blackPoint, p.whitePoint, p.elevScale,
   ])
 

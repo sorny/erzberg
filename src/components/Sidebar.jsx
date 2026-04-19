@@ -126,11 +126,13 @@ function TogColor({ label, hint, checked, onToggle, color, onColor }) {
 }
 
 // ── Inline slider row (label left, range + val right, no ctrl-head) ───────────
-function InlineSl({ label, min, max, step = 1, value, onChange, fmt }) {
+function InlineSl({ label, hint, min, max, step = 1, value, onChange, fmt }) {
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: 8 }}>
-      <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52 }}>{label}</span>
+      <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52 }}>
+        {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+      </span>
       <input type="range" className="hmr" min={min} max={max} step={step} value={value}
         onChange={e => onChange(parsed(e.target.value))} />
       <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
@@ -306,13 +308,14 @@ export function Sidebar({
 
           {/* ── Terrain ───────────────────────────────────────────────────── */}
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
+            <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Resolution"   hint="i/k" min={1}  max={20}  value={terrain.resolution}   onChange={v => st({ resolution: v })} />
-              <Sl label="Line spacing" hint="j/l" min={1}  max={100} value={terrain.lineSpacing}   onChange={v => st({ lineSpacing: v })} />
-              <Sl label="Elev scale"              min={0}  max={5}   step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })}  fmt={v => v.toFixed(1)+'×'} />
-              <Sl label="Blur"                    min={0}  max={10}  value={terrain.blurRadius}    onChange={v => st({ blurRadius: v })} />
-              <Sl label="Shift lines"  hint="↑↓"  min={0}  max={19}  value={terrain.shiftLines}    onChange={v => st({ shiftLines: v })} />
-              <Sl label="Shift peaks"  hint="←→"  min={0}  max={19}  value={terrain.shiftPeaks}    onChange={v => st({ shiftPeaks: v })} />
+              <Sl label="Resolution" hint="i/k" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
+              <Sl label="Elev scale" min={0} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => v.toFixed(1)+'×'} />
+              <Sl label="Blur" min={0} max={10} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} />
+              <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
+              <Sl label="Grid offset X" hint="←→" min={0} max={19} value={terrain.gridOffsetX ?? 0} onChange={v => st({ gridOffsetX: v })} />
+              <Sl label="Grid offset Y" hint="↑↓" min={0} max={19} value={terrain.gridOffsetY ?? 0} onChange={v => st({ gridOffsetY: v })} />
               {hasGeoTiff ? (<>
                 <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
                   value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
@@ -322,7 +325,6 @@ export function Sidebar({
                 <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
                 <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
               </>)}
-              <Sl label="Jitter"                  min={0}  max={20}  step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} col2 />
             </div>
           </Section>
 
@@ -430,11 +432,12 @@ export function Sidebar({
               </div>
             </div>
 
-            {style.drawMode === 'hachure'  && <InlineSl label="Length"     min={0.1} max={5}   step={0.1}  value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
-            {style.drawMode === 'contours' && <InlineSl label="Interval"   min={0.5} max={30}  step={0.5}  value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
+            <InlineSl label="Line spacing" min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })} hint="j/l" />
+            {style.drawMode === 'hachure'  && <InlineSl label="Length"   min={0.1} max={5}   step={0.1} value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
+            {style.drawMode === 'contours' && <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
             {style.drawMode === 'flow' && (<>
-              <InlineSl label="Step"     min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}    onChange={v => ss({ flowStep: v })}    fmt={v => v.toFixed(1)} />
-              <InlineSl label="Max len"  min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100}   onChange={v => ss({ flowMaxLen: v })} />
+              <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />
+              <InlineSl label="Max len" min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
             </>)}
 
             {/* Lines row: label + color + toggle */}

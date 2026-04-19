@@ -37,25 +37,39 @@ function buildGradientTexture(gradientStops) {
 }
 
 // ── Shaders ───────────────────────────────────────────────────────────────────
-// Vertex: identity — positions already have correct Y elevation.
 const SURFACE_VERT = /* glsl */ `
   attribute float brightness;
-  varying   float vBrightness;
+  varying float vBrightness;
+  varying vec3  vNormal;
   void main() {
     vBrightness = brightness;
+    vNormal     = normalMatrix * normal;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
-// Fragment: bgColor when fill is off; white or full-gradient when fill is on.
 const SURFACE_FRAG = /* glsl */ `
   uniform vec3      uBgColor;
   uniform vec3      uFillColor;
   uniform bool      uShowFill;
   uniform bool      uGradient;
+  uniform bool      uRawTerrain;
   uniform sampler2D uGradientTex;
   varying float     vBrightness;
+  varying vec3      vNormal;
 
   void main() {
+    if (uRawTerrain) {
+      vec3 n      = normalize(vNormal);
+      vec3 light1 = normalize(vec3(1.0,  2.0, 1.5));
+      vec3 light2 = normalize(vec3(-0.5, 0.5, -1.0));
+      float diff  = max(dot(n, light1), 0.0) * 0.7
+                  + max(dot(n, light2), 0.0) * 0.15;
+      vec3 base = uGradient
+        ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
+        : uFillColor;
+      gl_FragColor = vec4(base * (0.2 + diff), 1.0);
+      return;
+    }
     if (!uShowFill) {
       gl_FragColor = vec4(uBgColor, 1.0);
       return;
@@ -111,6 +125,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uFillColor:   { value: new THREE.Vector3(1, 1, 1) },
       uShowFill:    { value: false },
       uGradient:    { value: false },
+      uRawTerrain:  { value: false },
       uGradientTex: { value: null },
     },
   }), [])
@@ -121,9 +136,10 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uBgColor.value.set(...hexToRgb(p.bgColor))
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
     surfMat.uniforms.uShowFill.value = p.showFill
-    surfMat.uniforms.uGradient.value = p.lineGradient && p.showFill
+    surfMat.uniforms.uGradient.value = p.lineGradient && (p.showFill || p.showRawTerrain)
+    surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
     surfMat.needsUpdate = true
-  }, [surfMat, p.bgColor, p.fillColor, p.showFill, p.lineGradient])
+  }, [surfMat, p.bgColor, p.fillColor, p.showFill, p.lineGradient, p.showRawTerrain])
 
   useEffect(() => {
     if (!surfMat) return

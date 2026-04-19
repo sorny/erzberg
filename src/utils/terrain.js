@@ -60,8 +60,8 @@ export function buildTerrain(rawPixels, imageWidth, imageHeight, p) {
   const {
     resolution: scl,
     blurRadius,
-    shiftLines,
-    shiftPeaks,
+    gridOffsetX,
+    gridOffsetY,
     blackPoint,
     whitePoint,
     elevScale,
@@ -71,8 +71,8 @@ export function buildTerrain(rawPixels, imageWidth, imageHeight, p) {
   const blurred = boxBlur(rawPixels, imageWidth, imageHeight, blurRadius)
 
   // Sampling with sub-pixel offsets
-  const peakOff = Math.floor(shiftPeaks) % scl
-  const lineOff = Math.floor(shiftLines) % scl
+  const peakOff = Math.floor(gridOffsetX ?? 0) % scl
+  const lineOff = Math.floor(gridOffsetY ?? 0) % scl
 
   const cols = Math.max(2, Math.ceil((imageWidth - peakOff) / scl) + 1)
   const rows = Math.max(2, Math.ceil((imageHeight - lineOff) / scl) + 1)

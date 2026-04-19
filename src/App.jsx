@@ -17,12 +17,12 @@ import { exportSTL } from './utils/stlExport'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
-  resolution: 2, lineSpacing: 4, elevScale: 1.0, blurRadius: 0,
-  shiftLines: 0, shiftPeaks: 0, elevMinCut: 0, elevMaxCut: 100,
+  resolution: 2, elevScale: 1.0, blurRadius: 0,
+  gridOffsetX: 0, gridOffsetY: 0, elevMinCut: 0, elevMaxCut: 100,
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
 const STYLE_DEF = {
-  drawMode: 'lines-x', hachureLength: 1, contourInterval: 5,
+  drawMode: 'lines-x', lineSpacing: 4, hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
@@ -38,7 +38,7 @@ const POINTS_DEF = {
 const VIEW_DEF = {
   tilt: 0, rotation: 0, zoom: 1,
   autoRotate: false, autoRotateSpeed: 0.5, autoRotateAxis: 'Y', autoRotateDir: -1,
-  showGuides: false,
+  showGuides: false, showRawTerrain: false,
 }
 
 // ── BgSync: keeps WebGL clear colour in sync with bgColor ────────────────────
@@ -143,12 +143,12 @@ export default function App() {
   )
   const levaSet = useCallback((vals) => {
     const t = {}, s = {}, v = {}
-    if (vals.resolution   != null) t.resolution   = vals.resolution
-    if (vals.lineSpacing  != null) t.lineSpacing   = vals.lineSpacing
-    if (vals.shiftLines   != null) t.shiftLines    = vals.shiftLines
-    if (vals.shiftPeaks   != null) t.shiftPeaks    = vals.shiftPeaks
+    if (vals.resolution   != null) t.resolution    = vals.resolution
+    if (vals.gridOffsetX  != null) t.gridOffsetX   = vals.gridOffsetX
+    if (vals.gridOffsetY  != null) t.gridOffsetY   = vals.gridOffsetY
     if (vals.blackPoint   != null) t.blackPoint    = vals.blackPoint
     if (vals.whitePoint   != null) t.whitePoint    = vals.whitePoint
+    if (vals.lineSpacing  != null) s.lineSpacing   = vals.lineSpacing
     if (vals.drawMode     != null) s.drawMode      = vals.drawMode
     if (vals.flowStep     != null) s.flowStep      = vals.flowStep
     if (vals.flowMaxLen   != null) s.flowMaxLen    = vals.flowMaxLen

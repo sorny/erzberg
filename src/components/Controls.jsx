@@ -95,10 +95,10 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
         case 'KeyG': levaSet({ showGuides: !(v.showGuides) }); break
 
         // ── Sub-pixel offsets ────────────────────────────────────────────────
-        case 'ArrowUp':    levaSet({ shiftLines: ((v.shiftLines ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowDown':  levaSet({ shiftLines: (((v.shiftLines ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowRight': levaSet({ shiftPeaks: ((v.shiftPeaks ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
-        case 'ArrowLeft':  levaSet({ shiftPeaks: (((v.shiftPeaks ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
+        case 'ArrowUp':    levaSet({ gridOffsetY: ((v.gridOffsetY ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
+        case 'ArrowDown':  levaSet({ gridOffsetY: (((v.gridOffsetY ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
+        case 'ArrowRight': levaSet({ gridOffsetX: ((v.gridOffsetX ?? 0) + 1) % Math.max(1, v.resolution ?? 4) }); break
+        case 'ArrowLeft':  levaSet({ gridOffsetX: (((v.gridOffsetX ?? 0) - 1) + Math.max(1, v.resolution ?? 4)) % Math.max(1, v.resolution ?? 4) }); break
 
         default: return
       }
