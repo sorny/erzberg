@@ -69,7 +69,7 @@ function LoadingOverlay({ msg }) {
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker, isLoading, loadingMsg } = useHeightmap()
+  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
@@ -240,6 +240,7 @@ export default function App() {
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
         loadFromPicker={loadFromPicker}
+        loadGeoTiffFromPicker={loadGeoTiffFromPicker}
         onSvg={() => setSvgTrigger(n => n + 1)}
         onDxf={() => setDxfTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}
@@ -292,7 +293,7 @@ export default function App() {
       {isComputing && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
-      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} />}
+      {noHmap && !isLoading && <EmptyState onLoad={loadFromPicker} onLoadGeoTiff={loadGeoTiffFromPicker} />}
     </div>
   )
 }
@@ -311,7 +312,7 @@ function CenterGuides({ bgColor }) {
   )
 }
 
-function EmptyState({ onLoad }) {
+function EmptyState({ onLoad, onLoadGeoTiff }) {
   return (
     <div style={{
       position:'fixed', inset:0, zIndex:3000,
@@ -320,17 +321,25 @@ function EmptyState({ onLoad }) {
     }}>
       <div style={{ fontSize:56, marginBottom:16, lineHeight:1 }}>⛰</div>
       <div style={{ fontSize:22, fontWeight:700, color:'#111', marginBottom:8 }}>No heightmap loaded</div>
-      <div style={{ fontSize:14, color:'#666', marginBottom:28, textAlign:'center', maxWidth:320 }}>
-        Load any greyscale PNG.<br/>
+      <div style={{ fontSize:14, color:'#666', marginBottom:28, textAlign:'center', maxWidth:340 }}>
+        Load a greyscale PNG or a GeoTIFF with real elevation data.<br/>
         <a href="https://tangrams.github.io/heightmapper" target="_blank" rel="noreferrer"
           style={{ color:'#444' }}>Tangrams Heightmapper</a> exports OSM-based heightmaps.
       </div>
-      <button onClick={onLoad} style={{
-        background:'#111', color:'#fff', border:'none', borderRadius:10,
-        padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
-      }}>
-        Load Heightmap
-      </button>
+      <div style={{ display:'flex', gap:12 }}>
+        <button onClick={onLoad} style={{
+          background:'#111', color:'#fff', border:'none', borderRadius:10,
+          padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
+        }}>
+          PNG / Image
+        </button>
+        <button onClick={onLoadGeoTiff} style={{
+          background:'#2563eb', color:'#fff', border:'none', borderRadius:10,
+          padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
+        }}>
+          GeoTIFF
+        </button>
+      </div>
     </div>
   )
 }

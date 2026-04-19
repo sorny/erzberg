@@ -186,7 +186,7 @@ export function Sidebar({
   view,    setView,
   gradientStops, setGradientStops,
   heightmapPixels, heightmapFilename,
-  loadFromPicker,
+  loadFromPicker, loadGeoTiffFromPicker,
   onSvg, onDxf, onPng,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
@@ -267,13 +267,22 @@ export function Sidebar({
 
           {/* ── Load ──────────────────────────────────────────────────────── */}
           <div style={{ padding:'12px 14px', borderBottom:`1px solid ${BORDER}` }}>
-            <button className="hmload" onClick={loadFromPicker} style={{
-              display:'block', width:'100%', padding:8, textAlign:'center',
-              background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`,
-              borderRadius:5, cursor:'pointer', fontSize:11,
-            }}>
-              ↑ &nbsp;Load Heightmap
-            </button>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+              <button className="hmload" onClick={loadFromPicker} style={{
+                padding:8, textAlign:'center',
+                background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`,
+                borderRadius:5, cursor:'pointer', fontSize:11,
+              }}>
+                ↑ &nbsp;PNG / Image
+              </button>
+              <button className="hmload" onClick={loadGeoTiffFromPicker} style={{
+                padding:8, textAlign:'center',
+                background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`,
+                borderRadius:5, cursor:'pointer', fontSize:11,
+              }}>
+                ↑ &nbsp;GeoTIFF
+              </button>
+            </div>
             {heightmapFilename && (
               <div style={{ marginTop:5, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {heightmapFilename}
