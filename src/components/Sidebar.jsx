@@ -386,7 +386,6 @@ export function Sidebar({
                   ))}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-                <ColorRow label="High color" value={style.lineColorHigh} onChange={v => ss({ lineColorHigh: v })} />
               </div>
             )}
 

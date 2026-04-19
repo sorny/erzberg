@@ -46,16 +46,10 @@ export function sampleGradient(stops, t) {
  * @param {object} terrain   { maxSlope }
  */
 export function computeVertexColor(normElev, slope, params, terrain) {
-  const {
-    lineColor, lineColorHigh,
-    lineGradient, gradientStops,
-  } = params
+  const { lineColor, lineGradient, gradientStops } = params
 
-  if (lineGradient) {
-    if (gradientStops && gradientStops.length > 1) {
-      return sampleGradient(gradientStops, normElev)
-    }
-    return lerpRgb(hexToRgb(lineColor), hexToRgb(lineColorHigh), normElev)
+  if (lineGradient && gradientStops && gradientStops.length > 1) {
+    return sampleGradient(gradientStops, normElev)
   }
 
   return hexToRgb(lineColor)

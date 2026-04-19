@@ -24,7 +24,7 @@ const STYLE_DEF = {
   drawMode: 'lines-x', tightness: 0, hachureLength: 1, contourInterval: 5,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   showFill: false, showMesh: false, bgColor: '#ffffff',
-  lineGradient: false, lineColorHigh: '#ff6b6b',
+  lineGradient: false,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -80,7 +80,7 @@ export default function App() {
   const [style,   setStyle]   = useState(STYLE_DEF)
   const [points,  setPoints]  = useState(POINTS_DEF)
   const [view,    setView]    = useState(VIEW_DEF)
-  const [gradientStops, setGradientStops] = useState(GRADIENT_PRESETS['Mono'])
+  const [gradientStops, setGradientStops] = useState(GRADIENT_PRESETS['Jet'])
   const [webmDuration, setWebmDuration]   = useState(5)
 
   // ── Export triggers ───────────────────────────────────────────────────────
@@ -257,7 +257,7 @@ export default function App() {
         onReset={() => {
           setTerrain(TERRAIN_DEF); setStyle(STYLE_DEF)
           setPoints(POINTS_DEF);   setView(VIEW_DEF)
-          setGradientStops(GRADIENT_PRESETS['Mono'])
+          setGradientStops(GRADIENT_PRESETS['Jet'])
         }}
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}
