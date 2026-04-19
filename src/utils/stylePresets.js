@@ -14,7 +14,7 @@ export const STYLE_PRESETS = {
       drawMode: 'contours',
       lineColor: '#7b4f2e', bgColor: '#f2ede4',
       strokeWeight: 1, showFill: false, showMesh: false,
-      lineGradient: false, contourInterval: 5, lineDash: 'solid',
+      lineGradient: false, contourInterval: 2, lineDash: 'solid',
     },
     gradientStops: null,   // leave gradient unchanged
   },

@@ -31,6 +31,7 @@ const STYLE_DEF = {
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
+  particlePeaksOnly: false,
   animateParticles: false, particleNoise: 1, particleDamping: 0.92,
   particleGravity: false, particleGravityStr: 1,
 }

@@ -487,6 +487,7 @@ export function Sidebar({
             {points.showPoints && (
               <>
                 <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
+                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
                 <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
                 {points.animateParticles && (
                   <>

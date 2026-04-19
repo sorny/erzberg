@@ -86,6 +86,45 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
   const homePositions = useMemo(() => {
     if (!terrain) return null
     const { grid, rows, cols, scl, halfW, halfH } = terrain
+
+    if (p.particlePeaksOnly) {
+      // One peak + one valley particle per drawn line
+      const lineStep = Math.max(1, Math.round((p.lineSpacing ?? 4) / scl))
+      const pts = []
+      const byCol = p.drawMode === 'lines-y'
+
+      if (byCol) {
+        for (let c = 0; c < cols; c++) {
+          if (c % lineStep !== 0) continue
+          let maxR = 0, minR = 0, maxElev = -Infinity, minElev = Infinity
+          for (let r = 0; r < rows; r++) {
+            const elev = cellElev(grid, r, c, cols, p.elevScale, p.jitterAmt)
+            if (elev > maxElev) { maxElev = elev; maxR = r }
+            if (elev < minElev) { minElev = elev; minR = r }
+          }
+          const x = c * scl - halfW
+          pts.push(x, maxElev, maxR * scl - halfH)
+          if (maxR !== minR) pts.push(x, minElev, minR * scl - halfH)
+        }
+      } else {
+        for (let r = 0; r < rows; r++) {
+          if (r % lineStep !== 0) continue
+          let maxC = 0, minC = 0, maxElev = -Infinity, minElev = Infinity
+          for (let c = 0; c < cols; c++) {
+            const elev = cellElev(grid, r, c, cols, p.elevScale, p.jitterAmt)
+            if (elev > maxElev) { maxElev = elev; maxC = c }
+            if (elev < minElev) { minElev = elev; minC = c }
+          }
+          const z = r * scl - halfH
+          pts.push(maxC * scl - halfW, maxElev, z)
+          if (maxC !== minC) pts.push(minC * scl - halfW, minElev, z)
+        }
+      }
+
+      return new Float32Array(pts)
+    }
+
+    // Default: particle at every terrain vertex
     const n = rows * cols
     const home = new Float32Array(n * 3)
     for (let r = 0; r < rows; r++) {
@@ -98,7 +137,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       }
     }
     return home
-  }, [terrain, p.elevScale, p.jitterAmt])
+  }, [terrain, p.elevScale, p.jitterAmt, p.particlePeaksOnly, p.lineSpacing, p.drawMode])
 
   // Rebuild physics arrays + geometry when home positions change
   useEffect(() => {
