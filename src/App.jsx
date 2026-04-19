@@ -91,14 +91,6 @@ export default function App() {
 
   const orbitRef = useRef()
 
-  // ── When elevation gradient is first enabled → switch to Topo ────────────
-  const prevLineGradient = useRef(false)
-  useEffect(() => {
-    if (style.lineGradient && !prevLineGradient.current) {
-      setGradientStops(GRADIENT_PRESETS['Topo'])
-    }
-    prevLineGradient.current = style.lineGradient
-  }, [style.lineGradient]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Preset helpers ────────────────────────────────────────────────────────
   const savePreset = useCallback(() => {
