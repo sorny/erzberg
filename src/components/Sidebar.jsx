@@ -380,7 +380,7 @@ export function Sidebar({
           <Section title="Style" open={sec.style} onToggle={() => tog('style')}>
             {/* Style presets */}
             <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Presets</span>
+              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
                 {Object.entries(STYLE_PRESETS).map(([name, preset]) => (
                   <button key={name} onClick={() => applyPreset(preset)}
