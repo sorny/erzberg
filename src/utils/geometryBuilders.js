@@ -22,11 +22,6 @@ function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
   return n >= elevMinCut / 100 && n <= elevMaxCut / 100
 }
 
-function effectiveLineStep(baseStep, rowSlope, maxSlope, slopeSpacing, slopeSpacingStr) {
-  if (!slopeSpacing || maxSlope === 0) return baseStep
-  const ns = rowSlope / maxSlope
-  return Math.max(1, Math.round(baseStep * (1 - ns * Math.min(1, slopeSpacingStr / 10))))
-}
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +54,7 @@ function buildRidgelines(terrain, p, isY) {
   const {
     lineSpacing, elevScale,
     elevMinCut, elevMaxCut,
-    jitterAmt, slopeSpacing, slopeSpacingStr,
+    jitterAmt,
   } = p
 
   const lineStep = Math.max(1, Math.round(lineSpacing / scl))
@@ -69,21 +64,8 @@ function buildRidgelines(terrain, p, isY) {
   const positions = []
   const colors = []
 
-  let lastOuter = -Infinity
-
   for (let outer = 0; outer < outerCount; outer++) {
-    // Per-outer slope for slope-driven spacing
-    let outerSlope = 0
-    if (slopeSpacing) {
-      for (let inner = 0; inner < innerCount; inner++) {
-        const idx = isY ? inner * cols + outer : outer * cols + inner
-        if (gridSlopes[idx] > outerSlope) outerSlope = gridSlopes[idx]
-      }
-    }
-
-    const effStep = effectiveLineStep(lineStep, outerSlope, maxSlope, slopeSpacing, slopeSpacingStr)
-    if (outer > 0 && outer - lastOuter < effStep) continue
-    lastOuter = outer
+    if (outer % lineStep !== 0) continue
 
     const outerPos = outer * scl - (isY ? halfW : halfH)
 
@@ -142,7 +124,7 @@ function buildCurves(terrain, p) {
   const {
     lineSpacing, elevScale, tightness,
     elevMinCut, elevMaxCut,
-    jitterAmt, slopeSpacing, slopeSpacingStr,
+    jitterAmt,
   } = p
 
   const lineStep = Math.max(1, Math.round(lineSpacing / scl))
@@ -151,16 +133,8 @@ function buildCurves(terrain, p) {
   const positions = []
   const colors = []
 
-  let lastRow = -Infinity
-
   for (let r = 0; r < rows; r++) {
-    let rowSlope = 0
-    if (slopeSpacing) {
-      for (let c = 0; c < cols; c++) rowSlope = Math.max(rowSlope, gridSlopes[r * cols + c])
-    }
-    const effStep = effectiveLineStep(lineStep, rowSlope, maxSlope, slopeSpacing, slopeSpacingStr)
-    if (r > 0 && r - lastRow < effStep) continue
-    lastRow = r
+    if (r % lineStep !== 0) continue
 
     const z = r * scl - halfH
 

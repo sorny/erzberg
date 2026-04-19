@@ -31,10 +31,8 @@ export function useTerrainGeometry(p) {
     terrain,
     p.drawMode, p.lineSpacing, p.tightness, p.hachureLength, p.contourInterval,
     p.elevMinCut, p.elevMaxCut,
-    p.jitterAmt, p.slopeSpacing, p.slopeSpacingStr,
+    p.jitterAmt,
     p.lineColor, p.lineColorHigh, p.lineGradient, p.gradientStops,
-    p.strokeByElev, p.strokeElevLow, p.strokeElevHigh,
-    p.slopeOpacity,
   ])
 
   // Surface mesh geometry (for fill / depth occlusion)

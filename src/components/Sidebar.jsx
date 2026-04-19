@@ -294,10 +294,6 @@ export function Sidebar({
               <Sl label="Elev max cut"            min={0}  max={100} value={terrain.elevMaxCut}    onChange={v => st({ elevMaxCut: v })}  fmt={v => v+'%'} />
               <Sl label="Jitter"                  min={0}  max={20}  step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} col2 />
             </div>
-            <Tog label="Slope spacing" checked={terrain.slopeSpacing} onChange={v => st({ slopeSpacing: v })} />
-            {terrain.slopeSpacing && (
-              <InlineSl label="Strength" min={1} max={10} value={terrain.slopeSpacingStr} onChange={v => st({ slopeSpacingStr: v })} />
-            )}
           </Section>
 
           {/* ── Levels ────────────────────────────────────────────────────── */}
@@ -394,17 +390,6 @@ export function Sidebar({
               </div>
             )}
 
-            {/* Wt by elev + Opacity/slope */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Tog label="Wt by elev"    checked={style.strokeByElev}  onChange={v => ss({ strokeByElev: v })}  small />
-              <Tog label="Opacity/slope" checked={style.slopeOpacity}  onChange={v => ss({ slopeOpacity: v })}  small />
-            </div>
-            {style.strokeByElev && (
-              <>
-                <InlineSl label="Wt low"  min={0} max={1} step={0.01} value={style.strokeElevLow}  onChange={v => ss({ strokeElevLow: v })}  fmt={v => v.toFixed(2)} />
-                <InlineSl label="Wt high" min={0} max={1} step={0.01} value={style.strokeElevHigh} onChange={v => ss({ strokeElevHigh: v })} fmt={v => v.toFixed(2)} />
-              </>
-            )}
           </Section>
 
           {/* ── Points ────────────────────────────────────────────────────── */}

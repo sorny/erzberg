@@ -49,41 +49,14 @@ export function computeVertexColor(normElev, slope, params, terrain) {
   const {
     lineColor, lineColorHigh,
     lineGradient, gradientStops,
-    strokeByElev, strokeElevLow, strokeElevHigh,
-    slopeOpacity,
-    bgColor,
   } = params
-
-  let rgb
 
   if (lineGradient) {
     if (gradientStops && gradientStops.length > 1) {
-      rgb = sampleGradient(gradientStops, normElev)
-    } else {
-      rgb = lerpRgb(hexToRgb(lineColor), hexToRgb(lineColorHigh), normElev)
+      return sampleGradient(gradientStops, normElev)
     }
-  } else {
-    rgb = hexToRgb(lineColor)
+    return lerpRgb(hexToRgb(lineColor), hexToRgb(lineColorHigh), normElev)
   }
 
-  // Stroke-weight-by-elevation: lerp toward bgColor at low elevations.
-  // Simulates a thinner (less opaque) stroke where elevation is low.
-  if (strokeByElev) {
-    const lo = strokeElevLow  ?? 0
-    const hi = strokeElevHigh ?? 1
-    const t  = hi > lo ? Math.max(0, Math.min(1, (normElev - lo) / (hi - lo))) : 1
-    const weight = 0.1 + 0.9 * t   // 0.1 at low end, 1.0 at high end
-    const bg = hexToRgb(bgColor ?? '#ffffff')
-    rgb = lerpRgb(bg, rgb, weight)
-  }
-
-  // Slope-opacity: premultiply toward zero (transparent) for flat areas
-  if (slopeOpacity && terrain.maxSlope > 0) {
-    const ns = Math.min(1, slope / terrain.maxSlope)
-    const alpha = Math.max(0.05, ns)
-    const bg = hexToRgb(bgColor ?? '#ffffff')
-    rgb = lerpRgb(bg, rgb, alpha)
-  }
-
-  return rgb  // [r, g, b]
+  return hexToRgb(lineColor)
 }

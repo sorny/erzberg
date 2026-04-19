@@ -92,7 +92,7 @@ export function Scene({
       {!webmRecording && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>
           <GizmoViewport
-            axisColors={['#ff4444', '#44dd44', '#4488ff']}
+            axisColors={['#e05555', '#55bb55', '#5588dd']}
             labelColor="#ffffff"
           />
         </GizmoHelper>

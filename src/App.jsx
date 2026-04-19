@@ -16,16 +16,15 @@ import { startWebM, stopWebM, isRecording } from './utils/webmRecorder'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
-  resolution: 4, lineSpacing: 8, elevScale: 1.5, blurRadius: 0,
+  resolution: 2, lineSpacing: 4, elevScale: 1.0, blurRadius: 0,
   shiftLines: 0, shiftPeaks: 0, elevMinCut: 0, elevMaxCut: 100,
-  blackPoint: 0, whitePoint: 255, jitterAmt: 0, slopeSpacing: false, slopeSpacingStr: 5,
+  blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
 const STYLE_DEF = {
   drawMode: 'lines-x', tightness: 0, hachureLength: 1, contourInterval: 5,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   showFill: false, showMesh: false, bgColor: '#ffffff',
   lineGradient: false, lineColorHigh: '#ff6b6b',
-  strokeByElev: false, strokeElevLow: 0, strokeElevHigh: 1, slopeOpacity: false,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
