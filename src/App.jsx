@@ -26,7 +26,7 @@ const STYLE_DEF = {
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
-  showFill: false, fillColor: '#ffffff', showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
+  showFill: true, fillColor: '#ffffff', showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
   lineGradient: false,
 }

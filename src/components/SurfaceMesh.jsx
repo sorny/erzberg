@@ -48,9 +48,7 @@ const SURFACE_VERT = /* glsl */ `
   }
 `
 const SURFACE_FRAG = /* glsl */ `
-  uniform vec3      uBgColor;
   uniform vec3      uFillColor;
-  uniform bool      uShowFill;
   uniform bool      uGradient;
   uniform bool      uRawTerrain;
   uniform sampler2D uGradientTex;
@@ -68,10 +66,6 @@ const SURFACE_FRAG = /* glsl */ `
         ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
         : uFillColor;
       gl_FragColor = vec4(base * (0.2 + diff), 1.0);
-      return;
-    }
-    if (!uShowFill) {
-      gl_FragColor = vec4(uBgColor, 1.0);
       return;
     }
     vec3 col = uGradient
@@ -121,9 +115,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     polygonOffsetFactor: 2,
     polygonOffsetUnits:  2,
     uniforms: {
-      uBgColor:     { value: new THREE.Vector3(1, 1, 1) },
       uFillColor:   { value: new THREE.Vector3(1, 1, 1) },
-      uShowFill:    { value: false },
       uGradient:    { value: false },
       uRawTerrain:  { value: false },
       uGradientTex: { value: null },
@@ -133,13 +125,13 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   // Update uniforms reactively (no material recreation needed)
   useEffect(() => {
     if (!surfMat) return
-    surfMat.uniforms.uBgColor.value.set(...hexToRgb(p.bgColor))
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
-    surfMat.uniforms.uShowFill.value = p.showFill
     surfMat.uniforms.uGradient.value = p.lineGradient && (p.showFill || p.showRawTerrain)
     surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
+    // When fill is off: depth-only occluder — write depth but no colour
+    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
     surfMat.needsUpdate = true
-  }, [surfMat, p.bgColor, p.fillColor, p.showFill, p.lineGradient, p.showRawTerrain])
+  }, [surfMat, p.fillColor, p.showFill, p.lineGradient, p.showRawTerrain])
 
   useEffect(() => {
     if (!surfMat) return
