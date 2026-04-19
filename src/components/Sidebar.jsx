@@ -392,9 +392,9 @@ export function Sidebar({
 
           </Section>
 
-          {/* ── Points ────────────────────────────────────────────────────── */}
-          <Section title="Points" open={sec.points} onToggle={() => tog('points')}>
-            <TogColor label="Points" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
+          {/* ── Particles ─────────────────────────────────────────────────── */}
+          <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
+            <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <>
                 <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />

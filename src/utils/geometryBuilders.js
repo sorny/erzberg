@@ -181,28 +181,33 @@ function buildHachure(terrain, p) {
   const colors = []
 
   for (let r = 0; r < rows; r += lineStep) {
-    for (let c = 0; c < cols; c++) {
+    for (let c = 0; c < cols; c += lineStep) {   // same spacing in both axes
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
 
-      // Finite-difference gradient (in brightness units)
-      const bC = grid[r * cols + c]
-      const bR = c < cols - 1 ? grid[r * cols + c + 1] : bC
-      const bD = r < rows - 1 ? grid[(r + 1) * cols + c] : bC
-      const gx = (bR - bC) * 100 * elevScale
-      const gz = (bD - bC) * 100 * elevScale
+      // Central-difference gradient (smoother direction than forward differences)
+      const bC  = grid[r * cols + c]
+      const bL  = c > 0       ? grid[r * cols + c - 1]       : bC
+      const bR  = c < cols-1  ? grid[r * cols + c + 1]       : bC
+      const bU  = r > 0       ? grid[(r - 1) * cols + c]     : bC
+      const bD  = r < rows-1  ? grid[(r + 1) * cols + c]     : bC
+      const gx = (bR - bL) * 50 * elevScale   // elevation rise per grid step in X
+      const gz = (bD - bU) * 50 * elevScale   // elevation rise per grid step in Z
       const mag = Math.sqrt(gx * gx + gz * gz)
-      if (mag < 0.01) continue  // flat — no hachure
+      if (mag < 0.005) continue   // flat cell — skip
 
-      // Perpendicular to gradient direction
-      const tickLen = mag * hachureLength * scl * 0.5
-      const px = -gz / mag * tickLen
-      const pz = gx / mag * tickLen
+      // Tick runs PERPENDICULAR to gradient (along the contour)
+      const tickLen = mag * hachureLength * scl
+      const nx = -gz / mag   // perpendicular unit vector X
+      const nz =  gx / mag   // perpendicular unit vector Z
 
       const wx = c * scl - halfW
       const wz = r * scl - halfH
 
-      positions.push(wx - px, elev, wz - pz, wx + px, elev, wz + pz)
+      positions.push(
+        wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5,
+        wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5,
+      )
 
       const slope = gridSlopes[r * cols + c]
       const col = computeVertexColor(normElev(elev, minZ, maxZ), slope, p, terrain)

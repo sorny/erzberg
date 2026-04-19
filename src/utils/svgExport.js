@@ -25,15 +25,19 @@ const EPS_VIEW  = 1.0
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
 /**
- * Rasterise every surface triangle into a full-resolution Z buffer that stores
- * the MAXIMUM view-space Z (= closest-to-camera surface) at each pixel.
+ * Rasterise every surface triangle into a full-resolution depth buffer.
  *
- * Returns a sampler:  sample(sx, sy) → view-space Z of closest surface (-Infinity
- * when no surface covers that pixel, i.e. open sky).
+ * Depth value stored: inv_w = 1 / depth_to_camera  (= 1 / (-viewZ), always > 0).
+ * This is the quantity that IS linearly interpolated in screen space for a
+ * perspective-correct result (unlike view-space Z itself, which is not).
+ * The buffer stores the MAXIMUM inv_w (= closest-to-camera surface).
+ *
+ * Returns a sampler: sample(sx, sy) → view-space Z of closest surface
+ * (-Infinity when no surface covers that pixel, i.e. open sky).
  */
 function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
   // Full resolution — half-res misses thin peak edges on dense grids.
-  const buf = new Float32Array(W * H).fill(-Infinity)
+  const buf = new Float32Array(W * H).fill(0)   // 0 = no surface (inv_w = 0)
 
   const { positions, indices } = surfaceGeo
   const nVerts = positions.length / 3
@@ -41,19 +45,19 @@ function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
 
   const vx  = new Float32Array(nVerts)  // screen X
   const vy  = new Float32Array(nVerts)  // screen Y
-  const vd  = new Float32Array(nVerts)  // view-space Z (negative in front of camera)
+  const vd  = new Float32Array(nVerts)  // inv_w = 1 / depth_to_camera (> 0)
 
-  const wld = new THREE.Vector3()  // world-space scratch
-  const viw = new THREE.Vector3()  // view-space scratch
+  const wld = new THREE.Vector3()
+  const viw = new THREE.Vector3()
 
   for (let i = 0; i < nVerts; i++) {
     wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-    wld.applyMatrix4(groupMatrix)          // local → world
+    wld.applyMatrix4(groupMatrix)
 
-    viw.copy(wld).applyMatrix4(camInv)    // world → view; viw.z is negative
-    vd[i] = viw.z
+    viw.copy(wld).applyMatrix4(camInv)
+    vd[i] = 1.0 / (-viw.z)   // viw.z < 0 in front → inv_w > 0; larger = closer
 
-    wld.project(camera)                   // world → NDC → screen
+    wld.project(camera)
     vx[i] = ( wld.x + 1) * 0.5 * W
     vy[i] = (-wld.y + 1) * 0.5 * H
   }
@@ -67,11 +71,12 @@ function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
   return (sx, sy) => {
     const xi = Math.min(W - 1, Math.max(0, Math.round(sx)))
     const yi = Math.min(H - 1, Math.max(0, Math.round(sy)))
-    return buf[yi * W + xi]   // -Infinity = open sky (line always visible)
+    const inv_w = buf[yi * W + xi]
+    return inv_w > 0 ? -1.0 / inv_w : -Infinity   // -Infinity = open sky
   }
 }
 
-/** Scan-line triangle fill storing MAXIMUM view-space Z per pixel. */
+/** Scan-line triangle fill storing MAXIMUM inv_w (closest surface) per pixel. */
 function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
   // Sort top-to-bottom
   if (y1 < y0) { let t; t=x0;x0=x1;x1=t; t=y0;y0=y1;y1=t; t=d0;d0=d1;d1=t }
@@ -109,9 +114,9 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
 
     for (let x = Math.max(0, Math.ceil(xL)); x <= Math.min(W - 1, Math.floor(xR)); x++) {
       const t = dx > 0 ? (x - xL) / dx : 0
-      const d = dL + (dR - dL) * t
+      const d = dL + (dR - dL) * t   // inv_w; perspective-correct since 1/w is linear
       const idx = y * W + x
-      if (d > buf[idx]) buf[idx] = d   // MAX: store closest surface (least-negative Z)
+      if (d > buf[idx]) buf[idx] = d   // MAX inv_w = closest surface to camera
     }
   }
 }
