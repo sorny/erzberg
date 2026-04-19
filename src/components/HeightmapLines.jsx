@@ -47,7 +47,9 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
     if (lineGeo.colors && lineGeo.colors.length === lineGeo.positions.length) {
       geo.setColors(lineGeo.colors)
     }
-    return new LineSegments2(geo, lineMaterial)
+    const lines = new LineSegments2(geo, lineMaterial)
+    lines.computeLineDistances()
+    return lines
   }, [lineGeo, lineMaterial])
 
   // Dispose geometry when object changes

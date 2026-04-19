@@ -47,7 +47,7 @@ export const STYLE_PRESETS = {
 
   'Burnt Paper': {
     style: {
-      drawMode: 'curves',
+      drawMode: 'lines-x',
       lineColor: '#c86420', bgColor: '#140802',
       strokeWeight: 1.5, showFill: true, showMesh: false,
       lineGradient: true, lineDash: 'solid',

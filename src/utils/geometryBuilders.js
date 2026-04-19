@@ -7,7 +7,6 @@
  * These arrays are passed directly to LineSegmentsGeometry.setPositions / setColors.
  */
 
-import * as THREE from 'three'
 import { cellElev } from './terrain'
 import { hexToRgb, sampleGradient, computeVertexColor } from './colorUtils'
 
@@ -35,7 +34,6 @@ export function buildLineGeometry(terrain, p) {
   switch (p.drawMode) {
     case 'lines-x':    return buildRidgelines(terrain, p, false)
     case 'lines-y':    return buildRidgelines(terrain, p, true)
-    case 'curves':     return buildCurves(terrain, p)
     case 'crosshatch': return buildCrosshatch(terrain, p)
     case 'hachure':    return buildHachure(terrain, p)
     case 'contours':   return buildContours(terrain, p)
@@ -116,59 +114,6 @@ function buildCrosshatch(terrain, p) {
     positions: concat(x.positions, y.positions),
     colors: concat(x.colors, y.colors),
   }
-}
-
-// ─── Curves (Catmull-Rom) ─────────────────────────────────────────────────────
-
-function buildCurves(terrain, p) {
-  const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
-  const {
-    lineSpacing, elevScale, tightness,
-    elevMinCut, elevMaxCut,
-    jitterAmt,
-  } = p
-
-  const lineStep = Math.max(1, Math.round(lineSpacing / scl))
-  const tension = Math.max(0, Math.min(1, 0.5 + tightness * 0.05))  // map -5..5 → 0..1
-
-  const positions = []
-  const colors = []
-
-  for (let r = 0; r < rows; r++) {
-    if (r % lineStep !== 0) continue
-
-    const z = r * scl - halfH
-
-    // Control points for CatmullRom
-    const ctrlPts = []
-    for (let c = 0; c < cols; c++) {
-      const x = c * scl - halfW
-      const y = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      ctrlPts.push(new THREE.Vector3(x, y, z))
-    }
-
-    if (ctrlPts.length < 2) continue
-
-    const curve = new THREE.CatmullRomCurve3(ctrlPts, false, 'catmullrom', tension)
-    const samples = Math.max(cols * 2, 64)
-    const pts = curve.getPoints(samples)
-
-    for (let i = 0; i < pts.length - 1; i++) {
-      const a = pts[i], b = pts[i + 1]
-      if (!inElevCut(a.y, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-      if (!inElevCut(b.y, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-
-      positions.push(a.x, a.y, a.z, b.x, b.y, b.z)
-
-      const nA = normElev(a.y, minZ, maxZ)
-      const nB = normElev(b.y, minZ, maxZ)
-      const colA = computeVertexColor(nA, 0, p, terrain)
-      const colB = computeVertexColor(nB, 0, p, terrain)
-      colors.push(...colA, ...colB)
-    }
-  }
-
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
 // ─── Hachure ──────────────────────────────────────────────────────────────────

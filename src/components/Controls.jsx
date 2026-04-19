@@ -25,7 +25,7 @@ import { useEffect, useRef } from 'react'
 import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-const DRAW_MODES = ['lines-x', 'lines-y', 'curves', 'crosshatch', 'hachure', 'contours', 'flow']
+const DRAW_MODES = ['lines-x', 'lines-y', 'crosshatch', 'hachure', 'contours', 'flow']
 
 export function Controls({ levaGet, levaSet, orbitRef }) {
   const { camera } = useThree()

@@ -209,6 +209,12 @@ export function Sidebar({
   const sp = (v) => setPoints(p => ({ ...p, ...v }))
   const sv = (v) => setView(p => ({ ...p, ...v }))
 
+  // GeoTIFF elevation cut helpers (convert % ↔ metres)
+  const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
+  const elevRange   = hasGeoTiff ? geoTiffElevMax - geoTiffElevMin : 0
+  const elevCutToM  = (pct) => Math.round(geoTiffElevMin + (pct / 100) * elevRange)
+  const mToElevCut  = (m)   => Math.round(((m - geoTiffElevMin) / elevRange) * 100)
+
   // Apply a style preset
   const applyPreset = (preset) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
@@ -219,7 +225,6 @@ export function Sidebar({
   const MODES = [
     { id:'lines-x',    label:'X' },
     { id:'lines-y',    label:'Y' },
-    { id:'curves',     label:'Curves' },
     { id:'crosshatch', label:'Cross' },
     { id:'hachure',    label:'Hachure' },
     { id:'contours',   label:'Contours' },
@@ -308,8 +313,15 @@ export function Sidebar({
               <Sl label="Blur"                    min={0}  max={10}  value={terrain.blurRadius}    onChange={v => st({ blurRadius: v })} />
               <Sl label="Shift lines"  hint="↑↓"  min={0}  max={19}  value={terrain.shiftLines}    onChange={v => st({ shiftLines: v })} />
               <Sl label="Shift peaks"  hint="←→"  min={0}  max={19}  value={terrain.shiftPeaks}    onChange={v => st({ shiftPeaks: v })} />
-              <Sl label="Elev min cut"            min={0}  max={100} value={terrain.elevMinCut}    onChange={v => st({ elevMinCut: v })}  fmt={v => v+'%'} />
-              <Sl label="Elev max cut"            min={0}  max={100} value={terrain.elevMaxCut}    onChange={v => st({ elevMaxCut: v })}  fmt={v => v+'%'} />
+              {hasGeoTiff ? (<>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </>) : (<>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </>)}
               <Sl label="Jitter"                  min={0}  max={20}  step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} col2 />
             </div>
           </Section>
@@ -418,7 +430,6 @@ export function Sidebar({
               </div>
             </div>
 
-            {style.drawMode === 'curves'   && <InlineSl label="Tightness"  min={-5}  max={5}   step={0.1}  value={style.tightness}      onChange={v => ss({ tightness: v })}      fmt={v => v.toFixed(1)} />}
             {style.drawMode === 'hachure'  && <InlineSl label="Length"     min={0.1} max={5}   step={0.1}  value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
             {style.drawMode === 'contours' && <InlineSl label="Interval"   min={0.5} max={30}  step={0.5}  value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
             {style.drawMode === 'flow' && (<>

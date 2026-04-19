@@ -22,7 +22,7 @@ const TERRAIN_DEF = {
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
 const STYLE_DEF = {
-  drawMode: 'lines-x', tightness: 0, hachureLength: 1, contourInterval: 5,
+  drawMode: 'lines-x', hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
@@ -220,7 +220,7 @@ export default function App() {
 
   const DRAW_MODE_LABELS = {
     'lines-x': 'X Ridge Lines', 'lines-y': 'Y Ridge Lines',
-    curves: 'Curves', crosshatch: 'Cross-Hatch',
+    crosshatch: 'Cross-Hatch',
     hachure: 'Hachure', contours: 'Contours',
     flow: 'Flow Lines',
   }
