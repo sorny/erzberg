@@ -233,6 +233,9 @@ export function Sidebar({
     { id:'flow',       label:'Flow' },
   ]
 
+  // Line shift range (grid steps between drawn lines)
+  const lineStep = terrainData ? Math.max(1, Math.round((style.lineSpacing ?? 4) / terrainData.scl)) : 1
+
   // Stats
   const segs  = lineGeo    ? (lineGeo.positions.length / 6).toLocaleString()     : '–'
   const verts = lineGeo    ? (lineGeo.positions.length / 3).toLocaleString()     : '–'
@@ -440,9 +443,10 @@ export function Sidebar({
                 min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
               />
             )}
-            {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && (
-              <InlineSl label="Line shift" min={0} max={100} value={style.lineShift ?? 0}
-                onChange={v => ss({ lineShift: v })} fmt={v => v + '%'} />
+            {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && lineStep > 1 && (
+              <InlineSl label="Line shift" min={0} max={lineStep - 1}
+                value={Math.min(style.lineShift ?? 0, lineStep - 1)}
+                onChange={v => ss({ lineShift: v })} />
             )}
             {style.drawMode === 'hachure'  && <InlineSl label="Length"   min={0.1} max={5}   step={0.1} value={style.hachureLength}   onChange={v => ss({ hachureLength: v })}   fmt={v => v.toFixed(1)} />}
             {style.drawMode === 'contours' && <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}

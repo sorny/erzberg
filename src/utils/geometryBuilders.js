@@ -57,7 +57,7 @@ function buildRidgelines(terrain, p, isY) {
   } = p
 
   const lineStep   = Math.max(1, Math.round(lineSpacing / scl))
-  const lineOffset = Math.round(((lineShift ?? 0) / 100) * lineStep) % lineStep
+  const lineOffset = (lineShift ?? 0) % lineStep
   const outerCount = isY ? cols : rows
   const innerCount = isY ? rows : cols
 
