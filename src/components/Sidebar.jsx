@@ -364,7 +364,7 @@ export function Sidebar({
               {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
-              {hasMode('contours') && <InlineSl label="Interval" min={0.5} max={30} step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} />}
+              {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}
               {hasMode('flow') && <><InlineSl label="F-Step" min={0.1} max={3} step={0.1} value={style.flowStep} onChange={v => ss({ flowStep: v })} /><InlineSl label="F-Max" min={1} max={250} value={style.flowMaxLen} onChange={v => ss({ flowMaxLen: v })} /></>}
               {hasMode('dag') && <InlineSl label="Threshold" min={0.5} max={5} step={0.5} value={style.strahlerThreshold} onChange={v => ss({ strahlerThreshold: v })} />}
               {hasMode('pencil') && <InlineSl label="P-Threshold" min={0.1} max={5} step={0.1} value={style.curvatureThreshold} onChange={v => ss({ curvatureThreshold: v })} />}
