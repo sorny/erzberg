@@ -25,21 +25,46 @@ function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
 /**
- * Main entry. Returns geometry arrays for the active draw mode.
+ * Main entry. Returns geometry arrays for the active draw mode(s).
+ * Supports both single string mode or an array of modes.
  * @param {object} terrain   Output of buildTerrain()
  * @param {object} p         All Leva params (terrain + visual)
  */
 export function buildLineGeometry(terrain, p) {
   if (!terrain) return empty()
-  switch (p.drawMode) {
-    case 'lines-x':    return buildRidgelines(terrain, p, false)
-    case 'lines-y':    return buildRidgelines(terrain, p, true)
-    case 'crosshatch': return buildCrosshatch(terrain, p)
-    case 'hachure':    return buildHachure(terrain, p)
-    case 'contours':   return buildContours(terrain, p)
-    case 'flow':       return buildFlowLines(terrain, p)
-    default:           return empty()
+  
+  const modes = Array.isArray(p.drawMode) ? p.drawMode : [p.drawMode]
+  if (modes.length === 0) return empty()
+
+  const results = modes.map(m => {
+    switch (m) {
+      case 'lines-x':    return buildRidgelines(terrain, p, false)
+      case 'lines-y':    return buildRidgelines(terrain, p, true)
+      case 'crosshatch': return buildCrosshatch(terrain, p)
+      case 'hachure':    return buildHachure(terrain, p)
+      case 'contours':   return buildContours(terrain, p)
+      case 'flow':       return buildFlowLines(terrain, p)
+      default:           return empty()
+    }
+  })
+
+  // Merge results efficiently
+  let totalPos = 0, totalCol = 0
+  for (const r of results) {
+    totalPos += r.positions.length
+    totalCol += r.colors.length
   }
+  const positions = new Float32Array(totalPos)
+  const colors = new Float32Array(totalCol)
+  let offsetPos = 0, offsetCol = 0
+  for (const r of results) {
+    positions.set(r.positions, offsetPos)
+    colors.set(r.colors, offsetCol)
+    offsetPos += r.positions.length
+    offsetCol += r.colors.length
+  }
+
+  return { positions, colors }
 }
 
 function empty() {
@@ -318,56 +343,87 @@ function buildFlowLines(terrain, p) {
   } = p
 
   const lineStep = Math.max(1, Math.round(lineSpacing / scl))
-  const positions = []
-  const colors = []
+  
+  // High budget for dense flow fields
+  const MAX_TOTAL_SEGMENTS = 3000000
+  let totalSegments = 0
 
-  for (let r = 0; r < rows; r += lineStep) {
+  const posBuf = new Float32Array(MAX_TOTAL_SEGMENTS * 6)
+  const colBuf = new Float32Array(MAX_TOTAL_SEGMENTS * 6)
+
+  // Occupancy mask prevents redundant lines in the same valleys
+  const mask = new Uint8Array(rows * cols)
+
+  const eps = 0.5
+
+  outer: for (let r = 0; r < rows; r += lineStep) {
     for (let c = 0; c < cols; c += lineStep) {
+      if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
+      
+      // If this start point is already covered by a flow line, skip it
+      if (mask[r * cols + c]) continue
+
       let fr = r, fc = c
+      let b0 = sampleBrightness(grid, rows, cols, fr, fc)
+      let e0 = (b0 - 0.5) * 100 * elevScale
 
       for (let step = 0; step < flowMaxLen; step++) {
-        // Out of bounds guard (leave a margin for central-diff sampling)
-        if (fr < 0.5 || fr > rows - 1.5 || fc < 0.5 || fc > cols - 1.5) break
+        if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
+        
+        if (fr < eps || fr > rows - 1 - eps || fc < eps || fc > cols - 1 - eps) break
 
-        // Central-difference gradient (col = X direction, row = Z direction)
-        const eps = 0.5
-        const gx = sampleBrightness(grid, rows, cols, fr, fc + eps) - sampleBrightness(grid, rows, cols, fr, fc - eps)
-        const gz = sampleBrightness(grid, rows, cols, fr + eps, fc) - sampleBrightness(grid, rows, cols, fr - eps, fc)
+        // Mark mask (cruder than sub-pixel but effective for stopping convergence)
+        mask[Math.round(fr) * cols + Math.round(fc)] = 1
 
+        // Gradient
+        const bL = sampleBrightness(grid, rows, cols, fr, fc - eps)
+        const bR = sampleBrightness(grid, rows, cols, fr, fc + eps)
+        const bU = sampleBrightness(grid, rows, cols, fr - eps, fc)
+        const bD = sampleBrightness(grid, rows, cols, fr + eps, fc)
+        
+        const gx = bR - bL
+        const gz = bD - bU
         const mag = Math.sqrt(gx * gx + gz * gz)
-        if (mag < 0.0005) break   // nearly flat — stop this streamline
+        if (mag < 0.0005) break
 
-        // Move one step downhill (negative gradient direction)
         const nfc = fc - (gx / mag) * flowStep
         const nfr = fr - (gz / mag) * flowStep
+        
+        // If we moved into a heavily occupied cell, stop this line
+        if (mask[Math.round(nfr) * cols + Math.round(nfc)]) break
 
-        if (nfr < 0 || nfr >= rows || nfc < 0 || nfc >= cols) break
-
-        const b0 = sampleBrightness(grid, rows, cols, fr, fc)
         const b1 = sampleBrightness(grid, rows, cols, nfr, nfc)
-        const e0 = (b0 - 0.5) * 100 * elevScale
         const e1 = (b1 - 0.5) * 100 * elevScale
 
-        if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) { fr = nfr; fc = nfc; continue }
-        if (!inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) break
+        const in0 = inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)
+        const in1 = inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)
 
-        const x0 = fc  * scl - halfW, z0 = fr  * scl - halfH
-        const x1 = nfc * scl - halfW, z1 = nfr * scl - halfH
+        if (in0 && in1) {
+          const pIdx = totalSegments * 6
+          posBuf[pIdx]   = fc  * scl - halfW; posBuf[pIdx+1] = e0; posBuf[pIdx+2] = fr  * scl - halfH
+          posBuf[pIdx+3] = nfc * scl - halfW; posBuf[pIdx+4] = e1; posBuf[pIdx+5] = nfr * scl - halfH
 
-        positions.push(x0, e0, z0, x1, e1, z1)
+          const slopeNorm = Math.min(1, mag / 0.02)
+          const c0 = computeVertexColor(normElev(e0, minZ, maxZ), slopeNorm, p, terrain)
+          const c1 = computeVertexColor(normElev(e1, minZ, maxZ), slopeNorm, p, terrain)
+          
+          colBuf[pIdx] = c0[0]; colBuf[pIdx+1] = c0[1]; colBuf[pIdx+2] = c0[2]
+          colBuf[pIdx+3] = c1[0]; colBuf[pIdx+4] = c1[1]; colBuf[pIdx+5] = c1[2]
+          
+          totalSegments++
+        } else if (!in0 && !in1) {
+          break
+        }
 
-        const slopeNorm = Math.min(1, mag / 0.02)   // normalise slope for colour
-        const col0 = computeVertexColor(normElev(e0, minZ, maxZ), slopeNorm, p, terrain)
-        const col1 = computeVertexColor(normElev(e1, minZ, maxZ), slopeNorm, p, terrain)
-        colors.push(...col0, ...col1)
-
-        fr = nfr
-        fc = nfc
+        fr = nfr; fc = nfc; b0 = b1; e0 = e1
       }
     }
   }
 
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { 
+    positions: posBuf.slice(0, totalSegments * 6), 
+    colors: colBuf.slice(0, totalSegments * 6) 
+  }
 }
 
 // ─── Surface mesh geometry (triangle grid) ────────────────────────────────────

@@ -1,34 +1,69 @@
 /**
  * Derives terrain grid and line geometry from the raw heightmap + Leva params.
  *
- * Two memoisation levels:
- *   1. buildTerrain() — only when raw pixels or sampling params change.
- *   2. buildLineGeometry() — when any visual/layout param changes.
+ * This hook offloads heavy CPU calculations to a Web Worker to keep the UI
+ * responsive and allow loading indicators to render during background work.
  */
-import { useMemo } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'
-import { buildTerrain } from '../utils/terrain'
-import { buildLineGeometry, buildSurfaceGeometry } from '../utils/geometryBuilders'
+import GeometryWorker from '../utils/geometry.worker?worker'
 
 export function useTerrainGeometry(p) {
   const { heightmapPixels, heightmapWidth, heightmapHeight } = useStore()
 
-  // Level 1: terrain grid (brightness samples on the scl-grid)
-  const terrain = useMemo(() => {
-    if (!heightmapPixels) return null
-    return buildTerrain(heightmapPixels, heightmapWidth, heightmapHeight, p)
+  const [terrain, setTerrain]       = useState(null)
+  const [lineGeo, setLineGeo]       = useState(null)
+  const [surfaceGeo, setSurfaceGeo] = useState(null)
+  const [isComputing, setIsComputing] = useState(false)
+
+  // We keep a single worker instance alive
+  const workerRef = useRef(null)
+
+  useEffect(() => {
+    if (!heightmapPixels) {
+      setTerrain(null)
+      setLineGeo(null)
+      setSurfaceGeo(null)
+      setIsComputing(false)
+      return
+    }
+
+    // Initialize worker if needed
+    if (!workerRef.current) {
+      workerRef.current = new GeometryWorker()
+    }
+
+    setIsComputing(true)
+
+    // Handle results from the worker
+    workerRef.current.onmessage = (e) => {
+      const { terrain, lineGeo, surfaceGeo, error } = e.data
+      if (error) {
+        console.error('[GeometryWorker] Error:', error)
+      } else {
+        setTerrain(terrain)
+        setLineGeo(lineGeo)
+        setSurfaceGeo(surfaceGeo)
+      }
+      setIsComputing(false)
+    }
+
+    // Start background calculation
+    workerRef.current.postMessage({
+      heightmapPixels,
+      heightmapWidth,
+      heightmapHeight,
+      p
+    })
+
+    return () => {
+      // Note: we don't necessarily want to terminate the worker on every update 
+      // as it's expensive to restart, but we could if needed.
+    }
   }, [
     heightmapPixels, heightmapWidth, heightmapHeight,
     p.resolution, p.blurRadius, p.gridOffsetX, p.gridOffsetY,
     p.blackPoint, p.whitePoint, p.elevScale,
-  ])
-
-  // Level 2: line geometry (positions + colors for GPU upload)
-  const lineGeo = useMemo(() => {
-    if (!terrain) return null
-    return buildLineGeometry(terrain, p)
-  }, [
-    terrain,
     p.drawMode, p.lineSpacing, p.lineShift, p.hachureSpacing, p.hachureLength, p.contourInterval,
     p.flowStep, p.flowMaxLen,
     p.elevMinCut, p.elevMaxCut,
@@ -37,11 +72,8 @@ export function useTerrainGeometry(p) {
     p.hypsoInterval, p.hypsoWeight,
   ])
 
-  // Surface mesh geometry (for fill / depth occlusion)
-  const surfaceGeo = useMemo(() => {
-    if (!terrain) return null
-    return buildSurfaceGeometry(terrain, p.elevScale, p.jitterAmt)
-  }, [terrain, p.elevScale, p.jitterAmt, p.hypsometricFill, p.hypsometricBanded])
+  // Cleanup on unmount
+  useEffect(() => () => workerRef.current?.terminate(), [])
 
-  return { terrain, lineGeo, surfaceGeo }
+  return { terrain, lineGeo, surfaceGeo, isComputing }
 }

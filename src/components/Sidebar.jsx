@@ -252,6 +252,19 @@ export function Sidebar({
     { id:'flow',       label:'Flow' },
   ]
 
+  // Multi-mode helpers
+  const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
+  const hasMode = (id) => activeModes.includes(id)
+  const toggleMode = (id) => {
+    let next
+    if (hasMode(id)) {
+      next = activeModes.filter(m => m !== id)
+    } else {
+      next = [...activeModes, id]
+    }
+    ss({ drawMode: next })
+  }
+
   // Line shift range (grid steps between drawn lines)
   const lineStep = terrainData ? Math.max(1, Math.round((style.lineSpacing ?? 4) / terrainData.scl)) : 1
 
@@ -463,13 +476,13 @@ export function Sidebar({
               </div>
               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                 {MODES.map(m => (
-                  <button key={m.id} className={`hmsb${style.drawMode === m.id ? ' on' : ''}`}
-                    onClick={() => ss({ drawMode: m.id })}
+                  <button key={m.id} className={`hmsb${hasMode(m.id) ? ' on' : ''}`}
+                    onClick={() => toggleMode(m.id)}
                     style={{
                       flex:1, padding:'5px 0', fontSize:11, fontWeight:500,
-                      background: style.drawMode === m.id ? ACCENT : SURF,
-                      color:      style.drawMode === m.id ? '#fff' : MUTED,
-                      border:`1px solid ${style.drawMode === m.id ? ACCENT : BORDER}`,
+                      background: hasMode(m.id) ? ACCENT : SURF,
+                      color:      hasMode(m.id) ? '#fff' : MUTED,
+                      border:`1px solid ${hasMode(m.id) ? ACCENT : BORDER}`,
                       borderRadius:4, cursor:'pointer',
                     }}>
                     {m.label}
@@ -479,27 +492,27 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {!['contours', 'hachure'].includes(style.drawMode) && (
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow')) && (
                 <InlineSl
-                  label={style.drawMode === 'flow' ? 'Seed spacing' : 'Line spacing'}
-                  min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
+                  label={hasMode('flow') && activeModes.length === 1 ? 'Seed spacing' : 'Line spacing'}
+                  min={1} max={hasMode('flow') ? 20 : 100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
                 />
               )}
-              {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && lineStep > 1 && (
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch')) && lineStep > 1 && (
                 <InlineSl label="Line shift" min={0} max={lineStep - 1}
                   value={Math.min(style.lineShift ?? 0, lineStep - 1)}
                   onChange={v => ss({ lineShift: v })} />
               )}
-              {style.drawMode === 'hachure' && <>
+              {hasMode('hachure') && <>
                 <InlineSl label="Tick spacing" min={1} max={100} value={style.hachureSpacing ?? 4} onChange={v => ss({ hachureSpacing: v })} />
                 <InlineSl label="Tick length"  min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} fmt={v => v.toFixed(1)} />
               </>}
-              {style.drawMode === 'contours' && (
+              {hasMode('contours') && (
                 <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />
               )}
-              {style.drawMode === 'flow' && (<>
+              {hasMode('flow') && (<>
                 <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />
-                <InlineSl label="Max len" min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
+                <InlineSl label="Max len" min={1}   max={250} step={1}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
               </>)}
             </Sub>
 

@@ -22,7 +22,7 @@ const TERRAIN_DEF = {
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
 const STYLE_DEF = {
-  drawMode: 'lines-x', lineSpacing: 4, lineShift: 0, hachureSpacing: 4, hachureLength: 1, contourInterval: 5,
+  drawMode: ['lines-x'], lineSpacing: 4, lineShift: 0, hachureSpacing: 4, hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
   showLines: true, lineColor: '#000000', strokeWeight: 1,
   lineDash: 'solid',
@@ -194,9 +194,22 @@ export default function App() {
 
   // ── Merged params ─────────────────────────────────────────────────────────
   const p = { ...terrain, ...style, ...points, ...view, gradientStops }
+  const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
-  const { terrain: terrainData, lineGeo, surfaceGeo } = useTerrainGeometry(p)
+  const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
+
+  // Delay the computing overlay to avoid flickering on fast calculations
+  const [showComputingOverlay, setShowComputingOverlay] = useState(false)
+  useEffect(() => {
+    let t
+    if (isComputing) {
+      t = setTimeout(() => setShowComputingOverlay(true), 1000)
+    } else {
+      setShowComputingOverlay(false)
+    }
+    return () => clearTimeout(t)
+  }, [isComputing])
 
   // ── STL export ────────────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
@@ -229,9 +242,6 @@ export default function App() {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [handleWebmToggle, handleStl])
-
-  // Geometry-computing indicator: pixels loaded but geometry not ready yet
-  const isComputing = !!heightmapPixels && !lineGeo
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   useEffect(() => {
@@ -336,7 +346,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ── Draw mode HUD ────────────────────────────────────────────────── */}
       {!noHmap && !webmActive && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
@@ -345,13 +354,13 @@ export default function App() {
           fontSize:12, zIndex:1500, pointerEvents:'none',
           fontFamily:'"JetBrains Mono","Fira Code",monospace',
         }}>
-          {DRAW_MODE_LABELS[style.drawMode] || style.drawMode}
+          {activeModes.map(m => DRAW_MODE_LABELS[m] || m).join(' + ')}
         </div>
       )}
 
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
-      {isComputing && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
+      {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
       {noHmap && !isLoading && <EmptyState
