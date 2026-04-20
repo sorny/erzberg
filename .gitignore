@@ -3,3 +3,8 @@ dist/
 .DS_Store
 *.local
 test-results/
+
+# Gemini CLI
+GEMINI.md
+.gemini/
+.geminiignore
