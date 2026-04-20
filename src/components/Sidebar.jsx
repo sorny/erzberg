@@ -361,11 +361,12 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow') || hasMode('dag') || hasMode('pencil')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.5} max={30} step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} />}
               {hasMode('flow') && <><InlineSl label="F-Step" min={0.1} max={3} step={0.1} value={style.flowStep} onChange={v => ss({ flowStep: v })} /><InlineSl label="F-Max" min={1} max={250} value={style.flowMaxLen} onChange={v => ss({ flowMaxLen: v })} /></>}
-              {hasMode('dag') && <InlineSl label="Threshold" min={1} max={10} step={1} value={style.strahlerThreshold} onChange={v => ss({ strahlerThreshold: v })} />}
+              {hasMode('dag') && <InlineSl label="Threshold" min={0.5} max={5} step={0.5} value={style.strahlerThreshold} onChange={v => ss({ strahlerThreshold: v })} />}
               {hasMode('pencil') && <InlineSl label="P-Threshold" min={0.1} max={5} step={0.1} value={style.curvatureThreshold} onChange={v => ss({ curvatureThreshold: v })} />}
             </Sub>
 
@@ -373,6 +374,7 @@ export function Sidebar({
             {style.showLines && (
               <Sub>
                 <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.lineOpacity ?? 1} onChange={v => ss({ lineOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
                 <Tog label="Hypsometric color" small checked={style.lineHypsometric} onChange={v => ss({ lineHypsometric: v })} />
                 {style.lineHypsometric && (
                   <Sub>
@@ -421,7 +423,25 @@ export function Sidebar({
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
-            {points.showPoints && <Sub><InlineSl label="Size" min={0.5} max={20} value={points.pointSize} onChange={v => sp({ pointSize: v })} /></Sub>}
+            {points.showPoints && (
+              <Sub>
+                <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
+                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
+                <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
+                {points.animateParticles && (
+                  <Sub>
+                    <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
+                    <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
+                    {points.particleGravity && (
+                      <Sub>
+                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
+                      </Sub>
+                    )}
+                  </Sub>
+                )}
+              </Sub>
+            )}
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>

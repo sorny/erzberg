@@ -29,13 +29,14 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
   useEffect(() => {
     if (!lineMaterial) return
     lineMaterial.linewidth = p.strokeWeight
+    lineMaterial.opacity   = p.lineOpacity
     lineMaterial.resolution.set(size.width, size.height)
     const dash = DASH_CONFIGS[p.lineDash ?? 'solid'] ?? DASH_CONFIGS.solid
     lineMaterial.dashed   = dash.dashed
     lineMaterial.dashSize = dash.dashSize
     lineMaterial.gapSize  = dash.gapSize
     lineMaterial.needsUpdate = true
-  }, [lineMaterial, p.strokeWeight, p.lineDash, size.width, size.height])
+  }, [lineMaterial, p.strokeWeight, p.lineOpacity, p.lineDash, size.width, size.height])
 
   useEffect(() => () => lineMaterial?.dispose(), [lineMaterial])
 

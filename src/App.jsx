@@ -23,11 +23,11 @@ const TERRAIN_DEF = {
 }
 const STYLE_DEF = {
   drawMode: ['lines-x'], lineSpacing: 4, lineShift: 0, hachureSpacing: 4, hachureLength: 1, contourInterval: 5,
-  flowStep: 0.5, flowMaxLen: 100, strahlerThreshold: 2,
+  flowStep: 1, flowMaxLen: 100, strahlerThreshold: 2,
   curvatureThreshold: 0.5,
   
   // Lines
-  showLines: true, lineColor: '#000000', strokeWeight: 1, lineDash: 'solid',
+  showLines: true, lineColor: '#000000', strokeWeight: 1, lineDash: 'solid', lineOpacity: 1,
   lineHypsometric: false, lineBanded: false, lineHypsoInterval: 10, lineHypsoWeight: 0, lineHypsoMode: 'elevation',
   
   // Fill (Surface)
@@ -170,6 +170,7 @@ export default function App() {
     if (vals.curvatureThreshold != null) s.curvatureThreshold = vals.curvatureThreshold
     if (vals.strokeWeight != null) s.strokeWeight  = vals.strokeWeight
     if (vals.lineDash     != null) s.lineDash      = vals.lineDash
+    if (vals.lineOpacity  != null) s.lineOpacity   = vals.lineOpacity
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
     
