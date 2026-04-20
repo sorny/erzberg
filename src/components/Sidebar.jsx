@@ -341,8 +341,17 @@ export function Sidebar({
               <Sub>
                 <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
                 <div style={{ display:'flex', gap:4 }}>
-                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
-                  {['X','Y','Z'].map(ax => <button key={ax} onClick={() => sv({ autoRotateAxis: ax })} style={{ fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF, color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED }}>{ax}</button>)}
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
+                  {[['CW', -1],['CCW', 1]].map(([label, dir]) => (
+                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
+                      style={{ 
+                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, 
+                        background: (view.autoRotateDir ?? -1) === dir ? ACCENT : SURF, 
+                        color: (view.autoRotateDir ?? -1) === dir ? '#fff' : MUTED 
+                      }}>
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </Sub>
             )}

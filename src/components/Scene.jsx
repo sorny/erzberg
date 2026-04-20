@@ -45,28 +45,16 @@ export function Scene({
     if (orbitRef.current) orbitRef.current.update()
   }
 
-  // Sync camera when Tilt, Rotation, or Zoom changes manually via sliders
+  // Sync camera when Tilt, Rotation, or Zoom changes (manually or via auto-rotate)
   useEffect(() => {
-    if (!p.autoRotate) {
-      updateCameraFromSliders(p.tilt, p.rotation, p.zoom)
-    }
-  }, [p.tilt, p.rotation, p.zoom, p.autoRotate])
+    updateCameraFromSliders(p.tilt, p.rotation, p.zoom)
+  }, [p.tilt, p.rotation, p.zoom])
 
-  // Handle auto-rotate
+  // Handle auto-rotate (Y-axis only)
   useFrame((_, delta) => {
     if (!p.autoRotate) return
-
     const step = (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
-    
-    // We update the state via levaSet so sliders stay in sync
-    if (p.autoRotateAxis === 'Y') {
-      levaSet({ rotation: p.rotation + step })
-    } else if (p.autoRotateAxis === 'X') {
-      levaSet({ tilt: p.tilt + step })
-    }
-    // Note: 'Z' axis auto-rotate is less common for "turntable" viewing
-    // but could be implemented by rotating the groupRef if needed.
-    // For now we keep it simple.
+    levaSet({ rotation: p.rotation + step })
   })
 
   // Camera presets
