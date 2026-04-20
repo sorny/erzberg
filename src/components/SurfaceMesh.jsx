@@ -73,7 +73,7 @@ const SURFACE_FRAG = /* glsl */ `
     }
     
     float lineMask = 0.0;
-...
+
     if (uHypsometricBanded) {
       // For Slope/Aspect, we quantize the value directly 0..1
       // For Elevation, we use the real-world units
@@ -91,7 +91,7 @@ const SURFACE_FRAG = /* glsl */ `
         float steps = 100.0 / uContourInterval; 
         if (uHypsoWeight > 0.0) {
           float fw = fwidth(b * steps);
-          float dist = mod(b * steps + 0.5, 1.0) - 0.5;
+          float dist = mod(b * (steps + 1e-5), 1.0) - 0.5;
           lineMask = 1.0 - smoothstep(uHypsoWeight * fw * 0.5, uHypsoWeight * fw * 1.5, abs(dist));
         }
         b = floor(b * steps) / steps;
@@ -184,7 +184,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
     // uGradient handles the "Smooth" look when not banded
-    surfMat.uniforms.uGradient.value = hasHypso && !isBanded && (p.showFill || p.showRawTerrain)
+    surfMat.uniforms.uGradient.value = hasHypso && !isBanded
     surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
     surfMat.uniforms.uHypsometricBanded.value = isBanded
     surfMat.uniforms.uContourInterval.value = p.fillHypsoInterval || 10.0
@@ -194,8 +194,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     const modeMap = { elevation: 0, slope: 1, aspect: 2 }
     surfMat.uniforms.uColorMode.value = modeMap[p.fillHypsoMode] ?? 0
     
-    // When fill is off: depth-only occluder — write depth but no colour
-    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain || hasHypso)
+    // Always write color if either fill or raw terrain is on
+    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
     surfMat.needsUpdate = true
   }, [surfMat, p.fillColor, p.showFill, p.fillHypsometric, p.fillBanded, p.showRawTerrain, p.fillHypsoInterval, p.fillHypsoWeight, p.elevScale, p.fillHypsoMode])
 
