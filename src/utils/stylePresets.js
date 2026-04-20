@@ -14,7 +14,7 @@ export const STYLE_PRESETS = {
       drawMode: 'contours',
       lineColor: '#7b4f2e', bgColor: '#f2ede4',
       strokeWeight: 1, showFill: false, showMesh: false,
-      lineGradient: false, contourInterval: 2, lineDash: 'solid',
+      hypsometricFill: false, contourInterval: 2, lineDash: 'solid',
     },
     gradientStops: null,   // leave gradient unchanged
   },
@@ -24,7 +24,7 @@ export const STYLE_PRESETS = {
       drawMode: 'lines-x',
       lineColor: '#00ffcc', bgColor: '#06050f',
       strokeWeight: 1, showFill: true, showMesh: false,
-      lineGradient: true, lineDash: 'solid',
+      hypsometricFill: true, lineDash: 'solid',
     },
     gradientStops: [
       { pos: 0,    color: '#06050f' },
@@ -40,7 +40,7 @@ export const STYLE_PRESETS = {
       drawMode: 'lines-x',
       lineColor: '#c8e8ff', bgColor: '#0d2b4e',
       strokeWeight: 0.5, showFill: false, showMesh: false,
-      lineGradient: false, lineDash: 'dashed',
+      hypsometricFill: false, lineDash: 'dashed',
     },
     gradientStops: null,
   },
@@ -50,7 +50,7 @@ export const STYLE_PRESETS = {
       drawMode: 'lines-x',
       lineColor: '#c86420', bgColor: '#140802',
       strokeWeight: 1.5, showFill: true, showMesh: false,
-      lineGradient: true, lineDash: 'solid',
+      hypsometricFill: true, lineDash: 'solid',
     },
     gradientStops: [
       { pos: 0,    color: '#0d0400' },

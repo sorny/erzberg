@@ -130,7 +130,7 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
  * for painter's-algorithm fill rendering in SVG.
  * Returns array of { pts: [[x,y],[x,y],[x,y]], fill: 'rgb(...)' }.
  */
-function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, lineGradient, gradientStops) {
+function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, hypsometricFill, gradientStops) {
   const { positions, indices, brightnessBuf } = surfaceGeo
   const nVerts  = positions.length / 3
   const camInv  = camera.matrixWorldInverse
@@ -160,7 +160,7 @@ function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, lineGradient, 
     const avgZ = (sz[a] + sz[b] + sz[c]) / 3
 
     let fill
-    if (lineGradient && gradientStops?.length > 1) {
+    if (hypsometricFill && gradientStops?.length > 1) {
       const brightness = (brightnessBuf[a] + brightnessBuf[b] + brightnessBuf[c]) / 3
       const [r, g, bl] = sampleGradient(gradientStops, brightness)
       fill = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(bl*255)})`
@@ -181,7 +181,7 @@ export function exportSVG({
   bgColor, bgGradient, bgGradientStops,
   lineColor, strokeWeight, lineDash,
   surfaceGeo, groupMatrix,
-  showFill, lineGradient, gradientStops,
+  showFill, hypsometricFill, gradientStops,
   showLines,
   particlePositions, particleCount, particleColor, particleSize,
 }) {

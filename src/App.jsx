@@ -28,7 +28,7 @@ const STYLE_DEF = {
   lineDash: 'solid',
   showFill: true, fillColor: '#ffffff', showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
-  lineGradient: false,
+  hypsometricFill: false, hypsometricBanded: false, hypsoInterval: 10, hypsoWeight: 1.5,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,

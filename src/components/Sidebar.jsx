@@ -153,14 +153,25 @@ function Section({ title, open, onToggle, children }) {
         <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED }}>
           {title}
         </span>
-        <span style={{ fontSize:13, color: MUTED, lineHeight:1, display:'inline-block',
-          transform: open ? 'none' : 'rotate(-90deg)', transition:'transform .18s' }}>▾</span>
+        <span style={{ 
+          fontSize:22, fontWeight:700, color: MUTED, lineHeight:1, display:'inline-block',
+          transform: open ? 'none' : 'rotate(-90deg)', transition:'transform .18s' 
+        }}>▾</span>
       </div>
       <div style={{ display:'grid', gridTemplateRows: open ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
         <div style={{ minHeight:0, overflow:'hidden', padding: open ? '0 14px 12px' : '0 14px' }}>
           {children}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── Sub-menu container ────────────────────────────────────────────────────────
+function Sub({ children }) {
+  return (
+    <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
+      {children}
     </div>
   )
 }
@@ -209,7 +220,13 @@ export function Sidebar({
 
   // Partial-update helpers
   const st = (v) => setTerrain(p => ({ ...p, ...v }))
-  const ss = (v) => setStyle(p => ({ ...p, ...v }))
+  const ss = (v) => setStyle(p => {
+    const next = { ...p, ...v }
+    // Mutual exclusion: Fill vs Hypsometric Fill
+    if (v.showFill === true) next.hypsometricFill = false
+    if (v.hypsometricFill === true) next.showFill = false
+    return next
+  })
   const sp = (v) => setPoints(p => ({ ...p, ...v }))
   const sv = (v) => setView(p => ({ ...p, ...v }))
 
@@ -319,20 +336,34 @@ export function Sidebar({
               <Sl label="Elev scale" min={0} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => v.toFixed(1)+'×'} />
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
-              {terrain.resolution > 1 && (<>
-                <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
-                <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
-              </>)}
-              {hasGeoTiff ? (<>
-                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-              </>) : (<>
-                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-              </>)}
             </div>
+
+            {terrain.resolution > 1 && (
+              <Sub>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                  <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
+                  <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
+                </div>
+              </Sub>
+            )}
+
+            {hasGeoTiff ? (
+              <Sub>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                  <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                    value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                  <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                    value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                </div>
+              </Sub>
+            ) : (
+              <Sub>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                  <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                  <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+                </div>
+              </Sub>
+            )}
           </Section>
 
           {/* ── Levels ────────────────────────────────────────────────────── */}
@@ -372,39 +403,42 @@ export function Sidebar({
             </div>
             <Sl label="Rotation" hint="e/r" min={-180} max={180} value={view.rotation}
               onChange={v => sv({ rotation: v })} fmt={v => v+'°'} />
+            
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
-            {view.autoRotate && (<>
-              <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed}
-                onChange={v => sv({ autoRotateSpeed: v })} fmt={v => v.toFixed(1)} />
-              <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
-                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
-                {['X','Y','Z'].map(ax => (
-                  <button key={ax} onClick={() => sv({ autoRotateAxis: ax })}
-                    style={{
-                      fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
-                      borderRadius:3, cursor:'pointer',
-                      background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF,
-                      color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED,
-                    }}>
-                    {ax}
-                  </button>
-                ))}
-              </div>
-              <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
-                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                {[['CW', -1],['CCW', 1]].map(([label, dir]) => (
-                  <button key={label} onClick={() => sv({ autoRotateDir: dir })}
-                    style={{
-                      fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
-                      borderRadius:3, cursor:'pointer',
-                      background: (view.autoRotateDir ?? -1) === dir ? ACCENT : SURF,
-                      color: (view.autoRotateDir ?? -1) === dir ? '#fff' : MUTED,
-                    }}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </>)}
+            {view.autoRotate && (
+              <Sub>
+                <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed}
+                  onChange={v => sv({ autoRotateSpeed: v })} fmt={v => v.toFixed(1)} />
+                <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
+                  {['X','Y','Z'].map(ax => (
+                    <button key={ax} onClick={() => sv({ autoRotateAxis: ax })}
+                      style={{
+                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
+                        borderRadius:3, cursor:'pointer',
+                        background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF,
+                        color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED,
+                      }}>
+                      {ax}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
+                  {[['CW', -1],['CCW', 1]].map(([label, dir]) => (
+                    <button key={label} onClick={() => sv({ autoRotateDir: dir })}
+                      style={{
+                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
+                        borderRadius:3, cursor:'pointer',
+                        background: (view.autoRotateDir ?? -1) === dir ? ACCENT : SURF,
+                        color: (view.autoRotateDir ?? -1) === dir ? '#fff' : MUTED,
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Sub>
+            )}
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
@@ -450,63 +484,67 @@ export function Sidebar({
               </div>
             </div>
 
-            {!['contours', 'hachure'].includes(style.drawMode) && (
-              <InlineSl
-                label={style.drawMode === 'flow' ? 'Seed spacing' : 'Line spacing'}
-                min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
-              />
-            )}
-            {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && lineStep > 1 && (
-              <InlineSl label="Line shift" min={0} max={lineStep - 1}
-                value={Math.min(style.lineShift ?? 0, lineStep - 1)}
-                onChange={v => ss({ lineShift: v })} />
-            )}
-            {style.drawMode === 'hachure' && <>
-              <InlineSl label="Tick spacing" min={1} max={100} value={style.hachureSpacing ?? 4} onChange={v => ss({ hachureSpacing: v })} />
-              <InlineSl label="Tick length"  min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} fmt={v => v.toFixed(1)} />
-            </>}
-            {style.drawMode === 'contours' && <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />}
-            {style.drawMode === 'flow' && (<>
-              <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />
-              <InlineSl label="Max len" min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
-            </>)}
+            <Sub>
+              {!['contours', 'hachure'].includes(style.drawMode) && (
+                <InlineSl
+                  label={style.drawMode === 'flow' ? 'Seed spacing' : 'Line spacing'}
+                  min={1} max={100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
+                />
+              )}
+              {['lines-x', 'lines-y', 'crosshatch'].includes(style.drawMode) && lineStep > 1 && (
+                <InlineSl label="Line shift" min={0} max={lineStep - 1}
+                  value={Math.min(style.lineShift ?? 0, lineStep - 1)}
+                  onChange={v => ss({ lineShift: v })} />
+              )}
+              {style.drawMode === 'hachure' && <>
+                <InlineSl label="Tick spacing" min={1} max={100} value={style.hachureSpacing ?? 4} onChange={v => ss({ hachureSpacing: v })} />
+                <InlineSl label="Tick length"  min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} fmt={v => v.toFixed(1)} />
+              </>}
+              {style.drawMode === 'contours' && (
+                <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />
+              )}
+              {style.drawMode === 'flow' && (<>
+                <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />
+                <InlineSl label="Max len" min={10}  max={500} step={10}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
+              </>)}
+            </Sub>
 
             {/* Lines row: label + color + toggle */}
             <TogColor label="Lines" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
-            {style.showLines && (<>
-              <InlineSl label="Weight  b/n" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
-              <div style={{ display:'flex', alignItems:'center', padding:'0 0 8px', gap:4 }}>
-                <span style={{ fontSize:10, color:MUTED, flex:1 }}>Dash</span>
-                {[['solid', 'solid'], ['dash', 'dashed'], ['dot', 'dotted'], ['long', 'long-dash']].map(([lbl, val]) => (
-                  <button key={val} onClick={() => ss({ lineDash: val })}
-                    style={{
-                      fontSize:10, padding:'2px 7px', border:`1px solid ${BORDER}`,
-                      borderRadius:3, cursor:'pointer',
-                      background: (style.lineDash ?? 'solid') === val ? ACCENT : SURF,
-                      color:      (style.lineDash ?? 'solid') === val ? '#fff'  : MUTED,
-                    }}>
-                    {lbl}
-                  </button>
-                ))}
-              </div>
-            </>)}
+            {style.showLines && (
+              <Sub>
+                <InlineSl label="Weight  b/n" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
+                <div style={{ display:'flex', alignItems:'center', padding:'0 0 8px', gap:4 }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Dash</span>
+                  {[['solid', 'solid'], ['dash', 'dashed'], ['dot', 'dotted'], ['long', 'long-dash']].map(([lbl, val]) => (
+                    <button key={val} onClick={() => ss({ lineDash: val })}
+                      style={{
+                        fontSize:10, padding:'2px 7px', border:`1px solid ${BORDER}`,
+                        borderRadius:3, cursor:'pointer',
+                        background: (style.lineDash ?? 'solid') === val ? ACCENT : SURF,
+                        color:      (style.lineDash ?? 'solid') === val ? '#fff'  : MUTED,
+                      }}>
+                      {lbl}
+                    </button>
+                  ))}
+                </div>
+              </Sub>
+            )}
 
             {/* Fill + Mesh */}
             <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor ?? '#ffffff'} onColor={v => ss({ fillColor: v })} />
-            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
 
-            <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
-            <Tog label="Background gradient" checked={style.bgGradient ?? false} onChange={v => ss({ bgGradient: v })} />
-            {style.bgGradient && (
-              <div style={{ marginBottom: 10 }}>
-                <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />
-              </div>
-            )}
-
-            {/* Elevation gradient */}
-            <Tog label="Elevation gradient" checked={style.lineGradient} onChange={v => ss({ lineGradient: v })} />
-            {style.lineGradient && (
-              <div style={{ marginBottom: 10 }}>
+            {/* Hypsometric fill (replaces Elevation gradient) */}
+            <Tog label="Hypsometric fill" checked={style.hypsometricFill} onChange={v => ss({ hypsometricFill: v })} />
+            {style.hypsometricFill && (
+              <Sub>
+                <Tog label="Banded look" checked={style.hypsometricBanded} onChange={v => ss({ hypsometricBanded: v })} />
+                {style.hypsometricBanded && (
+                  <Sub>
+                    <InlineSl label="Interval" min={0.5} max={50} step={0.5} value={style.hypsoInterval} onChange={v => ss({ hypsoInterval: v })} fmt={v => v} />
+                    <InlineSl label="Weight"   min={0} max={5} step={0.5} value={style.hypsoWeight} onChange={v => ss({ hypsoWeight: v })} />
+                  </Sub>
+                )}
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => (
                     <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])}
@@ -516,7 +554,17 @@ export function Sidebar({
                   ))}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-              </div>
+              </Sub>
+            )}
+
+            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
+
+            <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
+            <Tog label="Background gradient" checked={style.bgGradient ?? false} onChange={v => ss({ bgGradient: v })} />
+            {style.bgGradient && (
+              <Sub>
+                <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />
+              </Sub>
             )}
 
           </Section>
@@ -525,21 +573,23 @@ export function Sidebar({
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
-              <>
+              <Sub>
                 <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
                 <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
                 <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
                 {points.animateParticles && (
-                  <>
+                  <Sub>
                     <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
                     <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
                     <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
                     {points.particleGravity && (
-                      <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
+                      <Sub>
+                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
+                      </Sub>
                     )}
-                  </>
+                  </Sub>
                 )}
-              </>
+              </Sub>
             )}
           </Section>
 

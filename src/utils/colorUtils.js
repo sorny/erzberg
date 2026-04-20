@@ -46,9 +46,9 @@ export function sampleGradient(stops, t) {
  * @param {object} terrain   { maxSlope }
  */
 export function computeVertexColor(normElev, slope, params, terrain) {
-  const { lineColor, lineGradient, gradientStops } = params
+  const { lineColor, hypsometricFill, gradientStops } = params
 
-  if (lineGradient && gradientStops && gradientStops.length > 1) {
+  if (hypsometricFill && gradientStops && gradientStops.length > 1) {
     return sampleGradient(gradientStops, normElev)
   }
 

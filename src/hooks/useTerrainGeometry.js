@@ -33,14 +33,15 @@ export function useTerrainGeometry(p) {
     p.flowStep, p.flowMaxLen,
     p.elevMinCut, p.elevMaxCut,
     p.jitterAmt,
-    p.lineColor, p.lineGradient, p.gradientStops,
+    p.lineColor, p.hypsometricFill, p.hypsometricBanded, p.gradientStops,
+    p.hypsoInterval, p.hypsoWeight,
   ])
 
   // Surface mesh geometry (for fill / depth occlusion)
   const surfaceGeo = useMemo(() => {
     if (!terrain) return null
     return buildSurfaceGeometry(terrain, p.elevScale, p.jitterAmt)
-  }, [terrain, p.elevScale, p.jitterAmt])
+  }, [terrain, p.elevScale, p.jitterAmt, p.hypsometricFill, p.hypsometricBanded])
 
   return { terrain, lineGeo, surfaceGeo }
 }

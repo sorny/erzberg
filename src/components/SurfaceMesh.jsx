@@ -52,26 +52,58 @@ const SURFACE_FRAG = /* glsl */ `
   uniform bool      uGradient;
   uniform bool      uRawTerrain;
   uniform sampler2D uGradientTex;
+  uniform bool      uHypsometricBanded;
+  uniform float     uContourInterval;
+  uniform float     uHypsoWeight;
+  uniform float     uElevScale;
   varying float     vBrightness;
   varying vec3      vNormal;
 
   void main() {
+    float b = vBrightness;
+    float lineMask = 0.0;
+    
+    if (uHypsometricBanded) {
+      // Map brightness to elevation (-50..50 * scale)
+      float elev = (vBrightness - 0.5) * 100.0 * uElevScale;
+      
+      // Compute line mask for dark edges (contour lines on the surface)
+      if (uHypsoWeight > 0.0) {
+        float fw = fwidth(elev);
+        float dist = mod(elev + uContourInterval * 0.5, uContourInterval) - uContourInterval * 0.5;
+        lineMask = 1.0 - smoothstep(uHypsoWeight * fw * 0.5, uHypsoWeight * fw * 1.5, abs(dist));
+      }
+
+      // Quantize to bands
+      float quantizedElev = floor(elev / uContourInterval) * uContourInterval;
+      // Map back to 0..1 brightness for texture lookup
+      b = (quantizedElev / (100.0 * uElevScale)) + 0.5;
+      b = clamp(b, 0.0, 1.0);
+    }
+
+    vec3 base;
     if (uRawTerrain) {
       vec3 n      = normalize(vNormal);
       vec3 light1 = normalize(vec3(1.0,  2.0, 1.5));
       vec3 light2 = normalize(vec3(-0.5, 0.5, -1.0));
       float diff  = max(dot(n, light1), 0.0) * 0.7
                   + max(dot(n, light2), 0.0) * 0.15;
-      vec3 base = uGradient
-        ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
+      base = (uGradient || uHypsometricBanded)
+        ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
         : uFillColor;
-      gl_FragColor = vec4(base * (0.2 + diff), 1.0);
-      return;
+      base *= (0.2 + diff);
+    } else {
+      base = (uGradient || uHypsometricBanded)
+        ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
+        : uFillColor;
     }
-    vec3 col = uGradient
-      ? texture2D(uGradientTex, vec2(vBrightness, 0.5)).rgb
-      : uFillColor;
-    gl_FragColor = vec4(col, 1.0);
+
+    // Apply dark contour lines
+    if (uHypsometricBanded && uHypsoWeight > 0.0) {
+      base = mix(base, vec3(0.0), lineMask * 0.5);
+    }
+
+    gl_FragColor = vec4(base, 1.0);
   }
 `
 
@@ -95,13 +127,13 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   const gradientTex = useMemo(() => {
     gradTexRef.current?.dispose()
     const tex = buildGradientTexture(
-      p.lineGradient && p.gradientStops?.length > 1
+      p.hypsometricFill && p.gradientStops?.length > 1
         ? p.gradientStops
         : [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#ffffff' }]
     )
     gradTexRef.current = tex
     return tex
-  }, [p.lineGradient, p.gradientStops])
+  }, [p.hypsometricFill, p.gradientStops])
 
   useEffect(() => () => gradTexRef.current?.dispose(), [])
 
@@ -115,23 +147,36 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     polygonOffsetFactor: 2,
     polygonOffsetUnits:  2,
     uniforms: {
-      uFillColor:   { value: new THREE.Vector3(1, 1, 1) },
-      uGradient:    { value: false },
-      uRawTerrain:  { value: false },
-      uGradientTex: { value: null },
+      uFillColor:         { value: new THREE.Vector3(1, 1, 1) },
+      uGradient:          { value: false },
+      uRawTerrain:        { value: false },
+      uGradientTex:       { value: null },
+      uHypsometricBanded: { value: false },
+      uContourInterval:   { value: 1.0 },
+      uHypsoWeight:       { value: 0.0 },
+      uElevScale:         { value: 1.0 },
     },
   }), [])
 
   // Update uniforms reactively (no material recreation needed)
   useEffect(() => {
     if (!surfMat) return
+    const hasHypso = p.hypsometricFill
+    const isBanded = hasHypso && p.hypsometricBanded
+    
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
-    surfMat.uniforms.uGradient.value = p.lineGradient && (p.showFill || p.showRawTerrain)
+    // uGradient handles the "Smooth" look when not banded
+    surfMat.uniforms.uGradient.value = hasHypso && !isBanded && (p.showFill || p.showRawTerrain)
     surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
+    surfMat.uniforms.uHypsometricBanded.value = isBanded
+    surfMat.uniforms.uContourInterval.value = p.hypsoInterval || 10.0
+    surfMat.uniforms.uHypsoWeight.value = p.hypsoWeight || 0.0
+    surfMat.uniforms.uElevScale.value = p.elevScale || 1.0
+    
     // When fill is off: depth-only occluder — write depth but no colour
-    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
+    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain || hasHypso)
     surfMat.needsUpdate = true
-  }, [surfMat, p.fillColor, p.showFill, p.lineGradient, p.showRawTerrain])
+  }, [surfMat, p.fillColor, p.showFill, p.hypsometricFill, p.hypsometricBanded, p.showRawTerrain, p.hypsoInterval, p.hypsoWeight, p.elevScale])
 
   useEffect(() => {
     if (!surfMat) return
