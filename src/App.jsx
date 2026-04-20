@@ -24,11 +24,17 @@ const TERRAIN_DEF = {
 const STYLE_DEF = {
   drawMode: ['lines-x'], lineSpacing: 4, lineShift: 0, hachureSpacing: 4, hachureLength: 1, contourInterval: 5,
   flowStep: 0.5, flowMaxLen: 100,
-  showLines: true, lineColor: '#000000', strokeWeight: 1,
-  lineDash: 'solid',
-  showFill: true, fillColor: '#ffffff', showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
+  
+  // Lines
+  showLines: true, lineColor: '#000000', strokeWeight: 1, lineDash: 'solid',
+  lineHypsometric: false, lineBanded: false, lineHypsoInterval: 10, lineHypsoWeight: 0, lineHypsoMode: 'elevation',
+  
+  // Fill (Surface)
+  showFill: true, fillColor: '#ffffff',
+  fillHypsometric: false, fillBanded: false, fillHypsoInterval: 10, fillHypsoWeight: 1.5, fillHypsoMode: 'elevation',
+
+  showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
-  hypsometricFill: false, hypsometricBanded: false, hypsoInterval: 10, hypsoWeight: 1.5,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -37,7 +43,7 @@ const POINTS_DEF = {
   particleGravity: false, particleGravityStr: 1,
 }
 const VIEW_DEF = {
-  tilt: 60, rotation: 0, zoom: 1,
+  tilt: 40, rotation: 0, zoom: 1,
   autoRotate: false, autoRotateSpeed: 0.5, autoRotateAxis: 'Y', autoRotateDir: -1,
   showGuides: false, showRawTerrain: false,
 }
@@ -163,8 +169,20 @@ export default function App() {
     if (vals.lineDash     != null) s.lineDash      = vals.lineDash
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
-    if (vals.hypsoInterval != null) s.hypsoInterval = vals.hypsoInterval
-    if (vals.hypsoWeight   != null) s.hypsoWeight   = vals.hypsoWeight
+    
+    // Sync all split hypsometric properties
+    if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric
+    if (vals.lineBanded      != null) s.lineBanded      = vals.lineBanded
+    if (vals.lineHypsoInterval != null) s.lineHypsoInterval = vals.lineHypsoInterval
+    if (vals.lineHypsoWeight   != null) s.lineHypsoWeight   = vals.lineHypsoWeight
+    if (vals.lineHypsoMode     != null) s.lineHypsoMode     = vals.lineHypsoMode
+
+    if (vals.fillHypsometric != null) s.fillHypsometric = vals.fillHypsometric
+    if (vals.fillBanded      != null) s.fillBanded      = vals.fillBanded
+    if (vals.fillHypsoInterval != null) s.fillHypsoInterval = vals.fillHypsoInterval
+    if (vals.fillHypsoWeight   != null) s.fillHypsoWeight   = vals.fillHypsoWeight
+    if (vals.fillHypsoMode     != null) s.fillHypsoMode     = vals.fillHypsoMode
+
     if (vals.tilt         != null) v.tilt          = vals.tilt
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
@@ -223,7 +241,7 @@ export default function App() {
       top:   { tilt: 0,  rotation: 0 },
       front: { tilt: 90, rotation: 0 },
       iso:   { tilt: 45, rotation: -45 },
-      reset: { tilt: 60, rotation: 0 },
+      reset: { tilt: 40, rotation: 0 },
     }
     const p = presets[name] || presets.reset
     setView(prev => ({ ...prev, ...p }))
@@ -346,6 +364,7 @@ export default function App() {
         </div>
       )}
 
+      {/* ── Draw mode HUD ────────────────────────────────────────────────── */}
       {!noHmap && !webmActive && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',

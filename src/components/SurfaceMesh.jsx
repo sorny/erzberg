@@ -56,34 +56,51 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uContourInterval;
   uniform float     uHypsoWeight;
   uniform float     uElevScale;
+  uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
   varying float     vBrightness;
   varying vec3      vNormal;
 
   void main() {
+    vec3 n = normalize(vNormal);
     float b = vBrightness;
-    float lineMask = 0.0;
-    
-    if (uHypsometricBanded) {
-      // Map brightness to elevation (-50..50 * scale)
-      float elev = (vBrightness - 0.5) * 100.0 * uElevScale;
-      
-      // Compute line mask for dark edges (contour lines on the surface)
-      if (uHypsoWeight > 0.0) {
-        float fw = fwidth(elev);
-        float dist = mod(elev + uContourInterval * 0.5, uContourInterval) - uContourInterval * 0.5;
-        lineMask = 1.0 - smoothstep(uHypsoWeight * fw * 0.5, uHypsoWeight * fw * 1.5, abs(dist));
-      }
 
-      // Quantize to bands
-      float quantizedElev = floor(elev / uContourInterval) * uContourInterval;
-      // Map back to 0..1 brightness for texture lookup
-      b = (quantizedElev / (100.0 * uElevScale)) + 0.5;
+    if (uColorMode == 1) {
+      // Slope: 0 (flat) to 1 (vertical)
+      b = clamp(1.0 - n.y, 0.0, 1.0);
+    } else if (uColorMode == 2) {
+      // Aspect: 0 to 1 based on compass direction
+      b = atan(n.z, n.x) / 3.14159265 * 0.5 + 0.5;
+    }
+    
+    float lineMask = 0.0;
+...
+    if (uHypsometricBanded) {
+      // For Slope/Aspect, we quantize the value directly 0..1
+      // For Elevation, we use the real-world units
+      if (uColorMode == 0) {
+        float elev = (vBrightness - 0.5) * 100.0 * uElevScale;
+        if (uHypsoWeight > 0.0) {
+          float fw = fwidth(elev);
+          float dist = mod(elev + uContourInterval * 0.5, uContourInterval) - uContourInterval * 0.5;
+          lineMask = 1.0 - smoothstep(uHypsoWeight * fw * 0.5, uHypsoWeight * fw * 1.5, abs(dist));
+        }
+        float quantizedElev = floor(elev / uContourInterval) * uContourInterval;
+        b = (quantizedElev / (100.0 * uElevScale)) + 0.5;
+      } else {
+        // Simple 0..1 quantization for Slope/Aspect
+        float steps = 100.0 / uContourInterval; 
+        if (uHypsoWeight > 0.0) {
+          float fw = fwidth(b * steps);
+          float dist = mod(b * steps + 0.5, 1.0) - 0.5;
+          lineMask = 1.0 - smoothstep(uHypsoWeight * fw * 0.5, uHypsoWeight * fw * 1.5, abs(dist));
+        }
+        b = floor(b * steps) / steps;
+      }
       b = clamp(b, 0.0, 1.0);
     }
 
     vec3 base;
     if (uRawTerrain) {
-      vec3 n      = normalize(vNormal);
       vec3 light1 = normalize(vec3(1.0,  2.0, 1.5));
       vec3 light2 = normalize(vec3(-0.5, 0.5, -1.0));
       float diff  = max(dot(n, light1), 0.0) * 0.7
@@ -127,13 +144,13 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   const gradientTex = useMemo(() => {
     gradTexRef.current?.dispose()
     const tex = buildGradientTexture(
-      p.hypsometricFill && p.gradientStops?.length > 1
+      p.fillHypsometric && p.gradientStops?.length > 1
         ? p.gradientStops
         : [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#ffffff' }]
     )
     gradTexRef.current = tex
     return tex
-  }, [p.hypsometricFill, p.gradientStops])
+  }, [p.fillHypsometric, p.gradientStops])
 
   useEffect(() => () => gradTexRef.current?.dispose(), [])
 
@@ -155,28 +172,32 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uContourInterval:   { value: 1.0 },
       uHypsoWeight:       { value: 0.0 },
       uElevScale:         { value: 1.0 },
+      uColorMode:         { value: 0 },
     },
   }), [])
 
   // Update uniforms reactively (no material recreation needed)
   useEffect(() => {
     if (!surfMat) return
-    const hasHypso = p.hypsometricFill
-    const isBanded = hasHypso && p.hypsometricBanded
+    const hasHypso = p.fillHypsometric
+    const isBanded = hasHypso && p.fillBanded
     
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
     // uGradient handles the "Smooth" look when not banded
     surfMat.uniforms.uGradient.value = hasHypso && !isBanded && (p.showFill || p.showRawTerrain)
     surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
     surfMat.uniforms.uHypsometricBanded.value = isBanded
-    surfMat.uniforms.uContourInterval.value = p.hypsoInterval || 10.0
-    surfMat.uniforms.uHypsoWeight.value = p.hypsoWeight || 0.0
+    surfMat.uniforms.uContourInterval.value = p.fillHypsoInterval || 10.0
+    surfMat.uniforms.uHypsoWeight.value = p.fillHypsoWeight || 0.0
     surfMat.uniforms.uElevScale.value = p.elevScale || 1.0
+
+    const modeMap = { elevation: 0, slope: 1, aspect: 2 }
+    surfMat.uniforms.uColorMode.value = modeMap[p.fillHypsoMode] ?? 0
     
     // When fill is off: depth-only occluder — write depth but no colour
     surfMat.colorWrite = !!(p.showFill || p.showRawTerrain || hasHypso)
     surfMat.needsUpdate = true
-  }, [surfMat, p.fillColor, p.showFill, p.hypsometricFill, p.hypsometricBanded, p.showRawTerrain, p.hypsoInterval, p.hypsoWeight, p.elevScale])
+  }, [surfMat, p.fillColor, p.showFill, p.fillHypsometric, p.fillBanded, p.showRawTerrain, p.fillHypsoInterval, p.fillHypsoWeight, p.elevScale, p.fillHypsoMode])
 
   useEffect(() => {
     if (!surfMat) return

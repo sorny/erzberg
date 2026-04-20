@@ -1,19 +1,13 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
- *
- * Layout:
- *   Fixed right-side panel (272 px), dark theme, collapsible via a tab handle.
- *   Sections are individually collapsible using the CSS grid-template-rows trick
- *   so height animates smoothly without JS measurement.
- *
- * Styling injected via <PanelStyles> so range thumb / color swatch pseudo-elements
- * can be targeted (impossible with inline styles alone).
  */
 import { useState } from 'react'
 import { Histogram }      from './Histogram'
 import { GradientPicker } from './GradientPicker'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_PRESETS } from '../utils/stylePresets'
+import { simulateErosion } from '../utils/erosion'
+import { useStore } from '../store/useStore'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BG     = '#18181b'
@@ -52,7 +46,8 @@ function PanelStyles() {
   )
 }
 
-// ── Slider ────────────────────────────────────────────────────────────────────
+// ── UI Atomic Components ───────────────────────────────────────────────────────
+
 function Sl({ label, hint, min, max, step = 1, value, onChange, fmt, col2 }) {
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
@@ -72,7 +67,6 @@ function Sl({ label, hint, min, max, step = 1, value, onChange, fmt, col2 }) {
   )
 }
 
-// ── Toggle switch ──────────────────────────────────────────────────────────────
 function Tog({ label, hint, checked, onChange, small }) {
   const fs = small ? 11 : 12
   const tc = small ? MUTED : DIM
@@ -100,7 +94,6 @@ function Switch({ checked, onChange }) {
   )
 }
 
-// ── Color row ─────────────────────────────────────────────────────────────────
 function ColorRow({ label, value, onChange }) {
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
@@ -110,7 +103,6 @@ function ColorRow({ label, value, onChange }) {
   )
 }
 
-// ── Lines / Points row (toggle + color on same line) ──────────────────────────
 function TogColor({ label, hint, checked, onToggle, color, onColor }) {
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
@@ -118,14 +110,13 @@ function TogColor({ label, hint, checked, onToggle, color, onColor }) {
         {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
       </span>
       <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-        <input type="color" className="hmc" value={color} onChange={e => onColor(e.target.value)} />
+        {onColor && <input type="color" className="hmc" value={color} onChange={e => onColor(e.target.value)} />}
         <Switch checked={checked} onChange={onToggle} />
       </div>
     </div>
   )
 }
 
-// ── Inline slider row (label left, range + val right, no ctrl-head) ───────────
 function InlineSl({ label, hint, min, max, step = 1, value, onChange, fmt }) {
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
@@ -142,7 +133,6 @@ function InlineSl({ label, hint, min, max, step = 1, value, onChange, fmt }) {
   )
 }
 
-// ── Collapsible section ────────────────────────────────────────────────────────
 function Section({ title, open, onToggle, children }) {
   return (
     <div style={{ borderBottom: `1px solid ${BORDER}` }}>
@@ -167,7 +157,6 @@ function Section({ title, open, onToggle, children }) {
   )
 }
 
-// ── Sub-menu container ────────────────────────────────────────────────────────
 function Sub({ children }) {
   return (
     <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
@@ -176,7 +165,6 @@ function Sub({ children }) {
   )
 }
 
-// ── Export button ─────────────────────────────────────────────────────────────
 function ExpBtn({ label, hint, onClick, active }) {
   return (
     <button className="hmeb" onClick={onClick} style={{
@@ -213,36 +201,46 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, points: true, export: true,
+    terrain: true, levels: true, view: true, style: true, points: true, erosion: false, export: true,
   })
+
+  const [erosionIterations, setErosionIterations] = useState(50000)
+  const [isEroding, setIsEroding] = useState(false)
+  const setPixels = useStore(s => s.setPixels)
+  const heightmapWidth = useStore(s => s.heightmapWidth)
+  const heightmapHeight = useStore(s => s.heightmapHeight)
+
+  const handleRunErosion = () => {
+    if (!heightmapPixels || isEroding) return
+    setIsEroding(true)
+    setTimeout(() => {
+      try {
+        const next = simulateErosion(heightmapPixels, heightmapWidth, heightmapHeight, erosionIterations)
+        setPixels(next)
+      } finally {
+        setIsEroding(false)
+      }
+    }, 50)
+  }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
 
   // Partial-update helpers
   const st = (v) => setTerrain(p => ({ ...p, ...v }))
-  const ss = (v) => setStyle(p => {
-    const next = { ...p, ...v }
-    // Mutual exclusion: Fill vs Hypsometric Fill
-    if (v.showFill === true) next.hypsometricFill = false
-    if (v.hypsometricFill === true) next.showFill = false
-    return next
-  })
+  const ss = (v) => setStyle(p => ({ ...p, ...v }))
   const sp = (v) => setPoints(p => ({ ...p, ...v }))
   const sv = (v) => setView(p => ({ ...p, ...v }))
 
-  // GeoTIFF elevation cut helpers (convert % ↔ metres)
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
   const elevRange   = hasGeoTiff ? geoTiffElevMax - geoTiffElevMin : 0
   const elevCutToM  = (pct) => Math.round(geoTiffElevMin + (pct / 100) * elevRange)
   const mToElevCut  = (m)   => Math.round(((m - geoTiffElevMin) / elevRange) * 100)
 
-  // Apply a style preset
   const applyPreset = (preset) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
   }
 
-  // Draw modes
   const MODES = [
     { id:'lines-x',    label:'X' },
     { id:'lines-y',    label:'Y' },
@@ -252,33 +250,19 @@ export function Sidebar({
     { id:'flow',       label:'Flow' },
   ]
 
-  // Multi-mode helpers
   const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
   const hasMode = (id) => activeModes.includes(id)
   const toggleMode = (id) => {
-    let next
-    if (hasMode(id)) {
-      next = activeModes.filter(m => m !== id)
-    } else {
-      next = [...activeModes, id]
-    }
+    let next = hasMode(id) ? activeModes.filter(m => m !== id) : [...activeModes, id]
     ss({ drawMode: next })
   }
 
-  // Line shift range (grid steps between drawn lines)
   const lineStep = terrainData ? Math.max(1, Math.round((style.lineSpacing ?? 4) / terrainData.scl)) : 1
-
-  // Stats
-  const segs  = lineGeo    ? (lineGeo.positions.length / 6).toLocaleString()     : '–'
-  const verts = lineGeo    ? (lineGeo.positions.length / 3).toLocaleString()     : '–'
-  const tris  = surfaceGeo ? (surfaceGeo.indices.length  / 3).toLocaleString()   : '–'
-  const grid  = terrainData ? `${terrainData.cols}×${terrainData.rows}` : '–'
 
   return (
     <>
       <PanelStyles />
 
-      {/* ── Collapse tab ────────────────────────────────────────────────────── */}
       <div onClick={() => setOpen(o => !o)} style={{
         position:'fixed', right: open ? W : 0, top:'50%', transform:'translateY(-50%)',
         width:22, height:64, background: BG, borderRadius:'6px 0 0 6px',
@@ -286,11 +270,8 @@ export function Sidebar({
         display:'flex', alignItems:'center', justifyContent:'center',
         color: MUTED, fontSize:11, boxShadow:'-2px 0 8px rgba(0,0,0,.35)',
         transition:'right .22s cubic-bezier(.4,0,.2,1)',
-      }}>
-        {open ? '▶' : '◀'}
-      </div>
+      }}>{open ? '▶' : '◀'}</div>
 
-      {/* ── Panel shell ─────────────────────────────────────────────────────── */}
       <div style={{
         position:'fixed', right:0, top:0, width:W, height:'100%',
         background: BG, color: TEXT, zIndex:1000,
@@ -300,48 +281,19 @@ export function Sidebar({
         boxShadow:'-3px 0 16px rgba(0,0,0,.4)',
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
-
-        {/* Header */}
         <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'center' }}>
-          <span style={{ fontSize:9, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: MUTED, flex:1 }}>
-            Heightmap Lines
-          </span>
-          <button onClick={onReset} style={{
-            background:'none', border:`1px solid #52525b`, borderRadius:4,
-            color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer',
-            transition:'color .1s, border-color .1s',
-          }}>Reset</button>
+          <span style={{ fontSize:9, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: MUTED, flex:1 }}>Heightmap Lines</span>
+          <button onClick={onReset} style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset</button>
         </div>
 
-        {/* Scrollable body */}
         <div id="hm-panel-body" style={{ flex:1, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
-
-          {/* ── Load ──────────────────────────────────────────────────────── */}
           <div style={{ padding:'12px 14px', borderBottom:`1px solid ${BORDER}` }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-              <button className="hmload" onClick={loadFromPicker} style={{
-                padding:8, textAlign:'center',
-                background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`,
-                borderRadius:5, cursor:'pointer', fontSize:11,
-              }}>
-                ↑ &nbsp;PNG / Image
-              </button>
-              <button className="hmload" onClick={loadGeoTiffFromPicker} style={{
-                padding:8, textAlign:'center',
-                background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`,
-                borderRadius:5, cursor:'pointer', fontSize:11,
-              }}>
-                ↑ &nbsp;GeoTIFF
-              </button>
+              <button className="hmload" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
+              <button className="hmload" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
             </div>
-            {heightmapFilename && (
-              <div style={{ marginTop:5, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                {heightmapFilename}
-              </div>
-            )}
           </div>
 
-          {/* ── Terrain ───────────────────────────────────────────────────── */}
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
             <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
@@ -350,284 +302,135 @@ export function Sidebar({
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
-
             {terrain.resolution > 1 && (
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
                 <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-
-            {hasGeoTiff ? (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-              </div>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-              </div>
-            )}
-          </Section>
-
-          {/* ── Levels ────────────────────────────────────────────────────── */}
-          <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
-            <Histogram
-              pixels={heightmapPixels}
-              blackPoint={terrain.blackPoint}
-              whitePoint={terrain.whitePoint}
-              onBlackChange={v => st({ blackPoint: v })}
-              onWhiteChange={v => st({ whitePoint: v })}
-            />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px', marginTop:6 }}>
-              <Sl label="Shadows"    min={0}   max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
-              <Sl label="Highlights" min={1}   max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
             </div>
           </Section>
 
-          {/* ── View ──────────────────────────────────────────────────────── */}
+          <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
+            <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint} onBlackChange={v => st({ blackPoint: v })} onWhiteChange={v => st({ whitePoint: v })} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px', marginTop:6 }}>
+              <Sl label="Shadows" min={0} max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
+              <Sl label="Highlights" min={1} max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
+            </div>
+          </Section>
+
           <Section title="View" open={sec.view} onToggle={() => tog('view')}>
-            {/* Camera presets */}
             <div style={{ display:'flex', gap:4, marginBottom:6 }}>
               {[['Top', 'top'], ['Front', 'front'], ['Iso', 'iso'], ['Reset', 'reset']].map(([label, name]) => (
-                <button key={name} onClick={() => onCameraPreset(name)} style={{
-                  flex:1, fontSize:10, padding:'3px 0', border:`1px solid ${BORDER}`,
-                  borderRadius:3, cursor:'pointer', background: SURF, color: MUTED,
-                }}>
-                  {label}
-                </button>
+                <button key={name} onClick={() => onCameraPreset(name)} style={{ flex:1, fontSize:10, padding:'3px 0', border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer', background: SURF, color: MUTED }}>{label}</button>
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt}
-                onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Zoom" min={10} max={400}
-                value={Math.round(view.zoom * 100)}
-                onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
+              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Zoom" min={10} max={400} value={Math.round(view.zoom * 100)} onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation}
-              onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
-            
-            <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
+            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <Tog label="Auto-rotate" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
-                <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed}
-                  onChange={v => sv({ autoRotateSpeed: v })} fmt={v => v.toFixed(1)} />
-                <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
+                <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
+                <div style={{ display:'flex', gap:4 }}>
                   <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
-                  {['X','Y','Z'].map(ax => (
-                    <button key={ax} onClick={() => sv({ autoRotateAxis: ax })}
-                      style={{
-                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
-                        borderRadius:3, cursor:'pointer',
-                        background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF,
-                        color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED,
-                      }}>
-                      {ax}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display:'flex', alignItems:'center', padding:'3px 0', gap:4 }}>
-                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                  {[['CW', -1],['CCW', 1]].map(([label, dir]) => (
-                    <button key={label} onClick={() => sv({ autoRotateDir: dir })}
-                      style={{
-                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`,
-                        borderRadius:3, cursor:'pointer',
-                        background: (view.autoRotateDir ?? -1) === dir ? ACCENT : SURF,
-                        color: (view.autoRotateDir ?? -1) === dir ? '#fff' : MUTED,
-                      }}>
-                      {label}
-                    </button>
-                  ))}
+                  {['X','Y','Z'].map(ax => <button key={ax} onClick={() => sv({ autoRotateAxis: ax })} style={{ fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, background: (view.autoRotateAxis ?? 'Y') === ax ? ACCENT : SURF, color: (view.autoRotateAxis ?? 'Y') === ax ? '#fff' : MUTED }}>{ax}</button>)}
                 </div>
               </Sub>
             )}
-            <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
-          {/* ── Style ─────────────────────────────────────────────────────── */}
           <Section title="Style" open={sec.style} onToggle={() => tog('style')}>
-            {/* Style presets */}
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                {Object.entries(STYLE_PRESETS).map(([name, preset]) => (
-                  <button key={name} onClick={() => applyPreset(preset)}
-                    style={{
-                      padding:'6px 4px', fontSize:10, fontWeight:500, textAlign:'center',
-                      background: SURF, color: DIM, border:`1px solid ${BORDER}`,
-                      borderRadius:4, cursor:'pointer',
-                    }}>
-                    {name}
-                  </button>
-                ))}
-              </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:10 }}>
+              {Object.keys(STYLE_PRESETS).map(name => <button key={name} onClick={() => applyPreset(STYLE_PRESETS[name])} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
             </div>
 
-            {/* Draw mode segmented buttons */}
             <div style={{ marginBottom: 10 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                <span style={{ fontSize:10, color: DIM }}>Draw mode</span>
-                <span style={{ fontSize:9, color: MUTED }}>f</span>
-              </div>
               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                {MODES.map(m => (
-                  <button key={m.id} className={`hmsb${hasMode(m.id) ? ' on' : ''}`}
-                    onClick={() => toggleMode(m.id)}
-                    style={{
-                      flex:1, padding:'5px 0', fontSize:11, fontWeight:500,
-                      background: hasMode(m.id) ? ACCENT : SURF,
-                      color:      hasMode(m.id) ? '#fff' : MUTED,
-                      border:`1px solid ${hasMode(m.id) ? ACCENT : BORDER}`,
-                      borderRadius:4, cursor:'pointer',
-                    }}>
-                    {m.label}
-                  </button>
-                ))}
+                {MODES.map(m => <button key={m.id} className={`hmsb${hasMode(m.id) ? ' on' : ''}`} onClick={() => toggleMode(m.id)} style={{ flex:1, padding:'5px 0', fontSize:11, background: hasMode(m.id) ? ACCENT : SURF, color: hasMode(m.id) ? '#fff' : MUTED, border:`1px solid ${hasMode(m.id) ? ACCENT : BORDER}`, borderRadius:4, cursor:'pointer' }}>{m.label}</button>)}
               </div>
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow')) && (
-                <InlineSl
-                  label={hasMode('flow') && activeModes.length === 1 ? 'Seed spacing' : 'Line spacing'}
-                  min={1} max={hasMode('flow') ? 20 : 100} value={style.lineSpacing ?? 4} onChange={v => ss({ lineSpacing: v })}
-                />
-              )}
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch')) && lineStep > 1 && (
-                <InlineSl label="Line shift" min={0} max={lineStep - 1}
-                  value={Math.min(style.lineShift ?? 0, lineStep - 1)}
-                  onChange={v => ss({ lineShift: v })} />
-              )}
-              {hasMode('hachure') && <>
-                <InlineSl label="Tick spacing" min={1} max={100} value={style.hachureSpacing ?? 4} onChange={v => ss({ hachureSpacing: v })} />
-                <InlineSl label="Tick length"  min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} fmt={v => v.toFixed(1)} />
-              </>}
-              {hasMode('contours') && (
-                <InlineSl label="Interval" min={0.5} max={30}  step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v} />
-              )}
-              {hasMode('flow') && (<>
-                <InlineSl label="Step"    min={0.1} max={3}   step={0.1} value={style.flowStep ?? 0.5}  onChange={v => ss({ flowStep: v })}  fmt={v => v.toFixed(1)} />
-                <InlineSl label="Max len" min={1}   max={250} step={1}  value={style.flowMaxLen ?? 100} onChange={v => ss({ flowMaxLen: v })} />
-              </>)}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
+              {hasMode('contours') && <InlineSl label="Interval" min={0.5} max={30} step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} />}
+              {hasMode('flow') && <><InlineSl label="F-Step" min={0.1} max={3} step={0.1} value={style.flowStep} onChange={v => ss({ flowStep: v })} /><InlineSl label="F-Max" min={1} max={250} value={style.flowMaxLen} onChange={v => ss({ flowMaxLen: v })} /></>}
             </Sub>
 
-            {/* Lines row: label + color + toggle */}
             <TogColor label="Lines" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
             {style.showLines && (
               <Sub>
-                <InlineSl label="Weight  b/n" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
-                <div style={{ display:'flex', alignItems:'center', padding:'0 0 8px', gap:4 }}>
-                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Dash</span>
-                  {[['solid', 'solid'], ['dash', 'dashed'], ['dot', 'dotted'], ['long', 'long-dash']].map(([lbl, val]) => (
-                    <button key={val} onClick={() => ss({ lineDash: val })}
-                      style={{
-                        fontSize:10, padding:'2px 7px', border:`1px solid ${BORDER}`,
-                        borderRadius:3, cursor:'pointer',
-                        background: (style.lineDash ?? 'solid') === val ? ACCENT : SURF,
-                        color:      (style.lineDash ?? 'solid') === val ? '#fff'  : MUTED,
-                      }}>
-                      {lbl}
-                    </button>
-                  ))}
-                </div>
+                <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
+                <Tog label="Hypsometric color" small checked={style.lineHypsometric} onChange={v => ss({ lineHypsometric: v })} />
+                {style.lineHypsometric && (
+                  <Sub>
+                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ lineHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:8, padding:'2px 0', borderRadius:2, background: style.lineHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.lineHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.lineHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
+                    </div>
+                    <Tog label="Banded" small checked={style.lineBanded} onChange={v => ss({ lineBanded: v })} />
+                    {style.lineBanded && <InlineSl label="Band Dist" min={0.5} max={50} value={style.lineHypsoInterval} onChange={v => ss({ lineHypsoInterval: v })} />}
+                  </Sub>
+                )}
               </Sub>
             )}
 
-            {/* Fill + Mesh */}
-            <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor ?? '#ffffff'} onColor={v => ss({ fillColor: v })} />
-
-            {/* Hypsometric fill (replaces Elevation gradient) */}
-            <Tog label="Hypsometric fill" checked={style.hypsometricFill} onChange={v => ss({ hypsometricFill: v })} />
-            {style.hypsometricFill && (
+            <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
+            {style.showFill && (
               <Sub>
-                <Tog label="Banded look" checked={style.hypsometricBanded} onChange={v => ss({ hypsometricBanded: v })} />
-                {style.hypsometricBanded && (
+                <Tog label="Hypsometric fill" small checked={style.fillHypsometric} onChange={v => ss({ fillHypsometric: v })} />
+                {style.fillHypsometric && (
                   <Sub>
-                    <InlineSl label="Interval" min={0.5} max={50} step={0.5} value={style.hypsoInterval} onChange={v => ss({ hypsoInterval: v })} fmt={v => v} />
-                    <InlineSl label="Weight"   min={0} max={5} step={0.5} value={style.hypsoWeight} onChange={v => ss({ hypsoWeight: v })} />
+                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:8, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
+                    </div>
+                    <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
+                    {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
                   </Sub>
                 )}
+              </Sub>
+            )}
+
+            {style.fillHypsometric || style.lineHypsometric ? (
+              <div style={{ marginBottom: 10, marginTop: 10 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => (
-                    <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])}
-                      style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>
-                      {name}
-                    </button>
-                  ))}
+                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-              </Sub>
-            )}
+              </div>
+            ) : null}
 
-            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor ?? '#888888'} onColor={v => ss({ meshColor: v })} />
-
+            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
-            <Tog label="Background gradient" checked={style.bgGradient ?? false} onChange={v => ss({ bgGradient: v })} />
-            {style.bgGradient && (
-              <Sub>
-                <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />
-              </Sub>
-            )}
-
+            <Tog label="BG Gradient" checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
+            {style.bgGradient && <Sub><GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} /></Sub>}
           </Section>
 
-          {/* ── Particles ─────────────────────────────────────────────────── */}
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
-            {points.showPoints && (
-              <Sub>
-                <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
-                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
-                <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
-                {points.animateParticles && (
-                  <Sub>
-                    <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
-                    <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
-                    {points.particleGravity && (
-                      <Sub>
-                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
-                      </Sub>
-                    )}
-                  </Sub>
-                )}
-              </Sub>
-            )}
+            {points.showPoints && <Sub><InlineSl label="Size" min={0.5} max={20} value={points.pointSize} onChange={v => sp({ pointSize: v })} /></Sub>}
           </Section>
 
-          {/* ── Export ────────────────────────────────────────────────────── */}
+          <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
+            <InlineSl label="Iterations" min={1000} max={200000} step={1000} value={erosionIterations} onChange={v => setErosionIterations(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
+            <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ width:'100%', padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
+          </Section>
+
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label="SVG"   hint="key 1" onClick={onSvg} />
-              <ExpBtn label="PNG"   hint="key 2" onClick={onPng} />
-              <ExpBtn label="PNG α" hint="key 3"  onClick={onPngAlpha} />
-              <ExpBtn label="STL"   hint="key 4" onClick={onStl} />
+              <ExpBtn label="SVG" onClick={onSvg} /><ExpBtn label="PNG" onClick={onPng} /><ExpBtn label="PNG α" onClick={onPngAlpha} /><ExpBtn label="STL" onClick={onStl} />
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? 'recording' : 'key 5'} onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
-              <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label="Save Preset" onClick={onSavePreset} /><ExpBtn label="Load Preset" onClick={onLoadPreset} />
             </div>
-            <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
           </Section>
-
-          {/* ── Stats ─────────────────────────────────────────────────────── */}
-          <div style={{ padding:'10px 14px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
-            <div>Segments: {segs} · Verts: {verts}</div>
-            <div>Triangles: {tris} · Grid: {grid}</div>
-            {geoTiffElevMin != null && geoTiffElevMax != null && (
-              <div style={{ marginTop:3, color: MUTED }}>
-                Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m
-                &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
-              </div>
-            )}
-          </div>
-
         </div>
       </div>
     </>

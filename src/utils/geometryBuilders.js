@@ -121,8 +121,12 @@ function buildRidgelines(terrain, p, isY) {
 
       const slope0 = gridSlopes[r0 * cols + c0]
       const slope1 = gridSlopes[r1 * cols + c1]
-      const col0 = computeVertexColor(normElev(elev0, minZ, maxZ), slope0, p, terrain)
-      const col1 = computeVertexColor(normElev(elev1, minZ, maxZ), slope1, p, terrain)
+      
+      // Approximate aspect for grid lines
+      const aspect0 = isY ? Math.PI : Math.PI/2
+
+      const col0 = computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), aspect0, p)
+      const col1 = computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), aspect0, p)
       colors.push(...col0, ...col1)
     }
   }
@@ -181,7 +185,8 @@ function buildHachure(terrain, p) {
       )
 
       const slope = gridSlopes[r * cols + c]
-      const col = computeVertexColor(normElev(elev, minZ, maxZ), slope, p, terrain)
+      const aspect = Math.atan2(gz, gx)
+      const col = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), aspect, p)
       colors.push(...col, ...col)
     }
   }
@@ -281,7 +286,8 @@ function buildContours(terrain, p) {
 
     const segs = marchSquares(grid, rows, cols, bLevel)
 
-    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, p, terrain)
+    // For contours, slope is effectively 0 at the line itself. Aspect can be calculated from gradient.
+    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
 
     for (let i = 0; i < segs.length; i += 4) {
       const c0 = segs[i],   r0 = segs[i + 1]
@@ -335,7 +341,7 @@ function sampleBrightness(grid, rows, cols, fr, fc) {
 }
 
 function buildFlowLines(terrain, p) {
-  const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+  const { grid, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope } = terrain
   const {
     lineSpacing, elevScale,
     flowStep = 0.5, flowMaxLen = 100,
@@ -403,9 +409,11 @@ function buildFlowLines(terrain, p) {
           posBuf[pIdx]   = fc  * scl - halfW; posBuf[pIdx+1] = e0; posBuf[pIdx+2] = fr  * scl - halfH
           posBuf[pIdx+3] = nfc * scl - halfW; posBuf[pIdx+4] = e1; posBuf[pIdx+5] = nfr * scl - halfH
 
-          const slopeNorm = Math.min(1, mag / 0.02)
-          const c0 = computeVertexColor(normElev(e0, minZ, maxZ), slopeNorm, p, terrain)
-          const c1 = computeVertexColor(normElev(e1, minZ, maxZ), slopeNorm, p, terrain)
+          const slopeNorm = Math.min(1, mag / (maxSlope || 0.02))
+          const aspect = Math.atan2(gz, gx)
+
+          const c0 = computeVertexColor(normElev(e0, minZ, maxZ), slopeNorm, aspect, p)
+          const c1 = computeVertexColor(normElev(e1, minZ, maxZ), slopeNorm, aspect, p)
           
           colBuf[pIdx] = c0[0]; colBuf[pIdx+1] = c0[1]; colBuf[pIdx+2] = c0[2]
           colBuf[pIdx+3] = c1[0]; colBuf[pIdx+4] = c1[1]; colBuf[pIdx+5] = c1[2]

@@ -22,6 +22,8 @@ export const useStore = create((set) => ({
   setHeightmap: (pixels, width, height, filename) =>
     set({ heightmapPixels: pixels, heightmapWidth: width, heightmapHeight: height, heightmapFilename: filename }),
 
+  setPixels: (pixels) => set({ heightmapPixels: pixels }),
+
   setGeoTiffMeta: (elevMin, elevMax) =>
     set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax }),
 

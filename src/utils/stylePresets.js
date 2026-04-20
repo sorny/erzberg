@@ -10,17 +10,20 @@ export const STYLE_PRESETS = {
       drawMode: ['contours'],
       lineColor: '#7b4f2e', bgColor: '#f2ede4',
       strokeWeight: 1, showFill: false, showMesh: false,
-      hypsometricFill: false, contourInterval: 2, lineDash: 'solid',
+      lineHypsometric: false, fillHypsometric: false,
+      contourInterval: 2, lineDash: 'solid',
     },
     gradientStops: null,
   },
 
   'Neon City': {
     style: {
-      drawMode: 'lines-x',
+      drawMode: ['lines-x'],
       lineColor: '#00f2ff', bgColor: '#050505',
       strokeWeight: 1.5, showFill: true, showMesh: false,
-      hypsometricFill: true, lineDash: 'solid',
+      lineHypsometric: true, lineBanded: false, lineHypsoMode: 'elevation',
+      fillHypsometric: true, fillBanded: false, fillHypsoMode: 'elevation',
+      lineDash: 'solid',
     },
     gradientStops: [
       { pos: 0, color: '#0d0221' },
@@ -31,20 +34,23 @@ export const STYLE_PRESETS = {
 
   'Blueprint': {
     style: {
-      drawMode: 'lines-x',
+      drawMode: ['lines-x'],
       lineColor: '#c8e8ff', bgColor: '#0d2b4e',
       strokeWeight: 0.5, showFill: false, showMesh: false,
-      hypsometricFill: false, lineDash: 'dashed',
+      lineHypsometric: false, fillHypsometric: false,
+      lineDash: 'dashed',
     },
     gradientStops: null,
   },
 
   'Burnt Paper': {
     style: {
-      drawMode: 'lines-x',
+      drawMode: ['lines-x'],
       lineColor: '#1a1005', bgColor: '#d9cbb4',
       strokeWeight: 1.2, showFill: true, showMesh: false,
-      hypsometricFill: true, lineDash: 'solid',
+      lineHypsometric: true, lineBanded: false, lineHypsoMode: 'elevation',
+      fillHypsometric: true, fillBanded: false, fillHypsoMode: 'elevation',
+      lineDash: 'solid',
     },
     gradientStops: [
       { pos: 0,    color: '#000000' },

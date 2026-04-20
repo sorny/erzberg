@@ -115,7 +115,7 @@ export function Scene({
       groupMatrix,
       showLines: p.showLines,
       showFill: p.showFill,
-      hypsometricFill: p.hypsometricFill,
+      fillHypsometric: p.fillHypsometric,
       gradientStops: p.gradientStops,
       particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
       particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,

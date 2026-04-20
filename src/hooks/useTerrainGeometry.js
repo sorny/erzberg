@@ -68,8 +68,10 @@ export function useTerrainGeometry(p) {
     p.flowStep, p.flowMaxLen,
     p.elevMinCut, p.elevMaxCut,
     p.jitterAmt,
-    p.lineColor, p.hypsometricFill, p.hypsometricBanded, p.gradientStops,
-    p.hypsoInterval, p.hypsoWeight,
+    p.lineColor, p.fillColor,
+    p.lineHypsometric, p.lineBanded, p.lineHypsoInterval, p.lineHypsoWeight, p.lineHypsoMode,
+    p.fillHypsometric, p.fillBanded, p.fillHypsoInterval, p.fillHypsoWeight, p.fillHypsoMode,
+    p.gradientStops,
   ])
 
   // Cleanup on unmount

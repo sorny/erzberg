@@ -35,22 +35,31 @@ export function sampleGradient(stops, t) {
 
 /**
  * Compute per-vertex [r, g, b] for a given elevation and slope.
- *
- * strokeByElev: simulated by lerping line colour toward background colour at low
- * elevations (WebGL cannot vary linewidth per-vertex; this gives a visual
- * light→heavy progression by making low-elevation lines appear faded/thin).
+ * Decoupled for lines only (see lineHypsometric params).
  *
  * @param {number} normElev  0–1 within the rendered elevation range
- * @param {number} slope     raw slope gradient magnitude
- * @param {object} params    all visual params (from Leva + gradientStops)
- * @param {object} terrain   { maxSlope }
+ * @param {number} normSlope 0–1 normalised slope magnitude
+ * @param {number} aspect    Aspect angle in radians
+ * @param {object} params    All visual params (from levaSet)
  */
-export function computeVertexColor(normElev, slope, params, terrain) {
-  const { lineColor, hypsometricFill, gradientStops } = params
+export function computeVertexColor(normElev, normSlope, aspect, params) {
+  const { 
+    lineColor, lineHypsometric, lineBanded, 
+    lineHypsoMode, lineHypsoInterval, gradientStops 
+  } = params
 
-  if (hypsometricFill && gradientStops && gradientStops.length > 1) {
-    return sampleGradient(gradientStops, normElev)
+  if (!lineHypsometric || !gradientStops || gradientStops.length < 2) {
+    return hexToRgb(lineColor)
   }
 
-  return hexToRgb(lineColor)
+  let val = normElev
+  if (lineHypsoMode === 'slope') val = normSlope
+  else if (lineHypsoMode === 'aspect') val = aspect / (Math.PI * 2) + 0.5
+
+  if (lineBanded) {
+    const steps = 100 / (lineHypsoInterval || 10)
+    val = Math.floor(val * steps) / steps
+  }
+
+  return sampleGradient(gradientStops, Math.max(0, Math.min(1, val)))
 }
