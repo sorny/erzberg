@@ -1,13 +1,10 @@
 /**
  * R3F scene.
  *
- * Terrain transforms (tilt, rotation, zoom) are applied to a scene group rather
- * than the camera, matching the original sketch's transform stack:
- *   scale(zoom) → rotateX(tilt) → rotateY(rotation) → terrain
- *
- * OrbitControls handles free camera orbit/pan on top of these transforms.
- * Auto-rotate increments the group rotation in useFrame without touching
- * React state (avoids a setState per frame).
+ * Rotation logic:
+ * To keep the XYZ orientation gizmo in sync with the terrain, we manipulate the
+ * CAMERA position/rotation rather than the terrain group.
+ * Tilt and Rotation sliders drive the camera's spherical coordinates around [0,0,0].
  */
 import { useRef, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -31,78 +28,73 @@ export function Scene({
   const groupRef    = useRef()
   const particleRef = useRef()
 
-  // Rotation refs — driven by sliders when not auto-rotating,
-  // accumulated by auto-rotate when active on that axis.
-  const xRotRef = useRef(THREE.MathUtils.degToRad(p.tilt     ?? 0))
-  const yRotRef = useRef(THREE.MathUtils.degToRad(p.rotation ?? 0))  // rotation slider → Y
-  const zRotRef = useRef(0)                                            // auto-rotate Z only
+  // We use a spherical coordinate system for the camera to keep it "orbiting" the center
+  // distance is derived from p.zoom
+  const BASE_DIST = 800
+  
+  const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom) => {
+    const dist = (BASE_DIST / zoom)
+    const phi = THREE.MathUtils.degToRad(tiltDeg)       // polar angle (0 = top)
+    const theta = THREE.MathUtils.degToRad(rotationDeg) // azimuthal angle
 
-  // Keep manual slider refs in sync (skip if auto-rotating on that axis)
-  useEffect(() => {
-    if (!p.autoRotate || p.autoRotateAxis !== 'Y') {
-      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
-    }
-  }, [p.rotation, p.autoRotate, p.autoRotateAxis])
-
-  useEffect(() => {
-    if (!p.autoRotate || p.autoRotateAxis !== 'X') {
-      xRotRef.current = THREE.MathUtils.degToRad(p.tilt ?? 0)
-    }
-  }, [p.tilt, p.autoRotate, p.autoRotateAxis])
-
-  // Reset accumulated angle when auto-rotate axis changes
-  const prevAxisRef = useRef(p.autoRotateAxis ?? 'Y')
-  useEffect(() => {
-    if (p.autoRotateAxis !== prevAxisRef.current) {
-      xRotRef.current = THREE.MathUtils.degToRad(p.tilt     ?? 0)
-      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
-      zRotRef.current = 0
-      prevAxisRef.current = p.autoRotateAxis
-    }
-  }, [p.autoRotateAxis, p.rotation, p.tilt])
-
-  // Per-frame: apply tilt/rotation/zoom to group; handle auto-rotate
-  useFrame((_, delta) => {
-    if (!groupRef.current) return
-
-    const step = THREE.MathUtils.degToRad((p.autoRotateSpeed ?? 0.5) * delta * 40) * (p.autoRotateDir ?? 1)
-
-    if (p.autoRotate) {
-      const axis = p.autoRotateAxis ?? 'Y'
-      if (axis === 'X') xRotRef.current += step
-      else if (axis === 'Y') yRotRef.current += step
-      else if (axis === 'Z') zRotRef.current += step
-    } else {
-      xRotRef.current = THREE.MathUtils.degToRad(p.tilt     ?? 0)
-      yRotRef.current = THREE.MathUtils.degToRad(p.rotation ?? 0)
-      zRotRef.current = 0
-    }
-
-    groupRef.current.rotation.x = xRotRef.current
-    groupRef.current.rotation.y = yRotRef.current
-    groupRef.current.rotation.z = zRotRef.current
-    groupRef.current.scale.setScalar(p.zoom ?? 1)
-
+    // Spherical to Cartesian (Y is UP)
+    // We want tilt=0 to be Y-up, looking down.
+    // In Three.js Spherical: phi=0 is +Y axis.
+    camera.position.setFromSphericalCoords(dist, phi, theta)
+    camera.lookAt(0, 0, 0)
     if (orbitRef.current) orbitRef.current.update()
+  }
+
+  // Sync camera when Tilt, Rotation, or Zoom changes manually via sliders
+  useEffect(() => {
+    if (!p.autoRotate) {
+      updateCameraFromSliders(p.tilt, p.rotation, p.zoom)
+    }
+  }, [p.tilt, p.rotation, p.zoom, p.autoRotate])
+
+  // Handle auto-rotate
+  useFrame((_, delta) => {
+    if (!p.autoRotate) return
+
+    const step = (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
+    
+    // We update the state via levaSet so sliders stay in sync
+    if (p.autoRotateAxis === 'Y') {
+      levaSet({ rotation: p.rotation + step })
+    } else if (p.autoRotateAxis === 'X') {
+      levaSet({ tilt: p.tilt + step })
+    }
+    // Note: 'Z' axis auto-rotate is less common for "turntable" viewing
+    // but could be implemented by rotating the groupRef if needed.
+    // For now we keep it simple.
   })
 
   // Camera presets
   useEffect(() => {
     if (!cameraPreset?.name) return
-    const positions = {
-      top:   [0, 1800, 5],
-      front: [0, 0,    800],
-      iso:   [550, 550, 550],
-      reset: [0, 400,  500],
-    }
-    const [x, y, z] = positions[cameraPreset.name] ?? positions.reset
-    camera.position.set(x, y, z)
-    camera.lookAt(0, 0, 0)
+    // App.jsx already updated the p.tilt and p.rotation state, 
+    // which triggers the useEffect above to position the camera.
     if (orbitRef?.current) {
       orbitRef.current.target.set(0, 0, 0)
       orbitRef.current.update()
     }
-  }, [cameraPreset]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cameraPreset])
+
+  // Sync state back from OrbitControls when user drags
+  const handleOrbitChange = () => {
+    if (!orbitRef.current) return
+    const sph = new THREE.Spherical().setFromVector3(camera.position)
+    
+    // Convert back to degrees for the sliders
+    const tilt = THREE.MathUtils.radToDeg(sph.phi)
+    const rotation = THREE.MathUtils.radToDeg(sph.theta)
+    const zoom = BASE_DIST / sph.radius
+
+    // We only update if the difference is significant to avoid feedback loops
+    if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || Math.abs(zoom - p.zoom) > 0.01) {
+      levaSet({ tilt, rotation, zoom })
+    }
+  }
 
   // SVG export — software z-buffer occlusion, no GPU readback required
   useEffect(() => {
@@ -153,6 +145,7 @@ export function Scene({
         enableDamping
         dampingFactor={0.08}
         makeDefault
+        onChange={handleOrbitChange}
       />
 
       <Controls levaGet={levaGet} levaSet={levaSet} orbitRef={orbitRef} />

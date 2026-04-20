@@ -339,30 +339,24 @@ export function Sidebar({
             </div>
 
             {terrain.resolution > 1 && (
-              <Sub>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                  <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
-                  <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
-                </div>
-              </Sub>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
+                <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
+              </div>
             )}
 
             {hasGeoTiff ? (
-              <Sub>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                  <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                    value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                  <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                    value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                </div>
-              </Sub>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </div>
             ) : (
-              <Sub>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                  <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                  <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-                </div>
-              </Sub>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </div>
             )}
           </Section>
 
@@ -395,14 +389,14 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" hint="y/x" min={-90} max={90} value={view.tilt}
-                onChange={v => sv({ tilt: v })} fmt={v => v+'°'} />
+              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt}
+                onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400}
                 value={Math.round(view.zoom * 100)}
                 onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" hint="e/r" min={-180} max={180} value={view.rotation}
-              onChange={v => sv({ rotation: v })} fmt={v => v+'°'} />
+            <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation}
+              onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
             
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (

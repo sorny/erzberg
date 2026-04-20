@@ -4,16 +4,16 @@
  * All tweakable params live in plain React state (no Leva).
  * The custom <Sidebar> renders the right-hand control panel.
  */
-import { useState, useCallback, useEffect, useRef } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { Scene }         from './components/Scene'
-import { Sidebar }       from './components/Sidebar'
-import { useHeightmap }  from './hooks/useHeightmap'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Scene } from './components/Scene'
+import { Sidebar } from './components/Sidebar'
+import { useHeightmap } from './hooks/useHeightmap'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
-import { useStore }      from './store/useStore'
+import { useStore } from './store/useStore'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
-import { startWebM, stopWebM, isRecording } from './utils/webmRecorder'
 import { exportSTL } from './utils/stlExport'
+import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
@@ -37,7 +37,7 @@ const POINTS_DEF = {
   particleGravity: false, particleGravityStr: 1,
 }
 const VIEW_DEF = {
-  tilt: 0, rotation: 0, zoom: 1,
+  tilt: 60, rotation: 0, zoom: 1,
   autoRotate: false, autoRotateSpeed: 0.5, autoRotateAxis: 'Y', autoRotateDir: -1,
   showGuides: false, showRawTerrain: false,
 }
@@ -163,6 +163,8 @@ export default function App() {
     if (vals.lineDash     != null) s.lineDash      = vals.lineDash
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
+    if (vals.hypsoInterval != null) s.hypsoInterval = vals.hypsoInterval
+    if (vals.hypsoWeight   != null) s.hypsoWeight   = vals.hypsoWeight
     if (vals.tilt         != null) v.tilt          = vals.tilt
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
@@ -203,9 +205,15 @@ export default function App() {
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
-    const rotations = { top: 0, front: 0, iso: 45, reset: 0 }
-    const tilts     = { top: 0, front: 0, iso: 0,  reset: 0 }
-    setView(prev => ({ ...prev, tilt: tilts[name] ?? 0, rotation: rotations[name] ?? 0 }))
+    // Standard map viewing angles (tilt: 0 is top-down, rotation: 0 is North-up)
+    const presets = {
+      top:   { tilt: 0,  rotation: 0 },
+      front: { tilt: 90, rotation: 0 },
+      iso:   { tilt: 45, rotation: -45 },
+      reset: { tilt: 60, rotation: 0 },
+    }
+    const p = presets[name] || presets.reset
+    setView(prev => ({ ...prev, ...p }))
     setCameraPreset({ name, ts: Date.now() })
   }, [])
 
