@@ -6,10 +6,10 @@ import { buildTerrain } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry } from './geometryBuilders'
 
 self.onmessage = (e) => {
-  const { heightmapPixels, heightmapWidth, heightmapHeight, p } = e.data
+  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p } = e.data
 
   try {
-    const terrain = buildTerrain(heightmapPixels, heightmapWidth, heightmapHeight, p)
+    const terrain = buildTerrain(heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p)
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p.elevScale, p.jitterAmt)
 

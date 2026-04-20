@@ -11,6 +11,8 @@ import { create } from 'zustand'
 export const useStore = create((set) => ({
   // Raw pixel brightness extracted from the loaded image (Float32Array, values 0–1)
   heightmapPixels: null,
+  // Mask for GeoTIFF NoData pixels (Uint8Array, 1=valid, 0=nodata)
+  nodataMask: null,
   heightmapWidth: 0,
   heightmapHeight: 0,
   heightmapFilename: '',
@@ -19,8 +21,14 @@ export const useStore = create((set) => ({
   geoTiffElevMin: null,   // metres (or native unit)
   geoTiffElevMax: null,
 
-  setHeightmap: (pixels, width, height, filename) =>
-    set({ heightmapPixels: pixels, heightmapWidth: width, heightmapHeight: height, heightmapFilename: filename }),
+  setHeightmap: (pixels, mask, width, height, filename) =>
+    set({ 
+      heightmapPixels: pixels, 
+      nodataMask: mask,
+      heightmapWidth: width, 
+      heightmapHeight: height, 
+      heightmapFilename: filename 
+    }),
 
   setPixels: (pixels) => set({ heightmapPixels: pixels }),
 
@@ -31,6 +39,6 @@ export const useStore = create((set) => ({
     set({ geoTiffElevMin: null, geoTiffElevMax: null }),
 
   clearHeightmap: () =>
-    set({ heightmapPixels: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
+    set({ heightmapPixels: null, nodataMask: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
           geoTiffElevMin: null, geoTiffElevMax: null }),
 }))

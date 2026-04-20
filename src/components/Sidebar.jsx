@@ -206,6 +206,7 @@ export function Sidebar({
 
   const [erosionIterations, setErosionIterations] = useState(50000)
   const [isEroding, setIsEroding] = useState(false)
+  
   const setPixels = useStore(s => s.setPixels)
   const heightmapWidth = useStore(s => s.heightmapWidth)
   const heightmapHeight = useStore(s => s.heightmapHeight)
@@ -248,6 +249,8 @@ export function Sidebar({
     { id:'hachure',    label:'Hachure' },
     { id:'contours',   label:'Contours' },
     { id:'flow',       label:'Flow' },
+    { id:'dag',        label:'Network' },
+    { id:'pencil',     label:'Pencil' },
   ]
 
   const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
@@ -358,10 +361,12 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('flow') || hasMode('dag') || hasMode('pencil')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.5} max={30} step={0.5} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} />}
               {hasMode('flow') && <><InlineSl label="F-Step" min={0.1} max={3} step={0.1} value={style.flowStep} onChange={v => ss({ flowStep: v })} /><InlineSl label="F-Max" min={1} max={250} value={style.flowMaxLen} onChange={v => ss({ flowMaxLen: v })} /></>}
+              {hasMode('dag') && <InlineSl label="Threshold" min={1} max={10} step={1} value={style.strahlerThreshold} onChange={v => ss({ strahlerThreshold: v })} />}
+              {hasMode('pencil') && <InlineSl label="P-Threshold" min={0.1} max={5} step={0.1} value={style.curvatureThreshold} onChange={v => ss({ curvatureThreshold: v })} />}
             </Sub>
 
             <TogColor label="Lines" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
@@ -408,8 +413,10 @@ export function Sidebar({
 
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
-            <Tog label="BG Gradient" checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
-            {style.bgGradient && <Sub><GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} /></Sub>}
+            <Sub>
+              <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
+              {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />}
+            </Sub>
           </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
