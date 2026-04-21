@@ -54,8 +54,11 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       uOpacity: { value: 1.0 },
     },
     transparent: true,
-    depthTest:   false,
+    depthTest:   !!p.depthOcclusion,
     depthWrite:  false,
+    polygonOffset: true,
+    polygonOffsetFactor: -(p.occlusionBias ?? 1),
+    polygonOffsetUnits:  -(p.occlusionBias ?? 1),
   }), [])
 
   useEffect(() => () => particleMat.dispose(), [particleMat])
@@ -65,8 +68,11 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
     const [r, g, b] = hexToRgb(p.pointColor ?? p.lineColor)
     particleMat.uniforms.uSize.value  = p.pointSize ?? 4
     particleMat.uniforms.uColor.value.set(r, g, b)
+    particleMat.depthTest = !!p.depthOcclusion
+    particleMat.polygonOffsetFactor = -(p.occlusionBias ?? 1)
+    particleMat.polygonOffsetUnits  = -(p.occlusionBias ?? 1)
     particleMat.needsUpdate = true
-  }, [particleMat, p.pointColor, p.lineColor, p.pointSize])
+  }, [particleMat, p.pointColor, p.lineColor, p.pointSize, p.depthOcclusion, p.occlusionBias])
 
   const homePositions = useMemo(() => {
     if (!terrain) return null
