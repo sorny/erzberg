@@ -39,8 +39,8 @@ const STYLE_DEF = {
   bgGradient: false,
   depthOcclusion: true,
   
-  // Texture overlay
-  showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0,
+  // Creative
+  showMirrorPlusY: true, showMirrorMinusY: false,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -185,6 +185,8 @@ export default function App() {
     if (vals.textureScale   != null) s.textureScale   = vals.textureScale
     if (vals.textureShiftX  != null) s.textureShiftX  = vals.textureShiftX
     if (vals.textureShiftY  != null) s.textureShiftY  = vals.textureShiftY
+    if (vals.showMirrorPlusY  != null) s.showMirrorPlusY  = vals.showMirrorPlusY
+    if (vals.showMirrorMinusY != null) s.showMirrorMinusY = vals.showMirrorMinusY
     
     // Sync all split hypsometric properties
     if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric

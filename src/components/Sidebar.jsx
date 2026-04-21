@@ -328,7 +328,33 @@ export function Sidebar({
         if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
       }
     }
-    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored)')
+    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored X)')
+  }
+
+  const handleMirrorY = () => {
+    if (!heightmapPixels) return
+    const W = heightmapWidth
+    const H = heightmapHeight
+    const newH = H * 2
+    const nextPixels = new Float32Array(W * newH)
+    const nextMask = nodataMask ? new Uint8Array(W * newH) : null
+
+    for (let y = 0; y < H; y++) {
+      const sourceRowOff = y * W
+      // Mirrored copy (top side)
+      const destRowOffT = (H - 1 - y) * W
+      for (let x = 0; x < W; x++) {
+        nextPixels[destRowOffT + x] = heightmapPixels[sourceRowOff + x]
+        if (nextMask) nextMask[destRowOffT + x] = nodataMask[sourceRowOff + x]
+      }
+      // Original copy (bottom side)
+      const destRowOffB = (H + y) * W
+      for (let x = 0; x < W; x++) {
+        nextPixels[destRowOffB + x] = heightmapPixels[sourceRowOff + x]
+        if (nextMask) nextMask[destRowOffB + x] = nodataMask[sourceRowOff + x]
+      }
+    }
+    setHeightmap(nextPixels, nextMask, W, newH, heightmapFilename + ' (mirrored Y)')
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -585,15 +611,21 @@ export function Sidebar({
           </Section>
 
           <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
-            <button className="hmeb" onClick={handleMirrorX} style={{ 
-              width:'100%', padding:'8px 0', background: SURF, color: DIM, 
-              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
-            }}>
-              Mirror X (Symmetry)
-              <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>
-                Doubles width by mirroring existing terrain
-              </span>
-            </button>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+              <button className="hmeb" onClick={handleMirrorX}>
+                Mirror X
+                <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>Width Symmetry</span>
+              </button>
+              <button className="hmeb" onClick={handleMirrorY}>
+                Mirror Y
+                <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>Height Symmetry</span>
+              </button>
+            </div>
+            
+            <Sub>
+              <Tog label="+Y Mirror (Up)" help="Show the original upward elevation projection." checked={style.showMirrorPlusY} onChange={v => ss({ showMirrorPlusY: v })} small />
+              <Tog label="-Y Mirror (Down)" help="Mirror the elevation projection downwards. Amazing with Z (Pillar) mode." checked={style.showMirrorMinusY} onChange={v => ss({ showMirrorMinusY: v })} small />
+            </Sub>
           </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>

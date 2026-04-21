@@ -24,31 +24,49 @@ export function buildLineGeometry(terrain, p) {
   const modes = Array.isArray(p.drawMode) ? p.drawMode : [p.drawMode]
   if (modes.length === 0) return empty()
 
-  const results = modes.map(m => {
-    switch (m) {
-      case 'lines-x':    return buildRidgelines(terrain, p, false)
-      case 'lines-y':    return buildRidgelines(terrain, p, true)
-      case 'crosshatch': return buildCrosshatch(terrain, p)
-      case 'hachure':    return buildHachure(terrain, p)
-      case 'contours':   return buildContours(terrain, p)
-      case 'flow':       return buildFlowLines(terrain, p)
-      case 'dag':        return buildDagThinning(terrain, p)
-      case 'pencil':     return buildPencilShading(terrain, p)
-      case 'z':          return buildPillars(terrain, p)
-      default:           return empty()
-    }
-  })
+  const buildPass = (mirror) => {
+    const results = modes.map(m => {
+      let res
+      switch (m) {
+        case 'lines-x':    res = buildRidgelines(terrain, p, false); break
+        case 'lines-y':    res = buildRidgelines(terrain, p, true);  break
+        case 'crosshatch': res = buildCrosshatch(terrain, p);        break
+        case 'hachure':    res = buildHachure(terrain, p);           break
+        case 'contours':   res = buildContours(terrain, p);          break
+        case 'flow':       res = buildFlowLines(terrain, p);         break
+        case 'dag':        res = buildDagThinning(terrain, p);       break
+        case 'pencil':     res = buildPencilShading(terrain, p);     break
+        case 'z':          res = buildPillars(terrain, p);           break
+        default:           res = empty();
+      }
+      if (mirror) {
+        for (let i = 1; i < res.positions.length; i += 3) res.positions[i] *= -1
+      }
+      return res
+    })
 
-  let totalPos = 0, totalCol = 0
-  for (const r of results) { totalPos += r.positions.length; totalCol += r.colors.length }
-  const positions = new Float32Array(totalPos)
-  const colors = new Float32Array(totalCol)
-  let offsetPos = 0, offsetCol = 0
-  for (const r of results) {
-    positions.set(r.positions, offsetPos); colors.set(r.colors, offsetCol)
-    offsetPos += r.positions.length; offsetCol += r.colors.length
+    let totalPos = 0, totalCol = 0
+    for (const r of results) { totalPos += r.positions.length; totalCol += r.colors.length }
+    const positions = new Float32Array(totalPos)
+    const colors = new Float32Array(totalCol)
+    let offsetPos = 0, offsetCol = 0
+    for (const r of results) {
+      positions.set(r.positions, offsetPos); colors.set(r.colors, offsetCol)
+      offsetPos += r.positions.length; offsetCol += r.colors.length
+    }
+    return { positions, colors }
   }
-  return { positions, colors }
+
+  let finalPos = new Float32Array(0), finalCol = new Float32Array(0)
+  if (p.showMirrorPlusY) {
+    const p1 = buildPass(false); finalPos = p1.positions; finalCol = p1.colors
+  }
+  if (p.showMirrorMinusY) {
+    const p2 = buildPass(true)
+    finalPos = concat(finalPos, p2.positions); finalCol = concat(finalCol, p2.colors)
+  }
+  
+  return { positions: finalPos, colors: finalCol }
 }
 
 function empty() { return { positions: new Float32Array(0), colors: new Float32Array(0) } }
