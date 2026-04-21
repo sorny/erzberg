@@ -1,29 +1,28 @@
 import { GRADIENT_PRESETS } from './gradientPresets'
 
 /**
- * One-click style presets — each bundles drawMode, colors, stroke, fill,
- * gradient, and dash pattern into a named look.
+ * One-click style presets — each bundles enabled modes and their 
+ * unique layered parameters into a named look.
  */
 export const STYLE_PRESETS = {
   'Swiss Topo': {
     style: {
-      drawMode: ['contours'],
-      lineColor: '#7b4f2e', bgColor: '#f2ede4',
-      strokeWeight: 1, showFill: false, showMesh: false,
-      lineHypsometric: false, fillHypsometric: false,
-      contourInterval: 2, lineDash: 'solid',
+      enabledContours: true,
+      colorContours: '#7b4f2e', intervalContours: 2, weightContours: 1, opacityContours: 1, dashContours: 'solid', hypsoContours: false,
+      bgColor: '#f2ede4', bgGradient: false,
+      showFill: false, showMesh: false, depthOcclusion: true,
     },
     gradientStops: null,
   },
 
   'Neon City': {
     style: {
-      drawMode: ['lines-x'],
-      lineColor: '#00f2ff', bgColor: '#050505',
-      strokeWeight: 1.5, showFill: true, showMesh: false,
-      lineHypsometric: true, lineBanded: false, lineHypsoMode: 'elevation',
+      enabledX: true,
+      colorX: '#00f2ff', spacingX: 4, weightX: 1.5, opacityX: 1, dashX: 'solid', hypsoX: true, hypsoModeX: 'elevation', hypsoBandedX: false,
+      showFill: true, fillColor: '#0d0221',
       fillHypsometric: true, fillBanded: false, fillHypsoMode: 'elevation',
-      lineDash: 'solid',
+      bgColor: '#050505', bgGradient: false,
+      showMesh: false, depthOcclusion: true,
     },
     gradientStops: [
       { pos: 0, color: '#0d0221' },
@@ -34,23 +33,23 @@ export const STYLE_PRESETS = {
 
   'Blueprint': {
     style: {
-      drawMode: ['lines-x'],
-      lineColor: '#c8e8ff', bgColor: '#0d2b4e',
-      strokeWeight: 0.5, showFill: false, showMesh: false,
-      lineHypsometric: false, fillHypsometric: false,
-      lineDash: 'dashed',
+      enabledX: true, enabledY: true,
+      colorX: '#c8e8ff', spacingX: 4, weightX: 0.5, opacityX: 1, dashX: 'dashed', hypsoX: false,
+      colorY: '#c8e8ff', spacingY: 4, weightY: 0.5, opacityY: 0.5, dashY: 'solid', hypsoY: false,
+      bgColor: '#0d2b4e', bgGradient: false,
+      showFill: false, showMesh: false, depthOcclusion: true,
     },
     gradientStops: null,
   },
 
   'Burnt Paper': {
     style: {
-      drawMode: ['lines-x'],
-      lineColor: '#1a1005', bgColor: '#d9cbb4',
-      strokeWeight: 1.2, showFill: true, showMesh: false,
-      lineHypsometric: true, lineBanded: false, lineHypsoMode: 'elevation',
+      enabledX: true,
+      colorX: '#1a1005', spacingX: 4, weightX: 1.2, opacityX: 1, dashX: 'solid', hypsoX: true, hypsoModeX: 'elevation', hypsoBandedX: false,
+      showFill: true, fillColor: '#000000',
       fillHypsometric: true, fillBanded: false, fillHypsoMode: 'elevation',
-      lineDash: 'solid',
+      bgColor: '#d9cbb4', bgGradient: false,
+      showMesh: false, depthOcclusion: true,
     },
     gradientStops: [
       { pos: 0,    color: '#000000' },
