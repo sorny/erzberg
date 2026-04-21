@@ -246,7 +246,9 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
 function buildDagThinning(terrain, p, threshold) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-  const n = rows*cols, next = new Int32Array(n).fill(-1), inDeg = new Int32Array(n).fill(0)
+  const n = rows*cols, next = new Int32Array(n).fill(-1)
+  
+  // 1. Identify steepest descent for every cell
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (!gridMask[r*cols+c]) continue
@@ -260,21 +262,23 @@ function buildDagThinning(terrain, p, threshold) {
           }
         }
       }
-      if (target !== -1) { next[i] = target; inDeg[target]++ }
+      if (target !== -1) next[i] = target
     }
   }
-  const order = new Int32Array(n).fill(1), currentInDeg = new Int32Array(inDeg), maxInOrder = new Int32Array(n).fill(0), countMaxOrder = new Int32Array(n).fill(0), queue = []
-  for (let i = 0; i < n; i++) if (gridMask[i] && inDeg[i] === 0) queue.push(i)
-  let head = 0
-  while (head < queue.length) {
-    const i = queue[head++], dst = next[i]; if (dst === -1) continue
-    const o = order[i]; if (o > maxInOrder[dst]) { maxInOrder[dst] = o; countMaxOrder[dst] = 1 } else if (o === maxInOrder[dst]) countMaxOrder[dst]++
-    currentInDeg[dst]--; if (currentInDeg[dst] === 0) { order[dst] = (countMaxOrder[dst] > 1) ? maxInOrder[dst]+1 : maxInOrder[dst]; queue.push(dst) }
+
+  // 2. Accumulate flow using topological sort (or simple sorted pass)
+  const acc = new Float32Array(n).fill(1)
+  const sortedIndices = [...Array(n).keys()].sort((a,b) => grid[b] - grid[a])
+  for(const i of sortedIndices) {
+    const dst = next[i]; if(dst !== -1) acc[dst] += acc[i]
   }
+
+  // 3. Thin network based on continuous accumulation threshold
   const positions = [], colors = []
-  const strahlerThreshold = threshold ?? 2
+  const scaledThreshold = (threshold ?? 2) * 50
   for (let i = 0; i < n; i++) {
-    const dst = next[i]; if (dst === -1 || order[i] < strahlerThreshold) continue
+    const dst = next[i]
+    if (dst === -1 || acc[i] < scaledThreshold) continue
     const r0 = Math.floor(i/cols), c0 = i%cols, r1 = Math.floor(dst/cols), c1 = dst%cols, e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[dst]-0.5)*100*elevScale
     if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) continue
     positions.push(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
@@ -293,7 +297,7 @@ function buildPencilShading(terrain, p, spacing, threshold) {
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
       if (!gridMask[r*cols+c] || r <= 0 || r >= rows-1 || c <= 0 || c >= cols-1) continue
-      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+step] - 4*grid[r*cols+c]) * 100
+      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+1] - 4*grid[r*cols+c]) * 100
       if (curv < curvThreshold) continue
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
