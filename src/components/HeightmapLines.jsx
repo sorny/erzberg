@@ -1,7 +1,7 @@
 /**
  * Renders the ridge-line / curve / hachure / contour geometry as GPU line segments.
  */
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect } from 'react'
 import * as THREE from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -10,7 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 
-function LineLayer({ layer, depthOcclusion, resolution }) {
+function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, resolution }) {
   const { positions, colors, weight, opacity, dash } = layer
   
   const geometry = useMemo(() => {
@@ -25,6 +25,7 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
+  // ── Main (Visible) Pass ───────────────────────────────────────────────────
   const material = useMemo(() => new LineMaterial({
     linewidth: weight || 1,
     vertexColors: true,
@@ -32,6 +33,7 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
     transparent: true,
     depthWrite: false,
     depthTest: !!depthOcclusion,
+    depthFunc: THREE.LessEqualDepth,
     opacity: opacity ?? 1,
   }), [])
 
@@ -39,6 +41,24 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
     if (!geometry) return null
     return new LineSegments2(geometry, material)
   }, [geometry, material])
+
+  // ── Ghost (Hidden) Pass ───────────────────────────────────────────────────
+  const ghostMaterial = useMemo(() => new LineMaterial({
+    linewidth: weight || 1,
+    vertexColors: false,
+    color: new THREE.Color(occlusionColor || '#000000'),
+    resolution,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    depthFunc: THREE.GreaterDepth,
+    opacity: occlusionOpacity ?? 0,
+  }), [])
+
+  const ghostLines = useMemo(() => {
+    if (!geometry || !depthOcclusion || (occlusionOpacity ?? 0) <= 0) return null
+    return new LineSegments2(geometry, ghostMaterial)
+  }, [geometry, depthOcclusion, occlusionOpacity, ghostMaterial])
 
   useEffect(() => {
     if (!lines) return
@@ -54,13 +74,33 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
     material.needsUpdate = true
 
     lines.computeLineDistances()
-  }, [lines, material, weight, opacity, dash, depthOcclusion, resolution])
 
-  useEffect(() => () => material?.dispose(), [material])
+    if (ghostLines) {
+      ghostMaterial.linewidth = weight || 1
+      ghostMaterial.opacity = occlusionOpacity ?? 0
+      ghostMaterial.color.set(occlusionColor || '#000000')
+      ghostMaterial.resolution.copy(resolution)
+      ghostMaterial.dashed = d.dashed
+      ghostMaterial.dashSize = d.dashSize
+      ghostMaterial.gapSize = d.gapSize
+      ghostMaterial.needsUpdate = true
+      ghostLines.computeLineDistances()
+    }
+  }, [lines, ghostLines, material, ghostMaterial, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, resolution])
+
+  useEffect(() => () => {
+    material?.dispose()
+    ghostMaterial?.dispose()
+  }, [material, ghostMaterial])
 
   if (!lines) return null
 
-  return <primitive object={lines} />
+  return (
+    <group>
+      {ghostLines && <primitive object={ghostLines} />}
+      <primitive object={lines} />
+    </group>
+  )
 }
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
@@ -76,6 +116,8 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
           key={layer.id} 
           layer={layer} 
           depthOcclusion={p.depthOcclusion} 
+          occlusionOpacity={p.occlusionOpacity}
+          occlusionColor={p.occlusionColor}
           resolution={resolution} 
         />
       ))}

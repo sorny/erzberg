@@ -103,6 +103,8 @@ export function Scene({
       showLines: p.showLines,
       depthOcclusion: p.depthOcclusion,
       occlusionBias: p.occlusionBias,
+      occlusionOpacity: p.occlusionOpacity,
+      occlusionColor: p.occlusionColor,
       particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
       particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
       particleColor:     p.pointColor ?? '#000000',

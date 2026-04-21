@@ -13,7 +13,6 @@ import { DASH_SVG } from './stylePresets'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
-const EPS_VIEW  = 0.1  // tighter tolerance for surface lines
 
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
@@ -135,10 +134,11 @@ export function exportSVG({
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   showFill, fillHypsometric, gradientStops,
-  showLines, depthOcclusion, occlusionBias,
+  showLines, depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
 }) {
   const bias = occlusionBias ?? 0.1
+  const ghostOpac = occlusionOpacity ?? 0
   const camInv = camera.matrixWorldInverse
   const wld2 = new THREE.Vector3()
   const viw2 = new THREE.Vector3()
@@ -174,7 +174,8 @@ export function exportSVG({
       const { positions, colors, weight, opacity, dash } = layer
       if (!positions || positions.length === 0) continue
 
-      const currentLayerSegs = []
+      const visibleSegs = []
+      const ghostSegs = []
       const segCount = positions.length / 6
       for (let s = 0; s < segCount; s++) {
         const i = s * 6
@@ -186,15 +187,16 @@ export function exportSVG({
           stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
         }
 
-        const addSeg = (x0, y0, x1, y1) => {
+        const addSeg = (x0, y0, x1, y1, isVisible) => {
           if (Math.hypot(x1 - x0, y1 - y0) < 0.1) return
-          currentLayerSegs.push({ x0, y0, x1, y1, stroke })
+          if (isVisible) visibleSegs.push({ x0, y0, x1, y1, stroke })
+          else ghostSegs.push({ x0, y0, x1, y1, stroke: occlusionColor || '#000000' })
           expandBB(x0, y0); expandBB(x1, y1)
         }
 
         if (!surfViewZ) {
           const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
-          addSeg(p0[0], p0[1], p1[0], p1[1])
+          addSeg(p0[0], p0[1], p1[0], p1[1], true)
           continue
         }
 
@@ -205,24 +207,23 @@ export function exportSVG({
           const surfZ = surfViewZ(sx, sy)
           pts.push({ sx, sy, visible: (surfZ === -Infinity || lineZ >= surfZ - bias) })
         }
-        let runStart = null
-        for (let t = 0; t <= N_SAMPLES; t++) {
-          if (pts[t].visible && runStart === null) runStart = t
-          else if (!pts[t].visible && runStart !== null) {
-            addSeg(pts[runStart].sx, pts[runStart].sy, pts[t-1].sx, pts[t-1].sy)
-            runStart = null
+        let runStart = 0
+        for (let t = 1; t <= N_SAMPLES; t++) {
+          if (pts[t].visible !== pts[runStart].visible) {
+            const isVisible = pts[runStart].visible
+            if (isVisible || ghostOpac > 0) {
+              addSeg(pts[runStart].sx, pts[runStart].sy, pts[t].sx, pts[t].sy, isVisible)
+            }
+            runStart = t
           }
         }
-        if (runStart !== null) addSeg(pts[runStart].sx, pts[runStart].sy, pts[N_SAMPLES].sx, pts[N_SAMPLES].sy)
+        if (pts[runStart].visible || ghostOpac > 0) {
+          addSeg(pts[runStart].sx, pts[runStart].sy, pts[N_SAMPLES].sx, pts[N_SAMPLES].sy, pts[runStart].visible)
+        }
       }
 
-      if (currentLayerSegs.length > 0) {
-        svgLayers.push({
-          segs: currentLayerSegs,
-          weight,
-          opacity,
-          dash
-        })
+      if (visibleSegs.length > 0 || ghostSegs.length > 0) {
+        svgLayers.push({ visibleSegs, ghostSegs, weight, opacity, dash })
       }
     }
   }
@@ -245,8 +246,8 @@ export function exportSVG({
         if (surfZ !== -Infinity && viw2.z < surfZ - bias) visible = false
       }
 
-      if (visible) {
-        projectedParticles.push({ cx, cy, r })
+      if (visible || ghostOpac > 0) {
+        projectedParticles.push({ cx, cy, r, visible })
         expandBB(cx-r, cy-r); expandBB(cx+r, cy+r)
       }
     }
@@ -260,15 +261,25 @@ export function exportSVG({
   const fillPolygons = (showFill && surfaceGeo && groupMatrix) ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, fillHypsometric, gradientStops) : []
   const fillEls = fillPolygons.map(({ pts, fill }) => `<polygon points="${pts.map(([px, py]) => `${(px-vx).toFixed(1)},${(py-vy).toFixed(1)}`).join(' ')}" fill="${fill}" stroke="none"/>`)
   
-  const layerGroups = svgLayers.map(layer => {
+  const layerGroups = []
+  for (const layer of svgLayers) {
     const sw = (layer.weight * 0.5).toFixed(3)
     const dashArray = DASH_SVG[layer.dash ?? 'solid'] ?? ''
-    const lineEls = layer.segs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
-    return `<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`
-  })
+    
+    // Ghost pass (Hidden)
+    if (layer.ghostSegs.length > 0) {
+      const ghostEls = layer.ghostSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+      layerGroups.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${ghostEls.join('')}</g>`)
+    }
+    // Main pass (Visible)
+    if (layer.visibleSegs.length > 0) {
+      const lineEls = layer.visibleSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+      layerGroups.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`)
+    }
+  }
 
   const pColor = particleColor ?? '#000000'
-  const circleEls = projectedParticles.map(({ cx, cy, r }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`)
+  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : occlusionColor}" opacity="${visible ? 1 : ghostOpac}"/>`)
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
