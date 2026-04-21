@@ -112,7 +112,7 @@ function Tog({ label, hint, help, checked, onChange, small }) {
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: fs, color: tc, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED }}> {hint}</span>}
+          {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
           {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <Switch checked={checked} onChange={onChange} />
