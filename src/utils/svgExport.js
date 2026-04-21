@@ -16,14 +16,15 @@ const N_SAMPLES = 64   // depth-test samples per segment (increased for precisio
 
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
-function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
+function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) {
   const buf = new Float32Array(W * H).fill(0)
-  const { positions, indices } = surfaceGeo
+  const { positions, indices, brightnessBuf } = surfaceGeo
   const nVerts = positions.length / 3
   const camInv = camera.matrixWorldInverse
   const vx  = new Float32Array(nVerts)
   const vy  = new Float32Array(nVerts)
   const vd  = new Float32Array(nVerts)
+  const vb  = new Float32Array(nVerts) // brightness
   const wld = new THREE.Vector3()
   const viw = new THREE.Vector3()
 
@@ -35,11 +36,21 @@ function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
     wld.project(camera)
     vx[i] = ( wld.x + 1) * 0.5 * W
     vy[i] = (-wld.y + 1) * 0.5 * H
+    vb[i] = brightnessBuf[i]
   }
 
   const nTri = indices.length / 3
+  const minB = elevMinCut / 100
+  const maxB = elevMaxCut / 100
+
   for (let t = 0; t < nTri; t++) {
     const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
+    
+    // Simple discard: if any vertex is outside, we could refine this but 
+    // for occlusion matching the centroid/min is usually enough.
+    const avgB = (vb[a] + vb[b] + vb[c]) / 3
+    if (avgB < minB || avgB > maxB) continue
+
     fillTriangle(vx[a], vy[a], vd[a], vx[b], vy[b], vd[b], vx[c], vy[c], vd[c], buf, W, H)
   }
 
@@ -89,7 +100,7 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, fillHypsometric, gradientStops) {
+function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, fillHypsometric, gradientStops, elevMinCut, elevMaxCut) {
   const { positions, indices, brightnessBuf } = surfaceGeo
   const nVerts  = positions.length / 3
   const camInv  = camera.matrixWorldInverse
@@ -111,13 +122,17 @@ function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, fillHypsometri
 
   const nTri = indices.length / 3
   const polys = []
+  const minB = (elevMinCut || 0) / 100
+  const maxB = (elevMaxCut || 100) / 100
 
   for (let t = 0; t < nTri; t++) {
     const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
+    const brightness = (brightnessBuf[a] + brightnessBuf[b] + brightnessBuf[c]) / 3
+    if (brightness < minB || brightness > maxB) continue
+
     const avgZ = (sz[a] + sz[b] + sz[c]) / 3
     let fill
     if (fillHypsometric && gradientStops?.length > 1) {
-      const brightness = (brightnessBuf[a] + brightnessBuf[b] + brightnessBuf[c]) / 3
       const [r, g, bl] = sampleGradient(gradientStops, brightness)
       fill = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(bl*255)})`
     } else {
@@ -136,6 +151,7 @@ export function exportSVG({
   showFill, fillHypsometric, gradientStops,
   showLines, depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
+  elevMinCut, elevMaxCut,
 }) {
   const bias = occlusionBias ?? 0.1
   const ghostOpac = occlusionOpacity ?? 0
@@ -158,7 +174,7 @@ export function exportSVG({
 
   // Only build Z-Buffer if occlusion is enabled
   const surfViewZ = (depthOcclusion && surfaceGeo && groupMatrix)
-    ? buildZBuffer(surfaceGeo, groupMatrix, camera, width, height)
+    ? buildZBuffer(surfaceGeo, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
     : null
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -258,7 +274,7 @@ export function exportSVG({
   const vx = minX - MARGIN, vy = minY - MARGIN
   const vw = (maxX - minX) + MARGIN * 2, vh = (maxY - minY) + MARGIN * 2
   
-  const fillPolygons = (showFill && surfaceGeo && groupMatrix) ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, fillHypsometric, gradientStops) : []
+  const fillPolygons = (showFill && surfaceGeo && groupMatrix) ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, fillHypsometric, gradientStops, elevMinCut, elevMaxCut) : []
   const fillEls = fillPolygons.map(({ pts, fill }) => `<polygon points="${pts.map(([px, py]) => `${(px-vx).toFixed(1)},${(py-vy).toFixed(1)}`).join(' ')}" fill="${fill}" stroke="none"/>`)
   
   const layerGroups = []

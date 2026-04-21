@@ -55,11 +55,17 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uTextureScale;
   uniform vec2      uTextureOffset;
 
+  uniform float     uElevMinCut;
+  uniform float     uElevMaxCut;
+
   varying float     vBrightness;
   varying vec3      vNormal;
   varying vec2      vUv;
 
   void main() {
+    if (vBrightness < uElevMinCut / 100.0 || vBrightness > uElevMaxCut / 100.0) {
+      discard;
+    }
     if (uOcclusionOnly) {
       // Depth-only pass handled via material.colorWrite
     }
@@ -193,6 +199,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uElevScale:         { value: 1.0 },
       uColorMode:         { value: 0 },
       uOcclusionOnly:     { value: false },
+      uElevMinCut:        { value: 0.0 },
+      uElevMaxCut:        { value: 100.0 },
       uOverlayTex:        { value: null },
       uShowTexture:       { value: false },
       uTextureScale:      { value: 1.0 },
@@ -213,6 +221,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uHypsoWeight.value = p.fillHypsoWeight || 0.0
     surfMat.uniforms.uElevScale.value = p.elevScale || 1.0
     surfMat.uniforms.uColorMode.value = { elevation: 0, slope: 1, aspect: 2 }[p.fillHypsoMode] ?? 0
+    surfMat.uniforms.uElevMinCut.value = p.elevMinCut || 0.0
+    surfMat.uniforms.uElevMaxCut.value = p.elevMaxCut || 100.0
     
     surfMat.uniforms.uShowTexture.value = !!(p.showTexture && overlayTex)
     surfMat.uniforms.uOverlayTex.value = overlayTex
