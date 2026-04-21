@@ -48,12 +48,14 @@ function PanelStyles() {
 
 // ── UI Atomic Components ───────────────────────────────────────────────────────
 
-function Sl({ label, hint, min, max, step = 1, value, onChange, fmt, col2 }) {
+function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2 }) {
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ marginBottom: 8, ...(col2 && { gridColumn: '1/-1' }) }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 3 }}>
-        <span style={{ fontSize: 10, color: DIM }}>{label}</span>
+        <span title={help} style={{ fontSize: 10, color: DIM, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
+          {label}
+        </span>
         {hint && <span style={{ fontSize: 9, color: MUTED }}>{hint}</span>}
       </div>
       <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
@@ -67,12 +69,12 @@ function Sl({ label, hint, min, max, step = 1, value, onChange, fmt, col2 }) {
   )
 }
 
-function Tog({ label, hint, checked, onChange, small }) {
+function Tog({ label, hint, help, checked, onChange, small }) {
   const fs = small ? 11 : 12
   const tc = small ? MUTED : DIM
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span style={{ fontSize: fs, color: tc }}>
+      <span title={help} style={{ fontSize: fs, color: tc, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
         {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED }}> {hint}</span>}
       </span>
       <Switch checked={checked} onChange={onChange} />
@@ -103,10 +105,10 @@ function ColorRow({ label, value, onChange }) {
   )
 }
 
-function TogColor({ label, hint, checked, onToggle, color, onColor }) {
+function TogColor({ label, hint, help, checked, onToggle, color, onColor }) {
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span style={{ fontSize: 12, color: DIM }}>
+      <span title={help} style={{ fontSize: 12, color: DIM, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
         {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
       </span>
       <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
@@ -117,11 +119,11 @@ function TogColor({ label, hint, checked, onToggle, color, onColor }) {
   )
 }
 
-function InlineSl({ label, hint, min, max, step = 1, value, onChange, fmt }) {
+function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt }) {
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: 8 }}>
-      <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52 }}>
+      <span title={help} style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
         {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
       </span>
       <input type="range" className="hmr" min={min} max={max} step={step} value={value}
@@ -345,19 +347,10 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            {hasGeoTiff ? (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-              </div>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-              </div>
-            )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+            </div>
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -505,13 +498,13 @@ export function Sidebar({
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
             <Sub>
-              <InlineSl label="Iterations" min={1000} max={200000} step={1000} value={eIters} onChange={v => setEIters(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
-              <InlineSl label="Radius" min={2} max={10} value={eRadius} onChange={v => setERadius(v)} />
-              <InlineSl label="Inertia" min={0.01} max={0.5} step={0.01} value={eInertia} onChange={v => setEInertia(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Capacity" min={1} max={20} step={0.5} value={eCapacity} onChange={v => setECapacity(v)} />
-              <InlineSl label="Erosion" min={0.01} max={1} step={0.01} value={eErode} onChange={v => setEErode(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Deposition" min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Evaporation" min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
+              <InlineSl label="Iterations" help="Total number of raindrops to simulate. More iterations = more detailed drainage." min={1000} max={200000} step={1000} value={eIters} onChange={v => setEIters(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
+              <InlineSl label="Radius" help="The width of the erosion brush. Large values create smooth valleys; small values create sharp ravines." min={2} max={10} value={eRadius} onChange={v => setERadius(v)} />
+              <InlineSl label="Inertia" help="Droplet momentum. High values make water prefer its current direction (smooth curves); low values follow the gradient strictly (jittery)." min={0.01} max={0.5} step={0.01} value={eInertia} onChange={v => setEInertia(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Capacity" help="Multiplier for how much sediment a droplet can carry based on its speed and slope." min={1} max={20} step={0.5} value={eCapacity} onChange={v => setECapacity(v)} />
+              <InlineSl label="Erosion" help="How aggressively the droplet removes soil from the terrain." min={0.01} max={1} step={0.01} value={eErode} onChange={v => setEErode(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Deposition" help="How fast the droplet drops its sediment when it slows down or enters a basin." min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Evaporation" help="The rate at which the droplet shrinks. Smaller droplets carry less sediment." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
             </Sub>
             <div style={{ display:'flex', gap:6 }}>
               <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
