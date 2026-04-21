@@ -197,5 +197,15 @@
       "pos": 1,
       "color": "#800000"
     }
+  ],
+  "bgGradientStops": [
+    {
+      "pos": 0,
+      "color": "#615856"
+    },
+    {
+      "pos": 1,
+      "color": "#3a2f2b"
+    }
   ]
 }
