@@ -38,6 +38,9 @@ const STYLE_DEF = {
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
   depthOcclusion: true,
+  
+  // Texture overlay
+  showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -91,6 +94,8 @@ export default function App() {
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
   const heightmapFilename = useStore((s) => s.heightmapFilename)
+  const textureImage      = useStore((s) => s.textureImage)
+  const setTextureImage   = useStore((s) => s.setTextureImage)
   const geoTiffElevMin    = useStore((s) => s.geoTiffElevMin)
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
 
@@ -176,6 +181,10 @@ export default function App() {
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
     if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
+    if (vals.showTexture    != null) s.showTexture    = vals.showTexture
+    if (vals.textureScale   != null) s.textureScale   = vals.textureScale
+    if (vals.textureShiftX  != null) s.textureShiftX  = vals.textureShiftX
+    if (vals.textureShiftY  != null) s.textureShiftY  = vals.textureShiftY
     
     // Sync all split hypsometric properties
     if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric
@@ -330,6 +339,8 @@ export default function App() {
         bgGradientStops={bgGradientStops}     setBgGradientStops={setBgGradientStops}
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
+        textureImage={textureImage}
+        setTextureImage={setTextureImage}
         loadFromPicker={() => loadFromPicker(autoZoom)}
         loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, suggestedElevScale }) => {
           autoZoom({ width, height })

@@ -1,26 +1,15 @@
 /**
  * Terrain surface mesh.
- *
- * Elevation is baked into positions by buildSurfaceGeometry, so the vertex
- * shader here is identity (no displacement). This means wireframe and any
- * other material overlaid on the same geometry are always at the correct
- * elevation — the previous shader-displacement approach broke wireframe.
- *
- * Roles:
- *   1. Depth-write occluder — always rendered (even when fill is off),
- *      colored bgColor so it is invisible against the background.
- *   2. Fill — when showFill is on, colored white or gradient.
- *   3. Mesh  — wireframe LineSegments overlay (separate material, same geo).
  */
 import { useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { hexToRgb, sampleGradient } from '../utils/colorUtils'
+import { useStore } from '../store/useStore'
 
 // ── Gradient texture ──────────────────────────────────────────────────────────
 
 const GRAD_TEX_SIZE = 256
 
-/** Build a 256×1 RGBA DataTexture from gradient stops. */
 function buildGradientTexture(gradientStops) {
   const data = new Uint8Array(GRAD_TEX_SIZE * 4)
   for (let i = 0; i < GRAD_TEX_SIZE; i++) {
@@ -41,9 +30,11 @@ const SURFACE_VERT = /* glsl */ `
   attribute float brightness;
   varying float vBrightness;
   varying vec3  vNormal;
+  varying vec2  vUv;
   void main() {
     vBrightness = brightness;
     vNormal     = normalMatrix * normal;
+    vUv         = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `
@@ -58,31 +49,32 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uElevScale;
   uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
   uniform bool      uOcclusionOnly;
+  
+  uniform sampler2D uOverlayTex;
+  uniform bool      uShowTexture;
+  uniform float     uTextureScale;
+  uniform vec2      uTextureOffset;
+
   varying float     vBrightness;
   varying vec3      vNormal;
+  varying vec2      vUv;
 
   void main() {
     if (uOcclusionOnly) {
-      // Discarding fragments still writes to the depth buffer if depthWrite is true.
-      // Wait, discarding fragments might skip depth write on some GPUs. 
-      // Better way: use colorWrite = false on the material level.
+      // Depth-only pass handled via material.colorWrite
     }
     vec3 n = normalize(vNormal);
     float b = vBrightness;
 
     if (uColorMode == 1) {
-      // Slope: 0 (flat) to 1 (vertical)
       b = clamp(1.0 - n.y, 0.0, 1.0);
     } else if (uColorMode == 2) {
-      // Aspect: 0 to 1 based on compass direction
       b = atan(n.z, n.x) / 3.14159265 * 0.5 + 0.5;
     }
     
     float lineMask = 0.0;
 
     if (uHypsometricBanded) {
-      // For Slope/Aspect, we quantize the value directly 0..1
-      // For Elevation, we use the real-world units
       if (uColorMode == 0) {
         float elev = (vBrightness - 0.5) * 100.0 * uElevScale;
         if (uHypsoWeight > 0.0) {
@@ -93,7 +85,6 @@ const SURFACE_FRAG = /* glsl */ `
         float quantizedElev = floor(elev / uContourInterval) * uContourInterval;
         b = (quantizedElev / (100.0 * uElevScale)) + 0.5;
       } else {
-        // Simple 0..1 quantization for Slope/Aspect
         float steps = 100.0 / uContourInterval; 
         if (uHypsoWeight > 0.0) {
           float fw = fwidth(b * steps);
@@ -121,7 +112,12 @@ const SURFACE_FRAG = /* glsl */ `
         : uFillColor;
     }
 
-    // Apply dark contour lines
+    if (uShowTexture) {
+      vec2 uv = vUv * uTextureScale + uTextureOffset;
+      vec4 texColor = texture2D(uOverlayTex, uv);
+      base = mix(base, texColor.rgb, texColor.a);
+    }
+
     if (uHypsometricBanded && uHypsoWeight > 0.0) {
       base = mix(base, vec3(0.0), lineMask * 0.5);
     }
@@ -132,12 +128,25 @@ const SURFACE_FRAG = /* glsl */ `
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function SurfaceMesh({ surfaceGeo, p }) {
-  // Build Three.js geometry from CPU arrays
+  const textureImage = useStore(s => s.textureImage)
+  
   const geometry = useMemo(() => {
     if (!surfaceGeo) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position',   new THREE.BufferAttribute(surfaceGeo.positions,    3))
     geo.setAttribute('brightness', new THREE.BufferAttribute(surfaceGeo.brightnessBuf, 1))
+    
+    // Compute UVs for the grid
+    const { rows, cols } = surfaceGeo.metadata || { rows: Math.sqrt(surfaceGeo.positions.length/3), cols: Math.sqrt(surfaceGeo.positions.length/3) }
+    const uvs = new Float32Array((surfaceGeo.positions.length/3) * 2)
+    for(let r=0; r<rows; r++) {
+      for(let c=0; c<cols; c++) {
+        const i = r * cols + c
+        uvs[i*2] = c / (cols - 1)
+        uvs[i*2+1] = 1.0 - (r / (rows - 1))
+      }
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
     geo.setIndex(new THREE.BufferAttribute(surfaceGeo.indices, 1))
     geo.computeVertexNormals()
     return geo
@@ -145,7 +154,6 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
-  // Gradient texture — rebuilt whenever gradient stops change
   const gradTexRef = useRef(null)
   const gradientTex = useMemo(() => {
     gradTexRef.current?.dispose()
@@ -158,9 +166,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     return tex
   }, [p.fillHypsometric, p.gradientStops])
 
-  useEffect(() => () => gradTexRef.current?.dispose(), [])
+  const overlayTex = useMemo(() => {
+    if (!textureImage) return null
+    const loader = new THREE.TextureLoader()
+    const tex = loader.load(textureImage)
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    return tex
+  }, [textureImage])
 
-  // Surface shader material — created once, uniforms updated reactively
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,
     fragmentShader: SURFACE_FRAG,
@@ -179,37 +192,38 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uHypsoWeight:       { value: 0.0 },
       uElevScale:         { value: 1.0 },
       uColorMode:         { value: 0 },
+      uOcclusionOnly:     { value: false },
+      uOverlayTex:        { value: null },
+      uShowTexture:       { value: false },
+      uTextureScale:      { value: 1.0 },
+      uTextureOffset:     { value: new THREE.Vector2(0, 0) },
     },
   }), [])
 
-  // Update uniforms reactively (no material recreation needed)
   useEffect(() => {
     if (!surfMat) return
     const hasHypso = p.fillHypsometric
     const isBanded = hasHypso && p.fillBanded
     
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
-    // uGradient handles the "Smooth" look when not banded
     surfMat.uniforms.uGradient.value = hasHypso && !isBanded
     surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
     surfMat.uniforms.uHypsometricBanded.value = isBanded
     surfMat.uniforms.uContourInterval.value = p.fillHypsoInterval || 10.0
     surfMat.uniforms.uHypsoWeight.value = p.fillHypsoWeight || 0.0
     surfMat.uniforms.uElevScale.value = p.elevScale || 1.0
+    surfMat.uniforms.uColorMode.value = { elevation: 0, slope: 1, aspect: 2 }[p.fillHypsoMode] ?? 0
+    
+    surfMat.uniforms.uShowTexture.value = !!(p.showTexture && overlayTex)
+    surfMat.uniforms.uOverlayTex.value = overlayTex
+    surfMat.uniforms.uTextureScale.value = 1.0 / (p.textureScale || 1.0)
+    surfMat.uniforms.uTextureOffset.value.set(p.textureShiftX || 0, p.textureShiftY || 0)
 
-    const modeMap = { elevation: 0, slope: 1, aspect: 2 }
-    surfMat.uniforms.uColorMode.value = modeMap[p.fillHypsoMode] ?? 0
-    
-    // Always write color if either fill or raw terrain is on
     surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
-    
-    // Manage depth behavior: 
-    // We only want the surface to act as an occluder if depthOcclusion is ON.
     surfMat.depthTest  = !!p.depthOcclusion
     surfMat.depthWrite = !!p.depthOcclusion
-
     surfMat.needsUpdate = true
-  }, [surfMat, p.fillColor, p.showFill, p.fillHypsometric, p.fillBanded, p.showRawTerrain, p.fillHypsoInterval, p.fillHypsoWeight, p.elevScale, p.fillHypsoMode, p.depthOcclusion])
+  }, [surfMat, p, overlayTex])
 
   useEffect(() => {
     if (!surfMat) return
@@ -217,9 +231,11 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.needsUpdate = true
   }, [surfMat, gradientTex])
 
-  useEffect(() => () => surfMat?.dispose(), [surfMat])
+  useEffect(() => () => {
+    surfMat?.dispose()
+    overlayTex?.dispose()
+  }, [surfMat, overlayTex])
 
-  // Wireframe material — plain line material, recolored on change
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color:               new THREE.Color(p.meshColor ?? '#888888'),
     wireframe:           true,
@@ -229,22 +245,17 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     polygonOffset:       true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits:  1,
-  }), []) // eslint-disable-line react-hooks/exhaustive-deps
+  }), [])
 
   useEffect(() => {
-    if (!wireMat) return
-    wireMat.color.set(p.meshColor ?? '#888888')
+    if (wireMat) wireMat.color.set(p.meshColor ?? '#888888')
   }, [wireMat, p.meshColor])
-
-  useEffect(() => () => wireMat?.dispose(), [wireMat])
 
   if (!geometry) return null
 
   return (
     <group>
-      {/* Occluder + optional fill */}
       <mesh geometry={geometry} material={surfMat} />
-      {/* Wireframe overlay — only when showMesh is on */}
       {p.showMesh && <mesh geometry={geometry} material={wireMat} />}
     </group>
   )

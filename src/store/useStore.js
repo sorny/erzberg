@@ -16,6 +16,9 @@ export const useStore = create((set) => ({
   heightmapWidth: 0,
   heightmapHeight: 0,
   heightmapFilename: '',
+  
+  // Overlay texture
+  textureImage: null, // Image data (base64 or blob URL)
 
   // Real-world elevation metadata — only populated when a GeoTIFF is loaded
   geoTiffElevMin: null,   // metres (or native unit)
@@ -31,6 +34,9 @@ export const useStore = create((set) => ({
     }),
 
   setPixels: (pixels) => set({ heightmapPixels: pixels }),
+  
+  setTextureImage: (img) => set({ textureImage: img }),
+  clearTextureImage: () => set({ textureImage: null }),
 
   setGeoTiffMeta: (elevMin, elevMax) =>
     set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax }),
@@ -40,5 +46,5 @@ export const useStore = create((set) => ({
 
   clearHeightmap: () =>
     set({ heightmapPixels: null, nodataMask: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
-          geoTiffElevMin: null, geoTiffElevMax: null }),
+          textureImage: null, geoTiffElevMin: null, geoTiffElevMax: null }),
 }))
