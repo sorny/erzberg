@@ -192,7 +192,7 @@ export function Sidebar({
   loadFromPicker, loadGeoTiffFromPicker,
   geoTiffElevMin, geoTiffElevMax,
   onCameraPreset,
-  onSvg, onPng, onPngAlpha, onStl,
+  onSvg, onPng, onPngAlpha, onStl, onHeightmap,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,

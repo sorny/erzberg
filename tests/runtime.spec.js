@@ -1,53 +1,46 @@
 import { test, expect } from '@playwright/test'
 
-/**
- * Runtime stability test.
- * Checks for console errors and ensures the app actually boots up.
- */
 test('app loads without console errors', async ({ page }) => {
   const errors = []
 
-  // Catch console logs
   page.on('console', msg => {
     if (msg.type() === 'error') {
-      errors.push(msg.text())
+      const text = msg.text()
+      const url = msg.location().url
+      console.error(`[Browser Console Error] ${text} @ ${url}`)
+      errors.push({ text, url })
     }
   })
 
-  // Catch page errors
   page.on('pageerror', err => {
-    errors.push(err.message)
+    console.error(`[Browser Page Error] ${err.message}`)
+    errors.push({ text: err.message, url: 'pageerror' })
   })
 
-  console.log('Navigating to app...')
+  page.on('response', response => {
+    if (response.status() >= 400) {
+      console.error(`[HTTP ${response.status()}] ${response.url()}`)
+      errors.push({ text: `HTTP ${response.status()}`, url: response.url() })
+    }
+  })
+
+  console.log('Navigating to http://localhost:5173 ...')
   await page.goto('http://localhost:5173')
 
-  // Log the page title to confirm load
-  const title = await page.title()
-  console.log(`Page title: ${title}`)
-
-  // Wait for the main canvas to appear (longer timeout)
-  console.log('Waiting for canvas...')
-  try {
-    await page.waitForSelector('canvas', { timeout: 30000 })
-    console.log('Canvas detected ✓')
-  } catch (e) {
-    console.error('Canvas not found within timeout. Taking debug screenshot...')
-    await page.screenshot({ path: 'test-results/failure.png' })
-    throw e
-  }
-
-  // Wait for initial geometry computation to clear
+  await page.waitForSelector('#root', { timeout: 10000 })
   await page.waitForTimeout(3000)
 
-  // Assert no errors occurred during load
-  if (errors.length > 0) {
-    console.error('Console errors found:', errors)
-  }
-  expect(errors.length, `Found ${errors.length} console errors: ${errors.join(', ')}`).toBe(0)
-
-  // Verify app header is visible
-  await expect(page.locator('text=Heightmap Lines')).toBeVisible()
+  const header = page.locator('text=Heightmap Lines')
+  await expect(header).toBeVisible({ timeout: 10000 })
   
-  console.log('Runtime test passed: No console errors found ✓')
+  await page.waitForSelector('canvas', { timeout: 20000 })
+
+  // Filter out harmless errors
+  const realErrors = errors.filter(e => {
+    if (e.url.includes('favicon.ico')) return false
+    return true
+  })
+
+  expect(realErrors.length, `Total errors: ${realErrors.length}. ${realErrors.map(e => e.text).join('; ')}`).toBe(0)
+  console.log('Runtime test passed ✓')
 })
