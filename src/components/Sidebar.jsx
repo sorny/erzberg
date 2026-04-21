@@ -232,6 +232,21 @@ function ExpBtn({ label, hint, onClick, active }) {
   )
 }
 
+// ── Helper for per-mode styling ───────────────────────────────────────────────
+function ModeStyleOverride({ prefix, style, ss }) {
+  return (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>STYLING OVERRIDE</div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
+        <span style={{ fontSize: 10, color: DIM }}>Color</span>
+        <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
+      </div>
+      <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
+      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
+    </div>
+  )
+}
+
 // ── Main Sidebar component ────────────────────────────────────────────────────
 export function Sidebar({
   terrain, setTerrain,
@@ -254,7 +269,10 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, texture: false, creative: false, points: true, erosion: false, export: true,
+    terrain: true, levels: true, view: true, 
+    modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
+    modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
+    points: true, texture: false, creative: false, erosion: false, export: true,
   })
 
   // --- Erosion State ---
@@ -376,27 +394,6 @@ export function Sidebar({
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
   }
 
-  const MODES = [
-    { id:'lines-x',    label:'X' },
-    { id:'lines-y',    label:'Y' },
-    { id:'crosshatch', label:'Cross' },
-    { id:'z',          label:'Z' },
-    { id:'contours',   label:'Contours' },
-    { id:'hachure',    label:'Hachure' },
-    { id:'flow',       label:'Flow' },
-    { id:'dag',        label:'Network' },
-    { id:'pencil',     label:'Pencil' },
-  ]
-
-  const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
-  const hasMode = (id) => activeModes.includes(id)
-  const toggleMode = (id) => {
-    let next = hasMode(id) ? activeModes.filter(m => m !== id) : [...activeModes, id]
-    ss({ drawMode: next })
-  }
-
-  const lineStep = terrainData ? Math.max(1, Math.round((style.lineSpacing ?? 4) / terrainData.scl)) : 1
-
   // Stats
   const segs  = lineGeo    ? (lineGeo.positions.length / 6).toLocaleString()     : '–'
   const verts = lineGeo    ? (lineGeo.positions.length / 3).toLocaleString()     : '–'
@@ -451,12 +448,6 @@ export function Sidebar({
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
-            {terrain.resolution > 1 && (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Grid offset X" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetX ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetX: v })} />
-                <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
-              </div>
-            )}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
               <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
               <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
@@ -486,70 +477,136 @@ export function Sidebar({
             {view.autoRotate && (
               <Sub>
                 <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
-                <div style={{ display:'flex', gap:4 }}>
-                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                  {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
-                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
-                      style={{ 
-                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, 
-                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT : SURF, 
-                        color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
-                      }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
               </Sub>
             )}
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
-          <Section title="Style" open={sec.style} onToggle={() => tog('style')}>
+          {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
+          
+          <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')}>
+            <Tog label="Enabled" checked={style.enabledX} onChange={v => ss({ enabledX: v })} />
+            {style.enabledX && (
+              <>
+                <Sub>
+                  <InlineSl label="X-Spacing" min={1} max={100} value={style.spacingX} onChange={v => ss({ spacingX: v })} />
+                  <InlineSl label="X-Shift" min={0} max={100} value={style.shiftX} onChange={v => ss({ shiftX: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="X" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Y Lines" open={sec.modeY} onToggle={() => tog('modeY')}>
+            <Tog label="Enabled" checked={style.enabledY} onChange={v => ss({ enabledY: v })} />
+            {style.enabledY && (
+              <>
+                <Sub>
+                  <InlineSl label="Y-Spacing" min={1} max={100} value={style.spacingY} onChange={v => ss({ spacingY: v })} />
+                  <InlineSl label="Y-Shift" min={0} max={100} value={style.shiftY} onChange={v => ss({ shiftY: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Y" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Crosshatch" open={sec.modeCross} onToggle={() => tog('modeCross')}>
+            <Tog label="Enabled" checked={style.enabledCross} onChange={v => ss({ enabledCross: v })} />
+            {style.enabledCross && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Cross" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Pillars" open={sec.modePillars} onToggle={() => tog('modePillars')}>
+            <Tog label="Enabled" checked={style.enabledPillars} onChange={v => ss({ enabledPillars: v })} />
+            {style.enabledPillars && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingPillars} onChange={v => ss({ spacingPillars: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Pillars" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Contours" open={sec.modeContours} onToggle={() => tog('modeContours')}>
+            <Tog label="Enabled" checked={style.enabledContours} onChange={v => ss({ enabledContours: v })} />
+            {style.enabledContours && (
+              <>
+                <Sub>
+                  <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Contours" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Hachure" open={sec.modeHachure} onToggle={() => tog('modeHachure')}>
+            <Tog label="Enabled" checked={style.enabledHachure} onChange={v => ss({ enabledHachure: v })} />
+            {style.enabledHachure && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingHachure} onChange={v => ss({ spacingHachure: v })} />
+                  <InlineSl label="Length" min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Hachure" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Flow" open={sec.modeFlow} onToggle={() => tog('modeFlow')}>
+            <Tog label="Enabled" checked={style.enabledFlow} onChange={v => ss({ enabledFlow: v })} />
+            {style.enabledFlow && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
+                  <InlineSl label="Step" min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
+                  <InlineSl label="Max Len" min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Flow" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Network" open={sec.modeDag} onToggle={() => tog('modeDag')}>
+            <Tog label="Enabled" checked={style.enabledDag} onChange={v => ss({ enabledDag: v })} />
+            {style.enabledDag && (
+              <>
+                <Sub>
+                  <InlineSl label="Threshold" min={0.5} max={5} step={0.5} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Dag" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Pencil" open={sec.modePencil} onToggle={() => tog('modePencil')}>
+            <Tog label="Enabled" checked={style.enabledPencil} onChange={v => ss({ enabledPencil: v })} />
+            {style.enabledPencil && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingPencil} onChange={v => ss({ spacingPencil: v })} />
+                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdPencil} onChange={v => ss({ thresholdPencil: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Pencil" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          {/* ── Global Style ───────────────────────────────────────────────── */}
+
+          <Section title="Style (Global)" open={sec.style} onToggle={() => tog('style')}>
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
                 {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
               </div>
             </div>
-
-            <div style={{ marginBottom: 10 }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
-                <span style={{ fontSize:10, color: DIM }}>Draw mode</span>
-                <span style={{ fontSize:9, color: MUTED }}>f</span>
-              </div>
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
-                {MODES.map(m => <button key={m.id} className={`hmsb${hasMode(m.id) ? ' on' : ''}`} onClick={() => toggleMode(m.id)} style={{ flex:1, padding:'5px 0', fontSize:11, background: hasMode(m.id) ? ACCENT : SURF, color: hasMode(m.id) ? '#fff' : MUTED, border:`1px solid ${hasMode(m.id) ? ACCENT : BORDER}`, borderRadius:4, cursor:'pointer' }}>{m.label}</button>)}
-              </div>
-            </div>
-
-            <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
-              {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
-              {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
-              {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}
-              {hasMode('flow') && <><InlineSl label="F-Step" min={0.1} max={3} step={0.1} value={style.flowStep} onChange={v => ss({ flowStep: v })} /><InlineSl label="F-Max" min={1} max={250} value={style.flowMaxLen} onChange={v => ss({ flowMaxLen: v })} /></>}
-              {hasMode('dag') && <InlineSl label="Threshold" min={0.5} max={5} step={0.5} value={style.strahlerThreshold} onChange={v => ss({ strahlerThreshold: v })} />}
-              {hasMode('pencil') && <InlineSl label="P-Threshold" min={0.1} max={5} step={0.1} value={style.curvatureThreshold} onChange={v => ss({ curvatureThreshold: v })} />}
-            </Sub>
-
-            <TogColor label="Lines" checked={style.showLines} onToggle={v => ss({ showLines: v })} color={style.lineColor} onColor={v => ss({ lineColor: v })} />
-            {style.showLines && (
-              <Sub>
-                <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
-                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.lineOpacity ?? 1} onChange={v => ss({ lineOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
-                <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible. When OFF, all lines are visible (wireframe look)." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
-                <Tog label="Hypsometric color" small checked={style.lineHypsometric} onChange={v => ss({ lineHypsometric: v })} />
-                {style.lineHypsometric && (
-                  <Sub>
-                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
-                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ lineHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:8, padding:'2px 0', borderRadius:2, background: style.lineHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.lineHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.lineHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
-                    </div>
-                    <Tog label="Banded" small checked={style.lineBanded} onChange={v => ss({ lineBanded: v })} />
-                    {style.lineBanded && <InlineSl label="Band Dist" min={0.5} max={50} value={style.lineHypsoInterval} onChange={v => ss({ lineHypsoInterval: v })} />}
-                  </Sub>
-                )}
-              </Sub>
-            )}
 
             <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
             {style.showFill && (
@@ -567,16 +624,8 @@ export function Sidebar({
               </Sub>
             )}
 
-            {style.fillHypsometric || style.lineHypsometric ? (
-              <div style={{ marginBottom: 10, marginTop: 10 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
-                </div>
-                <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-              </div>
-            ) : null}
-
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
+            <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
             
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
@@ -661,13 +710,13 @@ export function Sidebar({
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
             <Sub>
-              <InlineSl label="Iterations" help="Total number of raindrops to simulate. More iterations = more detailed drainage." min={1000} max={200000} step={1000} value={eIters} onChange={v => setEIters(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
-              <InlineSl label="Radius" help="The width of the erosion brush. Large values create smooth valleys; small values create sharp ravines." min={2} max={10} value={eRadius} onChange={v => setERadius(v)} />
-              <InlineSl label="Inertia" help="Droplet momentum. High values make water prefer its current direction (smooth curves); low values follow the gradient strictly (jittery)." min={0.01} max={0.5} step={0.01} value={eInertia} onChange={v => setEInertia(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Capacity" help="Multiplier for how much sediment a droplet can carry based on its speed and slope." min={1} max={20} step={0.5} value={eCapacity} onChange={v => setECapacity(v)} />
-              <InlineSl label="Erosion" help="How aggressively the droplet removes soil from the terrain." min={0.01} max={1} step={0.01} value={eErode} onChange={v => setEErode(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Deposition" help="How fast the droplet drops its sediment when it slows down or enters a basin." min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
-              <InlineSl label="Evaporation" help="The rate at which the droplet shrinks. Smaller droplets carry less sediment." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
+              <InlineSl label="Iterations" help="Total number of raindrops to simulate." min={1000} max={200000} step={1000} value={eIters} onChange={v => setEIters(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
+              <InlineSl label="Radius" help="The width of the erosion brush." min={2} max={10} value={eRadius} onChange={v => setERadius(v)} />
+              <InlineSl label="Inertia" help="Droplet momentum." min={0.01} max={0.5} step={0.01} value={eInertia} onChange={v => setEInertia(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Capacity" help="Multiplier for sediment carry speed." min={1} max={20} step={0.5} value={eCapacity} onChange={v => setECapacity(v)} />
+              <InlineSl label="Erosion" help="Aggressiveness of soil removal." min={0.01} max={1} step={0.01} value={eErode} onChange={v => setEErode(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Deposition" help="Speed of sediment drop." min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Evaporation" help="Droplet shrinkage rate." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
             </Sub>
             <div style={{ display:'flex', gap:6 }}>
               <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>

@@ -22,28 +22,49 @@ const TERRAIN_DEF = {
   gridOffsetX: 0, gridOffsetY: 0, elevMinCut: 0, elevMaxCut: 100,
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
+
 const STYLE_DEF = {
-  drawMode: ['lines-x'], lineSpacing: 4, lineShift: 0, hachureSpacing: 4, hachureLength: 1, contourInterval: 4,
-  flowStep: 1, flowMaxLen: 100, strahlerThreshold: 2,
-  curvatureThreshold: 0.5,
-  
-  // Lines
-  showLines: true, lineColor: '#000000', strokeWeight: 1, lineDash: 'solid', lineOpacity: 1,
-  lineHypsometric: false, lineBanded: false, lineHypsoInterval: 10, lineHypsoWeight: 0, lineHypsoMode: 'elevation',
-  
-  // Fill (Surface)
+  // Global & Mesh
   showFill: true, fillColor: '#ffffff',
   fillHypsometric: false, fillBanded: false, fillHypsoInterval: 10, fillHypsoWeight: 1.5, fillHypsoMode: 'elevation',
-
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
   depthOcclusion: true,
-  
-  // Creative
+
+  // Texture overlay
+  showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0,
+
+  // Creative 3D Symmetry
   showMirrorPlusX: true, showMirrorMinusX: false,
   showMirrorPlusY: true, showMirrorMinusY: false,
   showMirrorPlusZ: true, showMirrorMinusZ: false,
+
+  // ── DRAW MODES ───────────────────────────────────────────────────────────
+  // X Lines
+  enabledX: true, spacingX: 4, shiftX: 0, colorX: '#000000', weightX: 1, opacityX: 1, dashX: 'solid',
+  // Y Lines
+  enabledY: false, spacingY: 4, shiftY: 0, colorY: '#000000', weightY: 1, opacityY: 1, dashY: 'solid',
+  // Crosshatch
+  enabledCross: false, spacingCross: 4, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
+  // Pillars (formerly Z)
+  enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',
+  // Contours
+  enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
+  // Hachure
+  enabledHachure: false, spacingHachure: 4, lengthHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
+  // Flow
+  enabledFlow: false, spacingFlow: 10, stepFlow: 1, maxLenFlow: 100, colorFlow: '#000000', weightFlow: 1, opacityFlow: 1, dashFlow: 'solid',
+  // Stream Network (DAG)
+  enabledDag: false, thresholdDag: 2, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
+  // Pencil Shading
+  enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
+
+  // Master visibility for all lines
+  showLines: true,
+  // Global Hypsometric (can still be used as a source for per-mode if needed, but per-mode overrides for now)
+  lineHypsometric: false, lineBanded: false, lineHypsoInterval: 10, lineHypsoWeight: 0, lineHypsoMode: 'elevation',
 }
+
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
   particlePeaksOnly: false,
@@ -159,7 +180,7 @@ export default function App() {
     input.click()
   }, [load])
 
-  // ── Keyboard bridge for Controls.jsx (keyboard shortcuts inside Canvas) ───
+  // ── Keyboard bridge for Controls.jsx ───
   const levaGet = useCallback(
     () => ({ ...terrain, ...style, ...points, ...view }),
     [terrain, style, points, view]
@@ -171,56 +192,51 @@ export default function App() {
     if (vals.gridOffsetY  != null) t.gridOffsetY   = vals.gridOffsetY
     if (vals.blackPoint   != null) t.blackPoint    = vals.blackPoint
     if (vals.whitePoint   != null) t.whitePoint    = vals.whitePoint
-    if (vals.lineSpacing  != null) s.lineSpacing   = vals.lineSpacing
-    if (vals.drawMode     != null) s.drawMode      = vals.drawMode
-    if (vals.flowStep     != null) s.flowStep      = vals.flowStep
-    if (vals.flowMaxLen   != null) s.flowMaxLen    = vals.flowMaxLen
-    if (vals.strahlerThreshold != null) s.strahlerThreshold = vals.strahlerThreshold
-    if (vals.curvatureThreshold != null) s.curvatureThreshold = vals.curvatureThreshold
-    if (vals.strokeWeight != null) s.strokeWeight  = vals.strokeWeight
-    if (vals.lineDash     != null) s.lineDash      = vals.lineDash
-    if (vals.lineOpacity  != null) s.lineOpacity   = vals.lineOpacity
+    
+    // Line globals
+    if (vals.showLines    != null) s.showLines     = vals.showLines
+    if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
+    
+    // Mode-specific enabled toggles
+    if (vals.enabledX != null) s.enabledX = vals.enabledX
+    if (vals.enabledY != null) s.enabledY = vals.enabledY
+    if (vals.enabledCross != null) s.enabledCross = vals.enabledCross
+    if (vals.enabledPillars != null) s.enabledPillars = vals.enabledPillars
+    if (vals.enabledContours != null) s.enabledContours = vals.enabledContours
+    if (vals.enabledHachure != null) s.enabledHachure = vals.enabledHachure
+    if (vals.enabledFlow != null) s.enabledFlow = vals.enabledFlow
+    if (vals.enabledDag != null) s.enabledDag = vals.enabledDag
+    if (vals.enabledPencil != null) s.enabledPencil = vals.enabledPencil
+
+    // Fill & Mesh
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
-    if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
     if (vals.showTexture    != null) s.showTexture    = vals.showTexture
     if (vals.textureScale   != null) s.textureScale   = vals.textureScale
     if (vals.textureShiftX  != null) s.textureShiftX  = vals.textureShiftX
     if (vals.textureShiftY  != null) s.textureShiftY  = vals.textureShiftY
+    
+    // Creative
     if (vals.showMirrorPlusX  != null) s.showMirrorPlusX  = vals.showMirrorPlusX
     if (vals.showMirrorMinusX != null) s.showMirrorMinusX = vals.showMirrorMinusX
     if (vals.showMirrorPlusY  != null) s.showMirrorPlusY  = vals.showMirrorPlusY
     if (vals.showMirrorMinusY != null) s.showMirrorMinusY = vals.showMirrorMinusY
     if (vals.showMirrorPlusZ  != null) s.showMirrorPlusZ  = vals.showMirrorPlusZ
     if (vals.showMirrorMinusZ != null) s.showMirrorMinusZ = vals.showMirrorMinusZ
-    
-    // Sync all split hypsometric properties
-    if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric
-    if (vals.lineBanded      != null) s.lineBanded      = vals.lineBanded
-    if (vals.lineHypsoInterval != null) s.lineHypsoInterval = vals.lineHypsoInterval
-    if (vals.lineHypsoWeight   != null) s.lineHypsoWeight   = vals.lineHypsoWeight
-    if (vals.lineHypsoMode     != null) s.lineHypsoMode     = vals.lineHypsoMode
-
-    if (vals.fillHypsometric != null) s.fillHypsometric = vals.fillHypsometric
-    if (vals.fillBanded      != null) s.fillBanded      = vals.fillBanded
-    if (vals.fillHypsoInterval != null) s.fillHypsoInterval = vals.fillHypsoInterval
-    if (vals.fillHypsoWeight   != null) s.fillHypsoWeight   = vals.fillHypsoWeight
-    if (vals.fillHypsoMode     != null) s.fillHypsoMode     = vals.fillHypsoMode
 
     if (vals.tilt         != null) v.tilt          = vals.tilt
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
     if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
-    if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
+    
     if (Object.keys(t).length) setTerrain(prev => ({ ...prev, ...t }))
     if (Object.keys(s).length) setStyle(prev   => ({ ...prev, ...s }))
     if (Object.keys(v).length) setView(prev    => ({ ...prev, ...v }))
   }, [setTerrain, setStyle, setView])
 
   // ── Auto-zoom to fit terrain on load ─────────────────────────────────────
-  // zoom = 500 / max(image_width, image_height) keeps any size terrain on screen.
   const autoZoom = useCallback(({ width, height }) => {
     const zoom = Math.max(0.05, Math.min(4, 500 / Math.max(width, height)))
     setView(prev => ({ ...prev, zoom }))
@@ -236,7 +252,6 @@ export default function App() {
 
   // ── Merged params ─────────────────────────────────────────────────────────
   const p = { ...terrain, ...style, ...points, ...view, gradientStops }
-  const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
@@ -264,7 +279,6 @@ export default function App() {
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
-    // Standard map viewing angles (tilt: 0 is top-down, rotation: 0 is North-up)
     const presets = {
       top:   { tilt: 0,  rotation: 0 },
       front: { tilt: 90, rotation: 0 },
@@ -301,14 +315,6 @@ export default function App() {
     ? `linear-gradient(to bottom, ${bgGradientStops.map(s => `${s.color} ${Math.round(s.pos * 100)}%`).join(', ')})`
     : bgColor
   const noHmap    = !heightmapPixels
-
-  const DRAW_MODE_LABELS = {
-    'lines-x': 'X Ridge Lines', 'lines-y': 'Y Ridge Lines',
-    crosshatch: 'Cross-Hatch',
-    hachure: 'Hachure', contours: 'Contours',
-    flow: 'Flow Lines', dag: 'Stream Network', pencil: 'Pencil Shading',
-    z: 'Pillar visualization',
-  }
 
   return (
     <div className="w-full h-full" style={{ background: bgCss }}>
@@ -393,19 +399,6 @@ export default function App() {
         }}>
           <span style={{ width:8, height:8, borderRadius:'50%', background:'#fff', display:'inline-block' }} />
           REC
-        </div>
-      )}
-
-      {/* ── Draw mode HUD ────────────────────────────────────────────────── */}
-      {!noHmap && !webmActive && (
-        <div style={{
-          position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
-          background:'rgba(20,20,24,0.65)', backdropFilter:'blur(4px)',
-          color:'#ccc', borderRadius:20, padding:'3px 14px',
-          fontSize:12, zIndex:1500, pointerEvents:'none',
-          fontFamily:'"JetBrains Mono","Fira Code",monospace',
-        }}>
-          {activeModes.map(m => DRAW_MODE_LABELS[m] || m).join(' + ')}
         </div>
       )}
 
