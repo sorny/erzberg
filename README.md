@@ -3,20 +3,23 @@
 A high-performance React Three Fiber topographic visualization suite.  
 Transforms grayscale heightmaps and GeoTIFFs into interactive 3D line art and sculpted surfaces with professional-grade terrain analysis tools.
 
+## 📖 Wiki & Documentation
+
+Detailed mathematical backgrounds and algorithm documentation can be found in the [Wiki](docs/wiki/):
+- **[Draw Modes Mathematics](docs/wiki/Draw-Modes.md)**
+- **[Hydraulic Erosion Implementation](docs/wiki/Hydraulic-Erosion.md)**
+
 ## 🚀 Key Features
 
+- **9 Layered Draw Modes**: Fully independent layers with per-mode styling, dash patterns, and hypsometric tinting. Mix and match Ridgelines, Contours, Hachure, Flow Lines, Network streams, Pencil shading, and Pillars.
+- **Ghost Occlusion**: True line-based depth culling via invisible 3D "curtains". Supports artistic ghosting where hidden lines can be styled with custom colors and opacities (e.g., faint red for lines behind mountains).
 - **Physically Correct Hydraulic Erosion**: Droplet-based simulation using Hans Beyer's research. Carve natural drainage patterns with inertia, gravity, and sediment capacity controls. Includes **Undo** support.
-- **Advanced Draw Modes**: 
-  - **Pillar (Z)**: Vertical extrusion visualization.
-  - **Stream Network (DAG)**: Drainage basin analysis.
-  - **Pencil Shading**: Curvature-based topographic sketching.
-  - **Contours**: High-precision marching squares.
-  - **Flow Lines**: Slope-following vector fields.
+- **Continuous Network Thinning**: Realistic river branching powered by Strahler stream order and continuous water accumulation.
 - **3D Symmetry Navigator**: A 6-directional arrow pad for real-time kaleidoscopic mirroring across X, Y, and Z axes.
-- **Texture Overlay**: Drape custom images over the terrain with scale and shift controls.
+- **External Preset System**: Easily share and load complete 3D scene states (Terrain, Style, Points, View, Gradients) via JSON files in `public/presets/`.
 - **GIS Integration**: Native support for **GeoTIFF** elevation data with real-world unit display (metres).
 - **Pro Exporters**: 
-  - **SVG**: High-precision projected vector lines with software Z-buffer occlusion.
+  - **SVG**: High-precision projected vector lines with true software Z-buffer ghost occlusion.
   - **PNG**: Auto-trimmed raster exports (including transparency support).
   - **STL**: 3D printable meshes.
   - **Heightmap**: 1:1 greyscale PNG export of the processed grid.
@@ -54,20 +57,8 @@ npm run dev
 | **G** | Toggle Center Guides |
 | **Reset** | Reverts all parameters to defaults |
 
-## 📖 Architecture
-
-- **`src/utils/geometry.worker.js`**: Offloads heavy CPU builds (Terrain, Lines, Surface) using Transferable objects to keep the UI at 60fps.
-- **`src/utils/erosion.js`**: Stable physics-based droplet simulation with bilinear sampling and weighted brushes.
-- **`src/components/Sidebar.jsx`**: Custom professional dashboard with clickable **(?)** help icons for every complex parameter.
-- **`src/components/SurfaceMesh.jsx`**: GLSL-powered terrain rendering with support for hypsometric tinting, banding, and custom textures.
-
-## 🏗 Drawing Modes
-
-- **Ridgelines (X/Y/Cross)**: Classical topographic scanlines.
-- **Hachure**: Slope-perpendicular artistic strokes.
-- **Network**: Stream-network thinning based on Strahler threshold.
-- **Pencil**: Laplacian-driven curvature shading for a hand-drawn look.
-- **Pillar (Z)**: Vertical pillars visualizing elevation spikes.
+## 📄 References & Credits
+- Hydraulic erosion implementation is based on [**"Implementation of a Method for Hydraulic Erosion"** by Hans Beyer](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf).
 
 ## 📄 License
 
