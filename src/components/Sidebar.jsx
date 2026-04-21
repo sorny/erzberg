@@ -492,6 +492,7 @@ export function Sidebar({
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
               <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
             </div>

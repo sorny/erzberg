@@ -13,6 +13,7 @@ import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { exportSTL } from './utils/stlExport'
+import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 
 // ── Default param sets ────────────────────────────────────────────────────────
@@ -233,10 +234,14 @@ export default function App() {
     return () => clearTimeout(t)
   }, [isComputing])
 
-  // ── STL export ────────────────────────────────────────────────────────────
+  // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
     exportSTL({ surfaceGeo, terrain: terrainData })
   }, [surfaceGeo, terrainData])
+
+  const handleHeightmapExport = useCallback(() => {
+    exportHeightmap(terrainData)
+  }, [terrainData])
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
@@ -337,6 +342,7 @@ export default function App() {
         onPng={() => setPngTrigger(n => n + 1)}
         onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}
         onStl={handleStl}
+        onHeightmap={handleHeightmapExport}
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
