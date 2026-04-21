@@ -15,7 +15,7 @@ function cssGradient(stops) {
   return `linear-gradient(to right, ${parts.join(', ')})`
 }
 
-export function GradientPicker({ stops, onChange }) {
+export function GradientPicker({ stops, onChange, isSimple = false }) {
   const barRef     = useRef()
   const dragging   = useRef(null)  // { index, startX, startPos }
   const colorInputRef = useRef()
@@ -36,6 +36,7 @@ export function GradientPicker({ stops, onChange }) {
 
   // Bar: click on empty area → add stop
   const onBarClick = (e) => {
+    if (isSimple) return // No intermediate stops allowed in simple mode
     // Ignore if a drag just happened
     if (dragging.current !== null) return
     const pos = xToPos(e.clientX)
@@ -67,7 +68,7 @@ export function GradientPicker({ stops, onChange }) {
   const onHandlePointerMove = (e, idx) => {
     if (!dragging.current || dragging.current.index !== idx) return
     const anchor = stops[idx].pos === 0 || stops[idx].pos === 1
-    if (anchor) return                      // anchor stops can't be moved
+    if (anchor || isSimple) return         // anchor stops can't be moved
     const pos = xToPos(e.clientX)
     const clamped = Math.max(0.01, Math.min(0.99, pos))
     dragging.current.moved = true
@@ -115,17 +116,18 @@ export function GradientPicker({ stops, onChange }) {
           height: 18,
           borderRadius: 4,
           background: cssGradient(stops),
-          cursor: 'crosshair',
+          cursor: isSimple ? 'default' : 'crosshair',
           marginBottom: 10,
           border: '1px solid #333',
         }}
       >
         {stops.map((stop, idx) => {
           const isAnchor = stop.pos === 0 || stop.pos === 1
+          if (isSimple && !isAnchor) return null // Hide non-anchor stops in simple mode
           return (
             <div
               key={idx}
-              title={isAnchor ? 'Anchor stop — cannot be deleted' : 'Drag to move · Click to change colour'}
+              title={isAnchor ? 'Anchor stop · Click to change colour' : 'Drag to move · Click to change colour'}
               onPointerDown={(e) => onHandlePointerDown(e, idx)}
               onPointerMove={(e) => onHandlePointerMove(e, idx)}
               onPointerUp={(e) => onHandlePointerUp(e, idx)}
@@ -136,7 +138,7 @@ export function GradientPicker({ stops, onChange }) {
                 transform: 'translateX(-50%)',
                 width: 12,
                 height: 18,
-                cursor: isAnchor ? 'pointer' : 'ew-resize',
+                cursor: (isAnchor || isSimple) ? 'pointer' : 'ew-resize',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -165,6 +167,14 @@ export function GradientPicker({ stops, onChange }) {
         {[...stops].sort((a, b) => a.pos - b.pos).map((stop, sortedIdx) => {
           const origIdx = stops.indexOf(stop)
           const isAnchor = stop.pos === 0 || stop.pos === 1
+          if (isSimple && !isAnchor) return null
+          
+          let label = `${(stop.pos * 100).toFixed(0)}%`
+          if (isSimple) {
+            if (stop.pos === 0) label = 'Top'
+            if (stop.pos === 1) label = 'Bottom'
+          }
+
           return (
             <div
               key={sortedIdx}
@@ -190,8 +200,8 @@ export function GradientPicker({ stops, onChange }) {
                   flexShrink: 0,
                 }}
               />
-              <span>{(stop.pos * 100).toFixed(0)}%</span>
-              {!isAnchor && (
+              <span>{label}</span>
+              {!isAnchor && !isSimple && (
                 <span
                   onClick={(e) => removeStop(e, origIdx)}
                   style={{ cursor: 'pointer', color: '#666', lineHeight: 1 }}

@@ -603,7 +603,7 @@ export function Sidebar({
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
               <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
-              {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />}
+              {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} isSimple />}
             </Sub>
           </Section>
 
