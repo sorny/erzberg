@@ -19,55 +19,64 @@ function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
+/**
+ * Returns an ARRAY of layers, each with its own geometry and styling.
+ */
 export function buildLineGeometry(terrain, p) {
-  if (!terrain) return empty()
+  if (!terrain) return []
   
   const MODES_CONFIG = [
-    { id:'X',       builder: (t, p) => buildRidgelines(t, p, false, p.spacingX, p.shiftX, p.colorX, p.weightX, p.opacityX, p.dashX) },
-    { id:'Y',       builder: (t, p) => buildRidgelines(t, p, true,  p.spacingY, p.shiftY, p.colorY, p.weightY, p.opacityY, p.dashY) },
-    { id:'Cross',   builder: (t, p) => buildCrosshatch(t, p) },
-    { id:'Pillars', builder: (t, p) => buildPillars(t, p, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars) },
-    { id:'Contours',builder: (t, p) => buildContours(t, p, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours) },
-    { id:'Hachure', builder: (t, p) => buildHachure(t, p, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure) },
-    { id:'Flow',    builder: (t, p) => buildFlowLines(t, p, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow, p.weightFlow, p.opacityFlow, p.dashFlow) },
-    { id:'Dag',     builder: (t, p) => buildDagThinning(t, p, p.thresholdDag, p.colorDag, p.weightDag, p.opacityDag, p.dashDag) },
-    { id:'Pencil',  builder: (t, p) => buildPencilShading(t, p, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil) },
+    { id:'X',       builder: (t, p) => buildRidgelines(t, p, false, p.spacingX, p.shiftX, p.colorX, p.weightX, p.opacityX, p.dashX), weight: p.weightX, opacity: p.opacityX, dash: p.dashX },
+    { id:'Y',       builder: (t, p) => buildRidgelines(t, p, true,  p.spacingY, p.shiftY, p.colorY, p.weightY, p.opacityY, p.dashY), weight: p.weightY, opacity: p.opacityY, dash: p.dashY },
+    { id:'Cross',   builder: (t, p) => buildCrosshatch(t, p), weight: p.weightCross, opacity: p.opacityCross, dash: p.dashCross },
+    { id:'Pillars', builder: (t, p) => buildPillars(t, p, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars), weight: p.weightPillars, opacity: p.opacityPillars, dash: p.dashPillars },
+    { id:'Contours',builder: (t, p) => buildContours(t, p, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours), weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours },
+    { id:'Hachure', builder: (t, p) => buildHachure(t, p, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure), weight: p.weightHachure, opacity: p.opacityHachure, dash: p.dashHachure },
+    { id:'Flow',    builder: (t, p) => buildFlowLines(t, p, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow, p.weightFlow, p.opacityFlow, p.dashFlow), weight: p.weightFlow, opacity: p.opacityFlow, dash: p.dashFlow },
+    { id:'Dag',     builder: (t, p) => buildDagThinning(t, p, p.thresholdDag, p.colorDag, p.weightDag, p.opacityDag, p.dashDag), weight: p.weightDag, opacity: p.opacityDag, dash: p.dashDag },
+    { id:'Pencil',  builder: (t, p) => buildPencilShading(t, p, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil), weight: p.weightPencil, opacity: p.opacityPencil, dash: p.dashPencil },
   ]
 
-  const buildPass = (sx, sy, sz) => {
-    const layerResults = []
-    for (const m of MODES_CONFIG) {
-      if (!p[`enabled${m.id}`]) continue
-      const res = m.builder(terrain, p)
-      if (res.positions.length > 0) {
-        if (sx !== 1 || sy !== 1 || sz !== 1) {
-          for (let i = 0; i < res.positions.length; i += 3) {
-            res.positions[i] *= sx; res.positions[i+1] *= sy; res.positions[i+2] *= sz
-          }
-        }
-        layerResults.push(res)
-      }
-    }
-    return layerResults
-  }
+  const finalLayers = []
 
-  let finalPos = new Float32Array(0), finalCol = new Float32Array(0)
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
   const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
 
-  for (const sx of mX) {
-    for (const sy of mY) {
-      for (const sz of mZ) {
-        const layers = buildPass(sx, sy, sz)
-        for (const L of layers) {
-          finalPos = concat(finalPos, L.positions); finalCol = concat(finalCol, L.colors)
+  for (const cfg of MODES_CONFIG) {
+    if (!p[`enabled${cfg.id}`]) continue
+
+    let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
+    
+    // Build the base pass for this layer once
+    const baseRes = cfg.builder(terrain, p)
+    if (baseRes.positions.length === 0) continue
+
+    // Mirror the base pass into all requested octants
+    for (const sx of mX) {
+      for (const sy of mY) {
+        for (const sz of mZ) {
+          const pPass = new Float32Array(baseRes.positions)
+          for (let i = 0; i < pPass.length; i += 3) {
+            pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz
+          }
+          layerPos = concat(layerPos, pPass)
+          layerCol = concat(layerCol, baseRes.colors)
         }
       }
     }
+
+    finalLayers.push({
+      id: cfg.id,
+      positions: layerPos,
+      colors: layerCol,
+      weight: cfg.weight,
+      opacity: cfg.opacity,
+      dash: cfg.dash
+    })
   }
 
-  return { positions: finalPos, colors: finalCol }
+  return finalLayers
 }
 
 function empty() { return { positions: new Float32Array(0), colors: new Float32Array(0) } }
@@ -305,7 +314,7 @@ export function buildSurfaceGeometry(terrain, p) {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c
-      if (!gridMask[i]) { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=-10000; basePos[i*3+2]=r*scl-halfH; brightnessBuf[i]=0 }
+      if (!gridMask[i]) { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=-10000; basePos[i*3+2]=r*scl-halfH; baseBright[i]=0 }
       else { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=cellElev(grid, r, c, cols, elevScale, jitterAmt); basePos[i*3+2]=r*scl-halfH; baseBright[i]=grid[i] }
     }
   }

@@ -90,25 +90,21 @@ export function Scene({
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     exportSVG({
-      positions: lineGeo.positions,
-      colors: lineGeo.colors,
+      lineGeo,
       camera, width, height,
       bgColor: p.bgColor,
       bgGradient: p.bgGradient,
       bgGradientStops,
-      lineColor: p.lineColor,
-      strokeWeight: p.strokeWeight,
-      lineDash: p.lineDash,
       surfaceGeo,
       groupMatrix,
-      showLines: p.showLines,
-      depthOcclusion: p.depthOcclusion,
       showFill: p.showFill,
       fillHypsometric: p.fillHypsometric,
       gradientStops: p.gradientStops,
+      showLines: p.showLines,
+      depthOcclusion: p.depthOcclusion,
       particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
       particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
-      particleColor:     p.pointColor ?? p.lineColor,
+      particleColor:     p.pointColor ?? '#000000',
       particleSize:      p.pointSize ?? 4,
     })
   }, [svgTrigger]) // eslint-disable-line react-hooks/exhaustive-deps

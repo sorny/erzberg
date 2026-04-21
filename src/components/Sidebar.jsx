@@ -395,8 +395,13 @@ export function Sidebar({
   }
 
   // Stats
-  const segs  = lineGeo    ? (lineGeo.positions.length / 6).toLocaleString()     : '–'
-  const verts = lineGeo    ? (lineGeo.positions.length / 3).toLocaleString()     : '–'
+  let totalLinePos = 0
+  if (Array.isArray(lineGeo)) {
+    for (const L of lineGeo) totalLinePos += L.positions.length
+  }
+
+  const segs  = lineGeo    ? (totalLinePos / 6).toLocaleString()     : '–'
+  const verts = lineGeo    ? (totalLinePos / 3).toLocaleString()     : '–'
   const tris  = surfaceGeo ? (surfaceGeo.indices.length  / 3).toLocaleString()   : '–'
   const grid  = terrainData ? `${terrainData.cols}×${terrainData.rows}` : '–'
 

@@ -13,19 +13,27 @@ self.onmessage = (e) => {
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
 
-    // Send back the results. We use Transferables for the large Float32Arrays 
-    // to avoid expensive copying.
+    // Collect all buffers for Transferables
+    const transferables = []
+    
+    // 1. Line Layers
+    if (Array.isArray(lineGeo)) {
+      for (const L of lineGeo) {
+        if (L.positions?.buffer) transferables.push(L.positions.buffer)
+        if (L.colors?.buffer)    transferables.push(L.colors.buffer)
+      }
+    }
+    
+    // 2. Surface
+    if (surfaceGeo.positions?.buffer)     transferables.push(surfaceGeo.positions.buffer)
+    if (surfaceGeo.brightnessBuf?.buffer) transferables.push(surfaceGeo.brightnessBuf.buffer)
+    if (surfaceGeo.indices?.buffer)       transferables.push(surfaceGeo.indices.buffer)
+
     self.postMessage({
       terrain,
       lineGeo,
       surfaceGeo
-    }, [
-      lineGeo.positions.buffer,
-      lineGeo.colors.buffer,
-      surfaceGeo.positions.buffer,
-      surfaceGeo.brightnessBuf.buffer,
-      surfaceGeo.indices.buffer
-    ])
+    }, transferables)
   } catch (err) {
     self.postMessage({ error: err.message })
   }

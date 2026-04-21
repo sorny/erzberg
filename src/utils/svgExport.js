@@ -131,9 +131,8 @@ function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, fillHypsometri
 }
 
 export function exportSVG({
-  positions, colors, camera, width, height,
+  lineGeo, camera, width, height,
   bgColor, bgGradient, bgGradientStops,
-  lineColor, strokeWeight, lineDash,
   surfaceGeo, groupMatrix,
   showFill, fillHypsometric, gradientStops,
   showLines, depthOcclusion,
@@ -167,71 +166,82 @@ export function exportSVG({
     if (y < minY) minY = y; if (y > maxY) maxY = y
   }
 
-  const allSegs = []
-  const addSeg = (x0, y0, x1, y1, stroke) => {
-    if (Math.hypot(x1 - x0, y1 - y0) < 0.1) return
-    allSegs.push({ x0, y0, x1, y1, stroke })
-    expandBB(x0, y0); expandBB(x1, y1)
-  }
+  const svgLayers = []
 
-  if (showLines && positions && positions.length > 0) {
-    const segCount = positions.length / 6
-    for (let s = 0; s < segCount; s++) {
-      const i = s * 6
-      const ax = positions[i], ay = positions[i+1], az = positions[i+2]
-      const bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
-      let stroke = lineColor
-      if (colors && colors.length > i + 2) {
-        stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
-      }
-      
-      // If no occlusion, project endpoints and add entire segment
-      if (!surfViewZ) {
-        const p0 = project(ax, ay, az)
-        const p1 = project(bx, by, bz)
-        addSeg(p0[0], p0[1], p1[0], p1[1], stroke)
-        continue
-      }
+  if (showLines && Array.isArray(lineGeo)) {
+    for (const layer of lineGeo) {
+      const { positions, colors, weight, opacity, dash } = layer
+      if (!positions || positions.length === 0) continue
 
-      // Occlusion path: sample along segment
-      const pts = []
-      for (let t = 0; t <= N_SAMPLES; t++) {
-        const f = t / N_SAMPLES
-        const [sx, sy, lineZ] = project(ax+(bx-ax)*f, ay+(by-ay)*f, az+(bz-az)*f)
-        const surfZ = surfViewZ(sx, sy)
-        pts.push({ sx, sy, visible: (surfZ === -Infinity || lineZ >= surfZ - EPS_VIEW) })
-      }
-      let runStart = null
-      for (let t = 0; t <= N_SAMPLES; t++) {
-        if (pts[t].visible && runStart === null) runStart = t
-        else if (!pts[t].visible && runStart !== null) {
-          addSeg(pts[runStart].sx, pts[runStart].sy, pts[t-1].sx, pts[t-1].sy, stroke)
-          runStart = null
+      const currentLayerSegs = []
+      const segCount = positions.length / 6
+      for (let s = 0; s < segCount; s++) {
+        const i = s * 6
+        const ax = positions[i], ay = positions[i+1], az = positions[i+2]
+        const bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
+        
+        let stroke = '#000000'
+        if (colors && colors.length > i + 2) {
+          stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
         }
+
+        const addSeg = (x0, y0, x1, y1) => {
+          if (Math.hypot(x1 - x0, y1 - y0) < 0.1) return
+          currentLayerSegs.push({ x0, y0, x1, y1, stroke })
+          expandBB(x0, y0); expandBB(x1, y1)
+        }
+
+        if (!surfViewZ) {
+          const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
+          addSeg(p0[0], p0[1], p1[0], p1[1])
+          continue
+        }
+
+        const pts = []
+        for (let t = 0; t <= N_SAMPLES; t++) {
+          const f = t / N_SAMPLES
+          const [sx, sy, lineZ] = project(ax+(bx-ax)*f, ay+(by-ay)*f, az+(bz-az)*f)
+          const surfZ = surfViewZ(sx, sy)
+          pts.push({ sx, sy, visible: (surfZ === -Infinity || lineZ >= surfZ - EPS_VIEW) })
+        }
+        let runStart = null
+        for (let t = 0; t <= N_SAMPLES; t++) {
+          if (pts[t].visible && runStart === null) runStart = t
+          else if (!pts[t].visible && runStart !== null) {
+            addSeg(pts[runStart].sx, pts[runStart].sy, pts[t-1].sx, pts[t-1].sy)
+            runStart = null
+          }
+        }
+        if (runStart !== null) addSeg(pts[runStart].sx, pts[runStart].sy, pts[N_SAMPLES].sx, pts[N_SAMPLES].sy)
       }
-      if (runStart !== null) addSeg(pts[runStart].sx, pts[runStart].sy, pts[N_SAMPLES].sx, pts[N_SAMPLES].sy, stroke)
+
+      if (currentLayerSegs.length > 0) {
+        svgLayers.push({
+          segs: currentLayerSegs,
+          weight,
+          opacity,
+          dash
+        })
+      }
     }
   }
 
-  const wldP = new THREE.Vector3()
-  const viwP = new THREE.Vector3()
   const projectedParticles = []
   if (particlePositions && particleCount > 0) {
     for (let i = 0; i < particleCount; i++) {
-      wldP.set(particlePositions[i*3], particlePositions[i*3+1], particlePositions[i*3+2])
-      if (groupMatrix) wldP.applyMatrix4(groupMatrix)
-      viwP.copy(wldP).applyMatrix4(camInv)
-      if (viwP.z >= 0) continue
+      wld2.set(particlePositions[i*3], particlePositions[i*3+1], particlePositions[i*3+2])
+      if (groupMatrix) wld2.applyMatrix4(groupMatrix)
+      viw2.copy(wld2).applyMatrix4(camInv)
+      if (viw2.z >= 0) continue
       
-      const r = ((particleSize ?? 4) * 300 / (-viwP.z)) * 0.5
-      wldP.project(camera)
-      const cx = (wldP.x+1)*0.5*width, cy = (-wldP.y+1)*0.5*height
+      const r = ((particleSize ?? 4) * 300 / (-viw2.z)) * 0.5
+      wld2.project(camera)
+      const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
       
-      // Depth test for particles
       let visible = true
       if (surfViewZ) {
         const surfZ = surfViewZ(cx, cy)
-        if (surfZ !== -Infinity && viwP.z < surfZ - EPS_VIEW) visible = false
+        if (surfZ !== -Infinity && viw2.z < surfZ - EPS_VIEW) visible = false
       }
 
       if (visible) {
@@ -241,16 +251,22 @@ export function exportSVG({
     }
   }
 
-  if (allSegs.length === 0 && projectedParticles.length === 0) return
+  if (svgLayers.length === 0 && projectedParticles.length === 0) return
 
   const vx = minX - MARGIN, vy = minY - MARGIN
   const vw = (maxX - minX) + MARGIN * 2, vh = (maxY - minY) + MARGIN * 2
-  const sw = (strokeWeight * 0.5).toFixed(3)
+  
   const fillPolygons = (showFill && surfaceGeo && groupMatrix) ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, fillHypsometric, gradientStops) : []
   const fillEls = fillPolygons.map(({ pts, fill }) => `<polygon points="${pts.map(([px, py]) => `${(px-vx).toFixed(1)},${(py-vy).toFixed(1)}`).join(' ')}" fill="${fill}" stroke="none"/>`)
-  const dashArray = DASH_SVG[lineDash ?? 'solid'] ?? ''
-  const lines = allSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
-  const pColor = particleColor ?? lineColor
+  
+  const layerGroups = svgLayers.map(layer => {
+    const sw = (layer.weight * 0.5).toFixed(3)
+    const dashArray = DASH_SVG[layer.dash ?? 'solid'] ?? ''
+    const lineEls = layer.segs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+    return `<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`
+  })
+
+  const pColor = particleColor ?? '#000000'
   const circleEls = projectedParticles.map(({ cx, cy, r }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${pColor}"/>`)
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
   const svg = [
@@ -259,7 +275,7 @@ export function exportSVG({
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...(fillEls.length > 0 ? [`<g>${fillEls.join('')}</g>`] : []),
-    ...(lines.length > 0 ? [`<g stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lines.join('')}</g>`] : []),
+    ...layerGroups,
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
     `</svg>`,
   ].join('\n')

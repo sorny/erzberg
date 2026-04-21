@@ -1,10 +1,7 @@
 /**
  * Renders the ridge-line / curve / hachure / contour geometry as GPU line segments.
- *
- * Uses Three.js LineSegments2 + LineMaterial for cross-browser thick-line support.
- * Per-vertex RGB colors handle gradient, slope-opacity, and stroke-by-elevation effects.
  */
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import * as THREE from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -13,59 +10,69 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 
-export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
-  const { size } = useThree()
+function LineLayer({ layer, depthOcclusion, resolution }) {
+  const { positions, colors, weight, opacity, dash } = layer
+  
+  const geometry = useMemo(() => {
+    const geo = new LineSegmentsGeometry()
+    geo.setPositions(positions)
+    if (colors && colors.length === positions.length) {
+      geo.setColors(colors)
+    }
+    return geo
+  }, [positions, colors])
 
-  // LineMaterial — thick lines that work in WebGL2 (created once)
-  const lineMaterial = useMemo(() => new LineMaterial({
-    linewidth: 1,
+  useEffect(() => () => geometry?.dispose(), [geometry])
+
+  const material = useMemo(() => new LineMaterial({
+    linewidth: weight,
     vertexColors: true,
-    resolution: new THREE.Vector2(size.width, size.height),
+    resolution,
     transparent: true,
     depthWrite: false,
-  }), []) // eslint-disable-line react-hooks/exhaustive-deps
+    depthTest: !!depthOcclusion,
+    opacity,
+  }), []) // Created once
 
-  // Keep material uniforms fresh without recreating it
   useEffect(() => {
-    if (!lineMaterial) return
-    lineMaterial.linewidth = p.strokeWeight
-    lineMaterial.opacity   = p.lineOpacity
-    lineMaterial.depthTest = !!p.depthOcclusion
-    lineMaterial.resolution.set(size.width, size.height)
-    const dash = DASH_CONFIGS[p.lineDash ?? 'solid'] ?? DASH_CONFIGS.solid
-    lineMaterial.dashed   = dash.dashed
-    lineMaterial.dashSize = dash.dashSize
-    lineMaterial.gapSize  = dash.gapSize
-    lineMaterial.needsUpdate = true
-  }, [lineMaterial, p.strokeWeight, p.lineOpacity, p.lineDash, size.width, size.height])
+    material.linewidth = weight
+    material.opacity = opacity
+    material.depthTest = !!depthOcclusion
+    material.resolution.copy(resolution)
+    const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
+    material.dashed = d.dashed
+    material.dashSize = d.dashSize
+    material.gapSize = d.gapSize
+    material.needsUpdate = true
+  }, [material, weight, opacity, dash, depthOcclusion, resolution])
 
-  useEffect(() => () => lineMaterial?.dispose(), [lineMaterial])
+  useEffect(() => () => material?.dispose(), [material])
 
-  // Build LineSegments2 from CPU arrays; memoised so it only rebuilds when geometry changes
-  const lineObject = useMemo(() => {
-    if (!lineGeo || lineGeo.positions.length === 0) return null
-    const geo = new LineSegmentsGeometry()
-    geo.setPositions(lineGeo.positions)
-    if (lineGeo.colors && lineGeo.colors.length === lineGeo.positions.length) {
-      geo.setColors(lineGeo.colors)
-    }
-    const lines = new LineSegments2(geo, lineMaterial)
-    lines.computeLineDistances()
-    return lines
-  }, [lineGeo, lineMaterial])
+  const lines = useMemo(() => {
+    const l = new LineSegments2(geometry, material)
+    l.computeLineDistances()
+    return l
+  }, [geometry, material])
 
-  // Dispose geometry when object changes
-  useEffect(() => () => lineObject?.geometry?.dispose(), [lineObject])
+  return <primitive object={lines} />
+}
+
+export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
+  const { size } = useThree()
+  const resolution = useMemo(() => new THREE.Vector2(size.width, size.height), [size.width, size.height])
 
   return (
     <group>
-      {/* Terrain surface — writes depth buffer for ridge-line occlusion */}
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} />
 
-      {/* Line art — drawn on top, respects depth from surface */}
-      {p.showLines && lineObject && (
-        <primitive object={lineObject} />
-      )}
+      {p.showLines && Array.isArray(lineGeo) && lineGeo.map(layer => (
+        <LineLayer 
+          key={layer.id} 
+          layer={layer} 
+          depthOcclusion={p.depthOcclusion} 
+          resolution={resolution} 
+        />
+      ))}
     </group>
   )
 }
