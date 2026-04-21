@@ -246,12 +246,12 @@ export function Sidebar({
     { id:'lines-x',    label:'X' },
     { id:'lines-y',    label:'Y' },
     { id:'crosshatch', label:'Cross' },
-    { id:'hachure',    label:'Hachure' },
+    { id:'z',          label:'Z' },
     { id:'contours',   label:'Contours' },
+    { id:'hachure',    label:'Hachure' },
     { id:'flow',       label:'Flow' },
     { id:'dag',        label:'Network' },
     { id:'pencil',     label:'Pencil' },
-    { id:'z',          label:'Z' },
   ]
 
   const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
@@ -262,6 +262,12 @@ export function Sidebar({
   }
 
   const lineStep = terrainData ? Math.max(1, Math.round((style.lineSpacing ?? 4) / terrainData.scl)) : 1
+
+  // Stats
+  const segs  = lineGeo    ? (lineGeo.positions.length / 6).toLocaleString()     : '–'
+  const verts = lineGeo    ? (lineGeo.positions.length / 3).toLocaleString()     : '–'
+  const tris  = surfaceGeo ? (surfaceGeo.indices.length  / 3).toLocaleString()   : '–'
+  const grid  = terrainData ? `${terrainData.cols}×${terrainData.rows}` : '–'
 
   return (
     <>
@@ -296,6 +302,11 @@ export function Sidebar({
               <button className="hmload" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
               <button className="hmload" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
             </div>
+            {heightmapFilename && (
+              <div style={{ marginTop:5, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {heightmapFilename}
+              </div>
+            )}
           </div>
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
@@ -312,10 +323,19 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-            </div>
+            {hasGeoTiff ? (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </div>
+            )}
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -333,11 +353,11 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round(view.zoom * 100)} onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
-            <Tog label="Auto-rotate" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
+            <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
                 <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
@@ -356,22 +376,29 @@ export function Sidebar({
                 </div>
               </Sub>
             )}
-            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
           <Section title="Style" open={sec.style} onToggle={() => tog('style')}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:10 }}>
-              {Object.keys(STYLE_PRESETS).map(name => <button key={name} onClick={() => applyPreset(STYLE_PRESETS[name])} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                {Object.keys(STYLE_PRESETS).map(name => <button key={name} onClick={() => applyPreset(STYLE_PRESETS[name])} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+              </div>
             </div>
 
             <div style={{ marginBottom: 10 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
+                <span style={{ fontSize:10, color: DIM }}>Draw mode</span>
+                <span style={{ fontSize:9, color: MUTED }}>f</span>
+              </div>
               <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
                 {MODES.map(m => <button key={m.id} className={`hmsb${hasMode(m.id) ? ' on' : ''}`} onClick={() => toggleMode(m.id)} style={{ flex:1, padding:'5px 0', fontSize:11, background: hasMode(m.id) ? ACCENT : SURF, color: hasMode(m.id) ? '#fff' : MUTED, border:`1px solid ${hasMode(m.id) ? ACCENT : BORDER}`, borderRadius:4, cursor:'pointer' }}>{m.label}</button>)}
               </div>
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}
@@ -461,13 +488,27 @@ export function Sidebar({
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label="SVG" onClick={onSvg} /><ExpBtn label="PNG" onClick={onPng} /><ExpBtn label="PNG α" onClick={onPngAlpha} /><ExpBtn label="STL" onClick={onStl} />
+              <ExpBtn label="SVG" hint="1" onClick={onSvg} /><ExpBtn label="PNG" hint="2" onClick={onPng} /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} /><ExpBtn label="STL" hint="4" onClick={onStl} />
             </div>
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Save Preset" onClick={onSavePreset} /><ExpBtn label="Load Preset" onClick={onLoadPreset} />
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
+              <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
             </div>
+            <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
           </Section>
+
+          {/* ── Stats ─────────────────────────────────────────────────────── */}
+          <div style={{ padding:'10px 14px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
+            <div>Segments: {segs} · Verts: {verts}</div>
+            <div>Triangles: {tris} · Grid: {grid}</div>
+            {geoTiffElevMin != null && geoTiffElevMax != null && (
+              <div style={{ marginTop:3, color: MUTED }}>
+                Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m
+                &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>
