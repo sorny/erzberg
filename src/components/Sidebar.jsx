@@ -42,22 +42,50 @@ function PanelStyles() {
       .hmload:hover { background:${SURF} !important; color:${TEXT} !important; }
       #hm-panel-body::-webkit-scrollbar { width:4px; }
       #hm-panel-body::-webkit-scrollbar-thumb { background:${BORDER}; border-radius:2px; }
+      .hmi:hover { color:${TEXT} !important; border-color:${MUTED} !important; }
     `}</style>
   )
 }
 
 // ── UI Atomic Components ───────────────────────────────────────────────────────
 
+function HelpBox({ text }) {
+  return (
+    <div style={{
+      fontSize: 9, color: MUTED, background: 'rgba(0,0,0,0.2)',
+      padding: '6px 8px', borderRadius: 4, marginBottom: 8,
+      border: `1px solid ${BORDER}`, lineHeight: 1.4
+    }}>
+      {text}
+    </div>
+  )
+}
+
+function HelpBtn({ active, onClick }) {
+  return (
+    <span onClick={onClick} className="hmi" style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      width: 12, height: 12, borderRadius: '50%', border: `1px solid ${BORDER}`,
+      fontSize: 8, color: MUTED, cursor: 'pointer', marginLeft: 4,
+      background: active ? BORDER : 'transparent',
+      transition: 'all 0.1s'
+    }}>?</span>
+  )
+}
+
 function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2 }) {
+  const [showHelp, setShowHelp] = useState(false)
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ marginBottom: 8, ...(col2 && { gridColumn: '1/-1' }) }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 3 }}>
-        <span title={help} style={{ fontSize: 10, color: DIM, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
+        <span style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center' }}>
           {label}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         {hint && <span style={{ fontSize: 9, color: MUTED }}>{hint}</span>}
       </div>
+      {showHelp && help && <HelpBox text={help} />}
       <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
         <input type="range" className="hmr" min={min} max={max} step={step} value={value}
           onChange={e => onChange(parsed(e.target.value))} />
@@ -70,14 +98,19 @@ function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2 
 }
 
 function Tog({ label, hint, help, checked, onChange, small }) {
+  const [showHelp, setShowHelp] = useState(false)
   const fs = small ? 11 : 12
   const tc = small ? MUTED : DIM
   return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span title={help} style={{ fontSize: fs, color: tc, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
-        {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED }}> {hint}</span>}
-      </span>
-      <Switch checked={checked} onChange={onChange} />
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
+        <span style={{ fontSize: fs, color: tc, display: 'flex', alignItems: 'center' }}>
+          {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED }}> {hint}</span>}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <Switch checked={checked} onChange={onChange} />
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
@@ -106,31 +139,41 @@ function ColorRow({ label, value, onChange }) {
 }
 
 function TogColor({ label, hint, help, checked, onToggle, color, onColor }) {
+  const [showHelp, setShowHelp] = useState(false)
   return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span title={help} style={{ fontSize: 12, color: DIM, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
-        {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
-      </span>
-      <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-        {onColor && <input type="color" className="hmc" value={color} onChange={e => onColor(e.target.value)} />}
-        <Switch checked={checked} onChange={onToggle} />
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
+        <span style={{ fontSize: 12, color: DIM, display: 'flex', alignItems: 'center' }}>
+          {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
+          {onColor && <input type="color" className="hmc" value={color} onChange={e => onColor(e.target.value)} />}
+          <Switch checked={checked} onChange={onToggle} />
+        </div>
       </div>
+      {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
 
 function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt }) {
+  const [showHelp, setShowHelp] = useState(false)
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
-    <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: 8 }}>
-      <span title={help} style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, cursor: help ? 'help' : 'default', borderBottom: help ? `1px dotted ${MUTED}` : 'none' }}>
-        {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
-      </span>
-      <input type="range" className="hmr" min={min} max={max} step={step} value={value}
-        onChange={e => onChange(parsed(e.target.value))} />
-      <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
-        {fmt ? fmt(value) : value}
-      </span>
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display: 'flex', alignItems: 'center' }}>
+          {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <input type="range" className="hmr" min={min} max={max} step={step} value={value}
+          onChange={e => onChange(parsed(e.target.value))} />
+        <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+          {fmt ? fmt(value) : value}
+        </span>
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
@@ -347,10 +390,19 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-            </div>
+            {hasGeoTiff ? (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </div>
+            )}
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
