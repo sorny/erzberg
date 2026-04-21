@@ -86,6 +86,7 @@ const VIEW_DEF = {
   showGuides: false, showRawTerrain: false,
 }
 
+
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
   const { gl } = useThree()
@@ -236,6 +237,7 @@ export default function App() {
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
     if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
+    if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
     

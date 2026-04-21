@@ -504,6 +504,19 @@ export function Sidebar({
             {view.autoRotate && (
               <Sub>
                 <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
+                <div style={{ display:'flex', gap:4 }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
+                  {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
+                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
+                      style={{ 
+                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, 
+                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT : SURF, 
+                        color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </Sub>
             )}
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
@@ -739,9 +752,17 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
+            <button onClick={() => ss({ 
+              showMirrorPlusX:true, showMirrorMinusX:false,
+              showMirrorPlusY:true, showMirrorMinusY:false,
+              showMirrorPlusZ:true, showMirrorMinusZ:false
+            })} style={{ 
+              width:'100%', padding:'6px 0', background: SURF, color: DIM, 
+              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
+            }}>Reset Symmetry</button>
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
