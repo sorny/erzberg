@@ -37,7 +37,7 @@ test('app loads without console errors', async ({ page }) => {
 
   // Filter out harmless errors
   const realErrors = errors.filter(e => {
-    if (e.url.includes('favicon.ico')) return false
+    if (e.url.includes('favicon.svg')) return false
     return true
   })
 
