@@ -308,7 +308,8 @@ function buildPillars(terrain, p, spacing) {
       const e = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(e, terrain.minZ, terrain.maxZ, elevMinCut, elevMaxCut)) continue
       const x = c * scl - halfW, z = r * scl - halfH
-      positions.push(x, 0, z, x, e, z)
+      // Project from the ground floor (minZ) to the peak elevation (e)
+      positions.push(x, terrain.minZ, z, x, e, z)
       const col = computeVertexColor(normElev(e, terrain.minZ, terrain.maxZ), 0.5, 0, p)
       colors.push(...col, ...col)
     }
