@@ -247,7 +247,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, points: true, erosion: false, export: true,
+    terrain: true, levels: true, view: true, style: true, texture: true, points: true, erosion: false, export: true,
   })
 
   // --- Erosion State ---
@@ -402,10 +402,19 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-            </div>
+            {hasGeoTiff ? (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </div>
+            )}
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -523,39 +532,38 @@ export function Sidebar({
 
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
             
-            {/* ── Texture Overlay ─────────────────────────────────────────── */}
-            <div style={{ marginTop:14, paddingTop:12, borderTop:`1px solid ${BORDER}` }}>
-              <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} help="Overlay a custom image over the terrain. Visible in PNG/WebM only." />
-              {style.showTexture && (
-                <Sub>
-                  <button className="hmload" onClick={handleTexturePicker} style={{ 
-                    width:'100%', padding:6, marginBottom:10, background: SURF, color: DIM, 
-                    border:`1px dashed ${BORDER}`, borderRadius:4, fontSize:10, cursor:'pointer' 
-                  }}>
-                    {textureImage ? 'Change Texture' : '↑ Upload Image'}
-                  </button>
-                  {textureImage && (
-                    <>
-                      <InlineSl label="Scale" min={0.1} max={10} step={0.1} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                        <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
-                        <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
-                      </div>
-                      <button onClick={() => setTextureImage(null)} style={{ 
-                        width:'100%', padding:4, background:'transparent', color: MUTED, 
-                        border:'none', fontSize:9, cursor:'pointer', textDecoration:'underline' 
-                      }}>Clear Texture</button>
-                    </>
-                  )}
-                </Sub>
-              )}
-            </div>
-
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
               <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
               {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />}
             </Sub>
+          </Section>
+
+          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
+            <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} help="Overlay a custom image over the terrain. Visible in PNG/WebM only." />
+            {style.showTexture && (
+              <Sub>
+                <button className="hmload" onClick={handleTexturePicker} style={{ 
+                  width:'100%', padding:8, marginBottom:10, background: SURF, color: DIM, 
+                  border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
+                }}>
+                  {textureImage ? 'Change Texture' : '↑ Upload Image'}
+                </button>
+                {textureImage && (
+                  <>
+                    <InlineSl label="Scale" min={0.1} max={10} step={0.1} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                      <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
+                      <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
+                    </div>
+                    <button onClick={() => setTextureImage(null)} style={{ 
+                      width:'100%', padding:'8px 0', background: SURF, color: DIM, 
+                      border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
+                    }}>Clear Texture</button>
+                  </>
+                )}
+              </Sub>
+            )}
           </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
