@@ -16,6 +16,7 @@ const TEXT   = '#e4e4e7'
 const DIM    = '#d4d4d8'
 const MUTED  = '#71717a'
 const ACCENT = '#3b82f6'
+const GREEN  = '#22c55e'
 const W      = 272   // panel width px
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
@@ -184,14 +185,15 @@ function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt 
   )
 }
 
-function Section({ title, open, onToggle, children }) {
+function Section({ title, open, onToggle, enabled, children }) {
   return (
     <div style={{ borderBottom: `1px solid ${BORDER}` }}>
       <div onClick={onToggle} style={{
         display:'flex', justifyContent:'space-between', alignItems:'center',
         padding:'10px 14px', cursor:'pointer', userSelect:'none',
       }}>
-        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED }}>
+        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center' }}>
+          {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, boxShadow:`0 0 6px ${GREEN}88` }} />}
           {title}
         </span>
         <span style={{ 
@@ -423,9 +425,25 @@ export function Sidebar({
   const elevCutToM  = (pct) => Math.round(geoTiffElevMin + (pct / 100) * elevRange)
   const mToElevCut  = (m)   => Math.round(((m - geoTiffElevMin) / elevRange) * 100)
 
+  const syncSectionsToStyle = (newStyle) => {
+    setSec(prev => ({
+      ...prev,
+      modeX:        !!newStyle.enabledX,
+      modeY:        !!newStyle.enabledY,
+      modeCross:    !!newStyle.enabledCross,
+      modePillars:  !!newStyle.enabledPillars,
+      modeContours: !!newStyle.enabledContours,
+      modeHachure:  !!newStyle.enabledHachure,
+      modeFlow:     !!newStyle.enabledFlow,
+      modeDag:      !!newStyle.enabledDag,
+      modePencil:   !!newStyle.enabledPencil,
+    }))
+  }
+
   const applyPreset = (preset) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
+    syncSectionsToStyle(preset.style)
   }
 
   // Stats
@@ -584,7 +602,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
           
-          <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')}>
+          <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')} enabled={style.enabledX}>
             <Tog label="Enabled" checked={style.enabledX} onChange={v => ss({ enabledX: v })} />
             {style.enabledX && (
               <>
@@ -597,7 +615,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Y Lines" open={sec.modeY} onToggle={() => tog('modeY')}>
+          <Section title="Mode: Y Lines" open={sec.modeY} onToggle={() => tog('modeY')} enabled={style.enabledY}>
             <Tog label="Enabled" checked={style.enabledY} onChange={v => ss({ enabledY: v })} />
             {style.enabledY && (
               <>
@@ -610,7 +628,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Crosshatch" open={sec.modeCross} onToggle={() => tog('modeCross')}>
+          <Section title="Mode: Crosshatch" open={sec.modeCross} onToggle={() => tog('modeCross')} enabled={style.enabledCross}>
             <Tog label="Enabled" checked={style.enabledCross} onChange={v => ss({ enabledCross: v })} />
             {style.enabledCross && (
               <>
@@ -622,7 +640,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Pillars" open={sec.modePillars} onToggle={() => tog('modePillars')}>
+          <Section title="Mode: Pillars" open={sec.modePillars} onToggle={() => tog('modePillars')} enabled={style.enabledPillars}>
             <Tog label="Enabled" checked={style.enabledPillars} onChange={v => ss({ enabledPillars: v })} />
             {style.enabledPillars && (
               <>
@@ -634,7 +652,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Contours" open={sec.modeContours} onToggle={() => tog('modeContours')}>
+          <Section title="Mode: Contours" open={sec.modeContours} onToggle={() => tog('modeContours')} enabled={style.enabledContours}>
             <Tog label="Enabled" checked={style.enabledContours} onChange={v => ss({ enabledContours: v })} />
             {style.enabledContours && (
               <>
@@ -646,7 +664,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Hachure" open={sec.modeHachure} onToggle={() => tog('modeHachure')}>
+          <Section title="Mode: Hachure" open={sec.modeHachure} onToggle={() => tog('modeHachure')} enabled={style.enabledHachure}>
             <Tog label="Enabled" checked={style.enabledHachure} onChange={v => ss({ enabledHachure: v })} />
             {style.enabledHachure && (
               <>
@@ -659,7 +677,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Flow" open={sec.modeFlow} onToggle={() => tog('modeFlow')}>
+          <Section title="Mode: Flow" open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow}>
             <Tog label="Enabled" checked={style.enabledFlow} onChange={v => ss({ enabledFlow: v })} />
             {style.enabledFlow && (
               <>
@@ -673,7 +691,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Network" open={sec.modeDag} onToggle={() => tog('modeDag')}>
+          <Section title="Mode: Network" open={sec.modeDag} onToggle={() => tog('modeDag')} enabled={style.enabledDag}>
             <Tog label="Enabled" checked={style.enabledDag} onChange={v => ss({ enabledDag: v })} />
             {style.enabledDag && (
               <>
@@ -685,7 +703,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Pencil" open={sec.modePencil} onToggle={() => tog('modePencil')}>
+          <Section title="Mode: Pencil" open={sec.modePencil} onToggle={() => tog('modePencil')} enabled={style.enabledPencil}>
             <Tog label="Enabled" checked={style.enabledPencil} onChange={v => ss({ enabledPencil: v })} />
             {style.enabledPencil && (
               <>
@@ -767,9 +785,17 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
+            <button onClick={() => ss({ 
+              showMirrorPlusX:true, showMirrorMinusX:false,
+              showMirrorPlusY:true, showMirrorMinusY:false,
+              showMirrorPlusZ:true, showMirrorMinusZ:false
+            })} style={{ 
+              width:'100%', padding:'6px 0', background: SURF, color: DIM, 
+              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
+            }}>Reset Symmetry</button>
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
