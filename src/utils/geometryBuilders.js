@@ -39,7 +39,7 @@ export function buildLineGeometry(terrain, p) {
   const MODES_CONFIG = [
     { id:'X',       builder: (t, ctx) => buildRidgelines(t, ctx, false, p.spacingX, p.shiftX) },
     { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
-    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx) },
+    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
     { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
@@ -62,7 +62,7 @@ export function buildLineGeometry(terrain, p) {
     
     // Build the base pass for this layer once
     const baseRes = cfg.builder(terrain, ctx)
-    if (baseRes.positions.length === 0) continue
+    if (!baseRes || baseRes.positions.length === 0) continue
 
     // Mirror the base pass into all requested octants
     for (const sx of mX) {
@@ -125,9 +125,9 @@ function buildRidgelines(terrain, p, isY, spacing, shift) {
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
-function buildCrosshatch(terrain, p) {
-  const x = buildRidgelines(terrain, p, false, p.spacingCross, 0)
-  const y = buildRidgelines(terrain, p, true,  p.spacingCross, 0)
+function buildCrosshatch(terrain, p, spacing) {
+  const x = buildRidgelines(terrain, p, false, spacing, 0)
+  const y = buildRidgelines(terrain, p, true,  spacing, 0)
   return { positions: concat(x.positions, y.positions), colors: concat(x.colors, y.colors) }
 }
 
@@ -142,15 +142,17 @@ function buildHachure(terrain, p, spacing, length) {
   for (let r = 0; r < rows; r += lineStep) {
     for (let c = 0; c < cols; c += lineStep) {
       if (!hasData(gridMask, r, c, cols)) continue
-      const b = grid[r * cols + c], elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      const bC = grid[r * cols + c], elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-      const br = (c < cols - 1) ? grid[r * cols + c + 1] : b, bd = (r < rows - 1) ? grid[(r + 1) * cols + c] : b
-      const gx = br - b, gy = bd - b, len = Math.sqrt(gx * gx + gy * gy)
-      if (len < 0.001) continue
-      const nx = -gy / len, ny = gx / len, l = (length ?? 1) * len * 50
-      const x0 = c * scl - halfW, z0 = r * scl - halfH
-      positions.push(x0 - nx * l, elev, z0 - ny * l, x0 + nx * l, elev, z0 + ny * l)
-      const col = computeVertexColor(normElev(elev, minZ, maxZ), len / (maxSlope || 1), Math.atan2(gy, gx), p)
+      const bL = (c > 0 && gridMask[r * cols + c - 1]) ? grid[r * cols + c - 1] : bC
+      const bR = (c < cols - 1 && gridMask[r * cols + c + 1]) ? grid[r * cols + c + 1] : bC
+      const bU = (r > 0 && gridMask[(r - 1) * cols + c]) ? grid[(r - 1) * cols + c] : bC
+      const bD = (r < rows - 1 && gridMask[(r + 1) * cols + c]) ? grid[(r + 1) * cols + c] : bC
+      const gx = (bR - bL) * 50 * elevScale, gz = (bD - bU) * 50 * elevScale, mag = Math.sqrt(gx * gx + gz * gz)
+      if (mag < 0.005) continue
+      const tickLen = mag * (length ?? 1) * scl, nx = -gz / mag, nz = gx / mag, wx = c * scl - halfW, wz = r * scl - halfH
+      positions.push(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
+      const col = computeVertexColor(normElev(elev, minZ, maxZ), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
       colors.push(...col, ...col)
     }
   }
@@ -164,26 +166,30 @@ function buildContours(terrain, p, interval) {
   const { elevScale, elevMinCut, elevMaxCut } = p
   const positions = [], colors = []
   const step = (interval ?? 4)
+  const elevRange = 100 * elevScale, levelCount = Math.ceil(elevRange / step) + 1, startElev = Math.ceil((-elevRange / 2) / step) * step
 
-  for (let r = 0; r < rows - 1; r++) {
-    for (let c = 0; c < cols - 1; c++) {
-      const i0 = r * cols + c, i1 = i0 + 1, i2 = (r + 1) * cols + c, i3 = i2 + 1
-      if (!gridMask[i0] || !gridMask[i1] || !gridMask[i2] || !gridMask[i3]) continue
-      const v0 = (grid[i0] - 0.5) * 100 * elevScale, v1 = (grid[i1] - 0.5) * 100 * elevScale
-      const v2 = (grid[i2] - 0.5) * 100 * elevScale, v3 = (grid[i3] - 0.5) * 100 * elevScale
-      const minV = Math.min(v0, v1, v2, v3), maxV = Math.max(v0, v1, v2, v3)
-      const start = Math.ceil(minV / step) * step
-      for (let v = start; v <= maxV; v += step) {
-        if (!inElevCut(v, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-        const pts = []
-        const interp = (a, b, va, vb) => { const t = (v - va) / (vb - va); return a + (b - a) * t }
-        if ((v0 < v) !== (v1 < v)) pts.push(interp(c * scl, (c+1) * scl, v0, v1) - halfW, v, r * scl - halfH)
-        if ((v1 < v) !== (v3 < v)) pts.push((c+1) * scl - halfW, v, interp(r * scl, (r+1) * scl, v1, v3) - halfH)
-        if ((v3 < v) !== (v2 < v)) pts.push(interp((c+1) * scl, c * scl, v3, v2) - halfW, v, (r+1) * scl - halfH)
-        if ((v2 < v) !== (v0 < v)) pts.push(c * scl - halfW, v, interp((r+1) * scl, r * scl, v2, v0) - halfH)
-        if (pts.length >= 6) {
-          positions.push(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5])
-          const col = computeVertexColor(normElev(v, minZ, maxZ), 0.5, 0, p)
+  for (let li = 0; li < levelCount; li++) {
+    const elev = startElev + li * step
+    if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+    const level = elev / (100 * elevScale) + 0.5
+    
+    // Fast Marching Squares
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        if (!gridMask[r*cols+c] || !gridMask[r*cols+c+1] || !gridMask[(r+1)*cols+c] || !gridMask[(r+1)*cols+c+1]) continue
+        const v00 = grid[r*cols+c], v10 = grid[r*cols+c+1], v01 = grid[(r+1)*cols+c], v11 = grid[(r+1)*cols+c+1]
+        const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
+        if (idx === 0 || idx === 15) continue
+        const edgeLerp = (a, b, va, vb) => { 
+          if (Math.abs(vb - va) < 1e-10) return 0.5
+          return a + (b - a) * ((level - va) / (vb - va)) 
+        }
+        const top = [c + edgeLerp(0, 1, v00, v10), r], right = [c + 1, r + edgeLerp(0, 1, v10, v11)], bottom = [c + edgeLerp(0, 1, v01, v11), r + 1], left = [c, r + edgeLerp(0, 1, v00, v01)]
+        const pairs = MARCHING_TABLE[idx], ed = [top, right, bottom, left]
+        for (let i = 0; i < pairs.length; i += 2) { 
+          const e0 = ed[pairs[i]], e1 = ed[pairs[i+1]]
+          positions.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
           colors.push(...col, ...col)
         }
       }
@@ -191,82 +197,88 @@ function buildContours(terrain, p, interval) {
   }
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
+const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
 
-// ─── Flow ─────────────────────────────────────────────────────────────────────
+// ─── Flow lines ───────────────────────────────────────────────────────────────
 
-function buildFlowLines(terrain, p, spacing, step, maxLen) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
-  const { elevScale } = p
-  const lineStep = Math.max(1, Math.round((spacing ?? 10) / scl))
-  const positions = [], colors = []
-  const occupancy = new Uint8Array(rows * cols)
-
-  for (let r = 0; r < rows; r += lineStep) {
-    for (let c = 0; c < cols; c += lineStep) {
-      if (!gridMask[r * cols + c] || occupancy[r * cols + c]) continue
-      let currR = r, currC = c, len = 0
-      while (len < (maxLen ?? 100)) {
-        const i = Math.round(currR) * cols + Math.round(currC)
-        if (i < 0 || i >= rows * cols || !gridMask[i]) break
-        occupancy[i] = 1
-        const b = grid[i], br = (currC < cols - 1) ? grid[i + 1] : b, bd = (currR < rows - 1) ? grid[i + cols] : b
-        const gx = br - b, gy = bd - b, gLen = Math.sqrt(gx * gx + gy * gy)
-        if (gLen < 0.0001) break
-        const dr = gy / gLen * (step ?? 1), dc = gx / gLen * (step ?? 1)
-        const nextR = currR + dr, nextC = currC + dc
-        const e0 = (b - 0.5) * 100 * elevScale, e1 = (grid[Math.min(rows*cols-1, Math.round(nextR)*cols + Math.round(nextC))] - 0.5) * 100 * elevScale
-        positions.push(currC * scl - halfW, e0, currR * scl - halfH, nextC * scl - halfW, e1, nextR * scl - halfH)
-        const col = computeVertexColor(normElev(e0, minZ, maxZ), gLen * 10, Math.atan2(gy, gx), p)
-        colors.push(...col, ...col)
-        currR = nextR; currC = nextC; len++
-      }
-    }
-  }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+function sampleB(grid, rows, cols, fr, fc) {
+  const r0 = Math.max(0, Math.min(rows-1, Math.floor(fr))), c0 = Math.max(0, Math.min(cols-1, Math.floor(fc))), r1 = Math.min(rows-1, r0+1), c1 = Math.min(cols-1, c0+1), dr = fr-r0, dc = fc-c0
+  return grid[r0*cols+c0]*(1-dr)*(1-dc) + grid[r0*cols+c1]*(1-dr)*dc + grid[r1*cols+c0]*dr*(1-dc) + grid[r1*cols+c1]*dr*dc
 }
 
-// ─── Stream Network (DAG) ──────────────────────────────────────────────────────
-
-function buildDagThinning(terrain, p, threshold) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
-  const { elevScale } = p
-  const accumulation = new Float32Array(rows * cols).fill(1)
-  const sorted = [...Array(rows * cols).keys()].sort((a, b) => grid[b] - grid[a])
-  for (const i of sorted) {
-    if (!gridMask[i]) continue
-    const r = Math.floor(i / cols), c = i % cols
-    let maxD = -1, nextIdx = -1
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue
-        const nr = r + dr, nc = c + dc
-        if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && gridMask[nr * cols + nc]) {
-          const drop = grid[i] - grid[nr * cols + nc]
-          if (drop > maxD) { maxD = drop; nextIdx = nr * cols + nc }
-        }
+function buildFlowLines(terrain, p, spacing, step, maxLen) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const lineStep = Math.max(1, Math.round((spacing ?? 10) / scl)), MAX_TOTAL_SEGMENTS = 3000000, posBuf = new Float32Array(MAX_TOTAL_SEGMENTS*6), colBuf = new Float32Array(MAX_TOTAL_SEGMENTS*6), mask = new Uint8Array(rows*cols), eps = 0.5
+  let totalSegments = 0
+  outer: for (let r = 0; r < rows; r += lineStep) {
+    for (let c = 0; c < cols; c += lineStep) {
+      if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
+      if (!gridMask[r*cols+c] || mask[r*cols+c]) continue
+      let fr = r, fc = c, b0 = sampleB(grid, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
+      for (let s = 0; s < (maxLen ?? 100); s++) {
+        if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
+        if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
+        const ri = Math.round(fr), ci = Math.round(fc)
+        if (!gridMask[ri*cols+ci]) break
+        mask[ri*cols+ci] = 1
+        const bL = sampleB(grid, rows, cols, fr, fc-eps), bR = sampleB(grid, rows, cols, fr, fc+eps), bU = sampleB(grid, rows, cols, fr-eps, fc), bD = sampleB(grid, rows, cols, fr+eps, fc)
+        const gx = bR-bL, gz = bD-bU, mag = Math.sqrt(gx*gx+gz*gz)
+        if (mag < 0.0005) break
+        const nfc = fc-(gx/mag)*(step??1), nfr = fr-(gz/mag)*(step??1)
+        if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
+        const b1 = sampleB(grid, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
+        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+          const pIdx = totalSegments*6; posBuf[pIdx]=fc*scl-halfW; posBuf[pIdx+1]=e0; posBuf[pIdx+2]=fr*scl-halfH; posBuf[pIdx+3]=nfc*scl-halfW; posBuf[pIdx+4]=e1; posBuf[pIdx+5]=nfr*scl-halfH
+          const col0 = computeVertexColor(normElev(e0, minZ, maxZ), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
+          colBuf[pIdx]=col0[0]; colBuf[pIdx+1]=col0[1]; colBuf[pIdx+2]=col0[2]; colBuf[pIdx+3]=col0[0]; colBuf[pIdx+4]=col0[1]; colBuf[pIdx+5]=col0[2]
+          totalSegments++
+        } else if (!(inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) || inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut))) break
+        fr=nfr; fc=nfc; b0=b1; e0=e1
       }
     }
-    if (nextIdx !== -1 && maxD > 0) accumulation[nextIdx] += accumulation[i]
   }
-  const positions = [], colors = []
-  for (let i = 0; i < rows * cols; i++) {
-    if (accumulation[i] > (threshold ?? 2) * 50) {
-      const r = Math.floor(i / cols), c = i % cols
+  return { positions: posBuf.slice(0, totalSegments*6), colors: colBuf.slice(0, totalSegments*6) }
+}
+
+// ─── Stream Network ──────────────────────────────────────────────────────
+
+function buildDagThinning(terrain, p, threshold) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const n = rows*cols, next = new Int32Array(n).fill(-1), inDeg = new Int32Array(n).fill(0)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!gridMask[r*cols+c]) continue
+      const i = r*cols+c; let minH = grid[i], target = -1
       for (let dr = -1; dr <= 1; dr++) {
         for (let dc = -1; dc <= 1; dc++) {
-          const nr = r + dr, nc = c + dc
-          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && gridMask[nr * cols + nc]) {
-            const ni = nr * cols + nc
-            if (accumulation[ni] > accumulation[i]) {
-              const e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[ni]-0.5)*100*elevScale
-              positions.push(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
-              const col = computeVertexColor(normElev(e0, minZ, maxZ), 0.5, 0, p)
-              colors.push(...col, ...col)
-            }
+          if (dr === 0 && dc === 0) continue
+          const nr = r+dr, nc = c+dc
+          if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && gridMask[nr*cols+nc]) {
+            const ni = nr*cols+nc; if (grid[ni] < minH) { minH = grid[ni]; target = ni }
           }
         }
       }
+      if (target !== -1) { next[i] = target; inDeg[target]++ }
     }
+  }
+  const order = new Int32Array(n).fill(1), currentInDeg = new Int32Array(inDeg), maxInOrder = new Int32Array(n).fill(0), countMaxOrder = new Int32Array(n).fill(0), queue = []
+  for (let i = 0; i < n; i++) if (gridMask[i] && inDeg[i] === 0) queue.push(i)
+  let head = 0
+  while (head < queue.length) {
+    const i = queue[head++], dst = next[i]; if (dst === -1) continue
+    const o = order[i]; if (o > maxInOrder[dst]) { maxInOrder[dst] = o; countMaxOrder[dst] = 1 } else if (o === maxInOrder[dst]) countMaxOrder[dst]++
+    currentInDeg[dst]--; if (currentInDeg[dst] === 0) { order[dst] = (countMaxOrder[dst] > 1) ? maxInOrder[dst]+1 : maxInOrder[dst]; queue.push(dst) }
+  }
+  const positions = [], colors = []
+  const strahlerThreshold = threshold ?? 2
+  for (let i = 0; i < n; i++) {
+    const dst = next[i]; if (dst === -1 || order[i] < strahlerThreshold) continue
+    const r0 = Math.floor(i/cols), c0 = i%cols, r1 = Math.floor(dst/cols), c1 = dst%cols, e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[dst]-0.5)*100*elevScale
+    if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+    positions.push(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
+    const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.push(...col, ...col)
   }
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
@@ -274,22 +286,20 @@ function buildDagThinning(terrain, p, threshold) {
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
 
 function buildPencilShading(terrain, p, spacing, threshold) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
-  const { elevScale } = p
-  const positions = [], colors = []
-  const step = Math.max(1, Math.round((spacing ?? 4) / scl))
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+  const { elevScale, jitterAmt, elevMinCut, elevMaxCut } = p
+  const positions = [], colors = [], step = Math.max(1, Math.round((spacing ?? 4) / scl))
+  const curvThreshold = threshold ?? 0.5
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
-      if (!gridMask[r * cols + c]) continue
-      const center = grid[r * cols + c]
-      const laplacian = (grid[(r-step)*cols+c] + grid[(r+step)*cols+c] + grid[r*cols+c-step] + grid[r*cols+c+step]) - 4 * center
-      if (Math.abs(laplacian) > (threshold ?? 0.5) * 0.05) {
-        const e = (center - 0.5) * 100 * elevScale
-        const x = c * scl - halfW, z = r * scl - halfH
-        positions.push(x - 1, e, z, x + 1, e, z)
-        const col = computeVertexColor(normElev(center, terrain.minZ, terrain.maxZ), 0.5, 0, p)
-        colors.push(...col, ...col)
-      }
+      if (!gridMask[r*cols+c] || r <= 0 || r >= rows-1 || c <= 0 || c >= cols-1) continue
+      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+step] - 4*grid[r*cols+c]) * 100
+      if (curv < curvThreshold) continue
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      const wx = c*scl-halfW, wz = r*scl-halfH, len = Math.min(scl*2, curv*0.5), col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+      positions.push(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len, wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
+      colors.push(...col, ...col, ...col, ...col)
     }
   }
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
@@ -298,22 +308,32 @@ function buildPencilShading(terrain, p, spacing, threshold) {
 // ─── Pillars ──────────────────────────────────────────────────────────────
 
 function buildPillars(terrain, p, spacing) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
-  const { elevMinCut, elevMaxCut, jitterAmt } = p
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+
   const step = Math.max(1, Math.round((spacing ?? 8) / scl))
-  const positions = [], colors = []
+  const positions = []
+  const colors = []
+
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
-      if (!gridMask[r * cols + c]) continue
-      const e = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(e, terrain.minZ, terrain.maxZ, elevMinCut, elevMaxCut)) continue
-      const x = c * scl - halfW, z = r * scl - halfH
-      // Project from the ground floor (minZ) to the peak elevation (e)
-      positions.push(x, terrain.minZ, z, x, e, z)
-      const col = computeVertexColor(normElev(e, terrain.minZ, terrain.maxZ), 0.5, 0, p)
-      colors.push(...col, ...col)
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+
+      const wx = c * scl - halfW
+      const wz = r * scl - halfH
+
+      positions.push(wx, minZ, wz, wx, elev, wz)
+      const slope = gridSlopes[i]
+      const colBase = computeVertexColor(normElev(minZ, minZ, maxZ), 0, 0, p)
+      const colPeak = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      colors.push(...colBase, ...colPeak)
     }
   }
+
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
@@ -338,10 +358,12 @@ export function buildSurfaceGeometry(terrain, p) {
       if (gridMask[tl] && gridMask[tr] && gridMask[bl] && gridMask[br]) baseIndices.push(tl, bl, tr, tr, bl, br)
     }
   }
-  let finalPos = new Float32Array(0), finalBright = new Float32Array(0), finalIndices = [], indexOffset = 0
+  let finalPos = new Float32Array(0), finalBright = new Float32Array(0), finalIndices = new Uint32Array(0), indexOffset = 0
+  if (!baseIndices.length) return { positions: finalPos, brightnessBuf: finalBright, indices: finalIndices, metadata: { rows, cols } }
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
   const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
+  const indicesList = []
   for (const sx of mX) {
     for (const sy of mY) {
       for (const sz of mZ) {
@@ -350,14 +372,14 @@ export function buildSurfaceGeometry(terrain, p) {
         finalPos = concat(finalPos, pPass); finalBright = concat(finalBright, baseBright)
         const flipWinding = (sx * sy * sz) < 0
         for (let i = 0; i < baseIndices.length; i += 3) {
-          if (flipWinding) finalIndices.push(baseIndices[i] + indexOffset, baseIndices[i+2] + indexOffset, baseIndices[i+1] + indexOffset)
-          else finalIndices.push(baseIndices[i] + indexOffset, baseIndices[i+1] + indexOffset, baseIndices[i+2] + indexOffset)
+          if (flipWinding) indicesList.push(baseIndices[i] + indexOffset, baseIndices[i+2] + indexOffset, baseIndices[i+1] + indexOffset)
+          else indicesList.push(baseIndices[i] + indexOffset, baseIndices[i+1] + indexOffset, baseIndices[i+2] + indexOffset)
         }
         indexOffset += vertexCount
       }
     }
   }
-  return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(finalIndices), metadata: { rows, cols } }
+  return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(indicesList), metadata: { rows, cols } }
 }
 
 function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set(a, 0); out.set(b, a.length); return out }
