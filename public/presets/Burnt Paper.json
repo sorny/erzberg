@@ -1,0 +1,28 @@
+{
+  "style": {
+    "enabledX": true,
+    "colorX": "#1a1005",
+    "spacingX": 4,
+    "weightX": 1.2,
+    "opacityX": 1,
+    "dashX": "solid",
+    "hypsoX": true,
+    "hypsoModeX": "elevation",
+    "hypsoBandedX": false,
+    "showFill": true,
+    "fillColor": "#000000",
+    "fillHypsometric": true,
+    "fillBanded": false,
+    "fillHypsoMode": "elevation",
+    "bgColor": "#d9cbb4",
+    "bgGradient": false,
+    "showMesh": false,
+    "depthOcclusion": true
+  },
+  "gradientStops": [
+    { "pos": 0, "color": "#000000" },
+    { "pos": 0.35, "color": "#442200" },
+    { "pos": 0.7, "color": "#ff7b3a" },
+    { "pos": 1, "color": "#ffe066" }
+  ]
+}

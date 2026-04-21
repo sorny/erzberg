@@ -1,0 +1,17 @@
+{
+  "style": {
+    "enabledContours": true,
+    "colorContours": "#7b4f2e",
+    "intervalContours": 2,
+    "weightContours": 1,
+    "opacityContours": 1,
+    "dashContours": "solid",
+    "hypsoContours": false,
+    "bgColor": "#f2ede4",
+    "bgGradient": false,
+    "showFill": false,
+    "showMesh": false,
+    "depthOcclusion": true
+  },
+  "gradientStops": null
+}

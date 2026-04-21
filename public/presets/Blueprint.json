@@ -1,0 +1,24 @@
+{
+  "style": {
+    "enabledX": true,
+    "enabledY": true,
+    "colorX": "#c8e8ff",
+    "spacingX": 4,
+    "weightX": 0.5,
+    "opacityX": 1,
+    "dashX": "dashed",
+    "hypsoX": false,
+    "colorY": "#c8e8ff",
+    "spacingY": 4,
+    "weightY": 0.5,
+    "opacityY": 0.5,
+    "dashY": "solid",
+    "hypsoY": false,
+    "bgColor": "#0d2b4e",
+    "bgGradient": false,
+    "showFill": false,
+    "showMesh": false,
+    "depthOcclusion": true
+  },
+  "gradientStops": null
+}

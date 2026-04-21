@@ -5,7 +5,6 @@ import { useState } from 'react'
 import { useStore } from '../store/useStore'
 import { simulateErosion } from '../utils/erosion'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
-import { STYLE_PRESETS } from '../utils/stylePresets'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 
@@ -298,6 +297,7 @@ export function Sidebar({
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
+  externalPresets,
   onReset,
   lineGeo, surfaceGeo, terrainData,
 }) {
@@ -540,7 +540,7 @@ export function Sidebar({
 
           <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+              {Object.entries(externalPresets || {}).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
             </div>
           </Section>
 

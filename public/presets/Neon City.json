@@ -1,0 +1,27 @@
+{
+  "style": {
+    "enabledX": true,
+    "colorX": "#00f2ff",
+    "spacingX": 4,
+    "weightX": 1.5,
+    "opacityX": 1,
+    "dashX": "solid",
+    "hypsoX": true,
+    "hypsoModeX": "elevation",
+    "hypsoBandedX": false,
+    "showFill": true,
+    "fillColor": "#0d0221",
+    "fillHypsometric": true,
+    "fillBanded": false,
+    "fillHypsoMode": "elevation",
+    "bgColor": "#050505",
+    "bgGradient": false,
+    "showMesh": false,
+    "depthOcclusion": true
+  },
+  "gradientStops": [
+    { "pos": 0, "color": "#0d0221" },
+    { "pos": 0.5, "color": "#b000ff" },
+    { "pos": 1, "color": "#00ffe7" }
+  ]
+}

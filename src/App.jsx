@@ -140,6 +140,28 @@ export default function App() {
   const [gradientStops,   setGradientStops]   = useState(GRADIENT_PRESETS['Jet'])
   const [bgGradientStops, setBgGradientStops] = useState([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
   const [webmDuration, setWebmDuration]   = useState(5)
+  const [externalPresets, setExternalPresets] = useState({})
+
+  // ── Load external presets on mount ────────────────────────────────────────
+  useEffect(() => {
+    const loadPresets = async () => {
+      try {
+        const res = await fetch('/presets/manifest.json')
+        const manifest = await res.json()
+        const loaded = {}
+        for (const file of manifest) {
+          const presRes = await fetch(`/presets/${file}`)
+          const presData = await presRes.json()
+          const name = file.replace('.json', '')
+          loaded[name] = presData
+        }
+        setExternalPresets(loaded)
+      } catch (e) {
+        console.warn('[App] Could not load external presets:', e)
+      }
+    }
+    loadPresets()
+  }, [])
 
   // ── Export triggers ───────────────────────────────────────────────────────
   const [svgTrigger,        setSvgTrigger]        = useState(0)
@@ -385,6 +407,7 @@ export default function App() {
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
         onSavePreset={savePreset}
         onLoadPreset={loadPresetFromFile}
+        externalPresets={externalPresets}
         onReset={() => {
           setTerrain(TERRAIN_DEF); setStyle(STYLE_DEF)
           setPoints(POINTS_DEF);   setView(VIEW_DEF)
