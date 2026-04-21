@@ -213,6 +213,7 @@ export function Sidebar({
   const [eDeposit,   setEDeposit]   = useState(0.3)
   const [eEvap,      setEEvap]      = useState(0.01)
   const [isEroding,  setIsEroding]  = useState(false)
+  const [lastPixels, setLastPixels] = useState(null)
   
   const setPixels = useStore(s => s.setPixels)
   const heightmapWidth = useStore(s => s.heightmapWidth)
@@ -220,6 +221,8 @@ export function Sidebar({
 
   const handleRunErosion = () => {
     if (!heightmapPixels || isEroding) return
+    // Save current state for Undo
+    setLastPixels(new Float32Array(heightmapPixels))
     setIsEroding(true)
     setTimeout(() => {
       try {
@@ -236,6 +239,12 @@ export function Sidebar({
         setIsEroding(false)
       }
     }, 50)
+  }
+
+  const handleUndoErosion = () => {
+    if (!lastPixels) return
+    setPixels(lastPixels)
+    setLastPixels(null)
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -336,10 +345,19 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-            </div>
+            {hasGeoTiff ? (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
+                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
+                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
+              </div>
+            ) : (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              </div>
+            )}
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -357,7 +375,7 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round(view.zoom * 100)} onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
             </div>
             <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
@@ -387,7 +405,7 @@ export function Sidebar({
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                {Object.keys(STYLE_PRESETS).map(name => <button key={name} onClick={() => applyPreset(STYLE_PRESETS[name])} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+                {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
               </div>
             </div>
 
@@ -402,7 +420,7 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}
@@ -495,7 +513,10 @@ export function Sidebar({
               <InlineSl label="Deposition" min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
               <InlineSl label="Evaporation" min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
             </Sub>
-            <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ width:'100%', padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
+            <div style={{ display:'flex', gap:6 }}>
+              <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
+              <button onClick={handleUndoErosion} disabled={!lastPixels || isEroding} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: (lastPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (lastPixels && !isEroding) ? 1 : 0.5 }}>Undo</button>
+            </div>
           </Section>
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
