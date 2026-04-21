@@ -650,7 +650,7 @@ export function Sidebar({
             {style.enabledDag && (
               <>
                 <Sub>
-                  <InlineSl label="Threshold" min={0.5} max={5} step={0.5} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
+                  <InlineSl label="Threshold" min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Dag" style={style} ss={ss} />
               </>
