@@ -558,7 +558,7 @@ export function Sidebar({
           </Section>
 
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
-            <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} help="Overlay a custom image over the terrain. Visible in PNG/WebM only." />
+            <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && (
               <Sub>
                 <button className="hmload" onClick={handleTexturePicker} style={{ 
