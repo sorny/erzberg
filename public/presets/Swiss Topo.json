@@ -77,7 +77,7 @@
     "hypsoBandedPillars": false,
     "hypsoIntervalPillars": 10,
     "enabledContours": true,
-    "intervalContours": 2,
+    "intervalContours": 1,
     "colorContours": "#7b4f2e",
     "weightContours": 1,
     "opacityContours": 1,

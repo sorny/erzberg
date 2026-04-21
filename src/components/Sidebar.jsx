@@ -536,7 +536,7 @@ export function Sidebar({
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
-                <InlineSl label="Speed" min={0.1} max={10} step={0.1} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
+                <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
                 <div style={{ display:'flex', gap:4 }}>
                   <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
                   {[['CW', 1],['CCW', -1]].map(([label, dir]) => (

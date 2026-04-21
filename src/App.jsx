@@ -12,8 +12,8 @@ import { useHeightmap } from './hooks/useHeightmap'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
-import { exportSTL } from './utils/stlExport'
 import { exportHeightmap } from './utils/heightmapExport'
+import { exportSTL } from './utils/stlExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 
 // ── Default param sets ────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ const POINTS_DEF = {
 }
 const VIEW_DEF = {
   tilt: 40, rotation: 0, zoom: 1,
-  autoRotate: false, autoRotateSpeed: 0.5, autoRotateAxis: 'Y', autoRotateDir: 1,
+  autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
   showGuides: false, showRawTerrain: false,
 }
 
