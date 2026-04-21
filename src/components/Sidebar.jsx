@@ -303,7 +303,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true,
+    terrain: true, levels: true, view: true, presets: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     points: true, texture: false, creative: false, erosion: false, export: true,
@@ -431,7 +431,9 @@ export function Sidebar({
   // Stats
   let totalLinePos = 0
   if (Array.isArray(lineGeo)) {
-    for (const L of lineGeo) totalLinePos += L.positions.length
+    for (const L of lineGeo) {
+      if (L.positions) totalLinePos += L.positions.length
+    }
   }
 
   const segs  = lineGeo    ? (totalLinePos / 6).toLocaleString()     : '–'
@@ -534,16 +536,17 @@ export function Sidebar({
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
+          {/* ── Presets ────────────────────────────────────────────────────── */}
+
+          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+              {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+            </div>
+          </Section>
+
           {/* ── Global Style ───────────────────────────────────────────────── */}
 
           <Section title="Terrain Style" open={sec.style} onToggle={() => tog('style')}>
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
-              </div>
-            </div>
-
             <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
             {style.showFill && (
               <Sub>
@@ -764,17 +767,9 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
-            <button onClick={() => ss({ 
-              showMirrorPlusX:true, showMirrorMinusX:false,
-              showMirrorPlusY:true, showMirrorMinusY:false,
-              showMirrorPlusZ:true, showMirrorMinusZ:false
-            })} style={{ 
-              width:'100%', padding:'6px 0', background: SURF, color: DIM, 
-              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
-            }}>Reset Symmetry</button>
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
