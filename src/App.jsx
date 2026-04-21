@@ -31,7 +31,7 @@ const STYLE_DEF = {
   bgGradient: false,
   depthOcclusion: true,
   occlusionBias: 1.0,
-  occlusionColor: '#000000',
+  occlusionColor: '#a80000',
   occlusionOpacity: 0.0,
 
   // Texture overlay
