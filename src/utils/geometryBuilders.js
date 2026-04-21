@@ -71,7 +71,7 @@ export function buildLineGeometry(terrain, p) {
     const cP = []
     const cI = []
     let vIdx = 0
-    const floorY = terrain.minZ - 5000 // Deep enough to occlude anything behind
+    const floorY = terrain.minZ - 500 // Deep enough to occlude, but less likely to clip camera
     for (let i = 0; i < baseP.length; i += 6) {
       const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
       const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]

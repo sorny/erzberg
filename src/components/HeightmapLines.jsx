@@ -10,7 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 
-function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution }) {
+function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt }) {
   const { positions, colors, weight, opacity, dash } = layer
   
   const geometry = useMemo(() => {
@@ -42,13 +42,16 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
 
   useEffect(() => {
     if (!curtainMat) return
+    // If the camera is underneath (tilt > 90), curtains would be between us and the lines.
+    // So we disable them to allow the lines to be visible from below.
+    curtainMat.visible = !!(depthOcclusion && (tilt == null || tilt <= 90))
     curtainMat.depthTest = !!depthOcclusion
     curtainMat.depthWrite = !!depthOcclusion
     curtainMat.polygonOffset = true
     curtainMat.polygonOffsetFactor = occlusionBias ?? 1
     curtainMat.polygonOffsetUnits = occlusionBias ?? 1
     curtainMat.needsUpdate = true
-  }, [curtainMat, depthOcclusion, occlusionBias])
+  }, [curtainMat, depthOcclusion, occlusionBias, tilt])
 
   useEffect(() => () => curtainMat?.dispose(), [curtainMat])
   useEffect(() => () => curtainGeo?.dispose(), [curtainGeo])
@@ -149,6 +152,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
           occlusionColor={p.occlusionColor}
           occlusionBias={p.occlusionBias}
           resolution={resolution} 
+          tilt={p.tilt}
         />
       ))}
     </group>
