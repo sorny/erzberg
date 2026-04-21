@@ -269,10 +269,8 @@ export function Sidebar({
   const [lastPixels, setLastPixels] = useState(null)
   
   const setPixels = useStore(s => s.setPixels)
-  const setHeightmap = useStore(s => s.setHeightmap)
   const heightmapWidth = useStore(s => s.heightmapWidth)
   const heightmapHeight = useStore(s => s.heightmapHeight)
-  const nodataMask = useStore(s => s.nodataMask)
 
   const handleRunErosion = () => {
     if (!heightmapPixels || isEroding) return
@@ -311,52 +309,6 @@ export function Sidebar({
       reader.readAsDataURL(file)
     }
     input.click()
-  }
-
-  const handleMirrorX = () => {
-    if (!heightmapPixels) return
-    const W = heightmapWidth
-    const H = heightmapHeight
-    const newW = W * 2
-    const nextPixels = new Float32Array(newW * H)
-    const nextMask = nodataMask ? new Uint8Array(newW * H) : null
-
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const sourceIdx = y * W + x
-        const destIdxL = y * newW + (W - 1 - x)
-        nextPixels[destIdxL] = heightmapPixels[sourceIdx]
-        if (nextMask) nextMask[destIdxL] = nodataMask[sourceIdx]
-        const destIdxR = y * newW + (W + x)
-        nextPixels[destIdxR] = heightmapPixels[sourceIdx]
-        if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
-      }
-    }
-    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored X)')
-  }
-
-  const handleMirrorY = () => {
-    if (!heightmapPixels) return
-    const W = heightmapWidth
-    const H = heightmapHeight
-    const newH = H * 2
-    const nextPixels = new Float32Array(W * newH)
-    const nextMask = nodataMask ? new Uint8Array(W * newH) : null
-
-    for (let y = 0; y < H; y++) {
-      const sourceRowOff = y * W
-      const destRowOffT = (H - 1 - y) * W
-      for (let x = 0; x < W; x++) {
-        nextPixels[destRowOffT + x] = heightmapPixels[sourceRowOff + x]
-        if (nextMask) nextMask[destRowOffT + x] = nodataMask[sourceRowOff + x]
-      }
-      const destRowOffB = (H + y) * W
-      for (let x = 0; x < W; x++) {
-        nextPixels[destRowOffB + x] = heightmapPixels[sourceRowOff + x]
-        if (nextMask) nextMask[destRowOffB + x] = nodataMask[sourceRowOff + x]
-      }
-    }
-    setHeightmap(nextPixels, nextMask, W, newH, heightmapFilename + ' (mirrored Y)')
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -613,8 +565,8 @@ export function Sidebar({
           </Section>
 
           <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
-            <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY PAD</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, maxWidth:180, margin:'0 auto 16px' }}>
+            <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />
               <button title="Mirror Up (+Y)" className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<div className="sym-label">+Y</div></button>
               <div />
@@ -631,13 +583,8 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-
-            <div style={{ borderTop:`1px solid ${BORDER}`, paddingTop:12 }}>
-              <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:8, letterSpacing:1, textAlign:'center' }}>IMAGE SYMMETRY (PERMANENT)</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
-                <button className="hmeb" onClick={handleMirrorX}>Mirror X</button>
-                <button className="hmeb" onClick={handleMirrorY}>Mirror Y</button>
-              </div>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
+              Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
           </Section>
 
@@ -684,7 +631,7 @@ export function Sidebar({
             <div style={{ display:'flex', gap:5, marginBottom:6 }}>
               <ExpBtn label="SVG" hint="1" onClick={onSvg} /><ExpBtn label="PNG" hint="2" onClick={onPng} /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} /><ExpBtn label="STL" hint="4" onClick={onStl} />
             </div>
-            <div style={{ display:'flex', gap:5, marginBottom:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5, marginBottom:6 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
               <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
