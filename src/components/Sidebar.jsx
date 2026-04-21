@@ -2,12 +2,12 @@
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
 import { useState } from 'react'
-import { Histogram }      from './Histogram'
-import { GradientPicker } from './GradientPicker'
+import { useStore } from '../store/useStore'
+import { simulateErosion } from '../utils/erosion'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_PRESETS } from '../utils/stylePresets'
-import { simulateErosion } from '../utils/erosion'
-import { useStore } from '../store/useStore'
+import { GradientPicker } from './GradientPicker'
+import { Histogram } from './Histogram'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BG     = '#18181b'
@@ -237,7 +237,7 @@ function ModeStyleOverride({ prefix, style, ss }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>STYLING OVERRIDE</div>
+      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>LINE STYLE</div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
         <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
         <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
@@ -524,7 +524,7 @@ export function Sidebar({
 
           {/* ── Global Style ───────────────────────────────────────────────── */}
 
-          <Section title="Style (Global)" open={sec.style} onToggle={() => tog('style')}>
+          <Section title="Terrain Style" open={sec.style} onToggle={() => tog('style')}>
             <div style={{ marginBottom: 10 }}>
               <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
