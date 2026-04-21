@@ -47,22 +47,31 @@ export function useTerrainGeometry(p) {
 
     // Mode: X
     p.enabledX, p.spacingX, p.shiftX, p.colorX, p.weightX, p.opacityX, p.dashX,
+    p.hypsoX, p.hypsoModeX, p.hypsoBandedX, p.hypsoIntervalX,
     // Mode: Y
     p.enabledY, p.spacingY, p.shiftY, p.colorY, p.weightY, p.opacityY, p.dashY,
+    p.hypsoY, p.hypsoModeY, p.hypsoBandedY, p.hypsoIntervalY,
     // Mode: Cross
     p.enabledCross, p.spacingCross, p.colorCross, p.weightCross, p.opacityCross, p.dashCross,
+    p.hypsoCross, p.hypsoModeCross, p.hypsoBandedCross, p.hypsoIntervalCross,
     // Mode: Pillars
     p.enabledPillars, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars,
+    p.hypsoPillars, p.hypsoModePillars, p.hypsoBandedPillars, p.hypsoIntervalPillars,
     // Mode: Contours
     p.enabledContours, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours,
+    p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,
     // Mode: Hachure
     p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure,
+    p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,
     // Mode: Flow
     p.enabledFlow, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow, p.weightFlow, p.opacityFlow, p.dashFlow,
+    p.hypsoFlow, p.hypsoModeFlow, p.hypsoBandedFlow, p.hypsoIntervalFlow,
     // Mode: Network
     p.enabledDag, p.thresholdDag, p.colorDag, p.weightDag, p.opacityDag, p.dashDag,
+    p.hypsoDag, p.hypsoModeDag, p.hypsoBandedDag, p.hypsoIntervalDag,
     // Mode: Pencil
     p.enabledPencil, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil,
+    p.hypsoPencil, p.hypsoModePencil, p.hypsoBandedPencil, p.hypsoIntervalPencil,
 
     // Global Line Styling (for fallback)
     p.showLines, p.lineColor, p.strokeWeight, p.lineOpacity, p.lineDash,
