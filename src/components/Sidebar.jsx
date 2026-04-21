@@ -443,6 +443,7 @@ export function Sidebar({
   const applyPreset = (preset) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
+    if (preset.bgGradientStops) setBgGradientStops(preset.bgGradientStops)
     syncSectionsToStyle(preset.style)
   }
 

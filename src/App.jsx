@@ -188,12 +188,12 @@ export default function App() {
       ctx.putImageData(img, 0, 0)
       heightmapDataURL = c.toDataURL('image/png')
     }
-    const data = JSON.stringify({ terrain, style, points, view, gradientStops, heightmapDataURL }, null, 2)
+    const data = JSON.stringify({ terrain, style, points, view, gradientStops, bgGradientStops, heightmapDataURL }, null, 2)
     Object.assign(document.createElement('a'), {
       download: 'heightmap_preset.json',
       href: 'data:application/json,' + encodeURIComponent(data),
     }).click()
-  }, [terrain, style, points, view, gradientStops, heightmapPixels, heightmapWidth, heightmapHeight])
+  }, [terrain, style, points, view, gradientStops, bgGradientStops, heightmapPixels, heightmapWidth, heightmapHeight])
 
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'), { type:'file', accept:'.json' })
@@ -201,11 +201,12 @@ export default function App() {
       const file = e.target.files[0]; if (!file) return
       try {
         const d = JSON.parse(await file.text())
-        if (d.terrain)       setTerrain(prev => ({ ...prev, ...d.terrain }))
-        if (d.style)         setStyle(prev   => ({ ...prev, ...d.style }))
-        if (d.points)        setPoints(prev  => ({ ...prev, ...d.points }))
-        if (d.view)          setView(prev    => ({ ...prev, ...d.view }))
-        if (d.gradientStops) setGradientStops(d.gradientStops)
+        if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
+        if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
+        if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
+        if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
+        if (d.gradientStops)   setGradientStops(d.gradientStops)
+        if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
         if (d.heightmapDataURL) load(d.heightmapDataURL)
       } catch { alert('Invalid preset file.') }
     }
