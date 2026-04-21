@@ -245,6 +245,18 @@ function ModeStyleOverride({ prefix, style, ss }) {
       <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
       
+      <div style={{ marginTop: 8, display:'flex', gap:2 }}>
+        {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
+          <button key={d} onClick={() => ss({ [`dash${prefix}`]: d })} 
+            style={{ 
+              flex:1, fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase',
+              background: style[`dash${prefix}`] === d ? ACCENT : SURF, 
+              color: style[`dash${prefix}`] === d ? '#fff' : MUTED, 
+              border:`1px solid ${style[`dash${prefix}`] === d ? ACCENT : BORDER}` 
+            }}>{d.replace('-dash','')}</button>
+        ))}
+      </div>
+
       <div style={{ marginTop: 10 }}>
         <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
         {isHypso && (

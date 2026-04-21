@@ -1,7 +1,7 @@
 /**
  * Renders the ridge-line / curve / hachure / contour geometry as GPU line segments.
  */
-import { useMemo, useEffect, useState } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -14,6 +14,7 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
   const { positions, colors, weight, opacity, dash } = layer
   
   const geometry = useMemo(() => {
+    if (!positions || positions.length === 0) return null
     const geo = new LineSegmentsGeometry()
     geo.setPositions(positions)
     if (colors && colors.length === positions.length) {
@@ -25,34 +26,39 @@ function LineLayer({ layer, depthOcclusion, resolution }) {
   useEffect(() => () => geometry?.dispose(), [geometry])
 
   const material = useMemo(() => new LineMaterial({
-    linewidth: weight,
+    linewidth: weight || 1,
     vertexColors: true,
     resolution,
     transparent: true,
     depthWrite: false,
     depthTest: !!depthOcclusion,
-    opacity,
-  }), []) // Created once
+    opacity: opacity ?? 1,
+  }), [])
+
+  const lines = useMemo(() => {
+    if (!geometry) return null
+    return new LineSegments2(geometry, material)
+  }, [geometry, material])
 
   useEffect(() => {
-    material.linewidth = weight
-    material.opacity = opacity
+    if (!lines) return
+    material.linewidth = weight || 1
+    material.opacity = opacity ?? 1
     material.depthTest = !!depthOcclusion
     material.resolution.copy(resolution)
+    
     const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
     material.dashed = d.dashed
     material.dashSize = d.dashSize
     material.gapSize = d.gapSize
     material.needsUpdate = true
-  }, [material, weight, opacity, dash, depthOcclusion, resolution])
+
+    lines.computeLineDistances()
+  }, [lines, material, weight, opacity, dash, depthOcclusion, resolution])
 
   useEffect(() => () => material?.dispose(), [material])
 
-  const lines = useMemo(() => {
-    const l = new LineSegments2(geometry, material)
-    l.computeLineDistances()
-    return l
-  }, [geometry, material])
+  if (!lines) return null
 
   return <primitive object={lines} />
 }
