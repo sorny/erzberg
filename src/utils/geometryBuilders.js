@@ -59,21 +59,55 @@ export function buildLineGeometry(terrain, p) {
 
     const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`], p[`opacity${cfg.id}`])
     let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
+    let layerCPos = new Float32Array(0), layerCInd = []
+    let cIndOffset = 0
     
     // Build the base pass for this layer once
     const baseRes = cfg.builder(terrain, ctx)
     if (!baseRes || baseRes.positions.length === 0) continue
 
+    // Build base curtains (occlusion geometry) for the lines
+    const baseP = baseRes.positions
+    const cP = []
+    const cI = []
+    let vIdx = 0
+    const floorY = terrain.minZ - 5000 // Deep enough to occlude anything behind
+    for (let i = 0; i < baseP.length; i += 6) {
+      const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
+      const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
+      if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+
+      cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
+      cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
+      vIdx += 4
+    }
+
     // Mirror the base pass into all requested octants
     for (const sx of mX) {
       for (const sy of mY) {
         for (const sz of mZ) {
-          const pPass = new Float32Array(baseRes.positions)
+          const pPass = new Float32Array(baseP)
           for (let i = 0; i < pPass.length; i += 3) {
             pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz
           }
           layerPos = concat(layerPos, pPass)
           layerCol = concat(layerCol, baseRes.colors)
+
+          // Mirror curtains
+          const cPass = new Float32Array(cP)
+          for (let i = 0; i < cPass.length; i += 3) {
+            cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz
+          }
+          layerCPos = concat(layerCPos, cPass)
+          const flipWinding = (sx * sy * sz) < 0
+          for (let i = 0; i < cI.length; i += 3) {
+            if (flipWinding) {
+              layerCInd.push(cI[i] + cIndOffset, cI[i+2] + cIndOffset, cI[i+1] + cIndOffset)
+            } else {
+              layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
+            }
+          }
+          cIndOffset += (cP.length / 3)
         }
       }
     }
@@ -82,6 +116,7 @@ export function buildLineGeometry(terrain, p) {
       id: cfg.id,
       positions: layerPos,
       colors: layerCol,
+      curtains: { positions: layerCPos, indices: new Uint32Array(layerCInd) },
       weight: p[`weight${cfg.id}`],
       opacity: p[`opacity${cfg.id}`],
       dash: p[`dash${cfg.id}`]
@@ -216,7 +251,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
       if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
       if (!gridMask[r*cols+c] || mask[r*cols+c]) continue
       let fr = r, fc = c, b0 = sampleB(grid, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
-      for (let s = 0; step < (maxLen ?? 100); s++) {
+      for (let s = 0; s < (maxLen ?? 100); s++) {
         if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
         if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
         const ri = Math.round(fr), ci = Math.round(fc)
@@ -228,7 +263,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
         const nfc = fc-(gx/mag)*(step??1), nfr = fr-(gz/mag)*(step??1)
         if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
         const b1 = sampleB(grid, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
-        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) {
+        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
           const pIdx = totalSegments*6; posBuf[pIdx]=fc*scl-halfW; posBuf[pIdx+1]=e0; posBuf[pIdx+2]=fr*scl-halfH; posBuf[pIdx+3]=nfc*scl-halfW; posBuf[pIdx+4]=e1; posBuf[pIdx+5]=nfr*scl-halfH
           const col0 = computeVertexColor(normElev(e0, minZ, maxZ), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
           colBuf[pIdx]=col0[0]; colBuf[pIdx+1]=col0[1]; colBuf[pIdx+2]=col0[2]; colBuf[pIdx+3]=col0[0]; colBuf[pIdx+4]=col0[1]; colBuf[pIdx+5]=col0[2]

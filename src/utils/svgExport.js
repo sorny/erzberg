@@ -16,42 +16,43 @@ const N_SAMPLES = 64   // depth-test samples per segment (increased for precisio
 
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
-function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) {
+function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) {
   const buf = new Float32Array(W * H).fill(0)
-  const { positions, indices, brightnessBuf } = surfaceGeo
-  const nVerts = positions.length / 3
   const camInv = camera.matrixWorldInverse
-  const vx  = new Float32Array(nVerts)
-  const vy  = new Float32Array(nVerts)
-  const vd  = new Float32Array(nVerts)
-  const vb  = new Float32Array(nVerts) // brightness
   const wld = new THREE.Vector3()
   const viw = new THREE.Vector3()
+  const minB = (elevMinCut || 0) / 100
+  const maxB = (elevMaxCut || 100) / 100
 
-  for (let i = 0; i < nVerts; i++) {
-    wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-    if (groupMatrix) wld.applyMatrix4(groupMatrix)
-    viw.copy(wld).applyMatrix4(camInv)
-    vd[i] = 1.0 / (-viw.z)
-    wld.project(camera)
-    vx[i] = ( wld.x + 1) * 0.5 * W
-    vy[i] = (-wld.y + 1) * 0.5 * H
-    vb[i] = brightnessBuf[i]
-  }
+  for (const geo of zGeos) {
+    const { positions, indices, brightnessBuf } = geo
+    if (!positions || positions.length === 0) continue
+    const nVerts = positions.length / 3
+    const vx  = new Float32Array(nVerts)
+    const vy  = new Float32Array(nVerts)
+    const vd  = new Float32Array(nVerts)
+    const vb  = brightnessBuf ? new Float32Array(nVerts) : null
 
-  const nTri = indices.length / 3
-  const minB = elevMinCut / 100
-  const maxB = elevMaxCut / 100
+    for (let i = 0; i < nVerts; i++) {
+      wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
+      if (groupMatrix) wld.applyMatrix4(groupMatrix)
+      viw.copy(wld).applyMatrix4(camInv)
+      vd[i] = 1.0 / (-viw.z)
+      wld.project(camera)
+      vx[i] = ( wld.x + 1) * 0.5 * W
+      vy[i] = (-wld.y + 1) * 0.5 * H
+      if (vb) vb[i] = brightnessBuf[i]
+    }
 
-  for (let t = 0; t < nTri; t++) {
-    const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
-    
-    // Simple discard: if any vertex is outside, we could refine this but 
-    // for occlusion matching the centroid/min is usually enough.
-    const avgB = (vb[a] + vb[b] + vb[c]) / 3
-    if (avgB < minB || avgB > maxB) continue
-
-    fillTriangle(vx[a], vy[a], vd[a], vx[b], vy[b], vd[b], vx[c], vy[c], vd[c], buf, W, H)
+    const nTri = indices.length / 3
+    for (let t = 0; t < nTri; t++) {
+      const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
+      if (vb) {
+        const avgB = (vb[a] + vb[b] + vb[c]) / 3
+        if (avgB < minB || avgB > maxB) continue
+      }
+      fillTriangle(vx[a], vy[a], vd[a], vx[b], vy[b], vd[b], vx[c], vy[c], vd[c], buf, W, H)
+    }
   }
 
   return (sx, sy) => {
@@ -172,9 +173,21 @@ export function exportSVG({
     ]
   }
 
+  const zGeos = []
+  if (showFill && surfaceGeo && groupMatrix) {
+    zGeos.push(surfaceGeo)
+  }
+  if (showLines && Array.isArray(lineGeo)) {
+    for (const layer of lineGeo) {
+      if (layer.curtains && layer.curtains.positions.length > 0) {
+        zGeos.push(layer.curtains)
+      }
+    }
+  }
+
   // Only build Z-Buffer if occlusion is enabled
-  const surfViewZ = (depthOcclusion && surfaceGeo && groupMatrix)
-    ? buildZBuffer(surfaceGeo, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
+  const surfViewZ = (depthOcclusion && zGeos.length > 0 && groupMatrix)
+    ? buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
     : null
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity

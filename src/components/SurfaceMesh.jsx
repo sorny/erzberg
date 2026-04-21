@@ -231,7 +231,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
     surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
     surfMat.depthTest  = !!p.depthOcclusion
-    surfMat.depthWrite = !!p.depthOcclusion
+    surfMat.depthWrite = !!(p.depthOcclusion && (p.showFill || p.showRawTerrain))
     surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
     surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
     surfMat.needsUpdate = true

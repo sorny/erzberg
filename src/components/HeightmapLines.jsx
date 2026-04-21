@@ -10,7 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 
-function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, resolution }) {
+function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution }) {
   const { positions, colors, weight, opacity, dash } = layer
   
   const geometry = useMemo(() => {
@@ -24,6 +24,34 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, re
   }, [positions, colors])
 
   useEffect(() => () => geometry?.dispose(), [geometry])
+
+  const curtainGeo = useMemo(() => {
+    if (!layer.curtains || layer.curtains.positions.length === 0) return null
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(layer.curtains.positions, 3))
+    geo.setIndex(new THREE.BufferAttribute(layer.curtains.indices, 1))
+    return geo
+  }, [layer.curtains])
+
+  const curtainMat = useMemo(() => new THREE.MeshBasicMaterial({
+    colorWrite: false,
+    depthWrite: true,
+    side: THREE.DoubleSide,
+    transparent: true,
+  }), [])
+
+  useEffect(() => {
+    if (!curtainMat) return
+    curtainMat.depthTest = !!depthOcclusion
+    curtainMat.depthWrite = !!depthOcclusion
+    curtainMat.polygonOffset = true
+    curtainMat.polygonOffsetFactor = occlusionBias ?? 1
+    curtainMat.polygonOffsetUnits = occlusionBias ?? 1
+    curtainMat.needsUpdate = true
+  }, [curtainMat, depthOcclusion, occlusionBias])
+
+  useEffect(() => () => curtainMat?.dispose(), [curtainMat])
+  useEffect(() => () => curtainGeo?.dispose(), [curtainGeo])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
   const material = useMemo(() => new LineMaterial({
@@ -97,6 +125,7 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, re
 
   return (
     <group>
+      {curtainGeo && depthOcclusion && <mesh geometry={curtainGeo} material={curtainMat} />}
       {ghostLines && <primitive object={ghostLines} />}
       <primitive object={lines} />
     </group>
@@ -118,6 +147,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
           depthOcclusion={p.depthOcclusion} 
           occlusionOpacity={p.occlusionOpacity}
           occlusionColor={p.occlusionColor}
+          occlusionBias={p.occlusionBias}
           resolution={resolution} 
         />
       ))}
