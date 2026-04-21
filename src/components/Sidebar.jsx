@@ -251,6 +251,7 @@ export function Sidebar({
     { id:'flow',       label:'Flow' },
     { id:'dag',        label:'Network' },
     { id:'pencil',     label:'Pencil' },
+    { id:'z',          label:'Z' },
   ]
 
   const activeModes = Array.isArray(style.drawMode) ? style.drawMode : [style.drawMode]
@@ -370,7 +371,7 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}

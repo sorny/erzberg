@@ -283,6 +283,7 @@ export default function App() {
     crosshatch: 'Cross-Hatch',
     hachure: 'Hachure', contours: 'Contours',
     flow: 'Flow Lines', dag: 'Stream Network', pencil: 'Pencil Shading',
+    z: 'Pillar visualization',
   }
 
   return (

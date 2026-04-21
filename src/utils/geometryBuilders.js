@@ -34,6 +34,7 @@ export function buildLineGeometry(terrain, p) {
       case 'flow':       return buildFlowLines(terrain, p)
       case 'dag':        return buildDagThinning(terrain, p)
       case 'pencil':     return buildPencilShading(terrain, p)
+      case 'z':          return buildPillars(terrain, p)
       default:           return empty()
     }
   })
@@ -264,6 +265,44 @@ function buildPencilShading(terrain, p) {
       colors.push(...col, ...col, ...col, ...col)
     }
   }
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+}
+
+// ─── Pillars (Z-Visualization) ────────────────────────────────────────────────
+
+function buildPillars(terrain, p) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { lineSpacing, elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+
+  const step = Math.max(1, Math.round(lineSpacing / scl))
+  const positions = []
+  const colors = []
+
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 0; c < cols; c += step) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+
+      const wx = c * scl - halfW
+      const wz = r * scl - halfH
+
+      // Segment from global floor to local peak
+      positions.push(
+        wx, minZ, wz,
+        wx, elev, wz
+      )
+
+      const slope = gridSlopes[i]
+      const colBase = computeVertexColor(normElev(minZ, minZ, maxZ), 0, 0, p)
+      const colPeak = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      
+      colors.push(...colBase, ...colPeak)
+    }
+  }
+
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
