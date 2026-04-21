@@ -204,8 +204,15 @@ export function Sidebar({
     terrain: true, levels: true, view: true, style: true, points: true, erosion: false, export: true,
   })
 
-  const [erosionIterations, setErosionIterations] = useState(50000)
-  const [isEroding, setIsEroding] = useState(false)
+  // --- Erosion State ---
+  const [eIters,     setEIters]     = useState(50000)
+  const [eRadius,    setERadius]    = useState(3)
+  const [eInertia,   setEInertia]   = useState(0.1)
+  const [eCapacity,  setECapacity]  = useState(4)
+  const [eErode,     setEErode]     = useState(0.3)
+  const [eDeposit,   setEDeposit]   = useState(0.3)
+  const [eEvap,      setEEvap]      = useState(0.01)
+  const [isEroding,  setIsEroding]  = useState(false)
   
   const setPixels = useStore(s => s.setPixels)
   const heightmapWidth = useStore(s => s.heightmapWidth)
@@ -216,7 +223,14 @@ export function Sidebar({
     setIsEroding(true)
     setTimeout(() => {
       try {
-        const next = simulateErosion(heightmapPixels, heightmapWidth, heightmapHeight, erosionIterations)
+        const next = simulateErosion(heightmapPixels, heightmapWidth, heightmapHeight, eIters, {
+          erosionRadius: eRadius,
+          inertia: eInertia,
+          sedimentCapacityFactor: eCapacity,
+          erodeSpeed: eErode,
+          depositSpeed: eDeposit,
+          evaporateSpeed: eEvap
+        })
         setPixels(next)
       } finally {
         setIsEroding(false)
@@ -226,7 +240,6 @@ export function Sidebar({
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
 
-  // Partial-update helpers
   const st = (v) => setTerrain(p => ({ ...p, ...v }))
   const ss = (v) => setStyle(p => ({ ...p, ...v }))
   const sp = (v) => setPoints(p => ({ ...p, ...v }))
@@ -323,19 +336,10 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            {hasGeoTiff ? (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-              </div>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-              </div>
-            )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+            </div>
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -353,7 +357,7 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round(view.zoom * 100)} onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
             </div>
             <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
@@ -398,7 +402,7 @@ export function Sidebar({
             </div>
 
             <Sub>
-              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
+              {(hasMode('lines-x') || hasMode('lines-y') || hasMode('crosshatch') || hasMode('hachure') || hasMode('pencil') || hasMode('z')) && <InlineSl label="Spacing" min={1} max={100} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('flow') && <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.lineSpacing} onChange={v => ss({ lineSpacing: v })} />}
               {hasMode('hachure') && <><InlineSl label="T-Spacing" min={1} max={100} value={style.hachureSpacing} onChange={v => ss({ hachureSpacing: v })} /><InlineSl label="T-Length" min={0.1} max={5} step={0.1} value={style.hachureLength} onChange={v => ss({ hachureLength: v })} /></>}
               {hasMode('contours') && <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.contourInterval} onChange={v => ss({ contourInterval: v })} fmt={v => v.toFixed(1)} />}
@@ -482,7 +486,15 @@ export function Sidebar({
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
-            <InlineSl label="Iterations" min={1000} max={200000} step={1000} value={erosionIterations} onChange={v => setErosionIterations(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
+            <Sub>
+              <InlineSl label="Iterations" min={1000} max={200000} step={1000} value={eIters} onChange={v => setEIters(v)} fmt={v => (v/1000).toFixed(0)+'k'} />
+              <InlineSl label="Radius" min={2} max={10} value={eRadius} onChange={v => setERadius(v)} />
+              <InlineSl label="Inertia" min={0.01} max={0.5} step={0.01} value={eInertia} onChange={v => setEInertia(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Capacity" min={1} max={20} step={0.5} value={eCapacity} onChange={v => setECapacity(v)} />
+              <InlineSl label="Erosion" min={0.01} max={1} step={0.01} value={eErode} onChange={v => setEErode(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Deposition" min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
+              <InlineSl label="Evaporation" min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
+            </Sub>
             <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ width:'100%', padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
           </Section>
 
