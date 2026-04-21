@@ -234,15 +234,37 @@ function ExpBtn({ label, hint, onClick, active }) {
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
 function ModeStyleOverride({ prefix, style, ss }) {
+  const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
       <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>STYLING OVERRIDE</div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, color: DIM }}>Color</span>
+        <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
         <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
       </div>
       <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
+      
+      <div style={{ marginTop: 10 }}>
+        <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
+        {isHypso && (
+          <Sub>
+            <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+              {['Elevation', 'Slope', 'Aspect'].map(m => (
+                <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
+                  style={{ 
+                    flex:1, fontSize:8, padding:'2px 0', borderRadius:2, 
+                    background: style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT : SURF, 
+                    color: style[`hypsoMode${prefix}`] === m.toLowerCase() ? '#fff' : MUTED, 
+                    border:`1px solid ${style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT : BORDER}` 
+                  }}>{m}</button>
+              ))}
+            </div>
+            <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
+            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
+          </Sub>
+        )}
+      </div>
     </div>
   )
 }
@@ -707,9 +729,6 @@ export function Sidebar({
               <div />
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
-            </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
-              Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
           </Section>
 

@@ -42,27 +42,36 @@ const STYLE_DEF = {
   // ── DRAW MODES ───────────────────────────────────────────────────────────
   // X Lines
   enabledX: true, spacingX: 4, shiftX: 0, colorX: '#000000', weightX: 1, opacityX: 1, dashX: 'solid',
+  hypsoX: false, hypsoModeX: 'elevation', hypsoBandedX: false, hypsoIntervalX: 10,
   // Y Lines
   enabledY: false, spacingY: 4, shiftY: 0, colorY: '#000000', weightY: 1, opacityY: 1, dashY: 'solid',
+  hypsoY: false, hypsoModeY: 'elevation', hypsoBandedY: false, hypsoIntervalY: 10,
   // Crosshatch
   enabledCross: false, spacingCross: 4, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
-  // Pillars (formerly Z)
+  hypsoCross: false, hypsoModeCross: 'elevation', hypsoBandedCross: false, hypsoIntervalCross: 10,
+  // Pillars
   enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',
+  hypsoPillars: false, hypsoModePillars: 'elevation', hypsoBandedPillars: false, hypsoIntervalPillars: 10,
   // Contours
   enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
+  hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
   // Hachure
   enabledHachure: false, spacingHachure: 4, lengthHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
+  hypsoHachure: false, hypsoModeHachure: 'elevation', hypsoBandedHachure: false, hypsoIntervalHachure: 10,
   // Flow
   enabledFlow: false, spacingFlow: 10, stepFlow: 1, maxLenFlow: 100, colorFlow: '#000000', weightFlow: 1, opacityFlow: 1, dashFlow: 'solid',
+  hypsoFlow: false, hypsoModeFlow: 'elevation', hypsoBandedFlow: false, hypsoIntervalFlow: 10,
   // Stream Network (DAG)
   enabledDag: false, thresholdDag: 2, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
+  hypsoDag: false, hypsoModeDag: 'elevation', hypsoBandedDag: false, hypsoIntervalDag: 10,
   // Pencil Shading
   enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
+  hypsoPencil: false, hypsoModePencil: 'elevation', hypsoBandedPencil: false, hypsoIntervalPencil: 10,
 
   // Master visibility for all lines
   showLines: true,
-  // Global Hypsometric (can still be used as a source for per-mode if needed, but per-mode overrides for now)
-  lineHypsometric: false, lineBanded: false, lineHypsoInterval: 10, lineHypsoWeight: 0, lineHypsoMode: 'elevation',
+  // Global Gradient Stops
+  gradientStops: GRADIENT_PRESETS['Jet'],
 }
 
 const POINTS_DEF = {
@@ -197,16 +206,15 @@ export default function App() {
     if (vals.showLines    != null) s.showLines     = vals.showLines
     if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
     
-    // Mode-specific enabled toggles
-    if (vals.enabledX != null) s.enabledX = vals.enabledX
-    if (vals.enabledY != null) s.enabledY = vals.enabledY
-    if (vals.enabledCross != null) s.enabledCross = vals.enabledCross
-    if (vals.enabledPillars != null) s.enabledPillars = vals.enabledPillars
-    if (vals.enabledContours != null) s.enabledContours = vals.enabledContours
-    if (vals.enabledHachure != null) s.enabledHachure = vals.enabledHachure
-    if (vals.enabledFlow != null) s.enabledFlow = vals.enabledFlow
-    if (vals.enabledDag != null) s.enabledDag = vals.enabledDag
-    if (vals.enabledPencil != null) s.enabledPencil = vals.enabledPencil
+    // Support massive sync of all per-mode params
+    Object.keys(vals).forEach(k => {
+      if (k.startsWith('enabled') || k.startsWith('spacing') || k.startsWith('shift') || 
+          k.startsWith('color') || k.startsWith('weight') || k.startsWith('opacity') || 
+          k.startsWith('dash') || k.startsWith('hypso') || k.startsWith('interval') ||
+          k.startsWith('threshold') || k.startsWith('length') || k.startsWith('maxLen') || k.startsWith('step')) {
+        s[k] = vals[k]
+      }
+    })
 
     // Fill & Mesh
     if (vals.showFill     != null) s.showFill      = vals.showFill
