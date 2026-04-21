@@ -25,16 +25,27 @@ function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
 export function buildLineGeometry(terrain, p) {
   if (!terrain) return []
   
+  // Helper to map per-layer hypsometric params to the keys computeVertexColor expects
+  const getLayerContext = (id, baseColor, baseOpacity) => ({
+    ...p,
+    lineColor:        baseColor,
+    lineOpacity:      baseOpacity,
+    lineHypsometric:  p[`hypso${id}`],
+    lineHypsoMode:    p[`hypsoMode${id}`],
+    lineBanded:       p[`hypsoBanded${id}`],
+    lineHypsoInterval:p[`hypsoInterval${id}`]
+  })
+
   const MODES_CONFIG = [
-    { id:'X',       builder: (t, p) => buildRidgelines(t, p, false, p.spacingX, p.shiftX, p.colorX, p.weightX, p.opacityX, p.dashX), weight: p.weightX, opacity: p.opacityX, dash: p.dashX },
-    { id:'Y',       builder: (t, p) => buildRidgelines(t, p, true,  p.spacingY, p.shiftY, p.colorY, p.weightY, p.opacityY, p.dashY), weight: p.weightY, opacity: p.opacityY, dash: p.dashY },
-    { id:'Cross',   builder: (t, p) => buildCrosshatch(t, p), weight: p.weightCross, opacity: p.opacityCross, dash: p.dashCross },
-    { id:'Pillars', builder: (t, p) => buildPillars(t, p, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars), weight: p.weightPillars, opacity: p.opacityPillars, dash: p.dashPillars },
-    { id:'Contours',builder: (t, p) => buildContours(t, p, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours), weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours },
-    { id:'Hachure', builder: (t, p) => buildHachure(t, p, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure), weight: p.weightHachure, opacity: p.opacityHachure, dash: p.dashHachure },
-    { id:'Flow',    builder: (t, p) => buildFlowLines(t, p, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow, p.weightFlow, p.opacityFlow, p.dashFlow), weight: p.weightFlow, opacity: p.opacityFlow, dash: p.dashFlow },
-    { id:'Dag',     builder: (t, p) => buildDagThinning(t, p, p.thresholdDag, p.colorDag, p.weightDag, p.opacityDag, p.dashDag), weight: p.weightDag, opacity: p.opacityDag, dash: p.dashDag },
-    { id:'Pencil',  builder: (t, p) => buildPencilShading(t, p, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil), weight: p.weightPencil, opacity: p.opacityPencil, dash: p.dashPencil },
+    { id:'X',       builder: (t, ctx) => buildRidgelines(t, ctx, false, p.spacingX, p.shiftX) },
+    { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
+    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx) },
+    { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
+    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours) },
+    { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
+    { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
+    { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
+    { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
   ]
 
   const finalLayers = []
@@ -46,10 +57,11 @@ export function buildLineGeometry(terrain, p) {
   for (const cfg of MODES_CONFIG) {
     if (!p[`enabled${cfg.id}`]) continue
 
+    const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`], p[`opacity${cfg.id}`])
     let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
     
     // Build the base pass for this layer once
-    const baseRes = cfg.builder(terrain, p)
+    const baseRes = cfg.builder(terrain, ctx)
     if (baseRes.positions.length === 0) continue
 
     // Mirror the base pass into all requested octants
@@ -70,9 +82,9 @@ export function buildLineGeometry(terrain, p) {
       id: cfg.id,
       positions: layerPos,
       colors: layerCol,
-      weight: cfg.weight,
-      opacity: cfg.opacity,
-      dash: cfg.dash
+      weight: p[`weight${cfg.id}`],
+      opacity: p[`opacity${cfg.id}`],
+      dash: p[`dash${cfg.id}`]
     })
   }
 
@@ -83,7 +95,7 @@ function empty() { return { positions: new Float32Array(0), colors: new Float32A
 
 // ─── Ridgelines ──────────────────────────────────────────────────────────────
 
-function buildRidgelines(terrain, p, isY, spacing, shift, color, weight, opacity, dash) {
+function buildRidgelines(terrain, p, isY, spacing, shift) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl)), lineOffset = (shift ?? 0) % lineStep
@@ -105,8 +117,8 @@ function buildRidgelines(terrain, p, isY, spacing, shift, color, weight, opacity
       else { x0 = innerPos0; z0 = outerPos; x1 = innerPos1; z1 = outerPos }
       positions.push(x0, elev0, z0, x1, elev1, z1)
       const slope0 = gridSlopes[r0 * cols + c0], slope1 = gridSlopes[r1 * cols + c1]
-      const col0 = computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, { ...p, lineColor: color, lineOpacity: opacity })
-      const col1 = computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, { ...p, lineColor: color, lineOpacity: opacity })
+      const col0 = computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, p)
+      const col1 = computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, p)
       colors.push(...col0, ...col1)
     }
   }
@@ -114,14 +126,14 @@ function buildRidgelines(terrain, p, isY, spacing, shift, color, weight, opacity
 }
 
 function buildCrosshatch(terrain, p) {
-  const x = buildRidgelines(terrain, p, false, p.spacingCross, 0, p.colorCross, p.weightCross, p.opacityCross, p.dashCross)
-  const y = buildRidgelines(terrain, p, true,  p.spacingCross, 0, p.colorCross, p.weightCross, p.opacityCross, p.dashCross)
+  const x = buildRidgelines(terrain, p, false, p.spacingCross, 0)
+  const y = buildRidgelines(terrain, p, true,  p.spacingCross, 0)
   return { positions: concat(x.positions, y.positions), colors: concat(x.colors, y.colors) }
 }
 
 // ─── Hachure ──────────────────────────────────────────────────────────────────
 
-function buildHachure(terrain, p, spacing, length, color, weight, opacity, dash) {
+function buildHachure(terrain, p, spacing, length) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
@@ -138,7 +150,7 @@ function buildHachure(terrain, p, spacing, length, color, weight, opacity, dash)
       const nx = -gy / len, ny = gx / len, l = (length ?? 1) * len * 50
       const x0 = c * scl - halfW, z0 = r * scl - halfH
       positions.push(x0 - nx * l, elev, z0 - ny * l, x0 + nx * l, elev, z0 + ny * l)
-      const col = computeVertexColor(normElev(elev, minZ, maxZ), len / (maxSlope || 1), Math.atan2(gy, gx), { ...p, lineColor: color, lineOpacity: opacity })
+      const col = computeVertexColor(normElev(elev, minZ, maxZ), len / (maxSlope || 1), Math.atan2(gy, gx), p)
       colors.push(...col, ...col)
     }
   }
@@ -147,7 +159,7 @@ function buildHachure(terrain, p, spacing, length, color, weight, opacity, dash)
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
 
-function buildContours(terrain, p, interval, color, weight, opacity, dash) {
+function buildContours(terrain, p, interval) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const positions = [], colors = []
@@ -171,7 +183,7 @@ function buildContours(terrain, p, interval, color, weight, opacity, dash) {
         if ((v2 < v) !== (v0 < v)) pts.push(c * scl - halfW, v, interp((r+1) * scl, r * scl, v2, v0) - halfH)
         if (pts.length >= 6) {
           positions.push(pts[0], pts[1], pts[2], pts[3], pts[4], pts[5])
-          const col = computeVertexColor(normElev(v, minZ, maxZ), 0.5, 0, { ...p, lineColor: color, lineOpacity: opacity })
+          const col = computeVertexColor(normElev(v, minZ, maxZ), 0.5, 0, p)
           colors.push(...col, ...col)
         }
       }
@@ -182,9 +194,9 @@ function buildContours(terrain, p, interval, color, weight, opacity, dash) {
 
 // ─── Flow ─────────────────────────────────────────────────────────────────────
 
-function buildFlowLines(terrain, p, spacing, step, maxLen, color, weight, opacity, dash) {
+function buildFlowLines(terrain, p, spacing, step, maxLen) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
+  const { elevScale } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 10) / scl))
   const positions = [], colors = []
   const occupancy = new Uint8Array(rows * cols)
@@ -204,7 +216,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen, color, weight, opacit
         const nextR = currR + dr, nextC = currC + dc
         const e0 = (b - 0.5) * 100 * elevScale, e1 = (grid[Math.min(rows*cols-1, Math.round(nextR)*cols + Math.round(nextC))] - 0.5) * 100 * elevScale
         positions.push(currC * scl - halfW, e0, currR * scl - halfH, nextC * scl - halfW, e1, nextR * scl - halfH)
-        const col = computeVertexColor(normElev(e0, minZ, maxZ), gLen * 10, Math.atan2(gy, gx), { ...p, lineColor: color, lineOpacity: opacity })
+        const col = computeVertexColor(normElev(e0, minZ, maxZ), gLen * 10, Math.atan2(gy, gx), p)
         colors.push(...col, ...col)
         currR = nextR; currC = nextC; len++
       }
@@ -215,7 +227,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen, color, weight, opacit
 
 // ─── Stream Network (DAG) ──────────────────────────────────────────────────────
 
-function buildDagThinning(terrain, p, threshold, color, weight, opacity, dash) {
+function buildDagThinning(terrain, p, threshold) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale } = p
   const accumulation = new Float32Array(rows * cols).fill(1)
@@ -248,7 +260,7 @@ function buildDagThinning(terrain, p, threshold, color, weight, opacity, dash) {
             if (accumulation[ni] > accumulation[i]) {
               const e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[ni]-0.5)*100*elevScale
               positions.push(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
-              const col = computeVertexColor(normElev(e0, minZ, maxZ), 0.5, 0, { ...p, lineColor: color, lineOpacity: opacity })
+              const col = computeVertexColor(normElev(e0, minZ, maxZ), 0.5, 0, p)
               colors.push(...col, ...col)
             }
           }
@@ -261,7 +273,7 @@ function buildDagThinning(terrain, p, threshold, color, weight, opacity, dash) {
 
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
 
-function buildPencilShading(terrain, p, spacing, threshold, color, weight, opacity, dash) {
+function buildPencilShading(terrain, p, spacing, threshold) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
   const { elevScale } = p
   const positions = [], colors = []
@@ -275,7 +287,7 @@ function buildPencilShading(terrain, p, spacing, threshold, color, weight, opaci
         const e = (center - 0.5) * 100 * elevScale
         const x = c * scl - halfW, z = r * scl - halfH
         positions.push(x - 1, e, z, x + 1, e, z)
-        const col = computeVertexColor(normElev(center, terrain.minZ, terrain.maxZ), 0.5, 0, { ...p, lineColor: color, lineOpacity: opacity })
+        const col = computeVertexColor(normElev(center, terrain.minZ, terrain.maxZ), 0.5, 0, p)
         colors.push(...col, ...col)
       }
     }
@@ -285,7 +297,7 @@ function buildPencilShading(terrain, p, spacing, threshold, color, weight, opaci
 
 // ─── Pillars ──────────────────────────────────────────────────────────────
 
-function buildPillars(terrain, p, spacing, color, weight, opacity, dash) {
+function buildPillars(terrain, p, spacing) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
   const { elevMinCut, elevMaxCut, jitterAmt } = p
   const step = Math.max(1, Math.round((spacing ?? 8) / scl))
@@ -297,7 +309,7 @@ function buildPillars(terrain, p, spacing, color, weight, opacity, dash) {
       if (!inElevCut(e, terrain.minZ, terrain.maxZ, elevMinCut, elevMaxCut)) continue
       const x = c * scl - halfW, z = r * scl - halfH
       positions.push(x, 0, z, x, e, z)
-      const col = computeVertexColor(normElev(e, terrain.minZ, terrain.maxZ), 0.5, 0, { ...p, lineColor: color, lineOpacity: opacity })
+      const col = computeVertexColor(normElev(e, terrain.minZ, terrain.maxZ), 0.5, 0, p)
       colors.push(...col, ...col)
     }
   }
