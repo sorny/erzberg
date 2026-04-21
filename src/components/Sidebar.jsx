@@ -254,7 +254,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, texture: true, creative: true, points: true, erosion: false, export: true,
+    terrain: true, levels: true, view: true, style: true, texture: false, creative: false, points: true, erosion: false, export: true,
   })
 
   // --- Erosion State ---
