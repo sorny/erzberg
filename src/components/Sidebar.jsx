@@ -479,6 +479,7 @@ export function Sidebar({
               <Sub>
                 <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style.strokeWeight} onChange={v => ss({ strokeWeight: v })} />
                 <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.lineOpacity ?? 1} onChange={v => ss({ lineOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
+                <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible. When OFF, all lines are visible (wireframe look)." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
                 <Tog label="Hypsometric color" small checked={style.lineHypsometric} onChange={v => ss({ lineHypsometric: v })} />
                 {style.lineHypsometric && (
                   <Sub>

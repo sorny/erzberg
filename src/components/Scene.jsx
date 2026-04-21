@@ -102,6 +102,7 @@ export function Scene({
       surfaceGeo,
       groupMatrix,
       showLines: p.showLines,
+      depthOcclusion: p.depthOcclusion,
       showFill: p.showFill,
       fillHypsometric: p.fillHypsometric,
       gradientStops: p.gradientStops,

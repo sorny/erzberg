@@ -37,6 +37,7 @@ const STYLE_DEF = {
 
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
+  depthOcclusion: true,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -174,6 +175,7 @@ export default function App() {
     if (vals.lineOpacity  != null) s.lineOpacity   = vals.lineOpacity
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
+    if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
     
     // Sync all split hypsometric properties
     if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric

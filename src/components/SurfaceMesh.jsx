@@ -57,10 +57,16 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uHypsoWeight;
   uniform float     uElevScale;
   uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
+  uniform bool      uOcclusionOnly;
   varying float     vBrightness;
   varying vec3      vNormal;
 
   void main() {
+    if (uOcclusionOnly) {
+      // Discarding fragments still writes to the depth buffer if depthWrite is true.
+      // Wait, discarding fragments might skip depth write on some GPUs. 
+      // Better way: use colorWrite = false on the material level.
+    }
     vec3 n = normalize(vNormal);
     float b = vBrightness;
 
@@ -196,8 +202,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     
     // Always write color if either fill or raw terrain is on
     surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
+    
+    // Manage depth behavior: 
+    // We only want the surface to act as an occluder if depthOcclusion is ON.
+    surfMat.depthTest  = !!p.depthOcclusion
+    surfMat.depthWrite = !!p.depthOcclusion
+
     surfMat.needsUpdate = true
-  }, [surfMat, p.fillColor, p.showFill, p.fillHypsometric, p.fillBanded, p.showRawTerrain, p.fillHypsoInterval, p.fillHypsoWeight, p.elevScale, p.fillHypsoMode])
+  }, [surfMat, p.fillColor, p.showFill, p.fillHypsometric, p.fillBanded, p.showRawTerrain, p.fillHypsoInterval, p.fillHypsoWeight, p.elevScale, p.fillHypsoMode, p.depthOcclusion])
 
   useEffect(() => {
     if (!surfMat) return

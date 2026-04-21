@@ -30,6 +30,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
     if (!lineMaterial) return
     lineMaterial.linewidth = p.strokeWeight
     lineMaterial.opacity   = p.lineOpacity
+    lineMaterial.depthTest = !!p.depthOcclusion
     lineMaterial.resolution.set(size.width, size.height)
     const dash = DASH_CONFIGS[p.lineDash ?? 'solid'] ?? DASH_CONFIGS.solid
     lineMaterial.dashed   = dash.dashed

@@ -12,8 +12,8 @@ import { sampleGradient } from './colorUtils'
 import { DASH_SVG } from './stylePresets'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
-const N_SAMPLES = 32   // depth-test samples per segment
-const EPS_VIEW  = 1.0
+const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
+const EPS_VIEW  = 0.1  // tighter tolerance for surface lines
 
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
@@ -30,7 +30,7 @@ function buildZBuffer(surfaceGeo, groupMatrix, camera, W, H) {
 
   for (let i = 0; i < nVerts; i++) {
     wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-    wld.applyMatrix4(groupMatrix)
+    if (groupMatrix) wld.applyMatrix4(groupMatrix)
     viw.copy(wld).applyMatrix4(camInv)
     vd[i] = 1.0 / (-viw.z)
     wld.project(camera)
@@ -136,7 +136,7 @@ export function exportSVG({
   lineColor, strokeWeight, lineDash,
   surfaceGeo, groupMatrix,
   showFill, fillHypsometric, gradientStops,
-  showLines,
+  showLines, depthOcclusion,
   particlePositions, particleCount, particleColor, particleSize,
 }) {
   const camInv = camera.matrixWorldInverse
@@ -156,7 +156,8 @@ export function exportSVG({
     ]
   }
 
-  const surfViewZ = (surfaceGeo && groupMatrix)
+  // Only build Z-Buffer if occlusion is enabled
+  const surfViewZ = (depthOcclusion && surfaceGeo && groupMatrix)
     ? buildZBuffer(surfaceGeo, groupMatrix, camera, width, height)
     : null
 
@@ -183,12 +184,16 @@ export function exportSVG({
       if (colors && colors.length > i + 2) {
         stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
       }
+      
+      // If no occlusion, project endpoints and add entire segment
       if (!surfViewZ) {
-        const [x0, y0] = project(ax, ay, az)
-        const [x1, y1] = project(bx, by, bz)
-        addSeg(x0, y0, x1, y1, stroke)
+        const p0 = project(ax, ay, az)
+        const p1 = project(bx, by, bz)
+        addSeg(p0[0], p0[1], p1[0], p1[1], stroke)
         continue
       }
+
+      // Occlusion path: sample along segment
       const pts = []
       for (let t = 0; t <= N_SAMPLES; t++) {
         const f = t / N_SAMPLES
@@ -217,11 +222,22 @@ export function exportSVG({
       if (groupMatrix) wldP.applyMatrix4(groupMatrix)
       viwP.copy(wldP).applyMatrix4(camInv)
       if (viwP.z >= 0) continue
+      
       const r = ((particleSize ?? 4) * 300 / (-viwP.z)) * 0.5
       wldP.project(camera)
       const cx = (wldP.x+1)*0.5*width, cy = (-wldP.y+1)*0.5*height
-      projectedParticles.push({ cx, cy, r })
-      expandBB(cx-r, cy-r); expandBB(cx+r, cy+r)
+      
+      // Depth test for particles
+      let visible = true
+      if (surfViewZ) {
+        const surfZ = surfViewZ(cx, cy)
+        if (surfZ !== -Infinity && viwP.z < surfZ - EPS_VIEW) visible = false
+      }
+
+      if (visible) {
+        projectedParticles.push({ cx, cy, r })
+        expandBB(cx-r, cy-r); expandBB(cx+r, cy+r)
+      }
     }
   }
 
