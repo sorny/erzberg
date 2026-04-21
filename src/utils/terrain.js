@@ -30,8 +30,13 @@ export function boxBlur(pixels, width, height, radius) {
 export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) {
   const { resolution: scl, blurRadius, gridOffsetX, gridOffsetY, blackPoint, whitePoint, elevScale } = p
   const blurred = boxBlur(rawPixels, imageWidth, imageHeight, blurRadius)
-  const peakOff = Math.floor(gridOffsetX ?? 0) % scl, lineOff = Math.floor(gridOffsetY ?? 0) % scl
-  const cols = Math.max(2, Math.ceil((imageWidth - peakOff) / scl) + 1), rows = Math.max(2, Math.ceil((imageHeight - lineOff) / scl) + 1)
+  
+  // Calculate grid dimensions correctly based on resolution
+  const peakOff = Math.floor(gridOffsetX ?? 0)
+  const lineOff = Math.floor(gridOffsetY ?? 0)
+  const cols = Math.floor((imageWidth - peakOff) / scl)
+  const rows = Math.floor((imageHeight - lineOff) / scl)
+  
   const bpN = blackPoint / 255, wpN = whitePoint / 255, bpWpRange = Math.max(1e-6, wpN - bpN)
 
   const grid = new Float32Array(rows * cols)
@@ -39,12 +44,12 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
   let minBrightness = 1, maxBrightness = 0
 
   for (let r = 0; r < rows; r++) {
-    const py = Math.min(imageHeight - 1, r * scl + lineOff)
+    const py = r * scl + lineOff
     for (let c = 0; c < cols; c++) {
-      const px = Math.min(imageWidth - 1, c * scl + peakOff)
-      const idx = Math.round(py) * imageWidth + Math.round(px)
+      const px = c * scl + peakOff
+      const idx = py * imageWidth + px
       
-      if (nodataMask && nodataMask[idx] === 0) {
+      if (nodataMask && (nodataMask[idx] === 0 || idx >= rawPixels.length)) {
         grid[r * cols + c] = 0; gridMask[r * cols + c] = 0
       } else {
         const raw = blurred[idx]
@@ -72,7 +77,12 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
     }
   }
 
-  return { grid, gridMask, rows, cols, scl, halfW: ((cols - 1) * scl) / 2, halfH: ((rows - 1) * scl) / 2, minZ, maxZ, maxSlope, gridSlopes, elevScale }
+  return { 
+    grid, gridMask, rows, cols, scl, 
+    halfW: ((cols - 1) * scl) / 2, 
+    halfH: ((rows - 1) * scl) / 2, 
+    minZ, maxZ, maxSlope, gridSlopes, elevScale 
+  }
 }
 
 export function cellElev(grid, r, c, cols, elevScale, jitterAmt = 0) {
