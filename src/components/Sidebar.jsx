@@ -291,7 +291,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, 
+    terrain: true, levels: true, view: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     points: true, texture: false, creative: false, erosion: false, export: true,
@@ -509,6 +509,51 @@ export function Sidebar({
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
+          {/* ── Global Style ───────────────────────────────────────────────── */}
+
+          <Section title="Style (Global)" open={sec.style} onToggle={() => tog('style')}>
+            <div style={{ marginBottom: 10 }}>
+              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+              </div>
+            </div>
+
+            <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
+            {style.showFill && (
+              <Sub>
+                <Tog label="Hypsometric fill" small checked={style.fillHypsometric} onChange={v => ss({ fillHypsometric: v })} />
+                {style.fillHypsometric && (
+                  <Sub>
+                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:8, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
+                    </div>
+                    <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
+                    {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
+                  </Sub>
+                )}
+              </Sub>
+            )}
+
+            {style.fillHypsometric || style.lineHypsometric ? (
+              <div style={{ marginBottom: 10, marginTop: 10 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
+                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
+                </div>
+                <GradientPicker stops={gradientStops} onChange={setGradientStops} />
+              </div>
+            ) : null}
+
+            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
+            <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
+            
+            <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
+            <Sub>
+              <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
+              {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />}
+            </Sub>
+          </Section>
+
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
           
           <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')}>
@@ -625,42 +670,6 @@ export function Sidebar({
             )}
           </Section>
 
-          {/* ── Global Style ───────────────────────────────────────────────── */}
-
-          <Section title="Style (Global)" open={sec.style} onToggle={() => tog('style')}>
-            <div style={{ marginBottom: 10 }}>
-              <span style={{ fontSize:10, color: DIM, display:'block', marginBottom:5 }}>Style presets</span>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-                {Object.entries(STYLE_PRESETS).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
-              </div>
-            </div>
-
-            <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
-            {style.showFill && (
-              <Sub>
-                <Tog label="Hypsometric fill" small checked={style.fillHypsometric} onChange={v => ss({ fillHypsometric: v })} />
-                {style.fillHypsometric && (
-                  <Sub>
-                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
-                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:8, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
-                    </div>
-                    <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
-                    {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
-                  </Sub>
-                )}
-              </Sub>
-            )}
-
-            <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
-            <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
-            
-            <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
-            <Sub>
-              <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
-              {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} />}
-            </Sub>
-          </Section>
-
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
@@ -729,6 +738,9 @@ export function Sidebar({
               <div />
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
+            </div>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
+              Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
           </Section>
 
