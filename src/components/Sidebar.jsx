@@ -247,7 +247,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, style: true, texture: true, points: true, erosion: false, export: true,
+    terrain: true, levels: true, view: true, style: true, texture: true, creative: true, points: true, erosion: false, export: true,
   })
 
   // --- Erosion State ---
@@ -262,8 +262,10 @@ export function Sidebar({
   const [lastPixels, setLastPixels] = useState(null)
   
   const setPixels = useStore(s => s.setPixels)
+  const setHeightmap = useStore(s => s.setHeightmap)
   const heightmapWidth = useStore(s => s.heightmapWidth)
   const heightmapHeight = useStore(s => s.heightmapHeight)
+  const nodataMask = useStore(s => s.nodataMask)
 
   const handleRunErosion = () => {
     if (!heightmapPixels || isEroding) return
@@ -302,6 +304,31 @@ export function Sidebar({
       reader.readAsDataURL(file)
     }
     input.click()
+  }
+
+  const handleMirrorX = () => {
+    if (!heightmapPixels) return
+    const W = heightmapWidth
+    const H = heightmapHeight
+    const newW = W * 2
+    const nextPixels = new Float32Array(newW * H)
+    const nextMask = nodataMask ? new Uint8Array(newW * H) : null
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const sourceIdx = y * W + x
+        // Mirrored copy (left side)
+        const destIdxL = y * newW + (W - 1 - x)
+        nextPixels[destIdxL] = heightmapPixels[sourceIdx]
+        if (nextMask) nextMask[destIdxL] = nodataMask[sourceIdx]
+        
+        // Original copy (right side)
+        const destIdxR = y * newW + (W + x)
+        nextPixels[destIdxR] = heightmapPixels[sourceIdx]
+        if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
+      }
+    }
+    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored)')
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -402,19 +429,10 @@ export function Sidebar({
                 <Sl label="Grid offset Y" min={0} max={terrain.resolution - 1} value={Math.min(terrain.gridOffsetY ?? 0, terrain.resolution - 1)} onChange={v => st({ gridOffsetY: v })} />
               </div>
             )}
-            {hasGeoTiff ? (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMinCut)} onChange={v => st({ elevMinCut: mToElevCut(v) })} fmt={v => v+'m'} />
-                <Sl label="Elev max" min={Math.round(geoTiffElevMin)} max={Math.round(geoTiffElevMax)} step={1}
-                  value={elevCutToM(terrain.elevMaxCut)} onChange={v => st({ elevMaxCut: mToElevCut(v) })} fmt={v => v+'m'} />
-              </div>
-            ) : (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-                <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-                <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
-              </div>
-            )}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+            </div>
           </Section>
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
@@ -564,6 +582,18 @@ export function Sidebar({
                 )}
               </Sub>
             )}
+          </Section>
+
+          <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
+            <button className="hmeb" onClick={handleMirrorX} style={{ 
+              width:'100%', padding:'8px 0', background: SURF, color: DIM, 
+              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
+            }}>
+              Mirror X (Symmetry)
+              <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>
+                Doubles width by mirroring existing terrain
+              </span>
+            </button>
           </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
