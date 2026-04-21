@@ -43,6 +43,12 @@ function PanelStyles() {
       #hm-panel-body::-webkit-scrollbar { width:4px; }
       #hm-panel-body::-webkit-scrollbar-thumb { background:${BORDER}; border-radius:2px; }
       .hmi:hover { color:${TEXT} !important; border-color:${MUTED} !important; }
+      
+      .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:4px; 
+                 cursor:pointer; display:flex; flex-direction:column; align-items:center; 
+                 justify-content:center; font-size:10px; font-weight:700; transition:all 0.1s; aspect-ratio:1/1; }
+      .sym-btn.on { background:${ACCENT}; color:#fff; border-color:${ACCENT}; }
+      .sym-btn:hover:not(.on) { border-color:${MUTED}; color:${DIM}; }
     `}</style>
   )
 }
@@ -324,7 +330,7 @@ export function Sidebar({
         
         // Original copy (right side)
         const destIdxR = y * newW + (W + x)
-        nextPixels[destIdxR] = heightmapPixels[sourceIdx]
+        nextPixels[destIdxR] = heightmapPixels[sourceRowOff + x]
         if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
       }
     }
@@ -611,28 +617,33 @@ export function Sidebar({
           </Section>
 
           <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:12 }}>
-              <button className="hmeb" onClick={handleMirrorX}>
-                Mirror X
-                <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>Width Symmetry</span>
-              </button>
-              <button className="hmeb" onClick={handleMirrorY}>
-                Mirror Y
-                <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>Height Symmetry</span>
-              </button>
+            <div style={{ marginBottom:14 }}>
+              <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:8, letterSpacing:1 }}>3D SYMMETRY (LIVE)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:6, maxWidth:180, margin:'0 auto' }}>
+                <div />
+                <button className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<br/>+Y</button>
+                <div />
+
+                <button className={`sym-btn${style.showMirrorMinusX ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusX: !style.showMirrorMinusX })}>◀<br/>-X</button>
+                <button className={`sym-btn${style.showMirrorMinusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusZ: !style.showMirrorMinusZ })}>↗<br/>-Z</button>
+                <button className={`sym-btn${style.showMirrorPlusX ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusX: !style.showMirrorPlusX })}>▶<br/>+X</button>
+
+                <div />
+                <button className={`sym-btn${style.showMirrorMinusY ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusY: !style.showMirrorMinusY })}>▼<br/>-Y</button>
+                <div />
+
+                <div />
+                <button className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<br/>+Z</button>
+                <div />
+              </div>
             </div>
-            
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:8 }}>
-              {['X', 'Y', 'Z'].map(axis => (
-                <div key={axis}>
-                  <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:6, textAlign:'center' }}>{axis} AXIS</div>
-                  <Tog label="+" checked={style[`showMirrorPlus${axis}`]} onChange={v => ss({ [`showMirrorPlus${axis}`]: v })} small />
-                  <Tog label="-" checked={style[`showMirrorMinus${axis}`]} onChange={v => ss({ [`showMirrorMinus${axis}`]: v })} small />
-                </div>
-              ))}
-            </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:4, opacity:0.7 }}>
-              Combine +/- to mirror across 3D planes
+
+            <div style={{ borderTop:`1px solid ${BORDER}`, paddingTop:12 }}>
+              <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:8, letterSpacing:1 }}>IMAGE DATA (PERMANENT)</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                <button className="hmeb" onClick={handleMirrorX}>Mirror X</button>
+                <button className="hmeb" onClick={handleMirrorY}>Mirror Y</button>
+              </div>
             </div>
           </Section>
 
