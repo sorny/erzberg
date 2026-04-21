@@ -330,24 +330,69 @@ function buildPillars(terrain, p) {
 
 // ─── Surface ──────────────────────────────────────────────────────────────────
 
-export function buildSurfaceGeometry(terrain, elevScale, jitterAmt) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
-  const vertexCount = rows * cols, positions = new Float32Array(vertexCount * 3), brightnessBuf = new Float32Array(vertexCount)
+export function buildSurfaceGeometry(terrain, p) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
+  const { jitterAmt } = p
+  
+  // 1. Build base pass
+  const vertexCount = rows * cols
+  const basePos = new Float32Array(vertexCount * 3)
+  const baseBright = new Float32Array(vertexCount)
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c
-      if (!gridMask[i]) { positions[i*3]=c*scl-halfW; positions[i*3+1]=-10000; positions[i*3+2]=r*scl-halfH; brightnessBuf[i]=0 }
-      else { positions[i*3]=c*scl-halfW; positions[i*3+1]=cellElev(grid, r, c, cols, elevScale, jitterAmt); positions[i*3+2]=r*scl-halfH; brightnessBuf[i]=grid[i] }
+      if (!gridMask[i]) {
+        basePos[i*3]=c*scl-halfW; basePos[i*3+1]=-10000; basePos[i*3+2]=r*scl-halfH; baseBright[i]=0
+      } else {
+        basePos[i*3]=c*scl-halfW; basePos[i*3+1]=cellElev(grid, r, c, cols, elevScale, jitterAmt); basePos[i*3+2]=r*scl-halfH; baseBright[i]=grid[i]
+      }
     }
   }
-  const indices = []
+  const baseIndices = []
   for (let r = 0; r < rows - 1; r++) {
     for (let c = 0; c < cols - 1; c++) {
       const tl = r*cols+c, tr = tl+1, bl = tl+cols, br = bl+1
-      if (gridMask[tl] && gridMask[tr] && gridMask[bl] && gridMask[br]) { indices.push(tl, bl, tr, tr, bl, br) }
+      if (gridMask[tl] && gridMask[tr] && gridMask[bl] && gridMask[br]) {
+        baseIndices.push(tl, bl, tr, tr, bl, br)
+      }
     }
   }
-  return { positions, brightnessBuf, indices: new Uint32Array(indices) }
+
+  // 2. Generate enabled octants
+  let finalPos = new Float32Array(0), finalBright = new Float32Array(0)
+  const finalIndices = []
+  let indexOffset = 0
+
+  const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
+  const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
+  const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
+
+  for (const sx of mX) {
+    for (const sy of mY) {
+      for (const sz of mZ) {
+        const pPass = new Float32Array(basePos)
+        for (let i = 0; i < pPass.length; i += 3) {
+          pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz
+        }
+        finalPos = concat(finalPos, pPass)
+        finalBright = concat(finalBright, baseBright)
+        
+        // If mirroring flipped the winding order, we need to correct it (swap tr/bl)
+        // Determinant of transformation matrix: sx * sy * sz
+        const flipWinding = (sx * sy * sz) < 0
+        for (let i = 0; i < baseIndices.length; i += 3) {
+          if (flipWinding) {
+            finalIndices.push(baseIndices[i] + indexOffset, baseIndices[i+2] + indexOffset, baseIndices[i+1] + indexOffset)
+          } else {
+            finalIndices.push(baseIndices[i] + indexOffset, baseIndices[i+1] + indexOffset, baseIndices[i+2] + indexOffset)
+          }
+        }
+        indexOffset += vertexCount
+      }
+    }
+  }
+
+  return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(finalIndices), metadata: { rows, cols } }
 }
 
 function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set(a, 0); out.set(b, a.length); return out }

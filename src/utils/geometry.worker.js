@@ -11,7 +11,7 @@ self.onmessage = (e) => {
   try {
     const terrain = buildTerrain(heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p)
     const lineGeo = buildLineGeometry(terrain, p)
-    const surfaceGeo = buildSurfaceGeometry(terrain, p.elevScale, p.jitterAmt)
+    const surfaceGeo = buildSurfaceGeometry(terrain, p)
 
     // Send back the results. We use Transferables for the large Float32Arrays 
     // to avoid expensive copying.

@@ -50,6 +50,9 @@ export function useTerrainGeometry(p) {
     p.lineHypsometric, p.lineBanded, p.lineHypsoInterval, p.lineHypsoWeight, p.lineHypsoMode,
     p.fillHypsometric, p.fillBanded, p.fillHypsoInterval, p.fillHypsoWeight, p.fillHypsoMode,
     p.gradientStops,
+    p.showMirrorPlusX, p.showMirrorMinusX,
+    p.showMirrorPlusY, p.showMirrorMinusY,
+    p.showMirrorPlusZ, p.showMirrorMinusZ,
   ])
 
   useEffect(() => () => workerRef.current?.terminate(), [])
