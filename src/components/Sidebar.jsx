@@ -269,8 +269,10 @@ export function Sidebar({
   const [lastPixels, setLastPixels] = useState(null)
   
   const setPixels = useStore(s => s.setPixels)
+  const setHeightmap = useStore(s => s.setHeightmap)
   const heightmapWidth = useStore(s => s.heightmapWidth)
   const heightmapHeight = useStore(s => s.heightmapHeight)
+  const nodataMask = useStore(s => s.nodataMask)
 
   const handleRunErosion = () => {
     if (!heightmapPixels || isEroding) return
@@ -309,6 +311,52 @@ export function Sidebar({
       reader.readAsDataURL(file)
     }
     input.click()
+  }
+
+  const handleMirrorX = () => {
+    if (!heightmapPixels) return
+    const W = heightmapWidth
+    const H = heightmapHeight
+    const newW = W * 2
+    const nextPixels = new Float32Array(newW * H)
+    const nextMask = nodataMask ? new Uint8Array(newW * H) : null
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const sourceIdx = y * W + x
+        const destIdxL = y * newW + (W - 1 - x)
+        nextPixels[destIdxL] = heightmapPixels[sourceIdx]
+        if (nextMask) nextMask[destIdxL] = nodataMask[sourceIdx]
+        const destIdxR = y * newW + (W + x)
+        nextPixels[destIdxR] = heightmapPixels[sourceIdx]
+        if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
+      }
+    }
+    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored X)')
+  }
+
+  const handleMirrorY = () => {
+    if (!heightmapPixels) return
+    const W = heightmapWidth
+    const H = heightmapHeight
+    const newH = H * 2
+    const nextPixels = new Float32Array(W * newH)
+    const nextMask = nodataMask ? new Uint8Array(W * newH) : null
+
+    for (let y = 0; y < H; y++) {
+      const sourceRowOff = y * W
+      const destRowOffT = (H - 1 - y) * W
+      for (let x = 0; x < W; x++) {
+        nextPixels[destRowOffT + x] = heightmapPixels[sourceRowOff + x]
+        if (nextMask) nextMask[destRowOffT + x] = nodataMask[sourceRowOff + x]
+      }
+      const destRowOffB = (H + y) * W
+      for (let x = 0; x < W; x++) {
+        nextPixels[destRowOffB + x] = heightmapPixels[sourceRowOff + x]
+        if (nextMask) nextMask[destRowOffB + x] = nodataMask[sourceRowOff + x]
+      }
+    }
+    setHeightmap(nextPixels, nextMask, W, newH, heightmapFilename + ' (mirrored Y)')
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
@@ -537,6 +585,29 @@ export function Sidebar({
             </Sub>
           </Section>
 
+          <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
+            <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
+            {points.showPoints && (
+              <Sub>
+                <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
+                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
+                <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
+                {points.animateParticles && (
+                  <Sub>
+                    <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
+                    <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
+                    {points.particleGravity && (
+                      <Sub>
+                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
+                      </Sub>
+                    )}
+                  </Sub>
+                )}
+              </Sub>
+            )}
+          </Section>
+
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && (
@@ -586,29 +657,6 @@ export function Sidebar({
             <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
-          </Section>
-
-          <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
-            <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
-            {points.showPoints && (
-              <Sub>
-                <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
-                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
-                <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
-                {points.animateParticles && (
-                  <Sub>
-                    <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
-                    <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
-                    {points.particleGravity && (
-                      <Sub>
-                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
-                      </Sub>
-                    )}
-                  </Sub>
-                )}
-              </Sub>
-            )}
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>
