@@ -30,6 +30,7 @@ const STYLE_DEF = {
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
   depthOcclusion: true,
+  occlusionBias: 1.0,
 
   // Texture overlay
   showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0,
@@ -229,6 +230,7 @@ export default function App() {
     // Line globals
     if (vals.showLines    != null) s.showLines     = vals.showLines
     if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
+    if (vals.occlusionBias  != null) s.occlusionBias  = vals.occlusionBias
     
     // Support massive sync of all per-mode params
     Object.keys(vals).forEach(k => {

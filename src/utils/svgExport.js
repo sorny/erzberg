@@ -135,9 +135,10 @@ export function exportSVG({
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   showFill, fillHypsometric, gradientStops,
-  showLines, depthOcclusion,
+  showLines, depthOcclusion, occlusionBias,
   particlePositions, particleCount, particleColor, particleSize,
 }) {
+  const bias = occlusionBias ?? 0.1
   const camInv = camera.matrixWorldInverse
   const wld2 = new THREE.Vector3()
   const viw2 = new THREE.Vector3()
@@ -202,7 +203,7 @@ export function exportSVG({
           const f = t / N_SAMPLES
           const [sx, sy, lineZ] = project(ax+(bx-ax)*f, ay+(by-ay)*f, az+(bz-az)*f)
           const surfZ = surfViewZ(sx, sy)
-          pts.push({ sx, sy, visible: (surfZ === -Infinity || lineZ >= surfZ - EPS_VIEW) })
+          pts.push({ sx, sy, visible: (surfZ === -Infinity || lineZ >= surfZ - bias) })
         }
         let runStart = null
         for (let t = 0; t <= N_SAMPLES; t++) {
@@ -241,7 +242,7 @@ export function exportSVG({
       let visible = true
       if (surfViewZ) {
         const surfZ = surfViewZ(cx, cy)
-        if (surfZ !== -Infinity && viw2.z < surfZ - EPS_VIEW) visible = false
+        if (surfZ !== -Infinity && viw2.z < surfZ - bias) visible = false
       }
 
       if (visible) {

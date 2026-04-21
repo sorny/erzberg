@@ -593,6 +593,11 @@ export function Sidebar({
 
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
             <Tog label="Occlusion" help="When ON, lines hidden behind mountains are invisible." checked={style.depthOcclusion} onChange={v => ss({ depthOcclusion: v })} small />
+            {style.depthOcclusion && (
+              <Sub>
+                <InlineSl label="Occ. Dist" help="Adjust the depth tolerance. Higher values allow lines to peek through the terrain." min={0} max={10} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+              </Sub>
+            )}
             
             <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>

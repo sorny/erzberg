@@ -180,8 +180,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     side:           THREE.DoubleSide,
     depthWrite:     true,
     polygonOffset:       true,
-    polygonOffsetFactor: 2,
-    polygonOffsetUnits:  2,
+    polygonOffsetFactor: p.occlusionBias ?? 2,
+    polygonOffsetUnits:  p.occlusionBias ?? 2,
     uniforms: {
       uFillColor:         { value: new THREE.Vector3(1, 1, 1) },
       uGradient:          { value: false },
@@ -222,6 +222,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
     surfMat.depthTest  = !!p.depthOcclusion
     surfMat.depthWrite = !!p.depthOcclusion
+    surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
+    surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
     surfMat.needsUpdate = true
   }, [surfMat, p, overlayTex])
 
