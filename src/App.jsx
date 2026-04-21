@@ -40,7 +40,9 @@ const STYLE_DEF = {
   depthOcclusion: true,
   
   // Creative
+  showMirrorPlusX: true, showMirrorMinusX: false,
   showMirrorPlusY: true, showMirrorMinusY: false,
+  showMirrorPlusZ: true, showMirrorMinusZ: false,
 }
 const POINTS_DEF = {
   showPoints: false, pointColor: '#000000', pointSize: 4,
@@ -185,8 +187,12 @@ export default function App() {
     if (vals.textureScale   != null) s.textureScale   = vals.textureScale
     if (vals.textureShiftX  != null) s.textureShiftX  = vals.textureShiftX
     if (vals.textureShiftY  != null) s.textureShiftY  = vals.textureShiftY
+    if (vals.showMirrorPlusX  != null) s.showMirrorPlusX  = vals.showMirrorPlusX
+    if (vals.showMirrorMinusX != null) s.showMirrorMinusX = vals.showMirrorMinusX
     if (vals.showMirrorPlusY  != null) s.showMirrorPlusY  = vals.showMirrorPlusY
     if (vals.showMirrorMinusY != null) s.showMirrorMinusY = vals.showMirrorMinusY
+    if (vals.showMirrorPlusZ  != null) s.showMirrorPlusZ  = vals.showMirrorPlusZ
+    if (vals.showMirrorMinusZ != null) s.showMirrorMinusZ = vals.showMirrorMinusZ
     
     // Sync all split hypsometric properties
     if (vals.lineHypsometric != null) s.lineHypsometric = vals.lineHypsometric

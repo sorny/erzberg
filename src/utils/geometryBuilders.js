@@ -24,48 +24,52 @@ export function buildLineGeometry(terrain, p) {
   const modes = Array.isArray(p.drawMode) ? p.drawMode : [p.drawMode]
   if (modes.length === 0) return empty()
 
-  const buildPass = (mirror) => {
-    const results = modes.map(m => {
-      let res
-      switch (m) {
-        case 'lines-x':    res = buildRidgelines(terrain, p, false); break
-        case 'lines-y':    res = buildRidgelines(terrain, p, true);  break
-        case 'crosshatch': res = buildCrosshatch(terrain, p);        break
-        case 'hachure':    res = buildHachure(terrain, p);           break
-        case 'contours':   res = buildContours(terrain, p);          break
-        case 'flow':       res = buildFlowLines(terrain, p);         break
-        case 'dag':        res = buildDagThinning(terrain, p);       break
-        case 'pencil':     res = buildPencilShading(terrain, p);     break
-        case 'z':          res = buildPillars(terrain, p);           break
-        default:           res = empty();
-      }
-      if (mirror) {
-        for (let i = 1; i < res.positions.length; i += 3) res.positions[i] *= -1
-      }
-      return res
-    })
-
-    let totalPos = 0, totalCol = 0
-    for (const r of results) { totalPos += r.positions.length; totalCol += r.colors.length }
-    const positions = new Float32Array(totalPos)
-    const colors = new Float32Array(totalCol)
-    let offsetPos = 0, offsetCol = 0
-    for (const r of results) {
-      positions.set(r.positions, offsetPos); colors.set(r.colors, offsetCol)
-      offsetPos += r.positions.length; offsetCol += r.colors.length
+  // 1. Build the base geometry (original pass)
+  const baseResults = modes.map(m => {
+    switch (m) {
+      case 'lines-x':    return buildRidgelines(terrain, p, false)
+      case 'lines-y':    return buildRidgelines(terrain, p, true)
+      case 'crosshatch': return buildCrosshatch(terrain, p)
+      case 'hachure':    return buildHachure(terrain, p)
+      case 'contours':   return buildContours(terrain, p)
+      case 'flow':       return buildFlowLines(terrain, p)
+      case 'dag':        return buildDagThinning(terrain, p)
+      case 'pencil':     return buildPencilShading(terrain, p)
+      case 'z':          return buildPillars(terrain, p)
+      default:           return empty()
     }
-    return { positions, colors }
+  })
+
+  // Merge modes for the base pass
+  let bPosLen = 0, bColLen = 0
+  for (const r of baseResults) { bPosLen += r.positions.length; bColLen += r.colors.length }
+  const bPos = new Float32Array(bPosLen), bCol = new Float32Array(bColLen)
+  let bOffP = 0, bOffC = 0
+  for (const r of baseResults) {
+    bPos.set(r.positions, bOffP); bCol.set(r.colors, bOffC)
+    bOffP += r.positions.length; bOffC += r.colors.length
   }
 
+  // 2. Generate enabled octants by mirroring the base pass
   let finalPos = new Float32Array(0), finalCol = new Float32Array(0)
-  if (p.showMirrorPlusY) {
-    const p1 = buildPass(false); finalPos = p1.positions; finalCol = p1.colors
-  }
-  if (p.showMirrorMinusY) {
-    const p2 = buildPass(true)
-    finalPos = concat(finalPos, p2.positions); finalCol = concat(finalCol, p2.colors)
-  }
   
+  const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
+  const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
+  const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
+
+  for (const sx of mX) {
+    for (const sy of mY) {
+      for (const sz of mZ) {
+        // Clone base and transform
+        const pPass = new Float32Array(bPos)
+        for (let i = 0; i < pPass.length; i += 3) {
+          pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz
+        }
+        finalPos = concat(finalPos, pPass); finalCol = concat(finalCol, bCol)
+      }
+    }
+  }
+
   return { positions: finalPos, colors: finalCol }
 }
 

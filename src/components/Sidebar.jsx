@@ -611,7 +611,7 @@ export function Sidebar({
           </Section>
 
           <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6, marginBottom:12 }}>
               <button className="hmeb" onClick={handleMirrorX}>
                 Mirror X
                 <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>Width Symmetry</span>
@@ -622,10 +622,18 @@ export function Sidebar({
               </button>
             </div>
             
-            <Sub>
-              <Tog label="+Y Mirror (Up)" help="Show the original upward elevation projection." checked={style.showMirrorPlusY} onChange={v => ss({ showMirrorPlusY: v })} small />
-              <Tog label="-Y Mirror (Down)" help="Mirror the elevation projection downwards. Amazing with Z (Pillar) mode." checked={style.showMirrorMinusY} onChange={v => ss({ showMirrorMinusY: v })} small />
-            </Sub>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, marginBottom:8 }}>
+              {['X', 'Y', 'Z'].map(axis => (
+                <div key={axis}>
+                  <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:6, textAlign:'center' }}>{axis} AXIS</div>
+                  <Tog label="+" checked={style[`showMirrorPlus${axis}`]} onChange={v => ss({ [`showMirrorPlus${axis}`]: v })} small />
+                  <Tog label="-" checked={style[`showMirrorMinus${axis}`]} onChange={v => ss({ [`showMirrorMinus${axis}`]: v })} small />
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:4, opacity:0.7 }}>
+              Combine +/- to mirror across 3D planes
+            </div>
           </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
