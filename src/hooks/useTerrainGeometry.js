@@ -57,6 +57,7 @@ export function useTerrainGeometry(p) {
     // Mode: Pillars
     p.enabledPillars, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars,
     p.hypsoPillars, p.hypsoModePillars, p.hypsoBandedPillars, p.hypsoIntervalPillars,
+    p.pillarGap, p.pillarDepth,
     // Mode: Contours
     p.enabledContours, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours,
     p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,

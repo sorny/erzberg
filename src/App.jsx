@@ -55,6 +55,7 @@ const STYLE_DEF = {
   // Pillars
   enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',
   hypsoPillars: false, hypsoModePillars: 'elevation', hypsoBandedPillars: false, hypsoIntervalPillars: 10,
+  pillarGap: 0, pillarDepth: 0,
   // Contours
   enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
@@ -241,7 +242,8 @@ export default function App() {
       if (k.startsWith('enabled') || k.startsWith('spacing') || k.startsWith('shift') || 
           k.startsWith('color') || k.startsWith('weight') || k.startsWith('opacity') || 
           k.startsWith('dash') || k.startsWith('hypso') || k.startsWith('interval') ||
-          k.startsWith('threshold') || k.startsWith('length') || k.startsWith('maxLen') || k.startsWith('step')) {
+          k.startsWith('threshold') || k.startsWith('length') || k.startsWith('maxLen') || 
+          k.startsWith('step') || k.startsWith('pillar')) {
         s[k] = vals[k]
       }
     })

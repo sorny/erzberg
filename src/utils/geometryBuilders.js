@@ -344,11 +344,14 @@ function buildPencilShading(terrain, p, spacing, threshold) {
 
 function buildPillars(terrain, p, spacing) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
-  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt, pillarGap, pillarDepth } = p
 
   const step = Math.max(1, Math.round((spacing ?? 8) / scl))
   const positions = []
   const colors = []
+
+  const gap = pillarGap ?? 0
+  const depth = pillarDepth ?? 0
 
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
@@ -361,10 +364,17 @@ function buildPillars(terrain, p, spacing) {
       const wx = c * scl - halfW
       const wz = r * scl - halfH
 
-      positions.push(wx, minZ, wz, wx, elev, wz)
+      const top = elev - gap
+      const bottom = minZ - depth
+
+      // Don't draw if gap swallows the entire pillar
+      if (top <= bottom) continue
+
+      positions.push(wx, bottom, wz, wx, top, wz)
+      
       const slope = gridSlopes[i]
-      const colBase = computeVertexColor(normElev(minZ, minZ, maxZ), 0, 0, p)
-      const colPeak = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      const colBase = computeVertexColor(normElev(bottom, minZ, maxZ), 0, 0, p)
+      const colPeak = computeVertexColor(normElev(top, minZ, maxZ), slope / (maxSlope || 1), 0, p)
       colors.push(...colBase, ...colPeak)
     }
   }

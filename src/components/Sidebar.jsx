@@ -653,6 +653,8 @@ export function Sidebar({
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPillars} onChange={v => ss({ spacingPillars: v })} />
+                  <InlineSl label="Gap" min={0} max={20} step={0.5} value={style.pillarGap} onChange={v => ss({ pillarGap: v })} help="Distance from the terrain peak." />
+                  <InlineSl label="Depth" min={0} max={100} step={1} value={style.pillarDepth} onChange={v => ss({ pillarDepth: v })} help="Distance below the terrain floor." />
                 </Sub>
                 <ModeStyleOverride prefix="Pillars" style={style} ss={ss} />
               </>
