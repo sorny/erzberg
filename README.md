@@ -77,6 +77,24 @@ This project uses [Playwright](https://playwright.dev/) for rendering validation
 
 ---
 
+## 📜 Changelog
+
+### v0.2.0 (2026-04-22)
+*Cinematic Camera & Precision Update*
+- **Cinematic Camera Suite**: Dedicated Camera section with Orthographic projection, Focal Length (FOV) control, and precise X/Y target Panning.
+- **Improved Framing**: Content-based centering and auto-zoom for GeoTIFFs and PNGs (ignoring NoData/transparent areas).
+- **Omnidirectional Occlusion**: Refactored curtain geometry for perfect occlusion from all angles (360° tilt).
+- **Smart UI**: Dynamic browser tab titles and refined visual defaults.
+
+### v0.1.0 (2026-04-21)
+*Initial Alpha Release*
+- **11 Algorithmic Draw Modes**: Implementation of high-fidelity topographic feature extraction.
+- **Curtain-Based Ghost Occlusion**: Unique 3D geometric culling system.
+- **Droplet-Based Hydraulic Erosion**: Physically correct simulation.
+- **Pro Exporters**: 4K PNG, SVG, and STL suite.
+
+---
+
 ## 📄 License & Credits
 - **MIT License**: Copyright (c) 2026 sorny.
 - **Research**: Hydraulic erosion is based on [**"Implementation of a Method for Hydraulic Erosion"** by Hans Beyer](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf).
