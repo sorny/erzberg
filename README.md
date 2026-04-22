@@ -73,4 +73,4 @@ This project uses [Playwright](https://playwright.dev/) for end-to-end and rende
 
 ## 📄 License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
