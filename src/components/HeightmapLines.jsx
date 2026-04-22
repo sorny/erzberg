@@ -42,16 +42,14 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
 
   useEffect(() => {
     if (!curtainMat) return
-    // If the camera is underneath (tilt > 90), curtains would be between us and the lines.
-    // So we disable them to allow the lines to be visible from below.
-    curtainMat.visible = !!(depthOcclusion && (tilt == null || tilt <= 90))
+    curtainMat.visible = !!depthOcclusion
     curtainMat.depthTest = !!depthOcclusion
     curtainMat.depthWrite = !!depthOcclusion
     curtainMat.polygonOffset = true
-    curtainMat.polygonOffsetFactor = occlusionBias ?? 1
-    curtainMat.polygonOffsetUnits = occlusionBias ?? 1
+    curtainMat.polygonOffsetFactor = (occlusionBias ?? 1) + 2
+    curtainMat.polygonOffsetUnits  = (occlusionBias ?? 1) + 2
     curtainMat.needsUpdate = true
-  }, [curtainMat, depthOcclusion, occlusionBias, tilt])
+  }, [curtainMat, depthOcclusion, occlusionBias])
 
   useEffect(() => () => curtainMat?.dispose(), [curtainMat])
   useEffect(() => () => curtainGeo?.dispose(), [curtainGeo])
