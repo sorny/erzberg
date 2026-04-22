@@ -683,7 +683,7 @@ export function Sidebar({
               <>
                 <Sub>
                   {hasGeoTiff ? (
-                    <InlineSl label="Interval (m)" min={0.5} max={100} step={0.5} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)+'m'} />
+                    <InlineSl label="Interval (m)" min={0.1} max={100} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)+'m'} />
                   ) : (
                     <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
                   )}

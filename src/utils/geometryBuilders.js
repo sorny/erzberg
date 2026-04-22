@@ -220,12 +220,14 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset) {
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
 
-  for (let elev = startElev; elev <= maxElevPossible; elev += step) {
+  const numSteps = Math.floor((maxElevPossible - startElev) / step) + 1
+
+  for (let i = 0; i < numSteps; i++) {
+    const elev = startElev + i * step
     if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
     
     // Check if major based on bottom-up index + phase offset
-    const index = Math.round((elev - startElev) / step)
-    const isMajor = (majorMod > 1) ? ((index + (majorMod - offset)) % majorMod === 0) : (majorMod === 1)
+    const isMajor = (majorMod > 1) ? ((i + (majorMod - offset)) % majorMod === 0) : (majorMod === 1)
     
     const targetPos = (isMajor && majorMod > 0) ? majorPos : minorPos
     const targetCol = (isMajor && majorMod > 0) ? majorCol : minorCol
