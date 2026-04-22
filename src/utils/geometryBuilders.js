@@ -102,9 +102,13 @@ export function buildLineGeometry(terrain, p) {
             layerCol = concat(layerCol, res.colors)
 
             const cPass = new Float32Array(cP)
-            for (let i = 0; i < cPass.length; i += 3) { cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz }
+            for (let i = 0; i < cPass.length; i += 3) { 
+              cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz 
+            }
             layerCPos = concat(layerCPos, cPass)
+
             const flipWinding = (sx * sy * sz) < 0
+
             for (let i = 0; i < cI.length; i += 3) {
               if (flipWinding) layerCInd.push(cI[i] + cIndOffset, cI[i+2] + cIndOffset, cI[i+1] + cIndOffset)
               else layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
