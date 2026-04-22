@@ -147,7 +147,8 @@ export default function App() {
 
   // ── Update document title ─────────────────────────────────────────────────
   useEffect(() => {
-    document.title = heightmapFilename ? `erzberg - ${heightmapFilename}` : 'erzberg'
+    const isDefault = heightmapFilename === 'Heightmap.png'
+    document.title = (heightmapFilename && !isDefault) ? `erzberg - ${heightmapFilename}` : 'erzberg'
   }, [heightmapFilename])
 
   // ── All tweakable state ───────────────────────────────────────────────────
