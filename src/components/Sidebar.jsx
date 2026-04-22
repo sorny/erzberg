@@ -666,7 +666,13 @@ export function Sidebar({
             {style.enabledContours && (
               <>
                 <Sub>
-                  <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
+                  {hasGeoTiff ? (
+                    <InlineSl label="Interval (m)" min={0.5} max={100} step={0.5} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)+'m'} />
+                  ) : (
+                    <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
+                  )}
+                  <InlineSl label="Major Every" help="Frequency of bold contours, counting from the floor." min={2} max={50} step={1} value={style.majorIntervalContours} onChange={v => ss({ majorIntervalContours: v })} fmt={v => 'Every '+v} />
+                  <InlineSl label="Major Weight" min={0.5} max={10} step={0.5} value={style.majorWeightContours} onChange={v => ss({ majorWeightContours: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Contours" style={style} ss={ss} />
               </>

@@ -41,7 +41,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
-    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours) },
+    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
@@ -58,69 +58,73 @@ export function buildLineGeometry(terrain, p) {
     if (!p[`enabled${cfg.id}`]) continue
 
     const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`], p[`opacity${cfg.id}`])
-    let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
-    let layerCPos = new Float32Array(0), layerCInd = []
-    let cIndOffset = 0
     
     // Build the base pass for this layer once
     const baseRes = cfg.builder(terrain, ctx)
-    if (!baseRes || baseRes.positions.length === 0) continue
+    if (!baseRes) continue
 
-    // Build base curtains (occlusion geometry) for the lines
-    const baseP = baseRes.positions
-    const cP = []
-    const cI = []
-    let vIdx = 0
-    const floorY = terrain.minZ - 500 // Deep enough to occlude, but less likely to clip camera
-    for (let i = 0; i < baseP.length; i += 6) {
-      const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
-      const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
-      if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+    // Handle builders that return sub-layers (e.g. { minor: {...}, major: {...} })
+    const subLayers = (baseRes.positions instanceof Float32Array) 
+      ? { [cfg.id]: baseRes } 
+      : baseRes
 
-      cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
-      cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
-      vIdx += 4
-    }
+    for (const [subId, res] of Object.entries(subLayers)) {
+      if (!res.positions || res.positions.length === 0) continue
 
-    // Mirror the base pass into all requested octants
-    for (const sx of mX) {
-      for (const sy of mY) {
-        for (const sz of mZ) {
-          const pPass = new Float32Array(baseP)
-          for (let i = 0; i < pPass.length; i += 3) {
-            pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz
-          }
-          layerPos = concat(layerPos, pPass)
-          layerCol = concat(layerCol, baseRes.colors)
+      let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
+      let layerCPos = new Float32Array(0), layerCInd = []
+      let cIndOffset = 0
+      
+      const baseP = res.positions
+      const cP = []
+      const cI = []
+      let vIdx = 0
+      const floorY = terrain.minZ - 500
 
-          // Mirror curtains
-          const cPass = new Float32Array(cP)
-          for (let i = 0; i < cPass.length; i += 3) {
-            cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz
-          }
-          layerCPos = concat(layerCPos, cPass)
-          const flipWinding = (sx * sy * sz) < 0
-          for (let i = 0; i < cI.length; i += 3) {
-            if (flipWinding) {
-              layerCInd.push(cI[i] + cIndOffset, cI[i+2] + cIndOffset, cI[i+1] + cIndOffset)
-            } else {
-              layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
+      for (let i = 0; i < baseP.length; i += 6) {
+        const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
+        const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
+        if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+        cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
+        cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
+        vIdx += 4
+      }
+
+      // Mirror the base pass into all requested octants
+      for (const sx of mX) {
+        for (const sy of mY) {
+          for (const sz of mZ) {
+            const pPass = new Float32Array(baseP)
+            for (let i = 0; i < pPass.length; i += 3) { pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz }
+            layerPos = concat(layerPos, pPass)
+            layerCol = concat(layerCol, res.colors)
+
+            const cPass = new Float32Array(cP)
+            for (let i = 0; i < cPass.length; i += 3) { cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz }
+            layerCPos = concat(layerCPos, cPass)
+            const flipWinding = (sx * sy * sz) < 0
+            for (let i = 0; i < cI.length; i += 3) {
+              if (flipWinding) layerCInd.push(cI[i] + cIndOffset, cI[i+2] + cIndOffset, cI[i+1] + cIndOffset)
+              else layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
             }
+            cIndOffset += (cP.length / 3)
           }
-          cIndOffset += (cP.length / 3)
         }
       }
-    }
 
-    finalLayers.push({
-      id: cfg.id,
-      positions: layerPos,
-      colors: layerCol,
-      curtains: { positions: layerCPos, indices: new Uint32Array(layerCInd) },
-      weight: p[`weight${cfg.id}`],
-      opacity: p[`opacity${cfg.id}`],
-      dash: p[`dash${cfg.id}`]
-    })
+      // Apply specific weight for Major Contours
+      const weight = (subId === 'Contours-Major') ? p.majorWeightContours : p[`weight${cfg.id}`]
+
+      finalLayers.push({
+        id: (subId === cfg.id) ? cfg.id : subId,
+        positions: layerPos,
+        colors: layerCol,
+        curtains: { positions: layerCPos, indices: new Uint32Array(layerCInd) },
+        weight: weight,
+        opacity: p[`opacity${cfg.id}`],
+        dash: p[`dash${cfg.id}`]
+      })
+    }
   }
 
   return finalLayers
@@ -196,20 +200,32 @@ function buildHachure(terrain, p, spacing, length) {
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
 
-function buildContours(terrain, p, interval) {
+function buildContours(terrain, p, interval, majorInterval) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-  const positions = [], colors = []
+  
+  const minorPos = [], minorCol = []
+  const majorPos = [], majorCol = []
+  
   const step = (interval ?? 4)
-  const elevRange = 100 * elevScale, levelCount = Math.ceil(elevRange / step) + 1, startElev = Math.ceil((-elevRange / 2) / step) * step
+  const elevRange = 100 * elevScale
+  const startElev = Math.ceil(minZ / step) * step
+  const maxElevPossible = Math.ceil(maxZ / step) * step
+  
+  const majorMod = majorInterval ?? 10
 
-  for (let li = 0; li < levelCount; li++) {
-    const elev = startElev + li * step
+  for (let elev = startElev; elev <= maxElevPossible; elev += step) {
     if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+    
+    // Check if major based on bottom-up index
+    const index = Math.round((elev - startElev) / step)
+    const isMajor = (index % majorMod === 0)
+    
+    const targetPos = isMajor ? majorPos : minorPos
+    const targetCol = isMajor ? majorCol : minorCol
     const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
     const level = elev / (100 * elevScale) + 0.5
     
-    // Fast Marching Squares
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < cols - 1; c++) {
         if (!gridMask[r*cols+c] || !gridMask[r*cols+c+1] || !gridMask[(r+1)*cols+c] || !gridMask[(r+1)*cols+c+1]) continue
@@ -224,13 +240,17 @@ function buildContours(terrain, p, interval) {
         const pairs = MARCHING_TABLE[idx], ed = [top, right, bottom, left]
         for (let i = 0; i < pairs.length; i += 2) { 
           const e0 = ed[pairs[i]], e1 = ed[pairs[i+1]]
-          positions.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
-          colors.push(...col, ...col)
+          targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
+          targetCol.push(...col, ...col)
         }
       }
     }
   }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+
+  return {
+    'Contours-Minor': { positions: new Float32Array(minorPos), colors: new Float32Array(minorCol) },
+    'Contours-Major': { positions: new Float32Array(majorPos), colors: new Float32Array(majorCol) },
+  }
 }
 const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
 
