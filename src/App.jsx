@@ -145,6 +145,11 @@ export default function App() {
   const geoTiffElevMin    = useStore((s) => s.geoTiffElevMin)
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
 
+  // ── Update document title ─────────────────────────────────────────────────
+  useEffect(() => {
+    document.title = heightmapFilename ? `erzberg - ${heightmapFilename}` : 'erzberg'
+  }, [heightmapFilename])
+
   // ── All tweakable state ───────────────────────────────────────────────────
   const [terrain, setTerrain] = useState(TERRAIN_DEF)
   const [style,   setStyle]   = useState(STYLE_DEF)
