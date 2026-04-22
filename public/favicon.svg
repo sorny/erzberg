@@ -1,8 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Erzberg 'Stufen' (Terraces) Minimalist Icon -->
-  <path d="M4 26 L28 26 L26 22 L6 22 Z" fill="#3f3f46" />
-  <path d="M7 21 L25 21 L23 17 L9 17 Z" fill="#52525b" />
-  <path d="M10 16 L22 16 L20 12 L12 12 Z" fill="#71717a" />
-  <path d="M13 11 L19 11 L18 8 L14 8 Z" fill="#a1a1aa" />
-  <path d="M15 7 L17 7 L16 5 Z" fill="#d4d4d8" />
+  <!-- Background App-style container -->
+  <rect width="32" height="32" rx="8" fill="#09090b" />
+  
+  <!-- Outer Tier (Zinc) -->
+  <path d="M16 6 L26 12 V20 L16 26 L6 20 V12 L16 6 Z" stroke="#3f3f46" stroke-width="1.5" fill="none" />
+  
+  <!-- Middle Tier (Accent Blue) -->
+  <path d="M16 11 L22 14 V18 L16 21 L10 18 V14 L16 11 Z" stroke="#3b82f6" stroke-width="1.5" fill="none" />
+  
+  <!-- Peak Tier (Ghost Red) -->
+  <path d="M16 15 L18 16 V17 L16 18 L14 17 V16 L16 15 Z" stroke="#a80000" stroke-width="1.5" fill="none" />
 </svg>
