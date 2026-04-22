@@ -1,6 +1,6 @@
 # Hydraulic Erosion
 
-The procedural terrain modification in `heightmap-r3f` is driven by a physically-based droplet simulation. This enables realistic, non-destructive carving of riverbeds and drainage basins directly into the heightmap.
+The procedural terrain modification in `erzberg` is driven by a physically-based droplet simulation. This enables realistic, non-destructive carving of riverbeds and drainage basins directly into the heightmap.
 
 ## Acknowledgements
 The algorithm is a direct implementation of the techniques described in Hans Beyer's thesis:
@@ -18,8 +18,7 @@ A droplet is spawned at a random floating-point $(x, y)$ coordinate on the grid.
 - **Direction**: $dir = (0, 0)$
 
 ### 2. Movement & Gradient Calculation
-At each step, the droplet evaluates the slope of the terrain to decide where to flow.
-Because the droplet exists at a continuous floating-point coordinate, the terrain height and gradient are calculated using **Bilinear Interpolation** of the 4 nearest discrete grid cells.
+At each step, the droplet evaluates the slope of the terrain to decide where to flow. Because the droplet exists at a continuous floating-point coordinate, the terrain height and gradient are calculated using **Bilinear Interpolation** of the 4 nearest discrete grid cells.
 
 The droplet's direction is updated using inertia, blending its previous direction with the new gradient vector:
 $$ dir_{new} = (dir_{old} \times inertia) - (\nabla H \times (1 - inertia)) $$
@@ -41,6 +40,7 @@ The droplet's life ends if:
 2. Its water volume reaches zero.
 3. It becomes trapped in a local pit where it can no longer flow downhill.
 
-## Web Worker Concurrency
+## Multi-threaded Concurrency
 Because this algorithm requires millions of iterations (one iteration = one droplet life cycle) and modifies a large `Float32Array`, it is highly CPU-intensive. 
-In `heightmap-r3f`, the erosion loop runs inside `src/utils/erosion.js` and is executed off the main thread, ensuring the React UI remains responsive while the landscape is being sculpted.
+
+In `erzberg`, the erosion loop runs inside a dedicated **Web Worker** and is executed off the main thread. This ensures the React Three Fiber UI remains at a consistent 60 FPS while the landscape is being actively sculpted.

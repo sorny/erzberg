@@ -45,8 +45,8 @@ A physically-correct, droplet-based simulation implementing **Hans Beyer's resea
 ## 📖 Documentation & Wiki
 
 Deep-dives into the mathematical foundations and implementation details:
-- **[Mathematical Background of Draw Modes](docs/wiki/Draw-Modes.md)**
-- **[Hydraulic Erosion Algorithm](docs/wiki/Hydraulic-Erosion.md)**
+- **[Mathematical Background of Draw Modes](docs/Draw-Modes.md)**
+- **[Hydraulic Erosion Algorithm](docs/Hydraulic-Erosion.md)**
 
 ---
 
