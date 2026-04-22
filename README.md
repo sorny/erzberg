@@ -31,7 +31,6 @@ Detailed mathematical backgrounds and algorithm documentation can be found in th
 |---|---|
 | **3D Renderer** | [React Three Fiber](https://github.com/pmndrs/react-three-fiber) + [Three.js](https://github.com/mrdoob/three.js) |
 | **3D Helpers** | [Drei](https://github.com/pmndrs/drei) |
-| **GPU Lines** | `LineSegments2` / `LineMaterial` (Three.js) |
 | **State** | [Zustand](https://github.com/pmndrs/zustand) + [React](https://github.com/facebook/react) |
 | **UI / Controls** | [Leva](https://github.com/pmndrs/leva) |
 | **GIS Parsing** | [GeoTIFF.js](https://github.com/geotiffjs/geotiff.js) |
