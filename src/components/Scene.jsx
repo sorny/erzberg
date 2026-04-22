@@ -128,6 +128,30 @@ export function Scene({
     gl.setSize(targetW, targetH, false)
     gl.setPixelRatio(1)
 
+    // ─── TEMP: Scale up line weights and particles to match high-res ───
+    const lineMaterials = []
+    const particleMaterials = []
+    scene.traverse(obj => {
+      // Scale LineMaterial
+      if (obj.material && obj.material.isLineMaterial) {
+        lineMaterials.push({
+          mat: obj.material,
+          oldWidth: obj.material.linewidth,
+          oldRes: obj.material.resolution.clone()
+        })
+        obj.material.linewidth *= captureScale
+        obj.material.resolution.set(targetW, targetH)
+      }
+      // Scale Particle Material (uSize uniform)
+      if (obj.material && obj.material.uniforms && obj.material.uniforms.uSize) {
+        particleMaterials.push({
+          mat: obj.material,
+          oldSize: obj.material.uniforms.uSize.value
+        })
+        obj.material.uniforms.uSize.value *= captureScale
+      }
+    })
+
     // 3. Set transparent background for native alpha capture
     gl.setClearColor(0x000000, 0) 
     
@@ -137,7 +161,16 @@ export function Scene({
     // 5. Send the rendered buffer to our export utility
     captureAndExportPNG(gl.domElement, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha)
 
-    // 6. Restore original state
+    // 6. Restore material states
+    lineMaterials.forEach(({ mat, oldWidth, oldRes }) => {
+      mat.linewidth = oldWidth
+      mat.resolution.copy(oldRes)
+    })
+    particleMaterials.forEach(({ mat, oldSize }) => {
+      mat.uniforms.uSize.value = oldSize
+    })
+
+    // 7. Restore original GL state
     gl.setClearColor(oldClearColor, oldAlpha)
     gl.setPixelRatio(oldPixelRatio)
     gl.setSize(oldSize.x, oldSize.y, true)
