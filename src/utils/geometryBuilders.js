@@ -41,7 +41,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
-    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours) },
+    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
@@ -200,7 +200,7 @@ function buildHachure(terrain, p, spacing, length) {
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
 
-function buildContours(terrain, p, interval, majorInterval) {
+function buildContours(terrain, p, interval, majorInterval, majorOffset) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   
@@ -208,21 +208,21 @@ function buildContours(terrain, p, interval, majorInterval) {
   const majorPos = [], majorCol = []
   
   const step = (interval ?? 4)
-  const elevRange = 100 * elevScale
   const startElev = Math.ceil(minZ / step) * step
   const maxElevPossible = Math.ceil(maxZ / step) * step
   
-  const majorMod = majorInterval ?? 10
+  const majorMod = majorInterval ?? 0
+  const offset = majorOffset ?? 1
 
   for (let elev = startElev; elev <= maxElevPossible; elev += step) {
     if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
     
-    // Check if major based on bottom-up index
+    // Check if major based on bottom-up index + phase offset
     const index = Math.round((elev - startElev) / step)
-    const isMajor = (index % majorMod === 0)
+    const isMajor = (majorMod > 1) ? ((index + (majorMod - offset)) % majorMod === 0) : (majorMod === 1)
     
-    const targetPos = isMajor ? majorPos : minorPos
-    const targetCol = isMajor ? majorCol : minorCol
+    const targetPos = (isMajor && majorMod > 0) ? majorPos : minorPos
+    const targetCol = (isMajor && majorMod > 0) ? majorCol : minorCol
     const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
     const level = elev / (100 * elevScale) + 0.5
     

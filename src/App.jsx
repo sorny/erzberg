@@ -59,7 +59,7 @@ const STYLE_DEF = {
   // Contours
   enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
-  majorIntervalContours: 10, majorWeightContours: 2,
+  majorIntervalContours: 10, majorWeightContours: 2, majorOffsetContours: 1,
   // Hachure
   enabledHachure: false, spacingHachure: 4, lengthHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
   hypsoHachure: false, hypsoModeHachure: 'elevation', hypsoBandedHachure: false, hypsoIntervalHachure: 10,
