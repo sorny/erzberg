@@ -10,6 +10,9 @@ test('verify black lines are rendered on the canvas center', async ({ page }) =>
   // 3. Wait a few seconds for the geometry to be computed by the worker
   await page.waitForTimeout(3000)
 
+  const header = page.locator('text=erzberg')
+  await expect(header).toBeVisible({ timeout: 10000 })
+
   // 4. Capture pixel data from the 100x100 center region
   // Default bg is #ffffff, default lines are #000000.
   const hasLines = await page.evaluate(() => {

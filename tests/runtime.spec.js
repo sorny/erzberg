@@ -30,7 +30,7 @@ test('app loads without console errors', async ({ page }) => {
   await page.waitForSelector('#root', { timeout: 10000 })
   await page.waitForTimeout(3000)
 
-  const header = page.locator('text=Heightmap Lines')
+  const header = page.locator('text=erzberg')
   await expect(header).toBeVisible({ timeout: 10000 })
   
   await page.waitForSelector('canvas', { timeout: 20000 })

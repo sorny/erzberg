@@ -486,7 +486,7 @@ export function Sidebar({
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
         <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'center' }}>
-          <span style={{ fontSize:9, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: MUTED, flex:1 }}>Heightmap Lines</span>
+          <span style={{ fontSize:11, fontWeight:800, letterSpacing:'2px', textTransform:'lowercase', color: MUTED, flex:1 }}>erzberg</span>
           <button onClick={onReset} style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset</button>
         </div>
 

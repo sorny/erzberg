@@ -1,4 +1,4 @@
-# heightmap-r3f
+# erzberg
 
 A high-performance React Three Fiber topographic visualization suite.  
 Transforms grayscale heightmaps and GeoTIFFs into interactive 3D line art and sculpted surfaces with professional-grade terrain analysis tools.
@@ -11,16 +11,17 @@ Detailed mathematical backgrounds and algorithm documentation can be found in th
 
 ## 🚀 Key Features
 
-- **9 Layered Draw Modes**: Fully independent layers with per-mode styling, dash patterns, and hypsometric tinting. Mix and match Ridgelines, Contours, Hachure, Flow Lines, Network streams, Pencil shading, and Pillars.
+- **11 Layered Draw Modes**: Fully independent layers with per-mode styling, dash patterns, and hypsometric tinting. Mix and match Ridgelines, Contours, Hachure, Flow Lines, Network streams, Pencil shading, Ridge detection, Valley troughs, and Pillars.
 - **Ghost Occlusion**: True line-based depth culling via invisible 3D "curtains". Supports artistic ghosting where hidden lines can be styled with custom colors and opacities (e.g., faint red for lines behind mountains).
 - **Physically Correct Hydraulic Erosion**: Droplet-based simulation using Hans Beyer's research. Carve natural drainage patterns with inertia, gravity, and sediment capacity controls. Includes **Undo** support.
 - **Continuous Network Thinning**: Realistic river branching powered by Strahler stream order and continuous water accumulation.
+- **High-Fidelity Ridge Detection**: Advanced landform extraction using Hessian matrix eigenvalue analysis for precise mountain range and cliff-line tracing.
 - **3D Symmetry Navigator**: A 6-directional arrow pad for real-time kaleidoscopic mirroring across X, Y, and Z axes.
 - **External Preset System**: Easily share and load complete 3D scene states (Terrain, Style, Points, View, Gradients) via JSON files in `public/presets/`.
 - **GIS Integration**: Native support for **GeoTIFF** elevation data with real-world unit display (metres).
 - **Pro Exporters**: 
   - **SVG**: High-precision projected vector lines with true software Z-buffer ghost occlusion.
-  - **PNG**: Auto-trimmed raster exports (including transparency support).
+  - **PNG**: Auto-trimmed raster exports (including transparency support) at 4K resolution.
   - **STL**: 3D printable meshes.
   - **Heightmap**: 1:1 greyscale PNG export of the processed grid.
   - **WebM**: Real-time high-quality video recording.
@@ -40,7 +41,8 @@ Detailed mathematical backgrounds and algorithm documentation can be found in th
 ## 🏃 Running
 
 ```bash
-cd heightmap-r3f
+git clone https://github.com/your-username/erzberg.git
+cd erzberg
 npm install
 npm run dev
 # open http://localhost:5173
