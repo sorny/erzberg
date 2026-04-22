@@ -44,14 +44,22 @@ export function Scene({
   
   const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom, px, py) => {
     if (!activeCamera) return
-    const dist = (BASE_DIST / zoom)
-    const phi = THREE.MathUtils.degToRad(tiltDeg)       // polar angle (0 = top)
-    const theta = THREE.MathUtils.degToRad(rotationDeg) // azimuthal angle
+    
+    // For Perspective, distance changes. 
+    // For Orthographic, distance should be constant to avoid clipping/z-issues, 
+    // but the .zoom property is what actually scales the view.
+    const dist = p.orthographic ? BASE_DIST : (BASE_DIST / zoom)
+    const phi = THREE.MathUtils.degToRad(tiltDeg)
+    const theta = THREE.MathUtils.degToRad(rotationDeg)
 
-    // We want the camera to orbit around the shifted target (px, 0, py)
     const target = new THREE.Vector3(px || 0, 0, py || 0)
     activeCamera.position.setFromSphericalCoords(dist, phi, theta).add(target)
     activeCamera.lookAt(target)
+
+    if (p.orthographic) {
+      activeCamera.zoom = zoom * 2
+      activeCamera.updateProjectionMatrix()
+    }
 
     if (orbitRef.current) {
       orbitRef.current.target.copy(target)
@@ -61,7 +69,7 @@ export function Scene({
 
   useEffect(() => {
     updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
-  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
+  }, [p.tilt, p.rotation, p.zoom, p.orthographic, activeCamera])
 
   useFrame((_, delta) => {
     if (!p.autoRotate) return
@@ -82,15 +90,20 @@ export function Scene({
     const target = orbitRef.current.target
     const relativePos = activeCamera.position.clone().sub(target)
     const sph = new THREE.Spherical().setFromVector3(relativePos)
-
+    
     const tilt = THREE.MathUtils.radToDeg(sph.phi)
     const rotation = THREE.MathUtils.radToDeg(sph.theta)
-    const zoom = BASE_DIST / sph.radius
+    
+    // Calculate zoom based on camera type
+    const zoom = p.orthographic 
+      ? (activeCamera.zoom / 2) 
+      : (BASE_DIST / sph.radius)
+
     const panX = target.x
     const panY = target.z
 
     if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || 
-        Math.abs(zoom - p.zoom) > 0.01 || Math.abs(panX - (p.panX || 0)) > 1 || Math.abs(panY - (p.panY || 0)) > 1) {
+        Math.abs(zoom - p.zoom) > 0.001 || Math.abs(panX - (p.panX || 0)) > 1 || Math.abs(panY - (p.panY || 0)) > 1) {
       levaSet({ tilt, rotation, zoom, panX, panY })
     }
   }
