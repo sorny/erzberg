@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-04-22
+
+### Fixed
+- Contour interval anchoring: precisely identifies and renders 0.0m elevation levels.
+- Shoreline Tracing: Contours now accurately trace the boundary of terrain (NoData handling).
+
 ## [0.2.1] - 2026-04-22
 
 ### Fixed
