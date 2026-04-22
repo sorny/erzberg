@@ -29,12 +29,14 @@ Detailed mathematical backgrounds and algorithm documentation can be found in th
 
 | Layer | Library |
 |---|---|
-| **3D Renderer** | [React Three Fiber](https://github.com/pmndrs/react-three-fiber) v8 + Three.js v0.168 |
-| **GPU Lines** | `LineSegments2` / `LineMaterial` for consistent thick-line rendering |
-| **State** | [Zustand](https://github.com/pmndrs/zustand) (Heavy pixel data) + React State (UI) |
-| **Concurrency** | Web Workers for heavy geometry & erosion CPU tasks |
-| **Styling** | Tailwind CSS |
-| **Testing** | Playwright (E2E & Runtime verification) |
+| **3D Renderer** | [React Three Fiber](https://github.com/pmndrs/react-three-fiber) + [Three.js](https://github.com/mrdoob/three.js) |
+| **3D Helpers** | [Drei](https://github.com/pmndrs/drei) |
+| **GPU Lines** | `LineSegments2` / `LineMaterial` (Three.js) |
+| **State** | [Zustand](https://github.com/pmndrs/zustand) + [React](https://github.com/facebook/react) |
+| **UI / Controls** | [Leva](https://github.com/pmndrs/leva) |
+| **GIS Parsing** | [GeoTIFF.js](https://github.com/geotiffjs/geotiff.js) |
+| **Build / Style** | [Vite](https://github.com/vitejs/vite) + [Tailwind CSS](https://github.com/tailwindlabs/tailwindcss) |
+| **Testing** | [Playwright](https://github.com/microsoft/playwright) |
 
 ## 🏃 Running
 
