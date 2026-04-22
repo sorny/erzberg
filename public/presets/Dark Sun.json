@@ -1,7 +1,7 @@
 {
   "terrain": {
     "resolution": 2,
-    "elevScale": 1.71,
+    "elevScale": 1,
     "blurRadius": 0,
     "gridOffsetX": 0,
     "gridOffsetY": 0,
@@ -24,6 +24,9 @@
     "bgColor": "#ffffff",
     "bgGradient": false,
     "depthOcclusion": true,
+    "occlusionBias": 1,
+    "occlusionColor": "#a80000",
+    "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
     "textureShiftX": 0,
@@ -76,6 +79,8 @@
     "hypsoModePillars": "elevation",
     "hypsoBandedPillars": false,
     "hypsoIntervalPillars": 10,
+    "pillarGap": 1,
+    "pillarDepth": 100,
     "enabledContours": false,
     "intervalContours": 4,
     "colorContours": "#000000",
@@ -86,6 +91,9 @@
     "hypsoModeContours": "elevation",
     "hypsoBandedContours": false,
     "hypsoIntervalContours": 10,
+    "majorIntervalContours": 10,
+    "majorWeightContours": 2,
+    "majorOffsetContours": 1,
     "enabledHachure": false,
     "spacingHachure": 4,
     "lengthHachure": 1,
@@ -130,6 +138,30 @@
     "hypsoModePencil": "elevation",
     "hypsoBandedPencil": false,
     "hypsoIntervalPencil": 10,
+    "enabledRidge": false,
+    "spacingRidge": 1,
+    "radiusRidge": 1,
+    "thresholdRidge": 0.1,
+    "colorRidge": "#000000",
+    "weightRidge": 1,
+    "opacityRidge": 1,
+    "dashRidge": "solid",
+    "hypsoRidge": false,
+    "hypsoModeRidge": "elevation",
+    "hypsoBandedRidge": false,
+    "hypsoIntervalRidge": 10,
+    "enabledValley": false,
+    "spacingValley": 2,
+    "radiusValley": 2,
+    "thresholdValley": 0.5,
+    "colorValley": "#000000",
+    "weightValley": 1,
+    "opacityValley": 1,
+    "dashValley": "solid",
+    "hypsoValley": false,
+    "hypsoModeValley": "elevation",
+    "hypsoBandedValley": false,
+    "hypsoIntervalValley": 10,
     "showLines": true,
     "gradientStops": [
       {
@@ -166,11 +198,11 @@
     "particleGravityStr": 1
   },
   "view": {
-    "tilt": 60.952697935384975,
-    "rotation": -53.73889967472739,
-    "zoom": 0.4166666666666687,
+    "tilt": 69.11860428619146,
+    "rotation": -47.04318728534661,
+    "zoom": 1.7580869159106307,
     "autoRotate": false,
-    "autoRotateSpeed": 0.5,
+    "autoRotateSpeed": 0.2,
     "autoRotateAxis": "Y",
     "autoRotateDir": 1,
     "showGuides": false,
@@ -196,6 +228,16 @@
     {
       "pos": 1,
       "color": "#800000"
+    }
+  ],
+  "bgGradientStops": [
+    {
+      "pos": 0,
+      "color": "#615856"
+    },
+    {
+      "pos": 1,
+      "color": "#3a2f2b"
     }
   ]
 }
