@@ -18,12 +18,37 @@ function loadImagePixels(source) {
       ctx.drawImage(img, 0, 0)
       const { data } = ctx.getImageData(0, 0, w, h)
       const pixels = new Float32Array(w * h)
-      const nodataMask = new Uint8Array(w * h).fill(1) // Images have no NoData by default
+      const nodataMask = new Uint8Array(w * h)
+      
+      let minX = w, minY = h, maxX = 0, maxY = 0
+      let hasValid = false
+
       for (let i = 0; i < w * h; i++) {
-        const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2]
+        const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2], a = data[i * 4 + 3]
         pixels[i] = (r + g + b) / (3 * 255)
+        
+        // Treat pixels with low alpha as NoData
+        if (a < 128) {
+          nodataMask[i] = 0
+        } else {
+          nodataMask[i] = 1
+          const x = i % w
+          const y = Math.floor(i / w)
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+          hasValid = true
+        }
       }
-      resolve({ pixels, nodataMask, width: w, height: h })
+      resolve({ 
+        pixels, 
+        nodataMask, 
+        width: w, 
+        height: h,
+        dataWidth: hasValid ? (maxX - minX + 1) : w,
+        dataHeight: hasValid ? (maxY - minY + 1) : h
+      })
     }
     img.onerror = reject
     img.src = typeof source === 'string' ? source : URL.createObjectURL(source)
@@ -113,12 +138,12 @@ export function useHeightmap() {
   const load = useCallback((source) => {
     setIsLoading(true); setLoadingMsg('Loading heightmap…')
     return loadImagePixels(source)
-      .then(({ pixels, nodataMask, width, height }) => {
+      .then(({ pixels, nodataMask, width, height, dataWidth, dataHeight }) => {
         const filename = typeof source === 'string' ? source.split('/').pop() : source.name
         clearGeoTiffMeta()
         setHeightmap(pixels, nodataMask, width, height, filename)
         setIsLoading(false); setLoadingMsg('')
-        return { pixels, nodataMask, width, height, dataWidth: width, dataHeight: height }
+        return { pixels, nodataMask, width, height, dataWidth, dataHeight }
       })
       .catch(err => { setIsLoading(false); setLoadingMsg(''); throw err })
   }, [setHeightmap, clearGeoTiffMeta])
