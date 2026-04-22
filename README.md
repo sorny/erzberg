@@ -57,6 +57,17 @@ npm run dev
 | **G** | Toggle Center Guides |
 | **Reset** | Reverts all parameters to defaults |
 
+## 🧪 Testing
+
+This project uses [Playwright](https://playwright.dev/) for end-to-end and rendering validation. 
+
+**Ensure your development server is running (`npm run dev`) before executing tests.**
+
+- **Run all tests**: `npm run test`
+- **Open interactive UI**: `npm run test:ui`
+- **Run line visibility check**: `npx playwright test tests/lines.spec.js`
+- **Headed mode (watch browser)**: `npx playwright test --headed`
+
 ## 📄 References & Credits
 - Hydraulic erosion implementation is based on [**"Implementation of a Method for Hydraulic Erosion"** by Hans Beyer](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf).
 
