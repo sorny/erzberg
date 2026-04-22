@@ -156,22 +156,25 @@ export function Scene({
 
   return (
     <>
-      <PerspectiveCamera 
-        ref={persRef} 
-        makeDefault={!p.orthographic} 
-        fov={p.fov} 
-        near={1} 
-        far={50000} 
-        position={[0, 400, 500]} 
-      />
-      <OrthographicCamera 
-        ref={orthoRef} 
-        makeDefault={!!p.orthographic} 
-        zoom={p.zoom * 2} // Ortho uses a different zoom scale
-        near={1} 
-        far={50000} 
-        position={[0, 400, 500]} 
-      />
+      {p.orthographic ? (
+        <OrthographicCamera 
+          ref={orthoRef} 
+          makeDefault 
+          zoom={p.zoom * 2} 
+          near={1} 
+          far={50000} 
+          position={[0, 400, 500]} 
+        />
+      ) : (
+        <PerspectiveCamera 
+          ref={persRef} 
+          makeDefault 
+          fov={p.fov} 
+          near={1} 
+          far={50000} 
+          position={[0, 400, 500]} 
+        />
+      )}
 
       <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} />
       <Controls levaGet={levaGet} levaSet={levaSet} orbitRef={orbitRef} />

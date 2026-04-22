@@ -562,7 +562,7 @@ export function Sidebar({
 
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
             <Sub>
-              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onToggle={v => sv({ orthographic: v })} />
+              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
               {!view.orthographic && (
                 <InlineSl label="Focal Len" help="Field of View (FOV). Lower = Zoom/Tele, Higher = Wide." min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
               )}
