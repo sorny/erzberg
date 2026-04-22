@@ -1,123 +1,151 @@
 /**
  * PNG export utilities.
- *
- * exportPNG      — trimmed export; composites gradient under canvas when bgGradient is active.
- * exportPNGAlpha — transparent background: replaces solid bg pixels with alpha=0, then trims.
+ * Supports high-resolution offscreen captures with clean alpha channels.
  */
 
-const MARGIN    = 16   // px padding around trimmed content
-const THRESHOLD = 12   // per-channel tolerance for bg-pixel detection
+const MARGIN = 16 // px padding around trimmed content
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function parseBgRGB(bgHex) {
-  const n = parseInt((bgHex || '#ffffff').replace('#', ''), 16)
-  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
-}
-
-function trimAndDownload(ctx, width, height, isBg, filename) {
+/**
+ * Trims a canvas to its non-transparent content and triggers a download.
+ */
+function trimAndDownload(ctx, width, height, filename) {
   const { data } = ctx.getImageData(0, 0, width, height)
   let minX = width, minY = height, maxX = 0, maxY = 0
+  let hasContent = false
 
+  // Scan alpha channel for bounds
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const i = (y * width + x) * 4
-      if (!isBg(data, i)) {
+      const alpha = data[(y * width + x) * 4 + 3]
+      if (alpha > 5) { // Threshold for extremely faint pixels
         if (x < minX) minX = x
         if (y < minY) minY = y
         if (x > maxX) maxX = x
         if (y > maxY) maxY = y
+        hasContent = true
       }
     }
   }
 
-  if (minX >= maxX || minY >= maxY) {
+  if (!hasContent) {
     triggerDownload(ctx.canvas.toDataURL('image/png'), filename)
     return
   }
 
+  // Apply margin
   minX = Math.max(0, minX - MARGIN)
   minY = Math.max(0, minY - MARGIN)
-  maxX = Math.min(width  - 1, maxX + MARGIN)
+  maxX = Math.min(width - 1, maxX + MARGIN)
   maxY = Math.min(height - 1, maxY + MARGIN)
 
+  const outW = maxX - minX + 1
+  const outH = maxY - minY + 1
+
   const out = document.createElement('canvas')
-  out.width  = maxX - minX + 1
-  out.height = maxY - minY + 1
-  out.getContext('2d').drawImage(
-    ctx.canvas, minX, minY, out.width, out.height, 0, 0, out.width, out.height
+  out.width = outW
+  out.height = outH
+  const outCtx = out.getContext('2d')
+  
+  outCtx.drawImage(
+    ctx.canvas,
+    minX, minY, outW, outH,
+    0, 0, outW, outH
   )
+
   triggerDownload(out.toDataURL('image/png'), filename)
 }
 
 function triggerDownload(dataURL, filename) {
-  Object.assign(document.createElement('a'), { href: dataURL, download: filename }).click()
+  const a = Object.assign(document.createElement('a'), {
+    href: dataURL,
+    download: filename,
+  })
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
 
 /**
- * Regular PNG export — solid bg or composited gradient.
- * @param {HTMLCanvasElement} glCanvas
- * @param {string}            bgHex          solid background hex
- * @param {Array|null}        bgGradientStops gradient stops or null for solid
+ * High-fidelity PNG export.
+ * @param {HTMLCanvasElement} glCanvas  The captured WebGL canvas (rendered with alpha)
+ * @param {string}            bgHex     Solid background color
+ * @param {Array|null}        bgStops   Gradient stops or null
+ * @param {boolean}           isAlpha   If true, background is ignored
  */
-export function exportPNG(glCanvas, bgHex, bgGradientStops) {
+export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha) {
   const { width, height } = glCanvas
   const out = document.createElement('canvas')
-  out.width = width; out.height = height
+  out.width = width
+  out.height = height
   const ctx = out.getContext('2d')
 
-  if (bgGradientStops?.length > 1) {
-    // Gradient mode: canvas is transparent; composite gradient underneath
-    const grad = ctx.createLinearGradient(0, 0, 0, height)
-    for (const s of bgGradientStops) grad.addColorStop(s.pos, s.color)
-    ctx.fillStyle = grad
+  if (!isAlpha) {
+    // 1. Draw background
+    if (bgStops?.length > 1) {
+      const grad = ctx.createLinearGradient(0, 0, 0, height)
+      for (const s of bgStops) grad.addColorStop(s.pos, s.color)
+      ctx.fillStyle = grad
+    } else {
+      ctx.fillStyle = bgHex || '#ffffff'
+    }
     ctx.fillRect(0, 0, width, height)
-    ctx.drawImage(glCanvas, 0, 0)
+  }
 
-    // Trim: non-transparent pixels that aren't pure gradient corners
-    // Use the simpler transparent-pixel check since the canvas had alpha=0 in empty areas
-    trimAndDownload(ctx, width, height,
-      (data, i) => data[i + 3] < 10,   // "is background" = was transparent before composite
-      'heightmap.png'
-    )
+  // 2. Composite the WebGL content
+  // Note: WebGL canvas must have been rendered with { preserveDrawingBuffer: true }
+  // or captured immediately after a render call.
+  ctx.drawImage(glCanvas, 0, 0)
+
+  // 3. Trim based on the alpha pass
+  // To trim a non-alpha image accurately, we'd need a separate alpha-only mask.
+  // We'll assume the trimming happens based on the WebGL content bounds.
+  // For standard PNG, we look at the content before background was added.
+  if (!isAlpha) {
+    // We create a temporary alpha-only version just for bounds detection
+    const mask = document.createElement('canvas')
+    mask.width = width; mask.height = height
+    mask.getContext('2d').drawImage(glCanvas, 0, 0)
+    
+    // We'll pass the composite result but use the mask for bounds
+    const maskData = mask.getContext('2d').getImageData(0, 0, width, height).data
+    trimWithMaskAndDownload(ctx, maskData, width, height, 'heightmap.png')
   } else {
-    // Solid mode: canvas has bg baked in
-    ctx.drawImage(glCanvas, 0, 0)
-    const [bgR, bgG, bgB] = parseBgRGB(bgHex)
-    trimAndDownload(ctx, width, height,
-      (data, i) => data[i + 3] < 10 ||
-        (Math.abs(data[i]   - bgR) + Math.abs(data[i+1] - bgG) + Math.abs(data[i+2] - bgB)) <= THRESHOLD,
-      'heightmap.png'
-    )
+    trimAndDownload(ctx, width, height, 'heightmap-alpha.png')
   }
 }
 
-/**
- * Transparent PNG export.
- * - When gradient is active: canvas is already transparent → trim non-transparent pixels.
- * - When solid: replace bg-coloured pixels with alpha=0, then trim.
- */
-export function exportPNGAlpha(glCanvas, bgHex, bgGradientActive) {
-  const { width, height } = glCanvas
-  const tmp = document.createElement('canvas')
-  tmp.width = width; tmp.height = height
-  const ctx = tmp.getContext('2d')
-  ctx.drawImage(glCanvas, 0, 0)
+function trimWithMaskAndDownload(ctx, maskData, width, height, filename) {
+  let minX = width, minY = height, maxX = 0, maxY = 0
+  let hasContent = false
 
-  if (!bgGradientActive) {
-    // Replace solid bg pixels with transparent
-    const [bgR, bgG, bgB] = parseBgRGB(bgHex)
-    const img = ctx.getImageData(0, 0, width, height)
-    const { data } = img
-    for (let i = 0; i < data.length; i += 4) {
-      if (Math.abs(data[i] - bgR) + Math.abs(data[i+1] - bgG) + Math.abs(data[i+2] - bgB) <= THRESHOLD) {
-        data[i + 3] = 0
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const alpha = maskData[(y * width + x) * 4 + 3]
+      if (alpha > 5) {
+        if (x < minX) minX = x
+        if (y < minY) minY = y
+        if (x > maxX) maxX = x
+        if (y > maxY) maxY = y
+        hasContent = true
       }
     }
-    ctx.putImageData(img, 0, 0)
   }
 
-  trimAndDownload(ctx, width, height, (data, i) => data[i + 3] < 10, 'heightmap-alpha.png')
+  if (!hasContent) {
+    triggerDownload(ctx.canvas.toDataURL('image/png'), filename)
+    return
+  }
+
+  minX = Math.max(0, minX - MARGIN); minY = Math.max(0, minY - MARGIN)
+  maxX = Math.min(width - 1, maxX + MARGIN); maxY = Math.min(height - 1, maxY + MARGIN)
+
+  const outW = maxX - minX + 1; const outH = maxY - minY + 1
+  const out = document.createElement('canvas')
+  out.width = outW; out.height = outH
+  out.getContext('2d').drawImage(ctx.canvas, minX, minY, outW, outH, 0, 0, outW, outH)
+  triggerDownload(out.toDataURL('image/png'), filename)
 }
