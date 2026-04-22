@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* Leva panel tweaks */
 [class^='leva-'] { font-family: 'JetBrains Mono', 'Fira Code', monospace !important; }
