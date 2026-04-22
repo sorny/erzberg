@@ -2,8 +2,6 @@
 
 The `heightmap-r3f` rendering engine transforms a 2D scalar field (the heightmap grid) into expressive 3D line art. It provides 11 independent draw modes, each extracting different topographic features using specific mathematical techniques.
 
-This document outlines the theoretical background for each mode, all of which operate natively in $O(N)$ or $O(N \log N)$ complexity on the CPU-side Web Worker.
-
 ---
 
 ### 1 & 2. X Lines / Y Lines (Ridgelines)
@@ -12,7 +10,6 @@ These modes sample the terrain grid at fixed intervals along the X or Y axis.
 
 ### 3. Crosshatch
 A combination of X Lines and Y Lines.
-- **Math**: Simply invokes both the X and Y ridgeline builders at the identical `spacing` to create a grid-like wireframe matching the topography.
 
 ### 4. Pillars
 Visualizes the terrain as discrete vertical bars (extrusion).
@@ -21,10 +18,8 @@ Visualizes the terrain as discrete vertical bars (extrusion).
 ### 5. Contours (Isolines)
 Draws continuous lines connecting points of equal elevation.
 - **Math**: Implemented using **Fast Marching Squares**.
-  1. The elevation range is quantized based on the `interval`.
-  2. Every $2 \times 2$ cell forms a 4-bit index determining the line topology.
-  3. Supports **Major Contours**: Every $N$-th line is identified and drawn into a separate bold layer using a phase-offset logic.
-  4. **GIS-Aware**: If a GeoTIFF is loaded, intervals are calculated in real-world **meters**.
+  - Supports **Major Contours**: Every $N$-th line is identified and drawn into a separate bold layer using a phase-offset logic.
+  - **GIS-Aware**: If a GeoTIFF is loaded, intervals are calculated in real-world **meters**.
 
 ### 6. Hachure
 Draws short strokes pointing down the slope (classic cartographic shading).
@@ -37,24 +32,29 @@ Generates continuous trails that follow the drainage vector field.
 
 ### 8. Stream Network (DAG Thinning)
 Visualizes river systems based on flow accumulation.
-- **Math**: Based on **Strahler Stream Order**.
-  1. Forms a Directed Acyclic Graph (DAG) pointing to the steepest descent neighbor.
-  2. Performs a topological sort to accumulate upstream area (flow) at every cell.
-  3. Thins the network by only drawing edges where the accumulation exceeds a discrete threshold.
+- **Math**: Based on **Strahler Stream Order**. Performs a topological sort to accumulate upstream area (flow) at every cell.
 
 ### 9. Pencil Shading
 Creates a hand-drawn look by detecting sharp ridges and valleys.
 - **Math**: Calculates the discrete **Laplacian** $\nabla^2 H$ (mean curvature). If the magnitude exceeds a threshold, an oriented "X" cross-hatch is drawn.
 
-### 10 & 11. Ridge & Valley (TPI)
-Extracts structural landforms based on relative topographic position.
+### 10. Ridge Detection (Differential Geometry)
+Extracts Mathematically precise crest lines, cliffs, and mountain top ranges.
+- **Math**: Based on the **Hessian Matrix** $J = \begin{pmatrix} H_{xx} & H_{xy} \\ H_{xy} & H_{yy} \end{pmatrix}$.
+  1. **Eigenvalue Analysis**: Calculates the eigenvalues $\lambda_1, \lambda_2$ of the Hessian. $\lambda_1$ represents the maximum principal curvature.
+  2. **Crest Extraction**: Points are identified where $\lambda_1 \ll 0$ (concave-down) and $|\lambda_1|$ is a local maximum in the direction of the principal curvature.
+  3. **Connectivity**: Neighboring ridge points are connected to form continuous, "thin" topographic paths.
+- **Parameters**: 
+  - **Radius**: Controls the pre-smoothing scale (small = micro-cliffs, large = mountain ranges).
+  - **Threshold**: Controls the minimum sharpness required to be drawn.
+
+### 11. Valley Detection (TPI)
+Extracts basins, troughs, and valley floors.
 - **Math**: Uses the **Topographic Position Index (TPI)**:
   $$ TPI = Z_{center} - \bar{Z}_{radius} $$
   Where $\bar{Z}$ is the mean elevation in a neighborhood of size `radius`.
-- **Ridge**: $TPI > Threshold$. Extracts crests that are higher than their surroundings.
-* **Valley**: $TPI < -Threshold$. Extracts troughs and basins that are lower than their surroundings.
-* **Scale-Aware**: The `radius` allows you to target micro-features (small values) or macro-landforms (large values).
-* **Efficiency**: Calculated in **$O(N)$ constant time** using an Integral Image (Summed Area Table), making it responsive even at huge scales.
+- **Logic**: $TPI < -Threshold$. Extracts areas that are significantly lower than their surroundings.
+- **Efficiency**: Calculated in **$O(N)$ constant time** using an Integral Image (Summed Area Table).
 
 ---
 

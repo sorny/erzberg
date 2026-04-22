@@ -46,7 +46,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
-    { id:'Ridge',   builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge, true) },
+    { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
   ]
 
@@ -359,6 +359,75 @@ function buildPencilShading(terrain, p, spacing, threshold) {
       colors.push(...col, ...col, ...col, ...col)
     }
   }
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+}
+
+// ─── Ridge Lines (Differential Geometry) ──────────────────────────────────────
+
+function buildRidgeLines(terrain, p, spacing, radius, threshold) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  
+  // 1. Pre-smooth for stable second derivatives
+  const smoothed = boxBlur(grid, cols, rows, radius)
+  const ridgeThreshold = (threshold ?? 0.5) * 0.1
+  const step = Math.max(1, Math.round((spacing ?? 2) / scl))
+  const positions = [], colors = []
+  
+  // 2. Compute Ridge points using Hessian Eigenvalues
+  // Point is a ridge if max principal curvature is high AND it's a local maximum in direction of curvature
+  const isRidge = new Uint8Array(rows * cols)
+  const curvatures = new Float32Array(rows * cols)
+
+  for (let r = 1; r < rows - 1; r++) {
+    for (let c = 1; c < cols - 1; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      
+      // Finite differences for second derivatives
+      const hxx = smoothed[i+1] + smoothed[i-1] - 2*smoothed[i]
+      const hyy = smoothed[i+cols] + smoothed[i-cols] - 2*smoothed[i]
+      const hxy = (smoothed[i+cols+1] - smoothed[i+cols-1] - smoothed[i-cols+1] + smoothed[i-cols-1]) / 4
+      
+      // Eigenvalues of Hessian J = [[hxx, hxy], [hxy, hyy]]
+      // lambda = (tr(J) +- sqrt(tr(J)^2 - 4*det(J))) / 2
+      const tr = hxx + hyy
+      const det = hxx * hyy - hxy * hxy
+      const disc = Math.sqrt(Math.max(0, tr * tr - 4 * det))
+      const lambda1 = (tr - disc) / 2 // Smallest eigenvalue (most negative for ridge)
+      
+      curvatures[i] = -lambda1
+      if (-lambda1 > ridgeThreshold) isRidge[i] = 1
+    }
+  }
+
+  // 3. Connect neighboring Ridge points to form segments
+  for (let r = 1; r < rows - 1; r += step) {
+    for (let c = 1; c < cols - 1; c += step) {
+      const i = r * cols + c
+      if (!isRidge[i]) continue
+      
+      // Check 8-neighborhood for other ridge points to connect to
+      for (let dr = 0; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc <= 0) continue // Skip self and previous columns in current row
+          const nr = r + dr, nc = c + dc
+          const ni = nr * cols + nc
+          if (nr >= rows || nc < 0 || nc >= cols || !isRidge[ni]) continue
+          
+          const e0 = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+          const e1 = cellElev(grid, nr, nc, cols, elevScale, jitterAmt)
+          
+          if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+            positions.push(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
+            const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), 0, p)
+            colors.push(...col, ...col)
+          }
+        }
+      }
+    }
+  }
+
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
