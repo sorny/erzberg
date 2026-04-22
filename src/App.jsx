@@ -74,7 +74,7 @@ const STYLE_DEF = {
   hypsoPencil: false, hypsoModePencil: 'elevation', hypsoBandedPencil: false, hypsoIntervalPencil: 10,
 
   // Ridge
-  enabledRidge: false, spacingRidge: 2, radiusRidge: 2, thresholdRidge: 0.5, colorRidge: '#000000', weightRidge: 1, opacityRidge: 1, dashRidge: 'solid',
+  enabledRidge: false, spacingRidge: 1, radiusRidge: 1, thresholdRidge: 0.1, colorRidge: '#000000', weightRidge: 1, opacityRidge: 1, dashRidge: 'solid',
   hypsoRidge: false, hypsoModeRidge: 'elevation', hypsoBandedRidge: false, hypsoIntervalRidge: 10,
   // Valley
   enabledValley: false, spacingValley: 2, radiusValley: 2, thresholdValley: 0.5, colorValley: '#000000', weightValley: 1, opacityValley: 1, dashValley: 'solid',

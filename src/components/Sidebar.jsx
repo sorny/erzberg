@@ -742,9 +742,9 @@ export function Sidebar({
             {style.enabledRidge && (
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
-                  <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
-                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
+                  <InlineSl label="Spacing" min={1} max={10} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
+                  <InlineSl label="Radius" min={0.2} max={2} step={0.1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
+                  <InlineSl label="Threshold" min={0.005} max={0.5} step={0.005} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Ridge" style={style} ss={ss} />
               </>
@@ -756,9 +756,9 @@ export function Sidebar({
             {style.enabledValley && (
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
+                  <InlineSl label="Spacing" min={1} max={10} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
                   <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusValley} onChange={v => ss({ radiusValley: v })} />
-                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
+                  <InlineSl label="Threshold" min={0.005} max={5} step={0.005} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Valley" style={style} ss={ss} />
               </>
