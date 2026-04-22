@@ -10,7 +10,7 @@ test('grid size matches resolution for 500px image', async ({ page }) => {
   await page.goto('http://localhost:5173')
 
   // Wait for the main UI and Sidebar to render
-  await page.waitForSelector('text=Heightmap Lines', { timeout: 15000 })
+  await page.waitForSelector('text=erzberg', { timeout: 15000 })
   
   // --- Check Resolution 2 (Default) ---
   console.log('Checking Resolution 2...')

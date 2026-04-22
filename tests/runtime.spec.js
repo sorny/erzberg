@@ -4,11 +4,12 @@ test('app loads without console errors', async ({ page }) => {
   const errors = []
 
   page.on('console', msg => {
-    if (msg.type() === 'error') {
+    if (msg.type() === 'error' || msg.type() === 'warning') {
       const text = msg.text()
       const url = msg.location().url
-      console.error(`[Browser Console Error] ${text} @ ${url}`)
-      errors.push({ text, url })
+      const type = msg.type() === 'error' ? 'Error' : 'Warning'
+      console.error(`[Browser Console ${type}] ${text} @ ${url}`)
+      errors.push({ text, url, type: msg.type() })
     }
   })
 
@@ -38,6 +39,7 @@ test('app loads without console errors', async ({ page }) => {
   // Filter out harmless errors
   const realErrors = errors.filter(e => {
     if (e.url.includes('favicon.svg')) return false
+    if (e.text.includes('THREE.Clock: This module has been deprecated')) return false
     return true
   })
 
