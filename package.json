@@ -11,13 +11,13 @@
     "test:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@react-three/drei": "^9.109.0",
-    "@react-three/fiber": "^8.17.0",
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "geotiff": "^3.0.5",
     "leva": "^0.10.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.168.0",
+    "three": "^0.178.0",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
