@@ -308,6 +308,7 @@ export function Sidebar({
     terrain: true, levels: true, view: true, presets: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
+    modeRidge: false, modeValley: false,
     points: false, texture: false, creative: false, erosion: false, export: true,
   })
 
@@ -437,6 +438,8 @@ export function Sidebar({
       modeFlow:     !!newStyle.enabledFlow,
       modeDag:      !!newStyle.enabledDag,
       modePencil:   !!newStyle.enabledPencil,
+      modeRidge:    !!newStyle.enabledRidge,
+      modeValley:   !!newStyle.enabledValley,
     }))
   }
 
@@ -595,7 +598,7 @@ export function Sidebar({
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
             {style.depthOcclusion && (
               <Sub>
-                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface." min={0} max={100} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface." min={0} max={10} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
                 <InlineSl label="Ghost Opac" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -730,6 +733,34 @@ export function Sidebar({
                   <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdPencil} onChange={v => ss({ thresholdPencil: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Pencil" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Ridge" open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge}>
+            <Tog label="Enabled" checked={style.enabledRidge} onChange={v => ss({ enabledRidge: v })} />
+            {style.enabledRidge && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
+                  <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
+                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Ridge" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Valley" open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley}>
+            <Tog label="Enabled" checked={style.enabledValley} onChange={v => ss({ enabledValley: v })} />
+            {style.enabledValley && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
+                  <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusValley} onChange={v => ss({ radiusValley: v })} />
+                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Valley" style={style} ss={ss} />
               </>
             )}
           </Section>

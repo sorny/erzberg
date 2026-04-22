@@ -74,6 +74,12 @@ export function useTerrainGeometry(p) {
     // Mode: Pencil
     p.enabledPencil, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil,
     p.hypsoPencil, p.hypsoModePencil, p.hypsoBandedPencil, p.hypsoIntervalPencil,
+    // Mode: Ridge
+    p.enabledRidge, p.spacingRidge, p.radiusRidge, p.thresholdRidge, p.colorRidge, p.weightRidge, p.opacityRidge, p.dashRidge,
+    p.hypsoRidge, p.hypsoModeRidge, p.hypsoBandedRidge, p.hypsoIntervalRidge,
+    // Mode: Valley
+    p.enabledValley, p.spacingValley, p.radiusValley, p.thresholdValley, p.colorValley, p.weightValley, p.opacityValley, p.dashValley,
+    p.hypsoValley, p.hypsoModeValley, p.hypsoBandedValley, p.hypsoIntervalValley,
 
     // Global Line Styling (for fallback)
     p.showLines, p.lineColor, p.strokeWeight, p.lineOpacity, p.lineDash,

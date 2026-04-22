@@ -2,7 +2,7 @@
  * CPU-side geometry builders.
  */
 
-import { cellElev, hasData } from './terrain'
+import { cellElev, hasData, boxBlur } from './terrain'
 import { hexToRgb, sampleGradient, computeVertexColor } from './colorUtils'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,6 +46,8 @@ export function buildLineGeometry(terrain, p) {
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
+    { id:'Ridge',   builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge, true) },
+    { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
   ]
 
   const finalLayers = []
@@ -130,7 +132,7 @@ export function buildLineGeometry(terrain, p) {
   return finalLayers
 }
 
-function empty() { return { positions: new Float32Array(0), colors: new Float32Array(0) } }
+function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set(a, 0); out.set(b, a.length); return out }
 
 // ─── Ridgelines ──────────────────────────────────────────────────────────────
 
@@ -348,7 +350,7 @@ function buildPencilShading(terrain, p, spacing, threshold) {
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
       if (!gridMask[r*cols+c] || r <= 0 || r >= rows-1 || c <= 0 || c >= cols-1) continue
-      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+step] - 4*grid[r*cols+c]) * 100
+      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+1] - 4*grid[r*cols+c]) * 100
       if (curv < curvThreshold) continue
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
@@ -357,6 +359,49 @@ function buildPencilShading(terrain, p, spacing, threshold) {
       colors.push(...col, ...col, ...col, ...col)
     }
   }
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+}
+
+// ─── Ridge & Valley (TPI) ────────────────────────────────────────────────────
+
+function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  
+  // 1. Calculate neighborhood mean using Integral Image (boxBlur)
+  const blurred = boxBlur(grid, cols, rows, radius)
+  
+  const step = Math.max(1, Math.round((spacing ?? 2) / scl))
+  const positions = [], colors = []
+  
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 0; c < cols; c += step) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      
+      const val = grid[i]
+      const avg = blurred[i]
+      const tpi = val - avg
+      
+      const meetsThreshold = isRidge ? (tpi > threshold * 0.05) : (tpi < -threshold * 0.05)
+      if (!meetsThreshold) continue
+      
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      
+      const wx = c * scl - halfW
+      const wz = r * scl - halfH
+      
+      // Draw a small cross-mark centered at the feature point
+      const size = Math.abs(tpi) * 50 * scl
+      positions.push(wx - size, elev, wz, wx + size, elev, wz)
+      
+      const slope = gridSlopes[i]
+      const col = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      colors.push(...col, ...col)
+    }
+  }
+  
   return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
 }
 
@@ -446,5 +491,3 @@ export function buildSurfaceGeometry(terrain, p) {
   }
   return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(indicesList), metadata: { rows, cols } }
 }
-
-function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set(a, 0); out.set(b, a.length); return out }
