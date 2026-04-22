@@ -1,5 +1,5 @@
 /**
- * Root component — heightmap-r3f
+ * Root component — erzberg
  *
  * All tweakable params live in plain React state (no Leva).
  * The custom <Sidebar> renders the right-hand control panel.
