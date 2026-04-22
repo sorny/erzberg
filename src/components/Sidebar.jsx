@@ -308,7 +308,7 @@ export function Sidebar({
     terrain: true, levels: true, view: true, presets: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
-    points: true, texture: false, creative: false, erosion: false, export: true,
+    points: false, texture: false, creative: false, erosion: false, export: true,
   })
 
   // --- Erosion State ---
