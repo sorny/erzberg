@@ -79,6 +79,10 @@ This project uses [Playwright](https://playwright.dev/) for rendering validation
 
 ## 📜 Changelog
 
+### v0.2.1 (2026-04-22)
+*High-Res Fidelity Update*
+- **Export Scaling**: Fixed line weights and particle sizes in 4K PNG exports; they now perfectly match the visual thickness of the viewport.
+
 ### v0.2.0 (2026-04-22)
 *Cinematic Camera & Precision Update*
 - **Cinematic Camera Suite**: Dedicated Camera section with Orthographic projection, Focal Length (FOV) control, and precise X/Y target Panning.
