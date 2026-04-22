@@ -61,12 +61,24 @@ async function loadGeoTiffPixels(file) {
   const range = max - min
   const pixels = new Float32Array(band.length)
   const nodataMask = new Uint8Array(band.length)
+  
+  let minX = width, minY = height, maxX = 0, maxY = 0
+  let hasValid = false
+
   for (let i = 0; i < band.length; i++) {
     const v = band[i]
+    const x = i % width
+    const y = Math.floor(i / width)
+
     if (isNodata(v)) {
       pixels[i] = 0; nodataMask[i] = 0
     } else {
       pixels[i] = (v - min) / range; nodataMask[i] = 1
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+      hasValid = true
     }
   }
 
@@ -81,7 +93,12 @@ async function loadGeoTiffPixels(file) {
     }
   } catch (_) {}
 
-  return { pixels, nodataMask, width, height, realElevMin: min, realElevMax: max, suggestedElevScale }
+  return { 
+    pixels, nodataMask, width, height, 
+    realElevMin: min, realElevMax: max, suggestedElevScale,
+    dataWidth: hasValid ? (maxX - minX + 1) : width,
+    dataHeight: hasValid ? (maxY - minY + 1) : height
+  }
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -101,7 +118,7 @@ export function useHeightmap() {
         clearGeoTiffMeta()
         setHeightmap(pixels, nodataMask, width, height, filename)
         setIsLoading(false); setLoadingMsg('')
-        return { pixels, nodataMask, width, height }
+        return { pixels, nodataMask, width, height, dataWidth: width, dataHeight: height }
       })
       .catch(err => { setIsLoading(false); setLoadingMsg(''); throw err })
   }, [setHeightmap, clearGeoTiffMeta])
@@ -115,11 +132,11 @@ export function useHeightmap() {
   const loadGeoTiff = useCallback((file) => {
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…')
     return loadGeoTiffPixels(file)
-      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale }) => {
+      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }) => {
         setGeoTiffMeta(realElevMin, realElevMax)
         setHeightmap(pixels, nodataMask, width, height, file.name)
         setIsLoading(false); setLoadingMsg('')
-        return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale }
+        return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }
       })
       .catch(err => { setIsLoading(false); setLoadingMsg(''); console.error(err); throw err })
   }, [setHeightmap, setGeoTiffMeta])

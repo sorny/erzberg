@@ -12,7 +12,7 @@ Detailed mathematical backgrounds and algorithm documentation can be found in th
 ## 🚀 Key Features
 
 - **11 Layered Draw Modes**: Fully independent layers with per-mode styling, dash patterns, and hypsometric tinting. Mix and match Ridgelines, Contours, Hachure, Flow Lines, Network streams, Pencil shading, Ridge detection, Valley troughs, and Pillars.
-- **Layered Ghost Occlusion (Signature Feature)**: Powered by a unique **3D "Curtain" Algorithm**. Unlike standard terrain-based culling, `erzberg` generates invisible geometric curtains for every individual line segment. This enables true line-to-line depth awareness and allows for sophisticated artistic "ghosting"—where hidden lines can be styled with custom colors and opacities (e.g., faint red for lines behind mountains).
+- **Layered Ghost Occlusion**: Powered by a unique **3D "Curtain" Algorithm**. Unlike standard terrain-based culling, `erzberg` generates invisible geometric curtains for every individual line segment. This enables true line-to-line depth awareness and allows for sophisticated artistic "ghosting"—where hidden lines can be styled with custom colors and opacities (e.g., faint red for lines behind mountains).
 - **Physically Correct Hydraulic Erosion**: Droplet-based simulation using Hans Beyer's research. Carve natural drainage patterns with inertia, gravity, and sediment capacity controls. Includes **Undo** support.
 - **Continuous Network Thinning**: Realistic river branching powered by Strahler stream order and continuous water accumulation.
 - **High-Fidelity Ridge Detection**: Advanced landform extraction using Hessian matrix eigenvalue analysis for precise mountain range and cliff-line tracing.

@@ -65,9 +65,19 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
   const minZ = (minBrightness - 0.5) * 100 * elevScale, maxZ = (maxBrightness - 0.5) * 100 * elevScale
   let maxSlope = 0
   const gridSlopes = new Float32Array(rows * cols)
+  
+  let minC = cols, maxC = 0, minR = rows, maxR = 0
+  let hasValid = false
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       if (gridMask[r * cols + c] === 0) continue
+      hasValid = true
+      if (c < minC) minC = c
+      if (c > maxC) maxC = c
+      if (r < minR) minR = r
+      if (r > maxR) maxR = r
+
       const b = grid[r * cols + c]
       const br = (c < cols - 1 && gridMask[r * cols + c + 1]) ? grid[r * cols + c + 1] : b
       const bd = (r < rows - 1 && gridMask[(r + 1) * cols + c]) ? grid[(r + 1) * cols + c] : b
@@ -79,8 +89,8 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
 
   return { 
     grid, gridMask, rows, cols, scl, 
-    halfW: ((cols - 1) * scl) / 2, 
-    halfH: ((rows - 1) * scl) / 2, 
+    halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2, 
+    halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2, 
     minZ, maxZ, maxSlope, gridSlopes, elevScale 
   }
 }

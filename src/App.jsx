@@ -405,9 +405,11 @@ export default function App() {
         heightmapFilename={heightmapFilename}
         textureImage={textureImage}
         setTextureImage={setTextureImage}
-        loadFromPicker={() => loadFromPicker(autoZoom)}
-        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, suggestedElevScale }) => {
-          autoZoom({ width, height })
+        loadFromPicker={() => loadFromPicker(({ dataWidth, dataHeight }) => {
+          autoZoom({ width: dataWidth, height: dataHeight })
+        })}
+        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ dataWidth, dataHeight, suggestedElevScale }) => {
+          autoZoom({ width: dataWidth, height: dataHeight })
           if (suggestedElevScale != null) {
             setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
           }
