@@ -485,8 +485,10 @@ export function Sidebar({
         boxShadow:'-3px 0 16px rgba(0,0,0,.4)',
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
-        <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'center' }}>
-          <span style={{ fontSize:11, fontWeight:800, letterSpacing:'2px', textTransform:'lowercase', color: MUTED, flex:1 }}>erzberg</span>
+        <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
+          <span style={{ fontSize:11, fontWeight:800, letterSpacing:'2px', textTransform:'lowercase', color: MUTED }}>erzberg</span>
+          <span style={{ fontSize:9, color: BORDER, fontWeight:600 }}>v0.1.0</span>
+          <div style={{ flex: 1 }} />
           <button onClick={onReset} style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset</button>
         </div>
 

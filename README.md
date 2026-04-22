@@ -60,6 +60,16 @@ npm run dev
 | **G** | Toggle Center Guides |
 | **Reset** | Reverts all parameters to defaults |
 
+## 📜 Changelog
+
+### v0.1.0 (2026-04-21)
+*Initial Alpha Release*
+- **11 Algorithmic Draw Modes**: Implementation of high-fidelity topographic feature extraction (Ridgelines, Contours, Hachure, Flow, Network, Ridge/Valley, Pencil).
+- **Curtain-Based Ghost Occlusion**: Unique 3D geometric culling with custom ghosting color and opacity controls.
+- **Droplet-Based Hydraulic Erosion**: Physically correct simulation with inertia and sediment capacity.
+- **Pro Exporters**: Integrated high-resolution 4K PNG, Projected SVG, and 3D STL export suite.
+- **GIS Engine**: Native GeoTIFF parsing and unit-aware topographic analysis.
+
 ## 🧪 Testing
 
 This project uses [Playwright](https://playwright.dev/) for end-to-end and rendering validation. 
