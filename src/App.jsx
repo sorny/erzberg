@@ -362,7 +362,8 @@ export default function App() {
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   useEffect(() => {
-    load('/Heightmap.png').catch(() =>
+    const baseUrl = import.meta.env.BASE_URL || '/'
+    load(`${baseUrl}Heightmap.png`).catch(() =>
       console.warn('[App] Default heightmap not found — use Load Heightmap.')
     )
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
