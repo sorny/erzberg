@@ -31,6 +31,13 @@ export function Scene({
   const orthoRef    = useRef()
 
   const activeCamera = p.orthographic ? orthoRef.current : persRef.current
+  const set = useThree((s) => s.set)
+
+  useEffect(() => {
+    if (activeCamera) {
+      set({ camera: activeCamera })
+    }
+  }, [p.orthographic, activeCamera, set])
 
   // We use a spherical coordinate system for the camera to keep it "orbiting" the center
   const BASE_DIST = 800

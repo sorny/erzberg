@@ -24,8 +24,7 @@ const TERRAIN_DEF = {
 }
 
 const STYLE_DEF = {
-  // Global & Mesh
-  showFill: true, fillColor: '#ffffff',
+  showFill: false, fillColor: '#ffffff',
   fillHypsometric: false, fillBanded: false, fillHypsoInterval: 10, fillHypsoWeight: 1.5, fillHypsoMode: 'elevation',
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
