@@ -165,11 +165,12 @@ export default function App() {
   useEffect(() => {
     const loadPresets = async () => {
       try {
-        const res = await fetch('/presets/manifest.json')
+        const baseUrl = import.meta.env.BASE_URL || '/'
+        const res = await fetch(`${baseUrl}presets/manifest.json`)
         const manifest = await res.json()
         const loaded = {}
         for (const file of manifest) {
-          const presRes = await fetch(`/presets/${file}`)
+          const presRes = await fetch(`${baseUrl}presets/${file}`)
           const presData = await presRes.json()
           const name = file.replace('.json', '')
           loaded[name] = presData
