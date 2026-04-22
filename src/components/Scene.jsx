@@ -6,9 +6,9 @@
  * CAMERA position/rotation rather than the terrain group.
  * Tilt and Rotation sliders drive the camera's spherical coordinates around [0,0,0].
  */
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useMemo } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, GizmoHelper, GizmoViewport } from '@react-three/drei'
+import { OrbitControls, GizmoHelper, GizmoViewport, PerspectiveCamera, OrthographicCamera } from '@react-three/drei'
 import * as THREE from 'three'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem }  from './ParticleSystem'
@@ -24,25 +24,37 @@ export function Scene({
   cameraPreset,
   webmRecording,
 }) {
-  const { camera, gl, scene } = useThree()
+  const { camera: currentCamera, gl, scene, size } = useThree()
   const groupRef    = useRef()
   const particleRef = useRef()
+  const persRef     = useRef()
+  const orthoRef    = useRef()
+
+  const activeCamera = p.orthographic ? orthoRef.current : persRef.current
 
   // We use a spherical coordinate system for the camera to keep it "orbiting" the center
   const BASE_DIST = 800
   
-  const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom) => {
+  const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom, px, py) => {
+    if (!activeCamera) return
     const dist = (BASE_DIST / zoom)
     const phi = THREE.MathUtils.degToRad(tiltDeg)       // polar angle (0 = top)
     const theta = THREE.MathUtils.degToRad(rotationDeg) // azimuthal angle
-    camera.position.setFromSphericalCoords(dist, phi, theta)
-    camera.lookAt(0, 0, 0)
-    if (orbitRef.current) orbitRef.current.update()
+
+    // We want the camera to orbit around the shifted target (px, 0, py)
+    const target = new THREE.Vector3(px || 0, 0, py || 0)
+    activeCamera.position.setFromSphericalCoords(dist, phi, theta).add(target)
+    activeCamera.lookAt(target)
+
+    if (orbitRef.current) {
+      orbitRef.current.target.copy(target)
+      orbitRef.current.update()
+    }
   }
 
   useEffect(() => {
-    updateCameraFromSliders(p.tilt, p.rotation, p.zoom)
-  }, [p.tilt, p.rotation, p.zoom])
+    updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
+  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
 
   useFrame((_, delta) => {
     if (!p.autoRotate) return
@@ -53,24 +65,33 @@ export function Scene({
   useEffect(() => {
     if (!cameraPreset?.name) return
     if (orbitRef?.current) {
-      orbitRef.current.target.set(0, 0, 0)
+      orbitRef.current.target.set(p.panX || 0, 0, p.panY || 0)
       orbitRef.current.update()
     }
-  }, [cameraPreset])
+  }, [cameraPreset, p.panX, p.panY])
 
   const handleOrbitChange = () => {
-    if (!orbitRef.current) return
-    const sph = new THREE.Spherical().setFromVector3(camera.position)
+    if (!orbitRef.current || !activeCamera) return
+    const target = orbitRef.current.target
+    const relativePos = activeCamera.position.clone().sub(target)
+    const sph = new THREE.Spherical().setFromVector3(relativePos)
+
     const tilt = THREE.MathUtils.radToDeg(sph.phi)
     const rotation = THREE.MathUtils.radToDeg(sph.theta)
     const zoom = BASE_DIST / sph.radius
-    if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || Math.abs(zoom - p.zoom) > 0.01) {
-      levaSet({ tilt, rotation, zoom })
+    const panX = target.x
+    const panY = target.z
+
+    if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || 
+        Math.abs(zoom - p.zoom) > 0.01 || Math.abs(panX - (p.panX || 0)) > 1 || Math.abs(panY - (p.panY || 0)) > 1) {
+      levaSet({ tilt, rotation, zoom, panX, panY })
     }
   }
 
+
   // ── High-Res Offscreen Render Pass ──────────────────────────────────────────
   const performHighResCapture = (isAlpha) => {
+    const cam = activeCamera || currentCamera
     // 1. Store current GL state
     const oldClearColor = new THREE.Color()
     gl.getClearColor(oldClearColor)
@@ -80,19 +101,18 @@ export function Scene({
     gl.getSize(oldSize)
 
     // 2. Scale up for capture (e.g. 4x viewport or fixed 4k)
-    // We'll target approx 4k resolution for pro quality
     const captureScale = 4.0
     const targetW = oldSize.x * captureScale
     const targetH = oldSize.y * captureScale
     
     gl.setSize(targetW, targetH, false)
-    gl.setPixelRatio(1) // we manage scaling manually
+    gl.setPixelRatio(1)
 
     // 3. Set transparent background for native alpha capture
     gl.setClearColor(0x000000, 0) 
     
     // 4. Force a render pass
-    gl.render(scene, camera)
+    gl.render(scene, cam)
 
     // 5. Send the rendered buffer to our export utility
     captureAndExportPNG(gl.domElement, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha)
@@ -109,7 +129,7 @@ export function Scene({
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     exportSVG({
-      lineGeo, camera, width, height,
+      lineGeo, camera: activeCamera || currentCamera, width, height,
       bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
       surfaceGeo, groupMatrix,
       showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
@@ -121,15 +141,32 @@ export function Scene({
       particleColor:     p.pointColor ?? '#000000',
       particleSize:      p.pointSize ?? 4,
     })
-  }, [svgTrigger])
+  }, [svgTrigger, activeCamera])
 
   // PNG exports
-  useEffect(() => { if (pngTrigger) performHighResCapture(false) }, [pngTrigger])
-  useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true) }, [pngAlphaTrigger])
+  useEffect(() => { if (pngTrigger) performHighResCapture(false) }, [pngTrigger, activeCamera])
+  useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true) }, [pngAlphaTrigger, activeCamera])
 
   return (
     <>
-      <OrbitControls ref={orbitRef} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} />
+      <PerspectiveCamera 
+        ref={persRef} 
+        makeDefault={!p.orthographic} 
+        fov={p.fov} 
+        near={1} 
+        far={50000} 
+        position={[0, 400, 500]} 
+      />
+      <OrthographicCamera 
+        ref={orthoRef} 
+        makeDefault={!!p.orthographic} 
+        zoom={p.zoom * 2} // Ortho uses a different zoom scale
+        near={1} 
+        far={50000} 
+        position={[0, 400, 500]} 
+      />
+
+      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} />
       <Controls levaGet={levaGet} levaSet={levaSet} orbitRef={orbitRef} />
       {!webmRecording && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>

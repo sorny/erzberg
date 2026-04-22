@@ -305,7 +305,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, presets: true, style: true,
+    terrain: true, levels: true, view: true, camera: false, presets: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false,
@@ -558,6 +558,17 @@ export function Sidebar({
               </Sub>
             )}
             <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+          </Section>
+
+          <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
+            <Sub>
+              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onToggle={v => sv({ orthographic: v })} />
+              {!view.orthographic && (
+                <InlineSl label="Focal Len" help="Field of View (FOV). Lower = Zoom/Tele, Higher = Wide." min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+              )}
+              <InlineSl label="Pan X" help="Move the camera target horizontally." min={-1000} max={1000} value={view.panX ?? 0} onChange={v => sv({ panX: v })} />
+              <InlineSl label="Pan Y" help="Move the camera target vertically." min={-1000} max={1000} value={view.panY ?? 0} onChange={v => sv({ panY: v })} />
+            </Sub>
           </Section>
 
           {/* ── Presets ────────────────────────────────────────────────────── */}
