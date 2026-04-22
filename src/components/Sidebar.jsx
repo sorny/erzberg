@@ -564,10 +564,10 @@ export function Sidebar({
             <Sub>
               <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
               {!view.orthographic && (
-                <InlineSl label="Focal Len" help="Field of View (FOV). Lower = Zoom/Tele, Higher = Wide." min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
               )}
-              <InlineSl label="Pan X" help="Move the camera target horizontally." min={-1000} max={1000} value={view.panX ?? 0} onChange={v => sv({ panX: v })} />
-              <InlineSl label="Pan Y" help="Move the camera target vertically." min={-1000} max={1000} value={view.panY ?? 0} onChange={v => sv({ panY: v })} />
+              <InlineSl label="Pan X" min={-1000} max={1000} value={view.panX ?? 0} onChange={v => sv({ panX: v })} />
+              <InlineSl label="Pan Y" min={-1000} max={1000} value={view.panY ?? 0} onChange={v => sv({ panY: v })} />
             </Sub>
           </Section>
 
