@@ -214,13 +214,14 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset) {
   const majorPos = [], majorCol = []
   
   const step = (interval ?? 4)
-  const startElev = Math.ceil(minZ / step) * step
+  // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
+  const startElev = Math.ceil((minZ - 1e-7) / step) * step
   const maxElevPossible = Math.ceil(maxZ / step) * step
   
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
 
-  const numSteps = Math.floor((maxElevPossible - startElev) / step) + 1
+  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
 
   for (let i = 0; i < numSteps; i++) {
     const elev = startElev + i * step
@@ -236,8 +237,16 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset) {
     
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < cols - 1; c++) {
-        if (!gridMask[r*cols+c] || !gridMask[r*cols+c+1] || !gridMask[(r+1)*cols+c] || !gridMask[(r+1)*cols+c+1]) continue
-        const v00 = grid[r*cols+c], v10 = grid[r*cols+c+1], v01 = grid[(r+1)*cols+c], v11 = grid[(r+1)*cols+c+1]
+        // If all 4 are NoData, skip cell
+        const m00 = gridMask[r*cols+c], m10 = gridMask[r*cols+c+1], m01 = gridMask[(r+1)*cols+c], m11 = gridMask[(r+1)*cols+c+1]
+        if (!m00 && !m10 && !m01 && !m11) continue
+
+        // Treat NoData as being slightly below the level so shorelines draw
+        const v00 = m00 ? grid[r*cols+c] : level - 1e-7
+        const v10 = m10 ? grid[r*cols+c+1] : level - 1e-7
+        const v11 = m11 ? grid[(r+1)*cols+c+1] : level - 1e-7
+        const v01 = m01 ? grid[(r+1)*cols+c] : level - 1e-7
+
         const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
         if (idx === 0 || idx === 15) continue
         const edgeLerp = (a, b, va, vb) => { 
