@@ -1,66 +1,81 @@
-# Draw Modes: Mathematical Background
+# Draw Modes
 
-The `erzberg` rendering engine transforms a 2D scalar field (the heightmap grid) into expressive 3D line art. It provides 11 independent draw modes, each extracting different topographic features using specific mathematical techniques.
-
----
-
-### 1 & 2. X Lines / Y Lines (Ridgelines)
-These modes sample the terrain grid at fixed intervals along the X or Y axis.
-- **Math**: The terrain is treated as a 2D array $H(x, y)$. Lines are drawn by stepping through rows (or columns) at a defined `spacing` interval. Vertices are connected between $H(x, y)$ and $H(x+1, y)$ (for X-lines) or $H(x, y+1)$ (for Y-lines).
-
-### 3. Crosshatch
-A combination of X Lines and Y Lines, creating a textured structural grid.
-
-### 4. Pillars
-Visualizes the terrain as discrete vertical bars (extrusion).
-- **Math**: For a sampled cell at $(x, y)$, a line segment is drawn from a base (controlled by `pillarDepth`) up to the surface elevation (minus `pillarGap`).
-
-### 5. Contours (Isolines)
-Draws continuous lines connecting points of equal elevation.
-- **Math**: Implemented using **Fast Marching Squares**.
-  - Supports **Major Contours**: Every $N$-th line is identified and drawn into a separate bold layer using a phase-offset logic.
-  - **GIS-Aware**: If a GeoTIFF is loaded, intervals are calculated in real-world **meters**.
-
-### 6. Hachure
-Draws short strokes pointing down the slope (classic cartographic shading).
-- **Math**: Calculates the terrain gradient $\nabla H$. A stroke is drawn in the direction of $-\nabla H$ with a length proportional to the slope magnitude.
-
-### 7. Flow Lines
-Generates continuous trails that follow the drainage vector field.
-- **Math**: Uses **Euler integration** through the continuous gradient field.
-  - **Occupancy Mask**: Prevents visual clumping by blocking new lines from entering cells already occupied by existing flow paths.
-
-### 8. Stream Network (DAG Thinning)
-Visualizes river systems based on flow accumulation.
-- **Math**: Based on **Strahler Stream Order**. Performs a topological sort to accumulate upstream area (flow) at every cell.
-
-### 9. Pencil Shading
-Creates a hand-drawn look by detecting sharp ridges and valleys.
-- **Math**: Calculates the discrete **Laplacian** $\nabla^2 H$ (mean curvature). If the magnitude exceeds a threshold, an oriented "X" cross-hatch is drawn.
-
-### 10. Ridge Detection (Differential Geometry)
-Extracts mathematically precise crest lines, cliffs, and mountain top ranges.
-- **Math**: Based on the **Hessian Matrix** $J = \begin{pmatrix} H_{xx} & H_{xy} \\ H_{xy} & H_{yy} \end{pmatrix}$.
-  1. **Eigenvalue Analysis**: Calculates the eigenvalues $\lambda_1, \lambda_2$ of the Hessian. $\lambda_1$ represents the maximum principal curvature.
-  2. **Crest Extraction**: Points are identified where $\lambda_1 \ll 0$ (concave-down) and $|\lambda_1|$ is a local maximum in the direction of the principal curvature.
-  3. **Connectivity**: Neighboring ridge points are connected to form continuous, "thin" topographic paths.
-- **Parameters**: 
-  - **Radius**: Controls the pre-smoothing scale (small = micro-cliffs, large = mountain ranges).
-  - **Threshold**: Controls the minimum sharpness required to be drawn.
-
-### 11. Valley Detection (TPI)
-Extracts basins, troughs, and valley floors.
-- **Math**: Uses the **Topographic Position Index (TPI)**:
-  $$ TPI = Z_{center} - \bar{Z}_{radius} $$
-  Where $\bar{Z}$ is the mean elevation in a neighborhood of size `radius`.
-- **Logic**: $TPI < -Threshold$. Extracts areas that are significantly lower than their surroundings.
-- **Efficiency**: Calculated in **$O(N)$ constant time** using an Integral Image (Summed Area Table).
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using eleven independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
-### Layered Rendering & Ghost Occlusion (Signature Feature)
+## 1 & 2. X Lines / Y Lines
 
-All modes run independently and push their geometry into an array of `LineLayers`. 
-1. **Curtains**: Every line segment generates an invisible **3D geometric "Curtain"** mesh extending vertically.
-2. **Omnidirectional Occlusion**: Curtains act as high-precision depth buffers, ensuring lines only occlude other lines (solving the "terrain-swallows-lines" bug).
-3. **Ghosting**: Supports a multi-pass strategy where hidden segments are rendered with custom "Ghost" color and opacity, providing professional X-ray topographic views.
+The terrain grid is traversed row-by-row (X) or column-by-column (Y) at a configurable `spacing` interval. Within each row, adjacent grid samples $H(x, y)$ and $H(x+1, y)$ are connected as a line segment, lifted to their respective elevations in 3D. The `shift` parameter offsets the starting phase of the traversal.
+
+## 3. Crosshatch
+
+Runs the X and Y ridgeline builders simultaneously and merges their output into a single layer.
+
+## 4. Pillars
+
+For each sampled grid cell $(x, y)$, a vertical line segment is drawn from a configurable base depth up to $H(x, y)$ minus a gap. The result is an extruded bar chart of the terrain.
+
+## 5. Contours
+
+Isolines are computed with Marching Squares. The terrain is thresholded at each contour level, and edge intersections are interpolated linearly to produce smooth isoline vertices.
+
+Major contours are identified by a phase-offset rule: a contour at elevation $e$ is major if $\lfloor e / \text{majorInterval} \rfloor \neq \lfloor (e - \text{interval}) / \text{majorInterval} \rfloor$. Major and minor contours are written into separate layers so they can be styled independently.
+
+When a GeoTIFF is loaded, contour intervals are expressed in the file's native elevation unit (metres).
+
+## 6. Hachure
+
+The terrain gradient $\nabla H = (H_x, H_y)$ is estimated at each sampled cell using central differences. A short stroke is drawn from the cell centre in the direction of $-\nabla H$, with length proportional to $|\nabla H|$. Cells below a slope threshold are skipped.
+
+## 7. Flow Lines
+
+Flow paths are integrated through the gradient field using the forward Euler method:
+
+$$\mathbf{p}_{n+1} = \mathbf{p}_n - \alpha \, \nabla H(\mathbf{p}_n)$$
+
+where $\alpha$ is the step size. An occupancy mask prevents new paths from entering cells already traversed, which controls visual density. Each path terminates when it exits the grid boundary or reaches a flat region.
+
+## 8. Stream Network
+
+Flow accumulation is computed by a topological sort of the grid directed acyclic graph: each cell drains to its lowest neighbour, and upstream cell counts accumulate downward. Cells whose accumulated count exceeds the `threshold` parameter are drawn as stream segments. The result approximates Strahler-order river networks.
+
+## 9. Pencil Shading
+
+The discrete Laplacian $\nabla^2 H$ is approximated at each cell using the standard 4-neighbour finite difference:
+
+$$\nabla^2 H(x, y) \approx H(x+1,y) + H(x-1,y) + H(x,y+1) + H(x,y-1) - 4\,H(x,y)$$
+
+Where $|\nabla^2 H|$ exceeds the threshold, a small cross-hatch mark is drawn oriented perpendicular to the local gradient, simulating a pencil shading stroke.
+
+## 10. Ridge Detection
+
+Ridge crest lines are extracted using second-order differential geometry of the height field.
+
+**Hessian.** The symmetric Hessian matrix of $H$ is estimated at each cell using second-order finite differences:
+
+$$\mathcal{H} = \begin{pmatrix} H_{xx} & H_{xy} \\ H_{xy} & H_{yy} \end{pmatrix}$$
+
+**Eigenvalue analysis.** The eigenvalues $\lambda_1 \leq \lambda_2$ of $\mathcal{H}$ give the principal curvatures. A cell is a ridge candidate when $\lambda_1 < -\text{threshold}$ (strongly concave across the ridge) and $|\lambda_1|$ is a local maximum in the direction of the corresponding eigenvector.
+
+**Parameters.** `radius` controls the pre-smoothing scale before differentiation — small values detect micro-features such as cliff edges; large values detect mountain-range crests. `threshold` sets the minimum curvature magnitude required for a cell to qualify.
+
+## 11. Valley Detection
+
+Valley floors and basins are identified using the Topographic Position Index:
+
+$$\mathrm{TPI}(x, y) = H(x, y) - \bar{H}_r(x, y)$$
+
+where $\bar{H}_r$ is the mean elevation within a neighbourhood of radius $r$. Cells where $\mathrm{TPI} < -\text{threshold}$ are significantly lower than their surroundings and are drawn as valley segments.
+
+The neighbourhood mean is computed in $O(N)$ time (where $N$ is the number of grid cells) using a summed-area table, making large radii no more expensive than small ones.
+
+---
+
+## Ghost Occlusion
+
+All eleven modes share the same depth-ordering system.
+
+For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
+
+This approach gives true line-to-line depth awareness without relying on terrain surface depth, which would cause lines to be clipped by the mesh they are drawn on.

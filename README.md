@@ -3,86 +3,71 @@
 [![Deploy to GitHub Pages](https://github.com/sorny/erzberg/actions/workflows/deploy.yml/badge.svg)](https://github.com/sorny/erzberg/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**A high-performance, multi-layered topographic visualization suite powered by React Three Fiber.**
+A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the eleven independent draw modes.
 
-Transform grayscale heightmaps and GeoTIFFs into professional 3D line art, structural reliefs, and architectural sketches. `erzberg` leverages advanced differential geometry and physically-based simulation to extract the "bones" of your terrain.
-
-### 🌐 Live Version
-**[sorny.github.io/erzberg](https://sorny.github.io/erzberg/)**
+**Live version:** [sorny.github.io/erzberg](https://sorny.github.io/erzberg/)
 
 ---
 
-## 🚀 Key Innovations
+## Features
 
-### 🛡️ Layered Ghost Occlusion (Signature)
-Unlike standard terrain-based culling, `erzberg` generates invisible **3D geometric curtains** for every individual line segment. This enables true line-to-line depth awareness and allows for **Artistic Ghosting**—hidden lines can be styled with custom colors and opacities (e.g., a faint red "x-ray" look for lines behind mountain massifs).
+**Layered ghost occlusion.** Each line segment generates an invisible 3D curtain mesh that acts as a depth buffer. Lines occlude other lines rather than being swallowed by the terrain surface, and hidden segments can be rendered with a custom colour and opacity for an X-ray effect.
 
-### 📐 11 Algorithmic Draw Modes
-Fully independent rendering layers with granular per-mode styling, dash patterns, and hypsometric tinting:
-- **Crest Extraction**: High-fidelity ridge detection using Hessian matrix eigenvalue analysis.
-- **Topographic Troughs**: Scale-aware valley extraction via Topographic Position Index (TPI).
-- **Pro Contours**: Unit-aware isolines (meters for GeoTIFF) with major/minor hierarchical bolding.
-- **And More**: Ridgelines (X/Y), Crosshatch, Hachure, Flow Lines (Euler-integrated), Network (Strahler thinning), Pencil Shading (Laplacian), and Pillars.
+**Eleven draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
 
-### 🌊 Hydraulic Erosion
-A physically-correct, droplet-based simulation implementing **Hans Beyer's research**. Carve natural drainage patterns, riverbeds, and basins directly into your heightmap with real-time controls for inertia, gravity, and sediment capacity.
+| Mode | Technique |
+|---|---|
+| X Lines / Y Lines | Grid sampling along fixed axes |
+| Crosshatch | Combined X/Y ridgelines |
+| Pillars | Vertical extrusion per cell |
+| Contours | Marching Squares isolines, GIS-unit-aware |
+| Hachure | Slope-directed short strokes |
+| Flow Lines | Euler-integrated drainage paths |
+| Stream Network | Strahler-order flow accumulation |
+| Pencil Shading | Laplacian curvature detection |
+| Ridge Detection | Hessian eigenvalue crest extraction |
+| Valley Detection | Topographic Position Index troughs |
+
+**Hydraulic erosion.** A droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf). Runs off the main thread in a Web Worker.
+
+**Exporters.** SVG (software Z-buffer projection), 4K PNG, STL (watertight mesh), and greyscale heightmap PNG.
 
 ---
 
-## 🛠 Tech Stack
+## Tech stack
 
 | Layer | Library |
 |---|---|
-| **3D Engine** | [React Three Fiber](https://github.com/pmndrs/react-three-fiber) + [Three.js](https://github.com/mrdoob/three.js) |
-| **Helpers** | [Drei](https://github.com/pmndrs/drei) |
-| **State** | [Zustand](https://github.com/pmndrs/zustand) + [React](https://github.com/facebook/react) |
-| **GIS Parsing** | [GeoTIFF.js](https://github.com/geotiffjs/geotiff.js) |
-| **Industrial UI** | [Leva](https://github.com/pmndrs/leva) + Tailwind CSS |
-| **Concurrency** | Multi-threaded Web Workers for geometry and erosion |
+| 3D engine | React Three Fiber + Three.js |
+| State | Zustand (heightmap data) + React state (all UI params) |
+| GIS parsing | GeoTIFF.js |
+| UI controls | Custom panel + Tailwind CSS |
+| Geometry | Web Workers (geometry and erosion) |
 
 ---
 
-## 📖 Documentation & Wiki
+## Documentation
 
-Deep-dives into the mathematical foundations and implementation details:
-- **[Mathematical Background of Draw Modes](docs/Draw-Modes.md)**
-- **[Hydraulic Erosion Algorithm](docs/Hydraulic-Erosion.md)**
-
----
-
-## 📦 Exporters
-
-- **Projected SVG**: High-precision vector lines with true software Z-buffer ghost occlusion.
-- **4K PNG**: Professional raster exports with native WebGL alpha capture (no halos).
-- **3D STL**: Ready for 3D printing.
-- **Heightmap**: 1:1 greyscale PNG of the processed topographic grid.
+- [Draw mode mathematics](docs/Draw-Modes.md)
+- [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
 
 ---
 
-## 🧪 Development & Testing
+## Development
 
-### 🏃 Running Locally
 ```bash
-git clone https://github.com/sorny/erzberg.git
-cd erzberg
 npm install
-npm run dev
+npm run dev       # dev server at http://localhost:5173
+npm run build     # production build
+npm run test      # Playwright end-to-end suite
+npm run test:ui   # Playwright interactive UI
+npx playwright test tests/lines.spec.js   # single spec
 ```
 
-### 🧪 Automated QA
-This project uses [Playwright](https://playwright.dev/) for rendering validation.
-- **Full Suite**: `npm run test`
-- **UI Mode**: `npm run test:ui`
-- **Visibility Smoke Test**: `npx playwright test tests/lines.spec.js`
+Tests run against a live dev server in non-headless Chrome with WebGL enabled.
 
 ---
 
-## 📜 Changelog
+## License
 
-See [CHANGELOG.md](CHANGELOG.md) for a full history of changes and releases.
-
----
-
-## 📄 License & Credits
-- **MIT License**: Copyright (c) 2026 sorny.
-- **Research**: Hydraulic erosion is based on [**"Implementation of a Method for Hydraulic Erosion"** by Hans Beyer](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf).
+MIT — Copyright (c) 2026 sorny.

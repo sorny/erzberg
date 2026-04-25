@@ -1,46 +1,84 @@
 # Hydraulic Erosion
 
-The procedural terrain modification in `erzberg` is driven by a physically-based droplet simulation. This enables realistic, non-destructive carving of riverbeds and drainage basins directly into the heightmap.
+The erosion simulation in `erzberg` is a direct implementation of the droplet-based method described in:
 
-## Acknowledgements
-The algorithm is a direct implementation of the techniques described in Hans Beyer's thesis:
-> [**"Implementation of a Method for Hydraulic Erosion"** by Hans Beyer](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf)
+> Hans Beyer, *Implementation of a Method for Hydraulic Erosion* (2016).
+> [Full text](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf)
 
-## The Algorithm
+The algorithm modifies the heightmap `Float32Array` in place. It runs inside a dedicated Web Worker to keep the rendering thread free.
 
-The simulation is **Particle-Based**. It simulates the lifecycle of millions of independent water droplets ("raindrops") falling onto the terrain.
+---
 
-### 1. Droplet Spawning
-A droplet is spawned at a random floating-point $(x, y)$ coordinate on the grid. It begins with initial properties:
-- **Water Volume**: $W = 1.0$
-- **Velocity**: $V = 1.0$
-- **Sediment**: $S = 0.0$
-- **Direction**: $dir = (0, 0)$
+## Algorithm
 
-### 2. Movement & Gradient Calculation
-At each step, the droplet evaluates the slope of the terrain to decide where to flow. Because the droplet exists at a continuous floating-point coordinate, the terrain height and gradient are calculated using **Bilinear Interpolation** of the 4 nearest discrete grid cells.
+### Droplet initialisation
 
-The droplet's direction is updated using inertia, blending its previous direction with the new gradient vector:
-$$ dir_{new} = (dir_{old} \times inertia) - (\nabla H \times (1 - inertia)) $$
-$$ pos_{new} = pos_{old} + dir_{new} $$
+Each droplet is spawned at a uniformly random floating-point position $(x, y)$ on the grid with:
 
-### 3. Erosion and Deposition
-The droplet calculates its theoretical **Sediment Capacity** ($C$). This dictates how much dirt the water can carry, which is proportional to its velocity, water volume, and the local slope.
+$$W_0 = 1, \quad v_0 = 1, \quad s_0 = 0, \quad \mathbf{d}_0 = \mathbf{0}$$
 
-- **Erosion ($S < C$)**: If the droplet is carrying less sediment than its capacity, it picks up dirt from the terrain. It removes height from the terrain cells within a defined `erosionRadius`, using a weighted brush.
-- **Deposition ($S > C$)**: If the droplet is carrying too much sediment (often because it slowed down in a valley), it drops the excess sediment back onto the terrain. The dropped sediment is distributed to the 4 nearest grid cells using bilinear weighting.
+where $W$ is water volume, $v$ is speed, $s$ is carried sediment, and $\mathbf{d}$ is the direction vector.
 
-### 4. Evaporation & Termination
+### Gradient and movement
+
+Because the droplet position is continuous, the terrain height and gradient at $(x, y)$ are estimated by bilinear interpolation over the four surrounding grid cells. The direction is updated by blending the previous direction with the downhill gradient:
+
+$$\mathbf{d}_{t+1} = \mathbf{d}_t \cdot p_i - \nabla H(x_t, y_t) \cdot (1 - p_i)$$
+
+$$\mathbf{x}_{t+1} = \mathbf{x}_t + \hat{\mathbf{d}}_{t+1}$$
+
+where $p_i \in [0, 1]$ is the inertia parameter and $\hat{\mathbf{d}}$ is the unit direction vector. High inertia produces long, smooth river channels; low inertia produces short, fractal-like drainage patterns.
+
+### Sediment capacity
+
+The maximum sediment the droplet can carry is:
+
+$$C = \max(\sin\theta,\, \epsilon) \cdot v_t \cdot W_t \cdot k_c$$
+
+where $\theta$ is the local slope angle (derived from the height difference $\Delta h = H(\mathbf{x}_{t+1}) - H(\mathbf{x}_t)$), $\epsilon$ is a small floor to prevent division-like artefacts on flat ground, and $k_c$ is the capacity factor parameter.
+
+### Erosion and deposition
+
+**Erosion** ($s_t < C$): the droplet picks up sediment from the terrain. Material is removed from cells within the erosion radius using a smoothed radial brush $w_i$, so that:
+
+$$\Delta H_i = -k_e \cdot (C - s_t) \cdot w_i$$
+
+where $k_e$ is the erosion speed parameter. The brush weights sum to one, preventing grid-scale artefacts.
+
+**Deposition** ($s_t \geq C$): the droplet deposits the excess sediment onto the four nearest grid cells weighted by bilinear coefficients $\beta_i$:
+
+$$\Delta H_i = k_d \cdot (s_t - C) \cdot \beta_i$$
+
+where $k_d$ is the deposition speed parameter.
+
+### Evaporation and velocity update
+
 At the end of each step:
-- The droplet evaporates a small amount of water: $W = W \times (1 - evaporationRate)$.
-- Velocity is updated based on gravity and the change in height: $V = \sqrt{V^2 + \Delta H \times gravity}$.
 
-The droplet's life ends if:
-1. It flows off the edge of the map.
-2. Its water volume reaches zero.
-3. It becomes trapped in a local pit where it can no longer flow downhill.
+$$W_{t+1} = W_t \cdot (1 - k_\text{evap})$$
 
-## Multi-threaded Concurrency
-Because this algorithm requires millions of iterations (one iteration = one droplet life cycle) and modifies a large `Float32Array`, it is highly CPU-intensive. 
+$$v_{t+1} = \sqrt{\max(v_t^2 + \Delta h \cdot g,\; 0)}$$
 
-In `erzberg`, the erosion loop runs inside a dedicated **Web Worker** and is executed off the main thread. This ensures the React Three Fiber UI remains at a consistent 60 FPS while the landscape is being actively sculpted.
+where $k_\text{evap}$ is the evaporation rate and $g$ is the gravity parameter. The $\max(\cdot, 0)$ guard prevents imaginary speeds when a droplet climbs uphill.
+
+### Termination
+
+A droplet's lifecycle ends when any of the following conditions hold:
+- it moves outside the grid boundary,
+- $W_t$ falls below a minimum threshold,
+- $\Delta h > 0$ and the droplet cannot escape the local pit (stuck in a depression).
+
+---
+
+## Parameters
+
+| Parameter | Effect |
+|---|---|
+| Iterations | Total number of droplets simulated |
+| Erosion radius | Brush size for material removal |
+| Inertia | Smoothness of flow paths |
+| Capacity factor | How much sediment a fast droplet can carry |
+| Erosion speed | Rate of material removal |
+| Deposition speed | Rate of sediment deposition |
+| Evaporation rate | Droplet lifetime |
+| Gravity | Acceleration down-slope |
