@@ -8,3 +8,6 @@ test-results/
 GEMINI.md
 .gemini/
 .geminiignore
+CLAUDE.md
+.claude
+tests/testdata/benchmark.tif
