@@ -2,6 +2,7 @@
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
 import { useState } from 'react'
+import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { simulateErosion } from '../utils/erosion'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
@@ -488,7 +489,7 @@ export function Sidebar({
       }}>
         <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
           <span style={{ fontSize:11, fontWeight:800, letterSpacing:'2px', textTransform:'lowercase', color: MUTED }}>erzberg</span>
-          <span style={{ fontSize:9, color: MUTED, fontWeight:600, opacity: 0.8 }}>v0.2.2</span>
+          <span style={{ fontSize:9, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
           <div style={{ flex: 1 }} />
           <button onClick={onReset} style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset</button>
         </div>
