@@ -155,9 +155,11 @@ export function useHeightmap() {
   }, [load])
 
   const loadGeoTiff = useCallback((file) => {
+    console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…')
     return loadGeoTiffPixels(file)
       .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }) => {
+        console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
         setGeoTiffMeta(realElevMin, realElevMax)
         setHeightmap(pixels, nodataMask, width, height, file.name)
         setIsLoading(false); setLoadingMsg('')

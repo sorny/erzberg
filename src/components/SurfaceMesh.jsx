@@ -135,7 +135,11 @@ const SURFACE_FRAG = /* glsl */ `
 // ── Component ─────────────────────────────────────────────────────────────────
 export function SurfaceMesh({ surfaceGeo, p }) {
   const textureImage = useStore(s => s.textureImage)
-  
+
+  useEffect(() => {
+    if (p.showFill) console.log('[Benchmark] Color Updated: ' + Date.now())
+  }, [p.fillColor, p.showFill])
+
   const geometry = useMemo(() => {
     if (!surfaceGeo) return null
     const geo = new THREE.BufferGeometry()

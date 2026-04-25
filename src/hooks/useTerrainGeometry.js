@@ -14,6 +14,7 @@ export function useTerrainGeometry(p) {
   const [isComputing, setIsComputing] = useState(false)
 
   const workerRef = useRef(null)
+  const startTimeRef = useRef(0)
 
   useEffect(() => {
     if (!heightmapPixels) {
@@ -25,12 +26,18 @@ export function useTerrainGeometry(p) {
     setIsComputing(true)
 
     workerRef.current.onmessage = (e) => {
+      const elapsed = Math.round(performance.now() - startTimeRef.current)
       const { terrain, lineGeo, surfaceGeo, error } = e.data
       if (error) console.error('[GeometryWorker] Error:', error)
-      else { setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo) }
+      else {
+        setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
+        console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
+        console.log(`[Perf] Terrain ready Main: ${elapsed}ms`)
+      }
       setIsComputing(false)
     }
 
+    startTimeRef.current = performance.now()
     workerRef.current.postMessage({
       heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p
     })

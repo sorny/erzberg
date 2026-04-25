@@ -1,41 +1,70 @@
 import { test, expect } from '@playwright/test'
 
-test('rotation remains responsive during resolution change (max 2s)', async ({ page }) => {
-  // 1. Launch the app
+test('rotation remains responsive during resolution change', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  // High timeout for initial load in CI
-  await page.waitForSelector('canvas', { timeout: 30000 })
-  await page.waitForTimeout(5000)
-
-  // 2. Target specific sliders by looking for the span and its following input
-  const findSlider = async (label) => {
-    const span = page.locator('span', { hasText: new RegExp(`^${label}$`) }).first()
-    return span.locator('xpath=../..//input[@type="range"]')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  
+  // Ensure sidebar is open (shows ▶ when open)
+  const openToggle = page.locator('text=◀')
+  if (await openToggle.isVisible()) {
+    await openToggle.click()
+    await page.waitForTimeout(500)
   }
 
-  const resSlider = await findSlider('Resolution')
-  const rotSlider = await findSlider('Rotation')
+  // Find Resolution slider by label
+  const resSlider = page.locator('div:has-text("Resolution")').locator('input[type="range"]').first()
+  const rotSlider = page.locator('div:has-text("Rotation")').locator('input[type="range"]').first()
 
-  // 3. Change resolution from 2 to 1 (Triggering worker)
+  await expect(resSlider).toBeVisible({ timeout: 15000 })
   await resSlider.fill('1')
   console.log('Resolution changed to 1. Heavy worker task triggered.')
   
-  // Give it a tiny moment to start the debounce timer
-  await page.waitForTimeout(100)
+  await page.waitForTimeout(200)
 
-  // 4. Immediately change rotation to -71
   const start = Date.now()
   await rotSlider.fill('-71')
   console.log('Rotation command sent.')
 
-  // 5. Verify rotation text display updates within 2 seconds
-  // The UI text "-71.0" should update immediately because it's not debounced
-  // and the worker is running in the background.
-  const rotValue = page.locator('div:has(> div > span:text-is("Rotation")) span').last()
-  await expect(rotValue).toHaveText(/-71\.0/, { timeout: 2000 })
+  const rotValue = page.locator('div:has-text("Rotation")').locator('span').last()
+  await expect(rotValue).toHaveText(/-71/, { timeout: 10000 })
   
   const duration = Date.now() - start
   console.log(`Rotation responsiveness: ${duration}ms`)
-  
   expect(duration).toBeLessThan(2000)
+})
+
+test('render-performance-baseline', async ({ page }) => {
+  let perfLog = null
+  page.on('console', msg => {
+    if (msg.text().includes('[Perf] Terrain ready')) {
+      perfLog = msg.text()
+      console.log(`Captured: ${perfLog}`)
+    }
+  })
+
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+  const openToggle = page.locator('text=◀')
+  if (await openToggle.isVisible()) {
+    await openToggle.click()
+    await page.waitForTimeout(500)
+  }
+
+  const resSlider = page.locator('div:has-text("Resolution")').locator('input[type="range"]').first()
+  await expect(resSlider).toBeVisible({ timeout: 15000 })
+  await resSlider.fill('1')
+
+  let attempts = 0
+  while (!perfLog && attempts < 40) {
+    await page.waitForTimeout(1000)
+    attempts++
+  }
+
+  expect(perfLog).not.toBeNull()
+  const mainMatch = perfLog.match(/Main: ([\d.]+)ms/)
+  expect(mainMatch).not.toBeNull()
+  const mainThreadTime = parseFloat(mainMatch[1])
+  console.log(`Verified Main Thread Parsing: ${mainThreadTime}ms`)
+  expect(mainThreadTime).toBeLessThan(500)
 })

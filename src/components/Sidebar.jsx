@@ -301,6 +301,7 @@ export function Sidebar({
   onSavePreset, onLoadPreset,
   externalPresets,
   onReset,
+  baseZoom = 1,
   lineGeo, surfaceGeo, terrainData,
 }) {
   const [open, setOpen]     = useState(true)
@@ -509,7 +510,7 @@ export function Sidebar({
             <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
               <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
-              <Sl label="Elev scale" min={0} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => v.toFixed(1)+'×'} />
+              <Sl label="Elev scale" min={-5} max={5} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
               <Sl label="Blur" min={0} max={10} step={0.5} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
@@ -535,7 +536,7 @@ export function Sidebar({
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
               <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Zoom" min={10} max={400} value={Math.round(view.zoom * 100)} onChange={v => sv({ zoom: v / 100 })} fmt={v => v+'%'} />
+              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
             <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />

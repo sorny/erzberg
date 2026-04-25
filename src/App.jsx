@@ -18,7 +18,7 @@ import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 const TERRAIN_DEF = {
-  resolution: 2, elevScale: 1.0, blurRadius: 0,
+  resolution: 2, elevScale: 0, blurRadius: 0,
   gridOffsetX: 0, gridOffsetY: 0, elevMinCut: 0, elevMaxCut: 100,
   blackPoint: 0, whitePoint: 255, jitterAmt: 0,
 }
@@ -114,7 +114,7 @@ function BgSync({ color, gradient }) {
 // ── Loading overlay ───────────────────────────────────────────────────────────
 function LoadingOverlay({ msg }) {
   return (
-    <div style={{
+    <div data-testid="loading-overlay" style={{
       position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
       display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000,
     }}>
@@ -161,6 +161,11 @@ export default function App() {
   const [bgGradientStops, setBgGradientStops] = useState([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
   const [webmDuration, setWebmDuration]   = useState(5)
   const [externalPresets, setExternalPresets] = useState({})
+  // Intrinsic elevation scale derived from GeoTIFF metadata (metres / pixel ratio).
+  // terrain.elevScale is a signed offset (0 = use GeoTIFF-derived scale as-is).
+  const [baseElevScale, setBaseElevScale] = useState(1)
+  // Zoom fit calculated on load; view.zoom is the user-facing multiplier (1 = 100%).
+  const [baseZoom, setBaseZoom] = useState(1)
 
   // ── Load external presets on mount ────────────────────────────────────────
   useEffect(() => {
@@ -297,8 +302,14 @@ export default function App() {
   // ── Auto-zoom to fit terrain on load ─────────────────────────────────────
   const autoZoom = useCallback(({ width, height }) => {
     const zoom = Math.max(0.05, Math.min(4, 500 / Math.max(width, height)))
+    setBaseZoom(zoom)
     setView(prev => ({ ...prev, zoom }))
   }, [])
+
+  // ── Auto-resolution: keep the geometry grid within 1000×1000 ─────────────
+  const autoResolution = useCallback((width, height) =>
+    Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1000)))
+  , [])
 
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   const handleWebmToggle = useCallback(() => {
@@ -309,7 +320,9 @@ export default function App() {
   }, [webmDuration])
 
   // ── Merged params ─────────────────────────────────────────────────────────
-  const p = { ...terrain, ...style, ...points, ...view, gradientStops }
+  // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
+  const p = { ...terrain, ...style, ...points, ...view, gradientStops,
+    elevScale: baseElevScale + terrain.elevScale }
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
@@ -414,14 +427,15 @@ export default function App() {
         heightmapFilename={heightmapFilename}
         textureImage={textureImage}
         setTextureImage={setTextureImage}
-        loadFromPicker={() => loadFromPicker(({ dataWidth, dataHeight }) => {
+        loadFromPicker={() => loadFromPicker(({ width, height, dataWidth, dataHeight }) => {
           autoZoom({ width: dataWidth, height: dataHeight })
+          setBaseElevScale(1)
+          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
         })}
-        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ dataWidth, dataHeight, suggestedElevScale }) => {
+        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
           autoZoom({ width: dataWidth, height: dataHeight })
-          if (suggestedElevScale != null) {
-            setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
-          }
+          setBaseElevScale(suggestedElevScale ?? 1)
+          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
         })}
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
@@ -438,11 +452,14 @@ export default function App() {
         onLoadPreset={loadPresetFromFile}
         externalPresets={externalPresets}
         onReset={() => {
-          setTerrain(TERRAIN_DEF); setStyle(STYLE_DEF)
-          setPoints(POINTS_DEF);   setView(VIEW_DEF)
+          setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
+          setStyle(STYLE_DEF)
+          setPoints(POINTS_DEF)
+          setView({ ...VIEW_DEF, zoom: baseZoom })
           setGradientStops(GRADIENT_PRESETS['Jet'])
           setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
         }}
+        baseZoom={baseZoom}
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}
         terrainData={terrainData}
@@ -470,10 +487,15 @@ export default function App() {
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
       {noHmap && !isLoading && <EmptyState
-        onLoad={() => loadFromPicker(autoZoom)}
+        onLoad={() => loadFromPicker(({ width, height }) => {
+          autoZoom({ width, height })
+          setBaseElevScale(1)
+          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+        })}
         onLoadGeoTiff={() => loadGeoTiffFromPicker(({ width, height, suggestedElevScale }) => {
           autoZoom({ width, height })
-          if (suggestedElevScale != null) setTerrain(prev => ({ ...prev, elevScale: suggestedElevScale }))
+          setBaseElevScale(suggestedElevScale ?? 1)
+          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
         })} />}
     </div>
   )
