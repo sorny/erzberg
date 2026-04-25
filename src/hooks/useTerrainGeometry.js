@@ -37,9 +37,18 @@ export function useTerrainGeometry(p) {
       setIsComputing(false)
     }
 
+    // Guard against the race where heightmap pixels arrive before the terrain
+    // resolution state updates (App.jsx sets resolution after setHeightmap).
+    // Cap to 1000×1000 grid using the pixel dimensions already in the store.
+    const safeResolution = Math.max(
+      p.resolution,
+      Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1000)
+    )
+
     startTimeRef.current = performance.now()
     workerRef.current.postMessage({
-      heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p
+      heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
+      p: safeResolution !== p.resolution ? { ...p, resolution: safeResolution } : p,
     })
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
