@@ -1,10 +1,10 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
-import { simulateErosion } from '../utils/erosion'
+import ErosionWorker from '../utils/erosion.worker?worker'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
@@ -322,8 +322,10 @@ export function Sidebar({
   const [eErode,     setEErode]     = useState(0.3)
   const [eDeposit,   setEDeposit]   = useState(0.3)
   const [eEvap,      setEEvap]      = useState(0.01)
-  const [isEroding,  setIsEroding]  = useState(false)
-  const [lastPixels, setLastPixels] = useState(null)
+  const [isEroding,       setIsEroding]       = useState(false)
+  const [erosionProgress, setErosionProgress] = useState(0)
+  const [lastPixels,      setLastPixels]      = useState(null)
+  const erosionWorkerRef = useRef(null)
   
   const setPixels = useStore(s => s.setPixels)
   const setHeightmap = useStore(s => s.setHeightmap)
@@ -335,21 +337,36 @@ export function Sidebar({
     if (!heightmapPixels || isEroding) return
     setLastPixels(new Float32Array(heightmapPixels))
     setIsEroding(true)
-    setTimeout(() => {
-      try {
-        const next = simulateErosion(heightmapPixels, heightmapWidth, heightmapHeight, eIters, {
-          erosionRadius: eRadius,
-          inertia: eInertia,
-          sedimentCapacityFactor: eCapacity,
-          erodeSpeed: eErode,
-          depositSpeed: eDeposit,
-          evaporateSpeed: eEvap
-        })
-        setPixels(next)
-      } finally {
-        setIsEroding(false)
+    setErosionProgress(0)
+
+    const worker = new ErosionWorker()
+    erosionWorkerRef.current = worker
+
+    worker.onmessage = (e) => {
+      const { progress, result, error } = e.data
+      if (progress !== undefined) { setErosionProgress(progress); return }
+      if (result) setPixels(result)
+      if (error) console.error('[ErosionWorker]', error)
+      setIsEroding(false)
+      setErosionProgress(0)
+      worker.terminate()
+      erosionWorkerRef.current = null
+    }
+
+    worker.postMessage({
+      pixels: heightmapPixels,
+      width: heightmapWidth,
+      height: heightmapHeight,
+      iterations: eIters,
+      params: {
+        erosionRadius: eRadius,
+        inertia: eInertia,
+        sedimentCapacityFactor: eCapacity,
+        erodeSpeed: eErode,
+        depositSpeed: eDeposit,
+        evaporateSpeed: eEvap
       }
-    }, 50)
+    })
   }
 
   const handleUndoErosion = () => {
@@ -357,6 +374,8 @@ export function Sidebar({
     setPixels(lastPixels)
     setLastPixels(null)
   }
+
+  useEffect(() => () => { erosionWorkerRef.current?.terminate() }, [])
 
   const handleTexturePicker = () => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' })
@@ -873,7 +892,7 @@ export function Sidebar({
               <InlineSl label="Evaporation" help="Droplet shrinkage rate." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
             </Sub>
             <div style={{ display:'flex', gap:6 }}>
-              <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? 'Eroding...' : 'Run Erosion'}</button>
+              <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
               <button onClick={handleUndoErosion} disabled={!lastPixels || isEroding} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: (lastPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (lastPixels && !isEroding) ? 1 : 0.5 }}>Undo</button>
             </div>
           </Section>

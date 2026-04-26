@@ -10,7 +10,7 @@
  * - Automatic pit-filling for stability.
  */
 
-export function simulateErosion(pixels, width, height, iterations = 50000, params = {}) {
+export function simulateErosion(pixels, width, height, iterations = 50000, params = {}, onProgress = null) {
   const map = new Float32Array(pixels)
   
   const {
@@ -64,7 +64,9 @@ export function simulateErosion(pixels, width, height, iterations = 50000, param
   }
 
   // --- Main Simulation Loop ---
+  const progressChunk = onProgress ? Math.max(1000, Math.floor(iterations / 20)) : 0
   for (let i = 0; i < iterations; i++) {
+    if (onProgress && i > 0 && i % progressChunk === 0) onProgress(Math.round((i / iterations) * 100))
     // 1. Spawn droplet at random location
     let posX = Math.random() * (width - 1)
     let posY = Math.random() * (height - 1)
