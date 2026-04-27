@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-04-27
+
+### Added
+- **Stipple draw mode** (mode #12): stochastic dot-density map driven by slope, elevation, or their inverses. Each dot is placed on a jittered grid and accepted with probability proportional to the chosen terrain attribute raised to a configurable gamma exponent. Exposed controls: Spacing, Gamma, Jitter, Density mode, plus the full per-mode colour / weight / opacity / dash / hypsometric stack.
+- **Hillshade**: GPU surface shader that computes Lambertian illumination from a configurable sun direction (azimuth + altitude). Blends over the existing fill colour with adjustable intensity, opacity, and normal exaggeration. Separate colour pickers for highlights and shadows allow full tonal control (e.g. warm orange highlights + cool blue shadows for painted-relief aesthetics).
+
+### Fixed
+- Stipple mode parameters (`spacingStipple`, `stippleDensityMode`, `stippleGamma`, `stippleJitter`, and all hypsometric sub-params) were missing from the `useTerrainGeometry` dependency array, so the viewport did not update reactively when they changed.
+
 ## [0.2.3] - 2026-04-25
 
 ### Added

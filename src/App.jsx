@@ -79,6 +79,16 @@ const STYLE_DEF = {
   enabledValley: false, spacingValley: 2, radiusValley: 2, thresholdValley: 0.5, colorValley: '#000000', weightValley: 1, opacityValley: 1, dashValley: 'solid',
   hypsoValley: false, hypsoModeValley: 'elevation', hypsoBandedValley: false, hypsoIntervalValley: 10,
 
+  // Stipple
+  enabledStipple: false, spacingStipple: 0.5, weightStipple: 4, opacityStipple: 0.85, colorStipple: '#1a1a1a', dashStipple: 'solid',
+  stippleDensityMode: 'slope', stippleGamma: 1.2, stippleJitter: 0.8,
+  hypsoStipple: false, hypsoModeStipple: 'elevation', hypsoBandedStipple: false, hypsoIntervalStipple: 10,
+
+  // Hillshade
+  showHillshade: false, hillshadeAzimuth: 315, hillshadeAltitude: 45,
+  hillshadeIntensity: 1.0, hillshadeOpacity: 0.6, hillshadeExaggeration: 2.0,
+  hillshadeHighlightColor: '#ffffff', hillshadeShadowColor: '#000000',
+
   // Master visibility for all lines
 
   showLines: true,

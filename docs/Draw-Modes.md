@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using eleven independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twelve independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -70,11 +70,24 @@ where $\bar{H}_r$ is the mean elevation within a neighbourhood of radius $r$. Ce
 
 The neighbourhood mean is computed in $O(N)$ time (where $N$ is the number of grid cells) using a summed-area table, making large radii no more expensive than small ones.
 
+## 12. Stipple
+
+A stochastic dot-density map. Candidate positions are generated on a regular grid with pitch `spacing`, then each is displaced by a random jitter (up to `jitter × spacing` in each axis) to break mechanical regularity. For each candidate, a terrain attribute $d \in [0,1]$ is sampled:
+
+| Density mode | $d$ |
+|---|---|
+| Slope | $\|\nabla H\| / \|\nabla H\|_{\max}$ |
+| Inv Slope | $1 - d_{\text{slope}}$ |
+| Elevation | $(H - H_{\min}) / (H_{\max} - H_{\min})$ |
+| Inv Elevation | $1 - d_{\text{elev}}$ |
+
+The dot is placed with probability $d^\gamma$, where `gamma` sharpens ($\gamma > 1$) or flattens ($\gamma < 1$) the density contrast. Each accepted dot is emitted as a degenerate line segment of length $\epsilon \ll \text{scl}$, which the GPU renders as a square mark whose diameter equals the layer's `weight` in screen pixels.
+
 ---
 
 ## Ghost Occlusion
 
-All eleven modes share the same depth-ordering system.
+All twelve modes share the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

@@ -49,7 +49,7 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uElevScale;
   uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
   uniform bool      uOcclusionOnly;
-  
+
   uniform sampler2D uOverlayTex;
   uniform bool      uShowTexture;
   uniform float     uTextureScale;
@@ -57,6 +57,15 @@ const SURFACE_FRAG = /* glsl */ `
 
   uniform float     uElevMinCut;
   uniform float     uElevMaxCut;
+
+  uniform bool      uHillshade;
+  uniform float     uHillshadeAzimuth;
+  uniform float     uHillshadeAltitude;
+  uniform float     uHillshadeIntensity;
+  uniform float     uHillshadeOpacity;
+  uniform float     uHillshadeExaggeration;
+  uniform vec3      uHillshadeHighlight;
+  uniform vec3      uHillshadeShadow;
 
   varying float     vBrightness;
   varying vec3      vNormal;
@@ -126,6 +135,16 @@ const SURFACE_FRAG = /* glsl */ `
 
     if (uHypsometricBanded && uHypsoWeight > 0.0) {
       base = mix(base, vec3(0.0), lineMask * 0.5);
+    }
+
+    if (uHillshade) {
+      float az  = uHillshadeAzimuth  * 3.14159265 / 180.0;
+      float alt = uHillshadeAltitude * 3.14159265 / 180.0;
+      vec3 lightDir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
+      vec3 exagNormal = normalize(vec3(n.x * uHillshadeExaggeration, n.y, n.z * uHillshadeExaggeration));
+      float shade = clamp(dot(exagNormal, lightDir), 0.0, 1.0) * uHillshadeIntensity;
+      vec3 shadeColor = mix(uHillshadeShadow, uHillshadeHighlight, shade);
+      base = mix(base, shadeColor, uHillshadeOpacity);
     }
 
     gl_FragColor = vec4(base, 1.0);
@@ -209,6 +228,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uShowTexture:       { value: false },
       uTextureScale:      { value: 1.0 },
       uTextureOffset:     { value: new THREE.Vector2(0, 0) },
+      uHillshade:             { value: false },
+      uHillshadeAzimuth:      { value: 315.0 },
+      uHillshadeAltitude:     { value: 45.0 },
+      uHillshadeIntensity:    { value: 1.0 },
+      uHillshadeOpacity:      { value: 0.6 },
+      uHillshadeExaggeration: { value: 2.0 },
+      uHillshadeHighlight:    { value: new THREE.Vector3(1, 1, 1) },
+      uHillshadeShadow:       { value: new THREE.Vector3(0, 0, 0) },
     },
   }), [])
 
@@ -233,9 +260,18 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uTextureScale.value = 1.0 / (p.textureScale || 1.0)
     surfMat.uniforms.uTextureOffset.value.set(p.textureShiftX || 0, p.textureShiftY || 0)
 
-    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain)
+    surfMat.uniforms.uHillshade.value             = !!(p.showHillshade)
+    surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 315
+    surfMat.uniforms.uHillshadeAltitude.value     = p.hillshadeAltitude     ?? 45
+    surfMat.uniforms.uHillshadeIntensity.value    = p.hillshadeIntensity    ?? 1.0
+    surfMat.uniforms.uHillshadeOpacity.value      = p.hillshadeOpacity      ?? 0.6
+    surfMat.uniforms.uHillshadeExaggeration.value = p.hillshadeExaggeration ?? 2.0
+    surfMat.uniforms.uHillshadeHighlight.value.set(...hexToRgb(p.hillshadeHighlightColor ?? '#ffffff'))
+    surfMat.uniforms.uHillshadeShadow.value.set(...hexToRgb(p.hillshadeShadowColor   ?? '#000000'))
+
+    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain || p.showHillshade)
     surfMat.depthTest  = !!p.depthOcclusion
-    surfMat.depthWrite = !!(p.depthOcclusion && (p.showFill || p.showRawTerrain))
+    surfMat.depthWrite = !!(p.depthOcclusion && (p.showFill || p.showRawTerrain || p.showHillshade))
     surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
     surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
     surfMat.needsUpdate = true

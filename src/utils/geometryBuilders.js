@@ -48,6 +48,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
+    { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter) },
   ]
 
   const finalLayers = []
@@ -525,6 +526,52 @@ function buildPillars(terrain, p, spacing) {
       const colBase = computeVertexColor(normElev(bottom, minZ, maxZ), 0, 0, p)
       const colPeak = computeVertexColor(normElev(top, minZ, maxZ), slope / (maxSlope || 1), 0, p)
       colors.push(...colBase, ...colPeak)
+    }
+  }
+
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+}
+
+// ─── Stipple ──────────────────────────────────────────────────────────────────
+
+function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const step = Math.max(1, Math.round((spacing ?? 0.5) / scl))
+  const eps = Math.max(0.001, scl * 0.003)
+  const jAmt = (jitter ?? 0.8) * step
+  const gam  = gamma ?? 1.2
+  const dm   = densityMode ?? 'slope'
+  const positions = [], colors = []
+
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 0; c < cols; c += step) {
+      const jr = r + (Math.random() - 0.5) * jAmt
+      const jc = c + (Math.random() - 0.5) * jAmt
+      const ri = Math.max(0, Math.min(rows - 1, Math.floor(jr)))
+      const ci = Math.max(0, Math.min(cols - 1, Math.floor(jc)))
+      if (!gridMask[ri * cols + ci]) continue
+
+      const elev = cellElev(grid, ri, ci, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+
+      const normE = normElev(elev, minZ, maxZ)
+      const slope = gridSlopes[ri * cols + ci] / (maxSlope || 1)
+
+      let density
+      if      (dm === 'elevation') density = normE
+      else if (dm === 'invElev')   density = 1 - normE
+      else if (dm === 'invSlope')  density = 1 - slope
+      else                         density = slope
+
+      density = Math.pow(Math.max(0, Math.min(1, density)), gam)
+      if (Math.random() > density) continue
+
+      const wx = jc * scl - halfW
+      const wz = jr * scl - halfH
+      positions.push(wx - eps, elev, wz, wx + eps, elev, wz)
+      const col = computeVertexColor(normE, slope, 0, p)
+      colors.push(...col, ...col)
     }
   }
 

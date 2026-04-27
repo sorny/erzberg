@@ -96,6 +96,10 @@ export function useTerrainGeometry(p) {
     // Mode: Valley
     p.enabledValley, p.spacingValley, p.radiusValley, p.thresholdValley, p.colorValley, p.weightValley, p.opacityValley, p.dashValley,
     p.hypsoValley, p.hypsoModeValley, p.hypsoBandedValley, p.hypsoIntervalValley,
+    // Mode: Stipple
+    p.enabledStipple, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter,
+    p.colorStipple, p.weightStipple, p.opacityStipple, p.dashStipple,
+    p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
 
     // Global Line Styling (for fallback)
     p.showLines, p.lineColor, p.strokeWeight, p.lineOpacity, p.lineDash,

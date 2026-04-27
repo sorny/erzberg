@@ -310,7 +310,8 @@ export function Sidebar({
     terrain: true, levels: true, view: true, camera: false, presets: true, style: true,
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
-    modeRidge: false, modeValley: false,
+    modeRidge: false, modeValley: false, modeStipple: false,
+    hillshade: false,
     points: false, texture: false, creative: false, erosion: false, export: true,
   })
 
@@ -461,6 +462,7 @@ export function Sidebar({
       modePencil:   !!newStyle.enabledPencil,
       modeRidge:    !!newStyle.enabledRidge,
       modeValley:   !!newStyle.enabledValley,
+      modeStipple:  !!newStyle.enabledStipple,
     }))
   }
 
@@ -644,8 +646,25 @@ export function Sidebar({
             </Sub>
           </Section>
 
+          {/* ── Hillshade ──────────────────────────────────────────────────── */}
+
+          <Section title="Hillshade" open={sec.hillshade} onToggle={() => tog('hillshade')} enabled={style.showHillshade}>
+            <Tog label="Enabled" checked={style.showHillshade} onChange={v => ss({ showHillshade: v })} />
+            {style.showHillshade && (
+              <Sub>
+                <InlineSl label="Azimuth" help="Light direction: 0°=N, 90°=E, 315°=NW (classic)." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
+                <InlineSl label="Intensity" min={0} max={3} step={0.05} value={style.hillshadeIntensity} onChange={v => ss({ hillshadeIntensity: v })} fmt={v => v.toFixed(2)} />
+                <InlineSl label="Opacity" help="Blend strength over the fill colour." min={0} max={1} step={0.01} value={style.hillshadeOpacity} onChange={v => ss({ hillshadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <InlineSl label="Exaggeration" help="Amplifies normals for dramatic relief at low elevation scales." min={0.1} max={10} step={0.1} value={style.hillshadeExaggeration} onChange={v => ss({ hillshadeExaggeration: v })} fmt={v => v.toFixed(1)} />
+                <ColorRow label="Highlight" value={style.hillshadeHighlightColor} onChange={v => ss({ hillshadeHighlightColor: v })} />
+                <ColorRow label="Shadow" value={style.hillshadeShadowColor} onChange={v => ss({ hillshadeShadowColor: v })} />
+              </Sub>
+            )}
+          </Section>
+
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
-          
+
           <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')} enabled={style.enabledX}>
             <Tog label="Enabled" checked={style.enabledX} onChange={v => ss({ enabledX: v })} />
             {style.enabledX && (
@@ -795,6 +814,34 @@ export function Sidebar({
                   <InlineSl label="Threshold" min={0.005} max={5} step={0.005} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Valley" style={style} ss={ss} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Stipple" open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple}>
+            <Tog label="Enabled" checked={style.enabledStipple} onChange={v => ss({ enabledStipple: v })} />
+            {style.enabledStipple && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.1} max={5} step={0.1} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.1} max={4} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 1 = full cell, 0 = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => v.toFixed(2)} />
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      {[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']].map(([label, val]) => (
+                        <button key={val} onClick={() => ss({ stippleDensityMode: val })} style={{
+                          flex: 1, fontSize: 8, padding: '3px 0', borderRadius: 2,
+                          background: style.stippleDensityMode === val ? ACCENT : SURF,
+                          color: style.stippleDensityMode === val ? '#fff' : MUTED,
+                          border: `1px solid ${style.stippleDensityMode === val ? ACCENT : BORDER}`,
+                          cursor: 'pointer',
+                        }}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                </Sub>
+                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} />
               </>
             )}
           </Section>
