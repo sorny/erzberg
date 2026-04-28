@@ -1,7 +1,7 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import ErosionWorker from '../utils/erosion.worker?worker'
@@ -235,29 +235,31 @@ function ExpBtn({ label, hint, onClick, active }) {
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
-function ModeStyleOverride({ prefix, style, ss }) {
+function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>LINE STYLE</div>
+      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>{label}</div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
         <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
         <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
       </div>
       <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
-      
-      <div style={{ marginTop: 8, display:'flex', gap:2 }}>
-        {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
-          <button key={d} onClick={() => ss({ [`dash${prefix}`]: d })} 
-            style={{ 
-              flex:1, fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase',
-              background: style[`dash${prefix}`] === d ? ACCENT : SURF, 
-              color: style[`dash${prefix}`] === d ? '#fff' : MUTED, 
-              border:`1px solid ${style[`dash${prefix}`] === d ? ACCENT : BORDER}` 
-            }}>{d.replace('-dash','')}</button>
-        ))}
-      </div>
+
+      {showDash && (
+        <div style={{ marginTop: 8, display:'flex', gap:2 }}>
+          {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
+            <button key={d} onClick={() => ss({ [`dash${prefix}`]: d })}
+              style={{
+                flex:1, fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase',
+                background: style[`dash${prefix}`] === d ? ACCENT : SURF,
+                color: style[`dash${prefix}`] === d ? '#fff' : MUTED,
+                border:`1px solid ${style[`dash${prefix}`] === d ? ACCENT : BORDER}`
+              }}>{d.replace('-dash','')}</button>
+          ))}
+        </div>
+      )}
 
       <div style={{ marginTop: 10 }}>
         <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
@@ -818,13 +820,13 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Stipple" open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple}>
+          <Section title="Mode: Stipple Dots" open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple}>
             <Tog label="Enabled" checked={style.enabledStipple} onChange={v => ss({ enabledStipple: v })} />
             {style.enabledStipple && (
               <>
                 <Sub>
-                  <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.1} max={5} step={0.1} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.1} max={4} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.05} max={2} step={0.05} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.05} max={2} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 1 = full cell, 0 = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => v.toFixed(2)} />
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
@@ -841,7 +843,7 @@ export function Sidebar({
                     </div>
                   </div>
                 </Sub>
-                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} label="DOT STYLE" showDash={false} />
               </>
             )}
           </Section>
