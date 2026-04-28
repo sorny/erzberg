@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 160" fill="none" xmlns:xlink="http://www.w3.org/1999/xlink">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@700&amp;display=swap');
+    </style>
+  </defs>
+
+  <!--
+    ErzbergMark — terraced open-pit mountain, 12 lines in 4 bands.
+    Nested SVG preserves the original 80×60 viewBox at scale 1.6 (→ 128×96).
+    Positioned to vertically center with the text block.
+  -->
+  <svg x="56" y="32" width="128" height="96" viewBox="0 0 80 60" fill="none">
+    <g stroke="#E8823A" stroke-linecap="round" stroke-width="1.4">
+      <!-- Base terrace -->
+      <line x1="4"  y1="52" x2="76" y2="52"/>
+      <line x1="4"  y1="48" x2="76" y2="48"/>
+      <line x1="4"  y1="44" x2="76" y2="44"/>
+      <!-- Band 3 -->
+      <line x1="12" y1="39" x2="68" y2="39"/>
+      <line x1="12" y1="35" x2="68" y2="35"/>
+      <line x1="12" y1="31" x2="68" y2="31"/>
+      <!-- Band 2 -->
+      <line x1="22" y1="26" x2="58" y2="26"/>
+      <line x1="22" y1="22" x2="58" y2="22"/>
+      <line x1="22" y1="18" x2="58" y2="18"/>
+      <!-- Summit -->
+      <line x1="32" y1="13" x2="48" y2="13"/>
+      <line x1="32" y1="9"  x2="48" y2="9"/>
+      <!-- Peak -->
+      <line x1="37" y1="5"  x2="43" y2="5"/>
+    </g>
+  </svg>
+
+  <!-- Wordmark -->
+  <text
+    x="212" y="79"
+    font-family="'Space Mono', 'Courier New', monospace"
+    font-size="36" font-weight="700"
+    letter-spacing="-0.72"
+    fill="#F0EBE3"
+  >erzberg</text>
+
+  <!-- Tagline -->
+  <text
+    x="213" y="105"
+    font-family="'Space Mono', 'Courier New', monospace"
+    font-size="11" font-weight="400"
+    letter-spacing="2"
+    fill="#7A6E65"
+  >DIGITAL TERRAIN ARTISTRY</text>
+</svg>

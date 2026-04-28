@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 
 /**
- * Global store — only holds data that cannot live inside Leva:
+ * Global store — only holds data that cannot live in plain React state:
  *  - loaded heightmap pixel data
- *  - computed terrain grid (brightness samples)
+ *  - GeoTIFF NoData mask
  *  - filename display
+ *  - overlay texture image
  *
- * All tweakable visual / terrain params live in Leva (see App.jsx).
+ * All tweakable visual / terrain params live in React state in App.jsx.
  */
 export const useStore = create((set) => ({
   // Raw pixel brightness extracted from the loaded image (Float32Array, values 0–1)

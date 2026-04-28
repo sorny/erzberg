@@ -1,5 +1,5 @@
 /**
- * Derives terrain grid and line geometry from the raw heightmap + Leva params.
+ * Derives terrain grid and line geometry from the raw heightmap + visual params.
  */
 import { useState, useEffect, useRef } from 'react'
 import { useStore } from '../store/useStore'

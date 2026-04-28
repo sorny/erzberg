@@ -1,9 +1,13 @@
-# erzberg
+<p align="center">
+  <img src="public/logo.svg" alt="erzberg" width="420" height="160">
+</p>
 
 [![Deploy to GitHub Pages](https://github.com/sorny/erzberg/actions/workflows/deploy.yml/badge.svg)](https://github.com/sorny/erzberg/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the eleven independent draw modes.
+A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the twelve independent draw modes.
+
+**Everything runs locally in your browser.** Your files never leave your machine — no server, no upload, no account.
 
 **Live version:** [sorny.github.io/erzberg](https://sorny.github.io/erzberg/)
 
@@ -13,13 +17,13 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Layered ghost occlusion.** Each line segment generates an invisible 3D curtain mesh that acts as a depth buffer. Lines occlude other lines rather than being swallowed by the terrain surface, and hidden segments can be rendered with a custom colour and opacity for an X-ray effect.
 
-**Eleven draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
+**Twelve draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
 
 | Mode | Technique |
 |---|---|
 | X Lines / Y Lines | Grid sampling along fixed axes |
-| Crosshatch | Combined X/Y ridgelines |
-| Pillars | Vertical extrusion per cell |
+| Crosshatch | Combined X + Y ridgelines |
+| Pillars | Vertical extrusion per cell (line, cuboid, or cylinder shapes) |
 | Contours | Marching Squares isolines, GIS-unit-aware |
 | Hachure | Slope-directed short strokes |
 | Flow Lines | Euler-integrated drainage paths |
@@ -27,10 +31,15 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 | Pencil Shading | Laplacian curvature detection |
 | Ridge Detection | Hessian eigenvalue crest extraction |
 | Valley Detection | Topographic Position Index troughs |
+| Stipple Dots | Stochastic dot-density driven by slope or elevation |
 
-**Hydraulic erosion.** A droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf). Runs off the main thread in a Web Worker.
+**Surface overlays.** Hillshade (Lambertian GPU shader, configurable sun azimuth/altitude, separate highlight and shadow colours) and slope shading (two-colour steepness gradient blended over the fill).
 
-**Exporters.** SVG (software Z-buffer projection), 4K PNG, STL (watertight mesh), and greyscale heightmap PNG.
+**Hydraulic erosion.** Droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf), running off the main thread in a Web Worker.
+
+**Particle system.** Optional animated point cloud with noise-driven motion, gravity, and peaks-only mode.
+
+**Exporters.** SVG (software Z-buffer projection, per-mode Inkscape/Illustrator layers), 4K PNG, STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording.
 
 ---
 
@@ -41,8 +50,8 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 | 3D engine | React Three Fiber + Three.js |
 | State | Zustand (heightmap data) + React state (all UI params) |
 | GIS parsing | GeoTIFF.js |
-| UI controls | Custom panel + Tailwind CSS |
-| Geometry | Web Workers (geometry and erosion) |
+| UI | Custom sidebar panel + Tailwind CSS |
+| Geometry | Web Workers (geometry and erosion off-thread) |
 
 ---
 

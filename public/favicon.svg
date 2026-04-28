@@ -1,13 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <!-- Background App-style container -->
-  <rect width="32" height="32" rx="8" fill="#09090b" />
-  
-  <!-- Outer Tier (Zinc) -->
-  <path d="M16 6 L26 12 V20 L16 26 L6 20 V12 L16 6 Z" stroke="#3f3f46" stroke-width="1.5" fill="none" />
-  
-  <!-- Middle Tier (Accent Blue) -->
-  <path d="M16 11 L22 14 V18 L16 21 L10 18 V14 L16 11 Z" stroke="#3b82f6" stroke-width="1.5" fill="none" />
-  
-  <!-- Peak Tier (Ghost Red) -->
-  <path d="M16 15 L18 16 V17 L16 18 L14 17 V16 L16 15 Z" stroke="#a80000" stroke-width="1.5" fill="none" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!--
+    ErzbergMark — same viewBox (80×60) and strokeWidth as the logo mark.
+    Displayed at 28×21 inside the 32×32 icon so proportions are identical.
+    x=(32-28)/2=2  y=(32-21)/2=5.5
+  -->
+  <svg x="2" y="5.5" width="28" height="21" viewBox="0 0 80 60" fill="none">
+    <g stroke="#E8823A" stroke-linecap="round" stroke-width="1.4">
+      <!-- Base terrace -->
+      <line x1="4"  y1="52" x2="76" y2="52"/>
+      <line x1="4"  y1="48" x2="76" y2="48"/>
+      <line x1="4"  y1="44" x2="76" y2="44"/>
+      <!-- Band 3 -->
+      <line x1="12" y1="39" x2="68" y2="39"/>
+      <line x1="12" y1="35" x2="68" y2="35"/>
+      <line x1="12" y1="31" x2="68" y2="31"/>
+      <!-- Band 2 -->
+      <line x1="22" y1="26" x2="58" y2="26"/>
+      <line x1="22" y1="22" x2="58" y2="22"/>
+      <line x1="22" y1="18" x2="58" y2="18"/>
+      <!-- Summit -->
+      <line x1="32" y1="13" x2="48" y2="13"/>
+      <line x1="32" y1="9"  x2="48" y2="9"/>
+      <!-- Peak -->
+      <line x1="37" y1="5"  x2="43" y2="5"/>
+    </g>
+  </svg>
 </svg>

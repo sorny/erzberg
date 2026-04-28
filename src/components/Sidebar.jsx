@@ -511,7 +511,7 @@ export function Sidebar({
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
         <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
-          <span style={{ fontSize:11, fontWeight:800, letterSpacing:'2px', textTransform:'lowercase', color: MUTED }}>erzberg</span>
+          <span style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3' }}>erzberg</span>
           <span style={{ fontSize:9, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
           <div style={{ flex: 1 }} />
           <button onClick={onReset} style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset</button>
@@ -919,7 +919,7 @@ export function Sidebar({
                   width:'100%', padding:8, marginBottom:10, background: SURF, color: DIM, 
                   border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
                 }}>
-                  {textureImage ? 'Change Texture' : '↑ Upload Image'}
+                  {textureImage ? 'Change Texture' : '↑ Load Image'}
                 </button>
                 {textureImage && (
                   <>

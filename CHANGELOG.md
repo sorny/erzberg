@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-04-28
+
+### Added
+- **Brand identity** — new ErzbergMark: a terraced-mountain logo inspired by the real Erzberg open-pit mine profile, rendered as 12 horizontal line segments grouped into 4 terrace bands. Amber `#E8823A` on dark `#131210`.
+- **Logo** (`public/logo.svg`) — horizontal lockup: ErzbergMark + "erzberg" wordmark in Space Mono 700 with tagline. Transparent background.
+- **Favicon** (`public/favicon.svg`) — redesigned using the same ErzbergMark viewBox and strokeWidth as the logo so line proportions are identical at all sizes. Transparent background.
+
+### Changed
+- Sidebar "erzberg" wordmark updated to **Space Mono 700**, `-0.02em` letter-spacing, warm off-white `#F0EBE3` — matching the Dark/Iron logo variant.
+- Texture section button renamed from "↑ Upload Image" to "↑ Load Image" to accurately reflect that files are opened locally, not sent to a server.
+- README: added privacy statement (*everything runs locally in your browser — no server, no upload, no account*) and logo image.
+
 ## [0.2.6] - 2026-04-28
 
 ### Added
