@@ -908,6 +908,11 @@ export function Sidebar({
 
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
+            {style.showTexture && !style.showFill && (
+              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '5px 7px', marginBottom: 6 }}>
+                Fill is disabled — texture will not appear until Fill is enabled.
+              </div>
+            )}
             {style.showTexture && (
               <Sub>
                 <button className="hmload" onClick={handleTexturePicker} style={{ 

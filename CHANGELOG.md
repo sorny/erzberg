@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - "Creative" section in the sidebar renamed to "Mirror".
 
+### Fixed
+- Suppressed spurious Vite chunk-size warning caused by Three.js and GeoTIFF libs exceeding the default 500 kB threshold. Raised `chunkSizeWarningLimit` to 1500 kB to reflect the expected bundle weight.
+- Texture overlay now shows an amber warning in the sidebar when Fill is disabled, since the texture is not rendered without an active fill pass.
+
 ## [0.2.5] - 2026-04-28
 
 ### Added

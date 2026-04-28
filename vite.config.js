@@ -9,4 +9,7 @@ export default defineConfig({
   optimizeDeps: {
     include: ['three'],
   },
+  build: {
+    chunkSizeWarningLimit: 1500,
+  },
 })
