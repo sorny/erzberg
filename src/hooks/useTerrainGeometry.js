@@ -103,6 +103,7 @@ export function useTerrainGeometry(p) {
     p.colorStipple, p.weightStipple, p.opacityStipple, p.dashStipple,
     p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
 
+
     // Global Line Styling (for fallback)
     p.showLines, p.lineColor, p.strokeWeight, p.lineOpacity, p.lineDash,
     p.lineHypsometric, p.lineBanded, p.lineHypsoInterval, p.lineHypsoWeight, p.lineHypsoMode,

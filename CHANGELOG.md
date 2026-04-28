@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-04-28
+
+### Added
+- **Slope Shading** — new surface overlay that tints the terrain by steepness. Blends a configurable two-colour gradient (flat → steep) over the existing fill with an opacity slider. Works standalone or combined with hillshade and fill.
+- **SVG layer export** — exported SVGs now wrap each draw mode in a named `<g>` group with `inkscape:groupmode="layer"` metadata. Opening the file in Inkscape or Illustrator shows each mode as a separate, independently editable layer.
+
+### Changed
+- "Creative" section in the sidebar renamed to "Mirror".
+
 ## [0.2.5] - 2026-04-28
 
 ### Added

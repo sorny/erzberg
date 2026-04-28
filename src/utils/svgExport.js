@@ -200,7 +200,7 @@ export function exportSVG({
 
   if (showLines && Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
-      const { positions, colors, weight, opacity, dash } = layer
+      const { id, positions, colors, weight, opacity, dash } = layer
       if (!positions || positions.length === 0) continue
 
       const visibleSegs = []
@@ -252,7 +252,7 @@ export function exportSVG({
       }
 
       if (visibleSegs.length > 0 || ghostSegs.length > 0) {
-        svgLayers.push({ visibleSegs, ghostSegs, weight, opacity, dash })
+        svgLayers.push({ id, visibleSegs, ghostSegs, weight, opacity, dash })
       }
     }
   }
@@ -294,17 +294,22 @@ export function exportSVG({
   for (const layer of svgLayers) {
     const sw = (layer.weight * 0.5).toFixed(3)
     const dashArray = DASH_SVG[layer.dash ?? 'solid'] ?? ''
-    
+    const modeId    = layer.id ?? 'Lines'
+    const modeLabel = modeId.replace(/([A-Z])/g, ' $1').trim()
+    const inner = []
+
     // Ghost pass (Hidden)
     if (layer.ghostSegs.length > 0) {
       const ghostEls = layer.ghostSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
-      layerGroups.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${ghostEls.join('')}</g>`)
+      inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${ghostEls.join('')}</g>`)
     }
     // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
       const lineEls = layer.visibleSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
-      layerGroups.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`)
+      inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`)
     }
+
+    layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
   }
 
   const pColor = particleColor ?? '#000000'
@@ -312,7 +317,7 @@ export function exportSVG({
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${vw.toFixed(0)}" height="${vh.toFixed(0)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(0)}" height="${vh.toFixed(0)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...(fillEls.length > 0 ? [`<g>${fillEls.join('')}</g>`] : []),

@@ -67,6 +67,10 @@ const SURFACE_FRAG = /* glsl */ `
   uniform vec3      uHillshadeHighlight;
   uniform vec3      uHillshadeShadow;
 
+  uniform bool      uSlopeShade;
+  uniform float     uSlopeShadeOpacity;
+  uniform vec3      uSlopeColorLow;
+  uniform vec3      uSlopeColorHigh;
   varying float     vBrightness;
   varying vec3      vNormal;
   varying vec2      vUv;
@@ -145,6 +149,12 @@ const SURFACE_FRAG = /* glsl */ `
       float shade = clamp(dot(exagNormal, lightDir), 0.0, 1.0) * uHillshadeIntensity;
       vec3 shadeColor = mix(uHillshadeShadow, uHillshadeHighlight, shade);
       base = mix(base, shadeColor, uHillshadeOpacity);
+    }
+
+    if (uSlopeShade) {
+      float slope = clamp(1.0 - n.y, 0.0, 1.0);
+      vec3 slopeCol = mix(uSlopeColorLow, uSlopeColorHigh, slope);
+      base = mix(base, slopeCol, uSlopeShadeOpacity * slope);
     }
 
     gl_FragColor = vec4(base, 1.0);
@@ -236,6 +246,10 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uHillshadeExaggeration: { value: 2.0 },
       uHillshadeHighlight:    { value: new THREE.Vector3(1, 1, 1) },
       uHillshadeShadow:       { value: new THREE.Vector3(0, 0, 0) },
+      uSlopeShade:            { value: false },
+      uSlopeShadeOpacity:     { value: 0.75 },
+      uSlopeColorLow:         { value: new THREE.Vector3(0.525, 0.937, 0.6) },
+      uSlopeColorHigh:        { value: new THREE.Vector3(0.863, 0.149, 0.149) },
     },
   }), [])
 
@@ -269,9 +283,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uHillshadeHighlight.value.set(...hexToRgb(p.hillshadeHighlightColor ?? '#ffffff'))
     surfMat.uniforms.uHillshadeShadow.value.set(...hexToRgb(p.hillshadeShadowColor   ?? '#000000'))
 
-    surfMat.colorWrite = !!(p.showFill || p.showRawTerrain || p.showHillshade)
+    surfMat.uniforms.uSlopeShade.value        = !!(p.showSlopeShade)
+    surfMat.uniforms.uSlopeShadeOpacity.value = p.slopeShadeOpacity ?? 0.75
+    surfMat.uniforms.uSlopeColorLow.value.set(...hexToRgb(p.slopeColorLow   ?? '#86efac'))
+    surfMat.uniforms.uSlopeColorHigh.value.set(...hexToRgb(p.slopeColorHigh ?? '#dc2626'))
+    const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade)
+    surfMat.colorWrite = anyFill
     surfMat.depthTest  = !!p.depthOcclusion
-    surfMat.depthWrite = !!(p.depthOcclusion && (p.showFill || p.showRawTerrain || p.showHillshade))
+    surfMat.depthWrite = !!(p.depthOcclusion && anyFill)
     surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
     surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
     surfMat.needsUpdate = true

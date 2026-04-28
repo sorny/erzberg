@@ -313,8 +313,8 @@ export function Sidebar({
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
-    hillshade: false,
-    points: false, texture: false, creative: false, erosion: false, export: true,
+    hillshade: false, slopeShade: false,
+    points: false, texture: false, mirror: false, erosion: false, export: true,
   })
 
   // --- Erosion State ---
@@ -665,6 +665,18 @@ export function Sidebar({
             )}
           </Section>
 
+          {/* ── Slope Shading ──────────────────────────────────────────────── */}
+          <Section title="Slope Shading" open={sec.slopeShade} onToggle={() => tog('slopeShade')} enabled={style.showSlopeShade}>
+            <Tog label="Enabled" checked={style.showSlopeShade} onChange={v => ss({ showSlopeShade: v })} />
+            {style.showSlopeShade && (
+              <Sub>
+                <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Flat colour" value={style.slopeColorLow} onChange={v => ss({ slopeColorLow: v })} />
+                <ColorRow label="Steep colour" value={style.slopeColorHigh} onChange={v => ss({ slopeColorHigh: v })} />
+              </Sub>
+            )}
+          </Section>
+
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
           <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')} enabled={style.enabledX}>
@@ -921,7 +933,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Creative" open={sec.creative} onToggle={() => tog('creative')}>
+          <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}>
             <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />

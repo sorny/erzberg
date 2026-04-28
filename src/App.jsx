@@ -89,6 +89,9 @@ const STYLE_DEF = {
   hillshadeIntensity: 1.0, hillshadeOpacity: 0.6, hillshadeExaggeration: 2.0,
   hillshadeHighlightColor: '#ffffff', hillshadeShadowColor: '#000000',
 
+  // Slope & Aspect shading
+  showSlopeShade: false, slopeShadeOpacity: 0.75, slopeColorLow: '#86efac', slopeColorHigh: '#dc2626',
+
   // Master visibility for all lines
 
   showLines: true,
