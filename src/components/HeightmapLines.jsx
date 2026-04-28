@@ -40,6 +40,25 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
     transparent: true,
   }), [])
 
+  const lidGeo = useMemo(() => {
+    if (!layer.lids || layer.lids.positions.length === 0) return null
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(layer.lids.positions, 3))
+    geo.setAttribute('color',    new THREE.BufferAttribute(layer.lids.colors, 3))
+    geo.setIndex(new THREE.BufferAttribute(layer.lids.indices, 1))
+    return geo
+  }, [layer.lids])
+
+  const lidMat = useMemo(() => new THREE.MeshBasicMaterial({
+    vertexColors: true,
+    side: THREE.DoubleSide,
+    transparent: true,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1,
+  }), [])
+
   useEffect(() => {
     if (!curtainMat) return
     // If the camera is underneath (tilt > 90), curtains would be between us and the lines.
@@ -55,6 +74,15 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
 
   useEffect(() => () => curtainMat?.dispose(), [curtainMat])
   useEffect(() => () => curtainGeo?.dispose(), [curtainGeo])
+  useEffect(() => () => lidGeo?.dispose(),     [lidGeo])
+  useEffect(() => () => lidMat?.dispose(),     [lidMat])
+
+  useEffect(() => {
+    if (!lidMat) return
+    lidMat.opacity   = opacity ?? 1
+    lidMat.depthTest = !!depthOcclusion
+    lidMat.needsUpdate = true
+  }, [lidMat, opacity, depthOcclusion])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
   const material = useMemo(() => new LineMaterial({
@@ -129,6 +157,7 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
   return (
     <group>
       {curtainGeo && depthOcclusion && <mesh geometry={curtainGeo} material={curtainMat} />}
+      {lidGeo && <mesh geometry={lidGeo} material={lidMat} />}
       {ghostLines && <primitive object={ghostLines} />}
       <primitive object={lines} />
     </group>

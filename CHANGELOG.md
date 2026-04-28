@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-04-28
+
+### Added
+- **Pillars: Cuboid and Cylinder shapes** — the Pillars draw mode now supports three shapes selectable per-mode: Line (original), Cuboid (rectangular prism with 12 wireframe edges), and Cylinder (N-gon prism, configurable polygon segments). Both 3D shapes include a closed solid lid on the top face rendered as a filled mesh. Size controls the cross-section as a fraction of spacing; Segments controls polygon resolution for cylinders.
+- **Pillars: Lid Color** — independent colour picker for the solid top-face lid on Cuboid and Cylinder pillars, defaulting to white.
+
+### Changed
+- Stipple draw mode renamed to "Stipple Dots" in the sidebar.
+
+### Fixed
+- Resolution slider could not be set below the auto-safe minimum after loading a file wider than 1000 px. The safety clamp now applies only on the render where new pixels arrive (the race window), not on subsequent user-driven slider changes.
+
 ## [0.2.4] - 2026-04-27
 
 ### Added

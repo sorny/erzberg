@@ -713,6 +713,29 @@ export function Sidebar({
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPillars} onChange={v => ss({ spacingPillars: v })} />
                   <InlineSl label="Gap" min={0} max={20} step={0.5} value={style.pillarGap} onChange={v => ss({ pillarGap: v })} />
                   <InlineSl label="Depth" min={0} max={100} step={1} value={style.pillarDepth} onChange={v => ss({ pillarDepth: v })} />
+                  <div style={{ marginBottom: 6 }}>
+                    <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Shape</span>
+                    <div style={{ display: 'flex', gap: 3 }}>
+                      {[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']].map(([label, val]) => (
+                        <button key={val} onClick={() => ss({ pillarStyle: val })} style={{
+                          flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 2,
+                          background: (style.pillarStyle ?? 'line') === val ? ACCENT : SURF,
+                          color: (style.pillarStyle ?? 'line') === val ? '#fff' : MUTED,
+                          border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT : BORDER}`,
+                          cursor: 'pointer',
+                        }}>{label}</button>
+                      ))}
+                    </div>
+                  </div>
+                  {(style.pillarStyle === 'cuboid' || style.pillarStyle === 'cylinder') && (
+                    <InlineSl label="Size" help="Cross-section as a fraction of spacing. 1.0 = pillars touch, 0.5 = half-width." min={0.05} max={1} step={0.05} value={style.pillarSize ?? 0.8} onChange={v => ss({ pillarSize: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  )}
+                  {style.pillarStyle === 'cylinder' && (
+                    <InlineSl label="Segments" help="Number of polygon sides approximating the circle." min={3} max={16} step={1} value={style.pillarSegments ?? 8} onChange={v => ss({ pillarSegments: v })} fmt={v => Math.round(v)} />
+                  )}
+                  {(style.pillarStyle === 'cuboid' || style.pillarStyle === 'cylinder') && (
+                    <ColorRow label="Lid Color" value={style.pillarLidColor ?? '#ffffff'} onChange={v => ss({ pillarLidColor: v })} />
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Pillars" style={style} ss={ss} />
               </>

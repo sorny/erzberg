@@ -77,7 +77,9 @@ export function buildLineGeometry(terrain, p) {
       let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
       let layerCPos = new Float32Array(0), layerCInd = []
       let cIndOffset = 0
-      
+      let layerLidPos = new Float32Array(0), layerLidCol = new Float32Array(0)
+      let layerLidInd = [], lidIndOffset = 0
+
       const baseP = res.positions
       const cP = []
       const cI = []
@@ -93,6 +95,10 @@ export function buildLineGeometry(terrain, p) {
         vIdx += 4
       }
 
+      const baseLidP = res.lids?.positions ?? new Float32Array(0)
+      const baseLidC = res.lids?.colors   ?? new Float32Array(0)
+      const baseLidI = res.lids ? Array.from(res.lids.indices) : []
+
       // Mirror the base pass into all requested octants
       for (const sx of mX) {
         for (const sy of mY) {
@@ -103,8 +109,8 @@ export function buildLineGeometry(terrain, p) {
             layerCol = concat(layerCol, res.colors)
 
             const cPass = new Float32Array(cP)
-            for (let i = 0; i < cPass.length; i += 3) { 
-              cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz 
+            for (let i = 0; i < cPass.length; i += 3) {
+              cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz
             }
             layerCPos = concat(layerCPos, cPass)
 
@@ -115,6 +121,18 @@ export function buildLineGeometry(terrain, p) {
               else layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
             }
             cIndOffset += (cP.length / 3)
+
+            if (baseLidP.length > 0) {
+              const lPass = new Float32Array(baseLidP)
+              for (let i = 0; i < lPass.length; i += 3) { lPass[i] *= sx; lPass[i+1] *= sy; lPass[i+2] *= sz }
+              layerLidPos = concat(layerLidPos, lPass)
+              layerLidCol = concat(layerLidCol, baseLidC)
+              for (let i = 0; i < baseLidI.length; i += 3) {
+                if (flipWinding) layerLidInd.push(baseLidI[i]+lidIndOffset, baseLidI[i+2]+lidIndOffset, baseLidI[i+1]+lidIndOffset)
+                else layerLidInd.push(baseLidI[i]+lidIndOffset, baseLidI[i+1]+lidIndOffset, baseLidI[i+2]+lidIndOffset)
+              }
+              lidIndOffset += baseLidP.length / 3
+            }
           }
         }
       }
@@ -127,6 +145,9 @@ export function buildLineGeometry(terrain, p) {
         positions: layerPos,
         colors: layerCol,
         curtains: { positions: layerCPos, indices: new Uint32Array(layerCInd) },
+        lids: layerLidInd.length > 0
+          ? { positions: layerLidPos, colors: layerLidCol, indices: new Uint32Array(layerLidInd) }
+          : null,
         weight: weight,
         opacity: p[`opacity${cfg.id}`],
         dash: p[`dash${cfg.id}`]
@@ -496,12 +517,16 @@ function buildPillars(terrain, p, spacing) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt, pillarGap, pillarDepth } = p
 
-  const step = Math.max(1, Math.round((spacing ?? 8) / scl))
-  const positions = []
-  const colors = []
+  const step     = Math.max(1, Math.round((spacing ?? 8) / scl))
+  const gap      = pillarGap ?? 0
+  const depth    = pillarDepth ?? 0
+  const style    = p.pillarStyle ?? 'line'
+  const halfSize = (p.pillarSize ?? 0.8) * step * scl * 0.5
+  const segs     = Math.max(3, Math.round(p.pillarSegments ?? 8))
 
-  const gap = pillarGap ?? 0
-  const depth = pillarDepth ?? 0
+  const positions = [], colors = []
+  const lidP = [], lidC = [], lidI = []
+  let lidVIdx = 0
 
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
@@ -513,23 +538,66 @@ function buildPillars(terrain, p, spacing) {
 
       const wx = c * scl - halfW
       const wz = r * scl - halfH
-
-      const top = elev - gap
+      const top    = elev - gap
       const bottom = minZ - depth
-
-      // Don't draw if gap swallows the entire pillar
       if (top <= bottom) continue
 
-      positions.push(wx, bottom, wz, wx, top, wz)
-      
-      const slope = gridSlopes[i]
+      const slope   = gridSlopes[i]
       const colBase = computeVertexColor(normElev(bottom, minZ, maxZ), 0, 0, p)
-      const colPeak = computeVertexColor(normElev(top, minZ, maxZ), slope / (maxSlope || 1), 0, p)
-      colors.push(...colBase, ...colPeak)
+      const colPeak = computeVertexColor(normElev(top,    minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
+
+      if (style === 'cuboid') {
+        const h = halfSize
+        // Top face perimeter (4 edges)
+        positions.push(wx-h,top,wz-h, wx+h,top,wz-h,  wx+h,top,wz-h, wx+h,top,wz+h,
+                       wx+h,top,wz+h, wx-h,top,wz+h,  wx-h,top,wz+h, wx-h,top,wz-h)
+        for (let e = 0; e < 4; e++) colors.push(...colPeak, ...colPeak)
+        // Bottom face (4 edges)
+        positions.push(wx-h,bottom,wz-h, wx+h,bottom,wz-h,  wx+h,bottom,wz-h, wx+h,bottom,wz+h,
+                       wx+h,bottom,wz+h, wx-h,bottom,wz+h,  wx-h,bottom,wz+h, wx-h,bottom,wz-h)
+        for (let e = 0; e < 4; e++) colors.push(...colBase, ...colBase)
+        // 4 vertical edges (base → peak colour gradient)
+        positions.push(wx-h,bottom,wz-h, wx-h,top,wz-h,  wx+h,bottom,wz-h, wx+h,top,wz-h,
+                       wx+h,bottom,wz+h, wx+h,top,wz+h,  wx-h,bottom,wz+h, wx-h,top,wz+h)
+        for (let e = 0; e < 4; e++) colors.push(...colBase, ...colPeak)
+        // Lid mesh — 2 triangles covering the top face
+        lidP.push(wx-h,top,wz-h, wx+h,top,wz-h, wx+h,top,wz+h, wx-h,top,wz+h)
+        for (let v = 0; v < 4; v++) lidC.push(...colLid)
+        lidI.push(lidVIdx,lidVIdx+1,lidVIdx+2, lidVIdx,lidVIdx+2,lidVIdx+3)
+        lidVIdx += 4
+      } else if (style === 'cylinder') {
+        const rad = halfSize
+        for (let s = 0; s < segs; s++) {
+          const a0 = (s       / segs) * Math.PI * 2
+          const a1 = ((s + 1) / segs) * Math.PI * 2
+          const x0 = wx + rad * Math.cos(a0), z0 = wz + rad * Math.sin(a0)
+          const x1 = wx + rad * Math.cos(a1), z1 = wz + rad * Math.sin(a1)
+          positions.push(x0, top,    z0, x1, top,    z1); colors.push(...colPeak, ...colPeak)
+          positions.push(x0, bottom, z0, x1, bottom, z1); colors.push(...colBase, ...colBase)
+          positions.push(x0, bottom, z0, x0, top,    z0); colors.push(...colBase, ...colPeak)
+        }
+        // Lid mesh — N-gon fan from centre
+        lidP.push(wx, top, wz); lidC.push(...colLid)           // centre vertex
+        for (let s = 0; s < segs; s++) {
+          const a = (s / segs) * Math.PI * 2
+          lidP.push(wx + rad * Math.cos(a), top, wz + rad * Math.sin(a))
+          lidC.push(...colLid)
+        }
+        for (let s = 0; s < segs; s++)
+          lidI.push(lidVIdx, lidVIdx + s + 1, lidVIdx + ((s + 1) % segs) + 1)
+        lidVIdx += segs + 1
+      } else {
+        positions.push(wx, bottom, wz, wx, top, wz)
+        colors.push(...colBase, ...colPeak)
+      }
     }
   }
 
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  const lids = lidI.length > 0
+    ? { positions: new Float32Array(lidP), colors: new Float32Array(lidC), indices: new Uint32Array(lidI) }
+    : null
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors), lids }
 }
 
 // ─── Stipple ──────────────────────────────────────────────────────────────────
