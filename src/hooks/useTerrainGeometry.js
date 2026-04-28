@@ -15,6 +15,7 @@ export function useTerrainGeometry(p) {
 
   const workerRef = useRef(null)
   const startTimeRef = useRef(0)
+  const prevPixelsRef = useRef(null)
 
   useEffect(() => {
     if (!heightmapPixels) {
@@ -37,13 +38,14 @@ export function useTerrainGeometry(p) {
       setIsComputing(false)
     }
 
-    // Guard against the race where heightmap pixels arrive before the terrain
-    // resolution state updates (App.jsx sets resolution after setHeightmap).
-    // Cap to 1000×1000 grid using the pixel dimensions already in the store.
-    const safeResolution = Math.max(
-      p.resolution,
-      Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1000)
-    )
+    // Guard against the race where heightmap pixels arrive before App.jsx has
+    // committed the auto-resolution state update. Only clamp on the render
+    // where pixels actually changed — user slider changes must never be clamped.
+    const pixelsJustChanged = prevPixelsRef.current !== heightmapPixels
+    prevPixelsRef.current = heightmapPixels
+    const safeResolution = pixelsJustChanged
+      ? Math.max(p.resolution, Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1000))
+      : p.resolution
 
     startTimeRef.current = performance.now()
     workerRef.current.postMessage({
