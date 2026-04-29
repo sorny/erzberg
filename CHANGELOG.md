@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-04-29
+
+### Fixed
+- **PNG export colours darker than viewport** — three.js r152+ no longer applies `outputColorSpace` (sRGB conversion) when rendering to a `WebGLRenderTarget`, so exported pixels were in linear colour space. Image viewers interpret PNG bytes as sRGB, making the result appear darker than the live view. Adding `colorSpace: THREE.SRGBColorSpace` to the render target opts back into the sRGB output conversion, matching the main canvas.
+
 ## [0.2.13] - 2026-04-29
 
 ### Fixed
