@@ -132,6 +132,7 @@ export function Scene({
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
       samples: 4,
+      colorSpace: THREE.SRGBColorSpace,
     })
 
     // Only update LineMaterial resolution to match the render target dimensions.
