@@ -6,15 +6,15 @@
  * CAMERA position/rotation rather than the terrain group.
  * Tilt and Rotation sliders drive the camera's spherical coordinates around [0,0,0].
  */
-import { useRef, useEffect, useMemo } from 'react'
+import { GizmoHelper, GizmoViewport, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, GizmoHelper, GizmoViewport, PerspectiveCamera, OrthographicCamera } from '@react-three/drei'
+import { useEffect, useRef } from 'react'
 import * as THREE from 'three'
-import { HeightmapLines } from './HeightmapLines'
-import { ParticleSystem }  from './ParticleSystem'
-import { Controls }        from './Controls'
-import { exportSVG }              from '../utils/svgExport'
 import { captureAndExportPNG } from '../utils/pngExport'
+import { exportSVG } from '../utils/svgExport'
+import { Controls } from './Controls'
+import { HeightmapLines } from './HeightmapLines'
+import { ParticleSystem } from './ParticleSystem'
 
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
@@ -49,7 +49,9 @@ export function Scene({
     // For Orthographic, distance should be constant to avoid clipping/z-issues, 
     // but the .zoom property is what actually scales the view.
     const dist = p.orthographic ? BASE_DIST : (BASE_DIST / zoom)
-    const phi = THREE.MathUtils.degToRad(tiltDeg)
+    // Clamp phi away from 0 to avoid spherical coord singularity at top-down view
+    // (setFromSphericalCoords collapses theta when phi=0, making rotation invisible)
+    const phi = THREE.MathUtils.degToRad(Math.max(tiltDeg, 0.001))
     const theta = THREE.MathUtils.degToRad(rotationDeg)
 
     const target = new THREE.Vector3(px || 0, 0, py || 0)

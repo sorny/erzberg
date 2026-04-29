@@ -1,7 +1,7 @@
 /**
  * Derives terrain grid and line geometry from the raw heightmap + visual params.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, startTransition } from 'react'
 import { useStore } from '../store/useStore'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
@@ -31,7 +31,9 @@ export function useTerrainGeometry(p) {
       const { terrain, lineGeo, surfaceGeo, error } = e.data
       if (error) console.error('[GeometryWorker] Error:', error)
       else {
-        setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
+        startTransition(() => {
+          setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
+        })
         console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
         console.log(`[Perf] Terrain ready Main: ${elapsed}ms`)
       }

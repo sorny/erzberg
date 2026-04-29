@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-04-29
+
+### Fixed
+- **Rotation slider unresponsive after selecting Top view preset** — spherical coordinate singularity at `tilt = 0°` caused `setFromSphericalCoords` to collapse the azimuth term, placing the camera at `(0, dist, 0)` regardless of rotation. Clamping `phi` to `≥ 0.001°` keeps the `lookAt` cross product non-degenerate so rotation works correctly at top-down.
+- **Main thread blocked during geometry rebuild** — geometry state updates from the Web Worker were applied as urgent React renders, blocking user input (e.g. rotation slider) for up to 8 s on heavy recomputes. Wrapping the worker `onmessage` state updates in `startTransition` marks them as low-priority background work, so React can interrupt and process user input immediately.
+- **Auto-resolution grid target updated** from 1000 × 1000 to 1024 × 1024 cells, aligning with power-of-two texture sizes.
+
+### Changed
+- Upgraded `three-mesh-bvh` from `0.7.8` (deprecated) to `0.9.9` — the latest version compatible with three.js `0.184.0`.
+- Added `data-testid="sidebar-toggle"` to the sidebar toggle button; performance test now uses attribute-based selectors instead of fragile text matchers.
+
 ## [0.2.7] - 2026-04-28
 
 ### Added
