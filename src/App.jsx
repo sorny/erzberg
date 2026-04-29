@@ -149,7 +149,7 @@ function LoadingOverlay({ msg }) {
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg } = useHeightmap()
+  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
@@ -499,6 +499,24 @@ export default function App() {
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
       {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
+
+      {/* ── Load error banner ────────────────────────────────────────────── */}
+      {loadError && (
+        <div style={{
+          position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+          background:'#450a0a', border:'1px solid #991b1b', borderRadius:8,
+          padding:'12px 16px', zIndex:5000, display:'flex', alignItems:'center', gap:12,
+          maxWidth:480, boxShadow:'0 4px 24px rgba(0,0,0,0.5)',
+          fontFamily:'system-ui,sans-serif', fontSize:13, color:'#fca5a5',
+        }}>
+          <span style={{ fontSize:16 }}>⚠</span>
+          <span style={{ flex:1 }}>{loadError}</span>
+          <button onClick={clearError} style={{
+            background:'none', border:'none', color:'#fca5a5', cursor:'pointer',
+            fontSize:16, lineHeight:1, padding:'0 2px', opacity:0.7,
+          }}>✕</button>
+        </div>
+      )}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}
       {noHmap && !isLoading && <EmptyState

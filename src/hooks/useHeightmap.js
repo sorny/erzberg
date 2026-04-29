@@ -128,15 +128,26 @@ async function loadGeoTiffPixels(file) {
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
+function friendlyError(err) {
+  if (err instanceof RangeError || err?.message?.includes('Array buffer allocation failed') || err?.message?.includes('allocation failed'))
+    return 'File is too large to load in the browser. Try a smaller or lower-resolution GeoTIFF.'
+  if (err?.message?.includes('invalid elevation range'))
+    return 'GeoTIFF contains no valid elevation data.'
+  return err?.message || 'Unknown error.'
+}
+
 export function useHeightmap() {
   const setHeightmap    = useStore((s) => s.setHeightmap)
   const setGeoTiffMeta  = useStore((s) => s.setGeoTiffMeta)
   const clearGeoTiffMeta = useStore((s) => s.clearGeoTiffMeta)
   const [isLoading,  setIsLoading]  = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
+  const [loadError,  setLoadError]  = useState(null)
+
+  const clearError = useCallback(() => setLoadError(null), [])
 
   const load = useCallback((source) => {
-    setIsLoading(true); setLoadingMsg('Loading heightmap…')
+    setIsLoading(true); setLoadingMsg('Loading heightmap…'); setLoadError(null)
     return loadImagePixels(source)
       .then(({ pixels, nodataMask, width, height, dataWidth, dataHeight }) => {
         const filename = typeof source === 'string' ? source.split('/').pop() : source.name
@@ -145,7 +156,10 @@ export function useHeightmap() {
         setIsLoading(false); setLoadingMsg('')
         return { pixels, nodataMask, width, height, dataWidth, dataHeight }
       })
-      .catch(err => { setIsLoading(false); setLoadingMsg(''); throw err })
+      .catch(err => {
+        setIsLoading(false); setLoadingMsg('')
+        setLoadError('Failed to load image: ' + friendlyError(err))
+      })
   }, [setHeightmap, clearGeoTiffMeta])
 
   const loadFromPicker = useCallback((onLoaded) => {
@@ -156,7 +170,7 @@ export function useHeightmap() {
 
   const loadGeoTiff = useCallback((file) => {
     console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
-    setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…')
+    setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…'); setLoadError(null)
     return loadGeoTiffPixels(file)
       .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }) => {
         console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
@@ -165,7 +179,11 @@ export function useHeightmap() {
         setIsLoading(false); setLoadingMsg('')
         return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }
       })
-      .catch(err => { setIsLoading(false); setLoadingMsg(''); console.error(err); throw err })
+      .catch(err => {
+        setIsLoading(false); setLoadingMsg('')
+        setLoadError('Failed to load GeoTIFF: ' + friendlyError(err))
+        console.error(err)
+      })
   }, [setHeightmap, setGeoTiffMeta])
 
   const loadGeoTiffFromPicker = useCallback((onLoaded) => {
@@ -174,5 +192,5 @@ export function useHeightmap() {
     input.click()
   }, [loadGeoTiff])
 
-  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg }
+  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError }
 }

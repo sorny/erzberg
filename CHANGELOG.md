@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-04-29
+
+### Fixed
+- **No UI feedback on broken / oversized GeoTIFF** — loading failures previously swallowed the error silently (console only). A dismissible red banner now appears at the bottom of the screen with a friendly message. Out-of-memory (`RangeError: Array buffer allocation failed`) shows "File is too large to load in the browser. Try a smaller or lower-resolution GeoTIFF."; invalid elevation data shows "GeoTIFF contains no valid elevation data."; all other errors surface the raw message as a fallback.
+
 ## [0.2.10] - 2026-04-29
 
 ### Added
