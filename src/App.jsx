@@ -392,9 +392,11 @@ export default function App() {
   // ── Load default heightmap on mount ───────────────────────────────────────
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL || '/'
-    load(`${baseUrl}Heightmap.png`).catch(() =>
-      console.warn('[App] Default heightmap not found — use Load Heightmap.')
-    )
+    load(`${baseUrl}Heightmap.png`)
+      .then(({ width, height }) => {
+        setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height) }))
+      })
+      .catch(() => console.warn('[App] Default heightmap not found — use Load Heightmap.'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bgColor   = style.bgColor || '#ffffff'

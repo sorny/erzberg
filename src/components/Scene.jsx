@@ -112,70 +112,87 @@ export function Scene({
 
 
   // ── High-Res Offscreen Render Pass ──────────────────────────────────────────
+  // Uses a WebGLRenderTarget instead of resizing the main GL context, which
+  // avoids pixel-ratio / framebuffer-clamping issues that cut off the top of
+  // the scene when exporting from a retina display.
   const performHighResCapture = (isAlpha) => {
     const cam = activeCamera || currentCamera
-    // 1. Store current GL state
+    const captureScale = 4.0
+    const vpSize = new THREE.Vector2()
+    gl.getSize(vpSize)
+    const targetW = Math.round(vpSize.x * captureScale)
+    const targetH = Math.round(vpSize.y * captureScale)
+
+    // Offscreen render target — never touches the main framebuffer
+    const rt = new THREE.WebGLRenderTarget(targetW, targetH, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat,
+    })
+
+    // Only update LineMaterial resolution to match the render target dimensions.
+    // linewidth is intentionally NOT scaled: the shader formula
+    //   pixels_wide = linewidth × renderTargetHeight / resolution.y
+    // gives the same on-screen pixel width as the live viewport when resolution
+    // is set to (targetW, targetH), because the render target has no implicit DPR.
+    // Scaling uSize for particles is also skipped — the point-size shader already
+    // handles depth-based scaling, and mutating the shared material reference
+    // causes visible bleed into the live viewport after restore.
+    const lineMaterials = []
+    scene.traverse(obj => {
+      if (obj.material?.isLineMaterial) {
+        lineMaterials.push({ mat: obj.material, oldRes: obj.material.resolution.clone() })
+        obj.material.resolution.set(targetW, targetH)
+      }
+    })
+
+    // Update camera for the capture aspect ratio
+    const oldAspect = cam.isPerspectiveCamera ? cam.aspect : null
+    if (cam.isPerspectiveCamera) {
+      cam.aspect = targetW / targetH
+      cam.updateProjectionMatrix()
+    }
+
+    // Render into the offscreen target
     const oldClearColor = new THREE.Color()
     gl.getClearColor(oldClearColor)
     const oldAlpha = gl.getClearAlpha()
-    const oldPixelRatio = gl.getPixelRatio()
-    const oldSize = new THREE.Vector2()
-    gl.getSize(oldSize)
-
-    // 2. Scale up for capture (e.g. 4x viewport or fixed 4k)
-    const captureScale = 4.0
-    const targetW = oldSize.x * captureScale
-    const targetH = oldSize.y * captureScale
-    
-    gl.setSize(targetW, targetH, false)
-    gl.setPixelRatio(1)
-
-    // ─── TEMP: Scale up line weights and particles to match high-res ───
-    const lineMaterials = []
-    const particleMaterials = []
-    scene.traverse(obj => {
-      // Scale LineMaterial
-      if (obj.material && obj.material.isLineMaterial) {
-        lineMaterials.push({
-          mat: obj.material,
-          oldWidth: obj.material.linewidth,
-          oldRes: obj.material.resolution.clone()
-        })
-        obj.material.linewidth *= captureScale
-        obj.material.resolution.set(targetW, targetH)
-      }
-      // Scale Particle Material (uSize uniform)
-      if (obj.material && obj.material.uniforms && obj.material.uniforms.uSize) {
-        particleMaterials.push({
-          mat: obj.material,
-          oldSize: obj.material.uniforms.uSize.value
-        })
-        obj.material.uniforms.uSize.value *= captureScale
-      }
-    })
-
-    // 3. Set transparent background for native alpha capture
-    gl.setClearColor(0x000000, 0) 
-    
-    // 4. Force a render pass
+    gl.setRenderTarget(rt)
+    gl.setClearColor(0x000000, 0)
+    gl.clear()
     gl.render(scene, cam)
-
-    // 5. Send the rendered buffer to our export utility
-    captureAndExportPNG(gl.domElement, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha)
-
-    // 6. Restore material states
-    lineMaterials.forEach(({ mat, oldWidth, oldRes }) => {
-      mat.linewidth = oldWidth
-      mat.resolution.copy(oldRes)
-    })
-    particleMaterials.forEach(({ mat, oldSize }) => {
-      mat.uniforms.uSize.value = oldSize
-    })
-
-    // 7. Restore original GL state
+    gl.setRenderTarget(null)
     gl.setClearColor(oldClearColor, oldAlpha)
-    gl.setPixelRatio(oldPixelRatio)
-    gl.setSize(oldSize.x, oldSize.y, true)
+
+    // Read pixels from the render target.
+    // WebGL origin is bottom-left; flip vertically so (0,0) is top-left.
+    const raw = new Uint8Array(targetW * targetH * 4)
+    gl.readRenderTargetPixels(rt, 0, 0, targetW, targetH, raw)
+    rt.dispose()
+
+    const flipped = new Uint8Array(targetW * targetH * 4)
+    const rowBytes = targetW * 4
+    for (let y = 0; y < targetH; y++) {
+      flipped.set(raw.subarray((targetH - 1 - y) * rowBytes, (targetH - y) * rowBytes), y * rowBytes)
+    }
+
+    // Write into a plain 2D canvas for the export utility
+    const offscreen = document.createElement('canvas')
+    offscreen.width = targetW
+    offscreen.height = targetH
+    const offCtx = offscreen.getContext('2d')
+    const imgData = offCtx.createImageData(targetW, targetH)
+    imgData.data.set(flipped)
+    offCtx.putImageData(imgData, 0, 0)
+
+    captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha)
+
+    // Restore materials and camera
+    lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
+    if (cam.isPerspectiveCamera && oldAspect !== null) {
+      cam.aspect = oldAspect
+      cam.updateProjectionMatrix()
+    }
   }
 
   // SVG export
