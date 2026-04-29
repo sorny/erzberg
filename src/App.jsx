@@ -369,7 +369,7 @@ export default function App() {
       top:   { tilt: 0,  rotation: 0 },
       front: { tilt: 90, rotation: 0 },
       iso:   { tilt: 45, rotation: -45 },
-      reset: { tilt: 40, rotation: 0 },
+      reset: { tilt: 40, rotation: 0, zoom: 1, fov: 60, panX: 0, panY: 0 },
     }
     const p = presets[name] || presets.reset
     setView(prev => ({ ...prev, ...p }))

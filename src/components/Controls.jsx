@@ -29,35 +29,8 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
       const v = levaGet()
 
       switch (e.code) {
-        // ── Pan ──────────────────────────────────────────────────────────────
-        case 'KeyW': movePan(0, 0, -PAN_SPEED); break
-        case 'KeyS': movePan(0, 0,  PAN_SPEED); break
-        case 'KeyA': movePan(-PAN_SPEED, 0, 0); break
-        case 'KeyD': movePan( PAN_SPEED, 0, 0); break
-
-        // ── Tilt ─────────────────────────────────────────────────────────────
-        case 'KeyY': levaSet({ tilt: Math.max(-90, (v.tilt ?? 0) - TILT_STEP) }); break
-        case 'KeyX': levaSet({ tilt: Math.min( 90, (v.tilt ?? 0) + TILT_STEP) }); break
-
-        // ── Rotation ─────────────────────────────────────────────────────────
-        case 'KeyE': levaSet({ rotation: (v.rotation ?? 0) + ROT_STEP }); break
-        case 'KeyR': levaSet({ rotation: (v.rotation ?? 0) - ROT_STEP }); break
-
-        // ── Reset camera ─────────────────────────────────────────────────────
-        case 'KeyT':
-          camera.position.set(0, 400, 500)
-          panTarget.current.set(0, 0, 0)
-          if (orbitRef?.current) {
-            orbitRef.current.target.set(0, 0, 0)
-            orbitRef.current.update()
-          }
-          break
-
         // ── Auto-rotate ──────────────────────────────────────────────────────
         case 'KeyQ': levaSet({ autoRotate: !(v.autoRotate) }); break
-
-        // ── Toggles ──────────────────────────────────────────────────────────
-        case 'KeyG': levaSet({ showGuides: !(v.showGuides) }); break
 
         default: return
       }

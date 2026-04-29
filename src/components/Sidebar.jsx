@@ -559,10 +559,10 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Tilt" hint="y/x" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" hint="e/r" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
             <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
@@ -582,7 +582,7 @@ export function Sidebar({
                 </div>
               </Sub>
             )}
-            <Tog label="Center guides" hint="g" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
           </Section>
 
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>

@@ -39,7 +39,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Particle system.** Optional animated point cloud with noise-driven motion, gravity, and peaks-only mode.
 
-**Exporters.** SVG (software Z-buffer projection, per-mode Inkscape/Illustrator layers), 4K PNG, STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording.
+**Exporters.** SVG (software Z-buffer projection, per-mode Inkscape/Illustrator layers), 4K PNG with MSAA (WebGLRenderTarget, trimmed to content), PNG α (transparent background), STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording.
 
 ---
 
@@ -66,11 +66,12 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 ```bash
 npm install
-npm run dev       # dev server at http://localhost:5173
-npm run build     # production build
-npm run test      # Playwright end-to-end suite
-npm run test:ui   # Playwright interactive UI
+npm run dev              # dev server at http://localhost:5173
+npm run build            # production build
+npm run test             # Playwright end-to-end suite
+npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # single spec
+npm run update-presets   # round-trip all presets through the live app
 ```
 
 Tests run against a live dev server in non-headless Chrome with WebGL enabled.

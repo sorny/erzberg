@@ -71,7 +71,7 @@ export function Scene({
 
   useEffect(() => {
     updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
-  }, [p.tilt, p.rotation, p.zoom, p.orthographic, activeCamera])
+  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
 
   useFrame((_, delta) => {
     if (!p.autoRotate) return

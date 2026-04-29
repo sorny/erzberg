@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-04-29
+
+### Fixed
+- **Pan X / Pan Y sliders not updating viewport** — `p.panX` and `p.panY` were missing from the `updateCameraFromSliders` `useEffect` dependency array in `Scene.jsx`.
+- **Camera reset incomplete** — Reset button now restores `zoom`, `fov`, `panX`, and `panY` in addition to `tilt` and `rotation`. `orthographic` mode is intentionally preserved.
+
+### Changed
+- **Keyboard shortcuts trimmed** — removed `W/A/S/D` (pan), `Y/X` (tilt), `E/R` (rotate), `T` (camera reset), `G` (guides). Remaining hotkeys: `Q` (toggle auto-rotate), `1` SVG, `2` PNG 4×, `3` PNG α, `4` STL, `5` WebM.
+
 ## [0.2.12] - 2026-04-29
 
 ### Fixed
