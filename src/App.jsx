@@ -319,9 +319,9 @@ export default function App() {
     setView(prev => ({ ...prev, zoom }))
   }, [])
 
-  // ── Auto-resolution: keep the geometry grid within 1000×1000 ─────────────
+  // ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────
   const autoResolution = useCallback((width, height) =>
-    Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1000)))
+    Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
   , [])
 
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
