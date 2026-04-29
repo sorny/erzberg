@@ -123,11 +123,15 @@ export function Scene({
     const targetW = Math.round(vpSize.x * captureScale)
     const targetH = Math.round(vpSize.y * captureScale)
 
-    // Offscreen render target — never touches the main framebuffer
+    // Offscreen render target — never touches the main framebuffer.
+    // samples: 4 enables WebGL2 MSAA so edges are smooth like the main canvas
+    // (antialias: true). Three.js resolves the MSAA buffer to the texture
+    // automatically at the end of gl.render(), before readRenderTargetPixels.
     const rt = new THREE.WebGLRenderTarget(targetW, targetH, {
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
       format: THREE.RGBAFormat,
+      samples: 4,
     })
 
     // Only update LineMaterial resolution to match the render target dimensions.

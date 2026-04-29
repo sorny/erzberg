@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-04-29
+
+### Fixed
+- **PNG export: scene cropped at top** — replaced the `gl.setSize` / `gl.setPixelRatio` resize approach with a `WebGLRenderTarget`. The old approach created an intermediate framebuffer at `targetSize × devicePixelRatio` before resetting the DPR to 1, which on retina displays produced a buffer up to 2× the intended size that could be silently clamped by the GPU, cutting off the top of the scene.
+- **PNG export: lines too bold** — `linewidth` is no longer scaled during capture. The LineMaterial shader formula `pixels_wide = linewidth × targetH / resolution.y` reproduces the same on-screen pixel width as the live viewport when only `resolution` is updated to match the render target dimensions. Previously scaling by `captureScale = 4` made lines 4× bolder at 100% zoom.
+- **PNG export: particles blurry in live viewport after export** — removed `uSize` mutation during capture. The point-size shader already handles depth-based scaling; mutating the shared material reference caused visible size bleed into the next live frame.
+- **PNG export: lines pixelated / no antialiasing** — added `samples: 4` MSAA to the `WebGLRenderTarget`. Three.js resolves the multisampled buffer to the target texture automatically at the end of `gl.render()`, so `readRenderTargetPixels` receives the antialiased result without an extra blit pass.
+- **Default heightmap loads at resolution 2 instead of 1** — the mount-time load now calls `autoResolution` in its `.then()` callback, matching the behaviour of user-initiated loads.
+
 ## [0.2.11] - 2026-04-29
 
 ### Fixed
