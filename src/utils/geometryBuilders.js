@@ -41,7 +41,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
-    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours) },
+    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
@@ -228,18 +228,136 @@ function buildHachure(terrain, p, spacing, length) {
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
 
-function buildContours(terrain, p, interval, majorInterval, majorOffset) {
+// Chains raw marching-squares segments (grid coords) into polylines, then closes
+// any open ends that sit on the grid border by walking the border between them.
+// Returns a flat world-space array [x0,y,z0, x1,y,z1, ...] of segment pairs.
+function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
+  const n = levelSegs.length / 4
+  if (n === 0) return []
+
+  const toWorld = (c, r) => [c * scl - halfW, r * scl - halfH]
+  const key = (c, r) => `${c},${r}`
+
+  // Build endpoint adjacency: key -> [segment indices]
+  const adj = new Map()
+  for (let i = 0; i < n; i++) {
+    const k0 = key(levelSegs[i*4],   levelSegs[i*4+1])
+    const k1 = key(levelSegs[i*4+2], levelSegs[i*4+3])
+    if (!adj.has(k0)) adj.set(k0, [])
+    if (!adj.has(k1)) adj.set(k1, [])
+    adj.get(k0).push(i)
+    adj.get(k1).push(i)
+  }
+
+  // Chain segments into polylines
+  const visited = new Uint8Array(n)
+  const chains = []
+  for (let start = 0; start < n; start++) {
+    if (visited[start]) continue
+    visited[start] = 1
+    const chain = [
+      { c: levelSegs[start*4],   r: levelSegs[start*4+1] },
+      { c: levelSegs[start*4+2], r: levelSegs[start*4+3] },
+    ]
+    // Extend tail then head
+    for (const [getEnd, insert] of [
+      [() => chain[chain.length - 1], pt => chain.push(pt)],
+      [() => chain[0],                pt => chain.unshift(pt)],
+    ]) {
+      let tip = getEnd()
+      while (true) {
+        const next = (adj.get(key(tip.c, tip.r)) || []).find(i => !visited[i])
+        if (next === undefined) break
+        visited[next] = 1
+        const nc0 = levelSegs[next*4], nr0 = levelSegs[next*4+1]
+        const nc1 = levelSegs[next*4+2], nr1 = levelSegs[next*4+3]
+        tip = key(nc0, nr0) === key(tip.c, tip.r) ? { c: nc1, r: nr1 } : { c: nc0, r: nr0 }
+        insert(tip)
+      }
+    }
+    chains.push(chain)
+  }
+
+  // Emit all chain segments
+  const result = []
+  for (const chain of chains) {
+    for (let i = 0; i < chain.length - 1; i++) {
+      const [x0, z0] = toWorld(chain[i].c,   chain[i].r)
+      const [x1, z1] = toWorld(chain[i+1].c, chain[i+1].r)
+      result.push(x0, elev, z0, x1, elev, z1)
+    }
+  }
+
+  // Collect open border endpoints
+  // Clockwise border position in [0, 4): top=0..1, right=1..2, bottom=2..3, left=3..4
+  const EPS = 1e-9
+  const onBorder = (c, r) => c <= EPS || r <= EPS || c >= cols - 1 - EPS || r >= rows - 1 - EPS
+  const borderPos = (c, r) => {
+    if (r <= EPS)            return c / (cols - 1)
+    if (c >= cols - 1 - EPS) return 1 + r / (rows - 1)
+    if (r >= rows - 1 - EPS) return 2 + (1 - c / (cols - 1))
+    return                          3 + (1 - r / (rows - 1))
+  }
+
+  const bpts = []
+  for (const chain of chains) {
+    const head = chain[0], tail = chain[chain.length - 1]
+    if (key(head.c, head.r) === key(tail.c, tail.r)) continue // already closed
+    if (onBorder(head.c, head.r)) bpts.push({ c: head.c, r: head.r, pos: borderPos(head.c, head.r) })
+    if (onBorder(tail.c, tail.r)) bpts.push({ c: tail.c, r: tail.r, pos: borderPos(tail.c, tail.r) })
+  }
+
+  if (bpts.length < 2 || bpts.length % 2 !== 0) return result
+  bpts.sort((a, b) => a.pos - b.pos)
+
+  // Grid corners in clockwise order
+  const corners = [
+    { c: 0,        r: 0,        pos: 0 },
+    { c: cols - 1, r: 0,        pos: 1 },
+    { c: cols - 1, r: rows - 1, pos: 2 },
+    { c: 0,        r: rows - 1, pos: 3 },
+  ]
+
+  // Walk border clockwise from p0 to p1, inserting any corners in between
+  const traceBorder = (p0, p1) => {
+    const pts = [{ c: p0.c, r: p0.r }]
+    const inRange = pos => p0.pos < p1.pos
+      ? pos > p0.pos + EPS && pos < p1.pos - EPS
+      : pos > p0.pos + EPS || pos  < p1.pos - EPS
+    const dist = pos => (pos - p0.pos + 4) % 4
+    corners
+      .filter(corner => inRange(corner.pos))
+      .sort((a, b) => dist(a.pos) - dist(b.pos))
+      .forEach(corner => pts.push({ c: corner.c, r: corner.r }))
+    pts.push({ c: p1.c, r: p1.r })
+    return pts
+  }
+
+  // Pair consecutive border endpoints and emit border segments
+  for (let i = 0; i < bpts.length; i += 2) {
+    const pts = traceBorder(bpts[i], bpts[i + 1])
+    for (let j = 0; j < pts.length - 1; j++) {
+      const [x0, z0] = toWorld(pts[j].c,   pts[j].r)
+      const [x1, z1] = toWorld(pts[j+1].c, pts[j+1].r)
+      result.push(x0, elev, z0, x1, elev, z1)
+    }
+  }
+
+  return result
+}
+
+function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-  
+
   const minorPos = [], minorCol = []
   const majorPos = [], majorCol = []
-  
+
   const step = (interval ?? 4)
   // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
   const startElev = Math.ceil((minZ - 1e-7) / step) * step
   const maxElevPossible = Math.ceil(maxZ / step) * step
-  
+
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
 
@@ -248,15 +366,17 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset) {
   for (let i = 0; i < numSteps; i++) {
     const elev = startElev + i * step
     if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-    
+
     // Check if major based on bottom-up index + phase offset
     const isMajor = (majorMod > 1) ? ((i + (majorMod - offset)) % majorMod === 0) : (majorMod === 1)
-    
+
     const targetPos = (isMajor && majorMod > 0) ? majorPos : minorPos
     const targetCol = (isMajor && majorMod > 0) ? majorCol : minorCol
     const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
     const level = elev / (100 * elevScale) + 0.5
-    
+
+    const levelSegs = closeRings ? [] : null
+
     for (let r = 0; r < rows - 1; r++) {
       for (let c = 0; c < cols - 1; c++) {
         // If all 4 are NoData, skip cell
@@ -271,17 +391,29 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset) {
 
         const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
         if (idx === 0 || idx === 15) continue
-        const edgeLerp = (a, b, va, vb) => { 
+        const edgeLerp = (a, b, va, vb) => {
           if (Math.abs(vb - va) < 1e-10) return 0.5
-          return a + (b - a) * ((level - va) / (vb - va)) 
+          return a + (b - a) * ((level - va) / (vb - va))
         }
         const top = [c + edgeLerp(0, 1, v00, v10), r], right = [c + 1, r + edgeLerp(0, 1, v10, v11)], bottom = [c + edgeLerp(0, 1, v01, v11), r + 1], left = [c, r + edgeLerp(0, 1, v00, v01)]
         const pairs = MARCHING_TABLE[idx], ed = [top, right, bottom, left]
-        for (let i = 0; i < pairs.length; i += 2) { 
-          const e0 = ed[pairs[i]], e1 = ed[pairs[i+1]]
-          targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
-          targetCol.push(...col, ...col)
+        for (let pi = 0; pi < pairs.length; pi += 2) {
+          const e0 = ed[pairs[pi]], e1 = ed[pairs[pi+1]]
+          if (closeRings) {
+            levelSegs.push(e0[0], e0[1], e1[0], e1[1])
+          } else {
+            targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
+            targetCol.push(...col, ...col)
+          }
         }
+      }
+    }
+
+    if (closeRings && levelSegs.length > 0) {
+      const worldSegs = closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev)
+      for (let j = 0; j < worldSegs.length; j += 6) {
+        targetPos.push(worldSegs[j], worldSegs[j+1], worldSegs[j+2], worldSegs[j+3], worldSegs[j+4], worldSegs[j+5])
+        targetCol.push(...col, ...col)
       }
     }
   }

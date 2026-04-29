@@ -81,7 +81,7 @@ export function useTerrainGeometry(p) {
     // Mode: Contours
     p.enabledContours, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours,
     p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,
-    p.majorIntervalContours, p.majorWeightContours, p.majorOffsetContours,
+    p.majorIntervalContours, p.majorWeightContours, p.majorOffsetContours, p.closeRingsContours,
     // Mode: Hachure
     p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure,
     p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,

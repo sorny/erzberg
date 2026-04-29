@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-04-29
+
+### Added
+- **Contours: Close contours** — new toggle in the Contours mode that closes open contour lines at the heightmap boundary. When enabled, the marching-squares segments for each elevation level are first chained into polylines, then any open endpoints on the grid border are paired by clockwise position and connected via a border-walking path (inserting grid corners where needed). Pairing is per-level and uses the planar winding argument — consecutive clockwise border endpoints at the same elevation always bound the same region, so the algorithm never connects endpoints from different elevation levels.
+
 ## [0.2.9] - 2026-04-29
 
 ### Added
