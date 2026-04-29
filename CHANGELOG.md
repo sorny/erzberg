@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-04-29
+
+### Added
+- **Texture blend modes** — six GPU blend modes for the texture overlay: Normal (previous behaviour), Multiply, Screen, Overlay, Soft Light, and Add. Implemented as a `uniform int` branch in the surface fragment shader with no CPU overhead.
+- **Texture opacity** — 0–100% opacity slider for the texture overlay. Multiplies the texture's own alpha channel so both controls compose correctly.
+- **Texture scale extended** — minimum scale lowered from `0.1` to `0.01` (step `0.01`), allowing 10× more texture repetitions for high-res tiling.
+
 ## [0.2.8] - 2026-04-29
 
 ### Fixed

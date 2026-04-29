@@ -34,7 +34,7 @@ const STYLE_DEF = {
   occlusionOpacity: 0.0,
 
   // Texture overlay
-  showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0,
+  showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0, textureBlendMode: 'normal', textureOpacity: 1,
 
   // Creative 3D Symmetry
   showMirrorPlusX: true, showMirrorMinusX: false,
@@ -286,10 +286,12 @@ export default function App() {
     // Fill & Mesh
     if (vals.showFill     != null) s.showFill      = vals.showFill
     if (vals.showMesh     != null) s.showMesh      = vals.showMesh
-    if (vals.showTexture    != null) s.showTexture    = vals.showTexture
-    if (vals.textureScale   != null) s.textureScale   = vals.textureScale
-    if (vals.textureShiftX  != null) s.textureShiftX  = vals.textureShiftX
-    if (vals.textureShiftY  != null) s.textureShiftY  = vals.textureShiftY
+    if (vals.showTexture       != null) s.showTexture       = vals.showTexture
+    if (vals.textureScale      != null) s.textureScale      = vals.textureScale
+    if (vals.textureShiftX     != null) s.textureShiftX     = vals.textureShiftX
+    if (vals.textureShiftY     != null) s.textureShiftY     = vals.textureShiftY
+    if (vals.textureBlendMode  != null) s.textureBlendMode  = vals.textureBlendMode
+    if (vals.textureOpacity    != null) s.textureOpacity    = vals.textureOpacity
     
     // Creative
     if (vals.showMirrorPlusX  != null) s.showMirrorPlusX  = vals.showMirrorPlusX

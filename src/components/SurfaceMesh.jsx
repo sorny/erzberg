@@ -54,6 +54,8 @@ const SURFACE_FRAG = /* glsl */ `
   uniform bool      uShowTexture;
   uniform float     uTextureScale;
   uniform vec2      uTextureOffset;
+  uniform int       uTextureBlendMode; // 0=Normal 1=Multiply 2=Screen 3=Overlay 4=SoftLight 5=Add
+  uniform float     uTextureOpacity;
 
   uniform float     uElevMinCut;
   uniform float     uElevMaxCut;
@@ -134,7 +136,24 @@ const SURFACE_FRAG = /* glsl */ `
     if (uShowTexture) {
       vec2 uv = vUv * uTextureScale + uTextureOffset;
       vec4 texColor = texture2D(uOverlayTex, uv);
-      base = mix(base, texColor.rgb, texColor.a);
+      vec3 tex = texColor.rgb;
+      float alpha = texColor.a;
+      vec3 blended;
+      if (uTextureBlendMode == 1) {
+        blended = base * tex;
+      } else if (uTextureBlendMode == 2) {
+        blended = 1.0 - (1.0 - base) * (1.0 - tex);
+      } else if (uTextureBlendMode == 3) {
+        blended = mix(2.0*base*tex, 1.0 - 2.0*(1.0-base)*(1.0-tex), step(0.5, base));
+      } else if (uTextureBlendMode == 4) {
+        vec3 a = base, t = tex;
+        blended = mix(a - (1.0-2.0*t)*a*(1.0-a), a + (2.0*t-1.0)*(sqrt(a)-a), step(0.5, t));
+      } else if (uTextureBlendMode == 5) {
+        blended = clamp(base + tex, 0.0, 1.0);
+      } else {
+        blended = tex;
+      }
+      base = mix(base, blended, alpha * uTextureOpacity);
     }
 
     if (uHypsometricBanded && uHypsoWeight > 0.0) {
@@ -235,9 +254,11 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uElevMinCut:        { value: 0.0 },
       uElevMaxCut:        { value: 100.0 },
       uOverlayTex:        { value: null },
-      uShowTexture:       { value: false },
-      uTextureScale:      { value: 1.0 },
-      uTextureOffset:     { value: new THREE.Vector2(0, 0) },
+      uShowTexture:         { value: false },
+      uTextureScale:        { value: 1.0 },
+      uTextureOffset:       { value: new THREE.Vector2(0, 0) },
+      uTextureBlendMode:    { value: 0 },
+      uTextureOpacity:      { value: 1.0 },
       uHillshade:             { value: false },
       uHillshadeAzimuth:      { value: 315.0 },
       uHillshadeAltitude:     { value: 45.0 },
@@ -273,6 +294,8 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uOverlayTex.value = overlayTex
     surfMat.uniforms.uTextureScale.value = 1.0 / (p.textureScale || 1.0)
     surfMat.uniforms.uTextureOffset.value.set(p.textureShiftX || 0, p.textureShiftY || 0)
+    surfMat.uniforms.uTextureBlendMode.value = { normal: 0, multiply: 1, screen: 2, overlay: 3, softlight: 4, add: 5 }[p.textureBlendMode] ?? 0
+    surfMat.uniforms.uTextureOpacity.value = p.textureOpacity ?? 1.0
 
     surfMat.uniforms.uHillshade.value             = !!(p.showHillshade)
     surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 315

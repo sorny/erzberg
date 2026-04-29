@@ -923,7 +923,19 @@ export function Sidebar({
                 </button>
                 {textureImage && (
                   <>
-                    <InlineSl label="Scale" min={0.1} max={10} step={0.1} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
+                    <InlineSl label="Scale" min={0.01} max={10} step={0.01} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
+                    <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
+                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                        <option value="normal">Normal</option>
+                        <option value="multiply">Multiply</option>
+                        <option value="screen">Screen</option>
+                        <option value="overlay">Overlay</option>
+                        <option value="softlight">Soft Light</option>
+                        <option value="add">Add</option>
+                      </select>
+                    </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
                       <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
                       <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
