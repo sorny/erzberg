@@ -492,7 +492,7 @@ export function Sidebar({
     <>
       <PanelStyles />
 
-      <div onClick={() => setOpen(o => !o)} style={{
+      <div data-testid="sidebar-toggle" onClick={() => setOpen(o => !o)} style={{
         position:'fixed', right: open ? W : 0, top:'50%', transform:'translateY(-50%)',
         width:22, height:64, background: BG, borderRadius:'6px 0 0 6px',
         cursor:'pointer', zIndex:1001, userSelect:'none',
