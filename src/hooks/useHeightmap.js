@@ -118,11 +118,32 @@ async function loadGeoTiffPixels(file) {
     }
   } catch (_) {}
 
-  return { 
-    pixels, nodataMask, width, height, 
+  // Extract geographic extent for GPX coordinate projection.
+  // CRS detection strategy: read ProjectedCSTypeGeoKey first (reliable when present),
+  // fall back to GTModelTypeGeoKey, then fall back to a bbox-value heuristic —
+  // coordinates outside ±360° / ±90° cannot be geographic degrees, so they must be
+  // projected meters (e.g. UTM). Default assumption is EPSG:4326 (geographic).
+  let bbox = null, crs = 'EPSG:4326'
+  try {
+    bbox = image.getBoundingBox()
+    const gk = image.geoKeys ?? {}
+    const projCS = gk.ProjectedCSTypeGeoKey
+
+    if (projCS) {
+      crs = projCS === 3857 ? 'EPSG:3857' : `EPSG:${projCS}`
+    } else if (gk.GTModelTypeGeoKey === 1) {
+      crs = 'EPSG:projected-unknown'
+    } else if (bbox && (Math.abs(bbox[0]) > 360 || Math.abs(bbox[1]) > 90)) {
+      crs = 'EPSG:projected-unknown'
+    }
+  } catch (_) {}
+
+  return {
+    pixels, nodataMask, width, height,
     realElevMin: min, realElevMax: max, suggestedElevScale,
     dataWidth: hasValid ? (maxX - minX + 1) : width,
-    dataHeight: hasValid ? (maxY - minY + 1) : height
+    dataHeight: hasValid ? (maxY - minY + 1) : height,
+    bbox, crs,
   }
 }
 
@@ -172,9 +193,9 @@ export function useHeightmap() {
     console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…'); setLoadError(null)
     return loadGeoTiffPixels(file)
-      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }) => {
+      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs }) => {
         console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
-        setGeoTiffMeta(realElevMin, realElevMax)
+        setGeoTiffMeta(realElevMin, realElevMax, bbox, crs)
         setHeightmap(pixels, nodataMask, width, height, file.name)
         setIsLoading(false); setLoadingMsg('')
         return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }

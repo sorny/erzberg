@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-04
+
+### Added
+- **GPX Track overlay** — load a `.gpx` file when a GeoTIFF is active to render the GPS track as a coloured line on the terrain. The "GPX Track" sidebar section appears only when a GeoTIFF is loaded (geographic extent is required). Controls follow the same style stack as every draw mode: colour, line weight, opacity, dash pattern, and full hypsometric colouring by elevation.
+- **Geographic coordinate projection** (`src/utils/geoCoords.js`) — converts WGS84 lat/lon to terrain world-space for any of the common GeoTIFF coordinate systems: EPSG:4326 (geographic, pass-through), EPSG:3857 (Web Mercator), EPSG:326xx / EPSG:327xx (all 120 standard UTM zones, WGS84 Transverse Mercator formulas), and an `EPSG:projected-unknown` fallback that infers the UTM zone from the point's longitude. Includes bilinear terrain-elevation sampling for surface-snapping.
+- **GPX parser** (`src/utils/gpxParser.js`) — browser-native `DOMParser`-based parser with no added dependencies. Collects `<trkpt>` elements from all `<trk>/<trkseg>` chains; falls back to `<rtept>` if the file contains only a route.
+- **GPX in SVG export** — the track appears automatically as a named Inkscape layer in exported SVGs (it is a standard `lineGeo` layer and participates in the existing depth-occlusion pipeline).
+- **GPX ribbon in STL export** — when a GPX track is present, a second file `heightmap_gpx.stl` is downloaded alongside `heightmap.stl` for multicolour 3D printing (Bambu Studio / PrusaSlicer: import both, assign different filaments). The ribbon is 2 world-units tall and 6 world-units wide. Each segment is an independent closed rectangular prism (12 triangles, all 6 faces) so the mesh is unconditionally manifold.
+
+### Fixed
+- **GeoTIFF CRS detection** — `ProjectedCSTypeGeoKey` is now read directly from `image.geoKeys` regardless of `GTModelTypeGeoKey`, which is absent or unreliable on many real-world files. A bbox-value heuristic (coordinates outside ±360° / ±90°) provides a further fallback for files that lack geokey metadata entirely. Previously, projected GeoTIFFs (e.g. Austrian/Alpine UTM files) were silently mis-classified as EPSG:4326, causing GPX coordinates to map to the wrong location.
+
 ## [0.2.14] - 2026-04-29
 
 ### Fixed

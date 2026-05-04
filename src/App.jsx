@@ -11,6 +11,7 @@ import { Sidebar } from './components/Sidebar'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
+import { parseGpx } from './utils/gpxParser'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { exportHeightmap } from './utils/heightmapExport'
 import { exportSTL } from './utils/stlExport'
@@ -83,6 +84,10 @@ const STYLE_DEF = {
   enabledStipple: false, spacingStipple: 0.5, weightStipple: 4, opacityStipple: 0.85, colorStipple: '#1a1a1a', dashStipple: 'solid',
   stippleDensityMode: 'slope', stippleGamma: 1.2, stippleJitter: 0.8,
   hypsoStipple: false, hypsoModeStipple: 'elevation', hypsoBandedStipple: false, hypsoIntervalStipple: 10,
+
+  // GPX Track
+  colorGpx: '#a80000', weightGpx: 2, opacityGpx: 1, dashGpx: 'solid',
+  hypsoGpx: false, hypsoModeGpx: 'elevation', hypsoBandedGpx: false, hypsoIntervalGpx: 10,
 
   // Hillshade
   showHillshade: false, hillshadeAzimuth: 315, hillshadeAltitude: 45,
@@ -158,6 +163,10 @@ export default function App() {
   const setTextureImage   = useStore((s) => s.setTextureImage)
   const geoTiffElevMin    = useStore((s) => s.geoTiffElevMin)
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
+  const geoTiffBbox       = useStore((s) => s.geoTiffBbox)
+  const geoTiffCRS        = useStore((s) => s.geoTiffCRS)
+
+  const [gpxPoints, setGpxPoints] = useState([])
 
   // ── Update document title ─────────────────────────────────────────────────
   useEffect(() => {
@@ -337,7 +346,10 @@ export default function App() {
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
-    elevScale: baseElevScale + terrain.elevScale }
+    elevScale: baseElevScale + terrain.elevScale,
+    gpxPoints, geoTiffBbox, geoTiffCRS,
+    imageWidth: heightmapWidth, imageHeight: heightmapHeight,
+  }
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
@@ -354,10 +366,21 @@ export default function App() {
     return () => clearTimeout(t)
   }, [isComputing])
 
+  // ── GPX upload handler ────────────────────────────────────────────────────
+  const loadGpxFromPicker = useCallback(() => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.gpx' })
+    input.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return
+      try { setGpxPoints(parseGpx(await file.text())) }
+      catch (err) { console.error('[GPX] Parse error:', err) }
+    }
+    input.click()
+  }, [])
+
   // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
-    exportSTL({ surfaceGeo, terrain: terrainData })
-  }, [surfaceGeo, terrainData])
+    exportSTL({ surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p })
+  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p])
 
   const handleHeightmapExport = useCallback(() => {
     exportHeightmap(terrainData)
@@ -448,6 +471,7 @@ export default function App() {
           autoZoom({ width: dataWidth, height: dataHeight })
           setBaseElevScale(1)
           setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+          setGpxPoints([])
         })}
         loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
           autoZoom({ width: dataWidth, height: dataHeight })
@@ -456,6 +480,10 @@ export default function App() {
         })}
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
+        geoTiffCRS={geoTiffCRS}
+        loadGpxFromPicker={loadGpxFromPicker}
+        gpxPoints={gpxPoints}
+        onClearGpx={() => setGpxPoints([])}
         onCameraPreset={handleCameraPreset}
         onSvg={() => setSvgTrigger(n => n + 1)}
         onPng={() => setPngTrigger(n => n + 1)}

@@ -24,28 +24,30 @@ export const useStore = create((set) => ({
   // Real-world elevation metadata — only populated when a GeoTIFF is loaded
   geoTiffElevMin: null,   // metres (or native unit)
   geoTiffElevMax: null,
+  geoTiffBbox: null,      // [minX, minY, maxX, maxY] in native CRS
+  geoTiffCRS: null,       // 'EPSG:4326' | 'EPSG:3857' | 'unsupported:<code>'
 
   setHeightmap: (pixels, mask, width, height, filename) =>
-    set({ 
-      heightmapPixels: pixels, 
+    set({
+      heightmapPixels: pixels,
       nodataMask: mask,
-      heightmapWidth: width, 
-      heightmapHeight: height, 
-      heightmapFilename: filename 
+      heightmapWidth: width,
+      heightmapHeight: height,
+      heightmapFilename: filename
     }),
 
   setPixels: (pixels) => set({ heightmapPixels: pixels }),
-  
+
   setTextureImage: (img) => set({ textureImage: img }),
   clearTextureImage: () => set({ textureImage: null }),
 
-  setGeoTiffMeta: (elevMin, elevMax) =>
-    set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax }),
+  setGeoTiffMeta: (elevMin, elevMax, bbox, crs) =>
+    set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBbox: bbox ?? null, geoTiffCRS: crs ?? null }),
 
   clearGeoTiffMeta: () =>
-    set({ geoTiffElevMin: null, geoTiffElevMax: null }),
+    set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null, geoTiffCRS: null }),
 
   clearHeightmap: () =>
     set({ heightmapPixels: null, nodataMask: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
-          textureImage: null, geoTiffElevMin: null, geoTiffElevMax: null }),
+          textureImage: null, geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null, geoTiffCRS: null }),
 }))

@@ -296,7 +296,8 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
-  geoTiffElevMin, geoTiffElevMax,
+  geoTiffElevMin, geoTiffElevMax, geoTiffCRS,
+  loadGpxFromPicker, gpxPoints, onClearGpx,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
   onWebmToggle, webmActive,
@@ -313,7 +314,7 @@ export function Sidebar({
     modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
-    hillshade: false, slopeShade: false,
+    hillshade: false, slopeShade: false, gpxTrack: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
   })
 
@@ -883,6 +884,34 @@ export function Sidebar({
               </>
             )}
           </Section>
+
+          {geoTiffElevMin != null && (
+            <Section title="GPX Track" open={sec.gpxTrack} onToggle={() => tog('gpxTrack')} enabled={gpxPoints?.length > 0}>
+              {geoTiffCRS?.startsWith('unsupported') && (
+                <div style={{ fontSize:9, color:'#f97316', marginBottom:6 }}>
+                  GPX requires EPSG:4326 or EPSG:3857 GeoTIFF.
+                </div>
+              )}
+              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
+                <button className="hmload" onClick={loadGpxFromPicker}
+                  style={{ flex:1, padding:8, background:SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
+                  {gpxPoints?.length > 0 ? '↑ Replace GPX' : '↑ Load GPX (.gpx)'}
+                </button>
+                {gpxPoints?.length > 0 && (
+                  <button onClick={onClearGpx}
+                    style={{ padding:'8px 12px', background:SURF, color:MUTED, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
+                    ✕
+                  </button>
+                )}
+              </div>
+              {gpxPoints?.length > 0 && (
+                <>
+                  <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>{gpxPoints.length} track points</div>
+                  <ModeStyleOverride prefix="Gpx" style={style} ss={ss} />
+                </>
+              )}
+            </Section>
+          )}
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />

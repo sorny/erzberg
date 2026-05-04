@@ -4,6 +4,7 @@
 
 import { cellElev, hasData, boxBlur } from './terrain'
 import { hexToRgb, sampleGradient, computeVertexColor } from './colorUtils'
+import { geoToWorld, sampleTerrainElev } from './geoCoords'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -821,4 +822,77 @@ export function buildSurfaceGeometry(terrain, p) {
     }
   }
   return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(indicesList), metadata: { rows, cols } }
+}
+
+// ─── GPX Track ───────────────────────────────────────────────────────────────
+
+// Small Y lift so the track never clips into the terrain surface.
+const GPX_Y_OFFSET = 0.5
+
+/**
+ * Build the GPX track as a standard lineGeo layer.
+ *
+ * Unlike the 12 draw modes this builder is called directly from the worker
+ * after buildLineGeometry(), NOT via the MODES_CONFIG dispatch table, because:
+ *   • GPX is geo-referenced and must not go through the mirror/symmetry loop.
+ *   • It requires imageWidth/imageHeight which are worker top-level inputs,
+ *     not terrain-derived values.
+ *
+ * Coordinate path: WGS84 lat/lon → (geoToWorld) → pixel space → world space →
+ * bilinear terrain elevation sample → Y + GPX_Y_OFFSET.
+ *
+ * Points outside the GeoTIFF extent are mapped to null and skipped; the
+ * resulting gaps produce disconnected segments (correct for clipped tracks).
+ */
+export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
+  const { scl, halfW, halfH, minZ, maxZ } = terrain
+  const { gpxPoints, geoTiffBbox, geoTiffCRS } = p
+  if (!gpxPoints?.length || !geoTiffBbox || !geoTiffCRS?.startsWith('EPSG:')) return null
+
+  const peakOff = Math.floor(p.gridOffsetX ?? 0)
+  const lineOff = Math.floor(p.gridOffsetY ?? 0)
+
+  const ctx = {
+    ...p,
+    lineColor:         p.colorGpx,
+    lineOpacity:       p.opacityGpx,
+    lineHypsometric:   p.hypsoGpx,
+    lineHypsoMode:     p.hypsoModeGpx,
+    lineBanded:        p.hypsoBandedGpx,
+    lineHypsoInterval: p.hypsoIntervalGpx,
+  }
+
+  const positions = [], colors = []
+
+  const worldPts = gpxPoints.map(({ lat, lon }) =>
+    geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight, peakOff, lineOff, halfW, halfH)
+  )
+
+  for (let i = 0; i < worldPts.length - 1; i++) {
+    const a = worldPts[i], b = worldPts[i + 1]
+    if (!a || !b) continue
+
+    const elevA = sampleTerrainElev(a.pixelCol, a.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
+    const elevB = sampleTerrainElev(b.pixelCol, b.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
+
+    const normA = minZ < maxZ ? (elevA - minZ) / (maxZ - minZ) : 0
+    const normB = minZ < maxZ ? (elevB - minZ) / (maxZ - minZ) : 0
+
+    positions.push(a.worldX, elevA, a.worldZ, b.worldX, elevB, b.worldZ)
+    const cA = computeVertexColor(normA, 0, 0, ctx)
+    const cB = computeVertexColor(normB, 0, 0, ctx)
+    colors.push(...cA, ...cB)
+  }
+
+  if (positions.length === 0) return null
+  return {
+    id: 'Gpx',
+    positions: new Float32Array(positions),
+    colors: new Float32Array(colors),
+    weight: p.weightGpx,
+    opacity: p.opacityGpx,
+    dash: p.dashGpx,
+    curtains: null,
+    lids: null,
+  }
 }

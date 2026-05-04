@@ -113,6 +113,11 @@ export function useTerrainGeometry(p) {
     // Global Surface Styling
     p.showFill, p.fillColor, p.fillHypsometric, p.fillBanded, p.fillHypsoInterval, p.fillHypsoWeight, p.fillHypsoMode,
     p.gradientStops,
+
+    // GPX Track
+    p.gpxPoints, p.geoTiffBbox, p.geoTiffCRS,
+    p.colorGpx, p.weightGpx, p.opacityGpx, p.dashGpx,
+    p.hypsoGpx, p.hypsoModeGpx, p.hypsoBandedGpx, p.hypsoIntervalGpx,
   ])
 
   useEffect(() => () => workerRef.current?.terminate(), [])
