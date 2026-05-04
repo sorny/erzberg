@@ -218,11 +218,15 @@ export function Scene({
       particleColor:     p.pointColor ?? '#000000',
       particleSize:      p.pointSize ?? 4,
     })
-  }, [svgTrigger, activeCamera])
+  }, [svgTrigger])
 
-  // PNG exports
-  useEffect(() => { if (pngTrigger) performHighResCapture(false) }, [pngTrigger, activeCamera])
-  useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true) }, [pngAlphaTrigger, activeCamera])
+  // PNG exports — activeCamera is intentionally excluded from deps. It is a plain
+  // local variable (not state) so it changes reference on every render. Including it
+  // would re-fire the export whenever any setting causes a re-render after a trigger
+  // has been set. The closure already captures the current camera from the same render
+  // that incremented the trigger counter, so no staleness risk.
+  useEffect(() => { if (pngTrigger)      performHighResCapture(false) }, [pngTrigger])
+  useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true)  }, [pngAlphaTrigger])
 
   return (
     <>

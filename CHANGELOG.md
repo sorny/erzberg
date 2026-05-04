@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-05-04
+
+### Fixed
+- **PNG / SVG exports re-triggered after settings change** — `activeCamera` was listed as a dependency of the SVG, PNG, and PNG-α `useEffect` hooks in `Scene.jsx`. Because `activeCamera` is a plain local variable (`p.orthographic ? orthoRef.current : persRef.current`) it gets a new object reference on every render; any settings change that caused a re-render after a trigger counter had been incremented re-fired the export effect and downloaded an unexpected file. Removed `activeCamera` from all three dependency arrays — the closure already captures the correct camera from the render that incremented the trigger, so there is no staleness risk.
+
 ## [0.3.0] - 2026-05-04
 
 ### Added
