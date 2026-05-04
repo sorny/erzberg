@@ -39,6 +39,14 @@ jobs:
         env:
           GITHUB_PAGES: true
 
+      - name: Patch OG image URL
+        # og:image / twitter:image must be absolute URLs for social crawlers.
+        # index.html keeps a root-relative path (/og-image.png) for local dev;
+        # here we rewrite it to the canonical GitHub Pages URL in the built output.
+        run: |
+          BASE_URL="https://${{ github.repository_owner }}.github.io/erzberg"
+          sed -i "s|content=\"/og-image.png\"|content=\"${BASE_URL}/og-image.png\"|g" dist/index.html
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 

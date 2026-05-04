@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-05-04
+
+### Added
+- **Open Graph & Twitter meta tags** (`index.html`) — `og:type`, `og:title`, `og:description`, `og:image`, and the matching `twitter:card` / `twitter:title` / `twitter:description` / `twitter:image` tags. Also adds a standard `<meta name="description">` for search engines. All descriptions open with the tagline "Digital terrain artistry."
+
 ## [0.3.1] - 2026-05-04
 
 ### Fixed
