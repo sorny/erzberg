@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.4] - 2026-05-11
+
+### Fixed
+- **Viewport not updating after contour param change on large files** — the geometry worker queued every intermediate slider value and processed them all sequentially. On a large GeoTIFF with 1 m contours each rebuild could take several seconds, so the correct final result sat deep in a backlog and the viewport appeared frozen. The worker is now terminated and restarted on every param change, ensuring only the latest value is ever computed. A generation counter (`_gen`) echoed through the worker message discards any stale result that arrives after a restart.
+- **Major Weight slider visible when major contours are disabled** — the slider is now hidden when *Major Every* is set to 0 (None), consistent with how *Major Offset* is already hidden in that state.
+
 ## [0.3.3] - 2026-05-11
 
 ### Fixed
