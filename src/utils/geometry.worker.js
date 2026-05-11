@@ -14,7 +14,7 @@ import { buildTerrain } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry, buildGpxGeometry } from './geometryBuilders'
 
 self.onmessage = (e) => {
-  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p } = e.data
+  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p, _gen } = e.data
 
   try {
     const terrain = buildTerrain(heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p)
@@ -28,7 +28,7 @@ self.onmessage = (e) => {
 
     // Collect all buffers for Transferables
     const transferables = []
-    
+
     // 1. Line Layers
     if (Array.isArray(lineGeo)) {
       for (const L of lineGeo) {
@@ -36,18 +36,14 @@ self.onmessage = (e) => {
         if (L.colors?.buffer)    transferables.push(L.colors.buffer)
       }
     }
-    
+
     // 2. Surface
     if (surfaceGeo.positions?.buffer)     transferables.push(surfaceGeo.positions.buffer)
     if (surfaceGeo.brightnessBuf?.buffer) transferables.push(surfaceGeo.brightnessBuf.buffer)
     if (surfaceGeo.indices?.buffer)       transferables.push(surfaceGeo.indices.buffer)
 
-    self.postMessage({
-      terrain,
-      lineGeo,
-      surfaceGeo
-    }, transferables)
+    self.postMessage({ terrain, lineGeo, surfaceGeo, _gen }, transferables)
   } catch (err) {
-    self.postMessage({ error: err.message })
+    self.postMessage({ error: err.message, _gen })
   }
 }

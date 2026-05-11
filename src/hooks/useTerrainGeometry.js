@@ -16,19 +16,26 @@ export function useTerrainGeometry(p) {
   const workerRef = useRef(null)
   const startTimeRef = useRef(0)
   const prevPixelsRef = useRef(null)
+  const genRef = useRef(0)
 
   useEffect(() => {
     if (!heightmapPixels) {
+      workerRef.current?.terminate()
+      workerRef.current = null
       setTerrain(null); setLineGeo(null); setSurfaceGeo(null); setIsComputing(false)
       return
     }
 
-    if (!workerRef.current) workerRef.current = new GeometryWorker()
+    // Terminate any in-progress computation so stale results never overwrite the latest params.
+    workerRef.current?.terminate()
+    workerRef.current = new GeometryWorker()
     setIsComputing(true)
+    const gen = ++genRef.current
 
     workerRef.current.onmessage = (e) => {
       const elapsed = Math.round(performance.now() - startTimeRef.current)
-      const { terrain, lineGeo, surfaceGeo, error } = e.data
+      const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
+      if (_gen !== genRef.current) return  // stale result from a superseded computation
       if (error) console.error('[GeometryWorker] Error:', error)
       else {
         startTransition(() => {
@@ -53,6 +60,7 @@ export function useTerrainGeometry(p) {
     workerRef.current.postMessage({
       heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
       p: safeResolution !== p.resolution ? { ...p, resolution: safeResolution } : p,
+      _gen: gen,
     })
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
