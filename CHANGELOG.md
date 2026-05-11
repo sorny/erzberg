@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-05-11
+
+### Fixed
+- **SVG export: dash / dotted / long-dash modes rendered as solid lines** — SVG resets the `stroke-dasharray` phase at the start of each `<line>` element. Because terrain lines are stored as many short connected segments, every segment started within the first "on" portion of the dash cycle and appeared solid. The exporter now tracks cumulative screen-space length along each connected chain of segments and writes `stroke-dashoffset` on every `<line>`, making the dash pattern flow continuously across the full terrain line — matching the `LineMaterial` behaviour in the live viewport.
+
 ## [0.3.2] - 2026-05-04
 
 ### Added

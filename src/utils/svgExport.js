@@ -206,20 +206,38 @@ export function exportSVG({
       const visibleSegs = []
       const ghostSegs = []
       const segCount = positions.length / 6
+
+      // Track cumulative screen-space length per connected chain so stroke-dashoffset
+      // makes the dash pattern flow continuously across all segments of a terrain line.
+      let visCumLen = 0, ghostCumLen = 0
+      let visLastX = null, visLastY = null
+      let ghostLastX = null, ghostLastY = null
+      const CONNECT_EPS = 1.0
+
       for (let s = 0; s < segCount; s++) {
         const i = s * 6
         const ax = positions[i], ay = positions[i+1], az = positions[i+2]
         const bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
-        
+
         let stroke = '#000000'
         if (colors && colors.length > i + 2) {
           stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
         }
 
         const addSeg = (x0, y0, x1, y1, isVisible) => {
-          if (Math.hypot(x1 - x0, y1 - y0) < 0.1) return
-          if (isVisible) visibleSegs.push({ x0, y0, x1, y1, stroke })
-          else ghostSegs.push({ x0, y0, x1, y1, stroke: occlusionColor || '#000000' })
+          const segLen = Math.hypot(x1 - x0, y1 - y0)
+          if (segLen < 0.1) return
+          if (isVisible) {
+            if (visLastX === null || Math.hypot(x0 - visLastX, y0 - visLastY) > CONNECT_EPS) visCumLen = 0
+            visibleSegs.push({ x0, y0, x1, y1, stroke, dashOffset: visCumLen })
+            visCumLen += segLen
+            visLastX = x1; visLastY = y1
+          } else {
+            if (ghostLastX === null || Math.hypot(x0 - ghostLastX, y0 - ghostLastY) > CONNECT_EPS) ghostCumLen = 0
+            ghostSegs.push({ x0, y0, x1, y1, stroke: occlusionColor || '#000000', dashOffset: ghostCumLen })
+            ghostCumLen += segLen
+            ghostLastX = x1; ghostLastY = y1
+          }
           expandBB(x0, y0); expandBB(x1, y1)
         }
 
@@ -300,12 +318,12 @@ export function exportSVG({
 
     // Ghost pass (Hidden)
     if (layer.ghostSegs.length > 0) {
-      const ghostEls = layer.ghostSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+      const ghostEls = layer.ghostSegs.map(({ x0, y0, x1, y1, stroke, dashOffset }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"${dashArray ? ` stroke-dashoffset="${dashOffset.toFixed(2)}"` : ''}/>`)
       inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${ghostEls.join('')}</g>`)
     }
     // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
-      const lineEls = layer.visibleSegs.map(({ x0, y0, x1, y1, stroke }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+      const lineEls = layer.visibleSegs.map(({ x0, y0, x1, y1, stroke, dashOffset }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"${dashArray ? ` stroke-dashoffset="${dashOffset.toFixed(2)}"` : ''}/>`)
       inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`)
     }
 
