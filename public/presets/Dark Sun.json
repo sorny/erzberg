@@ -1,6 +1,6 @@
 {
   "terrain": {
-    "resolution": 2,
+    "resolution": 1,
     "elevScale": 0,
     "blurRadius": 0,
     "gridOffsetX": 0,
@@ -182,6 +182,14 @@
     "hypsoModeStipple": "elevation",
     "hypsoBandedStipple": false,
     "hypsoIntervalStipple": 10,
+    "colorGpx": "#a80000",
+    "weightGpx": 2,
+    "opacityGpx": 1,
+    "dashGpx": "solid",
+    "hypsoGpx": false,
+    "hypsoModeGpx": "elevation",
+    "hypsoBandedGpx": false,
+    "hypsoIntervalGpx": 10,
     "showHillshade": false,
     "hillshadeAzimuth": 315,
     "hillshadeAltitude": 45,
