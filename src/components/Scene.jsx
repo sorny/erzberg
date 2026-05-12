@@ -19,7 +19,7 @@ import { ParticleSystem } from './ParticleSystem'
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   levaGet, levaSet, orbitRef,
-  svgTrigger, pngTrigger, pngAlphaTrigger,
+  svgTrigger, onSvgDone, pngTrigger, pngAlphaTrigger,
   bgGradientStops,
   cameraPreset,
   webmRecording,
@@ -200,24 +200,28 @@ export function Scene({
     }
   }
 
-  // SVG export
+  // SVG export — setTimeout yields to the browser so the loading overlay can
+  // paint before the synchronous exportSVG call blocks the main thread.
   useEffect(() => {
     if (!svgTrigger) return
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
-    exportSVG({
-      lineGeo, camera: activeCamera || currentCamera, width, height,
-      bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
-      surfaceGeo, groupMatrix,
-      showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
-      showLines: p.showLines, depthOcclusion: p.depthOcclusion,
-      occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
-      elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,
-      particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
-      particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
-      particleColor:     p.pointColor ?? '#000000',
-      particleSize:      p.pointSize ?? 4,
-    })
+    setTimeout(() => {
+      exportSVG({
+        lineGeo, camera: activeCamera || currentCamera, width, height,
+        bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
+        surfaceGeo, groupMatrix,
+        showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
+        showLines: p.showLines, depthOcclusion: p.depthOcclusion,
+        occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
+        elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,
+        particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
+        particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
+        particleColor:     p.pointColor ?? '#000000',
+        particleSize:      p.pointSize ?? 4,
+      })
+      onSvgDone?.()
+    }, 0)
   }, [svgTrigger])
 
   // PNG exports — activeCamera is intentionally excluded from deps. It is a plain

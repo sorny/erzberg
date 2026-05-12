@@ -213,6 +213,7 @@ export default function App() {
 
   // ── Export triggers ───────────────────────────────────────────────────────
   const [svgTrigger,        setSvgTrigger]        = useState(0)
+  const [isSvgExporting,    setIsSvgExporting]    = useState(false)
   const [pngTrigger,        setPngTrigger]         = useState(0)
   const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
   const [webmActive, setWebmActive] = useState(false)
@@ -402,7 +403,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
-      if (e.code === 'Digit1') setSvgTrigger(n => n + 1)
+      if (e.code === 'Digit1') { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }
       if (e.code === 'Digit2') setPngTrigger(n => n + 1)
       if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
       if (e.code === 'Digit4') handleStl()
@@ -447,6 +448,7 @@ export default function App() {
           levaSet={levaSet}
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
+          onSvgDone={() => setIsSvgExporting(false)}
           pngTrigger={pngTrigger}
           pngAlphaTrigger={pngAlphaTrigger}
           bgGradientStops={bgGradientStops}
@@ -485,7 +487,7 @@ export default function App() {
         gpxPoints={gpxPoints}
         onClearGpx={() => setGpxPoints([])}
         onCameraPreset={handleCameraPreset}
-        onSvg={() => setSvgTrigger(n => n + 1)}
+        onSvg={() => { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }}
         onPng={() => setPngTrigger(n => n + 1)}
         onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}
         onStl={handleStl}
@@ -529,6 +531,7 @@ export default function App() {
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
       {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
+      {isSvgExporting && !isLoading && <LoadingOverlay msg="Exporting SVG…" />}
 
       {/* ── Load error banner ────────────────────────────────────────────── */}
       {loadError && (

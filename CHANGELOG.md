@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-05-12
+
+### Added
+- **SVG export loading indicator** — a spinner overlay ("Exporting SVG…") is now shown while the SVG is being computed. The export runs synchronously on the main thread; without a visual cue the UI appeared frozen for complex scenes. A `setTimeout` in the export effect yields to the browser so the overlay renders before computation begins.
+
+### Changed
+- **SVG export: dashed / dotted / long-dash rendered as real segments** — instead of relying on `stroke-dasharray` / `stroke-dashoffset`, each SVG line segment is now split into actual sub-segments covering only the "on" portions of the dash cycle. The existing cumulative-length `dashOffset` tracking keeps the pattern phase continuous across connected terrain lines. The exported file now faithfully matches the LineMaterial dash rendering in the viewport and is fully editable in Inkscape / Illustrator without any special SVG dash knowledge.
+
 ## [0.3.4] - 2026-05-11
 
 ### Fixed

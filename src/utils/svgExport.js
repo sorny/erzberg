@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three'
 import { sampleGradient } from './colorUtils'
-import { DASH_SVG } from './stylePresets'
+import { DASH_SEGMENT_SIZES } from './stylePresets'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -97,6 +97,42 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
       if (d > buf[idx]) buf[idx] = d
     }
   }
+}
+
+// ─── Dash segment splitter ────────────────────────────────────────────────────
+
+// Splits a screen-space line segment into actual on-sub-segments according to a
+// dash pattern, starting at `dashOffset` px into the repeating cycle.  Returns
+// an array of {x0,y0,x1,y1} objects covering only the "on" portions.
+function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
+  const len = Math.hypot(x1 - x0, y1 - y0)
+  if (len < 0.1) return []
+  const dx = (x1 - x0) / len
+  const dy = (y1 - y0) / len
+  const cycle = dashPx + gapPx
+  const result = []
+  let cp = ((dashOffset % cycle) + cycle) % cycle  // position within current cycle
+  let sp = 0  // position along segment
+
+  while (sp < len) {
+    if (cp < dashPx) {
+      // Currently in a dash — draw to its end (or to segment end)
+      const end = Math.min(sp + (dashPx - cp), len)
+      result.push([sp, end])
+      sp = end
+      cp = dashPx
+    } else {
+      // Currently in a gap — skip to next dash start
+      sp += cycle - cp
+      cp = 0
+      if (sp >= len) break
+    }
+  }
+
+  return result.map(([t0, t1]) => ({
+    x0: x0 + dx * t0, y0: y0 + dy * t0,
+    x1: x0 + dx * t1, y1: y0 + dy * t1,
+  }))
 }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -310,21 +346,36 @@ export function exportSVG({
   
   const layerGroups = []
   for (const layer of svgLayers) {
-    const sw = (layer.weight * 0.5).toFixed(3)
-    const dashArray = DASH_SVG[layer.dash ?? 'solid'] ?? ''
+    const sw        = (layer.weight * 0.5).toFixed(3)
+    const dashSizes = DASH_SEGMENT_SIZES[layer.dash ?? 'solid'] ?? null
     const modeId    = layer.id ?? 'Lines'
     const modeLabel = modeId.replace(/([A-Z])/g, ' $1').trim()
     const inner = []
 
+    const buildLineEls = (segs) => {
+      if (!dashSizes) {
+        return segs.map(({ x0, y0, x1, y1, stroke }) =>
+          `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+      }
+      const { dashPx, gapPx } = dashSizes
+      const els = []
+      for (const { x0, y0, x1, y1, stroke, dashOffset } of segs) {
+        for (const s of splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx)) {
+          els.push(`<line x1="${(s.x0-vx).toFixed(1)}" y1="${(s.y0-vy).toFixed(1)}" x2="${(s.x1-vx).toFixed(1)}" y2="${(s.y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+        }
+      }
+      return els
+    }
+
     // Ghost pass (Hidden)
     if (layer.ghostSegs.length > 0) {
-      const ghostEls = layer.ghostSegs.map(({ x0, y0, x1, y1, stroke, dashOffset }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"${dashArray ? ` stroke-dashoffset="${dashOffset.toFixed(2)}"` : ''}/>`)
-      inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${ghostEls.join('')}</g>`)
+      const ghostEls = buildLineEls(layer.ghostSegs)
+      inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`)
     }
     // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
-      const lineEls = layer.visibleSegs.map(({ x0, y0, x1, y1, stroke, dashOffset }) => `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"${dashArray ? ` stroke-dashoffset="${dashOffset.toFixed(2)}"` : ''}/>`)
-      inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round"${dashArray ? ` stroke-dasharray="${dashArray}"` : ''}>${lineEls.join('')}</g>`)
+      const lineEls = buildLineEls(layer.visibleSegs)
+      inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${lineEls.join('')}</g>`)
     }
 
     layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
