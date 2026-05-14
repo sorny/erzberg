@@ -189,6 +189,7 @@ export function exportSVG({
   showLines, depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
   elevMinCut, elevMaxCut,
+  baseName,
 }) {
   const bias = occlusionBias ?? 0.1
   const ghostOpac = occlusionOpacity ?? 0
@@ -394,7 +395,7 @@ export function exportSVG({
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
     `</svg>`,
   ].join('\n')
-  download(svg, 'heightmap.svg', 'image/svg+xml')
+  download(svg, `${baseName ?? 'heightmap'}.svg`, 'image/svg+xml')
 }
 
 function download(content, filename, mime) {

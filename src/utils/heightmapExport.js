@@ -5,7 +5,8 @@
  * contains only the relevant terrain data.
  */
 
-export function exportHeightmap(terrainData, filename = 'heightmap_processed.png') {
+export function exportHeightmap(terrainData, baseName) {
+  const filename = `${baseName ?? 'export'}-heightmap.png`
   if (!terrainData || !terrainData.grid) return
 
   const { grid, rows, cols } = terrainData

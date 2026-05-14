@@ -39,7 +39,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Particle system.** Optional animated point cloud with noise-driven motion, gravity, and peaks-only mode.
 
-**Exporters.** SVG (software Z-buffer projection, per-mode Inkscape/Illustrator layers, dash/dotted/long-dash patterns faithfully reproduced), 4K PNG with MSAA (WebGLRenderTarget, trimmed to content), PNG α (transparent background), STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording.
+**Exporters.** SVG (software Z-buffer projection, per-mode Inkscape/Illustrator layers, dash/dotted/long-dash patterns faithfully reproduced), 4K PNG with MSAA (WebGLRenderTarget, trimmed to content), PNG α (transparent background), STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording. All exported files are named after the uploaded source file (e.g. uploading `graz.tif` produces `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz.webm`, `graz-heightmap.png`).
 
 ---
 

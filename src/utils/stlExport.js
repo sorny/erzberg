@@ -148,7 +148,7 @@ function buildGpxRibbon(run, tris) {
 
 // ── Public export ─────────────────────────────────────────────────────────────
 
-export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p }) {
+export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName }) {
   if (!surfaceGeo || !terrain) return
 
   const { positions, indices } = surfaceGeo
@@ -199,7 +199,8 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
     add(0, 0, baseZ, spx(i0), spy(i0), baseZ, spx(i1), spy(i1), baseZ)
   }
 
-  writeBinarySTL(tris, 'heightmap.stl')
+  const base = baseName ?? 'heightmap'
+  writeBinarySTL(tris, `${base}.stl`)
 
   // ── GPX ribbon — separate file for multicolour printing ───────────────────
   if (gpxPoints?.length > 1 && geoTiffBbox && geoTiffCRS?.startsWith('EPSG:') && p) {
@@ -235,6 +236,6 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
 
     const gpxTris = []
     for (const run of runs) buildGpxRibbon(run, gpxTris)
-    writeBinarySTL(gpxTris, 'heightmap_gpx.stl')
+    writeBinarySTL(gpxTris, `${base}-gpx.stl`)
   }
 }

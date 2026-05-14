@@ -23,6 +23,7 @@ export function Scene({
   bgGradientStops,
   cameraPreset,
   webmRecording,
+  exportBaseName,
 }) {
   const { camera: currentCamera, gl, scene, size } = useThree()
   const groupRef    = useRef()
@@ -190,7 +191,7 @@ export function Scene({
     imgData.data.set(flipped)
     offCtx.putImageData(imgData, 0, 0)
 
-    captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha)
+    captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha, exportBaseName)
 
     // Restore materials and camera
     lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
@@ -219,6 +220,7 @@ export function Scene({
         particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
         particleColor:     p.pointColor ?? '#000000',
         particleSize:      p.pointSize ?? 4,
+        baseName:          exportBaseName,
       })
       onSvgDone?.()
     }, 0)

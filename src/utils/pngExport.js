@@ -63,7 +63,7 @@ function trimAndDownload(compositeCtx, maskData, width, height, filename) {
  * @param {Array|null}        bgStops   Gradient stops or null
  * @param {boolean}           isAlpha   If true, background is transparent
  */
-export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha) {
+export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName) {
   const { width, height } = glCanvas
   const out = document.createElement('canvas')
   out.width = width
@@ -91,5 +91,6 @@ export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha) {
   mask.getContext('2d').drawImage(glCanvas, 0, 0)
   const maskData = mask.getContext('2d').getImageData(0, 0, width, height).data
 
-  trimAndDownload(ctx, maskData, width, height, isAlpha ? 'heightmap-alpha.png' : 'heightmap.png')
+  const base = baseName ?? 'heightmap'
+  trimAndDownload(ctx, maskData, width, height, isAlpha ? `${base}-alpha.png` : `${base}.png`)
 }

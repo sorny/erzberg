@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.6] - 2026-05-14
+
+### Changed
+- **Export filenames derived from uploaded file** — all exporters now use the uploaded heightmap's filename as the base name (extension stripped). For example, uploading `graz.tif` produces `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-gpx.stl`, `graz.webm`, and `graz-heightmap.png`. Previously every exporter used the hardcoded prefix `heightmap`.
+
 ## [0.3.5] - 2026-05-12
 
 ### Added

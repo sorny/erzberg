@@ -7,7 +7,7 @@ let recorder  = null
 let chunks    = []
 let stopTimer = null
 
-export function startWebM(canvas, durationSecs, onStateChange) {
+export function startWebM(canvas, durationSecs, onStateChange, baseName) {
   if (recorder) return
 
   const mimeType = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm']
@@ -23,7 +23,7 @@ export function startWebM(canvas, durationSecs, onStateChange) {
       const blob = new Blob(chunks, { type: 'video/webm' })
       const url  = URL.createObjectURL(blob)
       Object.assign(document.createElement('a'), {
-        href: url, download: 'heightmap.webm',
+        href: url, download: `${baseName ?? 'heightmap'}.webm`,
       }).click()
       URL.revokeObjectURL(url)
       recorder = null

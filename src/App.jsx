@@ -168,6 +168,10 @@ export default function App() {
 
   const [gpxPoints, setGpxPoints] = useState([])
 
+  const exportBaseName = heightmapFilename
+    ? heightmapFilename.replace(/\.[^.]+$/, '')
+    : 'heightmap'
+
   // ── Update document title ─────────────────────────────────────────────────
   useEffect(() => {
     const isDefault = heightmapFilename === 'Heightmap.png'
@@ -341,8 +345,8 @@ export default function App() {
     const canvas = document.querySelector('canvas')
     if (!canvas) return
     if (isRecording()) stopWebM(() => setWebmActive(false))
-    else startWebM(canvas, webmDuration, setWebmActive)
-  }, [webmDuration])
+    else startWebM(canvas, webmDuration, setWebmActive, exportBaseName)
+  }, [webmDuration, exportBaseName])
 
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
@@ -380,12 +384,12 @@ export default function App() {
 
   // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
-    exportSTL({ surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p })
-  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p])
+    exportSTL({ surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName: exportBaseName })
+  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, exportBaseName])
 
   const handleHeightmapExport = useCallback(() => {
-    exportHeightmap(terrainData)
-  }, [terrainData])
+    exportHeightmap(terrainData, exportBaseName)
+  }, [terrainData, exportBaseName])
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
@@ -454,6 +458,7 @@ export default function App() {
           bgGradientStops={bgGradientStops}
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
+          exportBaseName={exportBaseName}
         />
       </Canvas>
 
