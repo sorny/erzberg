@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.7] - 2026-05-14
+
+### Fixed
+- **SVG export: fill enabled causes bloated files and missing occlusion** — when the terrain fill was enabled, the SVG exporter was projecting the entire surface mesh as individual `<polygon>` elements (one per triangle), making exported files enormous on complex terrain. Fill is now used purely as a depth occluder: the surface geometry is rasterised into the software Z-buffer so that lines behind the terrain are culled, but no fill polygons are written to the SVG output. The Z-buffer is also now built unconditionally when fill is enabled, regardless of the separate *Depth Occlusion* toggle.
+
 ## [0.3.6] - 2026-05-14
 
 ### Changed

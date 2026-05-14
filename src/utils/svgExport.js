@@ -8,7 +8,6 @@
  * behind them, matching the depth-buffer behaviour of the live viewport.
  */
 import * as THREE from 'three'
-import { sampleGradient } from './colorUtils'
 import { DASH_SEGMENT_SIZES } from './stylePresets'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
@@ -137,55 +136,11 @@ function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-function buildFillPolygons(surfaceGeo, groupMatrix, camera, W, H, fillHypsometric, gradientStops, elevMinCut, elevMaxCut) {
-  const { positions, indices, brightnessBuf } = surfaceGeo
-  const nVerts  = positions.length / 3
-  const camInv  = camera.matrixWorldInverse
-  const sx = new Float32Array(nVerts)
-  const sy = new Float32Array(nVerts)
-  const sz = new Float32Array(nVerts)
-  const wld = new THREE.Vector3()
-  const viw = new THREE.Vector3()
-
-  for (let i = 0; i < nVerts; i++) {
-    wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
-    if (groupMatrix) wld.applyMatrix4(groupMatrix)
-    viw.copy(wld).applyMatrix4(camInv)
-    sz[i] = viw.z
-    wld.project(camera)
-    sx[i] = ( wld.x + 1) * 0.5 * W
-    sy[i] = (-wld.y + 1) * 0.5 * H
-  }
-
-  const nTri = indices.length / 3
-  const polys = []
-  const minB = (elevMinCut || 0) / 100
-  const maxB = (elevMaxCut || 100) / 100
-
-  for (let t = 0; t < nTri; t++) {
-    const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
-    const brightness = (brightnessBuf[a] + brightnessBuf[b] + brightnessBuf[c]) / 3
-    if (brightness < minB || brightness > maxB) continue
-
-    const avgZ = (sz[a] + sz[b] + sz[c]) / 3
-    let fill
-    if (fillHypsometric && gradientStops?.length > 1) {
-      const [r, g, bl] = sampleGradient(gradientStops, brightness)
-      fill = `rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(bl*255)})`
-    } else {
-      fill = '#ffffff'
-    }
-    polys.push({ pts: [[sx[a], sy[a]], [sx[b], sy[b]], [sx[c], sy[c]]], avgZ, fill })
-  }
-  polys.sort((a, b) => a.avgZ - b.avgZ)
-  return polys
-}
-
 export function exportSVG({
   lineGeo, camera, width, height,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
-  showFill, fillHypsometric, gradientStops,
+  showFill,
   showLines, depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
   elevMinCut, elevMaxCut,
@@ -222,8 +177,9 @@ export function exportSVG({
     }
   }
 
-  // Only build Z-Buffer if occlusion is enabled
-  const surfViewZ = (depthOcclusion && zGeos.length > 0 && groupMatrix)
+  // Build Z-buffer when depth occlusion is on, or when fill is enabled (fill acts as
+  // a depth occluder in SVG — it is not rendered as polygons, only used to cull lines).
+  const surfViewZ = ((depthOcclusion || showFill) && zGeos.length > 0 && groupMatrix)
     ? buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
     : null
 
@@ -342,9 +298,6 @@ export function exportSVG({
   const vx = minX - MARGIN, vy = minY - MARGIN
   const vw = (maxX - minX) + MARGIN * 2, vh = (maxY - minY) + MARGIN * 2
   
-  const fillPolygons = (showFill && surfaceGeo && groupMatrix) ? buildFillPolygons(surfaceGeo, groupMatrix, camera, width, height, fillHypsometric, gradientStops, elevMinCut, elevMaxCut) : []
-  const fillEls = fillPolygons.map(({ pts, fill }) => `<polygon points="${pts.map(([px, py]) => `${(px-vx).toFixed(1)},${(py-vy).toFixed(1)}`).join(' ')}" fill="${fill}" stroke="none"/>`)
-  
   const layerGroups = []
   for (const layer of svgLayers) {
     const sw        = (layer.weight * 0.5).toFixed(3)
@@ -390,7 +343,6 @@ export function exportSVG({
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(0)}" height="${vh.toFixed(0)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
-    ...(fillEls.length > 0 ? [`<g>${fillEls.join('')}</g>`] : []),
     ...layerGroups,
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
     `</svg>`,
