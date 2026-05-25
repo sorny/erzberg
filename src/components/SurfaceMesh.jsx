@@ -176,30 +176,46 @@ const SURFACE_FRAG = /* glsl */ `
       vec3 exagNormal = normalize(vec3(n.x * uHillshadeExaggeration, n.y, n.z * uHillshadeExaggeration));
       float lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
 
-      // Cast shadow: ray-march in UV space toward the sun and check if
-      // any terrain sample exceeds the sun ray height at that distance.
+      // Cast shadow: ray-march in UV space toward the sun using progressive step
+      // sizes (linear growth) for far-field reach, compared via horizon angle so
+      // the penumbra is expressed in degrees rather than height units.
       float shadowFactor = 1.0;
       if (uCastShadows) {
-        float tanAlt = tan(max(alt, 0.001));
         float h0 = texture2D(uHeightmapTex, vUv).r;
-        // UV step per grid cell toward the light source.
-        // cos(az) = east component → +U; -sin(az) = north component → +V (V flipped).
+        // UV displacement per one grid cell toward the light source.
+        // cos(az) → +U (east); -sin(az) → +V (north, V is flipped vs row index).
         vec2 uvStep = vec2(cos(az) / uHeightmapCols, -sin(az) / uHeightmapRows);
-        // Height budget consumed by the sun ray per horizontal grid step.
-        float dH = uShadowStepH * tanAlt;
-        float maxExcess = 0.0;
+
+        // Track the maximum horizon angle seen along the ray.
+        // Shadow condition: maxHorizonAngle > sunAltitude.
+        float maxHorizonAngle = -1.5708; // start at −π/2
+        float accumN = 0.0;             // accumulated grid-cell steps
+
         for (int i = 1; i <= 128; i++) {
           if (i > uShadowSteps) break;
-          vec2 sUV = vUv + float(i) * uvStep;
+          // Progressive step: distant samples use larger strides so the ray
+          // covers far-off ridges with the same step budget.
+          float stepN = 1.0 + float(i - 1) * 0.1;
+          accumN += stepN;
+
+          vec2 sUV = vUv + uvStep * accumN;
           if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
+
           float hTerrain = texture2D(uHeightmapTex, sUV).r;
-          // How much higher terrain is than where the sun ray would be at this step.
-          float excess = hTerrain - (h0 + float(i) * dH);
-          if (excess > maxExcess) maxExcess = excess;
+          float elevDiff = hTerrain - h0;
+          if (elevDiff > 0.0) {
+            // Horizon angle: atan(world_height / world_horizontal)
+            // world_height = elevDiff × elevScale×100
+            // world_horiz  = accumN × scl  →  in uShadowStepH units:
+            //   elevDiff / (accumN × uShadowStepH)  [elevation per horizontal unit]
+            float horizAngle = atan(elevDiff / (accumN * uShadowStepH));
+            if (horizAngle > maxHorizonAngle) maxHorizonAngle = horizAngle;
+          }
         }
-        // Soft penumbra: smooth over a small elevation range.
-        float softRange = max(uShadowSoftness * 0.005, 0.0001);
-        shadowFactor = 1.0 - smoothstep(0.0, softRange, maxExcess);
+
+        // Soft penumbra expressed in degrees (1 unit ≈ 1° of arc).
+        float penumbra = max(uShadowSoftness * 0.017453, 0.0001);
+        shadowFactor = 1.0 - smoothstep(alt - penumbra, alt + penumbra, maxHorizonAngle);
       }
 
       // Shadow floor: prevents shadows from going completely black.

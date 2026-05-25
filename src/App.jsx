@@ -95,6 +95,7 @@ const STYLE_DEF = {
   hillshadeHighlightColor: '#ffffff', hillshadeShadowColor: '#000000',
   hillshadeCastShadows: false, hillshadeShadowSteps: 64,
   hillshadeShadowSoftness: 1.5, hillshadeShadowDarkness: 0.85,
+  showSun: false,
 
   // Slope & Aspect shading
   showSlopeShade: false, slopeShadeOpacity: 0.75, slopeColorLow: '#86efac', slopeColorHigh: '#dc2626',

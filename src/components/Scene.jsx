@@ -8,7 +8,7 @@
  */
 import { GizmoHelper, GizmoViewport, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { exportSVG } from '../utils/svgExport'
@@ -267,6 +267,45 @@ export function Scene({
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} />
         <ParticleSystem ref={particleRef} terrain={terrain} p={p} />
       </group>
+      {p.showHillshade && p.showSun && <SunIndicator p={p} terrain={terrain} />}
     </>
+  )
+}
+
+// ── Sun orb ───────────────────────────────────────────────────────────────────
+function SunIndicator({ p, terrain }) {
+  const az  = (p.hillshadeAzimuth  ?? 315) * Math.PI / 180
+  const alt = (p.hillshadeAltitude ?? 45)  * Math.PI / 180
+
+  // Place the sun at a fixed distance along the light direction.
+  // Scale the distance by the terrain's half-width so it stays outside the mesh.
+  const halfExtent = terrain
+    ? Math.max(terrain.halfW ?? 100, terrain.halfH ?? 100)
+    : 100
+  const dist = halfExtent * 2.5 + 60
+
+  const pos = useMemo(() => new THREE.Vector3(
+    Math.cos(az) * Math.cos(alt) * dist,
+    Math.sin(alt) * dist,
+    Math.sin(az) * Math.cos(alt) * dist,
+  ), [az, alt, dist])
+
+  const r = Math.max(halfExtent * 0.06, 6)
+
+  const coreMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fffbe8' }), [])
+  const haloMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#ffd060', transparent: true, opacity: 0.18,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide,
+  }), [])
+
+  return (
+    <group position={pos}>
+      <mesh material={coreMat}>
+        <sphereGeometry args={[r, 18, 12]} />
+      </mesh>
+      <mesh material={haloMat}>
+        <sphereGeometry args={[r * 2.6, 18, 12]} />
+      </mesh>
+    </group>
   )
 }
