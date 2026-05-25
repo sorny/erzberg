@@ -277,12 +277,13 @@ function SunIndicator({ p, terrain }) {
   const az  = (p.hillshadeAzimuth  ?? 315) * Math.PI / 180
   const alt = (p.hillshadeAltitude ?? 45)  * Math.PI / 180
 
-  // Place the sun at a fixed distance along the light direction.
-  // Scale the distance by the terrain's half-width so it stays outside the mesh.
+  // Keep the sun at ~1.1× halfExtent so it stays within the camera's FOV
+  // for all reasonable azimuth/altitude combinations at the default view angle.
+  // depthTest: false ensures it's never occluded by terrain geometry.
   const halfExtent = terrain
     ? Math.max(terrain.halfW ?? 100, terrain.halfH ?? 100)
     : 100
-  const dist = halfExtent * 2.5 + 60
+  const dist = halfExtent * 1.1
 
   const pos = useMemo(() => new THREE.Vector3(
     Math.cos(az) * Math.cos(alt) * dist,
@@ -290,21 +291,27 @@ function SunIndicator({ p, terrain }) {
     Math.sin(az) * Math.cos(alt) * dist,
   ), [az, alt, dist])
 
-  const r = Math.max(halfExtent * 0.06, 6)
+  const r = Math.max(halfExtent * 0.07, 6)
 
-  const coreMat = useMemo(() => new THREE.MeshBasicMaterial({ color: '#fffbe8' }), [])
+  // Core: saturated amber so it reads against both light and dark backgrounds.
+  // Normal blending (no transparency) keeps it fully opaque.
+  const coreMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: '#ffcc00', depthTest: false, depthWrite: false,
+  }), [])
+  // Halo: larger, orange-warm, additive blending for glow on dark backgrounds.
+  // On light backgrounds the halo is invisible but the core is still clear.
   const haloMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: '#ffd060', transparent: true, opacity: 0.18,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide,
+    color: '#ff8800', transparent: true, opacity: 0.35,
+    blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
   }), [])
 
   return (
     <group position={pos}>
-      <mesh material={coreMat}>
-        <sphereGeometry args={[r, 18, 12]} />
-      </mesh>
-      <mesh material={haloMat}>
+      <mesh renderOrder={999} material={haloMat}>
         <sphereGeometry args={[r * 2.6, 18, 12]} />
+      </mesh>
+      <mesh renderOrder={1000} material={coreMat}>
+        <sphereGeometry args={[r, 18, 12]} />
       </mesh>
     </group>
   )

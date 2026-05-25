@@ -10,7 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 
-function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt }) {
+function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
   const { positions, colors, weight, opacity, dash } = layer
   
   const geometry = useMemo(() => {
@@ -125,7 +125,7 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
     material.opacity = opacity ?? 1
     material.depthTest = !!depthOcclusion
     material.resolution.copy(resolution)
-    
+
     const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
     material.dashed = d.dashed
     material.dashSize = d.dashSize
@@ -133,6 +133,7 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
     material.needsUpdate = true
 
     lines.computeLineDistances()
+    lines.renderOrder = (layerIndex ?? 0) + 1
 
     if (ghostLines) {
       ghostMaterial.linewidth = weight || 1
@@ -144,8 +145,9 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
       ghostMaterial.gapSize = d.gapSize
       ghostMaterial.needsUpdate = true
       ghostLines.computeLineDistances()
+      ghostLines.renderOrder = (layerIndex ?? 0) + 1
     }
-  }, [lines, ghostLines, material, ghostMaterial, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, resolution])
+  }, [lines, ghostLines, material, ghostMaterial, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, resolution, layerIndex])
 
   useEffect(() => () => {
     material?.dispose()
@@ -165,23 +167,30 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
 }
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
-  const { size } = useThree()
-  const resolution = useMemo(() => new THREE.Vector2(size.width, size.height), [size.width, size.height])
+  const { size, gl } = useThree()
+  // Use physical pixel dimensions so LineMaterial calculates line widths correctly
+  // at any devicePixelRatio (CSS pixels would make lines double-wide at 2× DPR).
+  const resolution = useMemo(() => {
+    const s = new THREE.Vector2()
+    gl.getSize(s)
+    return s
+  }, [size.width, size.height])
 
   return (
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} />
 
-      {p.showLines && Array.isArray(lineGeo) && lineGeo.map(layer => (
-        <LineLayer 
-          key={layer.id} 
-          layer={layer} 
-          depthOcclusion={p.depthOcclusion} 
+      {p.showLines && Array.isArray(lineGeo) && lineGeo.map((layer, i) => (
+        <LineLayer
+          key={layer.id}
+          layer={layer}
+          depthOcclusion={p.depthOcclusion}
           occlusionOpacity={p.occlusionOpacity}
           occlusionColor={p.occlusionColor}
           occlusionBias={p.occlusionBias}
-          resolution={resolution} 
+          resolution={resolution}
           tilt={p.tilt}
+          layerIndex={i}
         />
       ))}
     </group>
