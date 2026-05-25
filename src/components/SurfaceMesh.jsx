@@ -69,6 +69,15 @@ const SURFACE_FRAG = /* glsl */ `
   uniform vec3      uHillshadeHighlight;
   uniform vec3      uHillshadeShadow;
 
+  uniform bool      uCastShadows;
+  uniform sampler2D uHeightmapTex;
+  uniform float     uHeightmapCols;
+  uniform float     uHeightmapRows;
+  uniform float     uShadowStepH;
+  uniform int       uShadowSteps;
+  uniform float     uShadowSoftness;
+  uniform float     uShadowDarkness;
+
   uniform bool      uSlopeShade;
   uniform float     uSlopeShadeOpacity;
   uniform vec3      uSlopeColorLow;
@@ -165,7 +174,37 @@ const SURFACE_FRAG = /* glsl */ `
       float alt = uHillshadeAltitude * 3.14159265 / 180.0;
       vec3 lightDir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
       vec3 exagNormal = normalize(vec3(n.x * uHillshadeExaggeration, n.y, n.z * uHillshadeExaggeration));
-      float shade = clamp(dot(exagNormal, lightDir), 0.0, 1.0) * uHillshadeIntensity;
+      float lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
+
+      // Cast shadow: ray-march in UV space toward the sun and check if
+      // any terrain sample exceeds the sun ray height at that distance.
+      float shadowFactor = 1.0;
+      if (uCastShadows) {
+        float tanAlt = tan(max(alt, 0.001));
+        float h0 = texture2D(uHeightmapTex, vUv).r;
+        // UV step per grid cell toward the light source.
+        // cos(az) = east component → +U; -sin(az) = north component → +V (V flipped).
+        vec2 uvStep = vec2(cos(az) / uHeightmapCols, -sin(az) / uHeightmapRows);
+        // Height budget consumed by the sun ray per horizontal grid step.
+        float dH = uShadowStepH * tanAlt;
+        float maxExcess = 0.0;
+        for (int i = 1; i <= 128; i++) {
+          if (i > uShadowSteps) break;
+          vec2 sUV = vUv + float(i) * uvStep;
+          if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
+          float hTerrain = texture2D(uHeightmapTex, sUV).r;
+          // How much higher terrain is than where the sun ray would be at this step.
+          float excess = hTerrain - (h0 + float(i) * dH);
+          if (excess > maxExcess) maxExcess = excess;
+        }
+        // Soft penumbra: smooth over a small elevation range.
+        float softRange = max(uShadowSoftness * 0.005, 0.0001);
+        shadowFactor = 1.0 - smoothstep(0.0, softRange, maxExcess);
+      }
+
+      // Shadow floor: prevents shadows from going completely black.
+      float effectiveShadow = max(shadowFactor, 1.0 - uShadowDarkness);
+      float shade = clamp(lambert * effectiveShadow * uHillshadeIntensity, 0.0, 1.0);
       vec3 shadeColor = mix(uHillshadeShadow, uHillshadeHighlight, shade);
       base = mix(base, shadeColor, uHillshadeOpacity);
     }
@@ -182,7 +221,10 @@ const SURFACE_FRAG = /* glsl */ `
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function SurfaceMesh({ surfaceGeo, p }) {
-  const textureImage = useStore(s => s.textureImage)
+  const textureImage     = useStore(s => s.textureImage)
+  const heightmapPixels  = useStore(s => s.heightmapPixels)
+  const heightmapWidth   = useStore(s => s.heightmapWidth)
+  const heightmapHeight  = useStore(s => s.heightmapHeight)
 
   useEffect(() => {
     if (p.showFill) console.log('[Benchmark] Color Updated: ' + Date.now())
@@ -232,6 +274,21 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     return tex
   }, [textureImage])
 
+  const hmTexRef = useRef(null)
+  const heightmapTex = useMemo(() => {
+    hmTexRef.current?.dispose()
+    if (!heightmapPixels || !heightmapWidth || !heightmapHeight) { hmTexRef.current = null; return null }
+    const tex = new THREE.DataTexture(
+      heightmapPixels, heightmapWidth, heightmapHeight,
+      THREE.RedFormat, THREE.FloatType
+    )
+    tex.minFilter = THREE.LinearFilter
+    tex.magFilter = THREE.LinearFilter
+    tex.needsUpdate = true
+    hmTexRef.current = tex
+    return tex
+  }, [heightmapPixels, heightmapWidth, heightmapHeight])
+
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,
     fragmentShader: SURFACE_FRAG,
@@ -267,6 +324,14 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uHillshadeExaggeration: { value: 2.0 },
       uHillshadeHighlight:    { value: new THREE.Vector3(1, 1, 1) },
       uHillshadeShadow:       { value: new THREE.Vector3(0, 0, 0) },
+      uCastShadows:           { value: false },
+      uHeightmapTex:          { value: null },
+      uHeightmapCols:         { value: 256.0 },
+      uHeightmapRows:         { value: 256.0 },
+      uShadowStepH:           { value: 0.01 },
+      uShadowSteps:           { value: 64 },
+      uShadowSoftness:        { value: 1.5 },
+      uShadowDarkness:        { value: 0.85 },
       uSlopeShade:            { value: false },
       uSlopeShadeOpacity:     { value: 0.75 },
       uSlopeColorLow:         { value: new THREE.Vector3(0.525, 0.937, 0.6) },
@@ -306,6 +371,17 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uHillshadeHighlight.value.set(...hexToRgb(p.hillshadeHighlightColor ?? '#ffffff'))
     surfMat.uniforms.uHillshadeShadow.value.set(...hexToRgb(p.hillshadeShadowColor   ?? '#000000'))
 
+    const cols = surfaceGeo?.metadata?.cols ?? heightmapWidth ?? 256
+    const rows = surfaceGeo?.metadata?.rows ?? heightmapHeight ?? 256
+    surfMat.uniforms.uCastShadows.value    = !!(p.hillshadeCastShadows && heightmapTex)
+    surfMat.uniforms.uHeightmapTex.value   = heightmapTex ?? null
+    surfMat.uniforms.uHeightmapCols.value  = cols
+    surfMat.uniforms.uHeightmapRows.value  = rows
+    surfMat.uniforms.uShadowStepH.value    = (p.resolution ?? 1) / ((p.elevScale ?? 1) * 100)
+    surfMat.uniforms.uShadowSteps.value    = p.hillshadeShadowSteps   ?? 64
+    surfMat.uniforms.uShadowSoftness.value = p.hillshadeShadowSoftness ?? 1.5
+    surfMat.uniforms.uShadowDarkness.value = p.hillshadeShadowDarkness ?? 0.85
+
     surfMat.uniforms.uSlopeShade.value        = !!(p.showSlopeShade)
     surfMat.uniforms.uSlopeShadeOpacity.value = p.slopeShadeOpacity ?? 0.75
     surfMat.uniforms.uSlopeColorLow.value.set(...hexToRgb(p.slopeColorLow   ?? '#86efac'))
@@ -317,7 +393,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
     surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
     surfMat.needsUpdate = true
-  }, [surfMat, p, overlayTex])
+  }, [surfMat, p, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight])
 
   useEffect(() => {
     if (!surfMat) return
@@ -328,6 +404,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
   useEffect(() => () => {
     surfMat?.dispose()
     overlayTex?.dispose()
+    hmTexRef.current?.dispose()
   }, [surfMat, overlayTex])
 
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({

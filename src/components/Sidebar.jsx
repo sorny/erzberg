@@ -662,6 +662,12 @@ export function Sidebar({
                 <InlineSl label="Exaggeration" help="Amplifies normals for dramatic relief at low elevation scales." min={0.1} max={10} step={0.1} value={style.hillshadeExaggeration} onChange={v => ss({ hillshadeExaggeration: v })} fmt={v => v.toFixed(1)} />
                 <ColorRow label="Highlight" value={style.hillshadeHighlightColor} onChange={v => ss({ hillshadeHighlightColor: v })} />
                 <ColorRow label="Shadow" value={style.hillshadeShadowColor} onChange={v => ss({ hillshadeShadowColor: v })} />
+                <Tog label="Cast Shadows" help="Ray-march cast shadows: ridges block sunlight." checked={style.hillshadeCastShadows} onChange={v => ss({ hillshadeCastShadows: v })} />
+                {style.hillshadeCastShadows && (<>
+                  <InlineSl label="Darkness" help="How dark cast shadows are (0 = no effect, 100% = pitch black)." min={0} max={1} step={0.05} value={style.hillshadeShadowDarkness} onChange={v => ss({ hillshadeShadowDarkness: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Softness" help="Penumbra width — 0 for crisp edges, higher for soft gradual shadows." min={0} max={5} step={0.1} value={style.hillshadeShadowSoftness} onChange={v => ss({ hillshadeShadowSoftness: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Quality" help="Shadow ray steps — more steps = longer shadows but higher GPU cost." min={16} max={128} step={8} value={style.hillshadeShadowSteps} onChange={v => ss({ hillshadeShadowSteps: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                </>)}
               </Sub>
             )}
           </Section>
