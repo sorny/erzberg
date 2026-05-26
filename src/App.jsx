@@ -232,7 +232,8 @@ export default function App() {
   // ── Preset helpers ────────────────────────────────────────────────────────
   const savePreset = useCallback(() => {
     let heightmapDataURL = null
-    if (heightmapPixels && heightmapWidth && heightmapHeight) {
+    const isDefaultHeightmap = heightmapFilename === 'Heightmap.png'
+    if (heightmapPixels && heightmapWidth && heightmapHeight && !isDefaultHeightmap) {
       const c = document.createElement('canvas')
       c.width = heightmapWidth; c.height = heightmapHeight
       const ctx = c.getContext('2d')
@@ -249,7 +250,7 @@ export default function App() {
       download: 'heightmap_preset.json',
       href: 'data:application/json,' + encodeURIComponent(data),
     }).click()
-  }, [terrain, style, points, view, gradientStops, bgGradientStops, heightmapPixels, heightmapWidth, heightmapHeight])
+  }, [terrain, style, points, view, gradientStops, bgGradientStops, heightmapPixels, heightmapWidth, heightmapHeight, heightmapFilename])
 
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'), { type:'file', accept:'.json' })
