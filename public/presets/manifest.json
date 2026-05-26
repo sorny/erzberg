@@ -1,6 +1,5 @@
 [
   "Alpine Survey.json",
-  "USGS Classic.json",
   "Stone Relief.json",
   "Dark Survey.json",
   "Teal Matrix.json",
@@ -12,5 +11,6 @@
   "Heart Surgery.json",
   "Unknown Pleasures.json",
   "Dark Sun.json",
-  "90s Network.json"
+  "90s Network.json",
+  "Coral Relief.json"
 ]
