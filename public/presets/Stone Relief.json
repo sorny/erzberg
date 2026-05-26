@@ -13,7 +13,7 @@
   },
   "style": {
     "showFill": true,
-    "fillColor": "#e09050",
+    "fillColor": "#ddd8d0",
     "fillHypsometric": true,
     "fillBanded": false,
     "fillHypsoInterval": 10,
@@ -21,7 +21,7 @@
     "fillHypsoMode": "elevation",
     "showMesh": false,
     "meshColor": "#888888",
-    "bgColor": "#f0ead8",
+    "bgColor": "#e6e2da",
     "bgGradient": false,
     "depthOcclusion": false,
     "occlusionBias": 1,
@@ -39,23 +39,23 @@
     "showMirrorMinusY": false,
     "showMirrorPlusZ": false,
     "showMirrorMinusZ": false,
-    "enabledX": true,
-    "spacingX": 10,
+    "enabledX": false,
+    "spacingX": 4,
     "shiftX": 0,
-    "colorX": "#5890b8",
-    "weightX": 0.5,
-    "opacityX": 0.18,
+    "colorX": "#000000",
+    "weightX": 1,
+    "opacityX": 1,
     "dashX": "solid",
     "hypsoX": false,
     "hypsoModeX": "elevation",
     "hypsoBandedX": false,
     "hypsoIntervalX": 10,
-    "enabledY": true,
-    "spacingY": 10,
+    "enabledY": false,
+    "spacingY": 4,
     "shiftY": 0,
-    "colorY": "#5890b8",
-    "weightY": 0.5,
-    "opacityY": 0.18,
+    "colorY": "#000000",
+    "weightY": 1,
+    "opacityY": 1,
     "dashY": "solid",
     "hypsoY": false,
     "hypsoModeY": "elevation",
@@ -87,17 +87,17 @@
     "pillarSize": 0.8,
     "pillarSegments": 8,
     "pillarLidColor": "#ffffff",
-    "enabledContours": true,
+    "enabledContours": false,
     "intervalContours": 1,
-    "colorContours": "#9a3818",
+    "colorContours": "#7b4f2e",
     "weightContours": 1,
     "opacityContours": 1,
     "dashContours": "solid",
-    "hypsoContours": true,
+    "hypsoContours": false,
     "hypsoModeContours": "elevation",
     "hypsoBandedContours": false,
     "hypsoIntervalContours": 10,
-    "majorIntervalContours": 5,
+    "majorIntervalContours": 10,
     "majorWeightContours": 2,
     "majorOffsetContours": 0,
     "closeRingsContours": false,
@@ -192,12 +192,12 @@
     "hypsoIntervalGpx": 10,
     "showHillshade": true,
     "hillshadeAzimuth": 315,
-    "hillshadeAltitude": 45,
-    "hillshadeIntensity": 0.75,
-    "hillshadeOpacity": 0.45,
-    "hillshadeExaggeration": 3,
-    "hillshadeHighlightColor": "#fff8f0",
-    "hillshadeShadowColor": "#7a2808",
+    "hillshadeAltitude": 38,
+    "hillshadeIntensity": 1,
+    "hillshadeOpacity": 0.88,
+    "hillshadeExaggeration": 4,
+    "hillshadeHighlightColor": "#ffffff",
+    "hillshadeShadowColor": "#5a5048",
     "hillshadeCastShadows": false,
     "hillshadeShadowSteps": 64,
     "hillshadeShadowSoftness": 1.5,
@@ -207,31 +207,27 @@
     "slopeShadeOpacity": 0.75,
     "slopeColorLow": "#86efac",
     "slopeColorHigh": "#dc2626",
-    "showLines": true,
+    "showLines": false,
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#f2ece0"
+        "color": "#b0bcbc"
       },
       {
-        "pos": 0.18,
-        "color": "#e0c88a"
+        "pos": 0.25,
+        "color": "#ccc8c0"
       },
       {
-        "pos": 0.38,
-        "color": "#e09050"
+        "pos": 0.55,
+        "color": "#d8d4cc"
       },
       {
-        "pos": 0.58,
-        "color": "#d06030"
-      },
-      {
-        "pos": 0.78,
-        "color": "#a03018"
+        "pos": 0.8,
+        "color": "#e4e0d8"
       },
       {
         "pos": 1,
-        "color": "#601808"
+        "color": "#f2eeea"
       }
     ]
   },
@@ -264,27 +260,23 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#f2ece0"
+      "color": "#b0bcbc"
     },
     {
-      "pos": 0.18,
-      "color": "#e0c88a"
+      "pos": 0.25,
+      "color": "#ccc8c0"
     },
     {
-      "pos": 0.38,
-      "color": "#e09050"
+      "pos": 0.55,
+      "color": "#d8d4cc"
     },
     {
-      "pos": 0.58,
-      "color": "#d06030"
-    },
-    {
-      "pos": 0.78,
-      "color": "#a03018"
+      "pos": 0.8,
+      "color": "#e4e0d8"
     },
     {
       "pos": 1,
-      "color": "#601808"
+      "color": "#f2eeea"
     }
   ],
   "bgGradientStops": [
