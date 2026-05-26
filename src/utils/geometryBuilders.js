@@ -436,15 +436,22 @@ function sampleB(grid, rows, cols, fr, fc) {
 function buildFlowLines(terrain, p, spacing, step, maxLen) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-  const lineStep = Math.max(1, Math.round((spacing ?? 10) / scl)), MAX_TOTAL_SEGMENTS = 3000000, posBuf = new Float32Array(MAX_TOTAL_SEGMENTS*6), colBuf = new Float32Array(MAX_TOTAL_SEGMENTS*6), mask = new Uint8Array(rows*cols), eps = 0.5
+  const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, posBuf = new Float32Array(n*6), colBuf = new Float32Array(n*6), mask = new Uint8Array(n), eps = 0.5
+  const seeds = []
+  for (let rf = 0; rf < rows; rf += seedStep) {
+    const r = Math.min(rows - 1, Math.round(rf))
+    for (let cf = 0; cf < cols; cf += seedStep) {
+      const c = Math.min(cols - 1, Math.round(cf))
+      if (gridMask[r*cols+c]) seeds.push(r*cols+c)
+    }
+  }
+  seeds.sort((a, b) => grid[b] - grid[a])
   let totalSegments = 0
-  outer: for (let r = 0; r < rows; r += lineStep) {
-    for (let c = 0; c < cols; c += lineStep) {
-      if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
-      if (!gridMask[r*cols+c] || mask[r*cols+c]) continue
-      let fr = r, fc = c, b0 = sampleB(grid, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
-      for (let s = 0; s < (maxLen ?? 100); s++) {
-        if (totalSegments >= MAX_TOTAL_SEGMENTS) break outer
+  for (const idx of seeds) {
+    const r = Math.floor(idx / cols), c = idx % cols
+    if (mask[idx]) continue
+    let fr = r, fc = c, b0 = sampleB(grid, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
+    for (let s = 0; s < (maxLen ?? 100); s++) {
         if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
         const ri = Math.round(fr), ci = Math.round(fc)
         if (!gridMask[ri*cols+ci]) break
@@ -463,7 +470,6 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
         } else if (!(inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) || inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut))) break
         fr=nfr; fc=nfc; b0=b1; e0=e1
       }
-    }
   }
   return { positions: posBuf.slice(0, totalSegments*6), colors: colBuf.slice(0, totalSegments*6) }
 }

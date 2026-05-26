@@ -34,7 +34,11 @@ Flow paths are integrated through the gradient field using the forward Euler met
 
 $$\mathbf{p}_{n+1} = \mathbf{p}_n - \alpha \, \nabla H(\mathbf{p}_n)$$
 
-where $\alpha$ is the step size. An occupancy mask prevents new paths from entering cells already traversed, which controls visual density. Each path terminates when it exits the grid boundary or reaches a flat region.
+where $\alpha$ is the step size.
+
+**Seeding order.** Candidate seed positions are laid on a regular grid with pitch `spacing / scl` cells (float-valued, so every 0.5-step increment produces a distinct grid). Candidates are sorted by descending elevation before any tracing begins. Ridges and peaks are seeded first; their paths trace the natural downhill flow and claim cells via an occupancy mask. Lower-elevation candidates whose starting cell has already been claimed are skipped. This ensures complete coverage of the terrain at any spacing — small spacings produce a dense tributary network, large spacings produce sparse primary channels.
+
+**Termination.** Each path stops when it exits the grid boundary, reaches a flat region ($|\nabla H| < \varepsilon$), or its next step would enter an already-occupied cell. The occupancy mask guarantees every grid cell is visited at most once across all paths, so the total segment count is bounded by $\text{rows} \times \text{cols}$ with no hard cap.
 
 ## 8. Stream Network
 

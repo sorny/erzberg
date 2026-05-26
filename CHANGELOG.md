@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-05-26
+
+### Fixed
+- **Flow Lines: incomplete coverage at small spacings** — seeds were processed in row-major order, so early rows' flow paths masked downstream cells before they could be seeded. At spacing ≤ 1 this produced large empty regions in the lower half of the terrain. Seeds are now sorted by descending elevation before tracing begins: ridges and peaks seed first, their paths fill the terrain naturally from high to low, and only genuinely uncovered cells become secondary seeds.
+- **Flow Lines: spacing slider 0.5 increments had no effect** — `lineStep` was computed with `Math.round(spacing / scl)`, collapsing pairs of consecutive 0.5-step values (e.g. 1.5 and 2.0) to the same integer. Replaced with a floating-point seed accumulator so every 0.5-step increment produces a distinct seed grid.
+- **Flow Lines: hard segment cap** — a fixed `MAX_TOTAL_SEGMENTS = 3 000 000` constant caused the outer seed loop to abort early on dense settings, cutting off large parts of the terrain. The cap is removed; the occupancy mask mathematically guarantees `totalSegments ≤ rows × cols`, so the buffer is sized exactly to that tight bound.
+
 ## [0.4.1] - 2026-05-26
 
 ### Added
