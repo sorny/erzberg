@@ -247,7 +247,7 @@ export default function App() {
     }
     const payload = { terrain, style, points, view, gradientStops, bgGradientStops }
     if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
-    const data = JSON.stringify(payload, null, 2)
+    const data = JSON.stringify(payload, null, 2) + '\n'
     Object.assign(document.createElement('a'), {
       download: 'heightmap_preset.json',
       href: 'data:application/json,' + encodeURIComponent(data),
