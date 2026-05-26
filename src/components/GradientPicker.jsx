@@ -16,21 +16,9 @@ function cssGradient(stops) {
 }
 
 export function GradientPicker({ stops, onChange, isSimple = false }) {
-  const barRef     = useRef()
-  const dragging   = useRef(null)  // { index, startX, startPos }
-  const colorInputRef = useRef()
-  const editingIdx    = useRef(null)
-
-  const openColorPicker = useCallback((idx, color, anchorEl) => {
-    editingIdx.current = idx
-    const input = colorInputRef.current
-    input.value = color
-    const rect = anchorEl.getBoundingClientRect()
-    const placeBelow = (window.innerHeight - rect.bottom) >= rect.top
-    input.style.left = `${rect.left}px`
-    input.style.top  = placeBelow ? `${rect.bottom}px` : `${rect.top}px`
-    input.click()
-  }, [])
+  const barRef      = useRef()
+  const dragging    = useRef(null)  // { index, moved }
+  const barInputs   = useRef({})    // idx → <input type="color"> inside bar handle
 
   const sorted = [...stops].sort((a, b) => a.pos - b.pos)
 
@@ -47,24 +35,16 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
 
   // Bar: click on empty area → add stop
   const onBarClick = (e) => {
-    if (isSimple) return // No intermediate stops allowed in simple mode
-    // Ignore if a drag just happened
+    if (isSimple) return
     if (dragging.current !== null) return
     const pos = xToPos(e.clientX)
-    // Ignore if too close to an existing stop (within 3px of the bar width)
     const rect = barRef.current.getBoundingClientRect()
     const tooClose = stops.some(s => Math.abs((s.pos - pos) * rect.width) < 8)
     if (tooClose) return
-    // Interpolate colour at click position
     const s = [...stops].sort((a, b) => a.pos - b.pos)
     let col = s[0].color
     for (let i = 1; i < s.length; i++) {
-      if (pos <= s[i].pos) {
-        const t = (pos - s[i - 1].pos) / (s[i].pos - s[i - 1].pos)
-        // simple hex average for the default colour
-        col = s[i - 1].color  // close enough — user will adjust
-        break
-      }
+      if (pos <= s[i].pos) { col = s[i - 1].color; break }
     }
     onChange([...stops, { pos, color: col }])
   }
@@ -79,7 +59,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
   const onHandlePointerMove = (e, idx) => {
     if (!dragging.current || dragging.current.index !== idx) return
     const anchor = stops[idx].pos === 0 || stops[idx].pos === 1
-    if (anchor || isSimple) return         // anchor stops can't be moved
+    if (anchor || isSimple) return
     const pos = xToPos(e.clientX)
     const clamped = Math.max(0.01, Math.min(0.99, pos))
     dragging.current.moved = true
@@ -90,31 +70,19 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
     const d = dragging.current
     dragging.current = null
     if (!d?.moved) {
-      openColorPicker(idx, stops[idx].color, e.currentTarget)
+      // Open the in-place color input for this handle
+      barInputs.current[idx]?.click()
     }
-  }
-
-  const onColorChange = (e) => {
-    if (editingIdx.current === null) return
-    updateStop(editingIdx.current, { color: e.target.value })
   }
 
   const removeStop = (e, idx) => {
     e.stopPropagation()
-    if (stops[idx].pos === 0 || stops[idx].pos === 1) return  // protect anchors
+    if (stops[idx].pos === 0 || stops[idx].pos === 1) return
     onChange(stops.filter((_, i) => i !== idx))
   }
 
   return (
     <div style={{ userSelect: 'none' }}>
-      {/* Hidden colour input */}
-      <input
-        ref={colorInputRef}
-        type="color"
-        style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
-        onChange={onColorChange}
-      />
-
       {/* Gradient bar + handles */}
       <div
         ref={barRef}
@@ -131,7 +99,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
       >
         {stops.map((stop, idx) => {
           const isAnchor = stop.pos === 0 || stop.pos === 1
-          if (isSimple && !isAnchor) return null // Hide non-anchor stops in simple mode
+          if (isSimple && !isAnchor) return null
           return (
             <div
               key={idx}
@@ -165,6 +133,19 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
                 background: stop.color,
                 boxShadow: '0 0 2px rgba(0,0,0,0.8)',
               }} />
+              {/* In-place color input — browser anchors picker here automatically */}
+              <input
+                ref={el => { barInputs.current[idx] = el }}
+                type="color"
+                value={stop.color}
+                onChange={(e) => updateStop(idx, { color: e.target.value })}
+                style={{
+                  position: 'absolute', inset: 0,
+                  opacity: 0, pointerEvents: 'none',
+                  width: '100%', height: '100%',
+                  padding: 0, border: 'none',
+                }}
+              />
             </div>
           )
         })}
@@ -176,7 +157,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
           const origIdx = stops.indexOf(stop)
           const isAnchor = stop.pos === 0 || stop.pos === 1
           if (isSimple && !isAnchor) return null
-          
+
           let label = `${(stop.pos * 100).toFixed(0)}%`
           if (isSimple) {
             if (stop.pos === 0) label = 'Top'
@@ -192,18 +173,26 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
                 fontSize: 10, color: '#aaa',
               }}
             >
-              <div
-                title="Click to change"
-                onClick={(e) => openColorPicker(origIdx, stop.color, e.currentTarget)}
-                style={{
-                  width: 12, height: 12,
+              {/* Swatch with overlaid in-place color input */}
+              <div style={{ position: 'relative', width: 12, height: 12, flexShrink: 0 }}>
+                <div style={{
+                  width: '100%', height: '100%',
                   background: stop.color,
                   borderRadius: 2,
                   border: '1px solid #555',
-                  cursor: 'pointer',
-                  flexShrink: 0,
-                }}
-              />
+                }} />
+                <input
+                  type="color"
+                  value={stop.color}
+                  onChange={(e) => updateStop(origIdx, { color: e.target.value })}
+                  title="Click to change"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    opacity: 0, width: '100%', height: '100%',
+                    cursor: 'pointer', padding: 0, border: 'none',
+                  }}
+                />
+              </div>
               <span>{label}</span>
               {!isAnchor && !isSimple && (
                 <span
