@@ -33,7 +33,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot-density driven by slope or elevation |
 
-**Surface overlays.** Hillshade with physically-based ray-march cast shadows: ridgelines occlude sunlight using a horizon-angle comparison across a progressive-step heightmap ray, with configurable darkness, softness (penumbra), and quality. An amber sun indicator sphere marks the light source position in the 3D scene. Azimuth and altitude drive both the Lambert shading and the cast shadows. Slope shading adds a two-colour steepness gradient blended over the fill.
+**Surface overlays.** Hillshade with physically-based ray-march cast shadows: ridgelines occlude sunlight using a horizon-angle comparison across a progressive-step heightmap ray, with configurable darkness, softness (penumbra), and quality. An amber sun indicator sphere with starburst ray lines marks the light source position in the 3D scene. Azimuth and altitude drive both the Lambert shading and the cast shadows. Slope shading adds a two-colour steepness gradient blended over the fill.
 
 **Hydraulic erosion.** Droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf), running off the main thread in a Web Worker.
 

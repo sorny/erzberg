@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-05-26
+
+### Added
+- **Sun ray indicators** — 14 line segments radiate from the sun orb sphere in all spatial directions (6 axis-aligned + 8 cube-corner diagonals), creating a starburst effect. Rays start just outside the core sphere and extend to ~4.5× the core radius. Same amber colour as the core (`#ffcc00`), 70% opacity, `depthTest: false` so they are always visible regardless of terrain geometry.
+
 ## [0.4.0] - 2026-05-26
 
 ### Added

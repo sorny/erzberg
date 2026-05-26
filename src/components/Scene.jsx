@@ -304,9 +304,32 @@ function SunIndicator({ p, terrain }) {
     color: '#ff8800', transparent: true, opacity: 0.35,
     blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false,
   }), [])
+  const rayMat = useMemo(() => new THREE.LineBasicMaterial({
+    color: '#ffcc00', depthTest: false, depthWrite: false,
+    transparent: true, opacity: 0.7,
+  }), [])
+  // 6 axis-aligned + 8 cube-corner diagonals; each direction emits one segment
+  const rayPositions = useMemo(() => {
+    const dirs = [
+      [1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1],
+      [1,1,1],[-1,1,1],[1,-1,1],[-1,-1,1],[1,1,-1],[-1,1,-1],[1,-1,-1],[-1,-1,-1],
+    ]
+    const inner = r * 1.4, outer = r * 4.5
+    const pts = []
+    for (const [x, y, z] of dirs) {
+      const len = Math.sqrt(x*x + y*y + z*z)
+      pts.push(x/len*inner, y/len*inner, z/len*inner, x/len*outer, y/len*outer, z/len*outer)
+    }
+    return new Float32Array(pts)
+  }, [r])
 
   return (
     <group position={pos}>
+      <lineSegments renderOrder={998} material={rayMat}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" array={rayPositions} itemSize={3} count={rayPositions.length / 3} />
+        </bufferGeometry>
+      </lineSegments>
       <mesh renderOrder={999} material={haloMat}>
         <sphereGeometry args={[r * 2.6, 18, 12]} />
       </mesh>
