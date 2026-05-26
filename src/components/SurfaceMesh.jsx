@@ -33,7 +33,7 @@ const SURFACE_VERT = /* glsl */ `
   varying vec2  vUv;
   void main() {
     vBrightness = brightness;
-    vNormal     = normalMatrix * normal;
+    vNormal     = normal;
     vUv         = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
@@ -300,6 +300,7 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     )
     tex.minFilter = THREE.LinearFilter
     tex.magFilter = THREE.LinearFilter
+    tex.flipY     = true
     tex.needsUpdate = true
     hmTexRef.current = tex
     return tex
