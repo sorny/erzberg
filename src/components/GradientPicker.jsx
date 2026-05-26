@@ -103,7 +103,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
       <input
         ref={colorInputRef}
         type="color"
-        style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+        style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
         onChange={onColorChange}
       />
 
