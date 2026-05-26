@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-05-26
+
+### Added
+- **Coral Relief preset** — hypsometric relief shading inspired by Aerialod-style renders. Teal valleys (`#00b8a8`) transition through cream to coral and deep terracotta at peaks, with strong directional hillshading, cast shadows, and a white background. No line work.
+
+### Fixed
+- **Gradient stop colour pickers opening in top-left corner** — the single globally-positioned hidden `<input type="color">` was placed at `top: 0; left: 0`, causing the OS picker to anchor there on every click. Each gradient stop now has its own `<input type="color">` rendered in-place inside its bar handle and swatch, so the browser opens the picker at the correct element position on the first and every subsequent click.
+- **Preset export missing trailing newline** — exported `.json` preset files now always end with a newline character.
+
+### Changed
+- Removed USGS Classic preset.
+- Updated Alpine Survey, Burnt Paper, Dark Survey, Ink Atlas, Swiss Topo, and Teal Matrix presets.
+
 ## [0.4.2] - 2026-05-26
 
 ### Fixed
