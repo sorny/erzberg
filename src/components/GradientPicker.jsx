@@ -21,6 +21,17 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
   const colorInputRef = useRef()
   const editingIdx    = useRef(null)
 
+  const openColorPicker = useCallback((idx, color, anchorEl) => {
+    editingIdx.current = idx
+    const input = colorInputRef.current
+    input.value = color
+    const rect = anchorEl.getBoundingClientRect()
+    const placeBelow = (window.innerHeight - rect.bottom) >= rect.top
+    input.style.left = `${rect.left}px`
+    input.style.top  = placeBelow ? `${rect.bottom}px` : `${rect.top}px`
+    input.click()
+  }, [])
+
   const sorted = [...stops].sort((a, b) => a.pos - b.pos)
 
   // Convert client X → 0–1 position on the bar
@@ -79,10 +90,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
     const d = dragging.current
     dragging.current = null
     if (!d?.moved) {
-      // Treat as click → open colour picker
-      editingIdx.current = idx
-      colorInputRef.current.value = stops[idx].color
-      colorInputRef.current.click()
+      openColorPicker(idx, stops[idx].color, e.currentTarget)
     }
   }
 
@@ -103,7 +111,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
       <input
         ref={colorInputRef}
         type="color"
-        style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', width: 0, height: 0 }}
+        style={{ position: 'fixed', top: 0, left: 0, opacity: 0, pointerEvents: 'none', width: 1, height: 1 }}
         onChange={onColorChange}
       />
 
@@ -186,11 +194,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
             >
               <div
                 title="Click to change"
-                onClick={() => {
-                  editingIdx.current = origIdx
-                  colorInputRef.current.value = stop.color
-                  colorInputRef.current.click()
-                }}
+                onClick={(e) => openColorPicker(origIdx, stop.color, e.currentTarget)}
                 style={{
                   width: 12, height: 12,
                   background: stop.color,
