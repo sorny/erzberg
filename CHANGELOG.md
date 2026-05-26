@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-05-26
+
+### Added
+- **Hillshade: ray-march cast shadows** — ridgelines now physically occlude sunlight. From each surface fragment a ray is marched across the heightmap toward the sun using progressive step sizes (linear stride growth) that give far-field reach within a fixed step budget. The shadow test compares the maximum horizon angle along the ray against the sun altitude, expressed in degrees so that the penumbra width is camera-independent. Controls: Darkness (shadow floor), Softness (penumbra width in degrees), Quality (step count 16–128×). Requires a loaded heightmap image.
+- **Sun indicator** — an amber sphere and orange glow halo placed in the scene at the configured hillshade azimuth/altitude, toggled independently via **Show Sun**. Visible regardless of terrain depth (depthTest: false) and correctly sized relative to the terrain's geographic extent. Renders consistently on both light and dark backgrounds (saturated `#ffcc00` core with additive halo).
+- **Elevation scale slider range widened** — upper and lower bounds extended from ±5 to ±10, allowing more dramatic vertical exaggeration on low-relief terrain.
+
+### Fixed
+- **Hillshade lighting direction wrong for non-90° azimuths** — the vertex shader was transforming terrain normals to view space (`normalMatrix × normal`), while the fragment shader computed `lightDir` in world space from the azimuth angle. The X axis happens to be preserved between the two spaces when camera rotation is 0°, which is why azimuth 90° appeared correct while 0°/180°/270° were wrong. Since the terrain group never rotates (only the camera orbits), model space equals world space; changing the vertex shader to `vNormal = normal` aligns both vectors and makes all azimuths correct.
+- **Cast shadow V-axis flipped in heightmap texture** — `DataTexture` defaults to `flipY = false`, placing image row 0 (North) at UV V = 0 in GPU texture space, while the surface mesh UV convention has North at V = 1. This caused the shadow ray to sample terrain from the geographically reversed North/South side. Setting `flipY = true` on the DataTexture corrects the alignment. The bug was masked on symmetric test terrain (cylinders) but would have produced incorrect shadow lengths on north/south-facing ridges.
+- **Sun orb not visible** — three independent bugs caused it to be invisible: (1) placement distance `halfExtent × 2.5 + 60` put the orb ~42° off the camera's centre, outside the 30° half-FOV; corrected to `halfExtent × 1.1`. (2) Core material lacked `depthTest: false`, allowing terrain to occlude it from behind. (3) Near-white core colour `#fffbe8` plus additive blending on a white background rendered as white-on-white; changed to saturated amber `#ffcc00` with normal blending.
+
 ## [0.3.7] - 2026-05-14
 
 ### Fixed
