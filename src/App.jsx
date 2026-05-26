@@ -245,7 +245,9 @@ export default function App() {
       ctx.putImageData(img, 0, 0)
       heightmapDataURL = c.toDataURL('image/png')
     }
-    const data = JSON.stringify({ terrain, style, points, view, gradientStops, bgGradientStops, heightmapDataURL }, null, 2)
+    const payload = { terrain, style, points, view, gradientStops, bgGradientStops }
+    if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
+    const data = JSON.stringify(payload, null, 2)
     Object.assign(document.createElement('a'), {
       download: 'heightmap_preset.json',
       href: 'data:application/json,' + encodeURIComponent(data),
