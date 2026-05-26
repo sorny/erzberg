@@ -13,7 +13,7 @@
   },
   "style": {
     "showFill": true,
-    "fillColor": "#d4a850",
+    "fillColor": "#e09050",
     "fillHypsometric": true,
     "fillBanded": false,
     "fillHypsoInterval": 10,
@@ -21,7 +21,7 @@
     "fillHypsoMode": "elevation",
     "showMesh": false,
     "meshColor": "#888888",
-    "bgColor": "#f2ece0",
+    "bgColor": "#f0ead8",
     "bgGradient": false,
     "depthOcclusion": false,
     "occlusionBias": 1,
@@ -42,9 +42,9 @@
     "enabledX": true,
     "spacingX": 10,
     "shiftX": 0,
-    "colorX": "#6ab0d0",
+    "colorX": "#5890b8",
     "weightX": 0.5,
-    "opacityX": 0.14,
+    "opacityX": 0.18,
     "dashX": "solid",
     "hypsoX": false,
     "hypsoModeX": "elevation",
@@ -53,9 +53,9 @@
     "enabledY": true,
     "spacingY": 10,
     "shiftY": 0,
-    "colorY": "#6ab0d0",
+    "colorY": "#5890b8",
     "weightY": 0.5,
-    "opacityY": 0.14,
+    "opacityY": 0.18,
     "dashY": "solid",
     "hypsoY": false,
     "hypsoModeY": "elevation",
@@ -89,7 +89,7 @@
     "pillarLidColor": "#ffffff",
     "enabledContours": true,
     "intervalContours": 1,
-    "colorContours": "#b86420",
+    "colorContours": "#9a3818",
     "weightContours": 1,
     "opacityContours": 1,
     "dashContours": "solid",
@@ -193,11 +193,11 @@
     "showHillshade": true,
     "hillshadeAzimuth": 315,
     "hillshadeAltitude": 45,
-    "hillshadeIntensity": 0.6,
-    "hillshadeOpacity": 0.28,
-    "hillshadeExaggeration": 2,
-    "hillshadeHighlightColor": "#ffffff",
-    "hillshadeShadowColor": "#7a4010",
+    "hillshadeIntensity": 0.75,
+    "hillshadeOpacity": 0.45,
+    "hillshadeExaggeration": 3,
+    "hillshadeHighlightColor": "#fff8f0",
+    "hillshadeShadowColor": "#7a2808",
     "hillshadeCastShadows": false,
     "hillshadeShadowSteps": 64,
     "hillshadeShadowSoftness": 1.5,
@@ -211,27 +211,27 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#3a7fc8"
+        "color": "#f2ece0"
       },
       {
-        "pos": 0.15,
-        "color": "#7cc8e8"
+        "pos": 0.18,
+        "color": "#e0c88a"
       },
       {
         "pos": 0.38,
-        "color": "#ede8dc"
+        "color": "#e09050"
       },
       {
         "pos": 0.58,
-        "color": "#d4a850"
+        "color": "#d06030"
       },
       {
         "pos": 0.78,
-        "color": "#c06820"
+        "color": "#a03018"
       },
       {
         "pos": 1,
-        "color": "#7a3408"
+        "color": "#601808"
       }
     ]
   },
@@ -264,27 +264,27 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#3a7fc8"
+      "color": "#f2ece0"
     },
     {
-      "pos": 0.15,
-      "color": "#7cc8e8"
+      "pos": 0.18,
+      "color": "#e0c88a"
     },
     {
       "pos": 0.38,
-      "color": "#ede8dc"
+      "color": "#e09050"
     },
     {
       "pos": 0.58,
-      "color": "#d4a850"
+      "color": "#d06030"
     },
     {
       "pos": 0.78,
-      "color": "#c06820"
+      "color": "#a03018"
     },
     {
       "pos": 1,
-      "color": "#7a3408"
+      "color": "#601808"
     }
   ],
   "bgGradientStops": [
