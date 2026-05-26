@@ -12,9 +12,9 @@
     "jitterAmt": 0
   },
   "style": {
-    "showFill": false,
+    "showFill": true,
     "fillColor": "#ffffff",
-    "fillHypsometric": false,
+    "fillHypsometric": true,
     "fillBanded": false,
     "fillHypsoInterval": 10,
     "fillHypsoWeight": 1.5,
@@ -91,13 +91,13 @@
     "intervalContours": 1,
     "colorContours": "#7b4f2e",
     "weightContours": 1,
-    "opacityContours": 1,
+    "opacityContours": 0.29,
     "dashContours": "solid",
-    "hypsoContours": false,
+    "hypsoContours": true,
     "hypsoModeContours": "elevation",
     "hypsoBandedContours": false,
     "hypsoIntervalContours": 10,
-    "majorIntervalContours": 10,
+    "majorIntervalContours": 0,
     "majorWeightContours": 2,
     "majorOffsetContours": 1,
     "closeRingsContours": false,
@@ -243,9 +243,9 @@
     "particleGravityStr": 1
   },
   "view": {
-    "tilt": 40,
-    "rotation": 0,
-    "zoom": 1,
+    "tilt": 34.835199838708164,
+    "rotation": -9.91934547807344,
+    "zoom": 1.5866734416093446,
     "fov": 60,
     "orthographic": false,
     "panX": 0,
@@ -260,23 +260,23 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#000080"
+      "color": "#0d3b00"
     },
     {
-      "pos": 0.25,
-      "color": "#00ffff"
+      "pos": 0.3,
+      "color": "#5a8c00"
     },
     {
-      "pos": 0.5,
-      "color": "#00ff00"
+      "pos": 0.6,
+      "color": "#c8a800"
     },
     {
-      "pos": 0.75,
-      "color": "#ff8800"
+      "pos": 0.85,
+      "color": "#8b4513"
     },
     {
       "pos": 1,
-      "color": "#800000"
+      "color": "#ffffff"
     }
   ],
   "bgGradientStops": [

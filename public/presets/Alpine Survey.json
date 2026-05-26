@@ -91,7 +91,7 @@
     "intervalContours": 1,
     "colorContours": "#b86420",
     "weightContours": 1,
-    "opacityContours": 1,
+    "opacityContours": 0.3,
     "dashContours": "solid",
     "hypsoContours": true,
     "hypsoModeContours": "elevation",
@@ -247,11 +247,11 @@
     "particleGravityStr": 1
   },
   "view": {
-    "tilt": 90,
+    "tilt": 40.064285355051574,
     "rotation": 0,
-    "zoom": 1,
+    "zoom": 1.1663507799970838,
     "fov": 60,
-    "orthographic": true,
+    "orthographic": false,
     "panX": 0,
     "panY": 0,
     "autoRotate": false,

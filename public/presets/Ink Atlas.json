@@ -21,7 +21,7 @@
     "fillHypsoMode": "elevation",
     "showMesh": false,
     "meshColor": "#888888",
-    "bgColor": "#f4f1e8",
+    "bgColor": "#121212",
     "bgGradient": false,
     "depthOcclusion": false,
     "occlusionBias": 1,
@@ -239,11 +239,11 @@
     "particleGravityStr": 1
   },
   "view": {
-    "tilt": 90,
+    "tilt": 40,
     "rotation": 0,
     "zoom": 1,
     "fov": 60,
-    "orthographic": true,
+    "orthographic": false,
     "panX": 0,
     "panY": 0,
     "autoRotate": false,

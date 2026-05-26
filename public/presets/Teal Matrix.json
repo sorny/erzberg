@@ -171,7 +171,7 @@
     "hypsoIntervalValley": 10,
     "enabledStipple": true,
     "spacingStipple": 0.5,
-    "weightStipple": 5,
+    "weightStipple": 1,
     "opacityStipple": 1,
     "colorStipple": "#10d0a0",
     "dashStipple": "solid",
@@ -243,11 +243,11 @@
     "particleGravityStr": 1
   },
   "view": {
-    "tilt": 90,
+    "tilt": 40,
     "rotation": 0,
     "zoom": 1,
     "fov": 60,
-    "orthographic": true,
+    "orthographic": false,
     "panX": 0,
     "panY": 0,
     "autoRotate": false,
