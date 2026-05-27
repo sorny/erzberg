@@ -23,7 +23,7 @@
     "meshColor": "#888888",
     "bgColor": "#1c2535",
     "bgGradient": false,
-    "depthOcclusion": false,
+    "depthOcclusion": true,
     "occlusionBias": 1,
     "occlusionColor": "#a80000",
     "occlusionOpacity": 0,
