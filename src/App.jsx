@@ -114,7 +114,7 @@ const POINTS_DEF = {
   particleGravity: false, particleGravityStr: 1,
 }
 const VIEW_DEF = {
-  tilt: 40, rotation: 0, zoom: 1,
+  tilt: 50, rotation: 0, zoom: 0.75,
   fov: 60, orthographic: false,
   panX: 0, panY: 0,
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
@@ -403,7 +403,7 @@ export default function App() {
       top:   { tilt: 0,  rotation: 0 },
       front: { tilt: 90, rotation: 0 },
       iso:   { tilt: 45, rotation: -45 },
-      reset: { tilt: 40, rotation: 0, zoom: 1, fov: 60, panX: 0, panY: 0 },
+      reset: { tilt: 50, rotation: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0 },
     }
     const p = presets[name] || presets.reset
     setView(prev => ({ ...prev, ...p }))
