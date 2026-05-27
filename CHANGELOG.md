@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-05-27
+
+### Added
+- **Scarlet Relief preset** — slope-driven red shading on a neutral warm-gray base. Flat areas remain gray (`#c8c2ba`); steep slopes grade to vivid red (`#d61900`) via full-opacity slope shading. No line work, no hillshade.
+- **Magma preset** — thermal-glow hypsometric with near-black valleys (`#030201`) graduating through deep crimson → burnt orange → amber → near-white peaks (`#fffbe8`). Paired with a dramatic low-angle hillshade (22 °, exaggeration ×9, full cast shadows) and thin golden ridge lines (`#f8c840`, Hessian detection) tracing the crests against the dark terrain.
+
+### Changed
+- **Default view on startup** — opening tilt changed from 40 ° to 50 °; default zoom set to 75 % (user-loaded heightmaps continue to auto-fit to the viewport).
+- **Default heightmap** — replaced with a higher-resolution sample terrain.
+- Updated Dark Survey preset (flow lines: wider spacing, longer paths, dotted dash, aspect-based hypsometric colouring).
+- Updated Swiss Topo preset (banded fill enabled, hypsometric weight set to 0).
+
 ## [0.4.5] - 2026-05-27
 
 ### Added
