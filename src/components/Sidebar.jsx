@@ -747,9 +747,9 @@ export function Sidebar({
             )}
           </Section>
 
-          {/* ── Ambient Occlusion ───────────────────────────────────────────── */}
-          <Section title="Ambient Occlusion" open={sec.ao} onToggle={() => tog('ao')} enabled={style.showAO}>
-            <Tog label="Enabled" help="Sky View Factor — darkens concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
+          {/* ── Sky View Factor ─────────────────────────────────────────────── */}
+          <Section title="Sky View Factor" open={sec.ao} onToggle={() => tog('ao')} enabled={style.showAO}>
+            <Tog label="Enabled" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
             {style.showAO && (
               <Sub>
                 <InlineSl label="Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
