@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-27
+
+### Added
+- **Multi-directional hillshade** — new "Multi-direction" toggle in the Hillshade section averages lambert from 8 evenly-spaced azimuth directions (Swiss-style). Eliminates directional bias; azimuth slider and cast-shadow controls are hidden while active.
+- **Sky View Factor** — ray-marches the sky hemisphere from each surface point to darken valleys, gullies, and other concavities where surrounding terrain blocks the sky. Controlled by Strength and Rays sliders, nested inside the Hillshade section alongside Cast Shadows.
+- **Tanaka contours** — "Tanaka illumination" toggle inside the Contours mode. Splits contour lines into thick bright segments (sun-facing slopes) and thin dark segments (shadow slopes) based on a configurable sun azimuth. Separate Bright Weight and Dark Weight sliders.
+- **Aspect map overlay** — circular HSL hue-wheel coloring by terrain facing direction. N-facing slopes one hue, E another, etc. Opacity slider; runs as a fragment shader pass after hillshade.
+- **Water fill** — flood all terrain below a configurable level threshold with translucent, depth-darkened water. Separate Level, Opacity, and Color controls.
+- **Elevation profile** — Analysis section at the bottom of the sidebar. Click "Elevation Profile", then click two points on the terrain canvas to sample a 200-point bilinear cross-section. Displays an SVG chart panel with real metre labels when a GeoTIFF is loaded.
+- **Hypsometric Integral** — stat row in the Terrain section showing HI = (mean − min) / (max − min). Inline help panel explains the geomorphological interpretation (> 0.6 young/rugged, ≈ 0.5 equilibrium, < 0.4 mature/eroded). Updates live when hydraulic erosion is applied.
+
+### Changed
+- All 16 presets updated to include new param keys with defaults.
+
 ## [0.4.6] - 2026-05-27
 
 ### Added
