@@ -448,8 +448,8 @@ export function Sidebar({
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
   const elevRange   = hasGeoTiff ? geoTiffElevMax - geoTiffElevMin : 0
-  const elevCutToM  = (pct) => Math.round(geoTiffElevMin + (pct / 100) * elevRange)
-  const mToElevCut  = (m)   => Math.round(((m - geoTiffElevMin) / elevRange) * 100)
+  const elevCutToM  = (pct) => +(geoTiffElevMin + (pct / 100) * elevRange).toFixed(1)
+  const mToElevCut  = (m)   => +(((m - geoTiffElevMin) / elevRange) * 100).toFixed(1)
 
   const syncSectionsToStyle = (newStyle) => {
     setSec(prev => ({
@@ -540,8 +540,8 @@ export function Sidebar({
               <Sl label="Jitter" min={0} max={20} step={0.5} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
-              <Sl label="Elev min cut" min={0} max={100} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v+'%'} />
+              <Sl label="Elev min cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
             </div>
           </Section>
 
