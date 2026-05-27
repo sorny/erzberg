@@ -779,6 +779,7 @@ export function Sidebar({
                   {style.majorIntervalContours > 0 && (
                     <InlineSl label="Major Weight" min={0.5} max={10} step={0.5} value={style.majorWeightContours} onChange={v => ss({ majorWeightContours: v })} />
                   )}
+                  <InlineSl label="Smooth" min={0} max={5} step={1} value={style.smoothContours ?? 0} onChange={v => ss({ smoothContours: v })} fmt={v => v === 0 ? 'Off' : `${v}×`} />
                   <Tog label="Close contours" checked={!!style.closeRingsContours} onChange={v => ss({ closeRingsContours: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Contours" style={style} ss={ss} />
