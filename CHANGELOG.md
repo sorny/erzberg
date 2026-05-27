@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-05-27
+
+### Added
+- **Elev min/max cut in 0.1 % steps** — the elevation cut sliders now move in 0.1 % increments (previously 1 %), allowing precise isolation of narrow elevation bands.
+
+### Fixed
+- **Depth occlusion disabled in several presets** — Alpine Survey, Coral Relief, Dark Survey, Ink Atlas, Stone Relief, and Teal Matrix all had `depthOcclusion: false`; corrected to `true`.
+
 ## [0.4.3] - 2026-05-26
 
 ### Added
