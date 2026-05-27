@@ -346,7 +346,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     hillshade: false, slopeShade: false, gpxTrack: false,
-    waterFill: false, aspectMap: false, ao: false, analysis: false,
+    waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
   })
 
@@ -709,6 +709,11 @@ export function Sidebar({
                     <InlineSl label="Quality" help="Shadow ray steps — more steps = longer shadows but higher GPU cost." min={16} max={128} step={8} value={style.hillshadeShadowSteps} onChange={v => ss({ hillshadeShadowSteps: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
                   </>)}
                 </>)}
+                <Tog label="Sky View Factor" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
+                {style.showAO && (<>
+                  <InlineSl label="SVF Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="SVF Rays" help="More rays = smoother result at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                </>)}
               </Sub>
             )}
           </Section>
@@ -743,17 +748,6 @@ export function Sidebar({
             {style.showAspectMap && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
-              </Sub>
-            )}
-          </Section>
-
-          {/* ── Sky View Factor ─────────────────────────────────────────────── */}
-          <Section title="Sky View Factor" open={sec.ao} onToggle={() => tog('ao')} enabled={style.showAO}>
-            <Tog label="Enabled" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
-            {style.showAO && (
-              <Sub>
-                <InlineSl label="Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
-                <InlineSl label="Rays" help="More rays = smoother occlusion at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
               </Sub>
             )}
           </Section>
