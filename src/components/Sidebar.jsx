@@ -81,6 +81,35 @@ function HelpBtn({ active, onClick }) {
   )
 }
 
+function HypsometricRow({ value }) {
+  const [show, setShow] = useState(false)
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:9, color:MUTED }}>
+        <span style={{ display:'flex', alignItems:'center' }}>
+          Hypso. Integral
+          <HelpBtn active={show} onClick={() => setShow(s => !s)} />
+        </span>
+        <span style={{ color:'#a1a1aa', fontFamily:'monospace' }}>{value.toFixed(3)}</span>
+      </div>
+      {show && (
+        <div style={{
+          fontSize: 9, color: MUTED, background: 'rgba(0,0,0,0.2)',
+          padding: '6px 8px', borderRadius: 4, marginBottom: 8,
+          border: `1px solid ${BORDER}`, lineHeight: 1.6
+        }}>
+          <div style={{ marginBottom: 4 }}>HI = (mean − min) / (max − min)</div>
+          <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', columnGap: 8, rowGap: 2 }}>
+            <span style={{ color:'#a1a1aa' }}>&gt; 0.6</span><span>young / rugged — most area is high</span>
+            <span style={{ color:'#a1a1aa' }}>≈ 0.5</span><span>equilibrium</span>
+            <span style={{ color:'#a1a1aa' }}>&lt; 0.4</span><span>mature / eroded — few peaks remain</span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2 }) {
   const [showHelp, setShowHelp] = useState(false)
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
@@ -536,11 +565,7 @@ export function Sidebar({
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
             {hypsometricIntegral != null && (
-              <div title="HI > 0.6 = young/rugged · ≈0.5 = equilibrium · < 0.4 = mature/eroded"
-                style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:MUTED, marginBottom:4, cursor:'help' }}>
-                <span>Hypso. Integral</span>
-                <span style={{ color:'#a1a1aa', fontFamily:'monospace' }}>{hypsometricIntegral.toFixed(3)}</span>
-              </div>
+              <HypsometricRow value={hypsometricIntegral} />
             )}
             <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
