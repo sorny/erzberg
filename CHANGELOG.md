@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-05-27
+
+### Added
+- **16-bit PNG heightmap support** — PNG files with 16-bit depth are now decoded natively, bypassing the browser canvas (which silently downgrades all images to 8-bit). The raw PNG bytes are parsed directly: IDAT chunks are decompressed with the browser-native `DecompressionStream` API (no new dependency), all five PNG filter types are reconstructed, and 16-bit samples are extracted at full precision. Supports grayscale, RGB, gray+alpha, and RGBA colour types; transparent pixels become NoData. Raises elevation precision from 256 to 65 536 distinct levels. 8-bit PNGs, JPEGs, and other image formats continue to use the existing canvas path unchanged.
+
 ## [0.4.4] - 2026-05-27
 
 ### Added

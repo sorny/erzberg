@@ -5,7 +5,7 @@
 [![Deploy to GitHub Pages](https://github.com/sorny/erzberg/actions/workflows/deploy.yml/badge.svg)](https://github.com/sorny/erzberg/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the twelve independent draw modes.
+A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap (8-bit or 16-bit PNG) or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the twelve independent draw modes.
 
 **Everything runs locally in your browser.** Your files never leave your machine — no server, no upload, no account.
 
