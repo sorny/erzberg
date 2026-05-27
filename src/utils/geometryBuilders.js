@@ -87,13 +87,15 @@ export function buildLineGeometry(terrain, p) {
       let vIdx = 0
       const floorY = terrain.minZ - 500
 
-      for (let i = 0; i < baseP.length; i += 6) {
-        const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
-        const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
-        if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
-        cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
-        cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
-        vIdx += 4
+      if (!res.isPoints) {
+        for (let i = 0; i < baseP.length; i += 6) {
+          const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
+          const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
+          if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+          cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
+          cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
+          vIdx += 4
+        }
       }
 
       const baseLidP = res.lids?.positions ?? new Float32Array(0)
@@ -155,7 +157,8 @@ export function buildLineGeometry(terrain, p) {
           : null,
         weight: weight,
         opacity: p[`opacity${cfg.id}`],
-        dash: p[`dash${cfg.id}`]
+        dash: p[`dash${cfg.id}`],
+        isPoints: res.isPoints ?? false,
       })
     }
   }
@@ -855,7 +858,7 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
     }
   }
 
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: new Float32Array(positions), colors: new Float32Array(colors), isPoints: true }
 }
 
 // ─── Surface ──────────────────────────────────────────────────────────────────

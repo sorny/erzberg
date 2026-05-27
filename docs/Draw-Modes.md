@@ -85,7 +85,7 @@ A stochastic dot-density map. Candidate positions are generated on a regular gri
 | Elevation | $(H - H_{\min}) / (H_{\max} - H_{\min})$ |
 | Inv Elevation | $1 - d_{\text{elev}}$ |
 
-The dot is placed with probability $d^\gamma$, where `gamma` sharpens ($\gamma > 1$) or flattens ($\gamma < 1$) the density contrast. Each accepted dot is emitted as a degenerate line segment of length $\epsilon \ll \text{scl}$, which the GPU renders as a square mark whose diameter equals the layer's `weight` in screen pixels.
+The dot is placed with probability $d^\gamma$, where `gamma` sharpens ($\gamma > 1$) or flattens ($\gamma < 1$) the density contrast. Each accepted dot is emitted as a degenerate line segment of length $\epsilon \ll \text{scl}$, which the GPU renders as a round mark whose diameter equals the layer's `weight` in screen pixels. In SVG export, each dot is written as a `<circle>` element.
 
 ---
 

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-05-27
+
+### Fixed
+- **Blur slider resolution** — the Blur slider now responds to every 0.1-step increment. Previously, fractional radii were rounded to the nearest integer via `Math.round`, so values like 0.6 were indistinguishable from 0.5. Fractional blur is now computed by linearly interpolating between the two adjacent integer-radius box-blur passes.
+- **Stipple dots missing from SVG export** — stipple dots are modelled as near-zero-length segments in 3D; the SVG exporter's sub-0.1 px segment filter silently dropped all of them. The exporter now detects the stipple layer (`isPoints` flag) and emits each dot as an SVG `<circle>` element instead, with radius proportional to the layer's weight. Depth occlusion and ghost opacity are respected.
+
 ## [0.5.0] - 2026-05-27
 
 ### Added

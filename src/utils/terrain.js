@@ -2,10 +2,7 @@
  * Terrain data extraction and processing.
  */
 
-/** Apply a box blur to a Float32Array of brightness values using an integral image. O(W×H). */
-export function boxBlur(pixels, width, height, radius) {
-  if (radius <= 0) return pixels
-  const r = Math.round(radius)
+function boxBlurInt(pixels, width, height, r) {
   const integral = new Float64Array((width + 1) * (height + 1))
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
@@ -20,6 +17,19 @@ export function boxBlur(pixels, width, height, radius) {
       out[y * width + x] = (integral[(y1 + 1) * (width + 1) + (x1 + 1)] - integral[y0 * (width + 1) + (x1 + 1)] - integral[(y1 + 1) * (width + 1) + x0] + integral[y0 * (width + 1) + x0]) / area
     }
   }
+  return out
+}
+
+/** Apply a box blur to a Float32Array of brightness values using an integral image. O(W×H).
+ *  Supports fractional radii by lerping between adjacent integer-radius results. */
+export function boxBlur(pixels, width, height, radius) {
+  if (radius <= 0) return pixels
+  const rLo = Math.floor(radius), rHi = Math.ceil(radius), frac = radius - rLo
+  if (frac === 0) return boxBlurInt(pixels, width, height, rLo)
+  const lo = rLo <= 0 ? pixels : boxBlurInt(pixels, width, height, rLo)
+  const hi = boxBlurInt(pixels, width, height, rHi)
+  const out = new Float32Array(pixels.length)
+  for (let i = 0; i < pixels.length; i++) out[i] = lo[i] * (1 - frac) + hi[i] * frac
   return out
 }
 

@@ -193,9 +193,44 @@ export function exportSVG({
 
   if (showLines && Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
-      const { id, positions, colors, weight, opacity, dash } = layer
+      const { id, positions, colors, weight, opacity, dash, isPoints } = layer
       if (!positions || positions.length === 0) continue
 
+      // ── Point layers (stipple dots) ──────────────────────────────────────────
+      if (isPoints) {
+        const dotR = (weight ?? 1) * 0.25
+        const visibleDots = []
+        const ghostDots = []
+        const dotCount = positions.length / 6
+        for (let s = 0; s < dotCount; s++) {
+          const i = s * 6
+          const cx3 = (positions[i] + positions[i+3]) * 0.5
+          const cy3 = (positions[i+1] + positions[i+4]) * 0.5
+          const cz3 = (positions[i+2] + positions[i+5]) * 0.5
+          const fill = (colors && colors.length > i + 2)
+            ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
+            : '#000000'
+          const [sx, sy, lineZ] = project(cx3, cy3, cz3)
+          let visible = true
+          if (surfViewZ) {
+            const surfZ = surfViewZ(sx, sy)
+            visible = surfZ === -Infinity || lineZ >= surfZ - bias
+          }
+          if (visible) {
+            visibleDots.push({ cx: sx, cy: sy, fill })
+            expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
+          } else if (ghostOpac > 0) {
+            ghostDots.push({ cx: sx, cy: sy, fill: occlusionColor || '#000000' })
+            expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
+          }
+        }
+        if (visibleDots.length > 0 || ghostDots.length > 0) {
+          svgLayers.push({ id, isPoints: true, visibleDots, ghostDots, dotR, weight, opacity })
+        }
+        continue
+      }
+
+      // ── Line layers ──────────────────────────────────────────────────────────
       const visibleSegs = []
       const ghostSegs = []
       const segCount = positions.length / 6
@@ -305,6 +340,22 @@ export function exportSVG({
     const modeId    = layer.id ?? 'Lines'
     const modeLabel = modeId.replace(/([A-Z])/g, ' $1').trim()
     const inner = []
+
+    if (layer.isPoints) {
+      const r = layer.dotR.toFixed(2)
+      if (layer.ghostDots.length > 0) {
+        const els = layer.ghostDots.map(({ cx, cy, fill }) =>
+          `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
+        inner.push(`<g stroke="none" opacity="${ghostOpac * layer.opacity}">${els.join('')}</g>`)
+      }
+      if (layer.visibleDots.length > 0) {
+        const els = layer.visibleDots.map(({ cx, cy, fill }) =>
+          `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
+        inner.push(`<g stroke="none" opacity="${layer.opacity}">${els.join('')}</g>`)
+      }
+      layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
+      continue
+    }
 
     const buildLineEls = (segs) => {
       if (!dashSizes) {
