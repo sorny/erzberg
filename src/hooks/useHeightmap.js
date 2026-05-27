@@ -6,7 +6,149 @@ import { useStore } from '../store/useStore'
 
 // ── Image (PNG / JPG) loader ─────────────────────────────────────────────────
 
-function loadImagePixels(source) {
+function readU32(bytes, offset) {
+  return ((bytes[offset] << 24) | (bytes[offset+1] << 16) | (bytes[offset+2] << 8) | bytes[offset+3]) >>> 0
+}
+
+function paethPredictor(a, b, c) {
+  const p = a + b - c
+  const pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c)
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c
+}
+
+// Decodes a 16-bit PNG natively, bypassing the canvas 8-bit downgrade.
+// Returns the same shape as loadImagePixels, or null if not a 16-bit PNG.
+async function decodePNG16(file) {
+  const buf = await file.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+
+  // PNG signature
+  if (bytes[0] !== 137 || bytes[1] !== 80 || bytes[2] !== 78 || bytes[3] !== 71 ||
+      bytes[4] !== 13  || bytes[5] !== 10  || bytes[6] !== 26  || bytes[7] !== 10) return null
+
+  // IHDR is always first chunk, data starts at byte 16
+  const width     = readU32(bytes, 16)
+  const height    = readU32(bytes, 20)
+  const bitDepth  = bytes[24]
+  const colorType = bytes[25]
+  const interlace = bytes[28]
+
+  if (bitDepth !== 16) return null  // 8-bit: let canvas handle it
+  if (interlace !== 0) return null  // Adam7 not supported
+
+  // channels: 0=gray(1), 2=RGB(3), 4=gray+alpha(2), 6=RGBA(4)
+  const chans = colorType === 0 ? 1 : colorType === 2 ? 3 : colorType === 4 ? 2 : colorType === 6 ? 4 : null
+  if (chans === null) return null
+
+  // Collect and concatenate all IDAT chunks
+  const idatParts = []
+  let pos = 8
+  while (pos + 12 <= bytes.length) {
+    const len  = readU32(bytes, pos)
+    const type = String.fromCharCode(bytes[pos+4], bytes[pos+5], bytes[pos+6], bytes[pos+7])
+    if (type === 'IDAT') idatParts.push(bytes.subarray(pos + 8, pos + 8 + len))
+    else if (type === 'IEND') break
+    pos += 12 + len
+  }
+  if (idatParts.length === 0) return null
+
+  const totalLen = idatParts.reduce((s, p) => s + p.length, 0)
+  const compressed = new Uint8Array(totalLen)
+  let off = 0
+  for (const p of idatParts) { compressed.set(p, off); off += p.length }
+
+  // Decompress: PNG uses zlib (RFC 1950), which is 'deflate' in DecompressionStream
+  const stream = new DecompressionStream('deflate')
+  const writer = stream.writable.getWriter()
+  const reader = stream.readable.getReader()
+  writer.write(compressed)
+  writer.close()
+  const rawParts = []
+  let rawLen = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    rawParts.push(value); rawLen += value.length
+  }
+  const raw = new Uint8Array(rawLen)
+  let rawOff = 0
+  for (const p of rawParts) { raw.set(p, rawOff); rawOff += p.length }
+
+  // Apply PNG filter reconstruction row by row
+  const bpp    = chans * 2          // bytes per pixel (2 bytes per sample)
+  const stride = width * bpp        // bytes per row (without filter byte)
+  const recon  = new Uint8Array(height * stride)
+
+  for (let y = 0; y < height; y++) {
+    const filter  = raw[y * (stride + 1)]
+    const srcBase = y * (stride + 1) + 1
+    const dst     = y * stride
+    const prev    = dst - stride
+
+    for (let x = 0; x < stride; x++) {
+      const filt = raw[srcBase + x]
+      const a = x >= bpp ? recon[dst + x - bpp] : 0
+      const b = y > 0   ? recon[prev + x]       : 0
+      const c = (x >= bpp && y > 0) ? recon[prev + x - bpp] : 0
+      switch (filter) {
+        case 0: recon[dst + x] = filt; break
+        case 1: recon[dst + x] = (filt + a) & 0xff; break
+        case 2: recon[dst + x] = (filt + b) & 0xff; break
+        case 3: recon[dst + x] = (filt + ((a + b) >> 1)) & 0xff; break
+        case 4: recon[dst + x] = (filt + paethPredictor(a, b, c)) & 0xff; break
+        default: recon[dst + x] = filt
+      }
+    }
+  }
+
+  // Extract normalized float pixels
+  const pixels    = new Float32Array(width * height)
+  const nodataMask = new Uint8Array(width * height)
+  let minX = width, minY = height, maxX = 0, maxY = 0, hasValid = false
+
+  for (let i = 0; i < width * height; i++) {
+    const base = i * bpp
+
+    // Alpha channel (if present): use high byte for threshold
+    const alpha = colorType === 4 ? recon[base + 2]        // gray+alpha
+                : colorType === 6 ? recon[base + 6]        // RGBA
+                : 255
+
+    if (alpha < 128) {
+      nodataMask[i] = 0
+    } else {
+      nodataMask[i] = 1
+      const v0 = (recon[base] << 8 | recon[base + 1]) / 65535
+      if (chans >= 3) {
+        // RGB / RGBA: average the three colour channels
+        const v1 = (recon[base + 2] << 8 | recon[base + 3]) / 65535
+        const v2 = (recon[base + 4] << 8 | recon[base + 5]) / 65535
+        pixels[i] = (v0 + v1 + v2) / 3
+      } else {
+        pixels[i] = v0  // grayscale or gray+alpha
+      }
+      const x = i % width, y = Math.floor(i / width)
+      if (x < minX) minX = x; if (x > maxX) maxX = x
+      if (y < minY) minY = y; if (y > maxY) maxY = y
+      hasValid = true
+    }
+  }
+
+  return {
+    pixels, nodataMask, width, height,
+    dataWidth:  hasValid ? (maxX - minX + 1) : width,
+    dataHeight: hasValid ? (maxY - minY + 1) : height,
+  }
+}
+
+async function loadImagePixels(source) {
+  // For File/Blob inputs, attempt native 16-bit PNG decode before touching the canvas
+  if (source instanceof Blob) {
+    const result = await decodePNG16(source)
+    if (result) return result
+  }
+
+  // 8-bit images (PNG, JPG, WebP, …) — canvas path
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -19,35 +161,27 @@ function loadImagePixels(source) {
       const { data } = ctx.getImageData(0, 0, w, h)
       const pixels = new Float32Array(w * h)
       const nodataMask = new Uint8Array(w * h)
-      
+
       let minX = w, minY = h, maxX = 0, maxY = 0
       let hasValid = false
 
       for (let i = 0; i < w * h; i++) {
         const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2], a = data[i * 4 + 3]
         pixels[i] = (r + g + b) / (3 * 255)
-        
-        // Treat pixels with low alpha as NoData
         if (a < 128) {
           nodataMask[i] = 0
         } else {
           nodataMask[i] = 1
-          const x = i % w
-          const y = Math.floor(i / w)
-          if (x < minX) minX = x
-          if (x > maxX) maxX = x
-          if (y < minY) minY = y
-          if (y > maxY) maxY = y
+          const x = i % w, y = Math.floor(i / w)
+          if (x < minX) minX = x; if (x > maxX) maxX = x
+          if (y < minY) minY = y; if (y > maxY) maxY = y
           hasValid = true
         }
       }
-      resolve({ 
-        pixels, 
-        nodataMask, 
-        width: w, 
-        height: h,
-        dataWidth: hasValid ? (maxX - minX + 1) : w,
-        dataHeight: hasValid ? (maxY - minY + 1) : h
+      resolve({
+        pixels, nodataMask, width: w, height: h,
+        dataWidth:  hasValid ? (maxX - minX + 1) : w,
+        dataHeight: hasValid ? (maxY - minY + 1) : h,
       })
     }
     img.onerror = reject
