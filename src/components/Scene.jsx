@@ -24,6 +24,7 @@ export function Scene({
   cameraPreset,
   webmRecording,
   exportBaseName,
+  profileClickRef,
 }) {
   const { camera: currentCamera, gl, scene, size } = useThree()
   const groupRef    = useRef()
@@ -264,7 +265,7 @@ export function Scene({
         </GizmoHelper>
       )}
       <group ref={groupRef}>
-        <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} />
+        <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
         <ParticleSystem ref={particleRef} terrain={terrain} p={p} />
       </group>
       {p.showHillshade && p.showSun && <SunIndicator p={p} terrain={terrain} />}

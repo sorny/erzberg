@@ -138,8 +138,12 @@ export function buildLineGeometry(terrain, p) {
         }
       }
 
-      // Apply specific weight for Major Contours
-      const weight = (subId === 'Contours-Major') ? p.majorWeightContours : p[`weight${cfg.id}`]
+      // Apply specific weight for Major/Tanaka Contours
+      const weight =
+        subId === 'Contours-Major'         ? p.majorWeightContours :
+        subId === 'Contours-Tanaka-Bright' ? (p.tanakaWeightBright ?? 2.5) :
+        subId === 'Contours-Tanaka-Dark'   ? (p.tanakaWeightDark   ?? 0.5) :
+        p[`weight${cfg.id}`]
 
       finalLayers.push({
         id: (subId === cfg.id) ? cfg.id : subId,
@@ -348,6 +352,7 @@ function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
 }
 
 function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings) {
+  if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
 
@@ -425,6 +430,74 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
   }
 }
 const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
+
+function buildContoursTanaka(terrain, p, interval) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+
+  const brightPos = [], brightCol = []
+  const darkPos = [], darkCol = []
+
+  const step = (interval ?? 4)
+  const startElev = Math.ceil((minZ - 1e-7) / step) * step
+  const maxElevPossible = Math.ceil(maxZ / step) * step
+  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
+
+  const sunAzRad = ((p.tanakaSunAzimuth ?? 315) * Math.PI) / 180
+  const sunDirX =  Math.sin(sunAzRad)
+  const sunDirZ = -Math.cos(sunAzRad)
+
+  for (let i = 0; i < numSteps; i++) {
+    const elev = startElev + i * step
+    if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+
+    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+    const level = elev / (100 * elevScale) + 0.5
+
+    for (let r = 0; r < rows - 1; r++) {
+      for (let c = 0; c < cols - 1; c++) {
+        const m00 = gridMask[r*cols+c], m10 = gridMask[r*cols+c+1]
+        const m01 = gridMask[(r+1)*cols+c], m11 = gridMask[(r+1)*cols+c+1]
+        if (!m00 && !m10 && !m01 && !m11) continue
+
+        const v00 = m00 ? grid[r*cols+c] : level - 1e-7
+        const v10 = m10 ? grid[r*cols+c+1] : level - 1e-7
+        const v11 = m11 ? grid[(r+1)*cols+c+1] : level - 1e-7
+        const v01 = m01 ? grid[(r+1)*cols+c] : level - 1e-7
+
+        const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
+        if (idx === 0 || idx === 15) continue
+
+        const edgeLerp = (a, b, va, vb) => Math.abs(vb - va) < 1e-10 ? 0.5 : a + (b - a) * ((level - va) / (vb - va))
+        const top    = [c + edgeLerp(0, 1, v00, v10), r]
+        const right  = [c + 1, r + edgeLerp(0, 1, v10, v11)]
+        const bottom = [c + edgeLerp(0, 1, v01, v11), r + 1]
+        const left   = [c, r + edgeLerp(0, 1, v00, v01)]
+        const ed = [top, right, bottom, left]
+        const pairs = MARCHING_TABLE[idx]
+
+        for (let pi = 0; pi < pairs.length; pi += 2) {
+          const e0 = ed[pairs[pi]], e1 = ed[pairs[pi+1]]
+          const mc = Math.max(0, Math.min(cols-1, Math.round((e0[0] + e1[0]) / 2)))
+          const mr = Math.max(0, Math.min(rows-1, Math.round((e0[1] + e1[1]) / 2)))
+          const gx = (grid[mr*cols + Math.min(mc+1,cols-1)] - grid[mr*cols + Math.max(mc-1,0)]) / (2 * scl)
+          const gz = (grid[Math.min(mr+1,rows-1)*cols + mc] - grid[Math.max(mr-1,0)*cols + mc]) / (2 * scl)
+          const lit = sunDirX * gx + sunDirZ * gz >= 0
+
+          const targetPos = lit ? brightPos : darkPos
+          const targetCol = lit ? brightCol : darkCol
+          targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
+          targetCol.push(...col, ...col)
+        }
+      }
+    }
+  }
+
+  return {
+    'Contours-Tanaka-Bright': { positions: new Float32Array(brightPos), colors: new Float32Array(brightCol) },
+    'Contours-Tanaka-Dark':   { positions: new Float32Array(darkPos),   colors: new Float32Array(darkCol) },
+  }
+}
 
 // ─── Flow lines ───────────────────────────────────────────────────────────────
 

@@ -5,7 +5,8 @@
  * The custom <Sidebar> renders the right-hand control panel.
  */
 import { Canvas, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { useHeightmap } from './hooks/useHeightmap'
@@ -97,8 +98,23 @@ const STYLE_DEF = {
   hillshadeShadowSoftness: 1.5, hillshadeShadowDarkness: 0.85,
   showSun: false,
 
+  // Multi-directional hillshade
+  hillshadeMultiDir: false,
+
   // Slope & Aspect shading
   showSlopeShade: false, slopeShadeOpacity: 0.75, slopeColorLow: '#86efac', slopeColorHigh: '#dc2626',
+
+  // Aspect map overlay
+  showAspectMap: false, aspectMapOpacity: 0.8,
+
+  // Ambient occlusion (Sky View Factor)
+  showAO: false, aoStrength: 0.7, aoRays: 8,
+
+  // Water fill
+  showWaterFill: false, waterLevel: 0.3, waterColor: '#1a78c2', waterOpacity: 0.82,
+
+  // Tanaka contours
+  tanakaContours: false, tanakaSunAzimuth: 315, tanakaWeightBright: 2.5, tanakaWeightDark: 0.5,
 
   // Master visibility for all lines
 
@@ -195,6 +211,63 @@ export default function App() {
   const [baseElevScale, setBaseElevScale] = useState(1)
   // Zoom fit calculated on load; view.zoom is the user-facing multiplier (1 = 100%).
   const [baseZoom, setBaseZoom] = useState(1)
+
+  // ── Elevation profile ─────────────────────────────────────────────────────
+  const [profileMode,   setProfileMode]   = useState(false)
+  const [profileClicks, setProfileClicks] = useState([])
+  const [profileData,   setProfileData]   = useState(null)
+
+  const sampleProfile = useCallback((uv0, uv1) => {
+    if (!heightmapPixels || !heightmapWidth || !heightmapHeight) return
+    const N = 200
+    const pts = []
+    let minV = Infinity, maxV = -Infinity
+    for (let i = 0; i < N; i++) {
+      const t  = i / (N - 1)
+      const u  = uv0.x + (uv1.x - uv0.x) * t
+      const v  = uv0.y + (uv1.y - uv0.y) * t
+      const px = u * (heightmapWidth - 1)
+      const py = (1 - v) * (heightmapHeight - 1)
+      const x0 = Math.floor(px), y0 = Math.floor(py)
+      const x1 = Math.min(x0 + 1, heightmapWidth - 1)
+      const y1 = Math.min(y0 + 1, heightmapHeight - 1)
+      const dx = px - x0, dy = py - y0
+      const val = heightmapPixels[y0 * heightmapWidth + x0] * (1 - dx) * (1 - dy)
+                + heightmapPixels[y0 * heightmapWidth + x1] * dx       * (1 - dy)
+                + heightmapPixels[y1 * heightmapWidth + x0] * (1 - dx) * dy
+                + heightmapPixels[y1 * heightmapWidth + x1] * dx       * dy
+      pts.push(val)
+      if (val < minV) minV = val
+      if (val > maxV) maxV = val
+    }
+    setProfileData({ points: pts, elevMin: minV, elevMax: maxV })
+    setProfileMode(false)
+    setProfileClicks([])
+  }, [heightmapPixels, heightmapWidth, heightmapHeight])
+
+  const handleProfileClick = useCallback((uv) => {
+    setProfileClicks(prev => {
+      const next = [...prev, uv]
+      if (next.length === 2) {
+        sampleProfile(next[0], next[1])
+        return []
+      }
+      return next
+    })
+  }, [sampleProfile])
+
+  // ── Hypsometric integral ──────────────────────────────────────────────────
+  const hypsometricIntegral = useMemo(() => {
+    if (!heightmapPixels?.length) return null
+    let sum = 0, min = Infinity, max = -Infinity
+    for (let i = 0; i < heightmapPixels.length; i++) {
+      const v = heightmapPixels[i]
+      if (v < min) min = v
+      if (v > max) max = v
+      sum += v
+    }
+    return max > min ? (sum / heightmapPixels.length - min) / (max - min) : 0.5
+  }, [heightmapPixels])
 
   // ── Load external presets on mount ────────────────────────────────────────
   useEffect(() => {
@@ -360,7 +433,12 @@ export default function App() {
     elevScale: baseElevScale + terrain.elevScale,
     gpxPoints, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
+    profileMode,
   }
+  // Keep the click handler in a ref so SurfaceMesh can read it without it
+  // entering the postMessage-serialized p object sent to the Web Worker.
+  const profileClickRef = useRef(handleProfileClick)
+  profileClickRef.current = handleProfileClick
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
@@ -413,6 +491,7 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]) }
       if (e.code === 'Digit1') { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }
       if (e.code === 'Digit2') setPngTrigger(n => n + 1)
       if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
@@ -454,6 +533,7 @@ export default function App() {
           lineGeo={lineGeo}
           surfaceGeo={surfaceGeo}
           p={p}
+          profileClickRef={profileClickRef}
           levaGet={levaGet}
           levaSet={levaSet}
           orbitRef={orbitRef}
@@ -521,6 +601,10 @@ export default function App() {
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}
         terrainData={terrainData}
+        hypsometricIntegral={hypsometricIntegral}
+        profileMode={profileMode}
+        profileClicks={profileClicks}
+        onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]) }}
       />
 
       {/* ── Center guides ────────────────────────────────────────────────── */}
@@ -560,6 +644,18 @@ export default function App() {
             fontSize:16, lineHeight:1, padding:'0 2px', opacity:0.7,
           }}>✕</button>
         </div>
+      )}
+
+      {/* ── Elevation profile chart ──────────────────────────────────────── */}
+      {profileData && (
+        <ElevationProfile
+          points={profileData.points}
+          elevMin={profileData.elevMin}
+          elevMax={profileData.elevMax}
+          onClose={() => setProfileData(null)}
+          geoTiffElevMin={geoTiffElevMin}
+          geoTiffElevMax={geoTiffElevMax}
+        />
       )}
 
       {/* ── Empty state ──────────────────────────────────────────────────── */}

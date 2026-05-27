@@ -78,6 +78,20 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uShadowSoftness;
   uniform float     uShadowDarkness;
 
+  uniform bool      uHillshadeMultiDir;
+
+  uniform bool      uAO;
+  uniform float     uAOStrength;
+  uniform int       uAORays;
+
+  uniform bool      uWaterFill;
+  uniform float     uWaterLevel;
+  uniform vec3      uWaterColor;
+  uniform float     uWaterOpacity;
+
+  uniform bool      uAspectMap;
+  uniform float     uAspectMapOpacity;
+
   uniform bool      uSlopeShade;
   uniform float     uSlopeShadeOpacity;
   uniform vec3      uSlopeColorLow;
@@ -85,6 +99,42 @@ const SURFACE_FRAG = /* glsl */ `
   varying float     vBrightness;
   varying vec3      vNormal;
   varying vec2      vUv;
+
+  vec3 hue2rgb(float h) {
+    float r = abs(h * 6.0 - 3.0) - 1.0;
+    float g = 2.0 - abs(h * 6.0 - 2.0);
+    float b = 2.0 - abs(h * 6.0 - 4.0);
+    return clamp(vec3(r, g, b), 0.0, 1.0);
+  }
+  vec3 hsl_s1(float h, float l) {
+    vec3 rgb = hue2rgb(fract(h));
+    return (rgb - 0.5) * (1.0 - abs(2.0 * l - 1.0)) + l;
+  }
+
+  float computeSVF(vec2 uv) {
+    float h0 = texture2D(uHeightmapTex, uv).r;
+    float sumH = 0.0;
+    float PI2 = 6.28318530;
+    for (int i = 0; i < 32; i++) {
+      if (i >= uAORays) break;
+      float az = float(i) * PI2 / float(uAORays);
+      vec2 dir = vec2(cos(az) / uHeightmapCols, sin(az) / uHeightmapRows);
+      float maxH = 0.0;
+      float acc  = 0.0;
+      for (int s = 1; s <= 32; s++) {
+        acc += 1.0 + float(s - 1) * 0.15;
+        vec2 sUV = uv + dir * acc;
+        if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
+        float dh = texture2D(uHeightmapTex, sUV).r - h0;
+        if (dh > 0.0) {
+          float ha = atan(dh / (acc * uShadowStepH)) / 1.5707963;
+          if (ha > maxH) maxH = ha;
+        }
+      }
+      sumH += maxH;
+    }
+    return 1.0 - sumH / float(uAORays);
+  }
 
   void main() {
     if (vBrightness < uElevMinCut / 100.0 || vBrightness > uElevMaxCut / 100.0) {
@@ -169,53 +219,69 @@ const SURFACE_FRAG = /* glsl */ `
       base = mix(base, vec3(0.0), lineMask * 0.5);
     }
 
+    // Water fill — runs before hillshade so water surface gets shaded
+    if (uWaterFill && vBrightness < uWaterLevel) {
+      float depth = clamp((uWaterLevel - vBrightness) / max(uWaterLevel, 0.001), 0.0, 1.0);
+      base = mix(base, uWaterColor * (1.0 - depth * 0.6), uWaterOpacity);
+    }
+
     if (uHillshade) {
-      float az  = uHillshadeAzimuth  * 3.14159265 / 180.0;
       float alt = uHillshadeAltitude * 3.14159265 / 180.0;
-      vec3 lightDir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
       vec3 exagNormal = normalize(vec3(n.x * uHillshadeExaggeration, n.y, n.z * uHillshadeExaggeration));
-      float lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
-
-      // Cast shadow: ray-march in UV space toward the sun using progressive step
-      // sizes (linear growth) for far-field reach, compared via horizon angle so
-      // the penumbra is expressed in degrees rather than height units.
+      float lambert;
       float shadowFactor = 1.0;
-      if (uCastShadows) {
-        float h0 = texture2D(uHeightmapTex, vUv).r;
-        // UV displacement per one grid cell toward the light source.
-        // cos(az) → +U (east); -sin(az) → +V (north, V is flipped vs row index).
-        vec2 uvStep = vec2(cos(az) / uHeightmapCols, -sin(az) / uHeightmapRows);
 
-        // Track the maximum horizon angle seen along the ray.
-        // Shadow condition: maxHorizonAngle > sunAltitude.
-        float maxHorizonAngle = -1.5708; // start at −π/2
-        float accumN = 0.0;             // accumulated grid-cell steps
-
-        for (int i = 1; i <= 128; i++) {
-          if (i > uShadowSteps) break;
-          // Progressive step: distant samples use larger strides so the ray
-          // covers far-off ridges with the same step budget.
-          float stepN = 1.0 + float(i - 1) * 0.1;
-          accumN += stepN;
-
-          vec2 sUV = vUv + uvStep * accumN;
-          if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
-
-          float hTerrain = texture2D(uHeightmapTex, sUV).r;
-          float elevDiff = hTerrain - h0;
-          if (elevDiff > 0.0) {
-            // Horizon angle: atan(world_height / world_horizontal)
-            // world_height = elevDiff × elevScale×100
-            // world_horiz  = accumN × scl  →  in uShadowStepH units:
-            //   elevDiff / (accumN × uShadowStepH)  [elevation per horizontal unit]
-            float horizAngle = atan(elevDiff / (accumN * uShadowStepH));
-            if (horizAngle > maxHorizonAngle) maxHorizonAngle = horizAngle;
-          }
+      if (uHillshadeMultiDir) {
+        // Average Lambert over 8 equally-spaced azimuths — eliminates directional bias
+        float sumL = 0.0;
+        for (int d = 0; d < 8; d++) {
+          float az = float(d) * 0.7853981634; // π/4 steps
+          vec3 ldir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
+          sumL += clamp(dot(exagNormal, ldir), 0.0, 1.0);
         }
+        lambert = sumL / 8.0;
+        // Cast shadows not applicable in multi-directional mode
+      } else {
+        float az = uHillshadeAzimuth * 3.14159265 / 180.0;
+        vec3 lightDir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
+        lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
 
-        // Soft penumbra expressed in degrees (1 unit ≈ 1° of arc).
-        float penumbra = max(uShadowSoftness * 0.017453, 0.0001);
-        shadowFactor = 1.0 - smoothstep(alt - penumbra, alt + penumbra, maxHorizonAngle);
+        // Cast shadow: ray-march in UV space toward the sun using progressive step
+        // sizes (linear growth) for far-field reach, compared via horizon angle so
+        // the penumbra is expressed in degrees rather than height units.
+        if (uCastShadows) {
+          float h0 = texture2D(uHeightmapTex, vUv).r;
+          // UV displacement per one grid cell toward the light source.
+          // cos(az) → +U (east); -sin(az) → +V (north, V is flipped vs row index).
+          vec2 uvStep = vec2(cos(az) / uHeightmapCols, -sin(az) / uHeightmapRows);
+
+          // Track the maximum horizon angle seen along the ray.
+          // Shadow condition: maxHorizonAngle > sunAltitude.
+          float maxHorizonAngle = -1.5708; // start at −π/2
+          float accumN = 0.0;             // accumulated grid-cell steps
+
+          for (int i = 1; i <= 128; i++) {
+            if (i > uShadowSteps) break;
+            // Progressive step: distant samples use larger strides so the ray
+            // covers far-off ridges with the same step budget.
+            float stepN = 1.0 + float(i - 1) * 0.1;
+            accumN += stepN;
+
+            vec2 sUV = vUv + uvStep * accumN;
+            if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
+
+            float hTerrain = texture2D(uHeightmapTex, sUV).r;
+            float elevDiff = hTerrain - h0;
+            if (elevDiff > 0.0) {
+              float horizAngle = atan(elevDiff / (accumN * uShadowStepH));
+              if (horizAngle > maxHorizonAngle) maxHorizonAngle = horizAngle;
+            }
+          }
+
+          // Soft penumbra expressed in degrees (1 unit ≈ 1° of arc).
+          float penumbra = max(uShadowSoftness * 0.017453, 0.0001);
+          shadowFactor = 1.0 - smoothstep(alt - penumbra, alt + penumbra, maxHorizonAngle);
+        }
       }
 
       // Shadow floor: prevents shadows from going completely black.
@@ -223,6 +289,17 @@ const SURFACE_FRAG = /* glsl */ `
       float shade = clamp(lambert * effectiveShadow * uHillshadeIntensity, 0.0, 1.0);
       vec3 shadeColor = mix(uHillshadeShadow, uHillshadeHighlight, shade);
       base = mix(base, shadeColor, uHillshadeOpacity);
+    }
+
+    // Ambient occlusion (Sky View Factor)
+    if (uAO) {
+      base *= mix(1.0, computeSVF(vUv), uAOStrength);
+    }
+
+    // Aspect map overlay — fixed circular HSL wheel, independent of gradient
+    if (uAspectMap) {
+      float asp = atan(n.z, n.x) / (2.0 * 3.14159265) + 0.5;
+      base = mix(base, hsl_s1(asp, 0.65), uAspectMapOpacity);
     }
 
     if (uSlopeShade) {
@@ -236,7 +313,7 @@ const SURFACE_FRAG = /* glsl */ `
 `
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export function SurfaceMesh({ surfaceGeo, p }) {
+export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   const textureImage     = useStore(s => s.textureImage)
   const heightmapPixels  = useStore(s => s.heightmapPixels)
   const heightmapWidth   = useStore(s => s.heightmapWidth)
@@ -353,6 +430,16 @@ export function SurfaceMesh({ surfaceGeo, p }) {
       uSlopeShadeOpacity:     { value: 0.75 },
       uSlopeColorLow:         { value: new THREE.Vector3(0.525, 0.937, 0.6) },
       uSlopeColorHigh:        { value: new THREE.Vector3(0.863, 0.149, 0.149) },
+      uHillshadeMultiDir:     { value: false },
+      uAO:                    { value: false },
+      uAOStrength:            { value: 0.7 },
+      uAORays:                { value: 8 },
+      uWaterFill:             { value: false },
+      uWaterLevel:            { value: 0.3 },
+      uWaterColor:            { value: new THREE.Vector3(0.102, 0.471, 0.761) },
+      uWaterOpacity:          { value: 0.82 },
+      uAspectMap:             { value: false },
+      uAspectMapOpacity:      { value: 0.8 },
     },
   }), [])
 
@@ -403,7 +490,19 @@ export function SurfaceMesh({ surfaceGeo, p }) {
     surfMat.uniforms.uSlopeShadeOpacity.value = p.slopeShadeOpacity ?? 0.75
     surfMat.uniforms.uSlopeColorLow.value.set(...hexToRgb(p.slopeColorLow   ?? '#86efac'))
     surfMat.uniforms.uSlopeColorHigh.value.set(...hexToRgb(p.slopeColorHigh ?? '#dc2626'))
-    const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade)
+
+    surfMat.uniforms.uHillshadeMultiDir.value  = !!(p.hillshadeMultiDir)
+    surfMat.uniforms.uAO.value                 = !!(p.showAO)
+    surfMat.uniforms.uAOStrength.value         = p.aoStrength   ?? 0.7
+    surfMat.uniforms.uAORays.value             = p.aoRays       ?? 8
+    surfMat.uniforms.uWaterFill.value          = !!(p.showWaterFill)
+    surfMat.uniforms.uWaterLevel.value         = p.waterLevel   ?? 0.3
+    surfMat.uniforms.uWaterColor.value.set(...hexToRgb(p.waterColor ?? '#1a78c2'))
+    surfMat.uniforms.uWaterOpacity.value       = p.waterOpacity ?? 0.82
+    surfMat.uniforms.uAspectMap.value          = !!(p.showAspectMap)
+    surfMat.uniforms.uAspectMapOpacity.value   = p.aspectMapOpacity ?? 0.8
+
+    const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap)
     surfMat.colorWrite = anyFill
     surfMat.depthTest  = !!p.depthOcclusion
     surfMat.depthWrite = !!(p.depthOcclusion && anyFill)
@@ -443,7 +542,11 @@ export function SurfaceMesh({ surfaceGeo, p }) {
 
   return (
     <group>
-      <mesh geometry={geometry} material={surfMat} />
+      <mesh
+        geometry={geometry}
+        material={surfMat}
+        onPointerDown={p.profileMode ? (e) => { e.stopPropagation(); if (e.uv) profileClickRef?.current?.(e.uv) } : undefined}
+      />
       {p.showMesh && <mesh geometry={geometry} material={wireMat} />}
     </group>
   )

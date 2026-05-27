@@ -307,6 +307,8 @@ export function Sidebar({
   onReset,
   baseZoom = 1,
   lineGeo, surfaceGeo, terrainData,
+  hypsometricIntegral,
+  profileMode, profileClicks, onProfileMode,
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
@@ -315,6 +317,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     hillshade: false, slopeShade: false, gpxTrack: false,
+    waterFill: false, aspectMap: false, ao: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
   })
 
@@ -532,6 +535,13 @@ export function Sidebar({
           </div>
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
+            {hypsometricIntegral != null && (
+              <div title="HI > 0.6 = young/rugged · ≈0.5 = equilibrium · < 0.4 = mature/eroded"
+                style={{ display:'flex', justifyContent:'space-between', fontSize:9, color:MUTED, marginBottom:4, cursor:'help' }}>
+                <span>Hypso. Integral</span>
+                <span style={{ color:'#a1a1aa', fontFamily:'monospace' }}>{hypsometricIntegral.toFixed(3)}</span>
+              </div>
+            )}
             <Tog label="Raw terrain view" checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
               <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
@@ -655,7 +665,10 @@ export function Sidebar({
             <Tog label="Enabled" checked={style.showHillshade} onChange={v => ss({ showHillshade: v })} />
             {style.showHillshade && (
               <Sub>
-                <InlineSl label="Azimuth" help="Light direction: 0°=N, 90°=E, 315°=NW (classic)." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                <Tog label="Multi-direction" help="Average 8 light directions — eliminates directional bias (Swiss-style shading). Hides azimuth and cast shadows." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
+                {!style.hillshadeMultiDir && (
+                  <InlineSl label="Azimuth" help="Light direction: 0°=N, 90°=E, 315°=NW (classic)." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                )}
                 <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
                 <InlineSl label="Intensity" min={0} max={3} step={0.05} value={style.hillshadeIntensity} onChange={v => ss({ hillshadeIntensity: v })} fmt={v => v.toFixed(2)} />
                 <InlineSl label="Opacity" help="Blend strength over the fill colour." min={0} max={1} step={0.01} value={style.hillshadeOpacity} onChange={v => ss({ hillshadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -663,11 +676,13 @@ export function Sidebar({
                 <ColorRow label="Highlight" value={style.hillshadeHighlightColor} onChange={v => ss({ hillshadeHighlightColor: v })} />
                 <ColorRow label="Shadow" value={style.hillshadeShadowColor} onChange={v => ss({ hillshadeShadowColor: v })} />
                 <Tog label="Show Sun" help="Display a sun orb in the scene at the light source position." checked={style.showSun} onChange={v => ss({ showSun: v })} />
-                <Tog label="Cast Shadows" help="Ray-march cast shadows: ridges block sunlight." checked={style.hillshadeCastShadows} onChange={v => ss({ hillshadeCastShadows: v })} />
-                {style.hillshadeCastShadows && (<>
-                  <InlineSl label="Darkness" help="How dark cast shadows are (0 = no effect, 100% = pitch black)." min={0} max={1} step={0.05} value={style.hillshadeShadowDarkness} onChange={v => ss({ hillshadeShadowDarkness: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Softness" help="Penumbra width — 0 for crisp edges, higher for soft gradual shadows." min={0} max={5} step={0.1} value={style.hillshadeShadowSoftness} onChange={v => ss({ hillshadeShadowSoftness: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Quality" help="Shadow ray steps — more steps = longer shadows but higher GPU cost." min={16} max={128} step={8} value={style.hillshadeShadowSteps} onChange={v => ss({ hillshadeShadowSteps: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                {!style.hillshadeMultiDir && (<>
+                  <Tog label="Cast Shadows" help="Ray-march cast shadows: ridges block sunlight." checked={style.hillshadeCastShadows} onChange={v => ss({ hillshadeCastShadows: v })} />
+                  {style.hillshadeCastShadows && (<>
+                    <InlineSl label="Darkness" help="How dark cast shadows are (0 = no effect, 100% = pitch black)." min={0} max={1} step={0.05} value={style.hillshadeShadowDarkness} onChange={v => ss({ hillshadeShadowDarkness: v })} fmt={v => Math.round(v * 100) + '%'} />
+                    <InlineSl label="Softness" help="Penumbra width — 0 for crisp edges, higher for soft gradual shadows." min={0} max={5} step={0.1} value={style.hillshadeShadowSoftness} onChange={v => ss({ hillshadeShadowSoftness: v })} fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Quality" help="Shadow ray steps — more steps = longer shadows but higher GPU cost." min={16} max={128} step={8} value={style.hillshadeShadowSteps} onChange={v => ss({ hillshadeShadowSteps: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                  </>)}
                 </>)}
               </Sub>
             )}
@@ -681,6 +696,39 @@ export function Sidebar({
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <ColorRow label="Flat colour" value={style.slopeColorLow} onChange={v => ss({ slopeColorLow: v })} />
                 <ColorRow label="Steep colour" value={style.slopeColorHigh} onChange={v => ss({ slopeColorHigh: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Water Fill ─────────────────────────────────────────────────── */}
+          <Section title="Water Fill" open={sec.waterFill} onToggle={() => tog('waterFill')} enabled={style.showWaterFill}>
+            <Tog label="Enabled" checked={!!style.showWaterFill} onChange={v => ss({ showWaterFill: v })} />
+            {style.showWaterFill && (
+              <Sub>
+                <InlineSl label="Level" help="Flood threshold — percentage of terrain height." min={0} max={1} step={0.01} value={style.waterLevel ?? 0.3} onChange={v => ss({ waterLevel: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.waterOpacity ?? 0.82} onChange={v => ss({ waterOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Color" value={style.waterColor ?? '#1a78c2'} onChange={v => ss({ waterColor: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Aspect Map ──────────────────────────────────────────────────── */}
+          <Section title="Aspect Map" open={sec.aspectMap} onToggle={() => tog('aspectMap')} enabled={style.showAspectMap}>
+            <Tog label="Enabled" checked={!!style.showAspectMap} onChange={v => ss({ showAspectMap: v })} />
+            {style.showAspectMap && (
+              <Sub>
+                <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Ambient Occlusion ───────────────────────────────────────────── */}
+          <Section title="Ambient Occlusion" open={sec.ao} onToggle={() => tog('ao')} enabled={style.showAO}>
+            <Tog label="Enabled" help="Sky View Factor — darkens concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
+            {style.showAO && (
+              <Sub>
+                <InlineSl label="Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <InlineSl label="Rays" help="More rays = smoother occlusion at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
               </Sub>
             )}
           </Section>
@@ -780,6 +828,14 @@ export function Sidebar({
                     <InlineSl label="Major Weight" min={0.5} max={10} step={0.5} value={style.majorWeightContours} onChange={v => ss({ majorWeightContours: v })} />
                   )}
                   <Tog label="Close contours" checked={!!style.closeRingsContours} onChange={v => ss({ closeRingsContours: v })} />
+                  <Tog label="Tanaka illumination" help="Split contours into thick-bright (illuminated side) and thin-dark (shadow side) layers." checked={!!style.tanakaContours} onChange={v => ss({ tanakaContours: v })} />
+                  {style.tanakaContours && (
+                    <Sub>
+                      <InlineSl label="Sun Azimuth" min={0} max={360} step={5} value={style.tanakaSunAzimuth ?? 315} onChange={v => ss({ tanakaSunAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                      <InlineSl label="Bright Weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightBright ?? 2.5} onChange={v => ss({ tanakaWeightBright: v })} />
+                      <InlineSl label="Dark Weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightDark ?? 0.5} onChange={v => ss({ tanakaWeightDark: v })} />
+                    </Sub>
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Contours" style={style} ss={ss} />
               </>
@@ -1048,6 +1104,26 @@ export function Sidebar({
               <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
             </div>
             <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
+          </Section>
+
+          {/* ── Analysis ───────────────────────────────────────────────────── */}
+          <Section title="Analysis" open={sec.analysis} onToggle={() => tog('analysis')}>
+            <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
+              Click two points on the terrain to sample a cross-section.
+            </div>
+            <button
+              onClick={() => onProfileMode?.(!profileMode)}
+              style={{
+                width:'100%', padding:'7px 0', borderRadius:5, cursor:'pointer', fontSize:11,
+                background: profileMode ? '#1d4ed8' : SURF,
+                color: profileMode ? '#fff' : '#a1a1aa',
+                border: `1px solid ${profileMode ? '#3b82f6' : BORDER}`,
+              }}
+            >
+              {profileMode
+                ? (profileClicks?.length === 0 ? 'Click point A…' : 'Click point B…')
+                : 'Elevation Profile'}
+            </button>
           </Section>
 
           {/* ── Stats ─────────────────────────────────────────────────────── */}

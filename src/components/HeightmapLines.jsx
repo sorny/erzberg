@@ -166,7 +166,7 @@ function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, oc
   )
 }
 
-export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
+export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   const { size, gl } = useThree()
   // Use physical pixel dimensions so LineMaterial calculates line widths correctly
   // at any devicePixelRatio (CSS pixels would make lines double-wide at 2× DPR).
@@ -178,7 +178,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p }) {
 
   return (
     <group>
-      <SurfaceMesh surfaceGeo={surfaceGeo} p={p} />
+      <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
 
       {p.showLines && Array.isArray(lineGeo) && lineGeo.map((layer, i) => (
         <LineLayer
