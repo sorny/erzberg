@@ -137,7 +137,7 @@ function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function exportSVG({
-  lineGeo, camera, width, height,
+  lineGeo, lineStyles = {}, camera, width, height,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   showFill,
@@ -193,7 +193,8 @@ export function exportSVG({
 
   if (showLines && Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
-      const { id, positions, colors, weight, opacity, dash, isPoints } = layer
+      const { id, positions, colors, isPoints } = layer
+      const { weight = 1, opacity = 1, dash = 'solid' } = lineStyles[id] ?? {}
       if (!positions || positions.length === 0) continue
 
       // ── Point layers (stipple dots) ──────────────────────────────────────────

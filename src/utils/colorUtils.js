@@ -1,7 +1,14 @@
-/** Parse '#rrggbb' → [r,g,b] in 0–1 range */
+/** Parse '#rrggbb' → [r,g,b] in 0–1 range. Cached: computeVertexColor calls this
+ *  once per vertex in the geometry worker, almost always with the same few strings. */
+const _hexCache = new Map()
 export function hexToRgb(hex) {
-  const n = parseInt((hex || '#000000').replace('#', ''), 16)
-  return [(n >> 16 & 0xff) / 255, (n >> 8 & 0xff) / 255, (n & 0xff) / 255]
+  const key = hex || '#000000'
+  let rgb = _hexCache.get(key)
+  if (rgb) return rgb
+  const n = parseInt(key.replace('#', ''), 16)
+  rgb = [(n >> 16 & 0xff) / 255, (n >> 8 & 0xff) / 255, (n & 0xff) / 255]
+  _hexCache.set(key, rgb)
+  return rgb
 }
 
 /** Lerp two [r,g,b] triples */
@@ -16,21 +23,37 @@ export function lerpRgb(a, b, t) {
 /**
  * Sample a multi-stop gradient (sorted by pos 0→1).
  * stops: [{ pos: 0–1, color: '#rrggbb' }]
+ *
+ * Single-slot memo: the same `stops` array is reused for every vertex within one
+ * geometry build, so we sort + pre-parse it once and reuse until the reference
+ * changes. React state treats `gradientStops` immutably, so a new edit = new array.
  */
+let _gradStops = null
+let _gradPrepared = null
+function prepareStops(stops) {
+  if (stops === _gradStops) return _gradPrepared
+  _gradStops = stops
+  _gradPrepared = stops
+    .map(s => ({ pos: s.pos, rgb: hexToRgb(s.color) }))
+    .sort((a, b) => a.pos - b.pos)
+  return _gradPrepared
+}
+
 export function sampleGradient(stops, t) {
   if (!stops || stops.length === 0) return [1, 1, 1]
   if (stops.length === 1) return hexToRgb(stops[0].color)
   t = Math.max(0, Math.min(1, t))
-  const sorted = [...stops].sort((a, b) => a.pos - b.pos)
-  if (t <= sorted[0].pos) return hexToRgb(sorted[0].color)
-  if (t >= sorted[sorted.length - 1].pos) return hexToRgb(sorted[sorted.length - 1].color)
+  const sorted = prepareStops(stops)
+  if (t <= sorted[0].pos) return sorted[0].rgb
+  const last = sorted[sorted.length - 1]
+  if (t >= last.pos) return last.rgb
   for (let i = 1; i < sorted.length; i++) {
     if (t <= sorted[i].pos) {
       const local = (t - sorted[i - 1].pos) / (sorted[i].pos - sorted[i - 1].pos)
-      return lerpRgb(hexToRgb(sorted[i - 1].color), hexToRgb(sorted[i].color), local)
+      return lerpRgb(sorted[i - 1].rgb, sorted[i].rgb, local)
     }
   }
-  return hexToRgb(sorted[sorted.length - 1].color)
+  return last.rgb
 }
 
 /**
@@ -40,7 +63,7 @@ export function sampleGradient(stops, t) {
  * @param {number} normElev  0–1 within the rendered elevation range
  * @param {number} normSlope 0–1 normalised slope magnitude
  * @param {number} aspect    Aspect angle in radians
- * @param {object} params    All visual params (from levaSet)
+ * @param {object} params    All visual params
  */
 export function computeVertexColor(normElev, normSlope, aspect, params) {
   const { 

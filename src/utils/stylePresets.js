@@ -9,16 +9,6 @@ export const DASH_CONFIGS = {
 }
 
 /**
- * SVG stroke-dasharray value for each dash style (empty = no dashes).
- */
-export const DASH_SVG = {
-  solid:       '',
-  dashed:      '3 2',
-  dotted:      '2 5',
-  'long-dash': '16 6',
-}
-
-/**
  * Pixel sizes used to split segments into real dash sub-segments for SVG export.
  * Null = solid (no splitting needed).
  */

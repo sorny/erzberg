@@ -346,11 +346,11 @@ export default function App() {
   }, [load])
 
   // ── Keyboard bridge for Controls.jsx ───
-  const levaGet = useCallback(
+  const getParams = useCallback(
     () => ({ ...terrain, ...style, ...points, ...view }),
     [terrain, style, points, view]
   )
-  const levaSet = useCallback((vals) => {
+  const setParams = useCallback((vals) => {
     const t = {}, s = {}, v = {}
     if (vals.resolution   != null) t.resolution    = vals.resolution
     if (vals.gridOffsetX  != null) t.gridOffsetX   = vals.gridOffsetX
@@ -534,8 +534,8 @@ export default function App() {
           surfaceGeo={surfaceGeo}
           p={p}
           profileClickRef={profileClickRef}
-          levaGet={levaGet}
-          levaSet={levaSet}
+          getParams={getParams}
+          setParams={setParams}
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
           onSvgDone={() => setIsSvgExporting(false)}

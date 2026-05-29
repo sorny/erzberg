@@ -12,13 +12,14 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { exportSVG } from '../utils/svgExport'
+import { layerStyle } from '../utils/geometryBuilders'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem } from './ParticleSystem'
 
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
-  levaGet, levaSet, orbitRef,
+  getParams, setParams, orbitRef,
   svgTrigger, onSvgDone, pngTrigger, pngAlphaTrigger,
   bgGradientStops,
   cameraPreset,
@@ -78,7 +79,7 @@ export function Scene({
   useFrame((_, delta) => {
     if (!p.autoRotate) return
     const step = (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
-    levaSet({ rotation: p.rotation + step })
+    setParams({ rotation: p.rotation + step })
   })
 
   useEffect(() => {
@@ -108,7 +109,7 @@ export function Scene({
 
     if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || 
         Math.abs(zoom - p.zoom) > 0.001 || Math.abs(panX - (p.panX || 0)) > 1 || Math.abs(panY - (p.panY || 0)) > 1) {
-      levaSet({ tilt, rotation, zoom, panX, panY })
+      setParams({ tilt, rotation, zoom, panX, panY })
     }
   }
 
@@ -208,9 +209,13 @@ export function Scene({
     if (!svgTrigger) return
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
+    // weight/opacity/dash live in params (not the worker geometry) — resolve per layer id.
+    const lineStyles = Array.isArray(lineGeo)
+      ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
+      : {}
     setTimeout(() => {
       exportSVG({
-        lineGeo, camera: activeCamera || currentCamera, width, height,
+        lineGeo, lineStyles, camera: activeCamera || currentCamera, width, height,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
         showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
@@ -258,7 +263,7 @@ export function Scene({
       )}
 
       <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} />
-      <Controls levaGet={levaGet} levaSet={levaSet} orbitRef={orbitRef} />
+      <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
       {!webmRecording && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>
           <GizmoViewport axisColors={['#e05555', '#55bb55', '#5588dd']} labelColor="#ffffff" />

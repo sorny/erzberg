@@ -63,6 +63,4 @@ export function exportHeightmap(terrainData, baseName) {
   link.download = filename
   link.href = canvas.toDataURL('image/png')
   link.click()
-  
-  console.log(`Heightmap exported: ${exportW}x${exportH} (Trimmed from ${cols}x${rows})`)
 }

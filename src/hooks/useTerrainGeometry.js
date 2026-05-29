@@ -41,6 +41,7 @@ export function useTerrainGeometry(p) {
         startTransition(() => {
           setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
         })
+        // Timing telemetry — also parsed by tests/benchmark.spec.js + performance.spec.js.
         console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
         console.log(`[Perf] Terrain ready Main: ${elapsed}ms`)
       }
@@ -73,59 +74,60 @@ export function useTerrainGeometry(p) {
     p.showMirrorPlusY, p.showMirrorMinusY,
     p.showMirrorPlusZ, p.showMirrorMinusZ,
 
+    // NOTE: weight / opacity / dash are render-side (resolved via layerStyle(id, p)
+    // in HeightmapLines + svgExport) and deliberately excluded here so dragging
+    // those sliders updates the material live without a full geometry rebuild.
+
     // Mode: X
-    p.enabledX, p.spacingX, p.shiftX, p.colorX, p.weightX, p.opacityX, p.dashX,
+    p.enabledX, p.spacingX, p.shiftX, p.colorX,
     p.hypsoX, p.hypsoModeX, p.hypsoBandedX, p.hypsoIntervalX,
     // Mode: Y
-    p.enabledY, p.spacingY, p.shiftY, p.colorY, p.weightY, p.opacityY, p.dashY,
+    p.enabledY, p.spacingY, p.shiftY, p.colorY,
     p.hypsoY, p.hypsoModeY, p.hypsoBandedY, p.hypsoIntervalY,
     // Mode: Cross
-    p.enabledCross, p.spacingCross, p.colorCross, p.weightCross, p.opacityCross, p.dashCross,
+    p.enabledCross, p.spacingCross, p.colorCross,
     p.hypsoCross, p.hypsoModeCross, p.hypsoBandedCross, p.hypsoIntervalCross,
     // Mode: Pillars
-    p.enabledPillars, p.spacingPillars, p.colorPillars, p.weightPillars, p.opacityPillars, p.dashPillars,
+    p.enabledPillars, p.spacingPillars, p.colorPillars,
     p.hypsoPillars, p.hypsoModePillars, p.hypsoBandedPillars, p.hypsoIntervalPillars,
     p.pillarGap, p.pillarDepth, p.pillarStyle, p.pillarSize, p.pillarSegments, p.pillarLidColor,
     // Mode: Contours
-    p.enabledContours, p.intervalContours, p.colorContours, p.weightContours, p.opacityContours, p.dashContours,
+    p.enabledContours, p.intervalContours, p.colorContours,
     p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,
-    p.majorIntervalContours, p.majorWeightContours, p.majorOffsetContours, p.closeRingsContours,
-    p.tanakaContours, p.tanakaSunAzimuth, p.tanakaWeightBright, p.tanakaWeightDark,
+    p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours,
+    p.tanakaContours, p.tanakaSunAzimuth,
     // Mode: Hachure
-    p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure, p.weightHachure, p.opacityHachure, p.dashHachure,
+    p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure,
     p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,
     // Mode: Flow
-    p.enabledFlow, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow, p.weightFlow, p.opacityFlow, p.dashFlow,
+    p.enabledFlow, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow,
     p.hypsoFlow, p.hypsoModeFlow, p.hypsoBandedFlow, p.hypsoIntervalFlow,
     // Mode: Network
-    p.enabledDag, p.thresholdDag, p.colorDag, p.weightDag, p.opacityDag, p.dashDag,
+    p.enabledDag, p.thresholdDag, p.colorDag,
     p.hypsoDag, p.hypsoModeDag, p.hypsoBandedDag, p.hypsoIntervalDag,
     // Mode: Pencil
-    p.enabledPencil, p.spacingPencil, p.thresholdPencil, p.colorPencil, p.weightPencil, p.opacityPencil, p.dashPencil,
+    p.enabledPencil, p.spacingPencil, p.thresholdPencil, p.colorPencil,
     p.hypsoPencil, p.hypsoModePencil, p.hypsoBandedPencil, p.hypsoIntervalPencil,
     // Mode: Ridge
-    p.enabledRidge, p.spacingRidge, p.radiusRidge, p.thresholdRidge, p.colorRidge, p.weightRidge, p.opacityRidge, p.dashRidge,
+    p.enabledRidge, p.spacingRidge, p.radiusRidge, p.thresholdRidge, p.colorRidge,
     p.hypsoRidge, p.hypsoModeRidge, p.hypsoBandedRidge, p.hypsoIntervalRidge,
     // Mode: Valley
-    p.enabledValley, p.spacingValley, p.radiusValley, p.thresholdValley, p.colorValley, p.weightValley, p.opacityValley, p.dashValley,
+    p.enabledValley, p.spacingValley, p.radiusValley, p.thresholdValley, p.colorValley,
     p.hypsoValley, p.hypsoModeValley, p.hypsoBandedValley, p.hypsoIntervalValley,
     // Mode: Stipple
     p.enabledStipple, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter,
-    p.colorStipple, p.weightStipple, p.opacityStipple, p.dashStipple,
+    p.colorStipple,
     p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
 
+    // Master line visibility
+    p.showLines,
 
-    // Global Line Styling (for fallback)
-    p.showLines, p.lineColor, p.strokeWeight, p.lineOpacity, p.lineDash,
-    p.lineHypsometric, p.lineBanded, p.lineHypsoInterval, p.lineHypsoWeight, p.lineHypsoMode,
-    
     // Global Surface Styling
     p.showFill, p.fillColor, p.fillHypsometric, p.fillBanded, p.fillHypsoInterval, p.fillHypsoWeight, p.fillHypsoMode,
     p.gradientStops,
 
     // GPX Track
-    p.gpxPoints, p.geoTiffBbox, p.geoTiffCRS,
-    p.colorGpx, p.weightGpx, p.opacityGpx, p.dashGpx,
+    p.gpxPoints, p.geoTiffBbox, p.geoTiffCRS, p.colorGpx,
     p.hypsoGpx, p.hypsoModeGpx, p.hypsoBandedGpx, p.hypsoIntervalGpx,
   ])
 

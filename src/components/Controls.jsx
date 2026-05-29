@@ -8,17 +8,17 @@
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 
-export function Controls({ levaGet, levaSet, orbitRef }) {
+export function Controls({ getParams, setParams, orbitRef }) {
   const { camera } = useThree()
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
 
-      const v = levaGet()
+      const v = getParams()
 
       switch (e.code) {
-        case 'KeyQ': levaSet({ autoRotate: !(v.autoRotate) }); break
+        case 'KeyQ': setParams({ autoRotate: !(v.autoRotate) }); break
         default: return
       }
       e.preventDefault()
@@ -26,7 +26,7 @@ export function Controls({ levaGet, levaSet, orbitRef }) {
 
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [camera, levaGet, levaSet, orbitRef])
+  }, [camera, getParams, setParams, orbitRef])
 
   return null
 }

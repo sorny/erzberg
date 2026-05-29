@@ -319,6 +319,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   const heightmapWidth   = useStore(s => s.heightmapWidth)
   const heightmapHeight  = useStore(s => s.heightmapHeight)
 
+  // Color-reactivity telemetry — parsed by tests/benchmark.spec.js (Phase 3).
   useEffect(() => {
     if (p.showFill) console.log('[Benchmark] Color Updated: ' + Date.now())
   }, [p.fillColor, p.showFill])

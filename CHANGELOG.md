@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-05-29
+
+### Changed
+- **Line style changes no longer rebuild geometry** — `weight`, `opacity`, and `dash` are purely render-side, so they are now applied directly to the `LineMaterial` (and read from live params by the SVG exporter) instead of being baked into the worker geometry. Dragging these sliders previously terminated the worker and rebuilt the terrain grid + all 12 draw modes + surface mesh on every tick; they now update instantly with no recompute. Resolved via a single `layerStyle(id, p)` source of truth in `geometryBuilders.js`.
+- **Faster per-vertex colouring** — the gradient sampler used once per vertex inside the geometry worker no longer re-sorts the gradient-stop array and re-parses `#rrggbb` strings on every call. Stops are sorted/parsed once per build and hex colours are cached, cutting redundant work across the hundreds of thousands of per-vertex colour computations a rebuild performs.
+
+### Removed
+- Dead code: the unused `noise.js` value-noise module, an unused `sampleGradient` import, the unused `DASH_SVG` export, two unused Zustand store actions (`clearTextureImage`, `clearHeightmap`), and leftover Leva panel CSS.
+
+### Fixed
+- Renamed the leftover Leva-era parameter bridge (`levaGet`/`levaSet` → `getParams`/`setParams`) and corrected stale documentation (`CLAUDE.md`, `README.md`, `GEMINI.md`, store CRS comment).
+- **`grid.spec.js`** updated to the current 1024×1024 default heightmap (it had assumed an obsolete 500×500 image and asserted the wrong grid dimensions).
+
 ## [0.5.1] - 2026-05-27
 
 ### Fixed

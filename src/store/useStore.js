@@ -25,7 +25,7 @@ export const useStore = create((set) => ({
   geoTiffElevMin: null,   // metres (or native unit)
   geoTiffElevMax: null,
   geoTiffBbox: null,      // [minX, minY, maxX, maxY] in native CRS
-  geoTiffCRS: null,       // 'EPSG:4326' | 'EPSG:3857' | 'unsupported:<code>'
+  geoTiffCRS: null,       // 'EPSG:4326' | 'EPSG:3857' | 'EPSG:<code>' | 'EPSG:projected-unknown'
 
   setHeightmap: (pixels, mask, width, height, filename) =>
     set({
@@ -39,15 +39,10 @@ export const useStore = create((set) => ({
   setPixels: (pixels) => set({ heightmapPixels: pixels }),
 
   setTextureImage: (img) => set({ textureImage: img }),
-  clearTextureImage: () => set({ textureImage: null }),
 
   setGeoTiffMeta: (elevMin, elevMax, bbox, crs) =>
     set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBbox: bbox ?? null, geoTiffCRS: crs ?? null }),
 
   clearGeoTiffMeta: () =>
     set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null, geoTiffCRS: null }),
-
-  clearHeightmap: () =>
-    set({ heightmapPixels: null, nodataMask: null, heightmapWidth: 0, heightmapHeight: 0, heightmapFilename: '',
-          textureImage: null, geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null, geoTiffCRS: null }),
 }))

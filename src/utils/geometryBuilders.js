@@ -3,10 +3,35 @@
  */
 
 import { cellElev, hasData, boxBlur } from './terrain'
-import { hexToRgb, sampleGradient, computeVertexColor } from './colorUtils'
+import { hexToRgb, computeVertexColor } from './colorUtils'
 import { geoToWorld, sampleTerrainElev } from './geoCoords'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Maps a rendered layer id → its { weight, opacity, dash } from the live params.
+ *
+ * These three properties are purely render-side (LineMaterial) and are NOT baked
+ * into the worker geometry, so changing them never triggers a rebuild. This is the
+ * single source of truth, consumed by both HeightmapLines (live render) and
+ * svgExport (export). Sub-layers (Contours-*, Gpx) map to their dedicated params.
+ */
+export function layerStyle(id, p) {
+  switch (id) {
+    case 'Contours-Minor':
+      return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Contours-Major':
+      return { weight: p.majorWeightContours, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Contours-Tanaka-Bright':
+      return { weight: p.tanakaWeightBright ?? 2.5, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Contours-Tanaka-Dark':
+      return { weight: p.tanakaWeightDark ?? 0.5, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Gpx':
+      return { weight: p.weightGpx, opacity: p.opacityGpx, dash: p.dashGpx }
+    default:
+      return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
+  }
+}
 
 function normElev(elev, minZ, maxZ) {
   return maxZ > minZ ? (elev - minZ) / (maxZ - minZ) : 0
@@ -140,13 +165,8 @@ export function buildLineGeometry(terrain, p) {
         }
       }
 
-      // Apply specific weight for Major/Tanaka Contours
-      const weight =
-        subId === 'Contours-Major'         ? p.majorWeightContours :
-        subId === 'Contours-Tanaka-Bright' ? (p.tanakaWeightBright ?? 2.5) :
-        subId === 'Contours-Tanaka-Dark'   ? (p.tanakaWeightDark   ?? 0.5) :
-        p[`weight${cfg.id}`]
-
+      // weight / opacity / dash are render-side params resolved via layerStyle(id, p),
+      // not baked here — see layerStyle() above.
       finalLayers.push({
         id: (subId === cfg.id) ? cfg.id : subId,
         positions: layerPos,
@@ -155,9 +175,6 @@ export function buildLineGeometry(terrain, p) {
         lids: layerLidInd.length > 0
           ? { positions: layerLidPos, colors: layerLidCol, indices: new Uint32Array(layerLidInd) }
           : null,
-        weight: weight,
-        opacity: p[`opacity${cfg.id}`],
-        dash: p[`dash${cfg.id}`],
         isPoints: res.isPoints ?? false,
       })
     }
@@ -967,13 +984,11 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
   }
 
   if (positions.length === 0) return null
+  // weight / opacity / dash resolved via layerStyle('Gpx', p) at render/export time.
   return {
     id: 'Gpx',
     positions: new Float32Array(positions),
     colors: new Float32Array(colors),
-    weight: p.weightGpx,
-    opacity: p.opacityGpx,
-    dash: p.dashGpx,
     curtains: null,
     lids: null,
   }

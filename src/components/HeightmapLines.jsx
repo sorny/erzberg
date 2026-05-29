@@ -9,9 +9,10 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
+import { layerStyle } from '../utils/geometryBuilders'
 
-function LineLayer({ layer, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
-  const { positions, colors, weight, opacity, dash } = layer
+function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
+  const { positions, colors } = layer
   
   const geometry = useMemo(() => {
     if (!positions || positions.length === 0) return null
@@ -180,10 +181,15 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
 
-      {p.showLines && Array.isArray(lineGeo) && lineGeo.map((layer, i) => (
+      {p.showLines && Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
+        const { weight, opacity, dash } = layerStyle(layer.id, p)
+        return (
         <LineLayer
           key={layer.id}
           layer={layer}
+          weight={weight}
+          opacity={opacity}
+          dash={dash}
           depthOcclusion={p.depthOcclusion}
           occlusionOpacity={p.occlusionOpacity}
           occlusionColor={p.occlusionColor}
@@ -192,7 +198,8 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           tilt={p.tilt}
           layerIndex={i}
         />
-      ))}
+        )
+      })}
     </group>
   )
 }
