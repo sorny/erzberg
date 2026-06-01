@@ -124,10 +124,11 @@ const STYLE_DEF = {
 }
 
 const POINTS_DEF = {
-  showPoints: false, pointColor: '#000000', pointSize: 4,
-  particlePeaksOnly: false,
-  animateParticles: false, particleNoise: 1, particleDamping: 0.92,
-  particleGravity: false, particleGravityStr: 1,
+  showPoints: false, pointColor: '#2e7bff', pointSize: 4,
+  // Hologram field (GPU-animated). `animateParticles` toggles the motion.
+  animateParticles: true,
+  holoGlowColor: '#7df9ff', holoFloat: 1, holoNoiseAmt: 1, holoNoiseScale: 1,
+  holoFlowSpeed: 1, holoMaskContrast: 1.5, holoShimmer: 0.4,
 }
 const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,

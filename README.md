@@ -37,7 +37,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Hydraulic erosion.** Droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf), running off the main thread in a Web Worker.
 
-**Particle system.** Optional animated point cloud with spring-physics motion (randomised velocity perturbation), gravity, and peaks-only mode.
+**Hologram particles.** Optional GPU-animated holographic point cloud over the terrain. A single time uniform drives per-particle float and two-octave fractal-noise displacement gated by a moving "scan" mask — all animation lives in the vertex shader, so nothing is looped or re-uploaded on the CPU per frame. Soft glowing sprites (bright core, glow-tinted halo, travelling scanline shimmer) are faked in the fragment shader, needing no post-processing pass and leaving the export paths intact. Configurable colour, size, glow, shimmer, float, noise amount/scale, flow speed, and reveal contrast.
 
 **Exporters.** SVG (software Z-buffer projection with fill-based terrain occlusion, per-mode Inkscape/Illustrator layers, dash/dotted/long-dash patterns faithfully reproduced), 4K PNG with MSAA (WebGLRenderTarget, trimmed to content), PNG α (transparent background), STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording. All exported files are named after the uploaded source file (e.g. uploading `graz.tif` produces `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz.webm`, `graz-heightmap.png`).
 

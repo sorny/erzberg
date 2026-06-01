@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-06-01
+
+### Changed
+- **Hologram particle system** — the particle layer has been reworked from a CPU spring/gravity simulation into a GPU-driven holographic point cloud, adapting the technique from [cortiz2894/hologram-particles](https://github.com/cortiz2894/hologram-particles) (a WebGPU/TSL project) to erzberg's WebGL/R3F renderer. The old per-frame loop mutated and re-uploaded a `Float32Array` every frame; all motion now lives in the vertex shader, driven by a single `uTime` uniform, so the position buffer is uploaded once and never touched again. An inline 3D simplex-noise helper drives per-particle float plus two-octave fractal-noise displacement gated by a moving "scan" mask; the soft-glow look (bright core, glow-tinted halo, travelling scanline shimmer) is faked entirely in the fragment shader, so no post-processing pass is added and the SVG/PNG/STL export paths are unaffected. New params: glow colour, shimmer, float, noise amount/scale, flow speed, and reveal contrast.
+
+### Removed
+- Classic particle controls that no longer apply to the hologram field: spring noise/damping, gravity (+ strength), the mouse-interaction push/glow, additive-blend toggle, and peaks-&-valleys-only sampling.
+
 ## [0.5.2] - 2026-05-29
 
 ### Changed

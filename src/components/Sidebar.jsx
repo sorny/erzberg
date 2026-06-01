@@ -998,22 +998,20 @@ export function Sidebar({
           )}
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
-            <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
+            <TogColor label="Hologram" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <Sub>
                 <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
-                <Tog label="Peaks & valleys only" small checked={points.particlePeaksOnly ?? false} onChange={v => sp({ particlePeaksOnly: v })} />
+                <ColorRow label="Glow" value={points.holoGlowColor ?? '#00eaff'} onChange={v => sp({ holoGlowColor: v })} />
+                <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} />
                 <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
                 {points.animateParticles && (
                   <Sub>
-                    <InlineSl label="Noise"   min={0}   max={5}    step={0.1} value={points.particleNoise}   onChange={v => sp({ particleNoise: v })}   fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Damping" min={0.5} max={0.99} step={0.01} value={points.particleDamping} onChange={v => sp({ particleDamping: v })} fmt={v => v.toFixed(2)} />
-                    <Tog label="Gravity" small checked={points.particleGravity} onChange={v => sp({ particleGravity: v })} />
-                    {points.particleGravity && (
-                      <Sub>
-                        <InlineSl label="Strength" min={0.1} max={10} step={0.1} value={points.particleGravityStr} onChange={v => sp({ particleGravityStr: v })} fmt={v => v.toFixed(1)} />
-                      </Sub>
-                    )}
+                    <InlineSl label="Float"      min={0} max={5}  step={0.1} value={points.holoFloat ?? 1}       onChange={v => sp({ holoFloat: v })}       fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Noise"      min={0} max={5}  step={0.1} value={points.holoNoiseAmt ?? 1}    onChange={v => sp({ holoNoiseAmt: v })}    fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Noise scale" min={0.1} max={5} step={0.1} value={points.holoNoiseScale ?? 1} onChange={v => sp({ holoNoiseScale: v })} fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Flow speed" min={0} max={4}  step={0.1} value={points.holoFlowSpeed ?? 1}   onChange={v => sp({ holoFlowSpeed: v })}   fmt={v => v.toFixed(1)} />
+                    <InlineSl label="Reveal"     min={0.5} max={6} step={0.1} value={points.holoMaskContrast ?? 1.5} onChange={v => sp({ holoMaskContrast: v })} fmt={v => v.toFixed(1)} />
                   </Sub>
                 )}
               </Sub>
