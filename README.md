@@ -41,6 +41,8 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Exporters.** SVG (software Z-buffer projection with fill-based terrain occlusion, per-mode Inkscape/Illustrator layers, dash/dotted/long-dash patterns faithfully reproduced), 4K PNG with MSAA (WebGLRenderTarget, trimmed to content), PNG α (transparent background), STL (watertight mesh for 3D printing), greyscale heightmap PNG, and WebM screen recording. All exported files are named after the uploaded source file (e.g. uploading `graz.tif` produces `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz.webm`, `graz-heightmap.png`).
 
+**Built to idle.** Rendering is on-demand — the canvas only draws a frame when something actually changes, so a static scene leaves the GPU near-idle (and the fan quiet). Continuous animations (auto-rotate, the hologram field, WebM capture) keep the loop alive only while they run. Geometry rebuilds write straight into pre-sized typed arrays and the worker hands the largest buffers back zero-copy, so dragging sliders stays responsive even on dense terrain.
+
 ---
 
 ## Tech stack

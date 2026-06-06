@@ -524,6 +524,7 @@ export default function App() {
 
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <Canvas
+        frameloop="demand"
         gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
         camera={{ position: [0, 400, 500], fov: 60, near: 1, far: 50000 }}
         style={{ width:'100%', height:'100%' }}

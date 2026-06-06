@@ -27,7 +27,7 @@ export function Scene({
   exportBaseName,
   profileClickRef,
 }) {
-  const { camera: currentCamera, gl, scene, size } = useThree()
+  const { camera: currentCamera, gl, scene, size, invalidate } = useThree()
   const groupRef    = useRef()
   const particleRef = useRef()
   const persRef     = useRef()
@@ -76,11 +76,23 @@ export function Scene({
     updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
   }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
 
-  useFrame((_, delta) => {
+  useFrame(({ invalidate }, delta) => {
     if (!p.autoRotate) return
     const step = (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
     setParams({ rotation: p.rotation + step })
+    invalidate()  // keep the on-demand loop running while auto-rotating
   })
+
+  // WebM capture reads the live canvas via captureStream; under on-demand
+  // rendering we must keep drawing frames for the whole recording, even if no
+  // other animation is active.
+  useEffect(() => {
+    if (!webmRecording) return
+    let raf
+    const loop = () => { invalidate(); raf = requestAnimationFrame(loop) }
+    raf = requestAnimationFrame(loop)
+    return () => cancelAnimationFrame(raf)
+  }, [webmRecording, invalidate])
 
   useEffect(() => {
     if (!cameraPreset?.name) return

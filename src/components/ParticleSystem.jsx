@@ -251,9 +251,15 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
     getCount:     () => countRef.current,
   }))
 
-  useFrame((_, delta) => {
-    // Advance time only while animating (frozen field still renders, hologram-shaded).
-    if (p.animateParticles) particleMat.uniforms.uTime.value += Math.min(delta, 0.05)
+  useFrame(({ invalidate }, delta) => {
+    // Advance time only while the field is shown AND animating. invalidate() keeps
+    // the on-demand render loop alive for the next frame; gating on showPoints is
+    // essential — otherwise a hidden-but-"animated" field would pin the renderer at
+    // 60fps doing nothing (animateParticles defaults on).
+    if (p.showPoints && p.animateParticles) {
+      particleMat.uniforms.uTime.value += Math.min(delta, 0.05)
+      invalidate()
+    }
   })
 
   if (!p.showPoints || !pointsGeo) return null

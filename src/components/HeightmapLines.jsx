@@ -34,6 +34,10 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
     return geo
   }, [layer.curtains])
 
+  // Depth-only occluder: writes no colour, only depth. Kept in the transparent
+  // queue (despite writing no colour) so it renders *after* the transparent fill
+  // surface — making it opaque would render it before the fill and can punch
+  // depth holes through the fill where curtains hang in front of farther terrain.
   const curtainMat = useMemo(() => new THREE.MeshBasicMaterial({
     colorWrite: false,
     depthWrite: true,

@@ -26,21 +26,39 @@ self.onmessage = (e) => {
       if (gpxLayer) lineGeo.push(gpxLayer)
     }
 
-    // Collect all buffers for Transferables
+    // Collect all buffers for zero-copy Transferables. A Set guards against
+    // pushing the same ArrayBuffer twice (postMessage throws on duplicates).
+    const seen = new Set()
     const transferables = []
+    const xfer = (arr) => {
+      const buf = arr?.buffer
+      if (buf && !seen.has(buf)) { seen.add(buf); transferables.push(buf) }
+    }
 
-    // 1. Line Layers
+    // 1. Line layers — including the curtain/lid meshes, which are the largest
+    //    arrays in the payload and were previously structured-cloned every rebuild.
     if (Array.isArray(lineGeo)) {
       for (const L of lineGeo) {
-        if (L.positions?.buffer) transferables.push(L.positions.buffer)
-        if (L.colors?.buffer)    transferables.push(L.colors.buffer)
+        xfer(L.positions)
+        xfer(L.colors)
+        xfer(L.curtains?.positions)
+        xfer(L.curtains?.indices)
+        xfer(L.lids?.positions)
+        xfer(L.lids?.colors)
+        xfer(L.lids?.indices)
       }
     }
 
     // 2. Surface
-    if (surfaceGeo.positions?.buffer)     transferables.push(surfaceGeo.positions.buffer)
-    if (surfaceGeo.brightnessBuf?.buffer) transferables.push(surfaceGeo.brightnessBuf.buffer)
-    if (surfaceGeo.indices?.buffer)       transferables.push(surfaceGeo.indices.buffer)
+    xfer(surfaceGeo.positions)
+    xfer(surfaceGeo.brightnessBuf)
+    xfer(surfaceGeo.indices)
+
+    // 3. Terrain grids (consumed on the main thread by particles / sampling).
+    //    buildSurfaceGeometry/buildGpxGeometry above already finished reading them.
+    xfer(terrain.grid)
+    xfer(terrain.gridMask)
+    xfer(terrain.gridSlopes)
 
     self.postMessage({ terrain, lineGeo, surfaceGeo, _gen }, transferables)
   } catch (err) {

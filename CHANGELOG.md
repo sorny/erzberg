@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-06
+
+### Changed
+- **On-demand rendering** — the canvas now uses `frameloop="demand"` instead of redrawing 60 times a second whether or not anything changed. Frames are only drawn in response to actual state changes; the continuous animations that still need a live loop (auto-rotate, the hologram particle field, and WebM capture) keep it alive by calling `invalidate()` each frame. The particle loop additionally gates on `showPoints`, so a hidden-but-"animated" field no longer pins the renderer at 60 fps doing nothing. The result is a near-idle GPU (and far less battery/fan) whenever the scene is static.
+- **Faster geometry rebuilds** — the mirror/octant expansion in `buildLineGeometry()` was rewritten to write straight into pre-sized typed arrays instead of growing JS arrays with repeated `push()`/`concat()`. Curtain quads are now built once into sized `Float32Array`/`Uint32Array` buffers and the per-octant copy is a single sized allocation filled by offset — eliminating the O(octants²) reallocation churn and the millions of `push()` calls a dense layer previously made on every rebuild.
+- **Zero-copy worker transfers** — the geometry worker now transfers the curtain, lid, and terrain-grid buffers (the largest arrays in the payload) as Transferables instead of structure-cloning them on every rebuild. A `Set` guards against transferring the same `ArrayBuffer` twice.
+
+### Fixed
+- **Depth-occluder render order** — clarified and preserved the curtain occluder's place in the transparent render queue (it writes depth but no colour). Keeping it transparent ensures it renders after the transparent fill surface; promoting it to opaque would punch depth holes through the fill where curtains hang in front of farther terrain.
+
 ## [0.5.3] - 2026-06-01
 
 ### Changed

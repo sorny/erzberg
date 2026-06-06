@@ -100,66 +100,99 @@ export function buildLineGeometry(terrain, p) {
     for (const [subId, res] of Object.entries(subLayers)) {
       if (!res.positions || res.positions.length === 0) continue
 
-      let layerPos = new Float32Array(0), layerCol = new Float32Array(0)
-      let layerCPos = new Float32Array(0), layerCInd = []
-      let cIndOffset = 0
-      let layerLidPos = new Float32Array(0), layerLidCol = new Float32Array(0)
-      let layerLidInd = [], lidIndOffset = 0
-
       const baseP = res.positions
-      const cP = []
-      const cI = []
-      let vIdx = 0
       const floorY = terrain.minZ - 500
 
-      if (!res.isPoints) {
-        for (let i = 0; i < baseP.length; i += 6) {
-          const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
-          const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
-          if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
-          cP.push(x0, y0, z0, x1, y1, z1, x1, floorY, z1, x0, floorY, z0)
-          cI.push(vIdx, vIdx+1, vIdx+2, vIdx, vIdx+2, vIdx+3)
-          vIdx += 4
-        }
+      // Base curtain quads (one per non-degenerate segment) — built once, then
+      // mirrored into each octant below. Written straight into pre-sized typed
+      // arrays (segment count is known up front) and trimmed; this avoids the
+      // millions of JS-array push() calls a dense layer would otherwise make.
+      const segCount = res.isPoints ? 0 : (baseP.length / 6) | 0
+      const cPfull = new Float32Array(segCount * 12)
+      const cIfull = new Uint32Array(segCount * 6)
+      let cPn = 0, cIn = 0, vIdx = 0
+      for (let i = 0; i < segCount * 6; i += 6) {
+        const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
+        const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
+        if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+        cPfull[cPn]=x0;   cPfull[cPn+1]=y0;     cPfull[cPn+2]=z0
+        cPfull[cPn+3]=x1; cPfull[cPn+4]=y1;     cPfull[cPn+5]=z1
+        cPfull[cPn+6]=x1; cPfull[cPn+7]=floorY; cPfull[cPn+8]=z1
+        cPfull[cPn+9]=x0; cPfull[cPn+10]=floorY; cPfull[cPn+11]=z0
+        cPn += 12
+        cIfull[cIn]=vIdx; cIfull[cIn+1]=vIdx+1; cIfull[cIn+2]=vIdx+2
+        cIfull[cIn+3]=vIdx; cIfull[cIn+4]=vIdx+2; cIfull[cIn+5]=vIdx+3
+        cIn += 6
+        vIdx += 4
       }
+      const cPbase = cPn === cPfull.length ? cPfull : cPfull.subarray(0, cPn)
+      const cIbase = cIn === cIfull.length ? cIfull : cIfull.subarray(0, cIn)
+      const cVerts = cPbase.length / 3
 
       const baseLidP = res.lids?.positions ?? new Float32Array(0)
       const baseLidC = res.lids?.colors   ?? new Float32Array(0)
-      const baseLidI = res.lids ? Array.from(res.lids.indices) : []
+      const baseLidI = res.lids?.indices  ?? new Uint32Array(0)
+      const lidVerts = baseLidP.length / 3
+      const hasLids  = baseLidP.length > 0
 
-      // Mirror the base pass into all requested octants
+      // Pre-allocate every octant up front. Repeated concat() would reallocate and
+      // recopy the growing buffers on each octant (O(octants²)); a single sized
+      // allocation filled by offset is O(octants) and avoids the garbage churn.
+      const nOct = mX.length * mY.length * mZ.length
+      const layerPos    = new Float32Array(baseP.length * nOct)
+      const layerCol    = new Float32Array(res.colors.length * nOct)
+      const layerCPos   = new Float32Array(cPbase.length * nOct)
+      const layerCInd   = new Uint32Array(cIbase.length * nOct)
+      const layerLidPos = new Float32Array(baseLidP.length * nOct)
+      const layerLidCol = new Float32Array(baseLidC.length * nOct)
+      const layerLidInd = new Uint32Array(baseLidI.length * nOct)
+
+      let posOff = 0, colOff = 0, cPosOff = 0, cIndOff = 0, cIndBase = 0
+      let lidPosOff = 0, lidColOff = 0, lidIndOff = 0, lidIndBase = 0
+
       for (const sx of mX) {
         for (const sy of mY) {
           for (const sz of mZ) {
-            const pPass = new Float32Array(baseP)
-            for (let i = 0; i < pPass.length; i += 3) { pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz }
-            layerPos = concat(layerPos, pPass)
-            layerCol = concat(layerCol, res.colors)
-
-            const cPass = new Float32Array(cP)
-            for (let i = 0; i < cPass.length; i += 3) {
-              cPass[i] *= sx; cPass[i+1] *= sy; cPass[i+2] *= sz
-            }
-            layerCPos = concat(layerCPos, cPass)
-
             const flipWinding = (sx * sy * sz) < 0
 
-            for (let i = 0; i < cI.length; i += 3) {
-              if (flipWinding) layerCInd.push(cI[i] + cIndOffset, cI[i+2] + cIndOffset, cI[i+1] + cIndOffset)
-              else layerCInd.push(cI[i] + cIndOffset, cI[i+1] + cIndOffset, cI[i+2] + cIndOffset)
+            // Lines
+            for (let i = 0; i < baseP.length; i += 3) {
+              layerPos[posOff+i]   = baseP[i]   * sx
+              layerPos[posOff+i+1] = baseP[i+1] * sy
+              layerPos[posOff+i+2] = baseP[i+2] * sz
             }
-            cIndOffset += (cP.length / 3)
+            posOff += baseP.length
+            layerCol.set(res.colors, colOff); colOff += res.colors.length
 
-            if (baseLidP.length > 0) {
-              const lPass = new Float32Array(baseLidP)
-              for (let i = 0; i < lPass.length; i += 3) { lPass[i] *= sx; lPass[i+1] *= sy; lPass[i+2] *= sz }
-              layerLidPos = concat(layerLidPos, lPass)
-              layerLidCol = concat(layerLidCol, baseLidC)
-              for (let i = 0; i < baseLidI.length; i += 3) {
-                if (flipWinding) layerLidInd.push(baseLidI[i]+lidIndOffset, baseLidI[i+2]+lidIndOffset, baseLidI[i+1]+lidIndOffset)
-                else layerLidInd.push(baseLidI[i]+lidIndOffset, baseLidI[i+1]+lidIndOffset, baseLidI[i+2]+lidIndOffset)
+            // Curtains
+            for (let i = 0; i < cPbase.length; i += 3) {
+              layerCPos[cPosOff+i]   = cPbase[i]   * sx
+              layerCPos[cPosOff+i+1] = cPbase[i+1] * sy
+              layerCPos[cPosOff+i+2] = cPbase[i+2] * sz
+            }
+            cPosOff += cPbase.length
+            for (let i = 0; i < cIbase.length; i += 3) {
+              const a = cIbase[i] + cIndBase, b = cIbase[i+1] + cIndBase, c = cIbase[i+2] + cIndBase
+              if (flipWinding) { layerCInd[cIndOff+i] = a; layerCInd[cIndOff+i+1] = c; layerCInd[cIndOff+i+2] = b }
+              else             { layerCInd[cIndOff+i] = a; layerCInd[cIndOff+i+1] = b; layerCInd[cIndOff+i+2] = c }
+            }
+            cIndOff += cIbase.length; cIndBase += cVerts
+
+            // Lids
+            if (hasLids) {
+              for (let i = 0; i < baseLidP.length; i += 3) {
+                layerLidPos[lidPosOff+i]   = baseLidP[i]   * sx
+                layerLidPos[lidPosOff+i+1] = baseLidP[i+1] * sy
+                layerLidPos[lidPosOff+i+2] = baseLidP[i+2] * sz
               }
-              lidIndOffset += baseLidP.length / 3
+              lidPosOff += baseLidP.length
+              layerLidCol.set(baseLidC, lidColOff); lidColOff += baseLidC.length
+              for (let i = 0; i < baseLidI.length; i += 3) {
+                const a = baseLidI[i] + lidIndBase, b = baseLidI[i+1] + lidIndBase, c = baseLidI[i+2] + lidIndBase
+                if (flipWinding) { layerLidInd[lidIndOff+i] = a; layerLidInd[lidIndOff+i+1] = c; layerLidInd[lidIndOff+i+2] = b }
+                else             { layerLidInd[lidIndOff+i] = a; layerLidInd[lidIndOff+i+1] = b; layerLidInd[lidIndOff+i+2] = c }
+              }
+              lidIndOff += baseLidI.length; lidIndBase += lidVerts
             }
           }
         }
@@ -171,9 +204,9 @@ export function buildLineGeometry(terrain, p) {
         id: (subId === cfg.id) ? cfg.id : subId,
         positions: layerPos,
         colors: layerCol,
-        curtains: { positions: layerCPos, indices: new Uint32Array(layerCInd) },
+        curtains: { positions: layerCPos, indices: layerCInd },
         lids: layerLidInd.length > 0
-          ? { positions: layerLidPos, colors: layerLidCol, indices: new Uint32Array(layerLidInd) }
+          ? { positions: layerLidPos, colors: layerLidCol, indices: layerLidInd }
           : null,
         isPoints: res.isPoints ?? false,
       })
