@@ -503,6 +503,10 @@ export function Sidebar({
 
   const applyPreset = (preset) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
+    // Particle params live in the points state, not style — without this a
+    // preset can never drive the hologram field. All presets carry a points
+    // block with showPoints, so switching presets also turns particles off.
+    if (preset.points) setPoints(prev => ({ ...prev, ...preset.points }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
     if (preset.bgGradientStops) setBgGradientStops(preset.bgGradientStops)
     syncSectionsToStyle(preset.style)
@@ -1002,6 +1006,7 @@ export function Sidebar({
             {points.showPoints && (
               <Sub>
                 <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
+                <InlineSl label="Spacing" min={1} max={16} step={1} value={points.particleSpacing ?? 1} onChange={v => sp({ particleSpacing: v })} fmt={v => `${v}`} />
                 <ColorRow label="Glow" value={points.holoGlowColor ?? '#00eaff'} onChange={v => sp({ holoGlowColor: v })} />
                 <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} />
                 <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />

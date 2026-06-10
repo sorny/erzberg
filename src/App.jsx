@@ -125,6 +125,10 @@ const STYLE_DEF = {
 
 const POINTS_DEF = {
   showPoints: false, pointColor: '#2e7bff', pointSize: 4,
+  // Grid-cell stride between particles: 1 = one per cell (dense carpet),
+  // higher = sparse field. The only density control — the home buffer is
+  // otherwise one particle per valid terrain cell.
+  particleSpacing: 1,
   // Hologram field (GPU-animated). `animateParticles` toggles the motion.
   animateParticles: true,
   holoGlowColor: '#7df9ff', holoFloat: 1, holoNoiseAmt: 1, holoNoiseScale: 1,

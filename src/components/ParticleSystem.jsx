@@ -219,19 +219,21 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
   const homePositions = useMemo(() => {
     if (!terrain) return null
     const { grid, rows, cols, scl, halfW, halfH, gridMask } = terrain
+    // particleSpacing = grid-cell stride between particles (1 = every cell).
+    const stride = Math.max(1, Math.round(p.particleSpacing ?? 1))
 
     // Count valid cells first — this runs on the main thread on every terrain
     // change, so fill a pre-sized typed array instead of growing a JS array.
-    const total = rows * cols
-    let count = total
-    if (gridMask) {
-      count = 0
-      for (let i = 0; i < total; i++) if (gridMask[i]) count++
+    let count = 0
+    for (let r = 0; r < rows; r += stride) {
+      for (let c = 0; c < cols; c += stride) {
+        if (!gridMask || gridMask[r * cols + c]) count++
+      }
     }
     const home = new Float32Array(count * 3)
     let w = 0
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
+    for (let r = 0; r < rows; r += stride) {
+      for (let c = 0; c < cols; c += stride) {
         const i = r * cols + c
         if (gridMask && !gridMask[i]) continue
         home[w]     = c * scl - halfW
@@ -241,7 +243,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       }
     }
     return home
-  }, [terrain, p.elevScale, p.jitterAmt])
+  }, [terrain, p.elevScale, p.jitterAmt, p.particleSpacing])
 
   useEffect(() => {
     if (!homePositions) return

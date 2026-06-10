@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-06-10
+
+### Added
+- **Aurora Borealis preset** — a midnight terrain under a northern-lights sky: drainage flow lines coloured by an aurora gradient (deep teal valleys → spring green → mint → violet → pale magenta-white peaks) over a near-black fill with faint multi-directional hillshade, dim-violet ghost lines glowing behind ridges, a navy horizon-glow background gradient, and a sparse field of animated cyan hologram motes drifting above the surface. The first preset to use the hologram particles, ghost occlusion, and multi-directional hillshade.
+- **Particle spacing control** — new "Spacing" slider in the Hologram section sets the grid-cell stride between particles (1 = one per terrain cell, as before). Previously the field always spawned one particle per cell, which on a typical grid meant a ~260 000-point carpet that read as static noise and was the only possible density; sparse fields (and far lighter GPU loads) are now a slider away.
+
+### Changed
+- **Preset buttons now apply particle settings** — `applyPreset` only merged the `style` block and gradient stops, so no preset could enable or configure the hologram field. The `points` block is now applied too; since every preset carries `showPoints`, switching presets also correctly turns the particles off again.
+
 ## [0.5.6] - 2026-06-10
 
 ### Fixed
