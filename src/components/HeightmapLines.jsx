@@ -84,9 +84,9 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
 
   useEffect(() => {
     if (!lidMat) return
+    // opacity is a uniform and depthTest is render state — no recompile needed.
     lidMat.opacity   = opacity ?? 1
     lidMat.depthTest = !!depthOcclusion
-    lidMat.needsUpdate = true
   }, [lidMat, opacity, depthOcclusion])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
@@ -131,13 +131,19 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
     material.depthTest = !!depthOcclusion
     material.resolution.copy(resolution)
 
+    // linewidth/opacity/dashSize/gapSize map to uniforms and depthTest is plain
+    // render state — none need a shader recompile, so no needsUpdate here. The
+    // `dashed` setter flags needsUpdate itself when the USE_DASH define changes.
     const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
     material.dashed = d.dashed
     material.dashSize = d.dashSize
     material.gapSize = d.gapSize
-    material.needsUpdate = true
 
-    lines.computeLineDistances()
+    // Dash rendering needs per-segment cumulative distances. Computing them is
+    // O(segments) on the CPU plus a fresh GPU buffer, so do it lazily and only
+    // once per geometry (lines and ghostLines share the geometry) — not on
+    // every weight/opacity slider tick.
+    if (d.dashed && !geometry.attributes.instanceDistanceStart) lines.computeLineDistances()
     lines.renderOrder = (layerIndex ?? 0) + 1
 
     if (ghostLines) {
@@ -148,11 +154,9 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
       ghostMaterial.dashed = d.dashed
       ghostMaterial.dashSize = d.dashSize
       ghostMaterial.gapSize = d.gapSize
-      ghostMaterial.needsUpdate = true
-      ghostLines.computeLineDistances()
       ghostLines.renderOrder = (layerIndex ?? 0) + 1
     }
-  }, [lines, ghostLines, material, ghostMaterial, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, resolution, layerIndex])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, opacity, dash, depthOcclusion, occlusionOpacity, occlusionColor, resolution, layerIndex])
 
   useEffect(() => () => {
     material?.dispose()

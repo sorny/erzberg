@@ -119,11 +119,11 @@ export function useTerrainGeometry(p) {
     p.colorStipple,
     p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
 
-    // Master line visibility
-    p.showLines,
-
-    // Global Surface Styling
-    p.showFill, p.fillColor, p.fillHypsometric, p.fillBanded, p.fillHypsoInterval, p.fillHypsoWeight, p.fillHypsoMode,
+    // NOTE: showLines and the fill params (showFill, fillColor, fillBanded,
+    // fillHypso*) are render-side only — lines toggle visibility in
+    // HeightmapLines and fill styling is pure GPU uniforms in SurfaceMesh.
+    // They are deliberately excluded so toggling/dragging them never spawns a
+    // worker rebuild. gradientStops stays: it is baked into line vertex colors.
     p.gradientStops,
 
     // GPX Track

@@ -171,27 +171,19 @@ test('performance benchmark', async ({ page }) => {
   const resetStart = Date.now()
   await resetBtn.click()
 
-  // Wait for the geometry worker to finish after the reset-triggered recompute.
-  // We use the [Benchmark] Viewport Updated log (same as Phase 1) rather than the
-  // loading overlay, because the 1s delay on showComputingOverlay means the overlay
-  // often never appears for fast recomputes, making the overlay-wait a 3s timeout burn.
-  let resetViewportLog = null
-  for (let i = 0; i < 120; i++) {
-    const newLogs = logs.filter(l => l.time >= resetStart && l.text.includes('Viewport Updated'))
-    if (newLogs.length > 0) {
-      resetViewportLog = newLogs[newLogs.length - 1]
-      break
-    }
-    await page.waitForTimeout(250)
-  }
-  expect(resetViewportLog, '[Benchmark] Viewport Updated log not captured after Reset').not.toBeNull()
+  // Rotation and fill styling are render-side params: a Reset that only touches
+  // those no longer spawns a geometry-worker rebuild (the geometry already
+  // matches the default params). Reset completion is measured by the UI
+  // returning to defaults; if a worker recompute does happen (terrain params
+  // were changed), its Viewport Updated log is reported as extra detail.
+  await expect(rotSlider).toHaveValue('0', { timeout: 10000 })
+  const resetTime = Date.now() - resetStart
+  console.log(`RESULT: Full Reset took ${resetTime}ms`)
 
-  const resetTime = resetViewportLog.time - resetStart
-  console.log(`RESULT: Full Reset + Recompute took ${resetTime}ms`)
-  console.log(`Reset Viewport Log: ${resetViewportLog.text}`)
-
-  // Verify rotation is back to default (0)
-  await expect(rotSlider).toHaveValue('0', { timeout: 5000 })
+  const resetViewportLogs = logs.filter(l => l.time >= resetStart && l.text.includes('Viewport Updated'))
+  console.log(resetViewportLogs.length > 0
+    ? `Reset Viewport Log: ${resetViewportLogs[resetViewportLogs.length - 1].text}`
+    : 'Reset triggered no worker rebuild (render-side params only)')
 
   await page.waitForTimeout(300)
   await page.screenshot({ path: 'test-results/benchmark-04-reset.png' })
@@ -203,4 +195,5 @@ test('performance benchmark', async ({ page }) => {
   console.log(`Rotation 51°:     ${rotTime}ms`)
   console.log(`Color Reactivity: ${reactivityTime}ms`)
   console.log(`Full Reset:       ${resetTime}ms`)
+  expect(resetTime).toBeLessThan(10000)
 })

@@ -509,13 +509,14 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.depthWrite = !!(p.depthOcclusion && anyFill)
     surfMat.polygonOffsetFactor = p.occlusionBias ?? 2
     surfMat.polygonOffsetUnits  = p.occlusionBias ?? 2
-    surfMat.needsUpdate = true
+    // No needsUpdate: only uniform values and render-state flags change here,
+    // neither requires a program rebuild — and this effect runs on every render
+    // (p is a fresh object), so flagging it would re-validate the program per frame.
   }, [surfMat, p, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight])
 
   useEffect(() => {
     if (!surfMat) return
     surfMat.uniforms.uGradientTex.value = gradientTex
-    surfMat.needsUpdate = true
   }, [surfMat, gradientTex])
 
   useEffect(() => () => {
@@ -541,11 +542,20 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
 
   if (!geometry) return null
 
+  // When no fill layer is active the surface pass writes neither color nor
+  // depth (colorWrite=false; depthWrite requires anyFill) — rasterizing the
+  // full mesh through the heavyweight fragment shader would be a per-frame
+  // no-op. Skip it entirely, except in profile mode where the mesh must stay
+  // visible as the raycast target for elevation-profile clicks.
+  const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap)
+  const surfaceActive = anyFill || !!p.profileMode
+
   return (
     <group>
       <mesh
         geometry={geometry}
         material={surfMat}
+        visible={surfaceActive}
         onPointerDown={p.profileMode ? (e) => { e.stopPropagation(); if (e.uv) profileClickRef?.current?.(e.uv) } : undefined}
       />
       {p.showMesh && <mesh geometry={geometry} material={wireMat} />}

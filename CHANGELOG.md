@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-10
+
+### Changed
+- **Locked 60 fps camera interaction** — zooming in and panning around on the default terrain previously dropped to ~23 fps (and ~34 fps for rotation) at Retina resolution; all three interactions now hold a solid 60 fps with no frame over 18 ms. Three independent causes were fixed:
+  - **Occlusion curtains anchored to the terrain** — every line segment hangs an invisible depth-curtain for hidden-line occlusion, and each one extended a fixed 500 world-units down regardless of terrain size. A curtain only ever needs to reach the lowest rendered content (`minZ`, minus `pillarDepth` when pillars are enabled), so it now stops there — cutting depth-only GPU overdraw roughly 10× for a typical ±50-unit terrain. Rendered output is pixel-identical.
+  - **Throttled camera ⇄ state sync** — OrbitControls moves the camera directly, but every change event also pushed camera values into React state, re-rendering the entire app (sidebar included) up to 60×/s during a drag. The orbit → state sync is now a trailing 150 ms tick plus a final sync on gesture end, and state updates that are pure echoes of an orbit sync no longer snap the camera back mid-gesture. Auto-rotate drives the camera through a ref each frame instead of `setParams`.
+  - **No-op surface pass skipped** — with fill disabled (the default) the surface mesh still rasterised the full triangle mesh through the heavyweight hillshade/AO fragment shader every frame while writing neither colour nor depth. The mesh is now skipped entirely unless a fill layer is active (or profile mode needs it as a raycast target).
+- **Geometry builders rewritten on growable typed-array writers** — all 12 draw modes (plus GPX and the surface mesh) previously accumulated geometry in plain JS arrays via `push(...spread)` and converted to `Float32Array` at the end: megabytes of boxed doubles, GC churn, and a final copy on every rebuild. They now append straight into doubling `Float32Array`/`Uint32Array` writers and return subarray views with no final copy. Differential-tested bit-identical against the previous output across all modes, masks, mirroring, and colour settings.
+- **Single-pass marching-squares contours** — `buildContours` and `buildContoursTanaka` re-scanned the entire grid once per contour level (O(levels × cells)). They now visit each cell once and only test the levels that can cross its value range (O(cells + segments)): **18× faster** standard contours and **16× faster** Tanaka contours at a 1-unit interval on a ~1 Mcell grid (759 ms → 41 ms / 766 ms → 47 ms).
+- **Faster surface + mirror geometry** — `buildSurfaceGeometry` pre-counts valid quads and fills exact-size buffers instead of growing JS index arrays and re-concatenating per mirror octant (6–7× faster; 645 ms → 89 ms for 8 octants), and both the line and surface paths skip the octant copy loop entirely when no mirroring is active (the default).
+- **Render-side params no longer rebuild geometry** — `showLines` and all fill/surface styling params (`showFill`, `fillColor`, `fillBanded`, `fillHypso*`) were in the worker-rebuild dependency list although the worker never reads them; dragging the fill colour spawned a full terrain + 12-mode + surface recompute on every tick. They are excluded now: fill edits react in ~25 ms, and a Reset that only touches render-side params completes in ~45 ms with no recompute at all.
+- **Per-vertex colour sampling without allocation** — interpolated gradient samples inside the worker now come from a small rotating scratch pool instead of allocating a fresh `[r,g,b]` per vertex.
+- **Dashed-line distances computed lazily** — `computeLineDistances()` (O(segments) on the CPU plus a fresh GPU buffer) ran on every weight/opacity/dash slider tick, twice per layer on the same shared geometry. It now runs at most once per geometry and only when a dashed style actually needs it. Forced material recompiles (`needsUpdate`) on plain uniform/render-state changes were removed alongside.
+- **Particle home positions** are written into a pre-sized `Float32Array` instead of a growing JS array (runs on the main thread on every terrain change).
+
+### Fixed
+- **Pan position now persists** — `setParams` silently dropped the `panX`/`panY` keys the orbit sync sends after a pan. State could never catch up to the camera, which both re-fired the sync (and a full app re-render) on every subsequent orbit event forever, and snapped the pan back to centre on the next tilt/rotation/zoom change.
+- **`benchmark.spec.js` Phase 4** updated for the new reset behaviour: a Reset that only touches render-side params legitimately triggers no worker rebuild, so the test now measures reset completion via the UI instead of requiring a rebuild log.
+
 ## [0.5.4] - 2026-06-06
 
 ### Changed

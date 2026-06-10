@@ -20,6 +20,20 @@ export function lerpRgb(a, b, t) {
   ]
 }
 
+/* Rotating scratch pool for interpolated gradient samples. computeVertexColor
+ * runs once per vertex in the geometry worker; a fresh [r,g,b] per call is pure
+ * GC pressure. Callers hold at most two results at a time (segment endpoints),
+ * so a 4-slot pool is safe — copy the result if it must outlive the next calls. */
+const _lerpPool = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]
+let _lerpPoolIdx = 0
+function lerpRgbPooled(a, b, t) {
+  const out = _lerpPool[_lerpPoolIdx = (_lerpPoolIdx + 1) & 3]
+  out[0] = a[0] + (b[0] - a[0]) * t
+  out[1] = a[1] + (b[1] - a[1]) * t
+  out[2] = a[2] + (b[2] - a[2]) * t
+  return out
+}
+
 /**
  * Sample a multi-stop gradient (sorted by pos 0→1).
  * stops: [{ pos: 0–1, color: '#rrggbb' }]
@@ -39,6 +53,8 @@ function prepareStops(stops) {
   return _gradPrepared
 }
 
+/** NOTE: the returned triple may come from a small rotating pool — treat it as
+ *  read-only and copy it if it must be retained across further sample calls. */
 export function sampleGradient(stops, t) {
   if (!stops || stops.length === 0) return [1, 1, 1]
   if (stops.length === 1) return hexToRgb(stops[0].color)
@@ -50,7 +66,7 @@ export function sampleGradient(stops, t) {
   for (let i = 1; i < sorted.length; i++) {
     if (t <= sorted[i].pos) {
       const local = (t - sorted[i - 1].pos) / (sorted[i].pos - sorted[i - 1].pos)
-      return lerpRgb(sorted[i - 1].rgb, sorted[i].rgb, local)
+      return lerpRgbPooled(sorted[i - 1].rgb, sorted[i].rgb, local)
     }
   }
   return last.rgb

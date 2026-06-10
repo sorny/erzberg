@@ -72,14 +72,41 @@ export function Scene({
     }
   }
 
+  // ── Camera ⇄ React-state sync ────────────────────────────────────────────
+  // OrbitControls moves the camera directly (the fast path). Mirroring camera
+  // values into React state re-renders the entire app (Sidebar included), so:
+  //  • the orbit → state sync is throttled to a trailing tick during gestures
+  //    (plus an immediate sync on gesture end), instead of firing per frame;
+  //  • state → camera updates that are pure echoes of an orbit sync are
+  //    detected via orbitEchoRef and skipped, so the camera is never snapped
+  //    back to slightly stale values mid-gesture.
+  const ORBIT_SYNC_MS = 150
+  const orbitEchoRef   = useRef(null)
+  const orbitSyncTimer = useRef(0)
+  const autoRotRef     = useRef(p.rotation)
+  const pRef = useRef(p)
+  pRef.current = p
+
   useEffect(() => {
+    const echo = orbitEchoRef.current
+    orbitEchoRef.current = null // single-use: only the commit it announced may skip
+    if (echo && echo.cam === activeCamera &&
+        echo.tilt === p.tilt && echo.rotation === p.rotation && echo.zoom === p.zoom &&
+        echo.panX === (p.panX ?? 0) && echo.panY === (p.panY ?? 0)) {
+      return // echo of an orbit-driven sync — the camera is already there
+    }
+    autoRotRef.current = p.rotation
     updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
   }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
 
   useFrame(({ invalidate }, delta) => {
     if (!p.autoRotate) return
-    const step = (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
-    setParams({ rotation: p.rotation + step })
+    // Drive the camera directly — routing the rotation through setParams would
+    // re-render the whole app every frame. The orbit controls' change event
+    // (fired by updateCameraFromSliders → orbit.update()) keeps React state
+    // following at the throttled sync rate.
+    autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
+    updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY)
     invalidate()  // keep the on-demand loop running while auto-rotating
   })
 
@@ -102,28 +129,47 @@ export function Scene({
     }
   }, [cameraPreset, p.panX, p.panY])
 
-  const handleOrbitChange = () => {
+  const syncOrbitToState = () => {
     if (!orbitRef.current || !activeCamera) return
+    const pc = pRef.current
     const target = orbitRef.current.target
     const relativePos = activeCamera.position.clone().sub(target)
     const sph = new THREE.Spherical().setFromVector3(relativePos)
-    
+
     const tilt = THREE.MathUtils.radToDeg(sph.phi)
     const rotation = THREE.MathUtils.radToDeg(sph.theta)
-    
+
     // Calculate zoom based on camera type
-    const zoom = p.orthographic 
-      ? (activeCamera.zoom / 2) 
+    const zoom = pc.orthographic
+      ? (activeCamera.zoom / 2)
       : (BASE_DIST / sph.radius)
 
     const panX = target.x
     const panY = target.z
 
-    if (Math.abs(tilt - p.tilt) > 0.1 || Math.abs(rotation - p.rotation) > 0.1 || 
-        Math.abs(zoom - p.zoom) > 0.001 || Math.abs(panX - (p.panX || 0)) > 1 || Math.abs(panY - (p.panY || 0)) > 1) {
+    if (Math.abs(tilt - pc.tilt) > 0.1 || Math.abs(rotation - pc.rotation) > 0.1 ||
+        Math.abs(zoom - pc.zoom) > 0.001 || Math.abs(panX - (pc.panX || 0)) > 1 || Math.abs(panY - (pc.panY || 0)) > 1) {
+      orbitEchoRef.current = { cam: activeCamera, tilt, rotation, zoom, panX, panY }
+      autoRotRef.current = rotation
       setParams({ tilt, rotation, zoom, panX, panY })
     }
   }
+
+  // change fires every frame during a drag (and during the damping tail) —
+  // schedule a trailing sync instead of pushing state per event.
+  const handleOrbitChange = () => {
+    if (orbitSyncTimer.current) return
+    orbitSyncTimer.current = setTimeout(() => {
+      orbitSyncTimer.current = 0
+      syncOrbitToState()
+    }, ORBIT_SYNC_MS)
+  }
+  const handleOrbitEnd = () => {
+    clearTimeout(orbitSyncTimer.current)
+    orbitSyncTimer.current = 0
+    syncOrbitToState()
+  }
+  useEffect(() => () => clearTimeout(orbitSyncTimer.current), [])
 
 
   // ── High-Res Offscreen Render Pass ──────────────────────────────────────────
@@ -274,7 +320,7 @@ export function Scene({
         />
       )}
 
-      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} />
+      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
       <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
       {!webmRecording && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>

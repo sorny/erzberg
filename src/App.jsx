@@ -398,6 +398,12 @@ export default function App() {
     if (vals.tilt         != null) v.tilt          = vals.tilt
     if (vals.rotation     != null) v.rotation      = vals.rotation
     if (vals.zoom         != null) v.zoom          = vals.zoom
+    // panX/panY must round-trip: the orbit controls sync them after a pan, and
+    // dropping them here leaves state permanently behind the camera (which both
+    // re-fires the sync on every orbit event and snaps the pan back on the next
+    // tilt/rotation/zoom change).
+    if (vals.panX         != null) v.panX          = vals.panX
+    if (vals.panY         != null) v.panY          = vals.panY
     if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
     if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir

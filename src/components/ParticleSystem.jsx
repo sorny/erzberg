@@ -220,16 +220,27 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
     if (!terrain) return null
     const { grid, rows, cols, scl, halfW, halfH, gridMask } = terrain
 
-    const home = []
+    // Count valid cells first — this runs on the main thread on every terrain
+    // change, so fill a pre-sized typed array instead of growing a JS array.
+    const total = rows * cols
+    let count = total
+    if (gridMask) {
+      count = 0
+      for (let i = 0; i < total; i++) if (gridMask[i]) count++
+    }
+    const home = new Float32Array(count * 3)
+    let w = 0
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const i = r * cols + c
         if (gridMask && !gridMask[i]) continue
-        const elev = cellElev(grid, r, c, cols, p.elevScale, p.jitterAmt)
-        home.push(c * scl - halfW, elev, r * scl - halfH)
+        home[w]     = c * scl - halfW
+        home[w + 1] = cellElev(grid, r, c, cols, p.elevScale, p.jitterAmt)
+        home[w + 2] = r * scl - halfH
+        w += 3
       }
     }
-    return new Float32Array(home)
+    return home
   }, [terrain, p.elevScale, p.jitterAmt])
 
   useEffect(() => {

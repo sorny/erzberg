@@ -33,6 +33,63 @@ export function layerStyle(id, p) {
   }
 }
 
+/**
+ * Growable typed-array writers. The builders emit millions of floats per rebuild;
+ * accumulating them in plain JS arrays (boxed doubles + push/spread) and converting
+ * at the end dominated worker time and GC. These append straight into typed
+ * storage with doubling growth. toArray() returns a subarray view (no copy) — the
+ * backing buffer is at most 2× the payload, which is cheaper than a final copy
+ * for both the worker transfer and peak memory.
+ */
+class F32List {
+  constructor(cap = 4096) { this.a = new Float32Array(cap); this.n = 0 }
+  _grow(need) {
+    let cap = this.a.length * 2
+    while (cap < need) cap *= 2
+    const next = new Float32Array(cap)
+    next.set(this.a.subarray(0, this.n))
+    this.a = next
+  }
+  push3(x, y, z) {
+    if (this.n + 3 > this.a.length) this._grow(this.n + 3)
+    const a = this.a, n = this.n
+    a[n] = x; a[n + 1] = y; a[n + 2] = z
+    this.n = n + 3
+  }
+  push6(x0, y0, z0, x1, y1, z1) {
+    if (this.n + 6 > this.a.length) this._grow(this.n + 6)
+    const a = this.a, n = this.n
+    a[n] = x0; a[n + 1] = y0; a[n + 2] = z0
+    a[n + 3] = x1; a[n + 4] = y1; a[n + 5] = z1
+    this.n = n + 6
+  }
+  /** Append one [r,g,b] triple. */
+  pushRgb(c) { this.push3(c[0], c[1], c[2]) }
+  /** Append the same [r,g,b] triple twice (both vertices of a segment). */
+  pushRgb2(c) { this.push6(c[0], c[1], c[2], c[0], c[1], c[2]) }
+  get length() { return this.n }
+  toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
+}
+
+class U32List {
+  constructor(cap = 4096) { this.a = new Uint32Array(cap); this.n = 0 }
+  _grow(need) {
+    let cap = this.a.length * 2
+    while (cap < need) cap *= 2
+    const next = new Uint32Array(cap)
+    next.set(this.a.subarray(0, this.n))
+    this.a = next
+  }
+  push3(x, y, z) {
+    if (this.n + 3 > this.a.length) this._grow(this.n + 3)
+    const a = this.a, n = this.n
+    a[n] = x; a[n + 1] = y; a[n + 2] = z
+    this.n = n + 3
+  }
+  get length() { return this.n }
+  toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
+}
+
 function normElev(elev, minZ, maxZ) {
   return maxZ > minZ ? (elev - minZ) / (maxZ - minZ) : 0
 }
@@ -101,7 +158,14 @@ export function buildLineGeometry(terrain, p) {
       if (!res.positions || res.positions.length === 0) continue
 
       const baseP = res.positions
-      const floorY = terrain.minZ - 500
+      // Curtain bottom: a curtain only has to occlude sight lines to other
+      // rendered content, and nothing renders below minZ except pillar shafts
+      // (minZ - pillarDepth). Hanging every curtain a fixed 500 units deep
+      // instead multiplied the rasterized depth-only fragment area ~10× for a
+      // typical ±50-unit terrain — pure GPU fill-rate waste when zoomed in.
+      const floorY = terrain.minZ
+        - (p.enabledPillars ? (p.pillarDepth ?? 0) : 0)
+        - Math.max(2, (terrain.maxZ - terrain.minZ) * 0.05)
 
       // Base curtain quads (one per non-degenerate segment) — built once, then
       // mirrored into each octant below. Written straight into pre-sized typed
@@ -135,10 +199,25 @@ export function buildLineGeometry(terrain, p) {
       const lidVerts = baseLidP.length / 3
       const hasLids  = baseLidP.length > 0
 
+      const nOct = mX.length * mY.length * mZ.length
+
+      // Fast path: single identity octant (no mirroring — the default) means the
+      // base arrays ARE the final layer. Skip the octant copy loop entirely.
+      if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
+        finalLayers.push({
+          id: (subId === cfg.id) ? cfg.id : subId,
+          positions: baseP,
+          colors: res.colors,
+          curtains: { positions: cPbase, indices: cIbase },
+          lids: hasLids ? { positions: baseLidP, colors: baseLidC, indices: baseLidI } : null,
+          isPoints: res.isPoints ?? false,
+        })
+        continue
+      }
+
       // Pre-allocate every octant up front. Repeated concat() would reallocate and
       // recopy the growing buffers on each octant (O(octants²)); a single sized
       // allocation filled by offset is O(octants) and avoids the garbage churn.
-      const nOct = mX.length * mY.length * mZ.length
       const layerPos    = new Float32Array(baseP.length * nOct)
       const layerCol    = new Float32Array(res.colors.length * nOct)
       const layerCPos   = new Float32Array(cPbase.length * nOct)
@@ -225,7 +304,8 @@ function buildRidgelines(terrain, p, isY, spacing, shift) {
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl)), lineOffset = (shift ?? 0) % lineStep
   const outerCount = isY ? cols : rows, innerCount = isY ? rows : cols
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
+  const aspect = isY ? Math.PI : Math.PI / 2
 
   for (let outer = lineOffset; outer < outerCount; outer += lineStep) {
     const outerPos = outer * scl - (isY ? halfW : halfH)
@@ -240,14 +320,13 @@ function buildRidgelines(terrain, p, isY, spacing, shift) {
       let x0, z0, x1, z1
       if (isY) { x0 = outerPos; z0 = innerPos0; x1 = outerPos; z1 = innerPos1 }
       else { x0 = innerPos0; z0 = outerPos; x1 = innerPos1; z1 = outerPos }
-      positions.push(x0, elev0, z0, x1, elev1, z1)
+      positions.push6(x0, elev0, z0, x1, elev1, z1)
       const slope0 = gridSlopes[r0 * cols + c0], slope1 = gridSlopes[r1 * cols + c1]
-      const col0 = computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, p)
-      const col1 = computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), isY ? Math.PI : Math.PI/2, p)
-      colors.push(...col0, ...col1)
+      colors.pushRgb(computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), aspect, p))
+      colors.pushRgb(computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), aspect, p))
     }
   }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 function buildCrosshatch(terrain, p, spacing) {
@@ -262,7 +341,7 @@ function buildHachure(terrain, p, spacing, length) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
 
   for (let r = 0; r < rows; r += lineStep) {
     for (let c = 0; c < cols; c += lineStep) {
@@ -276,12 +355,12 @@ function buildHachure(terrain, p, spacing, length) {
       const gx = (bR - bL) * 50 * elevScale, gz = (bD - bU) * 50 * elevScale, mag = Math.sqrt(gx * gx + gz * gz)
       if (mag < 0.005) continue
       const tickLen = mag * (length ?? 1) * scl, nx = -gz / mag, nz = gx / mag, wx = c * scl - halfW, wz = r * scl - halfH
-      positions.push(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
+      positions.push6(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
       const col = computeVertexColor(normElev(elev, minZ, maxZ), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
-      colors.push(...col, ...col)
+      colors.pushRgb2(col)
     }
   }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
@@ -404,151 +483,224 @@ function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
   return result
 }
 
-function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings) {
-  if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+// Per-level metadata shared by buildContours / buildContoursTanaka. levelVal is
+// the marching-squares threshold in brightness (grid) space; it increases
+// linearly with the level index, which is what lets the cell-major pass map a
+// cell's value range straight to a level-index range.
+function prepareContourLevels(terrain, p, interval) {
+  const { minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-
-  const minorPos = [], minorCol = []
-  const majorPos = [], majorCol = []
-
   const step = (interval ?? 4)
   // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
   const startElev = Math.ceil((minZ - 1e-7) / step) * step
   const maxElevPossible = Math.ceil(maxZ / step) * step
+  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
+
+  const levelElev = new Float64Array(numSteps)
+  const levelVal = new Float64Array(numSteps)
+  const levelActive = new Uint8Array(numSteps)
+  const levelRgb = new Float32Array(numSteps * 3)
+  for (let i = 0; i < numSteps; i++) {
+    const elev = startElev + i * step
+    levelElev[i] = elev
+    levelVal[i] = elev / (100 * elevScale) + 0.5
+    levelActive[i] = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) ? 1 : 0
+    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+    levelRgb[i * 3] = col[0]; levelRgb[i * 3 + 1] = col[1]; levelRgb[i * 3 + 2] = col[2]
+  }
+  return { step, numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep: step / (100 * elevScale) }
+}
+
+function edgeLerp01(va, vb, level) {
+  return Math.abs(vb - va) < 1e-10 ? 0.5 : (level - va) / (vb - va)
+}
+
+// Scratch for the 4 marching-squares edge midpoints (top, right, bottom, left).
+const _edgeX = new Float64Array(4)
+const _edgeY = new Float64Array(4)
+
+function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings) {
+  if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
+  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
+
+  const minorPos = new F32List(), minorCol = new F32List()
+  const majorPos = new F32List(), majorCol = new F32List()
+
+  const { numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep } =
+    prepareContourLevels(terrain, p, interval)
 
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
-
-  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
-
+  // Major/minor routing per bottom-up level index + phase offset
+  const levelMajor = new Uint8Array(numSteps)
   for (let i = 0; i < numSteps; i++) {
-    const elev = startElev + i * step
-    if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+    levelMajor[i] = (majorMod > 1)
+      ? (((i + (majorMod - offset)) % majorMod === 0) ? 1 : 0)
+      : (majorMod === 1 ? 1 : 0)
+  }
 
-    // Check if major based on bottom-up index + phase offset
-    const isMajor = (majorMod > 1) ? ((i + (majorMod - offset)) % majorMod === 0) : (majorMod === 1)
+  // closeRings chains raw grid-space segments per level after the scan.
+  const levelSegs = closeRings ? new Array(numSteps).fill(null) : null
+  const lvl0 = numSteps > 0 ? levelVal[0] : 0
+  const ex = _edgeX, ey = _edgeY
 
-    const targetPos = (isMajor && majorMod > 0) ? majorPos : minorPos
-    const targetCol = (isMajor && majorMod > 0) ? majorCol : minorCol
-    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
-    const level = elev / (100 * elevScale) + 0.5
+  // Single cell-major pass: instead of re-scanning the whole grid once per level
+  // (O(levels × cells)), visit each cell once and only test the levels that can
+  // cross its value range (O(cells + emitted segments)).
+  if (numSteps > 0) for (let r = 0; r < rows - 1; r++) {
+    const row0 = r * cols, row1 = row0 + cols
+    for (let c = 0; c < cols - 1; c++) {
+      // If all 4 are NoData, skip cell
+      const m00 = gridMask[row0 + c], m10 = gridMask[row0 + c + 1]
+      const m01 = gridMask[row1 + c], m11 = gridMask[row1 + c + 1]
+      if (!m00 && !m10 && !m01 && !m11) continue
 
-    const levelSegs = closeRings ? [] : null
+      // Value range over valid corners. NoData corners count as "just below the
+      // level" at every level (so shorelines draw) — they never bound the range.
+      let vmin = Infinity, vmax = -Infinity, v
+      if (m00) { v = grid[row0 + c];     if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m10) { v = grid[row0 + c + 1]; if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m01) { v = grid[row1 + c];     if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m11) { v = grid[row1 + c + 1]; if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      const anyMasked = !(m00 && m10 && m01 && m11)
 
-    for (let r = 0; r < rows - 1; r++) {
-      for (let c = 0; c < cols - 1; c++) {
-        // If all 4 are NoData, skip cell
-        const m00 = gridMask[r*cols+c], m10 = gridMask[r*cols+c+1], m01 = gridMask[(r+1)*cols+c], m11 = gridMask[(r+1)*cols+c+1]
-        if (!m00 && !m10 && !m01 && !m11) continue
+      // Conservative level-index range (±1 slack for float safety); the exact
+      // idx === 0 / 15 test below filters identically to the per-level scan.
+      const kLo = anyMasked ? 0 : Math.max(0, Math.floor((vmin - lvl0) / lvlStep))
+      const kHi = Math.min(numSteps - 1, Math.floor((vmax - lvl0) / lvlStep) + 1)
 
+      for (let k = kLo; k <= kHi; k++) {
+        if (!levelActive[k]) continue
+        const level = levelVal[k]
         // Treat NoData as being slightly below the level so shorelines draw
-        const v00 = m00 ? grid[r*cols+c] : level - 1e-7
-        const v10 = m10 ? grid[r*cols+c+1] : level - 1e-7
-        const v11 = m11 ? grid[(r+1)*cols+c+1] : level - 1e-7
-        const v01 = m01 ? grid[(r+1)*cols+c] : level - 1e-7
+        const v00 = m00 ? grid[row0 + c] : level - 1e-7
+        const v10 = m10 ? grid[row0 + c + 1] : level - 1e-7
+        const v11 = m11 ? grid[row1 + c + 1] : level - 1e-7
+        const v01 = m01 ? grid[row1 + c] : level - 1e-7
 
         const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
         if (idx === 0 || idx === 15) continue
-        const edgeLerp = (a, b, va, vb) => {
-          if (Math.abs(vb - va) < 1e-10) return 0.5
-          return a + (b - a) * ((level - va) / (vb - va))
-        }
-        const top = [c + edgeLerp(0, 1, v00, v10), r], right = [c + 1, r + edgeLerp(0, 1, v10, v11)], bottom = [c + edgeLerp(0, 1, v01, v11), r + 1], left = [c, r + edgeLerp(0, 1, v00, v01)]
-        const pairs = MARCHING_TABLE[idx], ed = [top, right, bottom, left]
+
+        ex[0] = c + edgeLerp01(v00, v10, level); ey[0] = r
+        ex[1] = c + 1;                           ey[1] = r + edgeLerp01(v10, v11, level)
+        ex[2] = c + edgeLerp01(v01, v11, level); ey[2] = r + 1
+        ex[3] = c;                               ey[3] = r + edgeLerp01(v00, v01, level)
+
+        const pairs = MARCHING_TABLE[idx]
         for (let pi = 0; pi < pairs.length; pi += 2) {
-          const e0 = ed[pairs[pi]], e1 = ed[pairs[pi+1]]
+          const e0 = pairs[pi], e1 = pairs[pi + 1]
           if (closeRings) {
-            levelSegs.push(e0[0], e0[1], e1[0], e1[1])
+            (levelSegs[k] ??= []).push(ex[e0], ey[e0], ex[e1], ey[e1])
           } else {
-            targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
-            targetCol.push(...col, ...col)
+            const isMajor = levelMajor[k] === 1
+            const tp = isMajor ? majorPos : minorPos
+            const tc = isMajor ? majorCol : minorCol
+            tp.push6(ex[e0] * scl - halfW, levelElev[k], ey[e0] * scl - halfH,
+                     ex[e1] * scl - halfW, levelElev[k], ey[e1] * scl - halfH)
+            tc.push6(levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2],
+                     levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2])
           }
         }
       }
     }
+  }
 
-    if (closeRings && levelSegs.length > 0) {
-      const worldSegs = closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev)
+  if (closeRings) {
+    for (let k = 0; k < numSteps; k++) {
+      const segs = levelSegs[k]
+      if (!segs || segs.length === 0) continue
+      const worldSegs = closeContourRings(segs, rows, cols, scl, halfW, halfH, levelElev[k])
+      const isMajor = levelMajor[k] === 1
+      const tp = isMajor ? majorPos : minorPos
+      const tc = isMajor ? majorCol : minorCol
       for (let j = 0; j < worldSegs.length; j += 6) {
-        targetPos.push(worldSegs[j], worldSegs[j+1], worldSegs[j+2], worldSegs[j+3], worldSegs[j+4], worldSegs[j+5])
-        targetCol.push(...col, ...col)
+        tp.push6(worldSegs[j], worldSegs[j+1], worldSegs[j+2], worldSegs[j+3], worldSegs[j+4], worldSegs[j+5])
+        tc.push6(levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2],
+                 levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2])
       }
     }
   }
 
   return {
-    'Contours-Minor': { positions: new Float32Array(minorPos), colors: new Float32Array(minorCol) },
-    'Contours-Major': { positions: new Float32Array(majorPos), colors: new Float32Array(majorCol) },
+    'Contours-Minor': { positions: minorPos.toArray(), colors: minorCol.toArray() },
+    'Contours-Major': { positions: majorPos.toArray(), colors: majorCol.toArray() },
   }
 }
 const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
 
 function buildContoursTanaka(terrain, p, interval) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
+  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
 
-  const brightPos = [], brightCol = []
-  const darkPos = [], darkCol = []
+  const brightPos = new F32List(), brightCol = new F32List()
+  const darkPos = new F32List(), darkCol = new F32List()
 
-  const step = (interval ?? 4)
-  const startElev = Math.ceil((minZ - 1e-7) / step) * step
-  const maxElevPossible = Math.ceil(maxZ / step) * step
-  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
+  const { numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep } =
+    prepareContourLevels(terrain, p, interval)
 
   const sunAzRad = ((p.tanakaSunAzimuth ?? 315) * Math.PI) / 180
   const sunDirX =  Math.sin(sunAzRad)
   const sunDirZ = -Math.cos(sunAzRad)
 
-  for (let i = 0; i < numSteps; i++) {
-    const elev = startElev + i * step
-    if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+  const lvl0 = numSteps > 0 ? levelVal[0] : 0
+  const ex = _edgeX, ey = _edgeY
 
-    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
-    const level = elev / (100 * elevScale) + 0.5
+  // Same single cell-major pass as buildContours (see comment there).
+  if (numSteps > 0) for (let r = 0; r < rows - 1; r++) {
+    const row0 = r * cols, row1 = row0 + cols
+    for (let c = 0; c < cols - 1; c++) {
+      const m00 = gridMask[row0 + c], m10 = gridMask[row0 + c + 1]
+      const m01 = gridMask[row1 + c], m11 = gridMask[row1 + c + 1]
+      if (!m00 && !m10 && !m01 && !m11) continue
 
-    for (let r = 0; r < rows - 1; r++) {
-      for (let c = 0; c < cols - 1; c++) {
-        const m00 = gridMask[r*cols+c], m10 = gridMask[r*cols+c+1]
-        const m01 = gridMask[(r+1)*cols+c], m11 = gridMask[(r+1)*cols+c+1]
-        if (!m00 && !m10 && !m01 && !m11) continue
+      let vmin = Infinity, vmax = -Infinity, v
+      if (m00) { v = grid[row0 + c];     if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m10) { v = grid[row0 + c + 1]; if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m01) { v = grid[row1 + c];     if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      if (m11) { v = grid[row1 + c + 1]; if (v < vmin) vmin = v; if (v > vmax) vmax = v }
+      const anyMasked = !(m00 && m10 && m01 && m11)
 
-        const v00 = m00 ? grid[r*cols+c] : level - 1e-7
-        const v10 = m10 ? grid[r*cols+c+1] : level - 1e-7
-        const v11 = m11 ? grid[(r+1)*cols+c+1] : level - 1e-7
-        const v01 = m01 ? grid[(r+1)*cols+c] : level - 1e-7
+      const kLo = anyMasked ? 0 : Math.max(0, Math.floor((vmin - lvl0) / lvlStep))
+      const kHi = Math.min(numSteps - 1, Math.floor((vmax - lvl0) / lvlStep) + 1)
+
+      for (let k = kLo; k <= kHi; k++) {
+        if (!levelActive[k]) continue
+        const level = levelVal[k]
+        const v00 = m00 ? grid[row0 + c] : level - 1e-7
+        const v10 = m10 ? grid[row0 + c + 1] : level - 1e-7
+        const v11 = m11 ? grid[row1 + c + 1] : level - 1e-7
+        const v01 = m01 ? grid[row1 + c] : level - 1e-7
 
         const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
         if (idx === 0 || idx === 15) continue
 
-        const edgeLerp = (a, b, va, vb) => Math.abs(vb - va) < 1e-10 ? 0.5 : a + (b - a) * ((level - va) / (vb - va))
-        const top    = [c + edgeLerp(0, 1, v00, v10), r]
-        const right  = [c + 1, r + edgeLerp(0, 1, v10, v11)]
-        const bottom = [c + edgeLerp(0, 1, v01, v11), r + 1]
-        const left   = [c, r + edgeLerp(0, 1, v00, v01)]
-        const ed = [top, right, bottom, left]
-        const pairs = MARCHING_TABLE[idx]
+        ex[0] = c + edgeLerp01(v00, v10, level); ey[0] = r
+        ex[1] = c + 1;                           ey[1] = r + edgeLerp01(v10, v11, level)
+        ex[2] = c + edgeLerp01(v01, v11, level); ey[2] = r + 1
+        ex[3] = c;                               ey[3] = r + edgeLerp01(v00, v01, level)
 
+        const pairs = MARCHING_TABLE[idx]
         for (let pi = 0; pi < pairs.length; pi += 2) {
-          const e0 = ed[pairs[pi]], e1 = ed[pairs[pi+1]]
-          const mc = Math.max(0, Math.min(cols-1, Math.round((e0[0] + e1[0]) / 2)))
-          const mr = Math.max(0, Math.min(rows-1, Math.round((e0[1] + e1[1]) / 2)))
+          const e0 = pairs[pi], e1 = pairs[pi + 1]
+          const mc = Math.max(0, Math.min(cols - 1, Math.round((ex[e0] + ex[e1]) / 2)))
+          const mr = Math.max(0, Math.min(rows - 1, Math.round((ey[e0] + ey[e1]) / 2)))
           const gx = (grid[mr*cols + Math.min(mc+1,cols-1)] - grid[mr*cols + Math.max(mc-1,0)]) / (2 * scl)
           const gz = (grid[Math.min(mr+1,rows-1)*cols + mc] - grid[Math.max(mr-1,0)*cols + mc]) / (2 * scl)
           const lit = sunDirX * gx + sunDirZ * gz >= 0
 
-          const targetPos = lit ? brightPos : darkPos
-          const targetCol = lit ? brightCol : darkCol
-          targetPos.push(e0[0]*scl-halfW, elev, e0[1]*scl-halfH, e1[0]*scl-halfW, elev, e1[1]*scl-halfH)
-          targetCol.push(...col, ...col)
+          const tp = lit ? brightPos : darkPos
+          const tc = lit ? brightCol : darkCol
+          tp.push6(ex[e0] * scl - halfW, levelElev[k], ey[e0] * scl - halfH,
+                   ex[e1] * scl - halfW, levelElev[k], ey[e1] * scl - halfH)
+          tc.push6(levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2],
+                   levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2])
         }
       }
     }
   }
 
   return {
-    'Contours-Tanaka-Bright': { positions: new Float32Array(brightPos), colors: new Float32Array(brightCol) },
-    'Contours-Tanaka-Dark':   { positions: new Float32Array(darkPos),   colors: new Float32Array(darkCol) },
+    'Contours-Tanaka-Bright': { positions: brightPos.toArray(), colors: brightCol.toArray() },
+    'Contours-Tanaka-Dark':   { positions: darkPos.toArray(),   colors: darkCol.toArray() },
   }
 }
 
@@ -630,16 +782,16 @@ function buildDagThinning(terrain, p, threshold) {
     const o = order[i]; if (o > maxInOrder[dst]) { maxInOrder[dst] = o; countMaxOrder[dst] = 1 } else if (o === maxInOrder[dst]) countMaxOrder[dst]++
     currentInDeg[dst]--; if (currentInDeg[dst] === 0) { order[dst] = (countMaxOrder[dst] > 1) ? maxInOrder[dst]+1 : maxInOrder[dst]; queue.push(dst) }
   }
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
   const strahlerThreshold = Math.max(1, Math.round(threshold ?? 2))
   for (let i = 0; i < n; i++) {
     const dst = next[i]; if (dst === -1 || order[i] < strahlerThreshold) continue
     const r0 = Math.floor(i/cols), c0 = i%cols, r1 = Math.floor(dst/cols), c1 = dst%cols, e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[dst]-0.5)*100*elevScale
     if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-    positions.push(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
-    const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.push(...col, ...col)
+    positions.push6(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
+    const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.pushRgb2(col)
   }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
@@ -647,7 +799,7 @@ function buildDagThinning(terrain, p, threshold) {
 function buildPencilShading(terrain, p, spacing, threshold) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
   const { elevScale, jitterAmt, elevMinCut, elevMaxCut } = p
-  const positions = [], colors = [], step = Math.max(1, Math.round((spacing ?? 4) / scl))
+  const positions = new F32List(), colors = new F32List(), step = Math.max(1, Math.round((spacing ?? 4) / scl))
   const curvThreshold = threshold ?? 0.5
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
@@ -657,11 +809,12 @@ function buildPencilShading(terrain, p, spacing, threshold) {
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
       const wx = c*scl-halfW, wz = r*scl-halfH, len = Math.min(scl*2, curv*0.5), col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
-      positions.push(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len, wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
-      colors.push(...col, ...col, ...col, ...col)
+      positions.push6(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len)
+      positions.push6(wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
+      colors.pushRgb2(col); colors.pushRgb2(col)
     }
   }
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Ridge Lines (Differential Geometry) ──────────────────────────────────────
@@ -674,7 +827,7 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
   const smoothed = boxBlur(grid, cols, rows, radius)
   const ridgeThreshold = (threshold ?? 0.5) * 0.1
   const step = Math.max(1, Math.round((spacing ?? 2) / scl))
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
   
   // 2. Compute Ridge points using Hessian Eigenvalues
   // Point is a ridge if max principal curvature is high AND it's a local maximum in direction of curvature
@@ -721,16 +874,16 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
           const e1 = cellElev(grid, nr, nc, cols, elevScale, jitterAmt)
           
           if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
-            positions.push(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
+            positions.push6(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
             const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), 0, p)
-            colors.push(...col, ...col)
+            colors.pushRgb2(col)
           }
         }
       }
     }
   }
 
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Ridge & Valley (TPI) ────────────────────────────────────────────────────
@@ -743,8 +896,8 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
   const blurred = boxBlur(grid, cols, rows, radius)
   
   const step = Math.max(1, Math.round((spacing ?? 2) / scl))
-  const positions = [], colors = []
-  
+  const positions = new F32List(), colors = new F32List()
+
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
       const i = r * cols + c
@@ -765,15 +918,15 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
       
       // Draw a small cross-mark centered at the feature point
       const size = Math.abs(tpi) * 50 * scl
-      positions.push(wx - size, elev, wz, wx + size, elev, wz)
-      
+      positions.push6(wx - size, elev, wz, wx + size, elev, wz)
+
       const slope = gridSlopes[i]
       const col = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
-      colors.push(...col, ...col)
+      colors.pushRgb2(col)
     }
   }
-  
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors) }
+
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Pillars ──────────────────────────────────────────────────────────────
@@ -789,8 +942,8 @@ function buildPillars(terrain, p, spacing) {
   const halfSize = (p.pillarSize ?? 0.8) * step * scl * 0.5
   const segs     = Math.max(3, Math.round(p.pillarSegments ?? 8))
 
-  const positions = [], colors = []
-  const lidP = [], lidC = [], lidI = []
+  const positions = new F32List(), colors = new F32List()
+  const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
   let lidVIdx = 0
 
   for (let r = 0; r < rows; r += step) {
@@ -815,21 +968,21 @@ function buildPillars(terrain, p, spacing) {
       if (style === 'cuboid') {
         const h = halfSize
         // Top face perimeter (4 edges)
-        positions.push(wx-h,top,wz-h, wx+h,top,wz-h,  wx+h,top,wz-h, wx+h,top,wz+h,
-                       wx+h,top,wz+h, wx-h,top,wz+h,  wx-h,top,wz+h, wx-h,top,wz-h)
-        for (let e = 0; e < 4; e++) colors.push(...colPeak, ...colPeak)
+        positions.push6(wx-h,top,wz-h, wx+h,top,wz-h); positions.push6(wx+h,top,wz-h, wx+h,top,wz+h)
+        positions.push6(wx+h,top,wz+h, wx-h,top,wz+h); positions.push6(wx-h,top,wz+h, wx-h,top,wz-h)
+        for (let e = 0; e < 4; e++) colors.pushRgb2(colPeak)
         // Bottom face (4 edges)
-        positions.push(wx-h,bottom,wz-h, wx+h,bottom,wz-h,  wx+h,bottom,wz-h, wx+h,bottom,wz+h,
-                       wx+h,bottom,wz+h, wx-h,bottom,wz+h,  wx-h,bottom,wz+h, wx-h,bottom,wz-h)
-        for (let e = 0; e < 4; e++) colors.push(...colBase, ...colBase)
+        positions.push6(wx-h,bottom,wz-h, wx+h,bottom,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,bottom,wz+h)
+        positions.push6(wx+h,bottom,wz+h, wx-h,bottom,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,bottom,wz-h)
+        for (let e = 0; e < 4; e++) colors.pushRgb2(colBase)
         // 4 vertical edges (base → peak colour gradient)
-        positions.push(wx-h,bottom,wz-h, wx-h,top,wz-h,  wx+h,bottom,wz-h, wx+h,top,wz-h,
-                       wx+h,bottom,wz+h, wx+h,top,wz+h,  wx-h,bottom,wz+h, wx-h,top,wz+h)
-        for (let e = 0; e < 4; e++) colors.push(...colBase, ...colPeak)
+        positions.push6(wx-h,bottom,wz-h, wx-h,top,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,top,wz-h)
+        positions.push6(wx+h,bottom,wz+h, wx+h,top,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,top,wz+h)
+        for (let e = 0; e < 4; e++) { colors.pushRgb(colBase); colors.pushRgb(colPeak) }
         // Lid mesh — 2 triangles covering the top face
-        lidP.push(wx-h,top,wz-h, wx+h,top,wz-h, wx+h,top,wz+h, wx-h,top,wz+h)
-        for (let v = 0; v < 4; v++) lidC.push(...colLid)
-        lidI.push(lidVIdx,lidVIdx+1,lidVIdx+2, lidVIdx,lidVIdx+2,lidVIdx+3)
+        lidP.push6(wx-h,top,wz-h, wx+h,top,wz-h); lidP.push6(wx+h,top,wz+h, wx-h,top,wz+h)
+        for (let v = 0; v < 4; v++) lidC.pushRgb(colLid)
+        lidI.push3(lidVIdx, lidVIdx+1, lidVIdx+2); lidI.push3(lidVIdx, lidVIdx+2, lidVIdx+3)
         lidVIdx += 4
       } else if (style === 'cylinder') {
         const rad = halfSize
@@ -838,31 +991,31 @@ function buildPillars(terrain, p, spacing) {
           const a1 = ((s + 1) / segs) * Math.PI * 2
           const x0 = wx + rad * Math.cos(a0), z0 = wz + rad * Math.sin(a0)
           const x1 = wx + rad * Math.cos(a1), z1 = wz + rad * Math.sin(a1)
-          positions.push(x0, top,    z0, x1, top,    z1); colors.push(...colPeak, ...colPeak)
-          positions.push(x0, bottom, z0, x1, bottom, z1); colors.push(...colBase, ...colBase)
-          positions.push(x0, bottom, z0, x0, top,    z0); colors.push(...colBase, ...colPeak)
+          positions.push6(x0, top,    z0, x1, top,    z1); colors.pushRgb2(colPeak)
+          positions.push6(x0, bottom, z0, x1, bottom, z1); colors.pushRgb2(colBase)
+          positions.push6(x0, bottom, z0, x0, top,    z0); colors.pushRgb(colBase); colors.pushRgb(colPeak)
         }
         // Lid mesh — N-gon fan from centre
-        lidP.push(wx, top, wz); lidC.push(...colLid)           // centre vertex
+        lidP.push3(wx, top, wz); lidC.pushRgb(colLid)          // centre vertex
         for (let s = 0; s < segs; s++) {
           const a = (s / segs) * Math.PI * 2
-          lidP.push(wx + rad * Math.cos(a), top, wz + rad * Math.sin(a))
-          lidC.push(...colLid)
+          lidP.push3(wx + rad * Math.cos(a), top, wz + rad * Math.sin(a))
+          lidC.pushRgb(colLid)
         }
         for (let s = 0; s < segs; s++)
-          lidI.push(lidVIdx, lidVIdx + s + 1, lidVIdx + ((s + 1) % segs) + 1)
+          lidI.push3(lidVIdx, lidVIdx + s + 1, lidVIdx + ((s + 1) % segs) + 1)
         lidVIdx += segs + 1
       } else {
-        positions.push(wx, bottom, wz, wx, top, wz)
-        colors.push(...colBase, ...colPeak)
+        positions.push6(wx, bottom, wz, wx, top, wz)
+        colors.pushRgb(colBase); colors.pushRgb(colPeak)
       }
     }
   }
 
   const lids = lidI.length > 0
-    ? { positions: new Float32Array(lidP), colors: new Float32Array(lidC), indices: new Uint32Array(lidI) }
+    ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
     : null
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors), lids }
+  return { positions: positions.toArray(), colors: colors.toArray(), lids }
 }
 
 // ─── Stipple ──────────────────────────────────────────────────────────────────
@@ -875,7 +1028,7 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
   const jAmt = (jitter ?? 0.8) * step
   const gam  = gamma ?? 1.2
   const dm   = densityMode ?? 'slope'
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
 
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
@@ -902,13 +1055,13 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
 
       const wx = jc * scl - halfW
       const wz = jr * scl - halfH
-      positions.push(wx - eps, elev, wz, wx + eps, elev, wz)
+      positions.push6(wx - eps, elev, wz, wx + eps, elev, wz)
       const col = computeVertexColor(normE, slope, 0, p)
-      colors.push(...col, ...col)
+      colors.pushRgb2(col)
     }
   }
 
-  return { positions: new Float32Array(positions), colors: new Float32Array(colors), isPoints: true }
+  return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 
 // ─── Surface ──────────────────────────────────────────────────────────────────
@@ -925,35 +1078,69 @@ export function buildSurfaceGeometry(terrain, p) {
       else { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=cellElev(grid, r, c, cols, elevScale, jitterAmt); basePos[i*3+2]=r*scl-halfH; baseBright[i]=grid[i] }
     }
   }
-  const baseIndices = []
+  // Two-pass index build: count valid quads first so the buffer is allocated once.
+  let quadCount = 0
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const tl = r*cols+c
+      if (gridMask[tl] && gridMask[tl+1] && gridMask[tl+cols] && gridMask[tl+cols+1]) quadCount++
+    }
+  }
+  if (!quadCount) return { positions: new Float32Array(0), brightnessBuf: new Float32Array(0), indices: new Uint32Array(0), metadata: { rows, cols } }
+  const baseIndices = new Uint32Array(quadCount * 6)
+  let bi = 0
   for (let r = 0; r < rows - 1; r++) {
     for (let c = 0; c < cols - 1; c++) {
       const tl = r*cols+c, tr = tl+1, bl = tl+cols, br = bl+1
-      if (gridMask[tl] && gridMask[tr] && gridMask[bl] && gridMask[br]) baseIndices.push(tl, bl, tr, tr, bl, br)
+      if (gridMask[tl] && gridMask[tr] && gridMask[bl] && gridMask[br]) {
+        baseIndices[bi] = tl; baseIndices[bi+1] = bl; baseIndices[bi+2] = tr
+        baseIndices[bi+3] = tr; baseIndices[bi+4] = bl; baseIndices[bi+5] = br
+        bi += 6
+      }
     }
   }
-  let finalPos = new Float32Array(0), finalBright = new Float32Array(0), finalIndices = new Uint32Array(0), indexOffset = 0
-  if (!baseIndices.length) return { positions: finalPos, brightnessBuf: finalBright, indices: finalIndices, metadata: { rows, cols } }
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
   const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
-  const indicesList = []
+  const nOct = mX.length * mY.length * mZ.length
+
+  // Fast path: single identity octant — the base buffers are the final mesh.
+  if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
+    return { positions: basePos, brightnessBuf: baseBright, indices: baseIndices, metadata: { rows, cols } }
+  }
+
+  // Pre-allocate all octants once (repeated concat() is O(octants²) in copies).
+  const finalPos = new Float32Array(basePos.length * nOct)
+  const finalBright = new Float32Array(baseBright.length * nOct)
+  const finalIndices = new Uint32Array(baseIndices.length * nOct)
+  let posOff = 0, brightOff = 0, indOff = 0, indexOffset = 0
   for (const sx of mX) {
     for (const sy of mY) {
       for (const sz of mZ) {
-        const pPass = new Float32Array(basePos)
-        for (let i = 0; i < pPass.length; i += 3) { pPass[i] *= sx; pPass[i+1] *= sy; pPass[i+2] *= sz }
-        finalPos = concat(finalPos, pPass); finalBright = concat(finalBright, baseBright)
+        for (let i = 0; i < basePos.length; i += 3) {
+          finalPos[posOff + i]     = basePos[i]     * sx
+          finalPos[posOff + i + 1] = basePos[i + 1] * sy
+          finalPos[posOff + i + 2] = basePos[i + 2] * sz
+        }
+        posOff += basePos.length
+        finalBright.set(baseBright, brightOff); brightOff += baseBright.length
         const flipWinding = (sx * sy * sz) < 0
         for (let i = 0; i < baseIndices.length; i += 3) {
-          if (flipWinding) indicesList.push(baseIndices[i] + indexOffset, baseIndices[i+2] + indexOffset, baseIndices[i+1] + indexOffset)
-          else indicesList.push(baseIndices[i] + indexOffset, baseIndices[i+1] + indexOffset, baseIndices[i+2] + indexOffset)
+          finalIndices[indOff + i] = baseIndices[i] + indexOffset
+          if (flipWinding) {
+            finalIndices[indOff + i + 1] = baseIndices[i + 2] + indexOffset
+            finalIndices[indOff + i + 2] = baseIndices[i + 1] + indexOffset
+          } else {
+            finalIndices[indOff + i + 1] = baseIndices[i + 1] + indexOffset
+            finalIndices[indOff + i + 2] = baseIndices[i + 2] + indexOffset
+          }
         }
+        indOff += baseIndices.length
         indexOffset += vertexCount
       }
     }
   }
-  return { positions: finalPos, brightnessBuf: finalBright, indices: new Uint32Array(indicesList), metadata: { rows, cols } }
+  return { positions: finalPos, brightnessBuf: finalBright, indices: finalIndices, metadata: { rows, cols } }
 }
 
 // ─── GPX Track ───────────────────────────────────────────────────────────────
@@ -994,7 +1181,7 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
     lineHypsoInterval: p.hypsoIntervalGpx,
   }
 
-  const positions = [], colors = []
+  const positions = new F32List(), colors = new F32List()
 
   const worldPts = gpxPoints.map(({ lat, lon }) =>
     geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight, peakOff, lineOff, halfW, halfH)
@@ -1010,18 +1197,17 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
     const normA = minZ < maxZ ? (elevA - minZ) / (maxZ - minZ) : 0
     const normB = minZ < maxZ ? (elevB - minZ) / (maxZ - minZ) : 0
 
-    positions.push(a.worldX, elevA, a.worldZ, b.worldX, elevB, b.worldZ)
-    const cA = computeVertexColor(normA, 0, 0, ctx)
-    const cB = computeVertexColor(normB, 0, 0, ctx)
-    colors.push(...cA, ...cB)
+    positions.push6(a.worldX, elevA, a.worldZ, b.worldX, elevB, b.worldZ)
+    colors.pushRgb(computeVertexColor(normA, 0, 0, ctx))
+    colors.pushRgb(computeVertexColor(normB, 0, 0, ctx))
   }
 
   if (positions.length === 0) return null
   // weight / opacity / dash resolved via layerStyle('Gpx', p) at render/export time.
   return {
     id: 'Gpx',
-    positions: new Float32Array(positions),
-    colors: new Float32Array(colors),
+    positions: positions.toArray(),
+    colors: colors.toArray(),
     curtains: null,
     lids: null,
   }
