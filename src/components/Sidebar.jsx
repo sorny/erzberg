@@ -1001,7 +1001,7 @@ export function Sidebar({
             </Section>
           )}
 
-          <Section title="Particles" open={sec.points} onToggle={() => tog('points')}>
+          <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
             <TogColor label="Hologram" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <Sub>

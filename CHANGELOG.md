@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-06-10
+
+### Added
+- **Abyss preset** — a drowned mountain range as a deep-sea sonar chart: Tanaka contours (sun-facing rims bright, shadow strokes thin and dark) coloured by a bathymetric depth gradient (abyss blue → teal → pale cyan → white summits) over a dark slate fill with directional hillshade, translucent depth-darkened water flooding the basins, ghost contour rings behind ridges, and an abyssal blue-black sky. The first preset to use water fill and Tanaka contours.
+- **Particles section activity dot** — the Particles section header now shows the same green indicator dot the draw modes use when the hologram field is enabled.
+
 ## [0.5.7] - 2026-06-10
 
 ### Added
