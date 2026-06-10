@@ -258,7 +258,7 @@
     "showPoints": false,
     "pointColor": "#8fe8f5",
     "pointSize": 2.6,
-    "particleSpacing": 1,
+    "particleSpacing": 6,
     "animateParticles": true,
     "holoGlowColor": "#46f0d2",
     "holoFloat": 2.2,
@@ -266,8 +266,7 @@
     "holoNoiseScale": 1,
     "holoFlowSpeed": 0.5,
     "holoMaskContrast": 3,
-    "holoShimmer": 0.8,
-    "particleSpacing": 6
+    "holoShimmer": 0.8
   },
   "view": {
     "tilt": 50,

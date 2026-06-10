@@ -261,9 +261,9 @@
     "holoShimmer": 0.8
   },
   "view": {
-    "tilt": 0.00005729832627056611,
-    "rotation": 0.22924820442785515,
-    "zoom": 0.7500000000000056,
+    "tilt": 50,
+    "rotation": 0,
+    "zoom": 0.75,
     "fov": 60,
     "orthographic": false,
     "panX": 0,
