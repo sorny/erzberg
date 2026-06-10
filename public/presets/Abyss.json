@@ -1,6 +1,6 @@
 {
   "terrain": {
-    "resolution": 2,
+    "resolution": 1,
     "elevScale": 0,
     "blurRadius": 0,
     "gridOffsetX": 0,
@@ -26,7 +26,7 @@
     "depthOcclusion": true,
     "occlusionBias": 1,
     "occlusionColor": "#0d2c45",
-    "occlusionOpacity": 0.15,
+    "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
     "textureShiftX": 0,
@@ -193,7 +193,7 @@
     "showHillshade": true,
     "hillshadeAzimuth": 315,
     "hillshadeAltitude": 40,
-    "hillshadeIntensity": 1.0,
+    "hillshadeIntensity": 1,
     "hillshadeOpacity": 0.45,
     "hillshadeExaggeration": 2.5,
     "hillshadeHighlightColor": "#2c4a66",
@@ -218,13 +218,13 @@
     "waterColor": "#2e86bd",
     "waterOpacity": 0.92,
     "tanakaContours": true,
-    "tanakaSunAzimuth": 315,
-    "tanakaWeightBright": 2.5,
-    "tanakaWeightDark": 0.8,
+    "tanakaSunAzimuth": 290,
+    "tanakaWeightBright": 2,
+    "tanakaWeightDark": 0.5,
     "showLines": true,
     "gradientStops": [
       {
-        "pos": 0.0,
+        "pos": 0,
         "color": "#0b3550"
       },
       {
@@ -240,7 +240,7 @@
         "color": "#aee8f2"
       },
       {
-        "pos": 1.0,
+        "pos": 1,
         "color": "#ffffff"
       }
     ],
@@ -250,6 +250,7 @@
     "showPoints": false,
     "pointColor": "#8fe8f5",
     "pointSize": 2.6,
+    "particleSpacing": 6,
     "animateParticles": true,
     "holoGlowColor": "#46f0d2",
     "holoFloat": 2.2,
@@ -257,13 +258,12 @@
     "holoNoiseScale": 1,
     "holoFlowSpeed": 0.5,
     "holoMaskContrast": 3,
-    "holoShimmer": 0.8,
-    "particleSpacing": 6
+    "holoShimmer": 0.8
   },
   "view": {
-    "tilt": 50,
-    "rotation": 0,
-    "zoom": 0.75,
+    "tilt": 0.00005729832627056611,
+    "rotation": 0.22924820442785515,
+    "zoom": 0.7500000000000056,
     "fov": 60,
     "orthographic": false,
     "panX": 0,
@@ -277,7 +277,7 @@
   },
   "gradientStops": [
     {
-      "pos": 0.0,
+      "pos": 0,
       "color": "#0b3550"
     },
     {
@@ -293,7 +293,7 @@
       "color": "#aee8f2"
     },
     {
-      "pos": 1.0,
+      "pos": 1,
       "color": "#ffffff"
     }
   ],
