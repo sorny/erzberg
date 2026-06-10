@@ -22,6 +22,10 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
   const viw = new THREE.Vector3()
   const minB = (elevMinCut || 0) / 100
   const maxB = (elevMaxCut || 100) / 100
+  // View-space z of the near plane (camera looks down -z). Vertices on the
+  // camera side of it project to garbage screen coordinates (the perspective
+  // divide mirrors them), so triangles touching them must not be rasterised.
+  const nearZ = -(camera.near ?? 0.1)
 
   for (const geo of zGeos) {
     const { positions, indices, brightnessBuf } = geo
@@ -30,12 +34,14 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
     const vx  = new Float32Array(nVerts)
     const vy  = new Float32Array(nVerts)
     const vd  = new Float32Array(nVerts)
+    const behind = new Uint8Array(nVerts)
     const vb  = brightnessBuf ? new Float32Array(nVerts) : null
 
     for (let i = 0; i < nVerts; i++) {
       wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
       if (groupMatrix) wld.applyMatrix4(groupMatrix)
       viw.copy(wld).applyMatrix4(camInv)
+      if (viw.z > nearZ) { behind[i] = 1; continue }
       vd[i] = 1.0 / (-viw.z)
       wld.project(camera)
       vx[i] = ( wld.x + 1) * 0.5 * W
@@ -46,6 +52,12 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
     const nTri = indices.length / 3
     for (let t = 0; t < nTri; t++) {
       const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
+      if (behind[a] || behind[b] || behind[c]) continue
+      // Reject triangles fully outside the canvas — when zoomed in, that is
+      // most of the terrain, and fillTriangle's per-row clamping would still
+      // walk their full vertical extent.
+      if ((vx[a] < 0 && vx[b] < 0 && vx[c] < 0) || (vx[a] > W && vx[b] > W && vx[c] > W) ||
+          (vy[a] < 0 && vy[b] < 0 && vy[c] < 0) || (vy[a] > H && vy[b] > H && vy[c] > H)) continue
       if (vb) {
         const avgB = (vb[a] + vb[b] + vb[c]) / 3
         if (avgB < minB || avgB > maxB) continue
@@ -152,6 +164,23 @@ export function exportSVG({
   const wld2 = new THREE.Vector3()
   const viw2 = new THREE.Vector3()
 
+  // The export captures what the viewport shows. Geometry behind the camera's
+  // near plane projects to garbage screen coordinates (the perspective divide
+  // mirrors it, often millions of px out), and when zoomed in most of the
+  // terrain lies far outside the canvas — both previously inflated the SVG
+  // viewBox until the actual content was a sub-pixel sliver. So: segments are
+  // clipped against the near plane, anything fully outside the canvas (+PAD)
+  // is dropped, and the final viewBox is clamped to the canvas rect.
+  const nearZ = -(camera.near ?? 0.1)
+  const PAD = MARGIN
+
+  const viewZOf = (x, y, z) => {
+    wld2.set(x, y, z)
+    if (groupMatrix) wld2.applyMatrix4(groupMatrix)
+    viw2.copy(wld2).applyMatrix4(camInv)
+    return viw2.z
+  }
+
   const project = (x, y, z) => {
     wld2.set(x, y, z)
     if (groupMatrix) wld2.applyMatrix4(groupMatrix)
@@ -164,6 +193,13 @@ export function exportSVG({
       viewZ,
     ]
   }
+
+  const offCanvas2 = (p0, p1) =>
+    (p0[0] < -PAD && p1[0] < -PAD) || (p0[0] > width  + PAD && p1[0] > width  + PAD) ||
+    (p0[1] < -PAD && p1[1] < -PAD) || (p0[1] > height + PAD && p1[1] > height + PAD)
+
+  const offCanvas1 = (sx, sy) =>
+    sx < -PAD || sx > width + PAD || sy < -PAD || sy > height + PAD
 
   const zGeos = []
   if (showFill && surfaceGeo && groupMatrix) {
@@ -212,6 +248,7 @@ export function exportSVG({
             ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
             : '#000000'
           const [sx, sy, lineZ] = project(cx3, cy3, cz3)
+          if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           let visible = true
           if (surfViewZ) {
             const surfZ = surfViewZ(sx, sy)
@@ -245,8 +282,20 @@ export function exportSVG({
 
       for (let s = 0; s < segCount; s++) {
         const i = s * 6
-        const ax = positions[i], ay = positions[i+1], az = positions[i+2]
-        const bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
+        let ax = positions[i], ay = positions[i+1], az = positions[i+2]
+        let bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
+
+        // Near-plane clip in view space. World→view is affine, so the view-space
+        // crossing parameter t maps to the same t on the world-space segment.
+        const za = viewZOf(ax, ay, az)
+        const zb = viewZOf(bx, by, bz)
+        if (za > nearZ && zb > nearZ) continue // fully behind the camera
+        if (za > nearZ || zb > nearZ) {
+          const t = (nearZ - za) / (zb - za)
+          const cx3 = ax + (bx - ax) * t, cy3 = ay + (by - ay) * t, cz3 = az + (bz - az) * t
+          if (za > nearZ) { ax = cx3; ay = cy3; az = cz3 }
+          else            { bx = cx3; by = cy3; bz = cz3 }
+        }
 
         let stroke = '#000000'
         if (colors && colors.length > i + 2) {
@@ -272,8 +321,16 @@ export function exportSVG({
 
         if (!surfViewZ) {
           const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
+          if (offCanvas2(p0, p1)) continue
           addSeg(p0[0], p0[1], p1[0], p1[1], true)
           continue
+        }
+
+        // Skip segments entirely outside the canvas before the (expensive)
+        // per-sample occlusion test — when zoomed in this is most of them.
+        {
+          const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
+          if (offCanvas2(p0, p1)) continue
         }
 
         const pts = []
@@ -315,7 +372,8 @@ export function exportSVG({
       const r = ((particleSize ?? 4) * 300 / (-viw2.z)) * 0.5
       wld2.project(camera)
       const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
-      
+      if (offCanvas1(cx, cy)) continue
+
       let visible = true
       if (surfViewZ) {
         const surfZ = surfViewZ(cx, cy)
@@ -330,6 +388,14 @@ export function exportSVG({
   }
 
   if (svgLayers.length === 0 && projectedParticles.length === 0) return
+
+  // Clamp the content bounding box to the canvas: partially visible segments
+  // are kept whole, so the box can spill slightly past the edges. The export
+  // mirrors the viewport — never larger than what is on screen. (Zoomed-out
+  // scenes keep their tight content box; the clamp is a no-op there.)
+  minX = Math.max(minX, 0); minY = Math.max(minY, 0)
+  maxX = Math.min(maxX, width); maxY = Math.min(maxY, height)
+  if (maxX <= minX || maxY <= minY) return
 
   const vx = minX - MARGIN, vy = minY - MARGIN
   const vw = (maxX - minX) + MARGIN * 2, vh = (maxY - minY) + MARGIN * 2

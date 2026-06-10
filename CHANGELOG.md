@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-06-10
+
+### Fixed
+- **SVG export broken when zoomed in** — exporting while zoomed in produced an effectively blank SVG. The exporter projected *every* line segment through the camera and sized the document around all of them: geometry outside the canvas inflated the bounding box, and geometry **behind the near plane** projected to mirrored garbage coordinates millions of pixels out (a perspective-divide artefact), exploding the viewBox to absurd dimensions (observed: 3 490 267 × 1 174 252 px) in which the actual content was a sub-pixel sliver. The same behind-camera projections were rasterised into the software z-buffer, stamping wrong depths that could cull even on-screen lines. The exporter now clips segments against the camera's near plane, drops segments/dots/particles entirely outside the canvas (which also skips their 64-sample occlusion tests — zoomed-in exports are much faster and roughly halve in file size), rejects behind-camera and off-canvas triangles from the z-buffer, and clamps the final viewBox to the canvas rect. The export now always mirrors exactly what the viewport shows; zoomed-out exports keep their tight content crop unchanged.
+
 ## [0.5.5] - 2026-06-10
 
 ### Changed
