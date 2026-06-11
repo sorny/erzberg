@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-11
+
+### Added
+- **Engraving draw mode** — copperplate-style illumination cross-hatch. Per-cell darkness is computed as 1 − Lambert shading from a configurable sun azimuth; up to four hatch layers at the base angle, +90°, +45°, and +135° draw only where darkness exceeds each layer's threshold, so lit slopes carry sparse single-direction strokes while shadows accumulate dense stacked cross-hatching. Strokes are continuous polylines marched across the grid at any base angle, draped on the terrain, and break wherever the surface is too bright. Controls: spacing, base angle, levels, sun azimuth, and a contrast (tone-curve) exponent.
+- **Rock & Scree draw mode** — swisstopo-style alpine rock depiction in two sub-layers: cliff hachures (short downslope strokes perpendicular to the contours on cells steeper than the cliff threshold, with seeded hand-drawn wobble) and slope-graded scree dots on the band below the cliffs, denser toward the rock faces. Controls: spacing, cliff threshold, stroke length, scree density, and scree dot size.
+- **Seeded randomness** — Stipple and Rock & Scree each get a Seed slider in their mode section. All stochastic geometry (Stipple jitter/density, cliff-stroke wobble, scree placement) now runs on a seeded mulberry32 PRNG instead of `Math.random()`, so a given seed always reproduces the identical pattern — essential for reproducing prints.
+
+### Changed
+- All presets round-tripped to carry the new mode/feature params with defaults.
+
 ## [0.5.8] - 2026-06-10
 
 ### Added

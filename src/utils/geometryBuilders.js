@@ -28,6 +28,10 @@ export function layerStyle(id, p) {
       return { weight: p.tanakaWeightDark ?? 0.5, opacity: p.opacityContours, dash: p.dashContours }
     case 'Gpx':
       return { weight: p.weightGpx, opacity: p.opacityGpx, dash: p.dashGpx }
+    case 'Swiss-Rock':
+      return { weight: p.weightSwiss, opacity: p.opacitySwiss, dash: p.dashSwiss }
+    case 'Swiss-Scree':
+      return { weight: p.screeWeightSwiss ?? 2.5, opacity: p.opacitySwiss, dash: 'solid' }
     default:
       return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
   }
@@ -132,6 +136,8 @@ export function buildLineGeometry(terrain, p) {
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
     { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter) },
+    { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave) },
+    { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
   ]
 
   const finalLayers = []
@@ -1018,6 +1024,184 @@ function buildPillars(terrain, p, spacing) {
   return { positions: positions.toArray(), colors: colors.toArray(), lids }
 }
 
+// ─── Seeded randomness ───────────────────────────────────────────────────────
+
+/** Mulberry32 PRNG — deterministic per seed so stochastic modes (Stipple,
+ *  Swiss scree) are reproducible: the same seed always yields the same art. */
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return () => {
+    a |= 0; a = (a + 0x6D2B79F5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// ─── Engraving (illumination cross-hatch) ────────────────────────────────────
+
+/**
+ * Copperplate-style hatching: per-cell darkness = 1 − Lambert illumination from
+ * a configurable sun. Up to 4 hatch layers at angles θ, θ+90°, θ+45°, θ+135°;
+ * layer k only draws where darkness exceeds (k+1)/(levels+1), so lit slopes get
+ * sparse single-direction strokes and shadows build up stacked cross-hatching.
+ * Strokes are continuous polylines marched across the grid, draped on the
+ * terrain, breaking wherever the surface is too bright.
+ */
+function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const positions = new F32List(), colors = new F32List()
+
+  // Per-cell darkness from Lambert shading (same light convention as the
+  // hillshade shader: az 315° = NW, altitude fixed at 45°).
+  const azRad  = ((sunAzimuth ?? 315) * Math.PI) / 180
+  const altRad = Math.PI / 4
+  const Lx = Math.cos(azRad) * Math.cos(altRad)
+  const Ly = Math.sin(altRad)
+  const Lz = Math.sin(azRad) * Math.cos(altRad)
+  const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
+  const gam = gamma ?? 1
+
+  const n = rows * cols
+  const darkness = new Float32Array(n)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) { darkness[i] = -1; continue }  // -1 = NoData, never hatched
+      const b = grid[i]
+      const bL = (c > 0        && gridMask[i - 1])    ? grid[i - 1]    : b
+      const bR = (c < cols - 1 && gridMask[i + 1])    ? grid[i + 1]    : b
+      const bU = (r > 0        && gridMask[i - cols]) ? grid[i - cols] : b
+      const bD = (r < rows - 1 && gridMask[i + cols]) ? grid[i + cols] : b
+      const gx = (bR - bL) * dScale, gz = (bD - bU) * dScale
+      const inv = 1 / Math.sqrt(gx * gx + gz * gz + 1)
+      const lambert = Math.max(0, (-gx * Lx + Ly - gz * Lz) * inv)
+      darkness[i] = Math.pow(1 - lambert, gam)
+    }
+  }
+
+  const nLevels = Math.max(1, Math.min(4, Math.round(levels ?? 3)))
+  const HATCH_OFFSETS = [0, 90, 45, 135]
+  const lineStep = Math.max(1, (spacing ?? 3) / scl)   // pitch between hatch lines, in cells
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2       // grid centre
+  // Half-diagonal: lines offset/marched this far in both directions cover the grid
+  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
+
+  for (let lvl = 0; lvl < nLevels; lvl++) {
+    const thresh = (lvl + 1) / (nLevels + 1)
+    const theta = (((angleDeg ?? 45) + HATCH_OFFSETS[lvl]) * Math.PI) / 180
+    const dx = Math.cos(theta), dz = Math.sin(theta)      // march direction (grid units)
+    const nx = -dz, nz = dx                                // line-pitch normal
+
+    for (let o = -halfDiag; o <= halfDiag; o += lineStep) {
+      const ox = cc + nx * o, oz = rc + nz * o
+      let prevC = 0, prevR = 0, prevE = 0, inRun = false
+      for (let t = -halfDiag; t <= halfDiag; t += 1) {
+        const fc = ox + dx * t, fr = oz + dz * t
+        let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+        let elev = 0
+        if (ok) {
+          const ci = Math.round(fc), ri = Math.round(fr), idx = ri * cols + ci
+          ok = gridMask[idx] === 1 && darkness[idx] >= thresh
+          if (ok) {
+            elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
+            ok = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)
+          }
+        }
+        if (ok && inRun) {
+          positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
+                          fc * scl - halfW, elev, fr * scl - halfH)
+          const ci = Math.round(fc), ri = Math.round(fr), idx = ri * cols + ci
+          const col = computeVertexColor(normElev(elev, minZ, maxZ),
+                                         gridSlopes[idx] / (maxSlope || 1), theta, p)
+          colors.pushRgb2(col)
+        }
+        inRun = ok
+        prevC = fc; prevR = fr; prevE = elev
+      }
+    }
+  }
+
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Swiss rock & scree ──────────────────────────────────────────────────────
+
+/**
+ * Swisstopo-style alpine rock depiction, returned as two sub-layers:
+ *  • Swiss-Rock  — cliff hachures: short downslope strokes (perpendicular to
+ *    the contours) on cells steeper than the cliff threshold, with a little
+ *    seeded jitter for a hand-drawn feel.
+ *  • Swiss-Scree — slope-graded debris dots (isPoints) on the moderately steep
+ *    band below the cliff threshold, denser toward the cliffs.
+ */
+function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensity) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const rng = mulberry32(((p.seedSwiss ?? 42) * 2654435761 + 0x9e3779b9) >>> 0)
+
+  const step = Math.max(1, Math.round((spacing ?? 2) / scl))
+  const cliffT = Math.max(0.02, threshold ?? 0.45)
+  const screeT = cliffT * 0.45                       // lower edge of the scree band
+  const dens  = Math.max(0, Math.min(1, screeDensity ?? 0.5))
+  const eps   = Math.max(0.001, scl * 0.003)         // stipple-style dot half-length
+  const maxS  = maxSlope || 1
+
+  const rockPos = new F32List(), rockCol = new F32List()
+  const screePos = new F32List(), screeCol = new F32List()
+
+  for (let r = 1; r < rows - 1; r += step) {
+    for (let c = 1; c < cols - 1; c += step) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const slopeNorm = gridSlopes[i] / maxS
+      if (slopeNorm < screeT) continue
+
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      const normE = normElev(elev, minZ, maxZ)
+      const wx = c * scl - halfW, wz = r * scl - halfH
+
+      if (slopeNorm >= cliffT) {
+        // Cliff hachure: stroke pointing downslope, longer on steeper rock.
+        const gx = grid[i + 1] - grid[i - 1]
+        const gz = grid[i + cols] - grid[i - cols]
+        const mag = Math.sqrt(gx * gx + gz * gz)
+        if (mag < 1e-9) continue
+        const ux = gx / mag, uz = gz / mag           // +gradient = uphill; stroke goes downhill
+        const len = (length ?? 1) * scl * step * (0.6 + slopeNorm * 1.2)
+        // Slight seeded perpendicular wobble — engraver's hand, reproducible.
+        const j = (rng() - 0.5) * 0.35
+        const sx = -ux * len, sz = -uz * len
+        const jx = -uz * len * j, jz = ux * len * j
+        const ex = wx + sx + jx, ez = wz + sz + jz
+        const e1 = (sampleB(grid, rows, cols,
+                            Math.max(0, Math.min(rows - 1, (ez + halfH) / scl)),
+                            Math.max(0, Math.min(cols - 1, (ex + halfW) / scl))) - 0.5) * 100 * elevScale
+        rockPos.push6(wx, elev, wz, ex, e1, ez)
+        const col = computeVertexColor(normE, slopeNorm, Math.atan2(gz, gx), p)
+        rockCol.pushRgb2(col)
+      } else if (rng() < dens * ((slopeNorm - screeT) / (cliffT - screeT))) {
+        // Scree dot: jittered within the cell, denser approaching the cliffs.
+        const jc = c + (rng() - 0.5) * step, jr = r + (rng() - 0.5) * step
+        const sx2 = jc * scl - halfW, sz2 = jr * scl - halfH
+        const se = (sampleB(grid, rows, cols,
+                            Math.max(0, Math.min(rows - 1, jr)),
+                            Math.max(0, Math.min(cols - 1, jc))) - 0.5) * 100 * elevScale
+        screePos.push6(sx2 - eps, se, sz2, sx2 + eps, se, sz2)
+        const col = computeVertexColor(normElev(se, minZ, maxZ), slopeNorm, 0, p)
+        screeCol.pushRgb2(col)
+      }
+    }
+  }
+
+  return {
+    'Swiss-Rock':  { positions: rockPos.toArray(),  colors: rockCol.toArray() },
+    'Swiss-Scree': { positions: screePos.toArray(), colors: screeCol.toArray(), isPoints: true },
+  }
+}
+
 // ─── Stipple ──────────────────────────────────────────────────────────────────
 
 function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
@@ -1029,11 +1213,13 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
   const gam  = gamma ?? 1.2
   const dm   = densityMode ?? 'slope'
   const positions = new F32List(), colors = new F32List()
+  // Seeded so a given seed always produces the identical dot pattern.
+  const rng = mulberry32(((p.seedStipple ?? 42) * 2654435761) >>> 0)
 
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
-      const jr = r + (Math.random() - 0.5) * jAmt
-      const jc = c + (Math.random() - 0.5) * jAmt
+      const jr = r + (rng() - 0.5) * jAmt
+      const jc = c + (rng() - 0.5) * jAmt
       const ri = Math.max(0, Math.min(rows - 1, Math.floor(jr)))
       const ci = Math.max(0, Math.min(cols - 1, Math.floor(jc)))
       if (!gridMask[ri * cols + ci]) continue
@@ -1051,7 +1237,7 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
       else                         density = slope
 
       density = Math.pow(Math.max(0, Math.min(1, density)), gam)
-      if (Math.random() > density) continue
+      if (rng() > density) continue
 
       const wx = jc * scl - halfW
       const wz = jr * scl - halfH

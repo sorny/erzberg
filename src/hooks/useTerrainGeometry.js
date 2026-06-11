@@ -116,8 +116,16 @@ export function useTerrainGeometry(p) {
     p.hypsoValley, p.hypsoModeValley, p.hypsoBandedValley, p.hypsoIntervalValley,
     // Mode: Stipple
     p.enabledStipple, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter,
-    p.colorStipple,
+    p.seedStipple, p.colorStipple,
     p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
+    // Mode: Engraving
+    p.enabledEngrave, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave,
+    p.colorEngrave,
+    p.hypsoEngrave, p.hypsoModeEngrave, p.hypsoBandedEngrave, p.hypsoIntervalEngrave,
+    // Mode: Swiss rock & scree
+    p.enabledSwiss, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss,
+    p.seedSwiss, p.colorSwiss,
+    p.hypsoSwiss, p.hypsoModeSwiss, p.hypsoBandedSwiss, p.hypsoIntervalSwiss,
 
     // NOTE: showLines and the fill params (showFill, fillColor, fillBanded,
     // fillHypso*) are render-side only — lines toggle visibility in

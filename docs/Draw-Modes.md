@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twelve independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fourteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -87,11 +87,45 @@ A stochastic dot-density map. Candidate positions are generated on a regular gri
 
 The dot is placed with probability $d^\gamma$, where `gamma` sharpens ($\gamma > 1$) or flattens ($\gamma < 1$) the density contrast. Each accepted dot is emitted as a degenerate line segment of length $\epsilon \ll \text{scl}$, which the GPU renders as a round mark whose diameter equals the layer's `weight` in screen pixels. In SVG export, each dot is written as a `<circle>` element.
 
+All randomness (jitter and acceptance) is drawn from a mulberry32 PRNG initialised from the mode's `seed` parameter, so a given seed always reproduces the identical dot pattern.
+
+## 13. Engraving
+
+Copperplate-style illumination cross-hatch, after the classic pen-and-ink rendering principle: stroke density encodes shadow.
+
+**Tone.** The unit surface normal $\mathbf{n} \propto (-H_x, 1, -H_y)$ is estimated per cell from central differences, and Lambert illumination is evaluated against a light direction $\mathbf{l}$ built from the configurable sun azimuth (altitude fixed at 45°). Darkness is the tone-curved complement
+
+$$D = \big(1 - \max(0, \mathbf{n} \cdot \mathbf{l})\big)^{\gamma}$$
+
+where `contrast` is the exponent $\gamma$: values above 1 confine hatching to deep shadow, values below 1 spread it onto lit slopes.
+
+**Hatch layers.** Up to four stroke directions are stacked at the base angle $\theta$ plus offsets $\{0°, 90°, 45°, 135°\}$. Layer $k$ (of $L$ enabled levels) draws only where
+
+$$D \geq \frac{k + 1}{L + 1}$$
+
+so lightly shaded slopes carry sparse single-direction strokes while shadows accumulate dense cross-hatching.
+
+**Strokes.** For each layer, parallel lines with pitch `spacing` are marched across the grid at the layer's angle in unit-cell steps. Each sample is draped onto the terrain via bilinear elevation interpolation; a stroke continues while consecutive samples stay above the layer threshold (and inside the data mask and elevation cut) and breaks the moment the surface becomes too bright — producing continuous polylines that hug the shadowed terrain and vanish into the light.
+
+## 14. Rock & Scree
+
+Swisstopo-style alpine rock depiction, emitted as two independently rendered sub-layers.
+
+**Cliff hachures (`Swiss-Rock`).** With normalised slope $s = |\nabla H| / |\nabla H|_{\max}$, every sampled cell with $s \geq$ `cliff` receives a stroke from the cell centre along the downslope direction $-\nabla H / |\nabla H|$ — perpendicular to the contours, as an engraver would render a rock face. Stroke length grows with steepness, $\ell \propto (0.6 + 1.2\,s)$, scaled by the `stroke len` parameter, and each stroke gets a small seeded perpendicular wobble for a hand-drawn feel. The far endpoint is re-draped onto the terrain so strokes follow the surface.
+
+**Scree dots (`Swiss-Scree`).** Cells in the slope band $s \in [0.45\,T,\, T)$ below the cliff threshold $T$ form the debris apron. Each is accepted with probability
+
+$$p = \text{density} \cdot \frac{s - 0.45\,T}{T - 0.45\,T}$$
+
+so dots thicken toward the rock faces, mimicking talus accumulation. Accepted dots are jittered within their cell and rendered like stipple marks (round GPU points; `<circle>` elements in SVG) with their own size control.
+
+Both sub-layers share the mode's seeded PRNG: the same seed reproduces the identical wobble and scree placement.
+
 ---
 
 ## Ghost Occlusion
 
-All twelve modes share the same depth-ordering system.
+All fourteen modes share the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

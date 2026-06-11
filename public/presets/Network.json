@@ -152,7 +152,9 @@
         "pos": 1,
         "color": "#800000"
       }
-    ]
+    ],
+    "seedStipple": 42,
+    "seedSwiss": 42
   },
   "points": {
     "showPoints": false,

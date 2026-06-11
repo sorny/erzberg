@@ -244,11 +244,11 @@ export function exportSVG({
           const cx3 = (positions[i] + positions[i+3]) * 0.5
           const cy3 = (positions[i+1] + positions[i+4]) * 0.5
           const cz3 = (positions[i+2] + positions[i+5]) * 0.5
+          const [sx, sy, lineZ] = project(cx3, cy3, cz3)
+          if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           const fill = (colors && colors.length > i + 2)
             ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
             : '#000000'
-          const [sx, sy, lineZ] = project(cx3, cy3, cz3)
-          if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           let visible = true
           if (surfViewZ) {
             const surfZ = surfViewZ(sx, sy)
