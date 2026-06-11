@@ -22,7 +22,7 @@
     "showMesh": true,
     "meshColor": "#888888",
     "bgColor": "#ffffff",
-    "bgGradient": false,
+    "bgGradient": true,
     "depthOcclusion": true,
     "occlusionBias": 1,
     "occlusionColor": "#a80000",
@@ -325,11 +325,11 @@
   "bgGradientStops": [
     {
       "pos": 0,
-      "color": "#615856"
+      "color": "#f7f7f7"
     },
     {
       "pos": 1,
-      "color": "#3a2f2b"
+      "color": "#858585"
     }
   ]
 }
