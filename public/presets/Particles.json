@@ -12,21 +12,21 @@
     "jitterAmt": 0
   },
   "style": {
-    "showFill": true,
-    "fillColor": "#04060b",
+    "showFill": false,
+    "fillColor": "#ffffff",
     "fillHypsometric": false,
     "fillBanded": false,
     "fillHypsoInterval": 10,
-    "fillHypsoWeight": 1,
+    "fillHypsoWeight": 1.5,
     "fillHypsoMode": "elevation",
     "showMesh": false,
     "meshColor": "#888888",
-    "bgColor": "#04060f",
+    "bgColor": "#ffffff",
     "bgGradient": true,
     "depthOcclusion": true,
     "occlusionBias": 1,
-    "occlusionColor": "#3a2a66",
-    "occlusionOpacity": 0.22,
+    "occlusionColor": "#a80000",
+    "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
     "textureShiftX": 0,
@@ -79,7 +79,7 @@
     "pillarSegments": 8,
     "pillarLidColor": "#ffffff",
     "enabledContours": false,
-    "intervalContours": 1,
+    "intervalContours": 4,
     "colorContours": "#000000",
     "weightContours": 1,
     "opacityContours": 1,
@@ -90,7 +90,7 @@
     "hypsoIntervalContours": 10,
     "majorIntervalContours": 10,
     "majorWeightContours": 2,
-    "majorOffsetContours": 0,
+    "majorOffsetContours": 1,
     "closeRingsContours": false,
     "enabledHachure": false,
     "spacingHachure": 4,
@@ -103,15 +103,15 @@
     "hypsoModeHachure": "elevation",
     "hypsoBandedHachure": false,
     "hypsoIntervalHachure": 10,
-    "enabledFlow": true,
-    "spacingFlow": 4,
+    "enabledFlow": false,
+    "spacingFlow": 10,
     "stepFlow": 1,
-    "maxLenFlow": 300,
-    "colorFlow": "#22e0a0",
-    "weightFlow": 2,
+    "maxLenFlow": 100,
+    "colorFlow": "#000000",
+    "weightFlow": 1,
     "opacityFlow": 1,
     "dashFlow": "solid",
-    "hypsoFlow": true,
+    "hypsoFlow": false,
     "hypsoModeFlow": "elevation",
     "hypsoBandedFlow": false,
     "hypsoIntervalFlow": 10,
@@ -203,7 +203,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#f8c840",
+    "colorGpx": "#a80000",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -211,20 +211,20 @@
     "hypsoModeGpx": "elevation",
     "hypsoBandedGpx": false,
     "hypsoIntervalGpx": 10,
-    "showHillshade": true,
+    "showHillshade": false,
     "hillshadeAzimuth": 315,
     "hillshadeAltitude": 45,
     "hillshadeIntensity": 1,
-    "hillshadeOpacity": 0.2,
+    "hillshadeOpacity": 0.6,
     "hillshadeExaggeration": 2,
-    "hillshadeHighlightColor": "#1b2742",
+    "hillshadeHighlightColor": "#ffffff",
     "hillshadeShadowColor": "#000000",
     "hillshadeCastShadows": false,
     "hillshadeShadowSteps": 64,
-    "hillshadeShadowSoftness": 1.2,
-    "hillshadeShadowDarkness": 1,
+    "hillshadeShadowSoftness": 1.5,
+    "hillshadeShadowDarkness": 0.85,
     "showSun": false,
-    "hillshadeMultiDir": true,
+    "hillshadeMultiDir": false,
     "showSlopeShade": false,
     "slopeShadeOpacity": 0.75,
     "slopeColorLow": "#86efac",
@@ -246,48 +246,39 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#04181f"
+        "color": "#000080"
       },
       {
-        "pos": 0.18,
-        "color": "#086b52"
+        "pos": 0.25,
+        "color": "#00ffff"
       },
       {
-        "pos": 0.38,
-        "color": "#19d695"
-      },
-      {
-        "pos": 0.58,
-        "color": "#62f0d8"
+        "pos": 0.5,
+        "color": "#00ff00"
       },
       {
         "pos": 0.75,
-        "color": "#8a6bff"
-      },
-      {
-        "pos": 0.9,
-        "color": "#cd86ff"
+        "color": "#ff8800"
       },
       {
         "pos": 1,
-        "color": "#f6efff"
+        "color": "#800000"
       }
-    ],
-    "showRawTerrain": false
+    ]
   },
   "points": {
-    "showPoints": false,
-    "pointColor": "#8fe8f5",
-    "pointSize": 2.6,
-    "particleSpacing": 6,
+    "showPoints": true,
+    "pointColor": "#000000",
+    "pointSize": 6.5,
+    "particleSpacing": 1,
     "animateParticles": true,
-    "holoGlowColor": "#46f0d2",
-    "holoFloat": 2.2,
-    "holoNoiseAmt": 1,
+    "holoGlowColor": "#dd8d8d",
+    "holoFloat": 0.1,
+    "holoNoiseAmt": 0.5,
     "holoNoiseScale": 1,
     "holoFlowSpeed": 0.5,
-    "holoMaskContrast": 3,
-    "holoShimmer": 0.8
+    "holoMaskContrast": 2,
+    "holoShimmer": 1
   },
   "view": {
     "tilt": 50,
@@ -307,41 +298,33 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#04181f"
+      "color": "#000080"
     },
     {
-      "pos": 0.18,
-      "color": "#086b52"
+      "pos": 0.25,
+      "color": "#00ffff"
     },
     {
-      "pos": 0.38,
-      "color": "#19d695"
-    },
-    {
-      "pos": 0.58,
-      "color": "#62f0d8"
+      "pos": 0.5,
+      "color": "#00ff00"
     },
     {
       "pos": 0.75,
-      "color": "#8a6bff"
-    },
-    {
-      "pos": 0.9,
-      "color": "#cd86ff"
+      "color": "#ff8800"
     },
     {
       "pos": 1,
-      "color": "#f6efff"
+      "color": "#800000"
     }
   ],
   "bgGradientStops": [
     {
       "pos": 0,
-      "color": "#02030a"
+      "color": "#ffffff"
     },
     {
       "pos": 1,
-      "color": "#121d3d"
+      "color": "#d1d1d1"
     }
   ]
 }

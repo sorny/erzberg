@@ -12,7 +12,7 @@
     "jitterAmt": 0
   },
   "style": {
-    "showFill": true,
+    "showFill": false,
     "fillColor": "#000000",
     "fillHypsometric": true,
     "fillBanded": false,
@@ -39,7 +39,7 @@
     "showMirrorMinusY": false,
     "showMirrorPlusZ": true,
     "showMirrorMinusZ": false,
-    "enabledLines": true,
+    "enabledLines": false,
     "spacingLines": 4,
     "shiftLines": 0,
     "angleLines": 0,
@@ -78,7 +78,7 @@
     "pillarSize": 0.8,
     "pillarSegments": 8,
     "pillarLidColor": "#ffffff",
-    "enabledContours": true,
+    "enabledContours": false,
     "intervalContours": 2,
     "colorContours": "#7b4f2e",
     "weightContours": 1,
@@ -160,11 +160,11 @@
     "hypsoModeValley": "elevation",
     "hypsoBandedValley": false,
     "hypsoIntervalValley": 10,
-    "enabledStipple": false,
-    "spacingStipple": 0.5,
-    "weightStipple": 4,
-    "opacityStipple": 0.85,
-    "colorStipple": "#1a1a1a",
+    "enabledStipple": true,
+    "spacingStipple": 2,
+    "weightStipple": 1.5,
+    "opacityStipple": 1,
+    "colorStipple": "#2e1500",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -174,18 +174,18 @@
     "hypsoModeStipple": "elevation",
     "hypsoBandedStipple": false,
     "hypsoIntervalStipple": 10,
-    "enabledEngrave": false,
-    "spacingEngrave": 3,
+    "enabledEngrave": true,
+    "spacingEngrave": 2.5,
     "angleEngrave": 45,
     "levelsEngrave": 3,
     "sunAzimuthEngrave": 315,
-    "gammaEngrave": 1.5,
+    "gammaEngrave": 1.4,
     "colorEngrave": "#000000",
     "weightEngrave": 1,
     "opacityEngrave": 1,
     "dashEngrave": "solid",
     "hypsoEngrave": false,
-    "hypsoModeEngrave": "elevation",
+    "hypsoModeEngrave": "slope",
     "hypsoBandedEngrave": false,
     "hypsoIntervalEngrave": 10,
     "enabledSwiss": false,
@@ -310,12 +310,24 @@
       "color": "#442200"
     },
     {
-      "pos": 0.7,
+      "pos": 0.99,
       "color": "#ff7b3a"
     },
     {
       "pos": 1,
-      "color": "#ffe066"
+      "color": "#000000"
+    },
+    {
+      "pos": 0.6968325791855203,
+      "color": "#442200"
+    },
+    {
+      "pos": 0.9140271493212669,
+      "color": "#442200"
+    },
+    {
+      "pos": 0.47058823529411764,
+      "color": "#442200"
     }
   ],
   "bgGradientStops": [

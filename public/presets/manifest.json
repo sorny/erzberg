@@ -1,7 +1,6 @@
 [
   "Alpine Survey.json",
-  "Stone Relief.json",
-  "Dark Survey.json",
+  "Embers.json",
   "Teal Matrix.json",
   "Ink Atlas.json",
   "Swiss Topo.json",
@@ -12,9 +11,8 @@
   "Unknown Pleasures.json",
   "Dark Sun.json",
   "90s Network.json",
-  "Coral Relief.json",
+  "Stone Relief.json",
   "Scarlet Relief.json",
-  "Magma.json",
-  "Aurora.json",
-  "Abyss.json"
+  "Abyss.json",
+  "Particles.json"
 ]

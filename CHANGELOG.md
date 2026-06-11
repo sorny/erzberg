@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-11
+
+### Added
+- **Particles preset** — a pure pointillist take: an animated black hologram particle field (one mote per terrain cell, warm glow) over a white background, no line work or fill at all.
+
+### Changed
+- **Preset lineup reworked** (16 presets):
+  - **Dark Survey renamed to Embers** — the dotted ember-red flow trails on a dark navy night never looked like a survey.
+  - **Burnt Paper redesigned** around the new Engraving mode: slope-driven sepia cross-hatch plus fine charcoal stipple grain on the aged-paper background, replacing the previous lines + contours + fill combination.
+  - **Coral Relief, Magma, and Aurora removed.**
+  - Stone Relief moved next to Scarlet Relief in the preset list.
+  - All presets regenerated through the live app; stripped a stray `shiftCross` key that the X/Y→Lines migration had introduced (Crosshatch has no shift parameter).
+
 ## [0.7.0] - 2026-06-11
 
 ### Changed
