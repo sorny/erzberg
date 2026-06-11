@@ -178,6 +178,7 @@
     "stippleDensityMode": "elevation",
     "stippleGamma": 0.4,
     "stippleJitter": 0.15,
+    "seedStipple": 42,
     "hypsoStipple": true,
     "hypsoModeStipple": "elevation",
     "hypsoBandedStipple": false,
@@ -202,6 +203,7 @@
     "lengthSwiss": 1,
     "screeSwiss": 0.5,
     "screeWeightSwiss": 2.5,
+    "seedSwiss": 42,
     "colorSwiss": "#000000",
     "weightSwiss": 1,
     "opacitySwiss": 1,
@@ -271,9 +273,7 @@
         "pos": 1,
         "color": "#e08040"
       }
-    ],
-    "seedStipple": 42,
-    "seedSwiss": 42
+    ]
   },
   "points": {
     "showPoints": false,
