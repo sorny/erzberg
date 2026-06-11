@@ -2,7 +2,7 @@
  * CPU-side geometry builders.
  */
 
-import { cellElev, hasData, boxBlur } from './terrain'
+import { cellElev, hasData, boxBlur, jitterNoise } from './terrain'
 import { hexToRgb, computeVertexColor } from './colorUtils'
 import { geoToWorld, sampleTerrainElev } from './geoCoords'
 
@@ -124,9 +124,8 @@ export function buildLineGeometry(terrain, p) {
   })
 
   const MODES_CONFIG = [
-    { id:'X',       builder: (t, ctx) => buildRidgelines(t, ctx, false, p.spacingX, p.shiftX) },
-    { id:'Y',       builder: (t, ctx) => buildRidgelines(t, ctx, true,  p.spacingY, p.shiftY) },
-    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross) },
+    { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines) },
+    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross, p.angleCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
     { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
@@ -303,42 +302,75 @@ export function buildLineGeometry(terrain, p) {
 
 function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set(a, 0); out.set(b, a.length); return out }
 
-// ─── Ridgelines ──────────────────────────────────────────────────────────────
+// ─── Lines (arbitrary bearing) ───────────────────────────────────────────────
 
-function buildRidgelines(terrain, p, isY, spacing, shift) {
+/**
+ * Parallel terrain-draped lines at any bearing angle — the merger of the old
+ * X Lines (angle 0°) and Y Lines (angle 90°) modes.
+ *
+ * Lines sit at perpendicular positions pos = k·lineStep + shift (in grid cells)
+ * along the normal of the march direction, and are sampled in unit-cell steps.
+ * At 0°/90° the sample points land exactly on grid rows/columns, so those
+ * angles reproduce the old axis-aligned modes; oblique angles sample the
+ * terrain bilinearly along the rotated rays.
+ */
+function buildAngleLines(terrain, p, spacing, shift, angleDeg) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
-  const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl)), lineOffset = (shift ?? 0) % lineStep
-  const outerCount = isY ? cols : rows, innerCount = isY ? rows : cols
   const positions = new F32List(), colors = new F32List()
-  const aspect = isY ? Math.PI : Math.PI / 2
 
-  for (let outer = lineOffset; outer < outerCount; outer += lineStep) {
-    const outerPos = outer * scl - (isY ? halfW : halfH)
-    for (let inner = 0; inner < innerCount - 1; inner++) {
-      const r0 = isY ? inner : outer, c0 = isY ? outer : inner
-      const r1 = isY ? inner + 1 : outer, c1 = isY ? outer : inner + 1
-      if (!hasData(gridMask, r0, c0, cols) || !hasData(gridMask, r1, c1, cols)) continue
-      const elev0 = cellElev(grid, r0, c0, cols, elevScale, jitterAmt)
-      const elev1 = cellElev(grid, r1, c1, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev0, minZ, maxZ, elevMinCut, elevMaxCut) || !inElevCut(elev1, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-      const innerPos0 = inner * scl - (isY ? halfH : halfW), innerPos1 = (inner + 1) * scl - (isY ? halfH : halfW)
-      let x0, z0, x1, z1
-      if (isY) { x0 = outerPos; z0 = innerPos0; x1 = outerPos; z1 = innerPos1 }
-      else { x0 = innerPos0; z0 = outerPos; x1 = innerPos1; z1 = outerPos }
-      positions.push6(x0, elev0, z0, x1, elev1, z1)
-      const slope0 = gridSlopes[r0 * cols + c0], slope1 = gridSlopes[r1 * cols + c1]
-      colors.pushRgb(computeVertexColor(normElev(elev0, minZ, maxZ), slope0 / (maxSlope || 1), aspect, p))
-      colors.pushRgb(computeVertexColor(normElev(elev1, minZ, maxZ), slope1 / (maxSlope || 1), aspect, p))
+  const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
+  const shiftCells = (shift ?? 0) % lineStep
+  const theta = ((angleDeg ?? 0) * Math.PI) / 180
+  const dx = Math.cos(theta), dz = Math.sin(theta)   // march direction (grid cols/rows)
+  const nx = -dz, nz = dx                            // line-pitch normal
+
+  // Projection of the grid corners onto the normal (line positions) and the
+  // march direction (sample range) — covers the grid exactly at any angle.
+  let pMin = Infinity, pMax = -Infinity, tMin = Infinity, tMax = -Infinity
+  for (const [c, r] of [[0, 0], [cols - 1, 0], [0, rows - 1], [cols - 1, rows - 1]]) {
+    const pp = nx * c + nz * r; if (pp < pMin) pMin = pp; if (pp > pMax) pMax = pp
+    const tt = dx * c + dz * r; if (tt < tMin) tMin = tt; if (tt > tMax) tMax = tt
+  }
+  const kMin = Math.ceil((pMin - shiftCells) / lineStep)
+  const kMax = Math.floor((pMax - shiftCells) / lineStep)
+  const t0 = Math.ceil(tMin), t1 = Math.floor(tMax)
+
+  for (let k = kMin; k <= kMax; k++) {
+    const pos = k * lineStep + shiftCells
+    const ox = nx * pos, oz = nz * pos
+    let prevOk = false, prevC = 0, prevR = 0, prevE = 0
+    for (let t = t0; t <= t1; t++) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+      let elev = 0
+      if (ok) {
+        const ci = Math.round(fc), ri = Math.round(fr)
+        ok = hasData(gridMask, ri, ci, cols)
+        if (ok) {
+          elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
+          if (jitterAmt > 0) elev += jitterNoise(fc, fr) * jitterAmt
+          ok = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)
+        }
+      }
+      if (ok && prevOk) {
+        positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
+                        fc * scl - halfW, elev, fr * scl - halfH)
+        const i0 = Math.round(prevR) * cols + Math.round(prevC)
+        const i1 = Math.round(fr) * cols + Math.round(fc)
+        colors.pushRgb(computeVertexColor(normElev(prevE, minZ, maxZ), gridSlopes[i0] / (maxSlope || 1), theta, p))
+        colors.pushRgb(computeVertexColor(normElev(elev, minZ, maxZ), gridSlopes[i1] / (maxSlope || 1), theta, p))
+      }
+      prevOk = ok; prevC = fc; prevR = fr; prevE = elev
     }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
-function buildCrosshatch(terrain, p, spacing) {
-  const x = buildRidgelines(terrain, p, false, spacing, 0)
-  const y = buildRidgelines(terrain, p, true,  spacing, 0)
-  return { positions: concat(x.positions, y.positions), colors: concat(x.colors, y.colors) }
+function buildCrosshatch(terrain, p, spacing, angleDeg) {
+  const a = buildAngleLines(terrain, p, spacing, 0, angleDeg ?? 0)
+  const b = buildAngleLines(terrain, p, spacing, 0, (angleDeg ?? 0) + 90)
+  return { positions: concat(a.positions, b.positions), colors: concat(a.colors, b.colors) }
 }
 
 // ─── Hachure ──────────────────────────────────────────────────────────────────

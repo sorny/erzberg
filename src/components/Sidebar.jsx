@@ -21,7 +21,7 @@ const GREEN  = '#22c55e'
 const W      = 272   // panel width px
 
 // Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
-const MODE_HYPSO_IDS = ['X', 'Y', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Swiss', 'Gpx']
+const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Swiss', 'Gpx']
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
 function PanelStyles() {
@@ -357,7 +357,7 @@ export function Sidebar({
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
     terrain: true, levels: true, view: true, camera: false, presets: true, style: true,
-    modeX: true, modeY: false, modeCross: false, modePillars: false, modeContours: false,
+    modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     modeEngrave: false, modeSwiss: false,
@@ -502,8 +502,7 @@ export function Sidebar({
   const syncSectionsToStyle = (newStyle) => {
     setSec(prev => ({
       ...prev,
-      modeX:        !!newStyle.enabledX,
-      modeY:        !!newStyle.enabledY,
+      modeLines:    !!newStyle.enabledLines,
       modeCross:    !!newStyle.enabledCross,
       modePillars:  !!newStyle.enabledPillars,
       modeContours: !!newStyle.enabledContours,
@@ -779,28 +778,16 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          <Section title="Mode: X Lines" open={sec.modeX} onToggle={() => tog('modeX')} enabled={style.enabledX}>
-            <Tog label="Enabled" checked={style.enabledX} onChange={v => ss({ enabledX: v })} />
-            {style.enabledX && (
+          <Section title="Mode: Lines" open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
+            <Tog label="Enabled" checked={style.enabledLines} onChange={v => ss({ enabledLines: v })} />
+            {style.enabledLines && (
               <>
                 <Sub>
-                  <InlineSl label="X-Spacing" min={1} max={100} value={style.spacingX} onChange={v => ss({ spacingX: v })} />
-                  <InlineSl label="X-Shift" min={0} max={100} value={style.shiftX} onChange={v => ss({ shiftX: v })} />
+                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingLines} onChange={v => ss({ spacingLines: v })} />
+                  <InlineSl label="Shift" min={0} max={100} value={style.shiftLines} onChange={v => ss({ shiftLines: v })} />
+                  <InlineSl label="Angle" help="Bearing of the parallel lines. 0° runs along the X axis, 90° along Y, anything between gives diagonal ridgelines." min={0} max={180} step={1} value={style.angleLines ?? 0} onChange={v => ss({ angleLines: v })} fmt={v => `${v}°`} />
                 </Sub>
-                <ModeStyleOverride prefix="X" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Y Lines" open={sec.modeY} onToggle={() => tog('modeY')} enabled={style.enabledY}>
-            <Tog label="Enabled" checked={style.enabledY} onChange={v => ss({ enabledY: v })} />
-            {style.enabledY && (
-              <>
-                <Sub>
-                  <InlineSl label="Y-Spacing" min={1} max={100} value={style.spacingY} onChange={v => ss({ spacingY: v })} />
-                  <InlineSl label="Y-Shift" min={0} max={100} value={style.shiftY} onChange={v => ss({ shiftY: v })} />
-                </Sub>
-                <ModeStyleOverride prefix="Y" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
+                <ModeStyleOverride prefix="Lines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -811,6 +798,7 @@ export function Sidebar({
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} />
+                  <InlineSl label="Angle" help="Bearing of the first line set; the second runs perpendicular to it." min={0} max={90} step={1} value={style.angleCross ?? 0} onChange={v => ss({ angleCross: v })} fmt={v => `${v}°`} />
                 </Sub>
                 <ModeStyleOverride prefix="Cross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
@@ -1001,7 +989,7 @@ export function Sidebar({
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="Pitch between hatch strokes." min={1} max={20} step={0.5} value={style.spacingEngrave} onChange={v => ss({ spacingEngrave: v })} />
-                  <InlineSl label="Angle" help="Base hatch direction. Additional levels add +90°, +45°, +135°." min={0} max={180} step={5} value={style.angleEngrave} onChange={v => ss({ angleEngrave: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Angle" help="Base hatch direction. Additional levels add +90°, +45°, +135°." min={0} max={180} step={1} value={style.angleEngrave} onChange={v => ss({ angleEngrave: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Levels" help="Cross-hatch layers: shadows accumulate up to this many stacked directions." min={1} max={4} step={1} value={style.levelsEngrave} onChange={v => ss({ levelsEngrave: v })} />
                   <InlineSl label="Sun" help="Light azimuth driving the hatching: lit slopes stay sparse, shadows hatch densely." min={0} max={360} step={5} value={style.sunAzimuthEngrave} onChange={v => ss({ sunAzimuthEngrave: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 confines hatching to deep shadow; <1 spreads it." min={0.3} max={3} step={0.1} value={style.gammaEngrave} onChange={v => ss({ gammaEngrave: v })} fmt={v => v.toFixed(1)} />

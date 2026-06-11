@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-11
+
+### Changed
+- **X Lines + Y Lines merged into a single "Lines" mode with a bearing angle** (13 draw modes total). The new mode draws parallel terrain-draped ridgelines at any angle: 0° reproduces the old X Lines exactly, 90° the old Y Lines, and everything between unlocks diagonal compositions that previously required external rotation of the heightmap. Lines sit at perpendicular grid positions `k·spacing + shift` along the rotated normal and are sampled in unit-cell steps with bilinear elevation interpolation (exact grid samples at 0°/90°). Elevation jitter works at any angle.
+- **Crosshatch gains the same angle control** — it now draws the Lines builder at `angle` and `angle + 90°`, so the cross-grid can be rotated as a whole.
+- **Param schema change**: `enabledX`/`spacingX`/`shiftX`/`colorX`/… and the `*Y` equivalents are replaced by `*Lines` plus `angleLines`; Crosshatch adds `angleCross`. All bundled presets were migrated: X-only presets became Lines @ 0° (Blueprint, Dark Sun, Neon City, Unknown Pleasures, Burnt Paper), and Alpine Survey's identical X+Y pair became Crosshatch (visually unchanged). User-saved preset files containing the old X/Y keys load without error but those layers no longer render — re-save the preset after re-enabling Lines.
+
 ## [0.6.1] - 2026-06-11
 
 ### Fixed

@@ -78,14 +78,11 @@ export function useTerrainGeometry(p) {
     // in HeightmapLines + svgExport) and deliberately excluded here so dragging
     // those sliders updates the material live without a full geometry rebuild.
 
-    // Mode: X
-    p.enabledX, p.spacingX, p.shiftX, p.colorX,
-    p.hypsoX, p.hypsoModeX, p.hypsoBandedX, p.hypsoIntervalX,
-    // Mode: Y
-    p.enabledY, p.spacingY, p.shiftY, p.colorY,
-    p.hypsoY, p.hypsoModeY, p.hypsoBandedY, p.hypsoIntervalY,
+    // Mode: Lines
+    p.enabledLines, p.spacingLines, p.shiftLines, p.angleLines, p.colorLines,
+    p.hypsoLines, p.hypsoModeLines, p.hypsoBandedLines, p.hypsoIntervalLines,
     // Mode: Cross
-    p.enabledCross, p.spacingCross, p.colorCross,
+    p.enabledCross, p.spacingCross, p.angleCross, p.colorCross,
     p.hypsoCross, p.hypsoModeCross, p.hypsoBandedCross, p.hypsoIntervalCross,
     // Mode: Pillars
     p.enabledPillars, p.spacingPillars, p.colorPillars,

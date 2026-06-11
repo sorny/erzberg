@@ -44,14 +44,11 @@ const STYLE_DEF = {
   showMirrorPlusZ: true, showMirrorMinusZ: false,
 
   // ── DRAW MODES ───────────────────────────────────────────────────────────
-  // X Lines
-  enabledX: true, spacingX: 4, shiftX: 0, colorX: '#000000', weightX: 1, opacityX: 1, dashX: 'solid',
-  hypsoX: false, hypsoModeX: 'elevation', hypsoBandedX: false, hypsoIntervalX: 10,
-  // Y Lines
-  enabledY: false, spacingY: 4, shiftY: 0, colorY: '#000000', weightY: 1, opacityY: 1, dashY: 'solid',
-  hypsoY: false, hypsoModeY: 'elevation', hypsoBandedY: false, hypsoIntervalY: 10,
-  // Crosshatch
-  enabledCross: false, spacingCross: 4, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
+  // Lines (arbitrary bearing — 0° is the old X Lines, 90° the old Y Lines)
+  enabledLines: true, spacingLines: 4, shiftLines: 0, angleLines: 0, colorLines: '#000000', weightLines: 1, opacityLines: 1, dashLines: 'solid',
+  hypsoLines: false, hypsoModeLines: 'elevation', hypsoBandedLines: false, hypsoIntervalLines: 10,
+  // Crosshatch (two perpendicular line sets at angleCross / angleCross+90)
+  enabledCross: false, spacingCross: 4, angleCross: 0, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
   hypsoCross: false, hypsoModeCross: 'elevation', hypsoBandedCross: false, hypsoIntervalCross: 10,
   // Pillars
   enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',

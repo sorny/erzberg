@@ -1,22 +1,22 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fourteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using thirteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
-## 1 & 2. X Lines / Y Lines
+## 1. Lines
 
-The terrain grid is traversed row-by-row (X) or column-by-column (Y) at a configurable `spacing` interval. Within each row, adjacent grid samples $H(x, y)$ and $H(x+1, y)$ are connected as a line segment, lifted to their respective elevations in 3D. The `shift` parameter offsets the starting phase of the traversal.
+Parallel terrain-draped ridgelines at an arbitrary bearing angle $\theta$. Lines sit at perpendicular positions $p_k = k \cdot \text{spacing} + \text{shift}$ along the unit normal $(-\sin\theta, \cos\theta)$ and are sampled in unit-cell steps along the direction $(\cos\theta, \sin\theta)$, with elevations interpolated bilinearly and lifted into 3D. At $\theta = 0°$ and $90°$ the samples land exactly on grid rows/columns, reproducing the classic axis-aligned ridgeline look; oblique angles resample the terrain along rotated rays for diagonal compositions.
 
-## 3. Crosshatch
+## 2. Crosshatch
 
-Runs the X and Y ridgeline builders simultaneously and merges their output into a single layer.
+Runs the Lines builder twice — at the configured angle and at the angle + 90° — and merges both outputs into a single layer.
 
-## 4. Pillars
+## 3. Pillars
 
 For each sampled grid cell $(x, y)$, a vertical line segment is drawn from a configurable base depth up to $H(x, y)$ minus a gap. The result is an extruded bar chart of the terrain.
 
-## 5. Contours
+## 4. Contours
 
 Isolines are computed with Marching Squares. The terrain is thresholded at each contour level, and edge intersections are interpolated linearly to produce smooth isoline vertices.
 
@@ -24,11 +24,11 @@ Major contours are identified by a phase-offset rule: a contour at elevation $e$
 
 When a GeoTIFF is loaded, contour intervals are expressed in the file's native elevation unit (metres).
 
-## 6. Hachure
+## 5. Hachure
 
 The terrain gradient $\nabla H = (H_x, H_y)$ is estimated at each sampled cell using central differences. A short stroke is drawn from the cell centre in the direction of $-\nabla H$, with length proportional to $|\nabla H|$. Cells below a slope threshold are skipped.
 
-## 7. Flow Lines
+## 6. Flow Lines
 
 Flow paths are integrated through the gradient field using the forward Euler method:
 
@@ -40,11 +40,11 @@ where $\alpha$ is the step size.
 
 **Termination.** Each path stops when it exits the grid boundary, reaches a flat region ($|\nabla H| < \varepsilon$), or its next step would enter an already-occupied cell. The occupancy mask guarantees every grid cell is visited at most once across all paths, so the total segment count is bounded by $\text{rows} \times \text{cols}$ with no hard cap.
 
-## 8. Stream Network
+## 7. Stream Network
 
 Flow accumulation is computed by a topological sort of the grid directed acyclic graph: each cell drains to its lowest neighbour, and upstream cell counts accumulate downward. Cells whose accumulated count exceeds the `threshold` parameter are drawn as stream segments. The result approximates Strahler-order river networks.
 
-## 9. Pencil Shading
+## 8. Pencil Shading
 
 The discrete Laplacian $\nabla^2 H$ is approximated at each cell using the standard 4-neighbour finite difference:
 
@@ -52,7 +52,7 @@ $$\nabla^2 H(x, y) \approx H(x+1,y) + H(x-1,y) + H(x,y+1) + H(x,y-1) - 4\,H(x,y)
 
 Where $|\nabla^2 H|$ exceeds the threshold, a small cross-hatch mark is drawn oriented perpendicular to the local gradient, simulating a pencil shading stroke.
 
-## 10. Ridge Detection
+## 9. Ridge Detection
 
 Ridge crest lines are extracted using second-order differential geometry of the height field.
 
@@ -64,7 +64,7 @@ $$\mathcal{H} = \begin{pmatrix} H_{xx} & H_{xy} \\ H_{xy} & H_{yy} \end{pmatrix}
 
 **Parameters.** `radius` controls the pre-smoothing scale before differentiation — small values detect micro-features such as cliff edges; large values detect mountain-range crests. `threshold` sets the minimum curvature magnitude required for a cell to qualify.
 
-## 11. Valley Detection
+## 10. Valley Detection
 
 Valley floors and basins are identified using the Topographic Position Index:
 
@@ -74,7 +74,7 @@ where $\bar{H}_r$ is the mean elevation within a neighbourhood of radius $r$. Ce
 
 The neighbourhood mean is computed in $O(N)$ time (where $N$ is the number of grid cells) using a summed-area table, making large radii no more expensive than small ones.
 
-## 12. Stipple
+## 11. Stipple
 
 A stochastic dot-density map. Candidate positions are generated on a regular grid with pitch `spacing`, then each is displaced by a random jitter (up to `jitter × spacing` in each axis) to break mechanical regularity. For each candidate, a terrain attribute $d \in [0,1]$ is sampled:
 
@@ -89,7 +89,7 @@ The dot is placed with probability $d^\gamma$, where `gamma` sharpens ($\gamma >
 
 All randomness (jitter and acceptance) is drawn from a mulberry32 PRNG initialised from the mode's `seed` parameter, so a given seed always reproduces the identical dot pattern.
 
-## 13. Engraving
+## 12. Engraving
 
 Copperplate-style illumination cross-hatch, after the classic pen-and-ink rendering principle: stroke density encodes shadow.
 
@@ -107,7 +107,7 @@ so lightly shaded slopes carry sparse single-direction strokes while shadows acc
 
 **Strokes.** For each layer, parallel lines with pitch `spacing` are marched across the grid at the layer's angle in unit-cell steps. Each sample is draped onto the terrain via bilinear elevation interpolation; a stroke continues while consecutive samples stay above the layer threshold (and inside the data mask and elevation cut) and breaks the moment the surface becomes too bright — producing continuous polylines that hug the shadowed terrain and vanish into the light.
 
-## 14. Rock & Scree
+## 13. Rock & Scree
 
 Swisstopo-style alpine rock depiction, emitted as two independently rendered sub-layers.
 
@@ -125,7 +125,7 @@ Both sub-layers share the mode's seeded PRNG: the same seed reproduces the ident
 
 ## Ghost Occlusion
 
-All fourteen modes share the same depth-ordering system.
+All thirteen modes share the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

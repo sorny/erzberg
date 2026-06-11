@@ -105,19 +105,24 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
   }
 }
 
+/** Deterministic value-noise in [-1, 1] for elevation jitter. Works for
+ *  fractional grid coordinates (used by the angle-based line marcher) and
+ *  matches cellElev exactly at integer cells. */
+export function jitterNoise(c, r) {
+  const nx = c * 0.15, ny = r * 0.15, ix = Math.floor(nx), iy = Math.floor(ny), fx = nx - ix, fy = ny - iy
+  const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
+  const h = (a, b) => {
+    let n = ((a * 1031 + b * 2999) | 0); n = (((n ^ (n >>> 13)) * 0x45d9f3b) | 0)
+    return (((n ^ (n >>> 16)) & 0xffff) / 0xffff)
+  }
+  const noise = h(ix,iy)*(1-ux)*(1-uy) + h(ix+1,iy)*ux*(1-uy) + h(ix,iy+1)*(1-ux)*uy + h(ix+1,iy+1)*ux*uy
+  return (noise - 0.5) * 2
+}
+
 export function cellElev(grid, r, c, cols, elevScale, jitterAmt = 0) {
   const brightness = grid[r * cols + c]
   let elev = (brightness - 0.5) * 100 * elevScale
-  if (jitterAmt > 0) {
-    const nx = c * 0.15, ny = r * 0.15, ix = Math.floor(nx), iy = Math.floor(ny), fx = nx - ix, fy = ny - iy
-    const ux = fx * fx * fx * (fx * (fx * 6 - 15) + 10), uy = fy * fy * fy * (fy * (fy * 6 - 15) + 10)
-    const h = (a, b) => {
-      let n = ((a * 1031 + b * 2999) | 0); n = (((n ^ (n >>> 13)) * 0x45d9f3b) | 0)
-      return (((n ^ (n >>> 16)) & 0xffff) / 0xffff)
-    }
-    const noise = h(ix,iy)*(1-ux)*(1-uy) + h(ix+1,iy)*ux*(1-uy) + h(ix,iy+1)*(1-ux)*uy + h(ix+1,iy+1)*ux*uy
-    elev += (noise - 0.5) * jitterAmt * 2
-  }
+  if (jitterAmt > 0) elev += jitterNoise(c, r) * jitterAmt
   return elev
 }
 

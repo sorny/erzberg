@@ -5,7 +5,7 @@
 [![Deploy to GitHub Pages](https://github.com/sorny/erzberg/actions/workflows/deploy.yml/badge.svg)](https://github.com/sorny/erzberg/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap (8-bit or 16-bit PNG) or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the fourteen independent draw modes.
+A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap (8-bit or 16-bit PNG) or GeoTIFF and render it as 3D line art, structural relief, or architectural sketch using one or more of the thirteen independent draw modes.
 
 **Everything runs locally in your browser.** Your files never leave your machine — no server, no upload, no account.
 
@@ -17,12 +17,12 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Layered ghost occlusion.** Each line segment generates an invisible 3D curtain mesh that acts as a depth buffer. Lines occlude other lines rather than being swallowed by the terrain surface, and hidden segments can be rendered with a custom colour and opacity for an X-ray effect.
 
-**Fourteen draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
+**Thirteen draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
 
 | Mode | Technique |
 |---|---|
-| X Lines / Y Lines | Grid sampling along fixed axes |
-| Crosshatch | Combined X + Y ridgelines |
+| Lines | Parallel terrain ridgelines at any bearing angle |
+| Crosshatch | Two perpendicular line sets at a configurable angle |
 | Pillars | Vertical extrusion per cell (line, cuboid, or cylinder shapes) |
 | Contours | Marching Squares isolines, GIS-unit-aware |
 | Hachure | Slope-directed short strokes |
