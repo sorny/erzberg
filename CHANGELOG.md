@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-11
+
+### Fixed
+- **Hypsometric gradient unreachable without fill** — every draw mode offers hypsometric colouring, but the gradient editor only appeared in Terrain Style when *hypsometric fill* was enabled (the alternative `lineHypsometric` condition was a dead legacy key), so styling a mode's hypso colours required enabling fill first. The shared gradient editor (presets + stop picker) now renders directly inside each mode's Hypsometric panel — labelled as shared, since one global gradient drives fill and all hypsometric layers — and the Terrain Style copy appears whenever *any* hypsometric consumer is active, fill or not.
+
 ## [0.6.0] - 2026-06-11
 
 ### Added

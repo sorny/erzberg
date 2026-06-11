@@ -20,6 +20,9 @@ const ACCENT = '#3b82f6'
 const GREEN  = '#22c55e'
 const W      = 272   // panel width px
 
+// Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
+const MODE_HYPSO_IDS = ['X', 'Y', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Swiss', 'Gpx']
+
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
 function PanelStyles() {
   return (
@@ -264,7 +267,7 @@ function ExpBtn({ label, hint, onClick, active }) {
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
-function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true }) {
+function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
@@ -307,6 +310,18 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
             </div>
             <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
             {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
+            {/* The gradient is global (shared by every hypsometric layer + fill),
+                but it must be editable right where hypso is switched on — not
+                hidden behind enabling fill in Terrain Style. */}
+            {gradientStops && setGradientStops && (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 5, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
+                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
+                </div>
+                <GradientPicker stops={gradientStops} onChange={setGradientStops} />
+              </div>
+            )}
           </Sub>
         )}
       </div>
@@ -666,7 +681,10 @@ export function Sidebar({
               </Sub>
             )}
 
-            {style.fillHypsometric || style.lineHypsometric ? (
+            {/* Shared gradient editor: visible whenever ANY hypsometric consumer is
+                active — fill or any draw mode. (The old `style.lineHypsometric`
+                check was a dead legacy key, so this only ever showed for fill.) */}
+            {style.fillHypsometric || MODE_HYPSO_IDS.some(id => style[`hypso${id}`]) ? (
               <div style={{ marginBottom: 10, marginTop: 10 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
@@ -769,7 +787,7 @@ export function Sidebar({
                   <InlineSl label="X-Spacing" min={1} max={100} value={style.spacingX} onChange={v => ss({ spacingX: v })} />
                   <InlineSl label="X-Shift" min={0} max={100} value={style.shiftX} onChange={v => ss({ shiftX: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="X" style={style} ss={ss} />
+                <ModeStyleOverride prefix="X" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -782,7 +800,7 @@ export function Sidebar({
                   <InlineSl label="Y-Spacing" min={1} max={100} value={style.spacingY} onChange={v => ss({ spacingY: v })} />
                   <InlineSl label="Y-Shift" min={0} max={100} value={style.shiftY} onChange={v => ss({ shiftY: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Y" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Y" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -794,7 +812,7 @@ export function Sidebar({
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Cross" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Cross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -831,7 +849,7 @@ export function Sidebar({
                     <ColorRow label="Lid Color" value={style.pillarLidColor ?? '#ffffff'} onChange={v => ss({ pillarLidColor: v })} />
                   )}
                 </Sub>
-                <ModeStyleOverride prefix="Pillars" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Pillars" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -863,7 +881,7 @@ export function Sidebar({
                     </Sub>
                   )}
                 </Sub>
-                <ModeStyleOverride prefix="Contours" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Contours" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -876,7 +894,7 @@ export function Sidebar({
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingHachure} onChange={v => ss({ spacingHachure: v })} />
                   <InlineSl label="Length" min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Hachure" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Hachure" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -890,7 +908,7 @@ export function Sidebar({
                   <InlineSl label="Step" min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
                   <InlineSl label="Max Len" min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Flow" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Flow" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -902,7 +920,7 @@ export function Sidebar({
                 <Sub>
                   <InlineSl label="Threshold" min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Dag" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Dag" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -915,7 +933,7 @@ export function Sidebar({
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPencil} onChange={v => ss({ spacingPencil: v })} />
                   <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdPencil} onChange={v => ss({ thresholdPencil: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Pencil" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Pencil" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -929,7 +947,7 @@ export function Sidebar({
                   <InlineSl label="Radius" min={0.2} max={2} step={0.1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
                   <InlineSl label="Threshold" min={0.005} max={0.5} step={0.005} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Ridge" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Ridge" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -943,7 +961,7 @@ export function Sidebar({
                   <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusValley} onChange={v => ss({ radiusValley: v })} />
                   <InlineSl label="Threshold" min={0.005} max={5} step={0.005} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Valley" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Valley" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -972,7 +990,7 @@ export function Sidebar({
                     </div>
                   </div>
                 </Sub>
-                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} label="DOT STYLE" showDash={false} />
+                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} label="DOT STYLE" showDash={false} />
               </>
             )}
           </Section>
@@ -988,7 +1006,7 @@ export function Sidebar({
                   <InlineSl label="Sun" help="Light azimuth driving the hatching: lit slopes stay sparse, shadows hatch densely." min={0} max={360} step={5} value={style.sunAzimuthEngrave} onChange={v => ss({ sunAzimuthEngrave: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 confines hatching to deep shadow; <1 spreads it." min={0.3} max={3} step={0.1} value={style.gammaEngrave} onChange={v => ss({ gammaEngrave: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
-                <ModeStyleOverride prefix="Engrave" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Engrave" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -1005,7 +1023,7 @@ export function Sidebar({
                   <InlineSl label="Scree size" min={0.5} max={8} step={0.5} value={style.screeWeightSwiss} onChange={v => ss({ screeWeightSwiss: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical stroke wobble and scree pattern." min={1} max={999} step={1} value={style.seedSwiss ?? 42} onChange={v => ss({ seedSwiss: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Swiss" style={style} ss={ss} />
+                <ModeStyleOverride prefix="Swiss" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
               </>
             )}
           </Section>
@@ -1032,7 +1050,7 @@ export function Sidebar({
               {gpxPoints?.length > 0 && (
                 <>
                   <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>{gpxPoints.length} track points</div>
-                  <ModeStyleOverride prefix="Gpx" style={style} ss={ss} />
+                  <ModeStyleOverride prefix="Gpx" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
                 </>
               )}
             </Section>
