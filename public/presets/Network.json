@@ -108,7 +108,6 @@
     "hypsoModePencil": "elevation",
     "hypsoBandedPencil": false,
     "hypsoIntervalPencil": 10,
-    "showLines": true,
     "gradientStops": [
       {
         "pos": 0,

@@ -189,7 +189,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
 
-      {p.showLines && Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
+      {Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
         const { weight, opacity, dash } = layerStyle(layer.id, p)
         return (
         <LineLayer

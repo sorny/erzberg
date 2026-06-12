@@ -153,7 +153,7 @@ export function exportSVG({
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   showFill,
-  showLines, depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
+  depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
   elevMinCut, elevMaxCut,
   baseName,
@@ -205,7 +205,7 @@ export function exportSVG({
   if (showFill && surfaceGeo && groupMatrix) {
     zGeos.push(surfaceGeo)
   }
-  if (showLines && Array.isArray(lineGeo)) {
+  if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       if (layer.curtains && layer.curtains.positions.length > 0) {
         zGeos.push(layer.curtains)
@@ -227,7 +227,7 @@ export function exportSVG({
 
   const svgLayers = []
 
-  if (showLines && Array.isArray(lineGeo)) {
+  if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
       const { weight = 1, opacity = 1, dash = 'solid' } = lineStyles[id] ?? {}

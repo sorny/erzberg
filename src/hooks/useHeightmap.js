@@ -260,7 +260,7 @@ async function loadGeoTiffPixels(file) {
   let bbox = null, crs = 'EPSG:4326'
   try {
     bbox = image.getBoundingBox()
-    const gk = image.geoKeys ?? {}
+    const gk = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
     const projCS = gk.ProjectedCSTypeGeoKey
 
     if (projCS) {

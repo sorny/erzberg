@@ -242,7 +242,6 @@
     "tanakaSunAzimuth": 315,
     "tanakaWeightBright": 2.5,
     "tanakaWeightDark": 0.5,
-    "showLines": false,
     "gradientStops": [
       {
         "pos": 0,

@@ -121,9 +121,6 @@ const STYLE_DEF = {
   // Tanaka contours
   tanakaContours: false, tanakaSunAzimuth: 315, tanakaWeightBright: 2.5, tanakaWeightDark: 0.5,
 
-  // Master visibility for all lines
-
-  showLines: true,
   // Global Gradient Stops
   gradientStops: GRADIENT_PRESETS['Jet'],
 }
@@ -369,7 +366,6 @@ export default function App() {
     if (vals.whitePoint   != null) t.whitePoint    = vals.whitePoint
     
     // Line globals
-    if (vals.showLines    != null) s.showLines     = vals.showLines
     if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
     if (vals.occlusionBias  != null) s.occlusionBias  = vals.occlusionBias
     if (vals.occlusionColor != null) s.occlusionColor = vals.occlusionColor

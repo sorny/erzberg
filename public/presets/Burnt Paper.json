@@ -12,9 +12,9 @@
     "jitterAmt": 0
   },
   "style": {
-    "showFill": false,
-    "fillColor": "#000000",
-    "fillHypsometric": true,
+    "showFill": true,
+    "fillColor": "#d9cbb4",
+    "fillHypsometric": false,
     "fillBanded": false,
     "fillHypsoInterval": 10,
     "fillHypsoWeight": 1.5,
@@ -242,7 +242,6 @@
     "tanakaSunAzimuth": 315,
     "tanakaWeightBright": 2.5,
     "tanakaWeightDark": 0.5,
-    "showLines": true,
     "gradientStops": [
       {
         "pos": 0,

@@ -277,7 +277,7 @@ export function Scene({
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
         showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
-        showLines: p.showLines, depthOcclusion: p.depthOcclusion,
+        depthOcclusion: p.depthOcclusion,
         occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
         elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,
         particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,

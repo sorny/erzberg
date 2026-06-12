@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-13
+
+### Fixed
+- **Scarlet Relief / Stone Relief presets silently disabled all draw modes** — both presets carried `"showLines": false`, a hidden master visibility switch over every line layer that had no UI control anywhere. After applying either preset, enabling any draw mode built geometry but rendered nothing, with no way back except Reset or another preset. The `showLines` param has been removed entirely (app state, preset apply, renderer gate, SVG export, and all 17 bundled preset files) — line visibility is now governed solely by the per-mode Enabled toggles.
+- **GeoTIFF CRS detection never read the projection geokey** — `image.geoKeys` is undefined in the bundled geotiff.js, so `ProjectedCSTypeGeoKey` was never picked up (now read via `image.getGeoKeys()`) and CRS detection always fell back to the bbox heuristic. GPX overlays only worked when the UTM zone inferred from the track's longitude happened to match the file's zone; for files whose coordinates lie outside their nominal zone (e.g. zone 32 with eastings near 1,000,000), every track point clipped and the GPX layer silently vanished.
+
 ## [0.7.1] - 2026-06-11
 
 ### Added

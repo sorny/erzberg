@@ -124,9 +124,8 @@ export function useTerrainGeometry(p) {
     p.seedSwiss, p.colorSwiss,
     p.hypsoSwiss, p.hypsoModeSwiss, p.hypsoBandedSwiss, p.hypsoIntervalSwiss,
 
-    // NOTE: showLines and the fill params (showFill, fillColor, fillBanded,
-    // fillHypso*) are render-side only — lines toggle visibility in
-    // HeightmapLines and fill styling is pure GPU uniforms in SurfaceMesh.
+    // NOTE: the fill params (showFill, fillColor, fillBanded, fillHypso*) are
+    // render-side only — fill styling is pure GPU uniforms in SurfaceMesh.
     // They are deliberately excluded so toggling/dragging them never spawns a
     // worker rebuild. gradientStops stays: it is baked into line vertex colors.
     p.gradientStops,
