@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-13
+
+### Changed
+- **Crosshatch rectangles now close on the grid boundary** — previously the lines started at one grid corner and stepped by a fixed spacing, leaving a variable partial gap at the far edges (half-open rectangles along the right and bottom). Each crosshatch family now pins its first and last line exactly to the grid edges and nudges the step so a whole number of intervals spans the grid, so the cells close flush on all four sides. The requested spacing is honoured as closely as an integer interval count allows. Single-direction Lines mode is unchanged.
+
+### Fixed
+- **Crosshatch border lines missing at axis-aligned angles** — with the boundary-closing above, the edge lines sit exactly on the grid border, where the march direction's floating-point drift (`cos 90°` is `6e-17`, not `0`) accumulated along each line and pushed its samples just outside the `[0, cols-1]` bounds. At Angle 0 this clipped the entire left border line and part of the right, varying with heightmap size. The march direction is now snapped to exact `0/±1` at multiples of 90°, so the boundary samples land precisely on the inclusive edge and the border lines render fully.
+
 ## [0.7.2] - 2026-06-13
 
 ### Fixed

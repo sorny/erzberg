@@ -314,7 +314,7 @@ function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set
  * angles reproduce the old axis-aligned modes; oblique angles sample the
  * terrain bilinearly along the rotated rays.
  */
-function buildAngleLines(terrain, p, spacing, shift, angleDeg) {
+function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const positions = new F32List(), colors = new F32List()
@@ -322,8 +322,14 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg) {
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
   const shiftCells = (shift ?? 0) % lineStep
   const theta = ((angleDeg ?? 0) * Math.PI) / 180
-  const dx = Math.cos(theta), dz = Math.sin(theta)   // march direction (grid cols/rows)
-  const nx = -dz, nz = dx                            // line-pitch normal
+  // Snap near-axis components to exact 0/±1. At multiples of 90° cos/sin carry a
+  // ~1e-16 rounding error; with fitBoundary the edge lines sit exactly on the grid
+  // border, so that drift accumulates along the march (fc += dx·t) and pushes the
+  // samples just outside [0, cols-1], clipping the whole left / part of the right
+  // border line. Exact axis values keep them on the inclusive boundary.
+  const snap = (v) => Math.abs(v) < 1e-9 ? 0 : Math.abs(v - 1) < 1e-9 ? 1 : Math.abs(v + 1) < 1e-9 ? -1 : v
+  const dx = snap(Math.cos(theta)), dz = snap(Math.sin(theta))   // march direction (grid cols/rows)
+  const nx = -dz, nz = dx                                        // line-pitch normal
 
   // Projection of the grid corners onto the normal (line positions) and the
   // march direction (sample range) — covers the grid exactly at any angle.
@@ -332,12 +338,25 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg) {
     const pp = nx * c + nz * r; if (pp < pMin) pMin = pp; if (pp > pMax) pMax = pp
     const tt = dx * c + dz * r; if (tt < tMin) tMin = tt; if (tt > tMax) tMax = tt
   }
-  const kMin = Math.ceil((pMin - shiftCells) / lineStep)
-  const kMax = Math.floor((pMax - shiftCells) / lineStep)
   const t0 = Math.ceil(tMin), t1 = Math.floor(tMax)
 
-  for (let k = kMin; k <= kMax; k++) {
-    const pos = k * lineStep + shiftCells
+  // Line positions along the normal. By default lines sit at fixed multiples of
+  // lineStep, so the far edge keeps whatever partial gap is left over (open/half
+  // rectangles in Crosshatch). When fitBoundary is set, the first and last lines
+  // are pinned to the grid edges (pMin/pMax) and the step is nudged so an integer
+  // number of intervals spans them exactly — closing the rectangles on all sides.
+  const linePos = []
+  if (fitBoundary) {
+    const span = pMax - pMin
+    const n = Math.max(1, Math.round(span / lineStep))
+    for (let k = 0; k <= n; k++) linePos.push(pMin + (span * k) / n)
+  } else {
+    const kMin = Math.ceil((pMin - shiftCells) / lineStep)
+    const kMax = Math.floor((pMax - shiftCells) / lineStep)
+    for (let k = kMin; k <= kMax; k++) linePos.push(k * lineStep + shiftCells)
+  }
+
+  for (const pos of linePos) {
     const ox = nx * pos, oz = nz * pos
     let prevOk = false, prevC = 0, prevR = 0, prevE = 0
     for (let t = t0; t <= t1; t++) {
@@ -368,8 +387,8 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg) {
 }
 
 function buildCrosshatch(terrain, p, spacing, angleDeg) {
-  const a = buildAngleLines(terrain, p, spacing, 0, angleDeg ?? 0)
-  const b = buildAngleLines(terrain, p, spacing, 0, (angleDeg ?? 0) + 90)
+  const a = buildAngleLines(terrain, p, spacing, 0, angleDeg ?? 0, true)
+  const b = buildAngleLines(terrain, p, spacing, 0, (angleDeg ?? 0) + 90, true)
   return { positions: concat(a.positions, b.positions), colors: concat(a.colors, b.colors) }
 }
 
