@@ -127,7 +127,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross, p.angleCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
-    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours) },
+    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours) },
     { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
@@ -422,17 +422,15 @@ function buildHachure(terrain, p, spacing, length) {
 
 // ─── Contours ─────────────────────────────────────────────────────────────────
 
-// Chains raw marching-squares segments (grid coords) into polylines, then closes
-// any open ends that sit on the grid border by walking the border between them.
-// Returns a flat world-space array [x0,y,z0, x1,y,z1, ...] of segment pairs.
-function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
+// Chains raw marching-squares segments (4 grid coords per segment) into polylines
+// by walking shared endpoints. Returns an array of chains, each an ordered list of
+// { c, r } grid points; a closed ring has its first point equal to its last.
+// Used by buildContours for both Chaikin smoothing and border ring-closing.
+function chainContourSegments(levelSegs) {
   const n = levelSegs.length / 4
   if (n === 0) return []
-
-  const toWorld = (c, r) => [c * scl - halfW, r * scl - halfH]
   const key = (c, r) => `${c},${r}`
 
-  // Build endpoint adjacency: key -> [segment indices]
   const adj = new Map()
   for (let i = 0; i < n; i++) {
     const k0 = key(levelSegs[i*4],   levelSegs[i*4+1])
@@ -443,7 +441,6 @@ function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
     adj.get(k1).push(i)
   }
 
-  // Chain segments into polylines
   const visited = new Uint8Array(n)
   const chains = []
   for (let start = 0; start < n; start++) {
@@ -460,27 +457,54 @@ function closeContourRings(levelSegs, rows, cols, scl, halfW, halfH, elev) {
     ]) {
       let tip = getEnd()
       while (true) {
-        const next = (adj.get(key(tip.c, tip.r)) || []).find(i => !visited[i])
-        if (next === undefined) break
-        visited[next] = 1
-        const nc0 = levelSegs[next*4], nr0 = levelSegs[next*4+1]
-        const nc1 = levelSegs[next*4+2], nr1 = levelSegs[next*4+3]
+        const nxt = (adj.get(key(tip.c, tip.r)) || []).find(i => !visited[i])
+        if (nxt === undefined) break
+        visited[nxt] = 1
+        const nc0 = levelSegs[nxt*4], nr0 = levelSegs[nxt*4+1]
+        const nc1 = levelSegs[nxt*4+2], nr1 = levelSegs[nxt*4+3]
         tip = key(nc0, nr0) === key(tip.c, tip.r) ? { c: nc1, r: nr1 } : { c: nc0, r: nr0 }
         insert(tip)
       }
     }
     chains.push(chain)
   }
+  return chains
+}
 
-  // Emit all chain segments
-  const result = []
-  for (const chain of chains) {
-    for (let i = 0; i < chain.length - 1; i++) {
-      const [x0, z0] = toWorld(chain[i].c,   chain[i].r)
-      const [x1, z1] = toWorld(chain[i+1].c, chain[i+1].r)
-      result.push(x0, elev, z0, x1, elev, z1)
+// Chaikin corner-cutting: replaces the staircase of a marching-squares polyline
+// with a smooth curve, run `iterations` times. Closed rings (head === tail) are
+// smoothed as loops; open chains keep their two endpoints pinned so border-anchored
+// lines stay put.
+function chaikinSmooth(pts, iterations) {
+  let out = pts
+  for (let it = 0; it < iterations && out.length > 2; it++) {
+    const closed = out[0].c === out[out.length - 1].c && out[0].r === out[out.length - 1].r
+    const src = closed ? out.slice(0, -1) : out
+    const m = src.length
+    const next = []
+    if (!closed) next.push(src[0])
+    for (let i = 0; i < (closed ? m : m - 1); i++) {
+      const a = src[i], b = src[(i + 1) % m]
+      next.push({ c: a.c * 0.75 + b.c * 0.25, r: a.r * 0.75 + b.r * 0.25 })
+      next.push({ c: a.c * 0.25 + b.c * 0.75, r: a.r * 0.25 + b.r * 0.75 })
     }
+    if (closed) next.push({ c: next[0].c, r: next[0].r })
+    else next.push(src[m - 1])
+    out = next
   }
+  return out
+}
+
+// Given one contour level's chains (grid coords), returns flat world-space segments
+// [x0,y,z0, x1,y,z1, ...] that bridge open chain endpoints sitting on the grid
+// border — walking the border between them and inserting any corners — so the level
+// closes into rings. Only the bridges are returned; the chains themselves are
+// emitted (and optionally smoothed) by the caller, so smoothing and ring-closing
+// compose cleanly.
+function borderCloseSegments(chains, rows, cols, scl, halfW, halfH, elev) {
+  const toWorld = (c, r) => [c * scl - halfW, r * scl - halfH]
+  const key = (c, r) => `${c},${r}`
+  const result = []
 
   // Collect open border endpoints
   // Clockwise border position in [0, 4): top=0..1, right=1..2, bottom=2..3, left=3..4
@@ -576,9 +600,13 @@ function edgeLerp01(va, vb, level) {
 const _edgeX = new Float64Array(4)
 const _edgeY = new Float64Array(4)
 
-function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings) {
+function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings, smoothing) {
   if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
   const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
+  const smooth = Math.max(0, Math.min(4, Math.round(smoothing ?? 0)))
+  // Smoothing and ring-closing both need the per-level segments chained into
+  // polylines first, so they share the post-scan path.
+  const needsChains = closeRings || smooth > 0
 
   const minorPos = new F32List(), minorCol = new F32List()
   const majorPos = new F32List(), majorCol = new F32List()
@@ -596,8 +624,9 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
       : (majorMod === 1 ? 1 : 0)
   }
 
-  // closeRings chains raw grid-space segments per level after the scan.
-  const levelSegs = closeRings ? new Array(numSteps).fill(null) : null
+  // When chaining is needed, raw grid-space segments are collected per level and
+  // chained/smoothed/closed after the scan; otherwise they emit directly (fast path).
+  const levelSegs = needsChains ? new Array(numSteps).fill(null) : null
   const lvl0 = numSteps > 0 ? levelVal[0] : 0
   const ex = _edgeX, ey = _edgeY
 
@@ -646,7 +675,7 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
         const pairs = MARCHING_TABLE[idx]
         for (let pi = 0; pi < pairs.length; pi += 2) {
           const e0 = pairs[pi], e1 = pairs[pi + 1]
-          if (closeRings) {
+          if (needsChains) {
             (levelSegs[k] ??= []).push(ex[e0], ey[e0], ex[e1], ey[e1])
           } else {
             const isMajor = levelMajor[k] === 1
@@ -662,18 +691,34 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
     }
   }
 
-  if (closeRings) {
+  // Post-scan: chain each level into polylines, optionally Chaikin-smooth them into
+  // soft "form lines", and optionally add border-bridging segments to close rings.
+  if (needsChains) {
     for (let k = 0; k < numSteps; k++) {
       const segs = levelSegs[k]
       if (!segs || segs.length === 0) continue
-      const worldSegs = closeContourRings(segs, rows, cols, scl, halfW, halfH, levelElev[k])
+      const chains = chainContourSegments(segs)
       const isMajor = levelMajor[k] === 1
       const tp = isMajor ? majorPos : minorPos
       const tc = isMajor ? majorCol : minorCol
-      for (let j = 0; j < worldSegs.length; j += 6) {
-        tp.push6(worldSegs[j], worldSegs[j+1], worldSegs[j+2], worldSegs[j+3], worldSegs[j+4], worldSegs[j+5])
-        tc.push6(levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2],
-                 levelRgb[k * 3], levelRgb[k * 3 + 1], levelRgb[k * 3 + 2])
+      const y = levelElev[k]
+      const cr = levelRgb[k * 3], cg = levelRgb[k * 3 + 1], cb = levelRgb[k * 3 + 2]
+
+      for (const chain of chains) {
+        const pts = smooth > 0 ? chaikinSmooth(chain, smooth) : chain
+        for (let i = 0; i < pts.length - 1; i++) {
+          tp.push6(pts[i].c * scl - halfW,   y, pts[i].r * scl - halfH,
+                   pts[i+1].c * scl - halfW, y, pts[i+1].r * scl - halfH)
+          tc.push6(cr, cg, cb, cr, cg, cb)
+        }
+      }
+
+      if (closeRings) {
+        const bridges = borderCloseSegments(chains, rows, cols, scl, halfW, halfH, y)
+        for (let j = 0; j < bridges.length; j += 6) {
+          tp.push6(bridges[j], bridges[j+1], bridges[j+2], bridges[j+3], bridges[j+4], bridges[j+5])
+          tc.push6(cr, cg, cb, cr, cg, cb)
+        }
       }
     }
   }
@@ -850,6 +895,7 @@ function buildDagThinning(terrain, p, threshold) {
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
+
 
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
 

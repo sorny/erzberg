@@ -24,7 +24,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 | Lines | Parallel terrain ridgelines at any bearing angle |
 | Crosshatch | Two perpendicular line sets at a configurable angle |
 | Pillars | Vertical extrusion per cell (line, cuboid, or cylinder shapes) |
-| Contours | Marching Squares isolines, GIS-unit-aware |
+| Contours | Marching Squares isolines, GIS-unit-aware, with optional Chaikin smoothing for soft "form lines" |
 | Hachure | Slope-directed short strokes |
 | Flow Lines | Euler-integrated drainage paths |
 | Stream Network | Strahler-order flow accumulation |

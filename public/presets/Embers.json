@@ -92,6 +92,7 @@
     "majorWeightContours": 2,
     "majorOffsetContours": 0,
     "closeRingsContours": false,
+    "smoothingContours": 0,
     "enabledHachure": false,
     "spacingHachure": 3,
     "lengthHachure": 5,

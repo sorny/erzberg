@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.3] - 2026-06-13
+## [0.7.4] - 2026-06-14
+
+### Added
+- **Contour smoothing ("form lines")** — a Smoothing control in the Contours mode (0–4 Chaikin corner-cutting passes) turns the crisp marching-squares staircase into soft, flowing illustrative isolines. 0 keeps the exact original lines; higher values round the corners progressively. When smoothing or *Close contours* is on, each level's segments are chained into polylines, smoothed, and optionally ring-closed in a shared pass (the default still emits segments inline, so nothing slows down when smoothing is off). Smoothing does not apply to the Tanaka path.
+
+### Changed
+- All bundled presets regenerated to carry the new `smoothingContours` param (default 0 — no visual change).
 
 ### Changed
 - **Crosshatch rectangles now close on the grid boundary** — previously the lines started at one grid corner and stepped by a fixed spacing, leaving a variable partial gap at the far edges (half-open rectangles along the right and bottom). Each crosshatch family now pins its first and last line exactly to the grid edges and nudges the step so a whole number of intervals spans the grid, so the cells close flush on all four sides. The requested spacing is honoured as closely as an integer interval count allows. Single-direction Lines mode is unchanged.

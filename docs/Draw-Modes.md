@@ -24,6 +24,8 @@ Major contours are identified by a phase-offset rule: a contour at elevation $e$
 
 When a GeoTIFF is loaded, contour intervals are expressed in the file's native elevation unit (metres).
 
+**Smoothing (form lines).** With smoothing enabled, each level's raw marching-squares segments are first chained into polylines, then refined by Chaikin corner-cutting: every pass replaces each vertex with two points at the $\tfrac14$ and $\tfrac34$ positions of its adjacent edges, converging toward a quadratic B-spline. Closed rings are smoothed as loops; open chains keep their endpoints pinned so border-anchored lines stay put. The result is the soft, hand-drawn "form line" look. Smoothing operates purely in the horizontal plane — each line stays at its constant contour elevation — and composes with the *Close contours* option (border-bridging segments are added after smoothing).
+
 ## 5. Hachure
 
 The terrain gradient $\nabla H = (H_x, H_y)$ is estimated at each sampled cell using central differences. A short stroke is drawn from the cell centre in the direction of $-\nabla H$, with length proportional to $|\nabla H|$. Cells below a slope threshold are skipped.
