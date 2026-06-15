@@ -430,7 +430,9 @@ export function Sidebar({
   useEffect(() => () => { erosionWorkerRef.current?.terminate() }, [])
 
   const handleTexturePicker = () => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' })
+    // Restrict to formats THREE.TextureLoader (an <img> under the hood) can decode.
+    // 'image/*' let users pick TIFFs, which browsers can't decode and fail to load.
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif' })
     input.onchange = (e) => {
       const file = e.target.files[0]
       if (!file) return

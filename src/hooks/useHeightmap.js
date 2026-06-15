@@ -318,7 +318,9 @@ export function useHeightmap() {
   }, [setHeightmap, clearGeoTiffMeta])
 
   const loadFromPicker = useCallback((onLoaded) => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/*' })
+    // PNG only — this path decodes a greyscale heightmap (incl. 16-bit, which is
+    // PNG-specific). 'image/*' let users pick GeoTIFFs/JPEGs that then fail here.
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,.png' })
     input.onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]).then(onLoaded) }
     input.click()
   }, [load])
@@ -342,7 +344,7 @@ export function useHeightmap() {
   }, [setHeightmap, setGeoTiffMeta])
 
   const loadGeoTiffFromPicker = useCallback((onLoaded) => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.tif,.tiff,.geotiff' })
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.tif,.tiff,.geotiff,image/tiff' })
     input.onchange = (e) => { if (e.target.files[0]) loadGeoTiff(e.target.files[0]).then(onLoaded) }
     input.click()
   }, [loadGeoTiff])

@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.4] - 2026-06-14
+## [0.7.5] - 2026-06-15
+
+### Fixed
+- **File pickers accepted the wrong formats.** The PNG heightmap picker used `image/*`, so you could select a GeoTIFF (or JPEG) that then failed to load on the PNG decode path; it is now restricted to PNG. The texture picker had the same latent issue — it loads via `THREE.TextureLoader` (an `<img>` element), which cannot decode TIFF — and is now limited to browser-decodable raster formats (PNG, JPEG, WebP, GIF, BMP, AVIF). The GeoTIFF picker now also offers the `image/tiff` MIME type alongside the `.tif`/`.tiff`/`.geotiff` extensions. GPX (`.gpx`) and preset import (`.json`) were already correct.
 
 ### Added
 - **Contour smoothing ("form lines")** — a Smoothing control in the Contours mode (0–4 Chaikin corner-cutting passes) turns the crisp marching-squares staircase into soft, flowing illustrative isolines. 0 keeps the exact original lines; higher values round the corners progressively. When smoothing or *Close contours* is on, each level's segments are chained into polylines, smoothed, and optionally ring-closed in a shared pass (the default still emits segments inline, so nothing slows down when smoothing is off). Smoothing does not apply to the Tanaka path.
