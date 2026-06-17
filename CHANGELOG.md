@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-06-17
+
+### Fixed
+- **Projected (UTM) GeoTIFFs loaded almost flat, needing a large manual elevation-scale boost.** The auto vertical-exaggeration heuristic classified the pixel size as geographic *degrees* whenever it was `< 1.0`, then multiplied it by 111,320 to "convert" to metres. For a projected CRS (UTM, Web Mercator, …) the pixel size is *already* in metres, and high-resolution / lidar data legitimately has sub-metre pixels — so a 0.5 m pixel was inflated ~111,320× to ~55 km, collapsing the suggested elevation scale to the `0.1` clamp floor and rendering steep terrain as flat. Degrees-vs-metres is now decided by the **CRS** (via the same geokey detection used for GPX projection), not by pixel-size magnitude: a geographic CRS still converts degrees→metres, while a projected CRS uses the reported metre pixel size as-is. The `< 1.0 ⇒ degrees` test is gone.
+
 ## [0.7.5] - 2026-06-15
 
 ### Fixed

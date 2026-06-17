@@ -241,23 +241,12 @@ async function loadGeoTiffPixels(file) {
     }
   }
 
-  let suggestedElevScale = null
-  try {
-    const resolution = image.getResolution()
-    let pixelSizeM   = Math.abs(resolution[0])
-    if (pixelSizeM > 0) {
-      if (pixelSizeM < 1.0) pixelSizeM = pixelSizeM * 111_320
-      suggestedElevScale = range / (pixelSizeM * 100)
-      suggestedElevScale = Math.max(0.1, Math.min(50, +suggestedElevScale.toFixed(2)))
-    }
-  } catch (_) {}
-
   // Extract geographic extent for GPX coordinate projection.
   // CRS detection strategy: read ProjectedCSTypeGeoKey first (reliable when present),
   // fall back to GTModelTypeGeoKey, then fall back to a bbox-value heuristic —
   // coordinates outside ±360° / ±90° cannot be geographic degrees, so they must be
   // projected meters (e.g. UTM). Default assumption is EPSG:4326 (geographic).
-  let bbox = null, crs = 'EPSG:4326'
+  let bbox = null, crs = 'EPSG:4326', isGeographic = true
   try {
     bbox = image.getBoundingBox()
     const gk = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
@@ -265,10 +254,32 @@ async function loadGeoTiffPixels(file) {
 
     if (projCS) {
       crs = projCS === 3857 ? 'EPSG:3857' : `EPSG:${projCS}`
+      isGeographic = false
     } else if (gk.GTModelTypeGeoKey === 1) {
       crs = 'EPSG:projected-unknown'
+      isGeographic = false
     } else if (bbox && (Math.abs(bbox[0]) > 360 || Math.abs(bbox[1]) > 90)) {
       crs = 'EPSG:projected-unknown'
+      isGeographic = false
+    } else if (gk.GTModelTypeGeoKey === 2 || gk.GeographicTypeGeoKey) {
+      isGeographic = true
+    }
+  } catch (_) {}
+
+  // Suggest a vertical exaggeration from the real-world pixel size. A projected
+  // CRS (UTM, Web Mercator, …) already reports pixel size in metres — never scale
+  // it. Only a geographic CRS reports degrees, which must be converted to metres.
+  // Classify by CRS, NOT by magnitude: sub-metre lidar pixels are legitimately
+  // < 1 in metres, so a "< 1 ⇒ degrees" test mis-scales them ~111320× and flattens
+  // the terrain to the clamp floor.
+  let suggestedElevScale = null
+  try {
+    const resolution = image.getResolution()
+    let pixelSizeM   = Math.abs(resolution[0])
+    if (pixelSizeM > 0) {
+      if (isGeographic) pixelSizeM = pixelSizeM * 111_320  // degrees → metres
+      suggestedElevScale = range / (pixelSizeM * 100)
+      suggestedElevScale = Math.max(0.1, Math.min(50, +suggestedElevScale.toFixed(2)))
     }
   } catch (_) {}
 
