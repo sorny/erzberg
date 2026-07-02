@@ -178,9 +178,12 @@ export function Scene({
   // the scene when exporting from a retina display.
   const performHighResCapture = (isAlpha) => {
     const cam = activeCamera || currentCamera
-    const captureScale = 4.0
     const vpSize = new THREE.Vector2()
     gl.getSize(vpSize)
+    // 4× capture, clamped so the render target never exceeds the GPU's texture
+    // limit (large windows would otherwise fail the export silently).
+    const maxTex = gl.capabilities.maxTextureSize || 8192
+    const captureScale = Math.min(4.0, maxTex / Math.max(vpSize.x, vpSize.y))
     const targetW = Math.round(vpSize.x * captureScale)
     const targetH = Math.round(vpSize.y * captureScale)
 
@@ -310,17 +313,22 @@ export function Scene({
           position={[0, 400, 500]} 
         />
       ) : (
-        <PerspectiveCamera 
-          ref={persRef} 
-          makeDefault 
-          fov={p.fov} 
-          near={1} 
-          far={50000} 
-          position={[0, 400, 500]} 
+        <PerspectiveCamera
+          ref={persRef}
+          makeDefault
+          fov={p.fov}
+          near={5}
+          far={50000}
+          position={[0, 400, 500]}
         />
       )}
 
-      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
+      {/* near=5 (not 1): with near=1/far=50000 the depth buffer resolves only
+          ~0.04 world units at typical viewing distance, so lines vs. their
+          occlusion curtains z-fight (sparkle at crossings while orbiting).
+          near=5 is 5× finer; the zoom slider bottoms out at ~50 units distance
+          and minDistance keeps free scroll-zoom clear of the near plane. */}
+      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
       <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
       {!webmRecording && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>

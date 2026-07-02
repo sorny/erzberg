@@ -2,20 +2,40 @@
  * Terrain data extraction and processing.
  */
 
+// Separable box blur: horizontal window mean per row, then vertical window mean
+// per column. Because the horizontal window (and its clamped count) depends only
+// on x, mean-of-means equals the 2D box mean exactly — identical output to an
+// integral-image blur, but without the Float64 integral of the FULL-RES image
+// ((W+1)×(H+1)×8 bytes ≈ 512 MB for an 8k GeoTIFF). Peak extra memory here is
+// two W×H Float32 buffers; accumulators are Float64 scalars/rows for precision.
 function boxBlurInt(pixels, width, height, r) {
-  const integral = new Float64Array((width + 1) * (height + 1))
+  // Horizontal pass — per-row prefix sums (reused buffer), clamped window mean.
+  const tmp = new Float32Array(pixels.length)
+  const pre = new Float64Array(width + 1)
   for (let y = 0; y < height; y++) {
+    const row = y * width
+    for (let x = 0; x < width; x++) pre[x + 1] = pre[x] + pixels[row + x]
     for (let x = 0; x < width; x++) {
-      integral[(y + 1) * (width + 1) + (x + 1)] = pixels[y * width + x] + integral[y * (width + 1) + (x + 1)] + integral[(y + 1) * (width + 1) + x] - integral[y * (width + 1) + x]
+      const x0 = Math.max(0, x - r), x1 = Math.min(width - 1, x + r)
+      tmp[row + x] = (pre[x1 + 1] - pre[x0]) / (x1 - x0 + 1)
     }
   }
+  // Vertical pass — rolling per-column sums over the clamped row window.
   const out = new Float32Array(pixels.length)
+  const colSum = new Float64Array(width)
+  const rInit = Math.min(r, height - 1)
+  for (let y = 0; y <= rInit; y++) {
+    const row = y * width
+    for (let x = 0; x < width; x++) colSum[x] += tmp[row + x]
+  }
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      const x0 = Math.max(0, x - r), y0 = Math.max(0, y - r), x1 = Math.min(width - 1, x + r), y1 = Math.min(height - 1, y + r)
-      const area = (x1 - x0 + 1) * (y1 - y0 + 1)
-      out[y * width + x] = (integral[(y1 + 1) * (width + 1) + (x1 + 1)] - integral[y0 * (width + 1) + (x1 + 1)] - integral[(y1 + 1) * (width + 1) + x0] + integral[y0 * (width + 1) + x0]) / area
-    }
+    const y0 = Math.max(0, y - r), y1 = Math.min(height - 1, y + r)
+    const invCount = 1 / (y1 - y0 + 1)
+    const row = y * width
+    for (let x = 0; x < width; x++) out[row + x] = colSum[x] * invCount
+    const yAdd = y + r + 1
+    if (yAdd < height) { const ra = yAdd * width; for (let x = 0; x < width; x++) colSum[x] += tmp[ra + x] }
+    if (y - r >= 0)    { const rs = (y - r) * width; for (let x = 0; x < width; x++) colSum[x] -= tmp[rs + x] }
   }
   return out
 }

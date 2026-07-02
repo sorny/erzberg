@@ -324,25 +324,17 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     if (p.showFill) console.log('[Benchmark] Color Updated: ' + Date.now())
   }, [p.fillColor, p.showFill])
 
+  // Normals and UVs are computed in the geometry worker (buildSurfaceGeometry)
+  // and transferred — running computeVertexNormals() here would stall the main
+  // thread for megavertex meshes on every rebuild.
   const geometry = useMemo(() => {
     if (!surfaceGeo) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position',   new THREE.BufferAttribute(surfaceGeo.positions,    3))
     geo.setAttribute('brightness', new THREE.BufferAttribute(surfaceGeo.brightnessBuf, 1))
-    
-    // Compute UVs for the grid
-    const { rows, cols } = surfaceGeo.metadata || { rows: Math.sqrt(surfaceGeo.positions.length/3), cols: Math.sqrt(surfaceGeo.positions.length/3) }
-    const uvs = new Float32Array((surfaceGeo.positions.length/3) * 2)
-    for(let r=0; r<rows; r++) {
-      for(let c=0; c<cols; c++) {
-        const i = r * cols + c
-        uvs[i*2] = c / (cols - 1)
-        uvs[i*2+1] = 1.0 - (r / (rows - 1))
-      }
-    }
-    geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2))
+    geo.setAttribute('normal',     new THREE.BufferAttribute(surfaceGeo.normals,       3))
+    geo.setAttribute('uv',         new THREE.BufferAttribute(surfaceGeo.uvs,           2))
     geo.setIndex(new THREE.BufferAttribute(surfaceGeo.indices, 1))
-    geo.computeVertexNormals()
     return geo
   }, [surfaceGeo])
 

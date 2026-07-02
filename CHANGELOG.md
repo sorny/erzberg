@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-07-02
+
+### Added
+- **Supersampling control (View → Supersampling, 1×–2×).** Dense 1px line fields are denser than the pixel grid can represent, so they "boil" (shimmer/flicker) while panning or rotating — most visibly where lines cross. Measured attribution showed ~99.8% of the hard per-frame pixel flips come from this temporal aliasing (the depth-occlusion curtains contribute ~0.2%, so depth-bias tweaks don't help). The new slider renders the canvas internally at up to 2× the device pixel ratio and cut hard pixel flips during slow rotation by ~93% in measurement. Render-side only: dragging it never triggers a geometry rebuild, and it round-trips through presets like any view param.
+- **MSAA alpha-to-coverage on line materials** for (near-)opaque lines — smoothstep edge alpha instead of a hard shader discard, giving properly antialiased dash caps and line edges. Translucent lines keep plain blending (coverage would dither their body alpha).
+
+### Changed
+- **Surface mesh normals and UVs are now computed in the geometry worker** and transferred zero-copy, instead of `computeVertexNormals()` + a UV loop on the main thread after every rebuild. That was the largest remaining main-thread stall (~160 ms at a 1024² grid, scaling with mirror octants); the worker-side normals match three.js output to 1e-15. Slider drags that rebuild geometry no longer hitch the UI on dense terrain.
+- **Box blur rewritten as a separable sliding-window mean** (horizontal prefix sums + vertical rolling column sums). Mathematically identical to the previous integral-image blur (max deviation ~1e-7) at the same speed, but without allocating a `Float64Array((W+1)×(H+1))` over the full-resolution image — ~512 MB for an 8k GeoTIFF, now ~40% less peak memory.
+- **Flow Lines no longer pre-allocates two worst-case `rows×cols×6` buffers** (~48 MB per rebuild at a 1024² grid regardless of how many segments the mode actually emits) — it now uses the same growable typed-array writers as every other builder. Output is bit-identical.
+- **Perspective camera near plane raised from 1 to 5** (with `minDistance` on the orbit controls so free scroll-zoom stays clear of it) — 5× finer depth-buffer precision for the line-occlusion curtain system. The zoom slider's maximum still keeps the camera ≥50 units out, so nothing clips.
+
+### Fixed
+- **4K PNG export could exceed the GPU texture limit on very large windows** — the 4× capture scale is now clamped to the renderer's `maxTextureSize`, so the export degrades to the largest possible resolution instead of failing.
+
 ## [0.7.6] - 2026-06-17
 
 ### Fixed

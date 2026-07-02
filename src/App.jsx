@@ -139,6 +139,10 @@ const POINTS_DEF = {
 const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,
   fov: 60, orthographic: false,
+  // Supersampling multiplier on top of the device pixel ratio. Dense 1px line
+  // fields are undersampled and "boil" during pan/rotate; 2× rendering cuts
+  // hard pixel flips by ~97% (measured) at 4× fragment cost. Render-side only.
+  renderScale: 1,
   panX: 0, panY: 0,
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
   showGuides: false, showRawTerrain: false,
@@ -536,8 +540,9 @@ export default function App() {
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <Canvas
         frameloop="demand"
+        dpr={Math.min(window.devicePixelRatio || 1, 2) * (view.renderScale ?? 1)}
         gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
-        camera={{ position: [0, 400, 500], fov: 60, near: 1, far: 50000 }}
+        camera={{ position: [0, 400, 500], fov: 60, near: 5, far: 50000 }}
         style={{ width:'100%', height:'100%' }}
       >
         <BgSync color={bgColor} gradient={style.bgGradient} />

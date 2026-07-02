@@ -131,6 +131,14 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
     material.depthTest = !!depthOcclusion
     material.resolution.copy(resolution)
 
+    // MSAA alpha-to-coverage: smoothstep edge alpha instead of a hard discard,
+    // which removes most temporal shimmer ("boiling") of dense 1px lines while
+    // panning/rotating. Only for (near-)opaque lines — for translucent ones the
+    // body alpha would be dithered into the coverage mask (visible stipple), so
+    // those keep plain blending. The LineMaterial setter flags needsUpdate
+    // itself, and only when the define actually flips.
+    material.alphaToCoverage = (opacity ?? 1) >= 0.99
+
     // linewidth/opacity/dashSize/gapSize map to uniforms and depthTest is plain
     // render state — none need a shader recompile, so no needsUpdate here. The
     // `dashed` setter flags needsUpdate itself when the USE_DASH define changes.
@@ -151,6 +159,7 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
       ghostMaterial.opacity = occlusionOpacity ?? 0
       ghostMaterial.color.set(occlusionColor || '#000000')
       ghostMaterial.resolution.copy(resolution)
+      ghostMaterial.alphaToCoverage = (occlusionOpacity ?? 0) >= 0.99
       ghostMaterial.dashed = d.dashed
       ghostMaterial.dashSize = d.dashSize
       ghostMaterial.gapSize = d.gapSize

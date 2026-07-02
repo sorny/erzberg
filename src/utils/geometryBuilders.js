@@ -816,7 +816,8 @@ function sampleB(grid, rows, cols, fr, fc) {
 function buildFlowLines(terrain, p, spacing, step, maxLen) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
-  const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, posBuf = new Float32Array(n*6), colBuf = new Float32Array(n*6), mask = new Uint8Array(n), eps = 0.5
+  const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, mask = new Uint8Array(n), eps = 0.5
+  const positions = new F32List(), colors = new F32List()
   const seeds = []
   for (let rf = 0; rf < rows; rf += seedStep) {
     const r = Math.min(rows - 1, Math.round(rf))
@@ -826,7 +827,6 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
     }
   }
   seeds.sort((a, b) => grid[b] - grid[a])
-  let totalSegments = 0
   for (const idx of seeds) {
     const r = Math.floor(idx / cols), c = idx % cols
     if (mask[idx]) continue
@@ -843,15 +843,14 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
         if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
         const b1 = sampleB(grid, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
         if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
-          const pIdx = totalSegments*6; posBuf[pIdx]=fc*scl-halfW; posBuf[pIdx+1]=e0; posBuf[pIdx+2]=fr*scl-halfH; posBuf[pIdx+3]=nfc*scl-halfW; posBuf[pIdx+4]=e1; posBuf[pIdx+5]=nfr*scl-halfH
+          positions.push6(fc*scl-halfW, e0, fr*scl-halfH, nfc*scl-halfW, e1, nfr*scl-halfH)
           const col0 = computeVertexColor(normElev(e0, minZ, maxZ), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
-          colBuf[pIdx]=col0[0]; colBuf[pIdx+1]=col0[1]; colBuf[pIdx+2]=col0[2]; colBuf[pIdx+3]=col0[0]; colBuf[pIdx+4]=col0[1]; colBuf[pIdx+5]=col0[2]
-          totalSegments++
+          colors.pushRgb2(col0)
         } else if (!(inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) || inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut))) break
         fr=nfr; fc=nfc; b0=b1; e0=e1
       }
   }
-  return { positions: posBuf.slice(0, totalSegments*6), colors: colBuf.slice(0, totalSegments*6) }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
 // ─── Stream Network ──────────────────────────────────────────────────────
@@ -1349,6 +1348,53 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
 
 // ─── Surface ──────────────────────────────────────────────────────────────────
 
+/**
+ * Vertex normals for the surface mesh, computed in the worker so the main
+ * thread never runs three.js computeVertexNormals() over megavertex meshes.
+ * Same semantics as three.js: area-weighted face-normal accumulation
+ * (n = (C−B) × (A−B) per triangle), then per-vertex normalization; vertices
+ * referenced by no triangle (masked NoData cells) keep a zero normal.
+ */
+function computeSurfaceNormals(positions, indices) {
+  const normals = new Float32Array(positions.length)
+  for (let i = 0; i < indices.length; i += 3) {
+    const a = indices[i] * 3, b = indices[i + 1] * 3, c = indices[i + 2] * 3
+    const abx = positions[a]     - positions[b],
+          aby = positions[a + 1] - positions[b + 1],
+          abz = positions[a + 2] - positions[b + 2]
+    const cbx = positions[c]     - positions[b],
+          cby = positions[c + 1] - positions[b + 1],
+          cbz = positions[c + 2] - positions[b + 2]
+    const nx = cby * abz - cbz * aby
+    const ny = cbz * abx - cbx * abz
+    const nz = cbx * aby - cby * abx
+    normals[a] += nx; normals[a + 1] += ny; normals[a + 2] += nz
+    normals[b] += nx; normals[b + 1] += ny; normals[b + 2] += nz
+    normals[c] += nx; normals[c + 1] += ny; normals[c + 2] += nz
+  }
+  for (let i = 0; i < normals.length; i += 3) {
+    const x = normals[i], y = normals[i + 1], z = normals[i + 2]
+    const len = Math.sqrt(x * x + y * y + z * z) || 1
+    normals[i] = x / len; normals[i + 1] = y / len; normals[i + 2] = z / len
+  }
+  return normals
+}
+
+/** Grid UVs for the base octant; mirrored octants keep (0,0) — the shader
+ *  passes that only sample UVs (texture overlay, cast shadows, SVF) are
+ *  meaningful on the primary terrain, matching the previous main-thread build. */
+function buildSurfaceUvs(vertexCount, rows, cols) {
+  const uvs = new Float32Array(vertexCount * 2)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      uvs[i * 2]     = c / (cols - 1)
+      uvs[i * 2 + 1] = 1 - r / (rows - 1)
+    }
+  }
+  return uvs
+}
+
 export function buildSurfaceGeometry(terrain, p) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
   const { jitterAmt } = p
@@ -1369,7 +1415,7 @@ export function buildSurfaceGeometry(terrain, p) {
       if (gridMask[tl] && gridMask[tl+1] && gridMask[tl+cols] && gridMask[tl+cols+1]) quadCount++
     }
   }
-  if (!quadCount) return { positions: new Float32Array(0), brightnessBuf: new Float32Array(0), indices: new Uint32Array(0), metadata: { rows, cols } }
+  if (!quadCount) return { positions: new Float32Array(0), brightnessBuf: new Float32Array(0), indices: new Uint32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), metadata: { rows, cols } }
   const baseIndices = new Uint32Array(quadCount * 6)
   let bi = 0
   for (let r = 0; r < rows - 1; r++) {
@@ -1389,7 +1435,12 @@ export function buildSurfaceGeometry(terrain, p) {
 
   // Fast path: single identity octant — the base buffers are the final mesh.
   if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
-    return { positions: basePos, brightnessBuf: baseBright, indices: baseIndices, metadata: { rows, cols } }
+    return {
+      positions: basePos, brightnessBuf: baseBright, indices: baseIndices,
+      normals: computeSurfaceNormals(basePos, baseIndices),
+      uvs: buildSurfaceUvs(vertexCount, rows, cols),
+      metadata: { rows, cols },
+    }
   }
 
   // Pre-allocate all octants once (repeated concat() is O(octants²) in copies).
@@ -1423,7 +1474,12 @@ export function buildSurfaceGeometry(terrain, p) {
       }
     }
   }
-  return { positions: finalPos, brightnessBuf: finalBright, indices: finalIndices, metadata: { rows, cols } }
+  return {
+    positions: finalPos, brightnessBuf: finalBright, indices: finalIndices,
+    normals: computeSurfaceNormals(finalPos, finalIndices),
+    uvs: buildSurfaceUvs(vertexCount * nOct, rows, cols),
+    metadata: { rows, cols },
+  }
 }
 
 // ─── GPX Track ───────────────────────────────────────────────────────────────

@@ -53,6 +53,8 @@ self.onmessage = (e) => {
     xfer(surfaceGeo.positions)
     xfer(surfaceGeo.brightnessBuf)
     xfer(surfaceGeo.indices)
+    xfer(surfaceGeo.normals)
+    xfer(surfaceGeo.uvs)
 
     // 3. Terrain grids (consumed on the main thread by particles / sampling).
     //    buildSurfaceGeometry/buildGpxGeometry above already finished reading them.
