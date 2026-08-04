@@ -4,10 +4,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
+import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
+import { SpectrogramView } from './SpectrogramView'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 const BG     = '#18181b'
@@ -19,6 +21,14 @@ const MUTED  = '#71717a'
 const ACCENT = '#3b82f6'
 const GREEN  = '#22c55e'
 const W      = 272   // panel width px
+
+/** m:ss for the Soundscapes transport readout. */
+function fmtTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${String(s).padStart(2, '0')}`
+}
 
 // Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
 const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Swiss', 'Gpx']
@@ -340,6 +350,7 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
+  soundscape, onSoundscapeFit,
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS,
   loadGpxFromPicker, gpxPoints, onClearGpx,
   onCameraPreset,
@@ -364,6 +375,7 @@ export function Sidebar({
     hillshade: false, slopeShade: false, gpxTrack: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
+    soundscapes: false,
   })
 
   // --- Erosion State ---
@@ -490,6 +502,11 @@ export function Sidebar({
   }
 
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
+
+  // Soundscapes controller. Aliased because `ss` is already the style setter,
+  // and defaulted so the section degrades to an inert upload button if the
+  // prop is ever omitted rather than throwing on first render.
+  const snd = soundscape ?? { opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {} }
 
   const st = (v) => setTerrain(p => ({ ...p, ...v }))
   const ss = (v) => setStyle(p => ({ ...p, ...v }))
@@ -1159,6 +1176,109 @@ export function Sidebar({
               width:'100%', padding:'6px 0', background: SURF, color: DIM, 
               border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
             }}>Reset Symmetry</button>
+          </Section>
+
+          {/* ── Soundscapes ─────────────────────────────────────────────────
+              Streams an audio spectrogram into the heightmap slot, so every
+              draw mode / overlay / export works on it like any other terrain. */}
+          <Section title="Soundscapes" open={sec.soundscapes} onToggle={() => tog('soundscapes')} enabled={snd.active}>
+            <button
+              className="hmload"
+              onClick={() => snd.loadFromPicker(onSoundscapeFit)}
+              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
+            >↑ Audio (MP3 / WAV / OGG / M4A)</button>
+
+            {snd.error && (
+              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:4, padding:'6px 8px', marginBottom:8 }}>
+                {snd.error}
+              </div>
+            )}
+
+            {snd.fileName && (
+              <div style={{ fontSize:10, color: MUTED, marginBottom:8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {snd.fileName}
+              </div>
+            )}
+
+            {snd.isAnalyzing && (
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color: MUTED, marginBottom:4 }}>Analysing spectrogram… {snd.progress}%</div>
+                <div style={{ height:3, background: BORDER, borderRadius:2, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${snd.progress}%`, background: ACCENT, transition:'width .1s' }} />
+                </div>
+              </div>
+            )}
+
+            {snd.spec && (
+              <>
+                <SpectrogramView
+                  spec={snd.spec}
+                  currentTime={snd.currentTime}
+                  duration={snd.duration}
+                  windowFrames={snd.opts.windowFrames}
+                  dbFloor={snd.opts.dbFloor}
+                  contrast={snd.opts.contrast}
+                  onSeek={snd.seek}
+                />
+
+                <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:8 }}>
+                  <button
+                    data-testid="soundscape-play"
+                    onClick={snd.toggle}
+                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : '#fff', border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  >{snd.isPlaying ? '❙❙ Pause' : '▶ Play'}</button>
+                  <button
+                    onClick={snd.stop}
+                    style={{ padding:'8px 12px', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  >■</button>
+                  <span style={{ fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', minWidth:74, textAlign:'right' }}>
+                    {fmtTime(snd.currentTime)} / {fmtTime(snd.duration)}
+                  </span>
+                </div>
+
+                <Sub>
+                  <div style={{ fontSize:8, color: MUTED, fontWeight:700, marginBottom:6, letterSpacing:1 }}>ANALYSIS</div>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[1024, 2048, 4096].map(n => (
+                      <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
+                        style={{ flex:1, fontSize:8, padding:'4px 0', borderRadius:2,
+                          background: snd.opts.fftSize === n ? ACCENT : SURF,
+                          color: snd.opts.fftSize === n ? '#fff' : MUTED,
+                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT : BORDER}`, cursor:'pointer' }}>{n}</button>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['Log', true], ['Linear', false]].map(([lbl, v]) => (
+                      <button key={lbl} onClick={() => snd.setOpts({ logFreq: v })}
+                        style={{ flex:1, fontSize:8, padding:'4px 0', borderRadius:2, textTransform:'uppercase',
+                          background: snd.opts.logFreq === v ? ACCENT : SURF,
+                          color: snd.opts.logFreq === v ? '#fff' : MUTED,
+                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
+                    ))}
+                  </div>
+                  <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
+                    min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
+
+                  <div style={{ fontSize:8, color: MUTED, fontWeight:700, margin:'10px 0 6px', letterSpacing:1 }}>STREAM</div>
+                  <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
+                    min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
+                  <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
+                    min={2} max={60} value={snd.opts.fps} onChange={v => snd.setOpts({ fps: v })} fmt={v => v + '/s'} />
+                  <InlineSl label="dB Floor" help="Noise gate. Raise it to drop quiet detail into flat ground and leave only the loud structure standing."
+                    min={0} max={0.9} step={0.01} value={snd.opts.dbFloor} onChange={v => snd.setOpts({ dbFloor: v })} fmt={v => Math.round(v*100)+'%'} />
+                  <InlineSl label="Contrast" help="Gamma applied after the gate. Above 1 sharpens peaks into ridges; below 1 flattens them into plateaus."
+                    min={0.3} max={3} step={0.1} value={snd.opts.contrast} onChange={v => snd.setOpts({ contrast: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+
+                <button
+                  onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
+                  style={{ width:'100%', padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                >Freeze Whole Track</button>
+                <div style={{ fontSize:9, color: MUTED, marginTop:6, lineHeight:1.4 }}>
+                  Pauses playback and writes the entire track as one static heightmap — useful for erosion, STL and SVG, which need a terrain that holds still.
+                </div>
+              </>
+            )}
           </Section>
 
           <Section title="Hydraulic Erosion" open={sec.erosion} onToggle={() => tog('erosion')}>

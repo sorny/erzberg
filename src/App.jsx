@@ -10,6 +10,7 @@ import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { useHeightmap } from './hooks/useHeightmap'
+import { useSoundscape } from './hooks/useSoundscape'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { parseGpx } from './utils/gpxParser'
@@ -195,6 +196,8 @@ export default function App() {
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
   const geoTiffBbox       = useStore((s) => s.geoTiffBbox)
   const geoTiffCRS        = useStore((s) => s.geoTiffCRS)
+
+  const soundscape = useSoundscape()
 
   const [gpxPoints, setGpxPoints] = useState([])
 
@@ -435,6 +438,36 @@ export default function App() {
     Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
   , [])
 
+  // ── Soundscapes ───────────────────────────────────────────────────────────
+  // A spectrogram window is small (typically 256×128), so it always renders at
+  // resolution 1 — decimating it further would throw away frequency rows.
+  const fitSoundscape = useCallback(({ width, height }) => {
+    autoZoom({ width, height })
+    setBaseElevScale(1)
+    setTerrain(prev => ({ ...prev, resolution: 1, elevScale: 0 }))
+    setGpxPoints([])
+  }, [autoZoom])
+
+  // Loading a raster takes the heightmap slot, so stop any audio still driving it.
+  const loadPngAndFit = useCallback(() => {
+    soundscape.release()
+    loadFromPicker(({ width, height, dataWidth, dataHeight }) => {
+      autoZoom({ width: dataWidth, height: dataHeight })
+      setBaseElevScale(1)
+      setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+      setGpxPoints([])
+    })
+  }, [soundscape, loadFromPicker, autoZoom, autoResolution])
+
+  const loadGeoTiffAndFit = useCallback(() => {
+    soundscape.release()
+    loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
+      autoZoom({ width: dataWidth, height: dataHeight })
+      setBaseElevScale(suggestedElevScale ?? 1)
+      setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+    })
+  }, [soundscape, loadGeoTiffFromPicker, autoZoom, autoResolution])
+
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
@@ -450,6 +483,11 @@ export default function App() {
     gpxPoints, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
+    // Surface normals and UVs exist only for the terrain shader. STL export
+    // computes its own facet normals and SVG only needs positions/indices, so
+    // when no fill layer is on they are pure waste — ~8 ms of every rebuild.
+    needsSurfaceShading: !!(style.showFill || style.showRawTerrain || style.showHillshade ||
+      style.showSlopeShade || style.showWaterFill || style.showAO || style.showAspectMap || profileMode),
   }
   // Keep the click handler in a ref so SurfaceMesh can read it without it
   // entering the postMessage-serialized p object sent to the Web Worker.
@@ -457,19 +495,21 @@ export default function App() {
   profileClickRef.current = handleProfileClick
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
-  const { terrain: terrainData, lineGeo, surfaceGeo, isComputing } = useTerrainGeometry(p)
+  const { terrain: terrainData, lineGeo, surfaceGeo, isComputing, resultCount } = useTerrainGeometry(p)
 
-  // Delay the computing overlay to avoid flickering on fast calculations
+  // The overlay means "nothing has come back for a while", not "a build is in
+  // flight". Keying it on isComputing alone breaks under a continuous stream:
+  // rebuild requests queue back to back, isComputing never falls, and the
+  // overlay latches on permanently even though frames are arriving 30× a second.
+  // Including resultCount restarts the timer on every delivered frame, so the
+  // overlay appears only when the terrain genuinely stops updating.
   const [showComputingOverlay, setShowComputingOverlay] = useState(false)
   useEffect(() => {
-    let t
-    if (isComputing) {
-      t = setTimeout(() => setShowComputingOverlay(true), 1000)
-    } else {
-      setShowComputingOverlay(false)
-    }
+    if (!isComputing) { setShowComputingOverlay(false); return }
+    setShowComputingOverlay(false)
+    const t = setTimeout(() => setShowComputingOverlay(true), 1000)
     return () => clearTimeout(t)
-  }, [isComputing])
+  }, [isComputing, resultCount])
 
   // ── GPX upload handler ────────────────────────────────────────────────────
   const loadGpxFromPicker = useCallback(() => {
@@ -579,17 +619,10 @@ export default function App() {
         heightmapFilename={heightmapFilename}
         textureImage={textureImage}
         setTextureImage={setTextureImage}
-        loadFromPicker={() => loadFromPicker(({ width, height, dataWidth, dataHeight }) => {
-          autoZoom({ width: dataWidth, height: dataHeight })
-          setBaseElevScale(1)
-          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-          setGpxPoints([])
-        })}
-        loadGeoTiffFromPicker={() => loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
-          autoZoom({ width: dataWidth, height: dataHeight })
-          setBaseElevScale(suggestedElevScale ?? 1)
-          setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-        })}
+        loadFromPicker={loadPngAndFit}
+        loadGeoTiffFromPicker={loadGeoTiffAndFit}
+        soundscape={soundscape}
+        onSoundscapeFit={fitSoundscape}
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
         geoTiffCRS={geoTiffCRS}

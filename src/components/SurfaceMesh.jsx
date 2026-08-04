@@ -332,8 +332,11 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position',   new THREE.BufferAttribute(surfaceGeo.positions,    3))
     geo.setAttribute('brightness', new THREE.BufferAttribute(surfaceGeo.brightnessBuf, 1))
-    geo.setAttribute('normal',     new THREE.BufferAttribute(surfaceGeo.normals,       3))
-    geo.setAttribute('uv',         new THREE.BufferAttribute(surfaceGeo.uvs,           2))
+    // The worker omits normals/UVs when no fill layer is on (they exist only for
+    // this shader). That is exactly when `surfaceActive` below is false and the
+    // mesh is not drawn; switching a fill layer on rebuilds with them present.
+    if (surfaceGeo.normals?.length) geo.setAttribute('normal', new THREE.BufferAttribute(surfaceGeo.normals, 3))
+    if (surfaceGeo.uvs?.length)     geo.setAttribute('uv',     new THREE.BufferAttribute(surfaceGeo.uvs,     2))
     geo.setIndex(new THREE.BufferAttribute(surfaceGeo.indices, 1))
     return geo
   }, [surfaceGeo])

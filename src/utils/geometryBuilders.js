@@ -75,6 +75,45 @@ class F32List {
   toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
 }
 
+/** Float64 variant, used for contour chain coordinates. Double precision keeps
+ *  the chained/smoothed output bit-identical to the pre-optimisation builder;
+ *  Float32 was measured to be no faster here, so there is nothing to trade. */
+class F64List {
+  constructor(cap = 4096) { this.a = new Float64Array(cap); this.n = 0 }
+  _grow(need) {
+    let cap = this.a.length * 2
+    while (cap < need) cap *= 2
+    const next = new Float64Array(cap)
+    next.set(this.a.subarray(0, this.n))
+    this.a = next
+  }
+  push4(x0, y0, x1, y1) {
+    if (this.n + 4 > this.a.length) this._grow(this.n + 4)
+    const a = this.a, n = this.n
+    a[n] = x0; a[n + 1] = y0; a[n + 2] = x1; a[n + 3] = y1
+    this.n = n + 4
+  }
+  get length() { return this.n }
+}
+
+class I32List {
+  constructor(cap = 4096) { this.a = new Int32Array(cap); this.n = 0 }
+  _grow(need) {
+    let cap = this.a.length * 2
+    while (cap < need) cap *= 2
+    const next = new Int32Array(cap)
+    next.set(this.a.subarray(0, this.n))
+    this.a = next
+  }
+  push2(x, y) {
+    if (this.n + 2 > this.a.length) this._grow(this.n + 2)
+    const a = this.a, n = this.n
+    a[n] = x; a[n + 1] = y
+    this.n = n + 2
+  }
+  get length() { return this.n }
+}
+
 class U32List {
   constructor(cap = 4096) { this.a = new Uint32Array(cap); this.n = 0 }
   _grow(need) {
@@ -426,73 +465,235 @@ function buildHachure(terrain, p, spacing, length) {
 // by walking shared endpoints. Returns an array of chains, each an ordered list of
 // { c, r } grid points; a closed ring has its first point equal to its last.
 // Used by buildContours for both Chaikin smoothing and border ring-closing.
-function chainContourSegments(levelSegs) {
-  const n = levelSegs.length / 4
-  if (n === 0) return []
-  const key = (c, r) => `${c},${r}`
+/**
+ * Chaining scratch, keyed by grid edge id (see EDGE IDS below).
+ *
+ * Held at module scope and grown on demand rather than allocated per call: at a
+ * 512² grid these are ~8 MB per rebuild, and Soundscapes rebuilds 30× a second.
+ * adj0/adj1 are left all −1 between levels (each level resets only the ids it
+ * touched), so a reused buffer needs no clearing.
+ */
+let _chainScratch = null
+function getChainScratch(size) {
+  if (!_chainScratch || _chainScratch.adj0.length < size) {
+    _chainScratch = {
+      adj0: new Int32Array(size).fill(-1),
+      adj1: new Int32Array(size).fill(-1),
+      cx: new Float64Array(size),
+      cy: new Float64Array(size),
+      visited: new Uint8Array(1024),
+    }
+  }
+  return _chainScratch
+}
 
-  const adj = new Map()
-  for (let i = 0; i < n; i++) {
-    const k0 = key(levelSegs[i*4],   levelSegs[i*4+1])
-    const k1 = key(levelSegs[i*4+2], levelSegs[i*4+3])
-    if (!adj.has(k0)) adj.set(k0, [])
-    if (!adj.has(k1)) adj.set(k1, [])
-    adj.get(k0).push(i)
-    adj.get(k1).push(i)
+/**
+ * Chains one contour level's marching-squares segments into polylines.
+ *
+ * Segments are joined by GRID EDGE IDENTITY, not by coordinate. Every crossing
+ * sits on a specific grid edge, and adjacent cells derive a shared edge's
+ * crossing from the same two corner values — so a plain integer id identifies a
+ * junction exactly. The previous implementation stringified coordinates
+ * (`"12.5,7"`) into a Map and rebuilt two such strings per walk step just to
+ * compare tips; that alone was ~270 ms of the 312 ms closeRings cost at 512².
+ * Ids also let adjacency live in two flat Int32Arrays (an edge is shared by at
+ * most two segments) instead of a Map of arrays.
+ *
+ * Head extension collects into `back` and is reversed at the end. The old code
+ * used chain.unshift() per point, which is O(n) per insert — quadratic in the
+ * length of any long ring.
+ *
+ * @returns {{pts: Float32Array, closed: boolean}[]} pts is flat [c,r,c,r,…]
+ */
+function chainLevelSegments(segE, segXY, nSegs, scratch) {
+  const { adj0, adj1, cx, cy } = scratch
+  const touched = []
+
+  for (let i = 0; i < nSegs; i++) {
+    const e0 = segE[2 * i], e1 = segE[2 * i + 1]
+    if (adj0[e0] === -1) { adj0[e0] = i; touched.push(e0); cx[e0] = segXY[4 * i];     cy[e0] = segXY[4 * i + 1] }
+    else if (adj1[e0] === -1) adj1[e0] = i
+    if (adj0[e1] === -1) { adj0[e1] = i; touched.push(e1); cx[e1] = segXY[4 * i + 2]; cy[e1] = segXY[4 * i + 3] }
+    else if (adj1[e1] === -1) adj1[e1] = i
   }
 
-  const visited = new Uint8Array(n)
+  if (scratch.visited.length < nSegs) scratch.visited = new Uint8Array(nSegs * 2)
+  const visited = scratch.visited
+  visited.fill(0, 0, nSegs)
+
   const chains = []
-  for (let start = 0; start < n; start++) {
-    if (visited[start]) continue
-    visited[start] = 1
-    const chain = [
-      { c: levelSegs[start*4],   r: levelSegs[start*4+1] },
-      { c: levelSegs[start*4+2], r: levelSegs[start*4+3] },
-    ]
-    // Extend tail then head
-    for (const [getEnd, insert] of [
-      [() => chain[chain.length - 1], pt => chain.push(pt)],
-      [() => chain[0],                pt => chain.unshift(pt)],
-    ]) {
-      let tip = getEnd()
-      while (true) {
-        const nxt = (adj.get(key(tip.c, tip.r)) || []).find(i => !visited[i])
-        if (nxt === undefined) break
-        visited[nxt] = 1
-        const nc0 = levelSegs[nxt*4], nr0 = levelSegs[nxt*4+1]
-        const nc1 = levelSegs[nxt*4+2], nr1 = levelSegs[nxt*4+3]
-        tip = key(nc0, nr0) === key(tip.c, tip.r) ? { c: nc1, r: nr1 } : { c: nc0, r: nr0 }
-        insert(tip)
+  const fwd = [], back = []
+
+  for (let s = 0; s < nSegs; s++) {
+    if (visited[s]) continue
+    visited[s] = 1
+    const e0 = segE[2 * s], e1 = segE[2 * s + 1]
+
+    fwd.length = 0
+    back.length = 0
+
+    // Walk both directions from the seed segment's two endpoints.
+    for (let dir = 0; dir < 2; dir++) {
+      const out = dir === 0 ? fwd : back
+      let cur = dir === 0 ? e1 : e0
+      let from = s
+      for (;;) {
+        const a = adj0[cur], b = adj1[cur]
+        let nx = -1
+        if (a !== -1 && a !== from && !visited[a]) nx = a
+        else if (b !== -1 && b !== from && !visited[b]) nx = b
+        if (nx < 0) break
+        visited[nx] = 1
+        const na = segE[2 * nx], nb = segE[2 * nx + 1]
+        cur = na === cur ? nb : na
+        out.push(cur)
+        from = nx
       }
     }
-    chains.push(chain)
+
+    const m = back.length + 2 + fwd.length
+    const pts = new Float64Array(m * 2)
+    let w = 0
+    for (let i = back.length - 1; i >= 0; i--) { const id = back[i]; pts[w++] = cx[id]; pts[w++] = cy[id] }
+    pts[w++] = cx[e0]; pts[w++] = cy[e0]
+    pts[w++] = cx[e1]; pts[w++] = cy[e1]
+    for (let i = 0; i < fwd.length; i++) { const id = fwd[i]; pts[w++] = cx[id]; pts[w++] = cy[id] }
+
+    // A ring closes when the walk arrives back at the edge it started from.
+    // Comparing ids is exact; the old coordinate comparison was equivalent but
+    // relied on float equality.
+    const firstId = back.length ? back[back.length - 1] : e0
+    const lastId  = fwd.length  ? fwd[fwd.length - 1]   : e1
+    chains.push({ pts, closed: m > 2 && firstId === lastId })
   }
+
+  for (let i = 0; i < touched.length; i++) { const id = touched[i]; adj0[id] = -1; adj1[id] = -1 }
   return chains
 }
 
-// Chaikin corner-cutting: replaces the staircase of a marching-squares polyline
-// with a smooth curve, run `iterations` times. Closed rings (head === tail) are
-// smoothed as loops; open chains keep their two endpoints pinned so border-anchored
-// lines stay put.
-function chaikinSmooth(pts, iterations) {
-  let out = pts
-  for (let it = 0; it < iterations && out.length > 2; it++) {
-    const closed = out[0].c === out[out.length - 1].c && out[0].r === out[out.length - 1].r
-    const src = closed ? out.slice(0, -1) : out
-    const m = src.length
-    const next = []
-    if (!closed) next.push(src[0])
-    for (let i = 0; i < (closed ? m : m - 1); i++) {
-      const a = src[i], b = src[(i + 1) % m]
-      next.push({ c: a.c * 0.75 + b.c * 0.25, r: a.r * 0.75 + b.r * 0.25 })
-      next.push({ c: a.c * 0.25 + b.c * 0.75, r: a.r * 0.25 + b.r * 0.75 })
+/**
+ * Drops points that lie (near) on the line between their neighbours.
+ *
+ * Chaikin converges toward a smooth curve, so most of the points it emits are
+ * within a small fraction of a pixel of the chord through their neighbours —
+ * 3 passes multiply a polyline 8× while adding almost no visible shape. Those
+ * redundant points cost segment count everywhere downstream: worker time, the
+ * transferred payload, the GPU upload and the draw call.
+ *
+ * Douglas–Peucker, iterative (explicit stack, no recursion). A greedy
+ * neighbour-to-neighbour flatness test is tempting and cheaper, but it only
+ * bounds the error against adjacent points, so along a gently curving contour
+ * every point looks locally collinear, all of them get dropped and the line
+ * drifts arbitrarily far from its true path — measured as a 547× reduction that
+ * turned smooth contours into long straight chords. Douglas–Peucker instead
+ * guarantees no retained segment deviates more than `eps` from the original
+ * polyline. Endpoints are always kept, so a closed ring keeps its duplicated
+ * first/last point and stays closed.
+ *
+ * `eps` is in grid units. At the usual scl=1 a whole 512-unit terrain spans
+ * roughly 600 screen pixels, so 0.02 grid units is ~1/40 of a pixel.
+ */
+let _dpKeep = null
+let _dpStack = null
+function simplifyFlat(pts, eps, outBuf = null) {
+  const n = pts.length / 2
+  if (n < 3) return pts
+  if (!_dpKeep || _dpKeep.length < n) _dpKeep = new Uint8Array(n * 2)
+  if (!_dpStack || _dpStack.length < n * 2) _dpStack = new Int32Array(n * 4)
+  const keep = _dpKeep, stack = _dpStack
+  keep.fill(0, 0, n)
+  keep[0] = 1; keep[n - 1] = 1
+
+  const eps2 = eps * eps
+  let sp = 0
+  stack[sp++] = 0; stack[sp++] = n - 1
+
+  while (sp > 0) {
+    const hi = stack[--sp], lo = stack[--sp]
+    if (hi - lo < 2) continue
+    const ax = pts[2 * lo], ay = pts[2 * lo + 1]
+    const dx = pts[2 * hi] - ax, dy = pts[2 * hi + 1] - ay
+    const len2 = dx * dx + dy * dy
+    let best = -1, bestD2 = eps2
+    for (let i = lo + 1; i < hi; i++) {
+      const px = pts[2 * i], py = pts[2 * i + 1]
+      let d2
+      if (len2 < 1e-20) {
+        const ex = px - ax, ey = py - ay
+        d2 = ex * ex + ey * ey
+      } else {
+        const cross = dx * (py - ay) - dy * (px - ax)
+        d2 = (cross * cross) / len2
+      }
+      if (d2 > bestD2) { bestD2 = d2; best = i }
     }
-    if (closed) next.push({ c: next[0].c, r: next[0].r })
-    else next.push(src[m - 1])
-    out = next
+    if (best >= 0) {
+      keep[best] = 1
+      stack[sp++] = lo; stack[sp++] = best
+      stack[sp++] = best; stack[sp++] = hi
+    }
   }
-  return out
+
+  let w = 0
+  const out = outBuf && outBuf.length >= pts.length ? outBuf : new Float64Array(pts.length)
+  for (let i = 0; i < n; i++) {
+    if (keep[i]) { out[w++] = pts[2 * i]; out[w++] = pts[2 * i + 1] }
+  }
+  return out.subarray(0, w)
+}
+
+// Chaikin corner-cutting: replaces the staircase of a marching-squares polyline
+// with a smooth curve, run `iterations` times. Closed rings are smoothed as
+// loops; open chains keep their two endpoints pinned so border-anchored lines
+// stay put. Operates on flat [c,r,…] buffers — the previous version allocated a
+// fresh {c,r} object per point per iteration, and point count doubles each pass
+// (a 4-iteration smooth is 16× the points, so the object churn dominated).
+// Ping-pong scratch for the smoothing passes. Every pass used to allocate a
+// fresh Float64Array per chain, and there are tens of thousands of chains per
+// rebuild at a 1-unit contour interval — pure GC pressure. The returned view
+// points into one of these, so callers must consume it before smoothing the
+// next chain (the emit loop does).
+let _smA = new Float64Array(8192)
+let _smB = new Float64Array(8192)
+function ensureSmooth(n) {
+  if (_smA.length < n) { _smA = new Float64Array(n * 2); _smB = new Float64Array(n * 2) }
+}
+
+function chaikinSmoothFlat(pts, closed, iterations, interEps = 0) {
+  let cur = pts
+  for (let it = 0; it < iterations; it++) {
+    const total = cur.length / 2
+    // A closed ring repeats its first point at the end; smooth the distinct set.
+    const m = closed ? total - 1 : total
+    if (m < 3) break
+    const segs = closed ? m : m - 1
+    const need = (closed ? segs * 2 + 1 : segs * 2 + 2) * 2
+    ensureSmooth(need)
+    // Never write into the buffer `cur` views, and never into the caller's array.
+    const next = cur.buffer === _smA.buffer ? _smB : _smA
+    let w = 0
+    if (!closed) { next[w++] = cur[0]; next[w++] = cur[1] }
+    for (let i = 0; i < segs; i++) {
+      const ai = 2 * i, bi = 2 * ((i + 1) % m)
+      const ax = cur[ai], ay = cur[ai + 1], bx = cur[bi], by = cur[bi + 1]
+      next[w++] = ax * 0.75 + bx * 0.25; next[w++] = ay * 0.75 + by * 0.25
+      next[w++] = ax * 0.25 + bx * 0.75; next[w++] = ay * 0.25 + by * 0.75
+    }
+    if (closed) { next[w++] = next[0]; next[w++] = next[1] }
+    else { next[w++] = cur[2 * (m - 1)]; next[w++] = cur[2 * (m - 1) + 1] }
+    cur = next.subarray(0, w)
+
+    // Thin between passes, not just at the end. Each pass doubles the point
+    // count, so 4 passes on a 444k-segment contour set builds 7.1M points only
+    // to discard 97% of them afterwards. Culling as we go keeps every subsequent
+    // pass small; the dropped points were already within tolerance of the kept
+    // ones, so the curve is unchanged.
+    if (interEps > 0 && it < iterations - 1) {
+      const other = cur.buffer === _smA.buffer ? _smB : _smA
+      cur = simplifyFlat(cur, interEps, other)
+    }
+  }
+  return cur
 }
 
 // Given one contour level's chains (grid coords), returns flat world-space segments
@@ -503,7 +704,6 @@ function chaikinSmooth(pts, iterations) {
 // compose cleanly.
 function borderCloseSegments(chains, rows, cols, scl, halfW, halfH, elev) {
   const toWorld = (c, r) => [c * scl - halfW, r * scl - halfH]
-  const key = (c, r) => `${c},${r}`
   const result = []
 
   // Collect open border endpoints
@@ -519,10 +719,11 @@ function borderCloseSegments(chains, rows, cols, scl, halfW, halfH, elev) {
 
   const bpts = []
   for (const chain of chains) {
-    const head = chain[0], tail = chain[chain.length - 1]
-    if (key(head.c, head.r) === key(tail.c, tail.r)) continue // already closed
-    if (onBorder(head.c, head.r)) bpts.push({ c: head.c, r: head.r, pos: borderPos(head.c, head.r) })
-    if (onBorder(tail.c, tail.r)) bpts.push({ c: tail.c, r: tail.r, pos: borderPos(tail.c, tail.r) })
+    if (chain.closed) continue // already a ring
+    const pts = chain.pts, last = pts.length - 2
+    const hc = pts[0], hr = pts[1], tc = pts[last], tr = pts[last + 1]
+    if (onBorder(hc, hr)) bpts.push({ c: hc, r: hr, pos: borderPos(hc, hr) })
+    if (onBorder(tc, tr)) bpts.push({ c: tc, r: tr, pos: borderPos(tc, tr) })
   }
 
   if (bpts.length < 2 || bpts.length % 2 !== 0) return result
@@ -599,6 +800,12 @@ function edgeLerp01(va, vb, level) {
 // Scratch for the 4 marching-squares edge midpoints (top, right, bottom, left).
 const _edgeX = new Float64Array(4)
 const _edgeY = new Float64Array(4)
+// …and their grid-edge ids, used to chain segments without stringifying coords.
+const _edgeId = new Int32Array(4)
+
+// Flatness tolerance for post-smoothing decimation, in grid units. Well under a
+// screen pixel at any usual zoom — see simplifyFlat().
+const SMOOTH_SIMPLIFY_EPS = 0.02
 
 function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings, smoothing) {
   if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
@@ -626,9 +833,18 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
 
   // When chaining is needed, raw grid-space segments are collected per level and
   // chained/smoothed/closed after the scan; otherwise they emit directly (fast path).
-  const levelSegs = needsChains ? new Array(numSteps).fill(null) : null
+  //
+  // EDGE IDS — every marching-squares crossing lies on one grid edge, and two
+  // adjacent cells compute a shared edge's crossing from the same corner pair,
+  // so an integer id identifies a junction exactly:
+  //   horizontal edge, row r between cols c and c+1 → 2·(r·cols + c)
+  //   vertical   edge, col c between rows r and r+1 → 2·(r·cols + c) + 1
+  // Cell (r,c)'s bottom is (r+1,c)'s top, and its right is (r,c+1)'s left, so
+  // neighbours agree on the id without any coordinate comparison.
+  const levelSegE  = needsChains ? new Array(numSteps).fill(null) : null
+  const levelSegXY = needsChains ? new Array(numSteps).fill(null) : null
   const lvl0 = numSteps > 0 ? levelVal[0] : 0
-  const ex = _edgeX, ey = _edgeY
+  const ex = _edgeX, ey = _edgeY, eid = _edgeId
 
   // Single cell-major pass: instead of re-scanning the whole grid once per level
   // (O(levels × cells)), visit each cell once and only test the levels that can
@@ -672,11 +888,20 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
         ex[2] = c + edgeLerp01(v01, v11, level); ey[2] = r + 1
         ex[3] = c;                               ey[3] = r + edgeLerp01(v00, v01, level)
 
+        if (needsChains) {
+          const base = (row0 + c) * 2
+          eid[0] = base                    // top    → H(r,   c)
+          eid[1] = (row0 + c + 1) * 2 + 1  // right  → V(r,   c+1)
+          eid[2] = (row1 + c) * 2          // bottom → H(r+1, c)
+          eid[3] = base + 1                // left   → V(r,   c)
+        }
+
         const pairs = MARCHING_TABLE[idx]
         for (let pi = 0; pi < pairs.length; pi += 2) {
           const e0 = pairs[pi], e1 = pairs[pi + 1]
           if (needsChains) {
-            (levelSegs[k] ??= []).push(ex[e0], ey[e0], ex[e1], ey[e1])
+            (levelSegE[k]  ??= new I32List()).push2(eid[e0], eid[e1])
+            ;(levelSegXY[k] ??= new F64List()).push4(ex[e0], ey[e0], ex[e1], ey[e1])
           } else {
             const isMajor = levelMajor[k] === 1
             const tp = isMajor ? majorPos : minorPos
@@ -694,10 +919,12 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
   // Post-scan: chain each level into polylines, optionally Chaikin-smooth them into
   // soft "form lines", and optionally add border-bridging segments to close rings.
   if (needsChains) {
+    // Ids run to 2·rows·cols; one shared scratch serves every level.
+    const scratch = getChainScratch(rows * cols * 2)
     for (let k = 0; k < numSteps; k++) {
-      const segs = levelSegs[k]
-      if (!segs || segs.length === 0) continue
-      const chains = chainContourSegments(segs)
+      const segE = levelSegE[k]
+      if (!segE || segE.length === 0) continue
+      const chains = chainLevelSegments(segE.a, levelSegXY[k].a, segE.length / 2, scratch)
       const isMajor = levelMajor[k] === 1
       const tp = isMajor ? majorPos : minorPos
       const tc = isMajor ? majorCol : minorCol
@@ -705,10 +932,25 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
       const cr = levelRgb[k * 3], cg = levelRgb[k * 3 + 1], cb = levelRgb[k * 3 + 2]
 
       for (const chain of chains) {
-        const pts = smooth > 0 ? chaikinSmooth(chain, smooth) : chain
-        for (let i = 0; i < pts.length - 1; i++) {
-          tp.push6(pts[i].c * scl - halfW,   y, pts[i].r * scl - halfH,
-                   pts[i+1].c * scl - halfW, y, pts[i+1].r * scl - halfH)
+        // Decimation only pays after smoothing: raw marching-squares points are
+        // already minimal (one per grid-edge crossing), so there is nothing
+        // collinear to drop and the sweep would be pure overhead.
+        //
+        // Two-level decimation: cheap O(n) thinning between passes, bounded by a
+        // fraction of the tolerance so the shifts cannot compound past it, then
+        // one Douglas–Peucker pass at full tolerance to reach the point count the
+        // curve actually needs.
+        const pts = smooth > 0
+          ? simplifyFlat(
+              chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth),
+              SMOOTH_SIMPLIFY_EPS,
+            )
+          : chain.pts
+        const np = pts.length / 2
+        for (let i = 0; i < np - 1; i++) {
+          const j = i * 2
+          tp.push6(pts[j]     * scl - halfW, y, pts[j + 1] * scl - halfH,
+                   pts[j + 2] * scl - halfW, y, pts[j + 3] * scl - halfH)
           tc.push6(cr, cg, cb, cr, cg, cb)
         }
       }
@@ -1398,6 +1640,13 @@ function buildSurfaceUvs(vertexCount, rows, cols) {
 export function buildSurfaceGeometry(terrain, p) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
   const { jitterAmt } = p
+  // Normals and UVs feed the terrain shader only. STL export derives its own
+  // facet normals and SVG export needs just positions/indices, so when nothing
+  // shades the surface both are skipped — they are the bulk of this builder.
+  // `needsSurfaceShading` is a worker dependency, so turning a fill layer on
+  // triggers one rebuild that fills them back in.
+  const shade = p.needsSurfaceShading !== false
+  const NO_F32 = new Float32Array(0)
   const vertexCount = rows * cols
   const basePos = new Float32Array(vertexCount * 3), baseBright = new Float32Array(vertexCount)
   for (let r = 0; r < rows; r++) {
@@ -1437,8 +1686,8 @@ export function buildSurfaceGeometry(terrain, p) {
   if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
     return {
       positions: basePos, brightnessBuf: baseBright, indices: baseIndices,
-      normals: computeSurfaceNormals(basePos, baseIndices),
-      uvs: buildSurfaceUvs(vertexCount, rows, cols),
+      normals: shade ? computeSurfaceNormals(basePos, baseIndices) : NO_F32,
+      uvs: shade ? buildSurfaceUvs(vertexCount, rows, cols) : NO_F32,
       metadata: { rows, cols },
     }
   }
@@ -1476,8 +1725,8 @@ export function buildSurfaceGeometry(terrain, p) {
   }
   return {
     positions: finalPos, brightnessBuf: finalBright, indices: finalIndices,
-    normals: computeSurfaceNormals(finalPos, finalIndices),
-    uvs: buildSurfaceUvs(vertexCount * nOct, rows, cols),
+    normals: shade ? computeSurfaceNormals(finalPos, finalIndices) : NO_F32,
+    uvs: shade ? buildSurfaceUvs(vertexCount * nOct, rows, cols) : NO_F32,
     metadata: { rows, cols },
   }
 }

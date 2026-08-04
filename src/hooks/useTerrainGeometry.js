@@ -18,61 +18,105 @@ export function useTerrainGeometry(p) {
   const [lineGeo, setLineGeo]       = useState(null)
   const [surfaceGeo, setSurfaceGeo] = useState(null)
   const [isComputing, setIsComputing] = useState(false)
+  // Increments on every delivered result. Consumers use it to tell "a build is
+  // running but frames are still arriving" (streaming) from "a build is running
+  // and nothing has come back" (a genuine stall worth an overlay).
+  const [resultCount, setResultCount] = useState(0)
 
   const workerRef = useRef(null)
   const startTimeRef = useRef(0)
   const prevPixelsRef = useRef(null)
   const genRef = useRef(0)
-  // True between postMessage and the matching onmessage. Terminating is the only
-  // way to cancel a synchronous worker build, so we pay the respawn cost only
-  // when there is actually work to kill.
+  // True between postMessage and the matching onmessage.
   const busyRef = useRef(false)
   // Which pixel buffer the live worker already holds, so we re-send the (large)
   // raster only when the loaded file actually changed or the worker was replaced.
   const workerPixelsRef = useRef(null)
+  // Newest request that arrived while a build was running; only the latest is
+  // kept, since intermediate states are never displayed.
+  const pendingRef = useRef(null)
+  const buildStartRef = useRef(0)
+  const sendRef = useRef(null)
+
+  // Floor for how long an in-flight build may run before a newer request
+  // cancels it outright instead of queueing behind it.
+  //
+  // Terminating is the only way to interrupt a synchronous worker, but it also
+  // destroys the cached raster and costs a worker respawn. Cancelling on *every*
+  // superseding request is catastrophic when requests arrive faster than builds
+  // complete — Soundscapes streaming at 30/s into 44 ms builds killed every
+  // single one and completed 0.2 builds/s. Queueing instead lets each build
+  // finish and run at the pipeline's natural rate.
+  //
+  // A fixed threshold would reintroduce exactly that failure at a heavier
+  // setting (200 ms builds would all die at 150 ms), so the budget also scales
+  // with what this pipeline has actually been completing. The rule is "cancel
+  // only a build that is an outlier against the current cadence": a steady
+  // stream never trips it, while a single huge rebuild queued behind fast ones
+  // — dragging Resolution on a large GeoTIFF — still gets killed promptly.
+  const CANCEL_AFTER_MS = 150
+  const CANCEL_DURATION_FACTOR = 3
+  const lastDurationRef = useRef(0)
+
+  const ensureWorker = () => {
+    if (workerRef.current) return
+    workerRef.current = new GeometryWorker()
+    workerPixelsRef.current = null
+    workerRef.current.onmessage = (e) => {
+      const elapsed = Math.round(performance.now() - startTimeRef.current)
+      const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
+      busyRef.current = false
+      lastDurationRef.current = performance.now() - buildStartRef.current
+      if (_gen === genRef.current) {
+        if (error) console.error('[GeometryWorker] Error:', error)
+        else {
+          startTransition(() => {
+            setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
+            setResultCount((n) => n + 1)
+          })
+          // Timing telemetry — also parsed by tests/benchmark.spec.js + performance.spec.js.
+          console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
+          console.log(`[Perf] Terrain ready Main: ${elapsed}ms`)
+        }
+      }
+      // Drain a queued request rather than idling — this is what turns a
+      // faster-than-realtime request stream into steady throughput.
+      const next = pendingRef.current
+      pendingRef.current = null
+      if (next) sendRef.current(next)
+      else setIsComputing(false)
+    }
+  }
+
+  const send = (req) => {
+    ensureWorker()
+    // Decided at send time, not request time: a queued request may be sent to a
+    // different worker than the one that was live when it was created.
+    const needsPixels = workerPixelsRef.current !== req.pixels
+    workerPixelsRef.current = req.pixels
+    startTimeRef.current = performance.now()
+    buildStartRef.current = startTimeRef.current
+    busyRef.current = true
+    workerRef.current.postMessage({
+      ...(needsPixels
+        ? { heightmapPixels: req.pixels, nodataMask: req.mask, heightmapWidth: req.w, heightmapHeight: req.h }
+        : null),
+      p: req.p,
+      _gen: ++genRef.current,
+    })
+  }
+  sendRef.current = send
 
   useEffect(() => {
     if (!heightmapPixels) {
       workerRef.current?.terminate()
       workerRef.current = null
       workerPixelsRef.current = null
+      pendingRef.current = null
       busyRef.current = false
       setTerrain(null); setLineGeo(null); setSurfaceGeo(null); setIsComputing(false)
       return
     }
-
-    // Cancel an in-flight build so stale results never overwrite the latest params.
-    // A worker sitting idle is reused as-is — respawning it would also throw away
-    // the cached heightmap and force a full re-clone of the raster.
-    if (workerRef.current && busyRef.current) {
-      workerRef.current.terminate()
-      workerRef.current = null
-      workerPixelsRef.current = null
-    }
-
-    if (!workerRef.current) {
-      workerRef.current = new GeometryWorker()
-      workerPixelsRef.current = null
-      workerRef.current.onmessage = (e) => {
-        const elapsed = Math.round(performance.now() - startTimeRef.current)
-        const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
-        busyRef.current = false
-        if (_gen !== genRef.current) return  // stale result from a superseded computation
-        if (error) console.error('[GeometryWorker] Error:', error)
-        else {
-          startTransition(() => {
-            setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
-          })
-          // Timing telemetry — also parsed by tests/benchmark.spec.js + performance.spec.js.
-          console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
-          console.log(`[Perf] Terrain ready Main: ${elapsed}ms`)
-        }
-        setIsComputing(false)
-      }
-    }
-
-    setIsComputing(true)
-    const gen = ++genRef.current
 
     // Guard against the race where heightmap pixels arrive before App.jsx has
     // committed the auto-resolution state update. Only clamp on the render
@@ -83,17 +127,30 @@ export function useTerrainGeometry(p) {
       ? Math.max(p.resolution, Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1000))
       : p.resolution
 
-    // Only ship the raster when this worker instance does not already have it.
-    const needsPixels = workerPixelsRef.current !== heightmapPixels
-    workerPixelsRef.current = heightmapPixels
-
-    startTimeRef.current = performance.now()
-    busyRef.current = true
-    workerRef.current.postMessage({
-      ...(needsPixels ? { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight } : null),
+    const req = {
       p: safeResolution !== p.resolution ? { ...p, resolution: safeResolution } : p,
-      _gen: gen,
-    })
+      pixels: heightmapPixels, mask: nodataMask,
+      w: heightmapWidth, h: heightmapHeight,
+    }
+
+    setIsComputing(true)
+
+    if (busyRef.current) {
+      const budget = Math.max(CANCEL_AFTER_MS, lastDurationRef.current * CANCEL_DURATION_FACTOR)
+      if (performance.now() - buildStartRef.current > budget) {
+        workerRef.current?.terminate()
+        workerRef.current = null
+        workerPixelsRef.current = null
+        busyRef.current = false
+        pendingRef.current = null
+        send(req)
+      } else {
+        pendingRef.current = req   // newest wins
+      }
+      return
+    }
+
+    send(req)
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
     // Terrain Globals
@@ -155,6 +212,13 @@ export function useTerrainGeometry(p) {
     p.seedSwiss, p.colorSwiss,
     p.hypsoSwiss, p.hypsoModeSwiss, p.hypsoBandedSwiss, p.hypsoIntervalSwiss,
 
+    // Whether the surface mesh needs shading attributes (normals/UVs) at all.
+    // This is the one fill-related value that must rebuild geometry: with no
+    // fill layer on, the worker skips building them entirely, so switching one
+    // on has to regenerate them. Individual fill *styling* params below stay
+    // render-side.
+    p.needsSurfaceShading,
+
     // NOTE: the fill params (showFill, fillColor, fillBanded, fillHypso*) are
     // render-side only — fill styling is pure GPU uniforms in SurfaceMesh.
     // They are deliberately excluded so toggling/dragging them never spawns a
@@ -168,5 +232,5 @@ export function useTerrainGeometry(p) {
 
   useEffect(() => () => workerRef.current?.terminate(), [])
 
-  return { terrain, lineGeo, surfaceGeo, isComputing }
+  return { terrain, lineGeo, surfaceGeo, isComputing, resultCount }
 }
