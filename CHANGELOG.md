@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Two high-severity npm audit findings.** `postcss` (arbitrary `.map` file disclosure via `sourceMappingURL`) and `vite` (`server.fs.deny` bypass on Windows alternate paths) bumped to patched versions within their existing `^` ranges — no breaking changes.
+
+### Changed
+- **fsevents install scripts explicitly approved** (`allowScripts` in `package.json`) so macOS dev builds keep native file-watching instead of falling back to polling under npm's install-script gate.
+
 ## [0.7.7] - 2026-07-02
 
 ### Added

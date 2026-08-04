@@ -31,5 +31,9 @@
     "postcss": "^8.4.41",
     "tailwindcss": "^4.2.4",
     "vite": "^8.0.9"
+  },
+  "allowScripts": {
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
   }
 }
