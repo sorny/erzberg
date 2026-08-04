@@ -7,10 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-08-04
+
 ### Fixed
+- **Loading an overlay texture disposed the terrain shader material and the heightmap DataTexture.** A single `useEffect` cleanup released `surfMat`, `overlayTex` and the heightmap texture but was keyed on only `[surfMat, overlayTex]`, so every overlay-texture change ran it against still-live resources — forcing a full shader recompile and a re-upload of the (float, full-resolution) heightmap on a control that should touch neither. Split into one cleanup per resource, each keyed on what it actually owns.
+- **A failed file pick threw a `TypeError` on top of the error banner.** `load()` / `loadGeoTiff()` swallow errors and resolve `undefined`, but the pickers passed that straight to `.then(onLoaded)` and every callback destructures its argument. Both loaders now resolve `null` explicitly and the pickers gate `onLoaded` on it.
 - **Two high-severity npm audit findings.** `postcss` (arbitrary `.map` file disclosure via `sourceMappingURL`) and `vite` (`server.fs.deny` bypass on Windows alternate paths) bumped to patched versions within their existing `^` ranges — no breaking changes.
+- **Sun indicator leaked three GPU materials per toggle.** R3F only auto-disposes objects it creates from JSX; materials passed via the `material` prop are the component's to release. The gradient texture was likewise never released on unmount.
 
 ### Changed
+- **The geometry worker is now persistent and caches the source raster.** Every param change previously terminated the worker, spawned a fresh one (re-parsing the 32 kB worker chunk) and structured-cloned the entire heightmap through `postMessage` — a 256 MB copy per rebuild for an 8k GeoTIFF, on a raster that does not change when a style slider moves. The worker now caches the pixels and the main thread ships them only when the loaded file actually changes; an idle worker is reused instead of respawned. Terminate-to-cancel is kept for genuinely in-flight builds, so responsiveness during a drag is unchanged. Measured on the default 1024² heightmap over 8 consecutive rebuilds: worker round-trip 930 ms → 780 ms, with per-rebuild cost falling from a flat ~120 ms to ~65 ms once the worker is warm. The saving scales with raster size.
+- **`useTerrainGeometry` subscribes per field instead of calling `useStore()` bare**, so unrelated store writes (overlay texture, GeoTIFF metadata) no longer re-render it.
 - **fsevents install scripts explicitly approved** (`allowScripts` in `package.json`) so macOS dev builds keep native file-watching instead of falling back to polling under npm's install-script gate.
 
 ## [0.7.7] - 2026-07-02

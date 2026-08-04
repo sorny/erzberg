@@ -380,6 +380,13 @@ function SunIndicator({ p, terrain }) {
     color: '#ffcc00', depthTest: false, depthWrite: false,
     transparent: true, opacity: 0.7,
   }), [])
+
+  // R3F only auto-disposes objects it created from JSX; materials handed in via
+  // the `material` prop are ours to release. The sun toggles on and off freely,
+  // so without this each toggle strands three GPU materials.
+  useEffect(() => () => {
+    coreMat.dispose(); haloMat.dispose(); rayMat.dispose()
+  }, [coreMat, haloMat, rayMat])
   // 6 axis-aligned + 8 cube-corner diagonals; each direction emits one segment
   const rayPositions = useMemo(() => {
     const dirs = [

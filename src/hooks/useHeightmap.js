@@ -325,6 +325,7 @@ export function useHeightmap() {
       .catch(err => {
         setIsLoading(false); setLoadingMsg('')
         setLoadError('Failed to load image: ' + friendlyError(err))
+        return null   // signals failure to callers; see loadFromPicker
       })
   }, [setHeightmap, clearGeoTiffMeta])
 
@@ -332,7 +333,10 @@ export function useHeightmap() {
     // PNG only — this path decodes a greyscale heightmap (incl. 16-bit, which is
     // PNG-specific). 'image/*' let users pick GeoTIFFs/JPEGs that then fail here.
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: 'image/png,.png' })
-    input.onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]).then(onLoaded) }
+    // The catch above resolves to null rather than rejecting, so onLoaded must be
+    // gated on it — the callbacks destructure their argument and would otherwise
+    // throw a TypeError on top of the error the user is already being shown.
+    input.onchange = (e) => { if (e.target.files[0]) load(e.target.files[0]).then(r => { if (r) onLoaded(r) }) }
     input.click()
   }, [load])
 
@@ -351,12 +355,13 @@ export function useHeightmap() {
         setIsLoading(false); setLoadingMsg('')
         setLoadError('Failed to load GeoTIFF: ' + friendlyError(err))
         console.error(err)
+        return null   // signals failure to callers; see loadGeoTiffFromPicker
       })
   }, [setHeightmap, setGeoTiffMeta])
 
   const loadGeoTiffFromPicker = useCallback((onLoaded) => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.tif,.tiff,.geotiff,image/tiff' })
-    input.onchange = (e) => { if (e.target.files[0]) loadGeoTiff(e.target.files[0]).then(onLoaded) }
+    input.onchange = (e) => { if (e.target.files[0]) loadGeoTiff(e.target.files[0]).then(r => { if (r) onLoaded(r) }) }
     input.click()
   }, [loadGeoTiff])
 

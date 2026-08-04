@@ -186,13 +186,17 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   const { size, gl } = useThree()
-  // Use physical pixel dimensions so LineMaterial calculates line widths correctly
-  // at any devicePixelRatio (CSS pixels would make lines double-wide at 2× DPR).
+  // gl.getSize() is the CSS-pixel viewport (getDrawingBufferSize() would be the
+  // device-pixel one). That is deliberate: LineMaterial divides linewidth by
+  // resolution.y, so a CSS-sized resolution makes `weight` mean CSS pixels and
+  // keeps apparent line thickness constant across devicePixelRatio *and* across
+  // the View → Supersampling multiplier. Passing the drawing-buffer size instead
+  // would shrink every line by a factor of dpr × renderScale.
   const resolution = useMemo(() => {
     const s = new THREE.Vector2()
     gl.getSize(s)
     return s
-  }, [size.width, size.height])
+  }, [gl, size.width, size.height])
 
   return (
     <group>

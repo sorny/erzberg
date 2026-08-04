@@ -511,11 +511,14 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uGradientTex.value = gradientTex
   }, [surfMat, gradientTex])
 
-  useEffect(() => () => {
-    surfMat?.dispose()
-    overlayTex?.dispose()
-    hmTexRef.current?.dispose()
-  }, [surfMat, overlayTex])
+  // One cleanup per resource, each keyed only on what it owns. Grouping these
+  // disposed the (never-recreated) shader material and the heightmap DataTexture
+  // every time the overlay texture changed — forcing a shader recompile and a
+  // re-upload of the full float heightmap on a control that should touch neither.
+  useEffect(() => () => surfMat?.dispose(), [surfMat])
+  useEffect(() => () => overlayTex?.dispose(), [overlayTex])
+  useEffect(() => () => hmTexRef.current?.dispose(), [])
+  useEffect(() => () => gradTexRef.current?.dispose(), [])
 
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color:               new THREE.Color(p.meshColor ?? '#888888'),

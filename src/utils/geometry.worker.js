@@ -5,7 +5,13 @@
  *   buildTerrain()       → terrain grid, slopes, elevation bounds
  *   buildLineGeometry()  → array of lineGeo layers (the 12 draw modes + mirroring)
  *   buildGpxGeometry()   → optional GPX track layer appended to lineGeo
- *   buildSurfaceGeometry()→ triangulated surface mesh for fill / STL / SVG depth buffer
+ *   buildSurfaceGeometry()→ triangulated surface mesh for fill / SVG depth buffer
+ *
+ * The source heightmap is CACHED here across messages. It is by far the largest
+ * thing in the payload (an 8k GeoTIFF is a 256 MB Float32Array) and it does not
+ * change when a style slider moves, so re-sending it per rebuild meant a full
+ * structured-clone copy on every drag tick. The main thread now sends the pixels
+ * once per loaded file; subsequent builds carry only the params object.
  *
  * All Float32Array / Uint32Array buffers are transferred (zero-copy) back to the
  * main thread via the Transferables list. After transfer the originals are detached.
@@ -13,16 +19,26 @@
 import { buildTerrain } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry, buildGpxGeometry } from './geometryBuilders'
 
+// Cached source raster — replaced only by a message carrying `heightmapPixels`.
+let src = null
+
 self.onmessage = (e) => {
   const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p, _gen } = e.data
 
+  // A message with pixels refreshes the cache; one without reuses it.
+  if (heightmapPixels) src = { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight }
+  if (!src) {
+    self.postMessage({ error: 'No heightmap loaded in worker.', _gen })
+    return
+  }
+
   try {
-    const terrain = buildTerrain(heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p)
+    const terrain = buildTerrain(src.heightmapPixels, src.nodataMask, src.heightmapWidth, src.heightmapHeight, p)
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
 
     if (p.gpxPoints?.length > 0 && p.geoTiffBbox && p.geoTiffCRS?.startsWith('EPSG:')) {
-      const gpxLayer = buildGpxGeometry(terrain, p, heightmapWidth, heightmapHeight)
+      const gpxLayer = buildGpxGeometry(terrain, p, src.heightmapWidth, src.heightmapHeight)
       if (gpxLayer) lineGeo.push(gpxLayer)
     }
 

@@ -522,10 +522,11 @@ export default function App() {
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL || '/'
     load(`${baseUrl}Heightmap.png`)
-      .then(({ width, height }) => {
-        setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height) }))
+      .then((r) => {
+        // load() resolves null when it failed (the error banner is already shown).
+        if (!r) { console.warn('[App] Default heightmap not found — use Load Heightmap.'); return }
+        setTerrain(prev => ({ ...prev, resolution: autoResolution(r.width, r.height) }))
       })
-      .catch(() => console.warn('[App] Default heightmap not found — use Load Heightmap.'))
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const bgColor   = style.bgColor || '#ffffff'
