@@ -87,6 +87,11 @@ const STYLE_DEF = {
   enabledEngrave: false, spacingEngrave: 3, angleEngrave: 45, levelsEngrave: 3, sunAzimuthEngrave: 315, gammaEngrave: 1.5,
   colorEngrave: '#000000', weightEngrave: 1, opacityEngrave: 1, dashEngrave: 'solid',
   hypsoEngrave: false, hypsoModeEngrave: 'elevation', hypsoBandedEngrave: false, hypsoIntervalEngrave: 10,
+  // Curvature engraving — strokes trace the principal-curvature direction field
+  enabledCurv: false, spacingCurv: 4, lengthCurv: 60, thresholdCurv: 0.15, radiusCurv: 1,
+  dirModeCurv: 'max', stepCurv: 1,
+  colorCurv: '#000000', weightCurv: 1, opacityCurv: 1, dashCurv: 'solid',
+  hypsoCurv: false, hypsoModeCurv: 'elevation', hypsoBandedCurv: false, hypsoIntervalCurv: 10,
   // Swiss rock & scree — seedSwiss: same seed, same stroke wobble + scree pattern
   enabledSwiss: false, spacingSwiss: 2, thresholdSwiss: 0.45, lengthSwiss: 1, screeSwiss: 0.5, screeWeightSwiss: 2.5, seedSwiss: 42,
   colorSwiss: '#000000', weightSwiss: 1, opacitySwiss: 1, dashSwiss: 'solid',
@@ -160,6 +165,34 @@ function BgSync({ color, gradient }) {
   return null
 }
 
+// ── DprGuard: keeps the drawing buffer within what the GPU will actually give ─
+// A browser that cannot afford the requested WebGL drawing buffer clamps it
+// silently: canvas.width keeps reporting the requested size while the real
+// framebuffer is smaller, and Three goes on setting a viewport for the size it
+// asked for. The scene is then drawn past the edge of the buffer that exists and
+// lands off-centre and cropped — which is what Supersampling 2× did on a large
+// Retina display (10240×5760 requested, 7680×4320 delivered).
+//
+// The ceiling is not a constant that can be hardcoded: it depends on the live
+// context's own state, and an offscreen canvas with identical attributes probes
+// clean well past where the displayed one clamps. So measure it the moment it
+// bites and report the usable pixel budget upward, which caps Supersampling to
+// whatever the display can honestly deliver instead of breaking the view.
+function DprGuard({ onClamp }) {
+  const gl   = useThree((s) => s.gl)
+  const size = useThree((s) => s.size)
+  const dpr  = useThree((s) => s.viewport.dpr)
+  useEffect(() => {
+    const canvas = gl.domElement
+    const ctx = gl.getContext()
+    if (!ctx || !canvas.width || !canvas.height) return
+    if (ctx.drawingBufferWidth < canvas.width || ctx.drawingBufferHeight < canvas.height) {
+      onClamp(ctx.drawingBufferWidth * ctx.drawingBufferHeight)
+    }
+  }, [gl, size.width, size.height, dpr, onClamp])
+  return null
+}
+
 // ── Loading overlay ───────────────────────────────────────────────────────────
 function LoadingOverlay({ msg }) {
   return (
@@ -216,6 +249,20 @@ export default function App() {
   const [style,   setStyle]   = useState(STYLE_DEF)
   const [points,  setPoints]  = useState(POINTS_DEF)
   const [view,    setView]    = useState(VIEW_DEF)
+  // Largest drawing buffer this context has been observed to actually deliver.
+  // Infinity until DprGuard catches a clamp; only ever ratchets downward.
+  const [maxBufferPx, setMaxBufferPx] = useState(Infinity)
+  const handleBufferClamp = useCallback((px) => {
+    setMaxBufferPx((prev) => Math.min(prev, px))
+  }, [])
+  // The affordable pixel ratio depends on the window size, so it has to be
+  // reactive — shrinking the window can make a previously clamped setting fit.
+  const [winSize, setWinSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  useEffect(() => {
+    const onResize = () => setWinSize({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
   const [gradientStops,   setGradientStops]   = useState(GRADIENT_PRESETS['Jet'])
   const [bgGradientStops, setBgGradientStops] = useState([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
   const [webmDuration, setWebmDuration]   = useState(5)
@@ -476,6 +523,17 @@ export default function App() {
     else startWebM(canvas, webmDuration, setWebmActive, exportBaseName)
   }, [webmDuration, exportBaseName])
 
+  // ── Canvas pixel ratio ────────────────────────────────────────────────────
+  // The canvas fills the window, so its CSS size is the window size. Supersampling
+  // multiplies the device ratio, capped to whatever buffer DprGuard has found this
+  // context will actually hand back — asking for more than that renders off-centre.
+  const canvasDpr = useMemo(() => {
+    const desired = Math.min(window.devicePixelRatio || 1, 2) * (view.renderScale ?? 1)
+    const area = winSize.w * winSize.h
+    if (!Number.isFinite(maxBufferPx) || !area) return desired
+    return Math.min(desired, Math.sqrt(maxBufferPx / area))
+  }, [view.renderScale, maxBufferPx, winSize])
+
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
@@ -483,12 +541,18 @@ export default function App() {
     gpxPoints, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
-    // Surface normals and UVs exist only for the terrain shader. STL export
-    // computes its own facet normals and SVG only needs positions/indices, so
-    // when no fill layer is on they are pure waste — ~8 ms of every rebuild.
-    needsSurfaceShading: !!(style.showFill || style.showRawTerrain || style.showHillshade ||
-      style.showSlopeShade || style.showWaterFill || style.showAO || style.showAspectMap || profileMode),
   }
+
+  // Surface normals and UVs exist only for the terrain shader. STL export
+  // computes its own facet normals and SVG only needs positions/indices, so
+  // when no fill layer is on they are pure waste — ~8 ms of every rebuild.
+  //
+  // Read off the merged `p`, not the individual state blocks: these flags are
+  // split across style and view (showRawTerrain lives in view), and sourcing
+  // them by hand silently yields undefined for any that move.
+  p.needsSurfaceShading = !!(p.showFill || p.showRawTerrain || p.showHillshade ||
+    p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap || profileMode)
+
   // Keep the click handler in a ref so SurfaceMesh can read it without it
   // entering the postMessage-serialized p object sent to the Web Worker.
   const profileClickRef = useRef(handleProfileClick)
@@ -581,12 +645,13 @@ export default function App() {
       {/* ── Canvas ──────────────────────────────────────────────────────── */}
       <Canvas
         frameloop="demand"
-        dpr={Math.min(window.devicePixelRatio || 1, 2) * (view.renderScale ?? 1)}
+        dpr={canvasDpr}
         gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
         camera={{ position: [0, 400, 500], fov: 60, near: 5, far: 50000 }}
         style={{ width:'100%', height:'100%' }}
       >
         <BgSync color={bgColor} gradient={style.bgGradient} />
+        <DprGuard onClamp={handleBufferClamp} />
         <Scene
           terrain={terrainData}
           lineGeo={lineGeo}

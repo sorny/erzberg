@@ -31,7 +31,7 @@ function fmtTime(sec) {
 }
 
 // Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
-const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Swiss', 'Gpx']
+const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Curv', 'Swiss', 'Gpx']
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
 function PanelStyles() {
@@ -371,7 +371,7 @@ export function Sidebar({
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
-    modeEngrave: false, modeSwiss: false,
+    modeEngrave: false, modeCurv: false, modeSwiss: false,
     hillshade: false, slopeShade: false, gpxTrack: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -533,6 +533,7 @@ export function Sidebar({
       modeValley:   !!newStyle.enabledValley,
       modeStipple:  !!newStyle.enabledStipple,
       modeEngrave:  !!newStyle.enabledEngrave,
+      modeCurv:     !!newStyle.enabledCurv,
       modeSwiss:    !!newStyle.enabledSwiss,
     }))
   }
@@ -1035,6 +1036,34 @@ export function Sidebar({
             )}
           </Section>
 
+          <Section title="Mode: Curvature" open={sec.modeCurv} onToggle={() => tog('modeCurv')} enabled={style.enabledCurv}>
+            <Tog label="Enabled" checked={style.enabledCurv} onChange={v => ss({ enabledCurv: v })} />
+            {style.enabledCurv && (
+              <>
+                <HelpBox text="Copperplate engraving that follows the form rather than the light: strokes trace the principal-curvature field, so the lines themselves wrap around ridges and hollows." />
+                <Sub>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['Across form', 'max'], ['Along form', 'min']].map(([lbl, v]) => (
+                      <button key={v} onClick={() => ss({ dirModeCurv: v })}
+                        style={{
+                          flex:1, fontSize:8, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
+                          background: style.dirModeCurv === v ? ACCENT : SURF,
+                          color: style.dirModeCurv === v ? '#fff' : MUTED,
+                          border:`1px solid ${style.dirModeCurv === v ? ACCENT : BORDER}`,
+                        }}>{lbl}</button>
+                    ))}
+                  </div>
+                  <InlineSl label="Spacing" help="Separation between strokes. Each line claims territory as it advances and stops on reaching another's, so strokes stay evenly spread instead of clumping." min={1} max={20} step={0.5} value={style.spacingCurv} onChange={v => ss({ spacingCurv: v })} />
+                  <InlineSl label="Length" help="Maximum steps per stroke. Short values give a broken, sketched texture; long values give sweeping continuous lines." min={5} max={400} step={5} value={style.lengthCurv} onChange={v => ss({ lengthCurv: v })} />
+                  <InlineSl label="Step" help="Integration step in grid cells. Smaller follows the curvature field more faithfully at more segments." min={0.25} max={3} step={0.25} value={style.stepCurv} onChange={v => ss({ stepCurv: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Smoothing" help="Pre-blur radius before differencing. Second derivatives amplify noise, so raise this on grainy terrain." min={0} max={6} step={1} value={style.radiusCurv} onChange={v => ss({ radiusCurv: v })} />
+                  <InlineSl label="Threshold" help="Minimum curvature, as a fraction of the strongest present. Raise it to leave flat ground bare and engrave only where the surface actually bends." min={0} max={0.9} step={0.01} value={style.thresholdCurv} onChange={v => ss({ thresholdCurv: v })} fmt={v => Math.round(v*100)+'%'} />
+                </Sub>
+                <ModeStyleOverride prefix="Curv" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
+              </>
+            )}
+          </Section>
+
           <Section title="Mode: Rock & Scree" open={sec.modeSwiss} onToggle={() => tog('modeSwiss')} enabled={style.enabledSwiss}>
             <Tog label="Enabled" checked={style.enabledSwiss} onChange={v => ss({ enabledSwiss: v })} />
             {style.enabledSwiss && (
@@ -1218,6 +1247,7 @@ export function Sidebar({
                   windowFrames={snd.opts.windowFrames}
                   dbFloor={snd.opts.dbFloor}
                   contrast={snd.opts.contrast}
+                  frozen={snd.frozen}
                   onSeek={snd.seek}
                 />
 
@@ -1271,11 +1301,14 @@ export function Sidebar({
                 </Sub>
 
                 <button
+                  data-testid="soundscape-freeze"
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
-                  style={{ width:'100%', padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                >Freeze Whole Track</button>
+                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
                 <div style={{ fontSize:9, color: MUTED, marginTop:6, lineHeight:1.4 }}>
-                  Pauses playback and writes the entire track as one static heightmap — useful for erosion, STL and SVG, which need a terrain that holds still.
+                  {snd.frozen
+                    ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
+                    : 'Pauses playback and writes the entire track as one static heightmap — useful for erosion, STL and SVG, which need a terrain that holds still.'}
                 </div>
               </>
             )}

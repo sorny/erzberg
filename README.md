@@ -5,7 +5,7 @@
 [![Deploy to GitHub Pages](https://github.com/sorny/erzberg/actions/workflows/deploy.yml/badge.svg)](https://github.com/sorny/erzberg/actions/workflows/deploy.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap (8-bit or 16-bit PNG) or GeoTIFF — or an audio file — and render it as 3D line art, structural relief, or architectural sketch using one or more of the thirteen independent draw modes.
+A topographic visualisation tool built on React Three Fiber. Load a greyscale heightmap (8-bit or 16-bit PNG) or GeoTIFF — or an audio file — and render it as 3D line art, structural relief, or architectural sketch using one or more of the fourteen independent draw modes.
 
 **Everything runs locally in your browser.** Your files never leave your machine — no server, no upload, no account.
 
@@ -17,7 +17,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Layered ghost occlusion.** Each line segment generates an invisible 3D curtain mesh that acts as a depth buffer. Lines occlude other lines rather than being swallowed by the terrain surface, and hidden segments can be rendered with a custom colour and opacity for an X-ray effect.
 
-**Thirteen draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
+**Fourteen draw modes.** Every mode runs independently with its own colour, weight, dash pattern, and hypsometric tinting:
 
 | Mode | Technique |
 |---|---|
@@ -33,6 +33,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot-density driven by slope or elevation |
 | Engraving | Copperplate illumination cross-hatch — shadows accumulate up to 4 stacked stroke directions |
+| Curvature | Streamlines traced through the principal-curvature direction field, evenly spaced — strokes wrap the shape rather than the light |
 | Rock & Scree | Swisstopo-style cliff hachures + slope-graded debris dots |
 
 **Surface overlays.** Hillshade with physically-based ray-march cast shadows: ridgelines occlude sunlight using a horizon-angle comparison across a progressive-step heightmap ray, with configurable darkness, softness (penumbra), and quality. An amber sun indicator sphere with starburst ray lines marks the light source position in the 3D scene. Azimuth and altitude drive both the Lambert shading and the cast shadows. Slope shading adds a two-colour steepness gradient blended over the fill.

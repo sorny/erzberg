@@ -97,7 +97,9 @@ async function main() {
     process.exit(1)
   }
 
-  const browser = await chromium.launch({ headless: false })
+  // Same browser the Playwright suite uses (playwright.config.js pins
+  // channel: 'chrome'), so this script needs no separate browser download.
+  const browser = await chromium.launch({ headless: false, channel: 'chrome' })
 
   try {
     const context = await browser.newContext({ acceptDownloads: true })

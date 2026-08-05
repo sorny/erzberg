@@ -50,6 +50,17 @@ export function useSoundscape() {
   // True while the soundscape owns the heightmap slot. Cleared when another
   // loader takes over so the section can show whether it is still driving.
   const [active, setActive] = useState(false)
+  // True while the heightmap is the whole frozen track rather than a streamed
+  // window. The panel reads this to show what is actually driving the terrain —
+  // without it the readout keeps drawing a moving-window highlight over a
+  // terrain that is no longer following the playhead at all.
+  const [frozen, setFrozen] = useState(false)
+  const frozenRef = useRef(false)
+  const markFrozen = useCallback((v) => {
+    if (frozenRef.current === v) return   // guarded: pushFrame runs at tick rate
+    frozenRef.current = v
+    setFrozen(v)
+  }, [])
 
   const audioRef = useRef(null)
   const urlRef = useRef(null)
@@ -73,7 +84,8 @@ export function useSoundscape() {
     const pixels = sliceWindow(s, frame, o.windowFrames, o.dbFloor, o.contrast)
     setHeightmap(pixels, null, o.windowFrames, s.bins, fileNameRef.current || 'soundscape')
     setActive(true)
-  }, [setHeightmap])
+    markFrozen(false)   // any windowed push means we are streaming again
+  }, [setHeightmap, markFrozen])
 
   const pushFrameRef = useRef(pushFrame)
   pushFrameRef.current = pushFrame
@@ -196,8 +208,11 @@ export function useSoundscape() {
       if (pcmRef.current) runAnalysis(pcmRef.current, sampleRateRef.current, next)
     } else if (specRef.current) {
       // Stream-time params (window width, floor, contrast) re-slice the current
-      // position without touching the FFT.
-      pushFrameRef.current(audioRef.current?.currentTime ?? 0)
+      // position without touching the FFT. While the track is frozen there is no
+      // position to re-slice — rebuild the frozen heightmap instead, so nudging
+      // Contrast does not silently drop the terrain back to a moving window.
+      if (frozenRef.current) freezeRef.current()
+      else pushFrameRef.current(audioRef.current?.currentTime ?? 0)
     }
   }, [runAnalysis])
 
@@ -242,15 +257,20 @@ export function useSoundscape() {
     const { pixels, width, height } = resampleTime(s, FREEZE_MAX_COLS, o.dbFloor, o.contrast)
     setHeightmap(pixels, null, width, height, `${fileNameRef.current || 'soundscape'} (full)`)
     setActive(true)
+    markFrozen(true)
     return { width, height }
-  }, [pause, setHeightmap])
+  }, [pause, setHeightmap, markFrozen])
+
+  const freezeRef = useRef(freezeFullTrack)
+  freezeRef.current = freezeFullTrack
 
   /** Called when another loader takes the heightmap slot. */
   const release = useCallback(() => {
     audioRef.current?.pause()
     setIsPlaying(false)
     setActive(false)
-  }, [])
+    markFrozen(false)
+  }, [markFrozen])
 
   // ── Streaming tick ────────────────────────────────────────────────────────
   // Throttled to opts.fps because each push replaces the heightmap and so costs
@@ -305,7 +325,7 @@ export function useSoundscape() {
 
   return {
     fileName, duration, currentTime, isPlaying, isAnalyzing, progress, error, spec,
-    opts, setOpts, active,
+    opts, setOpts, active, frozen,
     loadFromPicker, play, pause, toggle, stop, seek, freezeFullTrack, release,
     clearError: () => setError(null),
   }

@@ -3,7 +3,7 @@
 Soundscapes turns an audio file into terrain. The track is analysed once into a
 spectrogram, and playback then *streams* a window of that spectrogram into the
 heightmap store — the same slot a PNG or GeoTIFF occupies. Every existing tool
-therefore applies unchanged: all thirteen draw modes, hillshade, erosion, and
+therefore applies unchanged: all fourteen draw modes, hillshade, erosion, and
 the SVG / PNG / STL exporters.
 
 ---

@@ -202,3 +202,53 @@ test('contours with close-rings and smoothing keep streaming', async ({ page }) 
   // machine and settings. A drop back under 18/s means one of them regressed.
   expect(times.length / el, 'contour throughput regressed').toBeGreaterThan(18)
 })
+
+test('freezing the whole track updates the sidebar spectrogram', async ({ page }) => {
+  await openSoundscapes(page)
+  await uploadTrack(page)
+
+  const spectro = page.locator('#hm-panel-body > div')
+    .filter({ hasText: /^Soundscapes/ }).first().locator('canvas').first()
+  const freeze = page.locator('[data-testid="soundscape-freeze"]')
+
+  // Mean luminance of the readout. The overlay marking "this is what is driving
+  // the terrain" is a translucent white wash, so covering the whole track is
+  // measurably brighter than shading a single streamed window.
+  const brightness = () => spectro.evaluate((c) => {
+    const off = document.createElement('canvas')
+    off.width = 120; off.height = 40
+    const ctx = off.getContext('2d')
+    ctx.drawImage(c, 0, 0, 120, 40)
+    const d = ctx.getImageData(0, 0, 120, 40).data
+    let sum = 0
+    for (let i = 0; i < d.length; i += 4) sum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]
+    return sum / (d.length / 4)
+  })
+
+  // Play briefly so the streamed window sits mid-track, then pause.
+  await page.click('[data-testid="soundscape-play"]')
+  await page.waitForTimeout(1500)
+  await page.click('[data-testid="soundscape-play"]')
+  await page.waitForTimeout(400)
+  const streaming = await brightness()
+
+  await freeze.click()
+  await page.waitForTimeout(1500)
+  const frozen = await brightness()
+  console.log(`spectrogram brightness: streaming=${streaming.toFixed(1)} frozen=${frozen.toFixed(1)}`)
+
+  // Regression guard: the readout used to keep drawing the moving-window
+  // highlight after a freeze, so it was pixel-identical before and after.
+  expect(frozen, 'freezing must mark the whole track as the source').toBeGreaterThan(streaming + 3)
+  await expect(freeze).toHaveText(/Frozen/)
+
+  // Resuming playback must hand the readout back to the streaming window.
+  await page.click('[data-testid="soundscape-play"]')
+  await page.waitForTimeout(900)
+  await page.click('[data-testid="soundscape-play"]')
+  await page.waitForTimeout(400)
+  const resumed = await brightness()
+  console.log(`spectrogram brightness after resume: ${resumed.toFixed(1)}`)
+  expect(resumed, 'playing again must release the frozen state').toBeLessThan(frozen - 3)
+  await expect(freeze).toHaveText(/Freeze Whole Track/)
+})

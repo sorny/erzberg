@@ -40,9 +40,10 @@ function rampColor(t) {
  * @param {number}   windowFrames width of the slice being streamed
  * @param {number}   dbFloor      noise gate, 0–1 of the stored dB range
  * @param {number}   contrast     gamma applied after gating
+ * @param {boolean}  frozen       whole track is the heightmap, not a window
  * @param {Function} onSeek       called with a time in seconds on click/drag
  */
-export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbFloor, contrast, onSeek }) {
+export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbFloor, contrast, frozen, onSeek }) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
 
@@ -97,6 +98,18 @@ export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbF
     ctx.imageSmoothingEnabled = false
     ctx.drawImage(cached, 0, 0, w, h)
 
+    // Frozen: the whole track is the heightmap, so the selection covers
+    // everything and there is no playhead to follow — drawing the moving window
+    // here would describe streaming behaviour the terrain is no longer doing.
+    if (frozen) {
+      ctx.fillStyle = 'rgba(255,255,255,0.16)'
+      ctx.fillRect(0, 0, w, h)
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+      ctx.lineWidth = 2
+      ctx.strokeRect(1, 1, w - 2, h - 2)
+      return
+    }
+
     if (!duration) return
     const px = (currentTime / duration) * w
 
@@ -114,7 +127,7 @@ export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbF
 
     ctx.fillStyle = '#ffffff'
     ctx.fillRect(Math.min(w - 1, Math.max(0, px - 0.5)), 0, 1.5, h)
-  }, [cached, currentTime, duration, windowFrames, spec])
+  }, [cached, currentTime, duration, windowFrames, spec, frozen])
 
   // Keep the backing store matched to the laid-out width so the image is crisp.
   useEffect(() => {

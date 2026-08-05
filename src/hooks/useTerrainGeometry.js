@@ -207,6 +207,10 @@ export function useTerrainGeometry(p) {
     p.enabledEngrave, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave,
     p.colorEngrave,
     p.hypsoEngrave, p.hypsoModeEngrave, p.hypsoBandedEngrave, p.hypsoIntervalEngrave,
+    // Mode: Curvature engraving
+    p.enabledCurv, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv,
+    p.dirModeCurv, p.stepCurv, p.colorCurv,
+    p.hypsoCurv, p.hypsoModeCurv, p.hypsoBandedCurv, p.hypsoIntervalCurv,
     // Mode: Swiss rock & scree
     p.enabledSwiss, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss,
     p.seedSwiss, p.colorSwiss,

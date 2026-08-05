@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using thirteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fourteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -123,11 +123,34 @@ so dots thicken toward the rock faces, mimicking talus accumulation. Accepted do
 
 Both sub-layers share the mode's seeded PRNG: the same seed reproduces the identical wobble and scree placement.
 
+## 14. Curvature
+
+Form-following engraving: strokes trace the *shape* of the surface rather than its illumination. Where Engraving (§12) hatches by light and Hachure (§5) follows the gradient, this mode integrates streamlines through the principal-curvature direction field, so the strokes wrap the terrain the way a burin follows a form.
+
+**Direction field.** The height field is pre-smoothed by `radius` (second derivatives amplify noise), then the symmetric Hessian is estimated per cell by finite differences, as in §9. Its eigen-decomposition
+
+$$\lambda_{\pm} = \tfrac{1}{2}\Big(\mathrm{tr}\,\mathcal{H} \pm \sqrt{(\mathrm{tr}\,\mathcal{H})^2 - 4\det\mathcal{H}}\Big)$$
+
+gives the two principal curvatures, and the eigenvector for the selected $\lambda$ gives the direction the stroke follows. `dirMode` picks which:
+
+| Mode | Eigenvalue | Reads as |
+|---|---|---|
+| Across form | larger $\|\lambda\|$ | Lines hoop *around* a ridge, across the direction of strongest bending |
+| Along form | smaller $\|\lambda\|$ | Strokes comb *along* ridges and valleys, down the flattest direction |
+
+Both selections are by **magnitude**, not sign, so a mode does not change meaning between a crest (both curvatures negative) and a basin. The eigenvector is taken from whichever Hessian row is better conditioned, so near-diagonal matrices stay stable, with the coordinate axes used exactly when $H_{xy} \to 0$.
+
+**Stroke strength** is always the dominant curvature $\max(|\lambda_-|, |\lambda_+|)$, never the eigenvalue the direction was taken from. This matters: on a ridge the *minimum* principal curvature is identically zero, so keying the threshold to the selected eigenvalue suppressed Along form everywhere it is most meaningful. `threshold` is a fraction of the maximum strength on the terrain, so it is resolution- and relief-independent.
+
+**Even spacing.** Streamlines are placed by the Jobard–Lefebvre criterion. Seeds are laid on a grid at the separation pitch and sorted by descending strength, so structurally significant strokes claim their territory before filler. Each line integrates outward in both directions in `step` steps, draping onto the terrain bilinearly, and stops when it leaves the mask, exceeds `length` steps, or enters ground already owned by another line. The direction is sign-aligned against the previous step each time, since an eigenvector is defined only up to sign and would otherwise flip the stroke back on itself.
+
+A line claims a disc of **half** the seed pitch, not the full separation — claiming the full pitch makes adjacent seeds collide on their first step and chops every stroke into a stub.
+
 ---
 
 ## Ghost Occlusion
 
-All thirteen modes share the same depth-ordering system.
+All fourteen modes share the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

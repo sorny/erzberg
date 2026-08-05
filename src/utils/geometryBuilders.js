@@ -175,6 +175,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
     { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter) },
     { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave) },
+    { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
   ]
 
@@ -1092,6 +1093,196 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
         fr=nfr; fc=nfc; b0=b1; e0=e1
       }
   }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Curvature engraving ─────────────────────────────────────────────────
+
+/**
+ * Bilinear sample of a principal-direction field, sign-aligned to a reference.
+ *
+ * Principal directions are a *line* field, not a vector field: ±v describe the
+ * same direction, and neighbouring cells are free to disagree on sign. Plain
+ * bilinear interpolation of such a field cancels to zero wherever neighbours
+ * happen to be anti-aligned, which shreds a streamline into noise. Each corner
+ * is therefore flipped to agree with `refX/refY` (the previous step's heading)
+ * before being blended.
+ */
+function sampleDirAligned(dirX, dirY, rows, cols, fr, fc, refX, refY) {
+  const r0 = Math.max(0, Math.min(rows - 1, Math.floor(fr)))
+  const c0 = Math.max(0, Math.min(cols - 1, Math.floor(fc)))
+  const r1 = Math.min(rows - 1, r0 + 1), c1 = Math.min(cols - 1, c0 + 1)
+  const dr = fr - r0, dc = fc - c0
+  let x = 0, y = 0
+  for (let k = 0; k < 4; k++) {
+    const rr = k < 2 ? r0 : r1, cc = (k & 1) ? c1 : c0
+    const w = (k < 2 ? 1 - dr : dr) * ((k & 1) ? dc : 1 - dc)
+    if (w === 0) continue
+    const i = rr * cols + cc
+    let vx = dirX[i], vy = dirY[i]
+    if (vx * refX + vy * refY < 0) { vx = -vx; vy = -vy }
+    x += vx * w; y += vy * w
+  }
+  const m = Math.hypot(x, y)
+  return m < 1e-9 ? null : [x / m, y / m]
+}
+
+/**
+ * Copperplate-style engraving that follows the *form* rather than the light.
+ *
+ * Mode: Engraving hatches by illumination — stroke density tracks how lit a
+ * cell is. This instead traces streamlines through the principal-curvature
+ * direction field, so the strokes themselves wrap around the shape the way a
+ * burin follows a surface. The Hessian
+ *
+ *     H = [[h_xx, h_xy], [h_xy, h_yy]]
+ *
+ * has eigenvalues λ = (tr ± √(tr² − 4·det)) / 2; its eigenvectors are the
+ * principal directions. Hatching across the form (`max`, the default) runs
+ * along the direction of greatest bending — lines wrap a ridge like hoops round
+ * a barrel. Hatching along the form (`min`) runs down the flattest direction,
+ * combing out along ridges and valleys instead.
+ *
+ * Spacing uses Jobard–Lefebvre style occupancy: each streamline claims a disc
+ * of cells as it advances and stops on reaching another line's territory, which
+ * gives evenly separated strokes instead of the clumping a fixed seed grid
+ * produces.
+ */
+function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode, stepLen) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+
+  const positions = new F32List(), colors = new F32List()
+  if (rows < 5 || cols < 5) return { positions: positions.toArray(), colors: colors.toArray() }
+
+  // Second derivatives are noise amplifiers; pre-smooth before differencing.
+  const sm = boxBlur(grid, cols, rows, Math.max(0, radius ?? 1))
+  const n = rows * cols
+  const dirX = new Float32Array(n), dirY = new Float32Array(n)
+  const strength = new Float32Array(n)
+  const wantMax = (dirMode ?? 'max') !== 'min'
+  let maxStrength = 0
+
+  for (let r = 1; r < rows - 1; r++) {
+    for (let c = 1; c < cols - 1; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const hxx = sm[i + 1] + sm[i - 1] - 2 * sm[i]
+      const hyy = sm[i + cols] + sm[i - cols] - 2 * sm[i]
+      const hxy = (sm[i + cols + 1] - sm[i + cols - 1] - sm[i - cols + 1] + sm[i - cols - 1]) / 4
+
+      const tr = hxx + hyy
+      const det = hxx * hyy - hxy * hxy
+      const disc = Math.sqrt(Math.max(0, tr * tr - 4 * det))
+      const lo = (tr - disc) / 2, hi = (tr + disc) / 2
+      // "Max"/"min" are by magnitude: the strongest and weakest bending,
+      // regardless of whether the surface curves up or down there.
+      const lam = wantMax
+        ? (Math.abs(hi) >= Math.abs(lo) ? hi : lo)
+        : (Math.abs(hi) <  Math.abs(lo) ? hi : lo)
+
+      // Eigenvector of [[hxx,hxy],[hxy,hyy]] for lam. Both rows give it; pick
+      // the better-conditioned one so near-diagonal Hessians stay stable.
+      let vx, vy
+      if (Math.abs(hxy) > 1e-12) {
+        if (Math.abs(lam - hxx) >= Math.abs(lam - hyy)) { vx = hxy; vy = lam - hxx }
+        else                                            { vx = lam - hyy; vy = hxy }
+      } else {
+        // Diagonal Hessian: principal directions are the axes.
+        const alongX = Math.abs(hxx - lam) < Math.abs(hyy - lam)
+        vx = alongX ? 1 : 0; vy = alongX ? 0 : 1
+      }
+      const m = Math.hypot(vx, vy)
+      if (m < 1e-12) continue
+      dirX[i] = vx / m; dirY[i] = vy / m
+      // Strength asks "does the surface bend here at all", so it is always the
+      // dominant curvature — never the eigenvalue we happened to pick a
+      // direction from. Along-form hatching selects the *weakest* curvature,
+      // which on a ridge is identically zero: keying the threshold to that
+      // suppressed the mode everywhere it is most meaningful.
+      const s = Math.max(Math.abs(hi), Math.abs(lo))
+      strength[i] = s
+      if (s > maxStrength) maxStrength = s
+    }
+  }
+  if (maxStrength <= 0) return { positions: positions.toArray(), colors: colors.toArray() }
+
+  const minStrength = (threshold ?? 0.15) * maxStrength
+  const sep = Math.max(0.75, (spacing ?? 4) / scl)
+  const sepCells = Math.max(1, Math.round(sep))
+  const stepSize = Math.max(0.25, stepLen ?? 1)
+  const maxSteps = Math.max(2, Math.round(length ?? 60))
+  const owner = new Int32Array(n)      // 0 = free, else the claiming streamline id
+  const eps = 0.5
+  // Seeds sit `sepCells` apart but a line only blocks its neighbours within
+  // half that. Claiming the full separation makes adjacent seeds collide on
+  // their first step, chopping every stroke into a stub.
+  const claimCells = Math.max(1, Math.round(sepCells / 2))
+
+  const claim = (fr, fc, id) => {
+    const r0 = Math.max(0, Math.round(fr) - claimCells), r1 = Math.min(rows - 1, Math.round(fr) + claimCells)
+    const c0 = Math.max(0, Math.round(fc) - claimCells), c1 = Math.min(cols - 1, Math.round(fc) + claimCells)
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const i = r * cols + c
+        if (owner[i] === 0) owner[i] = id
+      }
+    }
+  }
+
+  // Seed on a grid at the separation pitch, strongest curvature first so the
+  // most structurally meaningful strokes claim their territory before filler.
+  const seeds = []
+  for (let r = 1; r < rows - 1; r += sepCells) {
+    for (let c = 1; c < cols - 1; c += sepCells) {
+      const i = r * cols + c
+      if (gridMask[i] && strength[i] >= minStrength) seeds.push(i)
+    }
+  }
+  seeds.sort((a, b) => strength[b] - strength[a])
+
+  let id = 0
+  for (const seed of seeds) {
+    if (owner[seed] !== 0) continue
+    id++
+    const sr = Math.floor(seed / cols), sc = seed % cols
+
+    // Trace outward from the seed in both senses of the (unoriented) direction.
+    for (let dir = 0; dir < 2; dir++) {
+      let fr = sr, fc = sc
+      let hx = dirX[seed] * (dir ? -1 : 1), hy = dirY[seed] * (dir ? -1 : 1)
+      let e0 = cellElev(grid, sr, sc, cols, elevScale, jitterAmt)
+
+      for (let s = 0; s < maxSteps; s++) {
+        if (fr < eps || fr > rows - 1 - eps || fc < eps || fc > cols - 1 - eps) break
+        const d = sampleDirAligned(dirX, dirY, rows, cols, fr, fc, hx, hy)
+        if (!d) break
+        hx = d[0]; hy = d[1]
+
+        const nfc = fc + hx * stepSize, nfr = fr + hy * stepSize
+        if (nfr < eps || nfr > rows - 1 - eps || nfc < eps || nfc > cols - 1 - eps) break
+        const ni = Math.round(nfr) * cols + Math.round(nfc)
+        if (!gridMask[ni] || strength[ni] < minStrength) break
+        if (owner[ni] !== 0 && owner[ni] !== id) break
+
+        const e1 = cellElev(grid, Math.round(nfr), Math.round(nfc), cols, elevScale, jitterAmt)
+        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) &&
+            inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+          positions.push6(fc * scl - halfW, e0, fr * scl - halfH,
+                          nfc * scl - halfW, e1, nfr * scl - halfH)
+          const gi = Math.round(fr) * cols + Math.round(fc)
+          colors.pushRgb2(computeVertexColor(
+            normElev(e0, minZ, maxZ),
+            Math.min(1, gridSlopes[gi] / (maxSlope || 1)),
+            Math.atan2(hy, hx), p))
+        }
+        claim(nfr, nfc, id)
+        fr = nfr; fc = nfc; e0 = e1
+      }
+    }
+    claim(sr, sc, id)
+  }
+
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
