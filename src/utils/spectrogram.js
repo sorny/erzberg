@@ -49,6 +49,45 @@ export function binEdges(bins, specLen, sampleRate, logFreq) {
 }
 
 /**
+ * Centre frequency in Hz of every output bin, following the same spacing rule
+ * `binEdges` used. Whole-track projections need real frequencies to fold the
+ * spectrum onto pitch classes or to split it into named bands, which the bin
+ * index alone cannot give under either spacing.
+ */
+export function binFrequencies(spec) {
+  const { bins, fftSize, sampleRate, logFreq } = spec
+  const specLen = fftSize >> 1
+  const edges = binEdges(bins, specLen, sampleRate, logFreq)
+  const scale = (sampleRate / 2) / Math.max(1, specLen - 1)
+  const out = new Float32Array(bins)
+  for (let b = 0; b < bins; b++) out[b] = ((edges[b] + edges[b + 1]) * 0.5) * scale
+  return out
+}
+
+/**
+ * Reciprocal of the headroom left above the gate. Hoisted out of the tone map
+ * because it only depends on the floor, not on the sample.
+ */
+export function toneInv(dbFloor01) {
+  return 1 / Math.max(1e-6, 1 - dbFloor01)
+}
+
+/**
+ * The shared gate-then-gamma curve: everything below `dbFloor01` collapses to
+ * flat ground, what survives is rescaled to fill 0…1 and bent by `contrast`.
+ * One definition so the two sliders behave identically across the streamed
+ * window, the frozen track and every whole-track projection.
+ */
+export function toneMap(v, dbFloor01, inv, contrast) {
+  const t = (v - dbFloor01) * inv
+  if (t <= 0) return 0
+  if (t >= 1) return 1
+  // Worth the branch: the projections call this tens of millions of times with
+  // contrast pinned at 1, where the pow is pure overhead.
+  return contrast === 1 ? t : Math.pow(t, contrast)
+}
+
+/**
  * @param {Float32Array} pcm        mono samples, nominally −1…1
  * @param {number}       sampleRate Hz
  * @param {object}       opts       { fftSize, bins, logFreq }
@@ -136,16 +175,14 @@ export function computeSpectrogram(pcm, sampleRate, { fftSize, bins, logFreq }, 
 export function sliceWindow(spec, endFrame, windowFrames, dbFloor01 = 0, contrast = 1) {
   const { data, frames, bins } = spec
   const out = new Float32Array(bins * windowFrames)
-  const inv = 1 / Math.max(1e-6, 1 - dbFloor01)
+  const inv = toneInv(dbFloor01)
 
   for (let x = 0; x < windowFrames; x++) {
     const f = endFrame - (windowFrames - 1 - x)
     if (f < 0 || f >= frames) continue
     const src = f * bins
     for (let b = 0; b < bins; b++) {
-      let v = (data[src + b] - dbFloor01) * inv
-      v = v <= 0 ? 0 : v >= 1 ? 1 : Math.pow(v, contrast)
-      out[(bins - 1 - b) * windowFrames + x] = v
+      out[(bins - 1 - b) * windowFrames + x] = toneMap(data[src + b], dbFloor01, inv, contrast)
     }
   }
   return out
@@ -160,7 +197,7 @@ export function resampleTime(spec, maxCols, dbFloor01 = 0, contrast = 1) {
   const { data, frames, bins } = spec
   const cols = Math.max(1, Math.min(maxCols, frames))
   const out = new Float32Array(bins * cols)
-  const inv = 1 / Math.max(1e-6, 1 - dbFloor01)
+  const inv = toneInv(dbFloor01)
 
   for (let x = 0; x < cols; x++) {
     const f0 = Math.floor((x / cols) * frames)
@@ -171,9 +208,7 @@ export function resampleTime(spec, maxCols, dbFloor01 = 0, contrast = 1) {
         const v = data[f * bins + b]
         if (v > peak) peak = v
       }
-      let v = (peak - dbFloor01) * inv
-      v = v <= 0 ? 0 : v >= 1 ? 1 : Math.pow(v, contrast)
-      out[(bins - 1 - b) * cols + x] = v
+      out[(bins - 1 - b) * cols + x] = toneMap(peak, dbFloor01, inv, contrast)
     }
   }
   return { pixels: out, width: cols, height: bins }

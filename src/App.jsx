@@ -486,12 +486,24 @@ export default function App() {
   , [])
 
   // ── Soundscapes ───────────────────────────────────────────────────────────
-  // A spectrogram window is small (typically 256×128), so it always renders at
-  // resolution 1 — decimating it further would throw away frequency rows.
+  // A streamed spectrogram window is small (512×512) and must render at
+  // resolution 1 — decimating it further would throw away frequency rows. The
+  // whole-track projections reach further: a 1024² disc is twice the cell count
+  // of the widest frozen spectrogram, and at resolution 1 the line modes grind
+  // through it slowly enough to look like a hang.
+  //
+  // Cell count, not the longest side, is what costs: 1024×512 and 768×768 are
+  // the same amount of work despite looking very different. The budget is set
+  // just above the frozen spectrogram, which has always rendered undecimated, so
+  // only the genuinely larger projections step up.
   const fitSoundscape = useCallback(({ width, height }) => {
     autoZoom({ width, height })
     setBaseElevScale(1)
-    setTerrain(prev => ({ ...prev, resolution: 1, elevScale: 0 }))
+    setTerrain(prev => ({
+      ...prev,
+      resolution: Math.max(1, Math.ceil(Math.sqrt((width * height) / 600000))),
+      elevScale: 0,
+    }))
     setGpxPoints([])
   }, [autoZoom])
 

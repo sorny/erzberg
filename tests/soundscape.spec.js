@@ -252,3 +252,179 @@ test('freezing the whole track updates the sidebar spectrogram', async ({ page }
   expect(resumed, 'playing again must release the frozen state').toBeLessThan(frozen - 3)
   await expect(freeze).toHaveText(/Freeze Whole Track/)
 })
+
+// ── Whole-track projections ────────────────────────────────────────────────
+
+/** Terrain grid dimensions from the stats overlay, once they stop changing. */
+async function frozenGrid(page, notCols) {
+  await expect.poll(async () => {
+    const t = await page.locator('text=/Grid: \\d+×\\d+/').innerText()
+    return Number(t.match(/Grid: (\d+)×/)[1])
+  }, { timeout: 15000 }).not.toBe(notCols)
+  const t = await page.locator('text=/Grid: \\d+×\\d+/').innerText()
+  const [, cols, rows] = t.match(/Grid: (\d+)×(\d+)/)
+  return { cols: Number(cols), rows: Number(rows) }
+}
+
+// The sweep is 6 s, so the spectrogram is ~560 frames — wider than the 512-column
+// streaming window. Every projection below must move the grid off that window,
+// which is what `notCols` guards: a loose /Grid: \d+×\d+/ would happily match the
+// stale pre-freeze state.
+const STREAM_COLS = 512
+
+test('disc projection freezes to a square heightmap', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', e => errors.push(String(e)))
+
+  await openSoundscapes(page)
+  await uploadTrack(page)
+
+  await page.click('[data-testid="projection-polar"]')
+  await page.click('[data-testid="soundscape-freeze"]')
+
+  await expect(page.locator('text=sweep.mp3 (disc)').first()).toBeVisible({ timeout: 15000 })
+
+  // 768² at the default size, decimated to resolution 2 because a million cells
+  // is past the budget fitSoundscape allows undecimated.
+  const { cols, rows } = await frozenGrid(page, STREAM_COLS)
+  console.log(`disc grid: ${cols}×${rows}`)
+  expect(cols, 'the disc must be square').toBe(rows)
+  expect(errors).toEqual([])
+})
+
+test('similarity projection sizes itself from its own schema control', async ({ page }) => {
+  await openSoundscapes(page)
+  await uploadTrack(page)
+
+  await page.click('[data-testid="projection-ssm"]')
+
+  // Its default size happens to equal the streaming window's 512 columns, so the
+  // grid readout alone cannot tell the two apart. Moving Size first gives the
+  // freeze a distinguishable shape and exercises the schema-rendered slider.
+  const size = page.locator('[data-testid="proj-size"]')
+  await size.fill('256')
+  await size.dispatchEvent('change')
+
+  await page.click('[data-testid="soundscape-freeze"]')
+  await expect(page.locator('text=sweep.mp3 (similarity)').first()).toBeVisible({ timeout: 15000 })
+
+  const { cols, rows } = await frozenGrid(page, STREAM_COLS)
+  console.log(`similarity grid: ${cols}×${rows}`)
+  expect(cols).toBe(256)
+  expect(rows).toBe(256)
+})
+
+test('weave and strata projections freeze with plausible shapes', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', e => errors.push(String(e)))
+
+  await openSoundscapes(page)
+  await uploadTrack(page)
+
+  // The weave folds one bar per row. 6 s at the detected tempo is only a handful
+  // of bars, so it is deliberately short and much wider than it is tall.
+  await page.click('[data-testid="projection-weave"]')
+  await page.click('[data-testid="soundscape-freeze"]')
+  await expect(page.locator('text=sweep.mp3 (weave)').first()).toBeVisible({ timeout: 15000 })
+  const weave = await frozenGrid(page, STREAM_COLS)
+  console.log(`weave grid: ${weave.cols}×${weave.rows}`)
+  expect(weave.cols).toBeGreaterThan(weave.rows)
+
+  // A tempo must have been detected for the fold to mean anything.
+  await expect(page.locator('text=/Detected tempo: \\d+ BPM/')).toBeVisible()
+
+  // Strata stacks one band per enabled layer, so turning one off must shorten it.
+  await page.click('[data-testid="projection-strata"]')
+  await page.click('[data-testid="soundscape-freeze"]')
+  await expect(page.locator('text=sweep.mp3 (strata)').first()).toBeVisible({ timeout: 15000 })
+  const strata = await frozenGrid(page, weave.cols)
+  console.log(`strata grid: ${strata.cols}×${strata.rows}`)
+
+  // Dropping a layer while frozen must both re-render in place and shorten the
+  // stack — the regression this guards is a projection setting silently taking
+  // effect only on the next freeze.
+  await page.click('[data-testid="proj-fChroma"]')
+  await expect.poll(async () => {
+    const t = await page.locator('text=/Grid: \\d+×\\d+/').innerText()
+    return Number(t.match(/Grid: \d+×(\d+)/)[1])
+  }, { timeout: 15000 }).toBeLessThan(strata.rows)
+
+  await expect(page.locator('[data-testid="soundscape-freeze"]')).toHaveText(/Frozen/)
+  expect(errors).toEqual([])
+})
+
+/**
+ * The projection maths, exercised directly rather than through the pixels the
+ * renderer happens to show. The module is pure and has no DOM dependency, so the
+ * dev server can hand it straight to the page — which also means these run
+ * against the same transformed source the app does.
+ */
+test('projections satisfy their structural invariants', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+  const report = await page.evaluate(async () => {
+    const { computeSpectrogram } = await import('/src/utils/spectrogram.js')
+    const { TRACK_PROJECTIONS, allProjectionDefaults, detectTrackBpm } =
+      await import('/src/utils/trackProjections.js')
+
+    // 16 s at a known 120 BPM: a kick on every beat plus a chord that changes
+    // each bar and cycles every four, so there is real repetition to find.
+    const sr = 22050, n = sr * 16
+    const pcm = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      const t = i / sr, beat = 0.5, ph = (t % beat) / beat
+      pcm[i] = Math.exp(-ph * 30) * Math.sin(2 * Math.PI * 60 * t) * 0.8
+      const root = 220 * Math.pow(2, [0, 3, 5, 7][Math.floor(t / (beat * 4)) % 4] / 12)
+      pcm[i] += 0.2 * Math.sin(2 * Math.PI * root * t)
+    }
+    const spec = computeSpectrogram(pcm, sr, { fftSize: 2048, bins: 256, logFreq: true })
+    const defaults = allProjectionDefaults()
+    const tone = { dbFloor: 0.3, contrast: 1.2 }
+
+    const out = { bpm: detectTrackBpm(spec), shapes: {}, bad: {}, flat: {}, asymmetry: null }
+    for (const p of TRACK_PROJECTIONS) {
+      const r = p.build(spec, defaults[p.id], tone)
+      out.shapes[p.id] = [r.width, r.height, r.pixels.length]
+      let bad = 0, lo = Infinity, hi = -Infinity
+      for (let i = 0; i < r.pixels.length; i++) {
+        const v = r.pixels[i]
+        if (!Number.isFinite(v) || v < 0 || v > 1) bad++
+        if (v < lo) lo = v
+        if (v > hi) hi = v
+      }
+      out.bad[p.id] = bad
+      out.flat[p.id] = hi - lo
+    }
+
+    // Comparing every moment against every other is symmetric by construction;
+    // if it is not, the matrix is being indexed wrong somewhere.
+    const ssm = TRACK_PROJECTIONS.find(p => p.id === 'ssm')
+    const m = ssm.build(spec, { ...defaults.ssm, size: 256 }, tone)
+    let worst = 0
+    for (let i = 0; i < m.height; i++) {
+      for (let j = 0; j < m.width; j++) {
+        const d = Math.abs(m.pixels[i * m.width + j] - m.pixels[j * m.width + i])
+        if (d > worst) worst = d
+      }
+    }
+    out.asymmetry = worst
+    return out
+  })
+
+  console.log('projection report:', JSON.stringify(report))
+
+  // Every projection honours the heightmap contract: length === w*h, all values
+  // finite and inside 0…1, and carrying actual relief rather than a flat plane.
+  for (const [id, [w, h, len]] of Object.entries(report.shapes)) {
+    expect(len, `${id} pixel count`).toBe(w * h)
+    expect(report.bad[id], `${id} out-of-range values`).toBe(0)
+    expect(report.flat[id], `${id} is flat`).toBeGreaterThan(0.5)
+  }
+
+  expect(report.shapes.polar[0], 'disc must be square').toBe(report.shapes.polar[1])
+  expect(report.asymmetry, 'similarity must be symmetric').toBeLessThan(1e-6)
+  // Autocorrelation on a 120 BPM pulse, folded into a musical octave.
+  expect(report.bpm, 'tempo detection').toBeGreaterThan(115)
+  expect(report.bpm, 'tempo detection').toBeLessThan(125)
+})

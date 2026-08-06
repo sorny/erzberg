@@ -13,11 +13,12 @@ the SVG / PNG / STL exporters.
 ```
  .mp3 ──decodeAudioData──> mono PCM ──STFT (worker)──> spectrogram
                                                           │
-                        ┌─────────────────────────────────┤
-                        │                                 │
-             sidebar canvas (whole track)      sliceWindow() per tick
-                                                          │
-                                                  setHeightmap() ──> terrain
+              ┌───────────────────────────┬───────────────┤
+              │                           │               │
+   sidebar canvas (whole track)   sliceWindow()   projection.build()
+                                   per tick        on freeze
+                                        │               │
+                                        └──> setHeightmap() ──> terrain
 ```
 
 Analysis happens **once**, on upload. Seeking, restyling and every tone-mapping
@@ -118,8 +119,128 @@ frame budget at that grid size; smaller grids reach a full 60.
 
 Streaming terrain is a moving target, which erosion, STL and SVG cannot work
 with. **Freeze Whole Track** pauses playback and writes the entire track as one
-static heightmap, peak-holding the time axis down to at most 1024 columns so the
-result stays in the same size class as a normal raster.
+static heightmap.
+
+*Which shape* the track takes is chosen by the **projection** selector above the
+button. Every projection is a pure function of the spectrogram returning the
+same pixels/width/height the store takes, so none of them needs anything
+downstream to know which one ran.
+
+---
+
+## Whole-track projections
+
+A four-minute STFT squeezed into 1024 columns is the literal answer and a poor
+portrait: mostly noise with a loud middle. The other projections fold the track
+so its *structure* becomes relief.
+
+### Spectrogram
+
+Time across, frequency up, peak-held down to at most 1024 columns. The original
+freeze view, unchanged.
+
+### Disc
+
+The track wound into a record: time runs around the circle, frequency from the
+label out to the rim.
+
+**Turns** is where it gets interesting. At 1 the track makes a single lap. Above
+1 it becomes an Archimedean groove — and setting the turn count to the track's
+bar or phrase count makes every repeat land at the same angle, so verse/chorus
+structure resolves into visible sectors.
+
+The spiral is parameterised by nearest groove, not by ring index: for the groove
+centred at radius $u = t$ and angle $2\pi t \cdot \text{turns}$, a pixel's turn
+is $k = \operatorname{round}(u \cdot \text{turns} - \theta)$ and its position
+along the groove is $t = (k + \theta) / \text{turns}$. Deriving the turn from
+radius alone would tear the image along the seam where $\theta$ wraps — exactly
+where the groove is supposed to run on into its next lap.
+
+**Groove** below 100 % leaves a gap between laps so they read as separate ridges
+rather than one smear.
+
+### Similarity
+
+Every moment of the track compared against every other. A repeated chorus is a
+stripe parallel to the main diagonal; a section that holds still is a block.
+This is the projection that makes song *form* visible rather than sound.
+
+Moments are reduced to feature vectors — 24 log-spaced band energies
+(**Timbre**) or 12 pitch classes (**Harmony**, which folds octaves together so
+it tracks chords rather than production) — then L2-normalised, so similarity is
+a plain dot product and a loud passage cannot look more similar to everything
+than a quiet one.
+
+Two settings carry most of the visual weight:
+
+- **Enhance** averages along the diagonal direction. A single frame-to-frame
+  comparison is noisy; a genuine repeat is precisely the case where *consecutive*
+  moments match consecutive moments, so this is what turns a dotted repeat into a
+  continuous ridge.
+- **Layout → Lag** re-plots cell $(i, j)$ at $(i,\ j - i)$, straightening repeat
+  diagonals into horizontal ledges. Section boundaries become anti-diagonals.
+  The empty upper corner is the honest consequence of long lags having fewer
+  moments to compare.
+
+**Sparsity** drops the weakest share of the matrix to flat ground, using a
+256-bucket histogram for the cut point rather than sorting ~590k cells.
+
+Cosine similarity between non-negative spectra clusters in the top of its range,
+so the matrix is renormalised to its observed min/max before output — without
+that it is a plateau with faint marks on it rather than terrain.
+
+### Weave
+
+The track folded onto its own bar grid. Time runs across one bar and then wraps
+to the next row, so anything the drummer repeats stacks into a vertical ridge
+and the places where the pattern breaks — a fill, a dropped beat, a section
+change — appear as interruptions in an otherwise woven surface.
+
+Tempo comes from autocorrelating the onset envelope (half-wave-rectified
+spectral flux — only *rising* energy counts, since summing the signed difference
+would cancel attacks against decays) over the lag range for 60–200 BPM. The
+result is folded into 70–160 BPM, because raw autocorrelation locks onto half or
+double the tempo just as happily. Set **BPM** manually to override it, and
+**Phase** to move the downbeat until the ridges stand upright.
+
+Short tracks make thin weaves: one row per bar means a 6-second clip is three
+rows. Past 512 rows the laps are peak-folded together, so a long track loses
+resolution rather than being truncated.
+
+### Strata
+
+Measured qualities of the track — loudness, brightness, onset density, spectral
+spread, rolloff, noisiness, low/mid/high energy, and a 12-row chromagram — each
+given its own horizontal band over one shared timeline.
+
+**Profile** fills each band up to its curve, giving a silhouette; **Terrace**
+fills the whole band at the curve's value. Each curve is normalised to its own
+range over the track: spectral flatness lives in a very different numeric range
+from loudness, and a shared scale would flatten most of the strata into straight
+lines. What matters is how each quality moves across *this* track.
+
+Frequency-derived features are measured on a log axis — the perceptual distance
+from 200 Hz to 400 Hz is the same as 2 kHz to 4 kHz, and a linear centroid would
+spend its whole range in the top octave.
+
+### Cost
+
+All projections run synchronously on the main thread; freezing is a one-shot
+action that already pauses playback.
+
+| Projection | Default output | Time |
+|---|---|---|
+| Spectrogram | 1024 × bins | ~2 ms |
+| Disc | 768² | ~20 ms |
+| Similarity | 512² | ~17 ms |
+| Similarity (768², enhance 32) | 768² | ~90 ms |
+| Weave | 256 × bars | ~2 ms |
+| Strata | 512 × 304 | ~10 ms |
+
+Cell count, not the longest side, drives the render cost downstream, so
+`fitSoundscape` picks the terrain resolution from `width × height` against a
+budget set just above the frozen spectrogram — which has always rendered
+undecimated. Only the genuinely larger projections step up to resolution 2.
 
 ---
 
@@ -134,6 +255,10 @@ result stays in the same size class as a normal raster.
 | Rate | no | Heightmap pushes per second |
 | dB Floor | no | Noise gate — drops quiet detail to flat ground |
 | Contrast | no | Gamma after the gate; >1 sharpens peaks into ridges |
+| Projection + its settings | no | Only affects freezing; re-renders in place while frozen |
+
+dB Floor and Contrast feed every projection too, so the two sliders behave the
+same whether the terrain is a streamed window or a frozen disc.
 
 The sidebar canvas renders the whole analysed track once into an offscreen
 buffer and blits it per frame, overlaying the playhead and the slice currently
@@ -146,7 +271,17 @@ feeding the terrain. Click or drag it to seek.
 | File | Role |
 |---|---|
 | `src/utils/fft.js` | Radix-2 FFT + Hann window |
-| `src/utils/spectrogram.js` | STFT, binning, `sliceWindow`, `resampleTime` |
+| `src/utils/spectrogram.js` | STFT, binning, `sliceWindow`, `resampleTime`, tone map |
 | `src/utils/spectrogram.worker.js` | Runs the STFT off the main thread |
-| `src/hooks/useSoundscape.js` | Decode, transport, streaming tick |
+| `src/utils/trackProjections.js` | Whole-track projections + their param schemas |
+| `src/hooks/useSoundscape.js` | Decode, transport, streaming tick, freeze |
 | `src/components/SpectrogramView.jsx` | Sidebar canvas + playhead |
+
+### Adding a projection
+
+One entry in `TRACK_PROJECTIONS` (`src/utils/trackProjections.js`): an `id`, a
+`label`, a one-line `blurb`, a `build(spec, params, tone)` returning
+`{ pixels, width, height }`, and a `params` schema. The sidebar renders the
+schema itself — a bare descriptor is a slider, `type: 'seg'` a segmented row,
+`type: 'tog'` a switch, and a shared `group` collapses several toggles into a
+chip grid. Nothing else needs touching.

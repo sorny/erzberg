@@ -1,12 +1,13 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
+import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { SpectrogramView } from './SpectrogramView'
@@ -207,7 +208,7 @@ function TogColor({ label, hint, help, checked, onToggle, color, onColor }) {
   )
 }
 
-function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt }) {
+function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId }) {
   const [showHelp, setShowHelp] = useState(false)
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
@@ -217,7 +218,7 @@ function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt 
           {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <input type="range" className="hmr" min={min} max={max} step={step} value={value}
+        <input type="range" className="hmr" data-testid={testId} min={min} max={max} step={step} value={value}
           onChange={e => onChange(parsed(e.target.value))} />
         <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
           {fmt ? fmt(value) : value}
@@ -226,6 +227,84 @@ function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt 
       {showHelp && help && <HelpBox text={help} />}
     </div>
   )
+}
+
+/** Segmented button row — one exclusive choice, laid out like InlineSl. */
+function SegRow({ label, help, options, value, onChange }) {
+  const [showHelp, setShowHelp] = useState(false)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
+          {label}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <div style={{ display:'flex', gap: 2, flex: 1 }}>
+          {options.map(([lbl, v]) => (
+            <button key={String(v)} onClick={() => onChange(v)} style={{
+              flex: 1, fontSize: 8, padding:'4px 0', borderRadius: 2, textTransform:'uppercase', cursor:'pointer',
+              background: value === v ? ACCENT : SURF,
+              color: value === v ? '#fff' : MUTED,
+              border: `1px solid ${value === v ? ACCENT : BORDER}`,
+            }}>{lbl}</button>
+          ))}
+        </div>
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
+    </div>
+  )
+}
+
+/**
+ * Renders a whole-track projection's parameter schema.
+ *
+ * Five projections carrying up to ten settings each would be several hundred
+ * lines of near-identical JSX written out by hand, and every new projection
+ * would mean writing more of it. The descriptors map onto the control atoms
+ * above; anything carrying a `group` is drawn as a chip grid instead, because a
+ * column of ten labelled switches is a wall the strata list would otherwise be.
+ */
+function ProjectionParams({ params, values, onChange }) {
+  const get = (p) => values?.[p.key] ?? p.value
+  const out = []
+
+  for (let i = 0; i < params.length; i++) {
+    const p = params[i]
+    if (p.group) {
+      const chips = []
+      while (i < params.length && params[i].group === p.group) chips.push(params[i++])
+      i--
+      out.push(
+        <div key={p.group} style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{p.group}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 3 }}>
+            {chips.map((c) => {
+              const on = !!get(c)
+              return (
+                <button key={c.key} title={c.help} data-testid={`proj-${c.key}`} onClick={() => onChange(c.key, !on)} style={{
+                  fontSize: 8, padding:'5px 0', borderRadius: 3, textTransform:'uppercase', cursor:'pointer',
+                  background: on ? ACCENT : SURF, color: on ? '#fff' : MUTED,
+                  border: `1px solid ${on ? ACCENT : BORDER}`,
+                }}>{c.label}</button>
+              )
+            })}
+          </div>
+        </div>
+      )
+      continue
+    }
+    if (p.type === 'tog') {
+      out.push(<Tog key={p.key} small label={p.label} help={p.help} checked={!!get(p)}
+        onChange={(v) => onChange(p.key, v)} />)
+    } else if (p.type === 'seg') {
+      out.push(<SegRow key={p.key} label={p.label} help={p.help} options={p.options} value={get(p)}
+        onChange={(v) => onChange(p.key, v)} />)
+    } else {
+      out.push(<InlineSl key={p.key} testId={`proj-${p.key}`} label={p.label} help={p.help}
+        min={p.min} max={p.max} step={p.step} value={get(p)} fmt={p.fmt} onChange={(v) => onChange(p.key, v)} />)
+    }
+  }
+  return out
 }
 
 function Section({ title, open, onToggle, enabled, children }) {
@@ -506,7 +585,16 @@ export function Sidebar({
   // Soundscapes controller. Aliased because `ss` is already the style setter,
   // and defaulted so the section degrades to an inert upload button if the
   // prop is ever omitted rather than throwing on first render.
-  const snd = soundscape ?? { opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {} }
+  const snd = soundscape ?? { opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {}, setProjParam: () => {} }
+
+  // Whole-track projection the freeze button will render.
+  const projection = getProjection(snd.opts?.projection)
+  // Only the weave shows a tempo, and detecting one is a full pass over the
+  // spectrogram — not something to run on every unrelated re-render.
+  const detectedBpm = useMemo(
+    () => (projection.id === 'weave' && snd.spec ? detectTrackBpm(snd.spec) : 0),
+    [projection.id, snd.spec]
+  )
 
   const st = (v) => setTerrain(p => ({ ...p, ...v }))
   const ss = (v) => setStyle(p => ({ ...p, ...v }))
@@ -1300,6 +1388,38 @@ export function Sidebar({
                     min={0.3} max={3} step={0.1} value={snd.opts.contrast} onChange={v => snd.setOpts({ contrast: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
 
+                {/* Which shape the whole track takes when frozen. A stretched
+                    spectrogram is only one answer; the others fold the track so
+                    its structure — repeats, sections, groove — becomes relief. */}
+                <Sub>
+                  <div style={{ fontSize:8, color: MUTED, fontWeight:700, marginBottom:6, letterSpacing:1 }}>WHOLE TRACK</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:6 }}>
+                    {TRACK_PROJECTIONS.map(pj => (
+                      <button key={pj.id} data-testid={`projection-${pj.id}`}
+                        onClick={() => snd.setOpts({ projection: pj.id })}
+                        style={{ fontSize:8, padding:'5px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
+                          background: projection.id === pj.id ? ACCENT : SURF,
+                          color: projection.id === pj.id ? '#fff' : MUTED,
+                          border:`1px solid ${projection.id === pj.id ? ACCENT : BORDER}` }}>{pj.label}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:9, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
+
+                  {projection.id === 'weave' && (
+                    <div style={{ fontSize:9, color: MUTED, marginBottom:8 }}>
+                      Detected tempo: <span style={{ color:'#a1a1aa', fontVariantNumeric:'tabular-nums' }}>
+                        {detectedBpm ? `${Math.round(detectedBpm)} BPM` : '—'}
+                      </span>
+                    </div>
+                  )}
+
+                  <ProjectionParams
+                    params={projection.params}
+                    values={snd.opts?.proj?.[projection.id]}
+                    onChange={(k, v) => snd.setProjParam(projection.id, k, v)}
+                  />
+                </Sub>
+
                 <button
                   data-testid="soundscape-freeze"
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
@@ -1308,7 +1428,7 @@ export function Sidebar({
                 <div style={{ fontSize:9, color: MUTED, marginTop:6, lineHeight:1.4 }}>
                   {snd.frozen
                     ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
-                    : 'Pauses playback and writes the entire track as one static heightmap — useful for erosion, STL and SVG, which need a terrain that holds still.'}
+                    : `Pauses playback and writes the entire track as one static heightmap — the ${projection.label} projection above. Useful for erosion, STL and SVG, which need a terrain that holds still.`}
                 </div>
               </>
             )}

@@ -14,7 +14,8 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { resampleTime, sliceWindow } from '../utils/spectrogram'
+import { sliceWindow } from '../utils/spectrogram'
+import { allProjectionDefaults, getProjection } from '../utils/trackProjections'
 import SpectrogramWorker from '../utils/spectrogram.worker?worker'
 
 export const SOUNDSCAPE_DEFAULTS = {
@@ -25,14 +26,12 @@ export const SOUNDSCAPE_DEFAULTS = {
   fps: 30,            // heightmap pushes per second (each triggers a rebuild)
   dbFloor: 0.35,      // noise gate, as a fraction of the stored dB range
   contrast: 1.4,      // gamma on the gated value
+  projection: 'linear',           // which whole-track projection freezing writes
+  proj: allProjectionDefaults(),  // that projection's own settings, keyed by id
 }
 
 // Params that change the analysis itself and so require re-running the FFT.
 const ANALYSIS_KEYS = ['fftSize', 'bins', 'logFreq']
-
-// Column cap for "freeze whole track" — keeps the static heightmap in the same
-// size class as a normal raster instead of tens of thousands of columns wide.
-const FREEZE_MAX_COLS = 1024
 
 export function useSoundscape() {
   const setHeightmap = useStore((s) => s.setHeightmap)
@@ -216,6 +215,22 @@ export function useSoundscape() {
     }
   }, [runAnalysis])
 
+  /**
+   * Sets one setting of one projection.
+   *
+   * Projection settings are a third category alongside analysis and stream
+   * params: they describe only what freezing produces. While frozen, changing
+   * one re-runs the projection in place; while streaming there is nothing to
+   * update, and the value simply applies the next time the track is frozen.
+   */
+  const setProjParam = useCallback((id, key, value) => {
+    const prev = optsRef.current
+    const next = { ...prev, proj: { ...prev.proj, [id]: { ...prev.proj[id], [key]: value } } }
+    optsRef.current = next
+    setOptsState(next)
+    if (frozenRef.current && specRef.current && prev.projection === id) freezeRef.current()
+  }, [])
+
   // ── Transport ─────────────────────────────────────────────────────────────
   const play = useCallback(() => {
     const a = audioRef.current
@@ -248,14 +263,23 @@ export function useSoundscape() {
     if (specRef.current) pushFrameRef.current(clamped)
   }, [duration])
 
-  /** Writes the whole track as one static heightmap and stops streaming. */
+  /**
+   * Writes the whole track as one static heightmap and stops streaming.
+   *
+   * Which *shape* the track takes is the projection's business — a stretched
+   * spectrogram, a disc, a similarity matrix — but all of them come back as the
+   * same pixels/width/height the store takes, so nothing downstream of here has
+   * to know which one ran.
+   */
   const freezeFullTrack = useCallback(() => {
     const s = specRef.current
     if (!s) return null
     pause()
     const o = optsRef.current
-    const { pixels, width, height } = resampleTime(s, FREEZE_MAX_COLS, o.dbFloor, o.contrast)
-    setHeightmap(pixels, null, width, height, `${fileNameRef.current || 'soundscape'} (full)`)
+    const def = getProjection(o.projection)
+    const { pixels, width, height } = def.build(s, o.proj[def.id], { dbFloor: o.dbFloor, contrast: o.contrast })
+    const base = fileNameRef.current || 'soundscape'
+    setHeightmap(pixels, null, width, height, `${base} (${def.id === 'linear' ? 'full' : def.label.toLowerCase()})`)
     setActive(true)
     markFrozen(true)
     return { width, height }
@@ -325,7 +349,7 @@ export function useSoundscape() {
 
   return {
     fileName, duration, currentTime, isPlaying, isAnalyzing, progress, error, spec,
-    opts, setOpts, active, frozen,
+    opts, setOpts, setProjParam, active, frozen,
     loadFromPicker, play, pause, toggle, stop, seek, freezeFullTrack, release,
     clearError: () => setError(null),
   }
