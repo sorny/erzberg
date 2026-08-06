@@ -117,11 +117,18 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
     }
   }
 
-  return { 
-    grid, gridMask, rows, cols, scl, 
-    halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2, 
-    halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2, 
-    minZ, maxZ, maxSlope, gridSlopes, elevScale 
+  return {
+    grid, gridMask, rows, cols, scl,
+    halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2,
+    halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2,
+    minZ, maxZ, maxSlope, gridSlopes, elevScale,
+    // Brightness bounds over the valid cells. Raw terrain view stretches the
+    // greyscale across them, so a heightmap occupying only the middle of the
+    // range still reads at full contrast instead of as flat mid-grey. The seeds
+    // are 1 and 0, so a raster with no valid cell at all leaves them crossed —
+    // fall back to the full range rather than shipping an inverted one.
+    minB: hasValid ? minBrightness : 0,
+    maxB: hasValid ? maxBrightness : 1,
   }
 }
 

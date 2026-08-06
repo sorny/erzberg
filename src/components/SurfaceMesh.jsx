@@ -4,6 +4,7 @@
 import { useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { hexToRgb, sampleGradient } from '../utils/colorUtils'
+import { hasFillLayer } from '../utils/geometryBuilders'
 import { useStore } from '../store/useStore'
 
 // ── Gradient texture ──────────────────────────────────────────────────────────
@@ -27,6 +28,12 @@ function buildGradientTexture(gradientStops) {
 
 // ── Shaders ───────────────────────────────────────────────────────────────────
 const SURFACE_VERT = /* glsl */ `
+  // Raw terrain view collapses the elevation axis here rather than in the
+  // geometry, because the geometry is what the exporters read: flattening it
+  // upstream would make STL quietly ship a flat slab. Doing it in the shader
+  // also makes the toggle a uniform flip instead of a worker rebuild.
+  uniform bool uFlatten;
+
   attribute float brightness;
   varying float vBrightness;
   varying vec3  vNormal;
@@ -35,13 +42,16 @@ const SURFACE_VERT = /* glsl */ `
     vBrightness = brightness;
     vNormal     = normal;
     vUv         = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    vec3 pos    = uFlatten ? vec3(position.x, 0.0, position.z) : position;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
   }
 `
 const SURFACE_FRAG = /* glsl */ `
   uniform vec3      uFillColor;
   uniform bool      uGradient;
   uniform bool      uRawTerrain;
+  uniform float     uRawMin;
+  uniform float     uRawMax;
   uniform sampler2D uGradientTex;
   uniform bool      uHypsometricBanded;
   uniform float     uContourInterval;
@@ -143,6 +153,23 @@ const SURFACE_FRAG = /* glsl */ `
     if (uOcclusionOnly) {
       // Depth-only pass handled via material.colorWrite
     }
+
+    // Raw terrain view: the heightmap itself, flat and unlit — lowest point
+    // black, highest white. Returning here is what hides everything else; every
+    // overlay (gradient, texture, water, hillshade, AO, aspect, slope) lives
+    // below this point and is skipped wholesale rather than switched off one by
+    // one. It must also come before vNormal is touched: with raw view as the
+    // only fill layer the geometry carries no normals, so normalize() there
+    // would be NaN.
+    //
+    // The range is stretched across the data's actual bounds, so a heightmap
+    // occupying only the middle of 0…1 still reads at full contrast.
+    if (uRawTerrain) {
+      float g = clamp((vBrightness - uRawMin) / max(uRawMax - uRawMin, 1e-5), 0.0, 1.0);
+      gl_FragColor = vec4(g, g, g, 1.0);
+      return;
+    }
+
     vec3 n = normalize(vNormal);
     float b = vBrightness;
 
@@ -176,21 +203,9 @@ const SURFACE_FRAG = /* glsl */ `
       b = clamp(b, 0.0, 1.0);
     }
 
-    vec3 base;
-    if (uRawTerrain) {
-      vec3 light1 = normalize(vec3(1.0,  2.0, 1.5));
-      vec3 light2 = normalize(vec3(-0.5, 0.5, -1.0));
-      float diff  = max(dot(n, light1), 0.0) * 0.7
-                  + max(dot(n, light2), 0.0) * 0.15;
-      base = (uGradient || uHypsometricBanded)
-        ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
-        : uFillColor;
-      base *= (0.2 + diff);
-    } else {
-      base = (uGradient || uHypsometricBanded)
-        ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
-        : uFillColor;
-    }
+    vec3 base = (uGradient || uHypsometricBanded)
+      ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
+      : uFillColor;
 
     if (uShowTexture) {
       vec2 uv = vUv * uTextureScale + uTextureOffset;
@@ -391,6 +406,9 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uFillColor:         { value: new THREE.Vector3(1, 1, 1) },
       uGradient:          { value: false },
       uRawTerrain:        { value: false },
+      uRawMin:            { value: 0 },
+      uRawMax:            { value: 1 },
+      uFlatten:           { value: false },
       uGradientTex:       { value: null },
       uHypsometricBanded: { value: false },
       uContourInterval:   { value: 1.0 },
@@ -446,7 +464,13 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     
     surfMat.uniforms.uFillColor.value.set(...hexToRgb(p.fillColor ?? '#ffffff'))
     surfMat.uniforms.uGradient.value = hasHypso && !isBanded
-    surfMat.uniforms.uRawTerrain.value = p.showRawTerrain ?? false
+    const rawView = !!(p.showRawTerrain)
+    surfMat.uniforms.uRawTerrain.value = rawView
+    surfMat.uniforms.uFlatten.value    = rawView
+    // Brightness bounds ride in with the geometry, so they already track the
+    // resolution, blur and black/white point the grid was built with.
+    surfMat.uniforms.uRawMin.value     = surfaceGeo?.metadata?.minB ?? 0
+    surfMat.uniforms.uRawMax.value     = surfaceGeo?.metadata?.maxB ?? 1
     surfMat.uniforms.uHypsometricBanded.value = isBanded
     surfMat.uniforms.uContourInterval.value = p.fillHypsoInterval || 10.0
     surfMat.uniforms.uHypsoWeight.value = p.fillHypsoWeight || 0.0
@@ -498,7 +522,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uAspectMap.value          = !!(p.showAspectMap)
     surfMat.uniforms.uAspectMapOpacity.value   = p.aspectMapOpacity ?? 0.8
 
-    const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap)
+    const anyFill = hasFillLayer(p)
     surfMat.colorWrite = anyFill
     surfMat.depthTest  = !!p.depthOcclusion
     surfMat.depthWrite = !!(p.depthOcclusion && anyFill)
@@ -545,8 +569,12 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   // full mesh through the heavyweight fragment shader would be a per-frame
   // no-op. Skip it entirely, except in profile mode where the mesh must stay
   // visible as the raycast target for elevation-profile clicks.
-  const anyFill = !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap)
-  const surfaceActive = anyFill || !!p.profileMode
+  const surfaceActive = hasFillLayer(p) || !!p.profileMode
+
+  // Profile picking raycasts the *geometry*, which raw view leaves at its real
+  // elevation while drawing it flat — so a click would land somewhere other than
+  // where it was aimed. Disable it rather than report a wrong elevation.
+  const canPick = !!p.profileMode && !p.showRawTerrain
 
   return (
     <group>
@@ -554,9 +582,9 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
         geometry={geometry}
         material={surfMat}
         visible={surfaceActive}
-        onPointerDown={p.profileMode ? (e) => { e.stopPropagation(); if (e.uv) profileClickRef?.current?.(e.uv) } : undefined}
+        onPointerDown={canPick ? (e) => { e.stopPropagation(); if (e.uv) profileClickRef?.current?.(e.uv) } : undefined}
       />
-      {p.showMesh && <mesh geometry={geometry} material={wireMat} />}
+      {p.showMesh && !p.showRawTerrain && <mesh geometry={geometry} material={wireMat} />}
     </group>
   )
 }

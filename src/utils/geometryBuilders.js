@@ -16,6 +16,31 @@ import { geoToWorld, sampleTerrainElev } from './geoCoords'
  * single source of truth, consumed by both HeightmapLines (live render) and
  * svgExport (export). Sub-layers (Contours-*, Gpx) map to their dedicated params.
  */
+/**
+ * Is any fill layer drawing on the surface?
+ *
+ * Governs whether the surface mesh rasterizes at all and whether it writes
+ * depth. Raw terrain view counts: it draws the surface, it just draws it flat
+ * and unlit.
+ */
+export function hasFillLayer(p) {
+  return !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade ||
+            p.showWaterFill || p.showAO || p.showAspectMap)
+}
+
+/**
+ * Does the surface need shading attributes — normals and UVs — built for it?
+ *
+ * Deliberately *not* the same set as `hasFillLayer`. Raw terrain view is a flat
+ * greyscale readout of the heightmap that consults neither, so listing it here
+ * would cost a full geometry rebuild on every toggle to produce buffers nothing
+ * reads. Profile mode is included because it needs the mesh as a raycast target.
+ */
+export function needsSurfaceShading(p) {
+  return !!(p.showFill || p.showHillshade || p.showSlopeShade ||
+            p.showWaterFill || p.showAO || p.showAspectMap || p.profileMode)
+}
+
 export function layerStyle(id, p) {
   switch (id) {
     case 'Contours-Minor':
@@ -1829,7 +1854,10 @@ function buildSurfaceUvs(vertexCount, rows, cols) {
 }
 
 export function buildSurfaceGeometry(terrain, p) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
+  // minB/maxB ride along in the metadata rather than being recomputed on the
+  // main thread: buildTerrain already has them over the *valid* cells, and a
+  // scan of `brightnessBuf` could not tell a genuine 0 from a NoData vertex.
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale, minB, maxB } = terrain
   const { jitterAmt } = p
   // Normals and UVs feed the terrain shader only. STL export derives its own
   // facet normals and SVG export needs just positions/indices, so when nothing
@@ -1855,7 +1883,7 @@ export function buildSurfaceGeometry(terrain, p) {
       if (gridMask[tl] && gridMask[tl+1] && gridMask[tl+cols] && gridMask[tl+cols+1]) quadCount++
     }
   }
-  if (!quadCount) return { positions: new Float32Array(0), brightnessBuf: new Float32Array(0), indices: new Uint32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), metadata: { rows, cols } }
+  if (!quadCount) return { positions: new Float32Array(0), brightnessBuf: new Float32Array(0), indices: new Uint32Array(0), normals: new Float32Array(0), uvs: new Float32Array(0), metadata: { rows, cols, minB, maxB } }
   const baseIndices = new Uint32Array(quadCount * 6)
   let bi = 0
   for (let r = 0; r < rows - 1; r++) {
@@ -1879,7 +1907,7 @@ export function buildSurfaceGeometry(terrain, p) {
       positions: basePos, brightnessBuf: baseBright, indices: baseIndices,
       normals: shade ? computeSurfaceNormals(basePos, baseIndices) : NO_F32,
       uvs: shade ? buildSurfaceUvs(vertexCount, rows, cols) : NO_F32,
-      metadata: { rows, cols },
+      metadata: { rows, cols, minB, maxB },
     }
   }
 
@@ -1918,7 +1946,7 @@ export function buildSurfaceGeometry(terrain, p) {
     positions: finalPos, brightnessBuf: finalBright, indices: finalIndices,
     normals: shade ? computeSurfaceNormals(finalPos, finalIndices) : NO_F32,
     uvs: shade ? buildSurfaceUvs(vertexCount * nOct, rows, cols) : NO_F32,
-    metadata: { rows, cols },
+    metadata: { rows, cols, minB, maxB },
   }
 }
 

@@ -339,7 +339,8 @@ export function Scene({
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
         <ParticleSystem ref={particleRef} terrain={terrain} p={p} />
       </group>
-      {p.showHillshade && p.showSun && <SunIndicator p={p} terrain={terrain} />}
+      {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
+      {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}
     </>
   )
 }

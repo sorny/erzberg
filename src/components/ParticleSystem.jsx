@@ -275,6 +275,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
     }
   })
 
-  if (!p.showPoints || !pointsGeo) return null
+  // showRawTerrain: the raw view shows the heightmap and nothing else.
+  if (!p.showPoints || p.showRawTerrain || !pointsGeo) return null
   return <points geometry={pointsGeo} material={particleMat} />
 })

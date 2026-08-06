@@ -13,6 +13,7 @@ import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
+import { needsSurfaceShading } from './utils/geometryBuilders'
 import { parseGpx } from './utils/gpxParser'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { exportHeightmap } from './utils/heightmapExport'
@@ -559,11 +560,10 @@ export default function App() {
   // computes its own facet normals and SVG only needs positions/indices, so
   // when no fill layer is on they are pure waste — ~8 ms of every rebuild.
   //
-  // Read off the merged `p`, not the individual state blocks: these flags are
-  // split across style and view (showRawTerrain lives in view), and sourcing
-  // them by hand silently yields undefined for any that move.
-  p.needsSurfaceShading = !!(p.showFill || p.showRawTerrain || p.showHillshade ||
-    p.showSlopeShade || p.showWaterFill || p.showAO || p.showAspectMap || profileMode)
+  // Read off the merged `p`, not the individual state blocks: the fill flags are
+  // split across style and view, and sourcing them by hand silently yields
+  // undefined for any that move between the two.
+  p.needsSurfaceShading = needsSurfaceShading(p)
 
   // Keep the click handler in a ref so SurfaceMesh can read it without it
   // entering the postMessage-serialized p object sent to the Web Worker.

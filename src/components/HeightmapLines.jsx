@@ -202,7 +202,12 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
 
-      {Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
+      {/* Raw terrain view is a look at the source data, so every drawn layer —
+          all the modes plus the GPX track, which is just another lineGeo entry —
+          is skipped. Filtering here rather than forcing the `enabled*` flags off
+          keeps it a render-side switch: no worker rebuild, and the user's
+          selection is exactly as they left it when the view is turned off. */}
+      {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
         const { weight, opacity, dash } = layerStyle(layer.id, p)
         return (
         <LineLayer
