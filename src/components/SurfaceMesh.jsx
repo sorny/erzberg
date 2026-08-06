@@ -58,7 +58,6 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uHypsoWeight;
   uniform float     uElevScale;
   uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
-  uniform bool      uOcclusionOnly;
 
   uniform sampler2D uOverlayTex;
   uniform bool      uShowTexture;
@@ -150,10 +149,6 @@ const SURFACE_FRAG = /* glsl */ `
     if (vBrightness < uElevMinCut / 100.0 || vBrightness > uElevMaxCut / 100.0) {
       discard;
     }
-    if (uOcclusionOnly) {
-      // Depth-only pass handled via material.colorWrite
-    }
-
     // Raw terrain view: the heightmap itself, flat and unlit — lowest point
     // black, highest white. Returning here is what hides everything else; every
     // overlay (gradient, texture, water, hillshade, AO, aspect, slope) lives
@@ -415,7 +410,6 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uHypsoWeight:       { value: 0.0 },
       uElevScale:         { value: 1.0 },
       uColorMode:         { value: 0 },
-      uOcclusionOnly:     { value: false },
       uElevMinCut:        { value: 0.0 },
       uElevMaxCut:        { value: 100.0 },
       uOverlayTex:        { value: null },

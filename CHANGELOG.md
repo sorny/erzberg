@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-06
+
 ### Changed
 - **"Raw terrain view" now shows the raw terrain.** It did not: the toggle added two hardcoded diffuse lights in the surface fragment shader and multiplied the fill or gradient colour by them, leaving the elevation, every draw mode and every overlay — texture, water, hillshade, AO, aspect, slope shade — untouched on top. The name promised a look at the source data and the feature delivered a differently-lit render. It is now what it claims: the loaded heightmap as a **flat greyscale plane with everything else hidden**, lowest point black and highest white. It draws the grid the pipeline actually works from — after resolution, blur, Levels and the elevation cuts, which still punch holes — so it doubles as a live preview while tuning those, and the greyscale is stretched across the data's real bounds so a raster occupying only the middle of 0–1 reads at full contrast instead of as flat mid-grey. The camera deliberately does not move.
 - **Flattening happens in the vertex shader, not the geometry** — which is a correctness point, not a convenience one: `stlExport` builds from `surfaceGeo.positions`, so flattening upstream would have quietly exported a flat slab. Shader-side, the exporters all still see the real terrain and the toggle is a uniform flip. Hiding the rest falls out of a single early `return` in the fragment shader, placed above every overlay, rather than switching seven of them off by hand.
 - **Toggling raw view no longer rebuilds geometry.** `needsSurfaceShading` listed `showRawTerrain`, so each toggle cost a full worker rebuild to produce normals and UVs — which the new flat, unlit view never reads. It now sits in `hasFillLayer` (the surface must still rasterize and write depth) but not in `needsSurfaceShading`, making the toggle free. Both predicates were previously the same expression written out three times across `SurfaceMesh.jsx` and `App.jsx`, which is exactly how they would have drifted apart; they are now one definition each in `geometryBuilders.js`. Because raw view can now be the *only* fill layer, the geometry may carry no normals at all — hence the early return sits above `normalize(vNormal)`, which would otherwise be NaN.
 - Elevation-profile picking is disabled while raw view is on: the raycast target is the unflattened geometry, so a click would report an elevation from somewhere other than where it was aimed.
+
+### Removed
+- **The `uOcclusionOnly` shader uniform**, which never did anything. It was declared in the surface fragment shader, initialised to `false`, and read by an `if` block whose body was a comment explaining that the work happens elsewhere — nothing ever assigned it. The real occlusion-only mechanism is `surfMat.colorWrite = anyFill`, set from `hasFillLayer`. Left in place it reads as a second, parallel switch for surface visibility, which is exactly the wrong thing to believe while changing how that visibility is decided.
 
 ## [0.8.2] - 2026-08-06
 

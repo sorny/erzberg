@@ -134,6 +134,11 @@ A four-minute STFT squeezed into 1024 columns is the literal answer and a poor
 portrait: mostly noise with a loud middle. The other projections fold the track
 so its *structure* becomes relief.
 
+Each one lands in the heightmap slot as a plain raster, so **Terrain → Raw
+terrain view** shows exactly what a projection produced — flat, greyscale, with
+the draw modes out of the way. That is usually the quickest way to judge whether
+a setting did what you wanted before styling anything on top of it.
+
 ### Spectrogram
 
 Time across, frequency up, peak-held down to at most 1024 columns. The original
