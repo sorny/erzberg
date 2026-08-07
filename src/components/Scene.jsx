@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { exportSVG } from '../utils/svgExport'
-import { layerStyle } from '../utils/geometryBuilders'
+import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem } from './ParticleSystem'
@@ -279,7 +279,11 @@ export function Scene({
         lineGeo, lineStyles, camera: activeCamera || currentCamera, width, height,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
-        showFill: p.showFill, fillHypsometric: p.fillHypsometric, gradientStops: p.gradientStops,
+        // hasFillLayer, not showFill: the viewport makes the surface a depth
+        // occluder for any fill layer — hillshade, AO, water, slope, raw view —
+        // and Fill itself is off by default, so gating the export on it alone
+        // shipped SVGs whose lines were not hidden behind the terrain.
+        surfaceOccludes: hasFillLayer(p),
         depthOcclusion: p.depthOcclusion,
         occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
         elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,

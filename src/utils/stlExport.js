@@ -23,6 +23,7 @@
  */
 
 import { geoToWorld, sampleTerrainElev } from './geoCoords'
+import { NODATA_SENTINEL_Y } from './terrain'
 
 // ── STL writer ────────────────────────────────────────────────────────────────
 
@@ -152,16 +153,36 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   if (!surfaceGeo || !terrain) return
 
   const { positions, indices } = surfaceGeo
-  const { rows, cols } = terrain
+  const { rows, cols, gridMask } = terrain
+
+  // Nothing to export — an axis with both mirrors cleared yields zero octants and
+  // so zero vertices. Bailing here rather than pressing on is the difference
+  // between no download and a multi-megabyte file of NaN floats: every bound
+  // below would be Infinity, and the perimeter walk would read past the array.
+  if (!positions?.length || !indices?.length) return
 
   const spx = (i) =>  positions[i * 3]
   const spy = (i) => -positions[i * 3 + 2]
   const spz = (i) =>  positions[i * 3 + 1]
 
+  /**
+   * Is this vertex real terrain?
+   *
+   * buildSurfaceGeometry parks NoData vertices at y = -10000 as a hide-it
+   * sentinel. That is safe for rendering because no index ever references them,
+   * but everything here reads the position array directly, so they have to be
+   * excluded by hand — otherwise one voided pixel anywhere in a DEM drags the
+   * base plate 10 000 units down and extrudes the side walls to match.
+   */
+  const isReal = (i) => positions[i * 3 + 1] > NODATA_SENTINEL_Y
+
+  // Floor measured over *drawn* vertices only, for the same reason.
   let minWorldY = Infinity
-  for (let i = 1; i < positions.length; i += 3) {
-    if (positions[i] < minWorldY) minWorldY = positions[i]
+  for (let t = 0; t < indices.length; t++) {
+    const y = positions[indices[t] * 3 + 1]
+    if (y < minWorldY) minWorldY = y
   }
+  if (!Number.isFinite(minWorldY)) return
   const baseZ = minWorldY - 2
 
   const tris = []
@@ -178,11 +199,17 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   }
 
   // ── 2. Side walls ─────────────────────────────────────────────────────────
+  // The border is walked by index arithmetic, so it visits NoData cells as
+  // readily as real ones. Dropping them keeps the wall following the actual edge
+  // of the data; without the filter a single voided border pixel extrudes a
+  // 10 000-unit spike. The ring stays closed either way — consecutive survivors
+  // are simply joined across the gap.
   const perim = []
-  for (let c = 0; c < cols; c++)       perim.push(c)
-  for (let r = 1; r < rows; r++)       perim.push(r * cols + cols - 1)
-  for (let c = cols - 2; c >= 0; c--) perim.push((rows - 1) * cols + c)
-  for (let r = rows - 2; r >= 1; r--) perim.push(r * cols)
+  const edge = (i) => { if (isReal(i)) perim.push(i) }
+  for (let c = 0; c < cols; c++)       edge(c)
+  for (let r = 1; r < rows; r++)       edge(r * cols + cols - 1)
+  for (let c = cols - 2; c >= 0; c--)  edge((rows - 1) * cols + c)
+  for (let r = rows - 2; r >= 1; r--)  edge(r * cols)
 
   const pn = perim.length
   for (let i = 0; i < pn; i++) {

@@ -118,3 +118,79 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
   console.log('  export.png    — trimmed PNG export')
   console.log('  svg-render.png — SVG export rendered as image')
 })
+
+/**
+ * The surface must act as a depth occluder in SVG for *any* fill layer, not just
+ * Fill. It was gated on `showFill` alone, which is off by default — so a
+ * hillshaded scene exported lines the viewport correctly hid behind the terrain.
+ *
+ * Stipple is the sharpest probe: it returns `isPoints`, so it generates no
+ * occlusion curtains of its own. With it as the only mode, the terrain surface is
+ * the *only* thing that can occlude anything, which makes the difference a clean
+ * before/after count rather than a subtle one.
+ */
+test('any fill layer makes the terrain occlude lines in SVG export', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  const toggle = page.locator('[data-testid="sidebar-toggle"]')
+  if ((await toggle.innerText()) === '◀') { await toggle.click(); await page.waitForTimeout(400) }
+  await page.waitForTimeout(2500)
+
+  /**
+   * Flips the "Enabled" switch of a sidebar section.
+   *
+   * `openFirst` is passed explicitly rather than detected: a collapsed Section
+   * keeps its children in the DOM at full height, clipped by the parent's
+   * `grid-template-rows: 0fr` and scrolled far below the fold, so the toggle
+   * reports a perfectly normal 18px box and every "is it visible" heuristic says
+   * yes while a click at those coordinates does nothing. On a fresh page the
+   * open state is known, so there is nothing to detect.
+   */
+  const setEnabled = async (title, on, openFirst) => {
+    if (openFirst) {
+      await page.getByText(title, { exact: true }).click()
+      await page.waitForTimeout(500)
+    }
+    const tog = page.locator('#hm-panel-body > div')
+      .filter({ hasText: new RegExp(`^${title}`) }).first().locator('label').first()
+    await tog.scrollIntoViewIfNeeded()
+    await tog.click({ force: true })
+    await expect(tog.locator('input')).toBeChecked({ checked: on })
+  }
+
+  // Stipple only. Mode: Lines is the one draw-mode section open by default.
+  await setEnabled('Mode: Lines', false, false)
+  await setEnabled('Mode: Stipple Dots', true, true)
+  // Steep tilt, so there is genuinely something behind the mountain to hide.
+  for (let i = 0; i < 80; i++) await page.keyboard.press('KeyX')
+  await page.waitForTimeout(3000)
+
+  const dotCount = async () => {
+    // The export hotkey is a window listener, so focus has to be off the sidebar
+    // controls we just clicked or the keypress never reaches it.
+    await page.locator('canvas').first().click({ position: { x: 5, y: 5 } })
+    const [dl] = await Promise.all([
+      page.waitForEvent('download', { timeout: 20_000 }),
+      page.keyboard.press('Digit1'),
+    ])
+    const buf = await dl.createReadStream().then((s) => new Promise((res, rej) => {
+      const chunks = []
+      s.on('data', (c) => chunks.push(c))
+      s.on('end', () => res(Buffer.concat(chunks)))
+      s.on('error', rej)
+    }))
+    const t = buf.toString('utf-8')
+    return (t.match(/<circle |<line /g) || []).length
+  }
+
+  const withoutFill = await dotCount()
+
+  await setEnabled('Hillshade', true, true)
+  await page.waitForTimeout(3000)
+  const withHillshade = await dotCount()
+
+  console.log(`SVG marks — no fill layer: ${withoutFill}, hillshade on: ${withHillshade}`)
+  expect(withoutFill).toBeGreaterThan(100)
+  expect(withHillshade,
+    'hillshade must make the surface occlude, so fewer marks survive').toBeLessThan(withoutFill)
+})

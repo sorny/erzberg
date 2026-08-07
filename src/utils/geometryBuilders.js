@@ -2,7 +2,7 @@
  * CPU-side geometry builders.
  */
 
-import { cellElev, hasData, boxBlur, jitterNoise } from './terrain'
+import { cellElev, hasData, boxBlur, jitterNoise, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor } from './colorUtils'
 import { geoToWorld, sampleTerrainElev } from './geoCoords'
 
@@ -157,6 +157,12 @@ class U32List {
   get length() { return this.n }
   toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
 }
+
+// Shared zero-length buffers for "nothing to emit" returns. Immutable in
+// practice — callers only ever read them — so one instance each is enough.
+const EMPTY_F64 = new Float64Array(0)
+const EMPTY_F32 = new Float32Array(0)
+const EMPTY_U8  = new Uint8Array(0)
 
 function normElev(elev, minZ, maxZ) {
   return maxZ > minZ ? (elev - minZ) / (maxZ - minZ) : 0
@@ -799,6 +805,18 @@ function prepareContourLevels(terrain, p, interval) {
   const { minZ, maxZ } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const step = (interval ?? 4)
+
+  // elevScale reaches exactly 0 in one drag (it is baseElevScale plus a signed
+  // offset whose slider steps by 0.1), and the terrain is then a flat plane with
+  // no contours to draw. Return that answer deliberately: falling through would
+  // divide by zero into levelVal = 0/0 = NaN and lvlStep = Infinity, which makes
+  // the caller's `for (k = kLo; k <= kHi; k++)` bound NaN and skip silently — the
+  // same empty output, arrived at by accident and impossible to debug.
+  if (!elevScale) {
+    return { step, numSteps: 0, levelElev: EMPTY_F64, levelVal: EMPTY_F64,
+             levelActive: EMPTY_U8, levelRgb: EMPTY_F32, lvlStep: 0 }
+  }
+
   // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
   const startElev = Math.ceil((minZ - 1e-7) / step) * step
   const maxElevPossible = Math.ceil(maxZ / step) * step
@@ -1871,7 +1889,7 @@ export function buildSurfaceGeometry(terrain, p) {
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c
-      if (!gridMask[i]) { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=-10000; basePos[i*3+2]=r*scl-halfH; baseBright[i]=0 }
+      if (!gridMask[i]) { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=NODATA_SENTINEL_Y; basePos[i*3+2]=r*scl-halfH; baseBright[i]=0 }
       else { basePos[i*3]=c*scl-halfW; basePos[i*3+1]=cellElev(grid, r, c, cols, elevScale, jitterAmt); basePos[i*3+2]=r*scl-halfH; baseBright[i]=grid[i] }
     }
   }

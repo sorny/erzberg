@@ -152,7 +152,15 @@ async function loadImagePixels(source) {
   return new Promise((resolve, reject) => {
     const img = new Image()
     img.crossOrigin = 'anonymous'
+    // Only set when we minted one below — a plain URL source must not be revoked.
+    let objectUrl = null
+    // The blob stays alive for the page's lifetime otherwise, and this is the
+    // path every 8-bit PNG takes (the 16-bit fast path returns before it), so a
+    // session of a few large heightmaps pins hundreds of MB for nothing.
+    const release = () => { if (objectUrl) { URL.revokeObjectURL(objectUrl); objectUrl = null } }
+
     img.onload = () => {
+      release()
       const { naturalWidth: w, naturalHeight: h } = img
       const canvas = document.createElement('canvas')
       canvas.width = w; canvas.height = h
@@ -184,8 +192,13 @@ async function loadImagePixels(source) {
         dataHeight: hasValid ? (maxY - minY + 1) : h,
       })
     }
-    img.onerror = reject
-    img.src = typeof source === 'string' ? source : URL.createObjectURL(source)
+    img.onerror = (e) => { release(); reject(e) }
+    if (typeof source === 'string') {
+      img.src = source
+    } else {
+      objectUrl = URL.createObjectURL(source)
+      img.src = objectUrl
+    }
   })
 }
 

@@ -2,6 +2,18 @@
  * Terrain data extraction and processing.
  */
 
+/**
+ * Y value parked on surface vertices with no data.
+ *
+ * The renderer never sees these — `buildSurfaceGeometry` emits a quad only when
+ * all four corners are valid, so a masked vertex is never referenced by an
+ * index. Anything reading the position array *directly* must exclude them by
+ * hand, which is why this lives here rather than as a literal at the one write
+ * site: STL export walks the raw positions and once shipped a base plate 10 000
+ * units below the model because it did not know.
+ */
+export const NODATA_SENTINEL_Y = -10000
+
 // Separable box blur: horizontal window mean per row, then vertical window mean
 // per column. Because the horizontal window (and its clamped count) depends only
 // on x, mean-of-means equals the 2D box mean exactly — identical output to an
@@ -92,7 +104,17 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) 
     }
   }
 
-  const minZ = (minBrightness - 0.5) * 100 * elevScale, maxZ = (maxBrightness - 0.5) * 100 * elevScale
+  // Ordered, not just computed: elevScale is signed (the slider reaches −10, and
+  // the effective value is baseElevScale + the user's offset), so a negative
+  // scale maps the brightest cell to the lowest elevation and crosses the pair.
+  // Every consumer guards with `maxZ > minZ` and silently degrades when it fails
+  // — normElev returns 0 for every vertex, so hypsometric ramps collapse to one
+  // colour and an elevation cut above 0 culls the entire scene. Inverting the
+  // terrain is a legitimate use of a signed slider; it should not also turn off
+  // colouring.
+  const zA = (minBrightness - 0.5) * 100 * elevScale
+  const zB = (maxBrightness - 0.5) * 100 * elevScale
+  const minZ = Math.min(zA, zB), maxZ = Math.max(zA, zB)
   let maxSlope = 0
   const gridSlopes = new Float32Array(rows * cols)
   

@@ -146,7 +146,15 @@ const SURFACE_FRAG = /* glsl */ `
   }
 
   void main() {
-    if (vBrightness < uElevMinCut / 100.0 || vBrightness > uElevMaxCut / 100.0) {
+    // Elevation cut, measured the same way the line builders measure it:
+    // normalised across the data's own range, not against raw 0…1. The two
+    // agreed only for a heightmap spanning exactly 0…1 — for anything narrower
+    // (any raster with Blur on, since that pulls both bounds inward) the fill
+    // boundary and the lowest surviving contour sat at visibly different
+    // heights. The bounds are already here for the raw view, and normElev
+    // reduces to exactly this because elevScale cancels out of it.
+    float cut = clamp((vBrightness - uRawMin) / max(uRawMax - uRawMin, 1e-5), 0.0, 1.0);
+    if (cut < uElevMinCut / 100.0 || cut > uElevMaxCut / 100.0) {
       discard;
     }
     // Raw terrain view: the heightmap itself, flat and unlit — lowest point
@@ -468,10 +476,20 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uHypsometricBanded.value = isBanded
     surfMat.uniforms.uContourInterval.value = p.fillHypsoInterval || 10.0
     surfMat.uniforms.uHypsoWeight.value = p.fillHypsoWeight || 0.0
-    surfMat.uniforms.uElevScale.value = p.elevScale || 1.0
+    // The shader divides by this (banded hypsometric, and uShadowStepH below), so
+    // 0 has no usable value and substituting 1 is the only sane answer — but it
+    // has to be the SAME answer in both places. It was not: this line used `||`
+    // (→ 1) and uShadowStepH used `??` (→ 0 → Infinity), 27 lines apart, so at
+    // elevScale 0 cast shadows silently stopped while banding carried on at a
+    // different scale. elevScale reaches exactly 0 in one drag.
+    const elevScaleSafe = p.elevScale || 1.0
+    surfMat.uniforms.uElevScale.value = elevScaleSafe
     surfMat.uniforms.uColorMode.value = { elevation: 0, slope: 1, aspect: 2 }[p.fillHypsoMode] ?? 0
-    surfMat.uniforms.uElevMinCut.value = p.elevMinCut || 0.0
-    surfMat.uniforms.uElevMaxCut.value = p.elevMaxCut || 100.0
+    // These two, by contrast, take 0 as a real value — `||` here meant dragging
+    // Elev max cut to 0 fell back to 100, leaving the fill fully visible while
+    // every line layer was culled.
+    surfMat.uniforms.uElevMinCut.value = p.elevMinCut ?? 0.0
+    surfMat.uniforms.uElevMaxCut.value = p.elevMaxCut ?? 100.0
     
     surfMat.uniforms.uShowTexture.value = !!(p.showTexture && overlayTex)
     surfMat.uniforms.uOverlayTex.value = overlayTex
@@ -495,7 +513,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uHeightmapTex.value   = heightmapTex ?? null
     surfMat.uniforms.uHeightmapCols.value  = cols
     surfMat.uniforms.uHeightmapRows.value  = rows
-    surfMat.uniforms.uShadowStepH.value    = (p.resolution ?? 1) / ((p.elevScale ?? 1) * 100)
+    surfMat.uniforms.uShadowStepH.value    = (p.resolution ?? 1) / (elevScaleSafe * 100)
     surfMat.uniforms.uShadowSteps.value    = p.hillshadeShadowSteps   ?? 64
     surfMat.uniforms.uShadowSoftness.value = p.hillshadeShadowSoftness ?? 1.5
     surfMat.uniforms.uShadowDarkness.value = p.hillshadeShadowDarkness ?? 0.85

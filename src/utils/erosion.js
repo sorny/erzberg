@@ -26,8 +26,14 @@ export function simulateErosion(pixels, width, height, iterations = 50000, param
   } = params
 
   // --- Precompute Erosion Brush ---
+  // dx and dy are kept separately rather than pre-folded into a flat offset.
+  // A flat offset cannot be bounds-checked: `dy*width + dx` for a droplet near
+  // column 0 lands on the far side of the previous row, which is inside the
+  // array and so passes an index test while eroding a completely unrelated part
+  // of the map. That showed up as mirrored streaks down both borders.
   const brushWeights = []
-  const brushOffsets = []
+  const brushDx = []
+  const brushDy = []
   let weightSum = 0
 
   for (let dy = -erosionRadius; dy <= erosionRadius; dy++) {
@@ -36,7 +42,8 @@ export function simulateErosion(pixels, width, height, iterations = 50000, param
       if (dist <= erosionRadius) {
         const weight = 1 - dist / erosionRadius
         brushWeights.push(weight)
-        brushOffsets.push(dy * width + dx)
+        brushDx.push(dx)
+        brushDy.push(dy)
         weightSum += weight
       }
     }
@@ -131,15 +138,17 @@ export function simulateErosion(pixels, width, height, iterations = 50000, param
         // CASE B: Moving downhill and has capacity -> Erosion
         const erodeAmt = Math.min((capacity - sediment) * erodeSpeed, -deltaH)
         
-        // Distribute erosion weighted by brush
-        for (let b = 0; b < brushOffsets.length; b++) {
-          const targetIdx = (nodeY * width + nodeX) + brushOffsets[b]
-          if (targetIdx >= 0 && targetIdx < map.length) {
-            // Subtract weighted erosion, but ensure we don't go below absolute zero
-            const weight = brushWeights[b]
-            const actualErode = Math.min(map[targetIdx], erodeAmt * weight)
-            map[targetIdx] -= actualErode
-          }
+        // Distribute erosion weighted by brush. Both axes are checked — see the
+        // note on the brush construction above for why the flat index alone is
+        // not enough.
+        for (let b = 0; b < brushWeights.length; b++) {
+          const tx = nodeX + brushDx[b]
+          const ty = nodeY + brushDy[b]
+          if (tx < 0 || tx >= width || ty < 0 || ty >= height) continue
+          const targetIdx = ty * width + tx
+          // Subtract weighted erosion, but ensure we don't go below absolute zero
+          const actualErode = Math.min(map[targetIdx], erodeAmt * brushWeights[b])
+          map[targetIdx] -= actualErode
         }
         sediment += erodeAmt
       }

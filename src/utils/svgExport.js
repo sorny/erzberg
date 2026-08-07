@@ -20,8 +20,11 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
   const camInv = camera.matrixWorldInverse
   const wld = new THREE.Vector3()
   const viw = new THREE.Vector3()
-  const minB = (elevMinCut || 0) / 100
-  const maxB = (elevMaxCut || 100) / 100
+  // `??`, not `||`: 0 is a legitimate cut. With `||`, dragging Elev max cut to 0
+  // fell back to 100 and the depth buffer kept every triangle the viewport had
+  // discarded, so the export culled lines against terrain that was not there.
+  const cutLo = (elevMinCut ?? 0) / 100
+  const cutHi = (elevMaxCut ?? 100) / 100
   // View-space z of the near plane (camera looks down -z). Vertices on the
   // camera side of it project to garbage screen coordinates (the perspective
   // divide mirrors them), so triangles touching them must not be rasterised.
@@ -30,6 +33,12 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
   for (const geo of zGeos) {
     const { positions, indices, brightnessBuf } = geo
     if (!positions || positions.length === 0) continue
+    // The cut is a fraction of the data's own brightness range, matching the
+    // surface shader and the line builders. Curtain geometry carries no bounds
+    // (and no brightness either), so it falls back to the full range and the
+    // test below is skipped for it anyway.
+    const lo = geo.metadata?.minB ?? 0
+    const span = Math.max(1e-5, (geo.metadata?.maxB ?? 1) - lo)
     const nVerts = positions.length / 3
     const vx  = new Float32Array(nVerts)
     const vy  = new Float32Array(nVerts)
@@ -59,8 +68,8 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
       if ((vx[a] < 0 && vx[b] < 0 && vx[c] < 0) || (vx[a] > W && vx[b] > W && vx[c] > W) ||
           (vy[a] < 0 && vy[b] < 0 && vy[c] < 0) || (vy[a] > H && vy[b] > H && vy[c] > H)) continue
       if (vb) {
-        const avgB = (vb[a] + vb[b] + vb[c]) / 3
-        if (avgB < minB || avgB > maxB) continue
+        const avgB = ((vb[a] + vb[b] + vb[c]) / 3 - lo) / span
+        if (avgB < cutLo || avgB > cutHi) continue
       }
       fillTriangle(vx[a], vy[a], vd[a], vx[b], vy[b], vd[b], vx[c], vy[c], vd[c], buf, W, H)
     }
@@ -152,7 +161,7 @@ export function exportSVG({
   lineGeo, lineStyles = {}, camera, width, height,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
-  showFill,
+  surfaceOccludes,
   depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize,
   elevMinCut, elevMaxCut,
@@ -202,7 +211,7 @@ export function exportSVG({
     sx < -PAD || sx > width + PAD || sy < -PAD || sy > height + PAD
 
   const zGeos = []
-  if (showFill && surfaceGeo && groupMatrix) {
+  if (surfaceOccludes && surfaceGeo && groupMatrix) {
     zGeos.push(surfaceGeo)
   }
   if (Array.isArray(lineGeo)) {
@@ -213,9 +222,11 @@ export function exportSVG({
     }
   }
 
-  // Build Z-buffer when depth occlusion is on, or when fill is enabled (fill acts as
-  // a depth occluder in SVG — it is not rendered as polygons, only used to cull lines).
-  const surfViewZ = ((depthOcclusion || showFill) && zGeos.length > 0 && groupMatrix)
+  // Build the Z-buffer when depth occlusion is on, or when any fill layer is
+  // drawing. A visible surface acts as a depth occluder here — it is never
+  // rasterised into the SVG as polygons, only used to cull lines behind it,
+  // which is what keeps the export matching the viewport.
+  const surfViewZ = ((depthOcclusion || surfaceOccludes) && zGeos.length > 0 && groupMatrix)
     ? buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
     : null
 
