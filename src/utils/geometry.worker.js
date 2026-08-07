@@ -16,11 +16,32 @@
  * All Float32Array / Uint32Array buffers are transferred (zero-copy) back to the
  * main thread via the Transferables list. After transfer the originals are detached.
  */
-import { buildTerrain } from './terrain'
+import { boxBlur, buildTerrain } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry, buildGpxGeometry } from './geometryBuilders'
 
 // Cached source raster — replaced only by a message carrying `heightmapPixels`.
 let src = null
+
+// Cached blur of that raster. The blur is a function of the raster and the
+// radius alone, but buildTerrain re-ran it on every message — so dragging an
+// unrelated style slider re-blurred the full-resolution image each tick, which
+// at 8k is the single most expensive thing in the pipeline. Keyed on identity of
+// the pixels plus the radius; anything else invalidates it.
+//
+// It costs one extra full-size buffer held for as long as the raster is loaded,
+// but only when blur is actually on: at radius 0 boxBlur returns its input, so
+// the cache holds the same array `src` already does.
+let blurCache = { pixels: null, radius: -1, result: null }
+
+function blurredSource(p) {
+  const radius = p.blurRadius ?? 0
+  if (blurCache.pixels === src.heightmapPixels && blurCache.radius === radius) {
+    return blurCache.result
+  }
+  const result = boxBlur(src.heightmapPixels, src.heightmapWidth, src.heightmapHeight, radius)
+  blurCache = { pixels: src.heightmapPixels, radius, result }
+  return result
+}
 
 self.onmessage = (e) => {
   const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p, _gen } = e.data
@@ -33,7 +54,10 @@ self.onmessage = (e) => {
   }
 
   try {
-    const terrain = buildTerrain(src.heightmapPixels, src.nodataMask, src.heightmapWidth, src.heightmapHeight, p)
+    const terrain = buildTerrain(
+      src.heightmapPixels, src.nodataMask, src.heightmapWidth, src.heightmapHeight, p,
+      blurredSource(p)
+    )
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
 

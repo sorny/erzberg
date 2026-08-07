@@ -223,6 +223,11 @@ export function useTerrainGeometry(p) {
     // render-side.
     p.needsSurfaceShading,
 
+    // Same shape of trade: occlusion curtains are geometry, and building them
+    // for a scene that will not draw them costs ~18 MB and a per-segment loop on
+    // every rebuild. One rebuild when the switch moves is much cheaper.
+    p.depthOcclusion,
+
     // NOTE: the fill params (showFill, fillColor, fillBanded, fillHypso*) are
     // render-side only — fill styling is pure GPU uniforms in SurfaceMesh.
     // They are deliberately excluded so toggling/dragging them never spawns a

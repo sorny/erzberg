@@ -216,8 +216,15 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       p.holoNoiseAmt, p.holoNoiseScale, p.holoFlowSpeed, p.holoMaskContrast, p.holoShimmer,
       p.depthOcclusion, p.occlusionBias])
 
+  // showPoints is a dependency, not just a render-time guard. The early return
+  // that hides the field sits below every hook, so without it here a hidden
+  // particle system still scanned the grid twice, allocated the home buffer and
+  // seeded a random per particle on every terrain rebuild — ~15-25 ms and ~25 MB
+  // at a 1024² grid, in the *default* configuration (showPoints is off and
+  // particleSpacing is 1, one particle per cell). Under Soundscapes streaming
+  // that ran 30 times a second for a field nobody could see.
   const homePositions = useMemo(() => {
-    if (!terrain) return null
+    if (!terrain || !p.showPoints) return null
     const { grid, rows, cols, scl, halfW, halfH, gridMask } = terrain
     // particleSpacing = grid-cell stride between particles (1 = every cell).
     const stride = Math.max(1, Math.round(p.particleSpacing ?? 1))
@@ -243,12 +250,15 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       }
     }
     return home
-  }, [terrain, p.elevScale, p.jitterAmt, p.particleSpacing])
+  }, [terrain, p.showPoints, p.elevScale, p.jitterAmt, p.particleSpacing])
 
   useEffect(() => {
     if (!homePositions) return
     const n = homePositions.length / 3
-    const positions = homePositions.slice()
+    // Used directly rather than copied: nothing writes to it. All motion is
+    // computed from uTime in the vertex shader, and getPositions() only reads
+    // for SVG export — so the copy was a second full-size allocation per rebuild.
+    const positions = homePositions
     const seeds = new Float32Array(n)
     for (let i = 0; i < n; i++) seeds[i] = Math.random()
     const newGeo = new THREE.BufferGeometry()

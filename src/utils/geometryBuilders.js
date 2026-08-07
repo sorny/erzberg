@@ -247,7 +247,13 @@ export function buildLineGeometry(terrain, p) {
       // mirrored into each octant below. Written straight into pre-sized typed
       // arrays (segment count is known up front) and trimmed; this avoids the
       // millions of JS-array push() calls a dense layer would otherwise make.
-      const segCount = res.isPoints ? 0 : (baseP.length / 6) | 0
+      // Curtains exist only to occlude: HeightmapLines draws them when
+      // depthOcclusion is on, and svgExport pushes them into its Z-buffer under
+      // the same condition. With it off they were still built and shipped every
+      // rebuild — ~18 MB and a 255k-iteration loop at a dense layer, for
+      // geometry nothing would look at. Toggling the switch now costs one extra
+      // rebuild, which is the right trade against paying for it on every drag.
+      const segCount = (res.isPoints || !p.depthOcclusion) ? 0 : (baseP.length / 6) | 0
       const cPfull = new Float32Array(segCount * 12)
       const cIfull = new Uint32Array(segCount * 6)
       let cPn = 0, cIn = 0, vIdx = 0

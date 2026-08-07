@@ -26,6 +26,39 @@ function buildGradientTexture(gradientStops) {
   return tex
 }
 
+// Ceiling on the ray-marching heightmap texture — see `needsHeightmapTex`.
+const MAX_SHADOW_TEX = 2048
+
+/**
+ * Box-filters a raster down until neither side exceeds `maxSide`.
+ *
+ * Averaging rather than point-sampling matters here: the consumers march a ray
+ * across the result comparing heights, and a dropped-sample downsample would
+ * lose exactly the thin ridges that cast the shadows. Returns the input
+ * untouched when it already fits, so the common case allocates nothing.
+ */
+function downsampleRaster(pixels, width, height, maxSide) {
+  const step = Math.ceil(Math.max(width, height) / maxSide)
+  if (step <= 1) return { pixels, width, height }
+
+  const w = Math.max(1, Math.floor(width / step))
+  const h = Math.max(1, Math.floor(height / step))
+  const out = new Float32Array(w * h)
+  for (let y = 0; y < h; y++) {
+    const y0 = y * step, y1 = Math.min(height, y0 + step)
+    for (let x = 0; x < w; x++) {
+      const x0 = x * step, x1 = Math.min(width, x0 + step)
+      let sum = 0, n = 0
+      for (let sy = y0; sy < y1; sy++) {
+        const row = sy * width
+        for (let sx = x0; sx < x1; sx++) { sum += pixels[row + sx]; n++ }
+      }
+      out[y * w + x] = n ? sum / n : 0
+    }
+  }
+  return { pixels: out, width: w, height: h }
+}
+
 // ── Shaders ───────────────────────────────────────────────────────────────────
 const SURFACE_VERT = /* glsl */ `
   // Raw terrain view collapses the elevation axis here rather than in the
@@ -381,12 +414,27 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     return tex
   }, [textureImage])
 
+  // Only the cast-shadow and AO branches sample the heightmap texture, and both
+  // are off by default — so this used to hand the GPU a full-resolution R32F
+  // copy of the raster (268 MB for an 8k GeoTIFF) that nothing ever read.
+  const needsHeightmapTex = !!(p.hillshadeCastShadows || p.showAO)
+
   const hmTexRef = useRef(null)
   const heightmapTex = useMemo(() => {
     hmTexRef.current?.dispose()
-    if (!heightmapPixels || !heightmapWidth || !heightmapHeight) { hmTexRef.current = null; return null }
+    if (!needsHeightmapTex || !heightmapPixels || !heightmapWidth || !heightmapHeight) {
+      hmTexRef.current = null
+      return null
+    }
+    // Capped, because the consumers cannot resolve more: both ray-march at most
+    // 128 steps with a stride that grows to ~14 cells, so detail past a couple of
+    // thousand samples across is averaged away regardless. 2048² is a 16× cut at
+    // 8k with no visible difference.
+    const { pixels, width, height } = downsampleRaster(
+      heightmapPixels, heightmapWidth, heightmapHeight, MAX_SHADOW_TEX
+    )
     const tex = new THREE.DataTexture(
-      heightmapPixels, heightmapWidth, heightmapHeight,
+      pixels, width, height,
       THREE.RedFormat, THREE.FloatType
     )
     tex.minFilter = THREE.LinearFilter
@@ -395,7 +443,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     tex.needsUpdate = true
     hmTexRef.current = tex
     return tex
-  }, [heightmapPixels, heightmapWidth, heightmapHeight])
+  }, [needsHeightmapTex, heightmapPixels, heightmapWidth, heightmapHeight])
 
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,

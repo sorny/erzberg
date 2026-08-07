@@ -52,26 +52,46 @@ function boxBlurInt(pixels, width, height, r) {
   return out
 }
 
-/** Apply a box blur to a Float32Array of brightness values using an integral image. O(W×H).
- *  Supports fractional radii by lerping between adjacent integer-radius results. */
+/**
+ * Box blur over a Float32Array of brightness values. O(W×H) — see `boxBlurInt`.
+ *
+ * Fractional radii are supported by lerping the two neighbouring integer
+ * radii, which is what lets the Blur slider move smoothly instead of stepping.
+ * That costs a second full pass, so the integer case is kept on its own path
+ * — and since the slider steps by 0.1, the fractional case is the normal one.
+ * The lerp writes back into `lo` rather than allocating a third buffer: at 8k
+ * that is 268 MB of peak that bought nothing, `lo` is always a private result
+ * of `boxBlurInt` here, and nothing else can be holding a reference to it.
+ */
 export function boxBlur(pixels, width, height, radius) {
   if (radius <= 0) return pixels
   const rLo = Math.floor(radius), rHi = Math.ceil(radius), frac = radius - rLo
   if (frac === 0) return boxBlurInt(pixels, width, height, rLo)
-  const lo = rLo <= 0 ? pixels : boxBlurInt(pixels, width, height, rLo)
   const hi = boxBlurInt(pixels, width, height, rHi)
-  const out = new Float32Array(pixels.length)
-  for (let i = 0; i < pixels.length; i++) out[i] = lo[i] * (1 - frac) + hi[i] * frac
-  return out
+  // rLo === 0 means "no blur" for the lower end, so the source is the operand —
+  // and must not be written to.
+  if (rLo <= 0) {
+    const out = new Float32Array(pixels.length)
+    for (let i = 0; i < pixels.length; i++) out[i] = pixels[i] * (1 - frac) + hi[i] * frac
+    return out
+  }
+  const lo = boxBlurInt(pixels, width, height, rLo)
+  for (let i = 0; i < lo.length; i++) lo[i] += (hi[i] - lo[i]) * frac
+  return lo
 }
 
 /**
  * Build the terrain grid from loaded heightmap pixel data.
  * Respects the nodataMask to skip invalid pixels.
+ *
+ * `preBlurred` lets a caller supply the blurred raster it already has. The blur
+ * depends only on the source pixels and the radius, neither of which changes
+ * when a style slider moves, so the worker caches it across rebuilds rather than
+ * repeating the most expensive step in the pipeline on every drag tick.
  */
-export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p) {
+export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null) {
   const { resolution: scl, blurRadius, gridOffsetX, gridOffsetY, blackPoint, whitePoint, elevScale } = p
-  const blurred = boxBlur(rawPixels, imageWidth, imageHeight, blurRadius)
+  const blurred = preBlurred ?? boxBlur(rawPixels, imageWidth, imageHeight, blurRadius)
   
   // Calculate grid dimensions correctly based on resolution
   const peakOff = Math.floor(gridOffsetX ?? 0)

@@ -377,18 +377,40 @@ function chromaMatrix(spec, cols, dbFloor, contrast) {
   return out
 }
 
-/** Moving average along the diagonal direction — see buildSSM. */
+/**
+ * Moving average along the diagonal direction — see buildSSM.
+ *
+ * Every cell's window lies entirely on its own diagonal, so the matrix is really
+ * 2n−1 independent 1-D moving averages. Walking each diagonal once with a
+ * rolling sum makes this O(n²) instead of O(n²·r): at size 768 with enhance 32
+ * that is 590k accumulator updates rather than 38.4M reads. Output is identical,
+ * including the shrinking window at the ends, because the divisor is the true
+ * count of in-range taps either way.
+ */
 function enhanceDiagonals(s, n, r) {
   const out = new Float32Array(n * n)
-  for (let i = 0; i < n; i++) {
-    for (let j = 0; j < n; j++) {
-      let sum = 0, cnt = 0
-      for (let k = -r; k <= r; k++) {
-        const a = i + k, b = j + k
-        if (a < 0 || a >= n || b < 0 || b >= n) continue
-        sum += s[a * n + b]; cnt++
-      }
-      out[i * n + j] = sum / cnt
+  // Each diagonal starts at (i0, j0) with one of the two on the top/left edge.
+  for (let d = -(n - 1); d <= n - 1; d++) {
+    const i0 = d < 0 ? -d : 0
+    const j0 = d < 0 ? 0 : d
+    const len = n - Math.max(i0, j0)
+
+    let sum = 0
+    // Prime with the leading half-window of the first cell.
+    const first = Math.min(r, len - 1)
+    for (let t = 0; t <= first; t++) sum += s[(i0 + t) * n + (j0 + t)]
+
+    for (let t = 0; t < len; t++) {
+      const lo = t - r, hi = t + r
+      const from = lo < 0 ? 0 : lo
+      const to = hi >= len ? len - 1 : hi
+      out[(i0 + t) * n + (j0 + t)] = sum / (to - from + 1)
+
+      // Slide: drop the tap leaving the window, add the one entering it.
+      const drop = t - r
+      if (drop >= 0) sum -= s[(i0 + drop) * n + (j0 + drop)]
+      const add = t + r + 1
+      if (add < len) sum += s[(i0 + add) * n + (j0 + add)]
     }
   }
   return out
@@ -493,11 +515,16 @@ function buildStrata(spec, params, tone) {
   const gap = Math.max(0, params.gap | 0)
   const profile = params.render !== 'ridge'
 
-  const curves = featureCurves(spec, cols, tone.dbFloor)
   const smooth = Math.max(0, params.smooth | 0)
 
   const enabled = STRATA_FEATURES.filter((ft) => params[ft.key] !== false)
   if (!enabled.length) return { pixels: new Float32Array(cols), width: cols, height: 1 }
+
+  // The enabled set is resolved *before* the curves are computed, so the two
+  // genuinely expensive optional features can be skipped: noisiness needs a
+  // Math.log per bin per frame (~10M calls on a real track) and harmony needs a
+  // second full pass over the spectrogram. Both are off by default.
+  const curves = featureCurves(spec, cols, tone.dbFloor, new Set(enabled.map((ft) => ft.id)))
 
   const rows = enabled.length * bandH + Math.max(0, enabled.length - 1) * gap
   const out = new Float32Array(rows * cols)
@@ -562,8 +589,16 @@ export const STRATA_FEATURES = [
  * Frequency-derived features are measured on a log axis, because the perceptual
  * distance between 200 Hz and 400 Hz is the same as between 2 kHz and 4 kHz and
  * a linear centroid would spend its whole range in the top octave.
+ *
+ * `want` narrows the work to a set of feature ids. Most of them ride along free
+ * on the single pass this already makes, but two do not — noisiness costs a
+ * Math.log per bin per frame, and harmony is an entire second pass — so those
+ * are computed only when asked for. Omit the argument for all of them.
  */
-export function featureCurves(spec, cols, dbFloor = 0) {
+export function featureCurves(spec, cols, dbFloor = 0, want = null) {
+  const wants = (id) => !want || want.has(id)
+  const wantFlatness = wants('flatness')
+  const wantChroma = wants('chroma')
   const { data, frames, bins } = spec
   const freqs = binFrequencies(spec)
   const inv = toneInv(dbFloor)
@@ -605,7 +640,7 @@ export function featureCurves(spec, cols, dbFloor = 0) {
       gated[b] = v
       sum += v
       wSum += v * logF[b]
-      logSum += Math.log(v + 1e-6)
+      if (wantFlatness) logSum += Math.log(v + 1e-6)
       const g = group[b]
       if (g === 0) low += v
       else if (g === 1) mid += v
@@ -622,17 +657,20 @@ export function featureCurves(spec, cols, dbFloor = 0) {
     }
     spread = sum > 1e-9 ? Math.sqrt(spread / sum) : 0
 
-    // Spectral flatness: geometric over arithmetic mean. A flat (noisy) spectrum
-    // pushes it toward 1, a few loud partials over near-silence toward 0.
     const mean = sum / bins
-    const geo = Math.exp(logSum / bins)
 
     out.rms[c] += mean
     out.centroid[c] += centroid
     out.flux[c] += flux[f]
     out.bandwidth[c] += spread
     out.rolloff[c] += rolloff
-    out.flatness[c] += mean > 1e-9 ? Math.min(1, geo / mean) : 0
+    if (wantFlatness) {
+      // Spectral flatness: geometric over arithmetic mean. A flat (noisy)
+      // spectrum pushes it toward 1, a few loud partials over near-silence
+      // toward 0.
+      const geo = Math.exp(logSum / bins)
+      out.flatness[c] += mean > 1e-9 ? Math.min(1, geo / mean) : 0
+    }
     out.low[c] += nLow ? low / nLow : 0
     out.mid[c] += nMid ? mid / nMid : 0
     out.high[c] += nHigh ? high / nHigh : 0
@@ -645,7 +683,8 @@ export function featureCurves(spec, cols, dbFloor = 0) {
     for (let c = 0; c < cols; c++) if (counts[c] > 0) a[c] /= counts[c]
     normalize(a)
   }
-  out.chroma = normalize(chromaMatrix(spec, cols, dbFloor, 1))
+  // A whole second pass over the spectrogram, so it is only made on request.
+  out.chroma = wantChroma ? normalize(chromaMatrix(spec, cols, dbFloor, 1)) : null
   return out
 }
 

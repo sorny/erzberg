@@ -70,10 +70,14 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
   console.log(`PNG export size: ${pngBuf.length} bytes ✓`)
 
   // ── 4. Export SVG (key 1) ─────────────────────────────────────────────────
+  const svgStart = Date.now()
   const [svgDownload] = await Promise.all([
     page.waitForEvent('download', { timeout: 15_000 }),
     page.keyboard.press('Digit1'),
   ])
+  // Dominated by the per-sample occlusion walk. Recorded rather than asserted —
+  // machine-dependent, but a 10x regression here would be visible at a glance.
+  console.log(`SVG export took ${Date.now() - svgStart}ms`)
   const svgBuf = await svgDownload.createReadStream().then(stream =>
     new Promise((res, rej) => {
       const chunks = []
