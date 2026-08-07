@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-07
+
+A maintenance release: no new features, but the largest correctness pass the
+project has had. Two of the bugs below silently corrupted exported files, and
+three of the performance items were costing every user something in the default
+configuration.
+
 ### Fixed
 - **Every GeoTIFF with a NoData region exported an unprintable STL.** `buildSurfaceGeometry` parks masked vertices at `y = -10000` as a hide-it sentinel — safe for rendering, because a quad is emitted only when all four corners are valid, so no index ever references them. But `stlExport` scanned the *raw position array*: one voided pixel anywhere set the base plate 10 000 units below the model, and the perimeter walk, which indexes the grid border arithmetically with no mask test, extruded matching side-wall spikes. Measured on a 128² heightmap with a transparent quadrant: Z spanned −10002…28 before, −52…28 after. DEMs with voids — clipped catchments, SRTM holes — are the app's headline input. The floor is now taken over indexed vertices only, the perimeter skips masked cells, and the sentinel is a named constant in `terrain.js` so the write site and its readers cannot drift apart again.
 - **SVG export lost terrain occlusion unless *Fill* was on.** The exporter gated its depth buffer on `showFill` alone — the fourth copy of the predicate 0.8.3 consolidated into `hasFillLayer`, one file away and missed. Fill is off by default, so any scene styled with Hillshade, AO, Water, Slope shade or Raw view exported lines the viewport correctly hid behind the mountain. Measured with Stipple as the only draw mode (it produces no occlusion curtains of its own, so the surface is the only possible occluder): 33 636 marks exported both with and without Hillshade before the fix, 33 636 → 27 178 after.
