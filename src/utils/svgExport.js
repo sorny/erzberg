@@ -15,6 +15,22 @@ const N_SAMPLES = 64   // depth-test samples per segment (increased for precisio
 
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
+/**
+ * Rasterises the occluders into a software depth buffer and returns a sampler.
+ *
+ * The SVG has no depth test of its own, so hiding a line behind a mountain means
+ * knowing how far away the terrain is at each pixel. The occluders — the surface
+ * mesh and the per-layer occlusion curtains — are scan-converted here into a
+ * screen-sized buffer, and each line sample then compares its own depth against
+ * it.
+ *
+ * The buffer stores **inverse** view-space depth (`1 / -z`), for two reasons: it
+ * interpolates linearly in screen space where `z` does not, so `fillTriangle`
+ * can lerp it down an edge correctly; and it makes `0` a usable empty value,
+ * since no real surface is infinitely far away. The returned sampler turns that
+ * back into a depth, reporting `-Infinity` — nothing here, never occlude —
+ * wherever no occluder was drawn.
+ */
 function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) {
   const buf = new Float32Array(W * H).fill(0)
   const camInv = camera.matrixWorldInverse

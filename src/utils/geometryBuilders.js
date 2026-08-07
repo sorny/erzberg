@@ -164,12 +164,12 @@ const EMPTY_F64 = new Float64Array(0)
 const EMPTY_F32 = new Float32Array(0)
 const EMPTY_U8  = new Uint8Array(0)
 
-function normElev(elev, minZ, maxZ) {
-  return maxZ > minZ ? (elev - minZ) / (maxZ - minZ) : 0
+function normElev(elev, minElev, maxElev) {
+  return maxElev > minElev ? (elev - minElev) / (maxElev - minElev) : 0
 }
 
-function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
-  const n = normElev(elev, minZ, maxZ)
+function inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) {
+  const n = normElev(elev, minElev, maxElev)
   return n >= elevMinCut / 100 && n <= elevMaxCut / 100
 }
 
@@ -182,11 +182,13 @@ function inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) {
 export function buildLineGeometry(terrain, p) {
   if (!terrain) return []
   
-  // Helper to map per-layer hypsometric params to the keys computeVertexColor expects
-  const getLayerContext = (id, baseColor, baseOpacity) => ({
+  // Maps the per-layer hypsometric params onto the generic keys
+  // computeVertexColor expects. Opacity is deliberately absent: it is resolved
+  // render-side by layerStyle, never baked into vertex colours, and carrying it
+  // here only suggested otherwise.
+  const getLayerContext = (id, baseColor) => ({
     ...p,
     lineColor:        baseColor,
-    lineOpacity:      baseOpacity,
     lineHypsometric:  p[`hypso${id}`],
     lineHypsoMode:    p[`hypsoMode${id}`],
     lineBanded:       p[`hypsoBanded${id}`],
@@ -219,7 +221,7 @@ export function buildLineGeometry(terrain, p) {
   for (const cfg of MODES_CONFIG) {
     if (!p[`enabled${cfg.id}`]) continue
 
-    const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`], p[`opacity${cfg.id}`])
+    const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`])
     
     // Build the base pass for this layer once
     const baseRes = cfg.builder(terrain, ctx)
@@ -235,13 +237,13 @@ export function buildLineGeometry(terrain, p) {
 
       const baseP = res.positions
       // Curtain bottom: a curtain only has to occlude sight lines to other
-      // rendered content, and nothing renders below minZ except pillar shafts
-      // (minZ - pillarDepth). Hanging every curtain a fixed 500 units deep
+      // rendered content, and nothing renders below minElev except pillar shafts
+      // (minElev - pillarDepth). Hanging every curtain a fixed 500 units deep
       // instead multiplied the rasterized depth-only fragment area ~10× for a
       // typical ±50-unit terrain — pure GPU fill-rate waste when zoomed in.
-      const floorY = terrain.minZ
+      const floorY = terrain.minElev
         - (p.enabledPillars ? (p.pillarDepth ?? 0) : 0)
-        - Math.max(2, (terrain.maxZ - terrain.minZ) * 0.05)
+        - Math.max(2, (terrain.maxElev - terrain.minElev) * 0.05)
 
       // Base curtain quads (one per non-degenerate segment) — built once, then
       // mirrored into each octant below. Written straight into pre-sized typed
@@ -392,7 +394,7 @@ function concat(a, b) { const out = new Float32Array(a.length+b.length); out.set
  * terrain bilinearly along the rotated rays.
  */
 function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const positions = new F32List(), colors = new F32List()
 
@@ -446,7 +448,7 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = fal
         if (ok) {
           elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
           if (jitterAmt > 0) elev += jitterNoise(fc, fr) * jitterAmt
-          ok = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)
+          ok = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
         }
       }
       if (ok && prevOk) {
@@ -454,8 +456,8 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = fal
                         fc * scl - halfW, elev, fr * scl - halfH)
         const i0 = Math.round(prevR) * cols + Math.round(prevC)
         const i1 = Math.round(fr) * cols + Math.round(fc)
-        colors.pushRgb(computeVertexColor(normElev(prevE, minZ, maxZ), gridSlopes[i0] / (maxSlope || 1), theta, p))
-        colors.pushRgb(computeVertexColor(normElev(elev, minZ, maxZ), gridSlopes[i1] / (maxSlope || 1), theta, p))
+        colors.pushRgb(computeVertexColor(normElev(prevE, minElev, maxElev), gridSlopes[i0] / (maxSlope || 1), theta, p))
+        colors.pushRgb(computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[i1] / (maxSlope || 1), theta, p))
       }
       prevOk = ok; prevC = fc; prevR = fr; prevE = elev
     }
@@ -471,8 +473,19 @@ function buildCrosshatch(terrain, p, spacing, angleDeg) {
 
 // ─── Hachure ──────────────────────────────────────────────────────────────────
 
+/**
+ * Slope ticks — one stroke per sampled cell, length proportional to steepness.
+ *
+ * The stroke runs *across* the gradient (perpendicular to `∇H`, so tangent to
+ * the contour through that cell) and is centred on it, which makes the field
+ * read as stacked contour fragments thickening where the ground steepens —
+ * rather than as the downslope hachures the name suggests.
+ *
+ * Cells flatter than a small fixed epsilon emit nothing, so flats stay blank
+ * instead of filling with sub-pixel ticks of arbitrary direction.
+ */
 function buildHachure(terrain, p, spacing, length) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
   const positions = new F32List(), colors = new F32List()
@@ -481,7 +494,7 @@ function buildHachure(terrain, p, spacing, length) {
     for (let c = 0; c < cols; c += lineStep) {
       if (!hasData(gridMask, r, c, cols)) continue
       const bC = grid[r * cols + c], elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
       const bL = (c > 0 && gridMask[r * cols + c - 1]) ? grid[r * cols + c - 1] : bC
       const bR = (c < cols - 1 && gridMask[r * cols + c + 1]) ? grid[r * cols + c + 1] : bC
       const bU = (r > 0 && gridMask[(r - 1) * cols + c]) ? grid[(r - 1) * cols + c] : bC
@@ -490,7 +503,7 @@ function buildHachure(terrain, p, spacing, length) {
       if (mag < 0.005) continue
       const tickLen = mag * (length ?? 1) * scl, nx = -gz / mag, nz = gx / mag, wx = c * scl - halfW, wz = r * scl - halfH
       positions.push6(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
-      const col = computeVertexColor(normElev(elev, minZ, maxZ), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
+      const col = computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
       colors.pushRgb2(col)
     }
   }
@@ -808,7 +821,7 @@ function borderCloseSegments(chains, rows, cols, scl, halfW, halfH, elev) {
 // linearly with the level index, which is what lets the cell-major pass map a
 // cell's value range straight to a level-index range.
 function prepareContourLevels(terrain, p, interval) {
-  const { minZ, maxZ } = terrain
+  const { minElev, maxElev } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const step = (interval ?? 4)
 
@@ -824,8 +837,8 @@ function prepareContourLevels(terrain, p, interval) {
   }
 
   // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
-  const startElev = Math.ceil((minZ - 1e-7) / step) * step
-  const maxElevPossible = Math.ceil(maxZ / step) * step
+  const startElev = Math.ceil((minElev - 1e-7) / step) * step
+  const maxElevPossible = Math.ceil(maxElev / step) * step
   const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
 
   const levelElev = new Float64Array(numSteps)
@@ -836,8 +849,8 @@ function prepareContourLevels(terrain, p, interval) {
     const elev = startElev + i * step
     levelElev[i] = elev
     levelVal[i] = elev / (100 * elevScale) + 0.5
-    levelActive[i] = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut) ? 1 : 0
-    const col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+    levelActive[i] = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) ? 1 : 0
+    const col = computeVertexColor(normElev(elev, minElev, maxElev), 0, 0, p)
     levelRgb[i * 3] = col[0]; levelRgb[i * 3 + 1] = col[1]; levelRgb[i * 3 + 2] = col[2]
   }
   return { step, numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep: step / (100 * elevScale) }
@@ -857,6 +870,33 @@ const _edgeId = new Int32Array(4)
 // screen pixel at any usual zoom — see simplifyFlat().
 const SMOOTH_SIMPLIFY_EPS = 0.02
 
+/**
+ * Contour lines by marching squares, in one pass over the grid.
+ *
+ * The scan is cell-major, not level-major: each cell is visited once and emits
+ * segments for whichever levels cross it, so the cost is O(cells + segments)
+ * rather than O(levels × cells). At a 1-unit interval over a 1024² grid the
+ * difference is two orders of magnitude.
+ *
+ * What happens after the scan depends on the options, and only the extra work is
+ * paid for:
+ *  - Plain contours ship the loose segments straight out.
+ *  - **Close rings** and **smoothing** both need the segments chained into
+ *    polylines first, so they share `chainLevelSegments` — which joins them by
+ *    integer grid-edge identity rather than by coordinate, the rewrite that took
+ *    close-contours from 312 ms to 37 ms.
+ *  - Smoothing is Chaikin corner-cutting with Douglas–Peucker decimation between
+ *    passes, because each pass doubles the point count and almost all of the new
+ *    points sit under a pixel from the chord through their neighbours.
+ *  - Closing runs *after* smoothing, so border-bridging segments stay straight
+ *    against the frame instead of being rounded away from it.
+ *
+ * Minor and major levels are separated into two layers here rather than being
+ * restyled downstream, because they differ in geometry weight, not just colour.
+ *
+ * Tanaka (illuminated) contours are a different enough construction that they
+ * live in their own builder; this is the only place that fork is expressed.
+ */
 function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings, smoothing) {
   if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
   const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
@@ -1022,6 +1062,22 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
 }
 const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
 
+/**
+ * Illuminated ("Tanaka") contours — the same level set, lit rather than uniform.
+ *
+ * Every segment is sorted into a bright or dark half by the sign of the sun
+ * direction dotted with the surface gradient at its midpoint: a contour crossing
+ * ground that tilts toward the light goes bright, one on ground tilting away
+ * goes dark. Relief then reads from the contour lines alone, with no surface
+ * shading underneath — which is the point of the technique on a line plot.
+ *
+ * The two halves are emitted as separate sub-layers rather than one layer with
+ * per-vertex colour because what distinguishes them is stroke *weight*
+ * (`tanakaWeightBright` / `tanakaWeightDark`), and weight is resolved per layer
+ * at render time, not baked into geometry. Both halves carry the same
+ * hypsometric colour for their level; the contrast comes from weight and from
+ * whatever per-layer colours are set.
+ */
 function buildContoursTanaka(terrain, p, interval) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
 
@@ -1105,8 +1161,26 @@ function sampleB(grid, rows, cols, fr, fc) {
   return grid[r0*cols+c0]*(1-dr)*(1-dc) + grid[r0*cols+c1]*(1-dr)*dc + grid[r1*cols+c0]*dr*(1-dc) + grid[r1*cols+c1]*dr*dc
 }
 
+/**
+ * Streamlines traced down the gradient field — the path water would take.
+ *
+ * Each seed is integrated downhill in fixed-length steps rather than jumping
+ * cell to cell, so a line crosses the grid diagonally instead of staircasing
+ * along it; the field is sampled bilinearly between cells for the same reason.
+ *
+ * Two rules keep the field legible rather than a tangle:
+ *  - **Seeds run highest first.** Peaks are where the drainage pattern is
+ *    legible, so they get to claim their lines before lower ground does.
+ *  - **A trace stops on reaching ground another trace already covered.** Every
+ *    streamline in a basin converges on the same outlet, so without this they
+ *    would all overdraw the same channel; each cell belongs to the first line
+ *    through it.
+ *
+ * A trace also ends at `maxLen`, at the grid edge, or where the gradient goes
+ * flat and there is no longer a direction to follow.
+ */
 function buildFlowLines(terrain, p, spacing, step, maxLen) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, mask = new Uint8Array(n), eps = 0.5
   const positions = new F32List(), colors = new F32List()
@@ -1134,11 +1208,11 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
         const nfc = fc-(gx/mag)*(step??1), nfr = fr-(gz/mag)*(step??1)
         if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
         const b1 = sampleB(grid, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
-        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+        if (inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) && inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut)) {
           positions.push6(fc*scl-halfW, e0, fr*scl-halfH, nfc*scl-halfW, e1, nfr*scl-halfH)
-          const col0 = computeVertexColor(normElev(e0, minZ, maxZ), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
+          const col0 = computeVertexColor(normElev(e0, minElev, maxElev), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
           colors.pushRgb2(col0)
-        } else if (!(inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) || inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut))) break
+        } else if (!(inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) || inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut))) break
         fr=nfr; fc=nfc; b0=b1; e0=e1
       }
   }
@@ -1198,7 +1272,7 @@ function sampleDirAligned(dirX, dirY, rows, cols, fr, fc, refX, refY) {
  * produces.
  */
 function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode, stepLen) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
 
   const positions = new F32List(), colors = new F32List()
@@ -1315,13 +1389,13 @@ function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode,
         if (owner[ni] !== 0 && owner[ni] !== id) break
 
         const e1 = cellElev(grid, Math.round(nfr), Math.round(nfc), cols, elevScale, jitterAmt)
-        if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) &&
-            inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+        if (inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) &&
+            inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut)) {
           positions.push6(fc * scl - halfW, e0, fr * scl - halfH,
                           nfc * scl - halfW, e1, nfr * scl - halfH)
           const gi = Math.round(fr) * cols + Math.round(fc)
           colors.pushRgb2(computeVertexColor(
-            normElev(e0, minZ, maxZ),
+            normElev(e0, minElev, maxElev),
             Math.min(1, gridSlopes[gi] / (maxSlope || 1)),
             Math.atan2(hy, hx), p))
         }
@@ -1337,8 +1411,23 @@ function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode,
 
 // ─── Stream Network ──────────────────────────────────────────────────────
 
+/**
+ * Stream network, pruned by Strahler order.
+ *
+ * Every cell drains to its lowest of eight neighbours, which makes the grid a
+ * directed acyclic graph — so a topological sweep (Kahn's algorithm on
+ * in-degree, ridges having in-degree 0) can resolve the whole network in one
+ * pass with no iteration to a fixed point.
+ *
+ * `threshold` is a Strahler order, not a cell count: a channel's order rises
+ * only where two tributaries of *equal* order meet, and otherwise inherits the
+ * highest of its inputs. That is the distinction worth having — it prunes by
+ * how branched the network above a point is rather than by how much area drains
+ * through it, so a long unbranched gully stays order 1 no matter how far it
+ * runs, and raising the threshold strips headwaters while leaving the trunk.
+ */
 function buildDagThinning(terrain, p, threshold) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const n = rows*cols, next = new Int32Array(n).fill(-1), inDeg = new Int32Array(n).fill(0)
   for (let r = 0; r < rows; r++) {
@@ -1370,9 +1459,9 @@ function buildDagThinning(terrain, p, threshold) {
   for (let i = 0; i < n; i++) {
     const dst = next[i]; if (dst === -1 || order[i] < strahlerThreshold) continue
     const r0 = Math.floor(i/cols), c0 = i%cols, r1 = Math.floor(dst/cols), c1 = dst%cols, e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[dst]-0.5)*100*elevScale
-    if (!inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+    if (!inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut)) continue
     positions.push6(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
-    const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.pushRgb2(col)
+    const col = computeVertexColor(normElev(e0, minElev, maxElev), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.pushRgb2(col)
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
@@ -1380,8 +1469,22 @@ function buildDagThinning(terrain, p, threshold) {
 
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
 
+/**
+ * Cross-hatch marks on convex ground, sized by how sharply it bends.
+ *
+ * The measure is the negated discrete Laplacian, and the test is one-sided:
+ * only cells above `threshold` are marked, so ridges and crests get hatching
+ * while hollows of equal curvature get none. Keying on curvature rather than
+ * height or illumination is what leaves both flats and uniform slopes clean —
+ * only the form transitions are drawn.
+ *
+ * Each mark is a fixed X of two diagonals in world space, not oriented to the
+ * surface; its size grows with curvature up to a cap of two grid cells. The
+ * regularity is the point — it reads as a pencil texture rather than as
+ * structure competing with the other modes.
+ */
 function buildPencilShading(terrain, p, spacing, threshold) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
   const { elevScale, jitterAmt, elevMinCut, elevMaxCut } = p
   const positions = new F32List(), colors = new F32List(), step = Math.max(1, Math.round((spacing ?? 4) / scl))
   const curvThreshold = threshold ?? 0.5
@@ -1391,8 +1494,8 @@ function buildPencilShading(terrain, p, spacing, threshold) {
       const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+1] - 4*grid[r*cols+c]) * 100
       if (curv < curvThreshold) continue
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-      const wx = c*scl-halfW, wz = r*scl-halfH, len = Math.min(scl*2, curv*0.5), col = computeVertexColor(normElev(elev, minZ, maxZ), 0, 0, p)
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+      const wx = c*scl-halfW, wz = r*scl-halfH, len = Math.min(scl*2, curv*0.5), col = computeVertexColor(normElev(elev, minElev, maxElev), 0, 0, p)
       positions.push6(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len)
       positions.push6(wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
       colors.pushRgb2(col); colors.pushRgb2(col)
@@ -1403,8 +1506,25 @@ function buildPencilShading(terrain, p, spacing, threshold) {
 
 // ─── Ridge Lines (Differential Geometry) ──────────────────────────────────────
 
+/**
+ * Ridge crests from the Hessian's principal curvatures.
+ *
+ * A cell qualifies on two counts: its strongest principal curvature exceeds the
+ * threshold, *and* it is a local maximum along that curvature's own direction.
+ * The second test is what distinguishes a crest from a merely convex slope —
+ * without it the whole flank of a hill passes.
+ *
+ * `radius` pre-smooths the grid, and is not optional in practice: second
+ * derivatives amplify noise, so on raw data every pixel of sensor grain reads as
+ * its own ridge. It doubles as the scale control — a small radius finds every
+ * spur, a large one only the range.
+ *
+ * Compare `buildTpiFeatures`, which asks a different question: TPI measures
+ * height against the neighbourhood mean, so it finds ground that *sits* high,
+ * while this finds ground that is *shaped* like a crest.
+ */
 function buildRidgeLines(terrain, p, spacing, radius, threshold) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   
   // 1. Pre-smooth for stable second derivatives
@@ -1457,9 +1577,9 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
           const e0 = cellElev(grid, r, c, cols, elevScale, jitterAmt)
           const e1 = cellElev(grid, nr, nc, cols, elevScale, jitterAmt)
           
-          if (inElevCut(e0, minZ, maxZ, elevMinCut, elevMaxCut) && inElevCut(e1, minZ, maxZ, elevMinCut, elevMaxCut)) {
+          if (inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) && inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut)) {
             positions.push6(c*scl-halfW, e0, r*scl-halfH, nc*scl-halfW, e1, nr*scl-halfH)
-            const col = computeVertexColor(normElev(e0, minZ, maxZ), gridSlopes[i]/(maxSlope||1), 0, p)
+            const col = computeVertexColor(normElev(e0, minElev, maxElev), gridSlopes[i]/(maxSlope||1), 0, p)
             colors.pushRgb2(col)
           }
         }
@@ -1472,11 +1592,25 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
 
 // ─── Ridge & Valley (TPI) ────────────────────────────────────────────────────
 
+/**
+ * Ridges and valleys by Topographic Position Index.
+ *
+ * TPI is a cell's elevation minus the mean of its neighbourhood: strongly
+ * positive on a crest, strongly negative in a hollow, near zero on a uniform
+ * slope regardless of how steep that slope is. `radius` sets the neighbourhood,
+ * and so the scale of landform picked out — a small radius finds every gully, a
+ * large one only the major spurs.
+ *
+ * Ridges and valleys are the same measurement with the sign flipped, so one
+ * builder serves both and `isRidge` selects which tail of the distribution is
+ * kept. They are separate draw modes because they are usually styled apart.
+ */
 function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   
-  // 1. Calculate neighborhood mean using Integral Image (boxBlur)
+  // The neighbourhood mean is just a box blur of the grid — separable and O(n),
+  // so the radius is free rather than costing a window scan per cell.
   const blurred = boxBlur(grid, cols, rows, radius)
   
   const step = Math.max(1, Math.round((spacing ?? 2) / scl))
@@ -1495,7 +1629,7 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
       if (!meetsThreshold) continue
       
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
       
       const wx = c * scl - halfW
       const wz = r * scl - halfH
@@ -1505,7 +1639,7 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
       positions.push6(wx - size, elev, wz, wx + size, elev, wz)
 
       const slope = gridSlopes[i]
-      const col = computeVertexColor(normElev(elev, minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      const col = computeVertexColor(normElev(elev, minElev, maxElev), slope / (maxSlope || 1), 0, p)
       colors.pushRgb2(col)
     }
   }
@@ -1515,8 +1649,22 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
 
 // ─── Pillars ──────────────────────────────────────────────────────────────
 
+/**
+ * Extruded pillars — one per sampled cell, standing from a base up to the
+ * surface height at that cell.
+ *
+ * Three styles: a bare vertical `line`, or a `cuboid` or `cylinder` drawn as
+ * edges. `pillarGap` shortens each one so neighbours read as separate columns
+ * rather than a solid block, and `pillarDepth` sinks the base below the terrain
+ * minimum so the field reads as extruded rather than as floating.
+ *
+ * Unlike every other mode this one emits more than lines: the cuboid and
+ * cylinder styles also return a `lids` sub-mesh of filled caps. That is a
+ * separate triangle geometry rather than more segments because a cap has to be
+ * opaque — without it you see straight down the inside of every column.
+ */
 function buildPillars(terrain, p, spacing) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt, pillarGap, pillarDepth } = p
 
   const step     = Math.max(1, Math.round((spacing ?? 8) / scl))
@@ -1536,17 +1684,17 @@ function buildPillars(terrain, p, spacing) {
       if (!gridMask[i]) continue
 
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
 
       const wx = c * scl - halfW
       const wz = r * scl - halfH
       const top    = elev - gap
-      const bottom = minZ - depth
+      const bottom = minElev - depth
       if (top <= bottom) continue
 
       const slope   = gridSlopes[i]
-      const colBase = computeVertexColor(normElev(bottom, minZ, maxZ), 0, 0, p)
-      const colPeak = computeVertexColor(normElev(top,    minZ, maxZ), slope / (maxSlope || 1), 0, p)
+      const colBase = computeVertexColor(normElev(bottom, minElev, maxElev), 0, 0, p)
+      const colPeak = computeVertexColor(normElev(top,    minElev, maxElev), slope / (maxSlope || 1), 0, p)
       const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
 
       if (style === 'cuboid') {
@@ -1627,7 +1775,7 @@ function mulberry32(seed) {
  * terrain, breaking wherever the surface is too bright.
  */
 function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const positions = new F32List(), colors = new F32List()
 
@@ -1684,14 +1832,14 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
           ok = gridMask[idx] === 1 && darkness[idx] >= thresh
           if (ok) {
             elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
-            ok = inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)
+            ok = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
           }
         }
         if (ok && inRun) {
           positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
                           fc * scl - halfW, elev, fr * scl - halfH)
           const ci = Math.round(fc), ri = Math.round(fr), idx = ri * cols + ci
-          const col = computeVertexColor(normElev(elev, minZ, maxZ),
+          const col = computeVertexColor(normElev(elev, minElev, maxElev),
                                          gridSlopes[idx] / (maxSlope || 1), theta, p)
           colors.pushRgb2(col)
         }
@@ -1715,7 +1863,7 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
  *    band below the cliff threshold, denser toward the cliffs.
  */
 function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensity) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const rng = mulberry32(((p.seedSwiss ?? 42) * 2654435761 + 0x9e3779b9) >>> 0)
 
@@ -1737,8 +1885,8 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
       if (slopeNorm < screeT) continue
 
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
-      const normE = normElev(elev, minZ, maxZ)
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+      const normE = normElev(elev, minElev, maxElev)
       const wx = c * scl - halfW, wz = r * scl - halfH
 
       if (slopeNorm >= cliffT) {
@@ -1768,7 +1916,7 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
                             Math.max(0, Math.min(rows - 1, jr)),
                             Math.max(0, Math.min(cols - 1, jc))) - 0.5) * 100 * elevScale
         screePos.push6(sx2 - eps, se, sz2, sx2 + eps, se, sz2)
-        const col = computeVertexColor(normElev(se, minZ, maxZ), slopeNorm, 0, p)
+        const col = computeVertexColor(normElev(se, minElev, maxElev), slopeNorm, 0, p)
         screeCol.pushRgb2(col)
       }
     }
@@ -1782,8 +1930,25 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
 
 // ─── Stipple ──────────────────────────────────────────────────────────────────
 
+/**
+ * Stipple dots, placed by rejection sampling against a density field.
+ *
+ * A candidate is generated per grid cell and kept with probability equal to the
+ * local density, so `spacing` sets the *maximum* dot count and the field decides
+ * how much of it survives. `densityMode` chooses what drives that field
+ * (elevation, slope, …) and `gamma` bends it: above 1 concentrates dots into the
+ * densest areas, below 1 spreads them toward an even wash.
+ *
+ * `jitter` displaces the candidate within its cell *before* the density is read,
+ * so it moves the sample as well as the dot. At 0 the output is a visible regular
+ * lattice — the grid the candidates came from — so some jitter is what makes it
+ * read as stippling rather than as a halftone screen.
+ *
+ * Returned as `isPoints`, so the dispatcher skips occlusion curtains for it:
+ * a dot has no length to hang a curtain from.
+ */
 function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minZ, maxZ, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const step = Math.max(1, Math.round((spacing ?? 0.5) / scl))
   const eps = Math.max(0.001, scl * 0.003)
@@ -1803,9 +1968,9 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
       if (!gridMask[ri * cols + ci]) continue
 
       const elev = cellElev(grid, ri, ci, cols, elevScale, jitterAmt)
-      if (!inElevCut(elev, minZ, maxZ, elevMinCut, elevMaxCut)) continue
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
 
-      const normE = normElev(elev, minZ, maxZ)
+      const normE = normElev(elev, minElev, maxElev)
       const slope = gridSlopes[ri * cols + ci] / (maxSlope || 1)
 
       let density
@@ -1862,9 +2027,9 @@ function computeSurfaceNormals(positions, indices) {
   return normals
 }
 
-/** Grid UVs for the base octant; mirrored octants keep (0,0) — the shader
- *  passes that only sample UVs (texture overlay, cast shadows, SVF) are
- *  meaningful on the primary terrain, matching the previous main-thread build. */
+/** Grid UVs for the base octant; mirrored octants keep (0,0). The shader passes
+ *  that sample UVs — texture overlay, cast shadows, AO — describe the primary
+ *  terrain, and a mirrored copy has no meaningful position in that space. */
 function buildSurfaceUvs(vertexCount, rows, cols) {
   const uvs = new Float32Array(vertexCount * 2)
   for (let r = 0; r < rows; r++) {
@@ -1877,6 +2042,28 @@ function buildSurfaceUvs(vertexCount, rows, cols) {
   return uvs
 }
 
+/**
+ * The triangulated terrain surface: the fill layer, the SVG depth buffer's
+ * occluder, and the mesh STL export is built from.
+ *
+ * Three decisions here are load-bearing and not obvious from the code:
+ *
+ *  - **A quad is emitted only when all four of its corners have data.** That is
+ *    what makes a NoData hole a real hole rather than a stretched skin across
+ *    the gap.
+ *  - **Masked vertices are parked at `NODATA_SENTINEL_Y`** instead of being
+ *    compacted out, which keeps vertex index == grid index and so keeps the
+ *    index arithmetic trivial. Nothing references them, so the renderer never
+ *    sees them — but anything walking the position array directly must skip
+ *    them, and STL export once shipped a base plate 10 000 units down because
+ *    it did not.
+ *  - **Indices are counted in a first pass before being written.** The count is
+ *    not known up front once holes are possible, and growing the buffer would
+ *    mean reallocating a multi-megabyte array mid-build.
+ *
+ * Normals and UVs are skipped entirely when no fill layer needs them — see
+ * `needsSurfaceShading`. They are the bulk of the work here.
+ */
 export function buildSurfaceGeometry(terrain, p) {
   // minB/maxB ride along in the metadata rather than being recomputed on the
   // main thread: buildTerrain already has them over the *valid* cells, and a
@@ -1982,7 +2169,7 @@ const GPX_Y_OFFSET = 0.5
 /**
  * Build the GPX track as a standard lineGeo layer.
  *
- * Unlike the 12 draw modes this builder is called directly from the worker
+ * Unlike the 14 draw modes this builder is called directly from the worker
  * after buildLineGeometry(), NOT via the MODES_CONFIG dispatch table, because:
  *   • GPX is geo-referenced and must not go through the mirror/symmetry loop.
  *   • It requires imageWidth/imageHeight which are worker top-level inputs,
@@ -1995,7 +2182,7 @@ const GPX_Y_OFFSET = 0.5
  * resulting gaps produce disconnected segments (correct for clipped tracks).
  */
 export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
-  const { scl, halfW, halfH, minZ, maxZ } = terrain
+  const { scl, halfW, halfH, minElev, maxElev } = terrain
   const { gpxPoints, geoTiffBbox, geoTiffCRS } = p
   if (!gpxPoints?.length || !geoTiffBbox || !geoTiffCRS?.startsWith('EPSG:')) return null
 
@@ -2005,7 +2192,6 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
   const ctx = {
     ...p,
     lineColor:         p.colorGpx,
-    lineOpacity:       p.opacityGpx,
     lineHypsometric:   p.hypsoGpx,
     lineHypsoMode:     p.hypsoModeGpx,
     lineBanded:        p.hypsoBandedGpx,
@@ -2025,8 +2211,8 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
     const elevA = sampleTerrainElev(a.pixelCol, a.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
     const elevB = sampleTerrainElev(b.pixelCol, b.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
 
-    const normA = minZ < maxZ ? (elevA - minZ) / (maxZ - minZ) : 0
-    const normB = minZ < maxZ ? (elevB - minZ) / (maxZ - minZ) : 0
+    const normA = minElev < maxElev ? (elevA - minElev) / (maxElev - minElev) : 0
+    const normB = minElev < maxElev ? (elevB - minElev) / (maxElev - minElev) : 0
 
     positions.push6(a.worldX, elevA, a.worldZ, b.worldX, elevB, b.worldZ)
     colors.pushRgb(computeVertexColor(normA, 0, 0, ctx))

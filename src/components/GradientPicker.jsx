@@ -20,8 +20,6 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
   const dragging    = useRef(null)  // { index, moved }
   const barInputs   = useRef({})    // idx → <input type="color"> inside bar handle
 
-  const sorted = [...stops].sort((a, b) => a.pos - b.pos)
-
   // Convert client X → 0–1 position on the bar
   const xToPos = useCallback((clientX) => {
     const rect = barRef.current.getBoundingClientRect()
@@ -66,7 +64,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
     updateStop(idx, { pos: clamped })
   }
 
-  const onHandlePointerUp = (e, idx) => {
+  const onHandlePointerUp = (idx) => {
     const d = dragging.current
     dragging.current = null
     if (!d?.moved) {
@@ -106,7 +104,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               title={isAnchor ? 'Anchor stop · Click to change colour' : 'Drag to move · Click to change colour'}
               onPointerDown={(e) => onHandlePointerDown(e, idx)}
               onPointerMove={(e) => onHandlePointerMove(e, idx)}
-              onPointerUp={(e) => onHandlePointerUp(e, idx)}
+              onPointerUp={() => onHandlePointerUp(idx)}
               style={{
                 position: 'absolute',
                 left:  `${stop.pos * 100}%`,

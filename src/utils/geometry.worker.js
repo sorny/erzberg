@@ -3,7 +3,7 @@
  *
  * Pipeline per message:
  *   buildTerrain()       → terrain grid, slopes, elevation bounds
- *   buildLineGeometry()  → array of lineGeo layers (the 12 draw modes + mirroring)
+ *   buildLineGeometry()  → array of lineGeo layers (the 14 draw modes + mirroring)
  *   buildGpxGeometry()   → optional GPX track layer appended to lineGeo
  *   buildSurfaceGeometry()→ triangulated surface mesh for fill / SVG depth buffer
  *

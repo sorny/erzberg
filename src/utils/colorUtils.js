@@ -11,15 +11,6 @@ export function hexToRgb(hex) {
   return rgb
 }
 
-/** Lerp two [r,g,b] triples */
-export function lerpRgb(a, b, t) {
-  return [
-    a[0] + (b[0] - a[0]) * t,
-    a[1] + (b[1] - a[1]) * t,
-    a[2] + (b[2] - a[2]) * t,
-  ]
-}
-
 /* Rotating scratch pool for interpolated gradient samples. computeVertexColor
  * runs once per vertex in the geometry worker; a fresh [r,g,b] per call is pure
  * GC pressure. Callers hold at most two results at a time (segment endpoints),

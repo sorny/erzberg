@@ -144,7 +144,15 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
     // Only the enabled ones need clearing; +X is on by default, −X is not.
     if ((await btn.getAttribute('class'))?.includes('on')) await btn.click({ force: true })
   }
-  await page.waitForTimeout(2500)
+
+  // Wait on the rebuild actually landing rather than on a fixed delay: the whole
+  // point is that geometry is empty before the export runs, and under load a
+  // timeout can expire while the worker is still mid-build — which exports the
+  // *previous* geometry and quietly passes for the wrong reason.
+  await expect.poll(async () => {
+    const t = await page.locator('text=/Triangles: [\\d,]+/').innerText()
+    return Number(t.match(/Triangles: ([\d,]+)/)[1].replace(/,/g, ''))
+  }, { timeout: 20000 }).toBe(0)
 
   let downloaded = false
   page.on('download', () => { downloaded = true })

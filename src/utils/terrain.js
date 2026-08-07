@@ -127,14 +127,14 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
   // Ordered, not just computed: elevScale is signed (the slider reaches −10, and
   // the effective value is baseElevScale + the user's offset), so a negative
   // scale maps the brightest cell to the lowest elevation and crosses the pair.
-  // Every consumer guards with `maxZ > minZ` and silently degrades when it fails
-  // — normElev returns 0 for every vertex, so hypsometric ramps collapse to one
+  // Every consumer guards with `maxElev > minElev` and silently degrades when that
+  // fails — normElev returns 0 for every vertex, so hypsometric ramps collapse to one
   // colour and an elevation cut above 0 culls the entire scene. Inverting the
   // terrain is a legitimate use of a signed slider; it should not also turn off
   // colouring.
-  const zA = (minBrightness - 0.5) * 100 * elevScale
-  const zB = (maxBrightness - 0.5) * 100 * elevScale
-  const minZ = Math.min(zA, zB), maxZ = Math.max(zA, zB)
+  const eLo = (minBrightness - 0.5) * 100 * elevScale
+  const eHi = (maxBrightness - 0.5) * 100 * elevScale
+  const minElev = Math.min(eLo, eHi), maxElev = Math.max(eLo, eHi)
   let maxSlope = 0
   const gridSlopes = new Float32Array(rows * cols)
   
@@ -163,7 +163,7 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
     grid, gridMask, rows, cols, scl,
     halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2,
     halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2,
-    minZ, maxZ, maxSlope, gridSlopes, elevScale,
+    minElev, maxElev, maxSlope, gridSlopes, elevScale,
     // Brightness bounds over the valid cells. Raw terrain view stretches the
     // greyscale across them, so a heightmap occupying only the middle of the
     // range still reads at full contrast instead of as flat mid-grey. The seeds

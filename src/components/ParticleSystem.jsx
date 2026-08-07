@@ -130,7 +130,6 @@ const PARTICLE_VERT = /* glsl */ `
 const PARTICLE_FRAG = /* glsl */ `
   uniform vec3  uColor;
   uniform vec3  uGlowColor;
-  uniform float uOpacity;
   uniform float uShimmer;
   uniform float uTime;
 
@@ -155,7 +154,7 @@ const PARTICLE_FRAG = /* glsl */ `
     col *= shimmer;
     col  = mix(col, vec3(1.0), core * 0.3);   // hot whitened core
 
-    gl_FragColor = vec4(col, alpha * uOpacity);
+    gl_FragColor = vec4(col, alpha);
   }
 `
 
@@ -180,7 +179,6 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
       uMaskContrast:  { value: 1.5 },
       uColor:         { value: new THREE.Vector3(0, 0, 0) },
       uGlowColor:     { value: new THREE.Vector3(0, 0.92, 1) },
-      uOpacity:       { value: 1.0 },
       uShimmer:       { value: 0.4 },
     },
     transparent: true,

@@ -353,6 +353,9 @@ export function useHeightmap() {
     input.click()
   }, [load])
 
+  // The two [Benchmark] lines below are load telemetry parsed by
+  // tests/benchmark.spec.js, which times upload → parse → first render. They
+  // read as debug leftovers and are not; deleting them silently guts that spec.
   const loadGeoTiff = useCallback((file) => {
     console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…'); setLoadError(null)
