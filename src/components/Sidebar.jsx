@@ -1203,7 +1203,7 @@ export function Sidebar({
             <TogColor label="Hologram" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <Sub>
-                <InlineSl label="Size" min={0.5} max={20} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
+                <InlineSl label="Size" min={0.5} max={100} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
                 <InlineSl label="Spacing" min={1} max={16} step={1} value={points.particleSpacing ?? 1} onChange={v => sp({ particleSpacing: v })} fmt={v => `${v}`} />
                 <ColorRow label="Glow" value={points.holoGlowColor ?? '#00eaff'} onChange={v => sp({ holoGlowColor: v })} />
                 <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} />

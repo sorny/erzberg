@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Particle Size now goes to 100**, up from 20. The shader scales point size by distance (`size × 300 / −z`), so the previous ceiling capped the field well short of the dense, overlapping look large points give. The GPU's own limit is the real ceiling — measured at 511 px here — and 100 stays under it at any normal camera distance. SVG export uses the identical scaling, so exports still match the viewport.
+
 ## [0.9.0] - 2026-08-07
 
 A maintenance release: no new features, but the largest correctness pass the
