@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-09
+
+A library release. The preset shelf triples in size, which is also why the
+panel that holds it no longer opens by default.
+
+### Added
+- **Forty new style presets**, taking the shipped library from 16 to 56. The set is built to cover the range the draw modes can actually reach rather than to vary one knob forty times: engraving and hatching (Copper Plate, Woodcut, Etched Glass, Chalk Cliff), cartographic (Cartographer's Draft, Compass Rose, Dotted Survey, Contour Quilt, Lunar Survey), instrument readouts (X-Ray, Thermal Camera, Sonar Sweep, Circuit Board, Static), water and light (Bathymetric, Mirror Lake, Tide Line, Riverbed, Rainfall, Aurora, Solar Wind, Long Exposure, Blue Hour), and material studies (Obsidian, Iron Oxide, Bark, Scree Slope, Ceramic Glaze, Magma Chamber, Crystal Lattice, Moss & Granite). Each was round-tripped through the app by `scripts/update-presets.js`, so every file carries the complete current `STYLE_DEF` surface — a preset that omitted a param would silently inherit whatever the previous style had left there, which is how a preset stops being reproducible.
+
 ### Changed
+- **The Presets section starts collapsed.** At 16 entries the open grid was a reasonable landing spot; at 56 it pushed Style, the draw modes and everything below them off the first screen of the sidebar, so the panel that is meant to be a shortcut became the thing you scroll past. It is the only section whose default changed — its own open/closed state is still remembered for the rest of the session once you toggle it.
 - **Particle Size now goes to 100**, up from 20. The shader scales point size by distance (`size × 300 / −z`), so the previous ceiling capped the field well short of the dense, overlapping look large points give. The GPU's own limit is the real ceiling — measured at 511 px here — and 100 stays under it at any normal camera distance. SVG export uses the identical scaling, so exports still match the viewport.
 
 ## [0.9.0] - 2026-08-07

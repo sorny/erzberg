@@ -17,6 +17,14 @@ async function openSoundscapes(page) {
   await page.waitForTimeout(300)
 }
 
+// The Presets section ships collapsed, and a collapsed Section keeps its
+// children mounted inside a 0fr grid row — so the buttons exist but have no
+// height and are unclickable until the header is toggled.
+async function openPresets(page) {
+  await page.locator('text=PRESETS').first().click()
+  await page.waitForTimeout(300)
+}
+
 async function uploadTrack(page) {
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
@@ -127,6 +135,7 @@ test('heavy preset streams without latching the computing overlay', async ({ pag
 
   // Ink Atlas is the heaviest bundled preset: contours at interval 1 plus
   // sub-cell stipple, ~450k segments per rebuild at the 512×512 default.
+  await openPresets(page)
   await page.click('text=Ink Atlas')
   await page.waitForTimeout(2000)
 
@@ -167,6 +176,7 @@ test('contours with close-rings and smoothing keep streaming', async ({ page }) 
   // Ink Atlas already enables Contours (at interval 1), so only the two
   // chain-path options need toggling. Both used to stringify a Map key per
   // endpoint and unshift() chains into quadratic time.
+  await openPresets(page)
   await page.click('text=Ink Atlas')
   await page.waitForTimeout(1500)
   await page.locator('text=MODE: CONTOURS').click()

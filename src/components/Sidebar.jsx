@@ -446,7 +446,7 @@ export function Sidebar({
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, camera: false, presets: true, style: true,
+    terrain: true, levels: true, view: true, camera: false, presets: false, style: true,
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
