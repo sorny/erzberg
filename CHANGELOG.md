@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Three export tests set their camera by pressing a key nothing listens for.** Each opened with `for (let i = 0; i < 80; i++) page.keyboard.press('KeyX')` and a comment about taking a steep tilt. `KeyX` stepped tilt by 0.5° up to a 90° clamp until v0.2.13 removed it (`hotkey trim`, alongside W/A/S/D, Y, E/R, T, G) — the tests were never updated, so for eleven releases the loop pressed a dead key and every one of them silently ran at the *default* tilt instead. They still passed, because occlusion does bite at 50°, but no test verified the angle it claimed to be testing at. Tilt is now set through the actual slider and asserted afterwards, since a silently ineffective camera control is the precise failure being repaired. Pinned at 50° — the value the thresholds and reference numbers were tuned against, so nothing moved: 255 105 SVG elements, 33 636 → 27 178 marks under Hillshade, both unchanged. Setting it explicitly also means a future change to the default camera fails these tests instead of quietly altering what they measure.
+
 ## [0.9.2] - 2026-08-10
 
 A correctness release for georeferenced input. Every fix below is a silent

@@ -22,6 +22,46 @@ const OUT = path.join(process.cwd(), 'test-results')
 
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
+/**
+ * Camera tilt these tests run at, in degrees.
+ *
+ * Every occlusion test here needs a viewing angle where some terrain genuinely
+ * sits behind other terrain, or the thing they assert cannot happen at all.
+ * They used to reach for it by pressing `x` eighty times — a hotkey that stepped
+ * tilt by 0.5° up to a 90° clamp, and that was removed in v0.2.13 (`hotkey trim`)
+ * without the tests noticing. Since then the loop pressed a key nothing listens
+ * for, and every one of these ran at the *default* tilt instead.
+ *
+ * 50° is that default, so pinning it here changes no behaviour and keeps the
+ * numbers the assertions were tuned against. It is set explicitly rather than
+ * inherited because these tests depend on the angle: were the default camera
+ * ever changed, an inherited tilt would quietly alter what they measure instead
+ * of failing. Occlusion does bite at 50° — Hillshade takes the stipple test from
+ * 33 636 marks to 27 178.
+ */
+const TILT_DEG = 50
+
+/**
+ * The Tilt slider lives in the View section, which is open by default.
+ * min/max alone would also match the two hatch-angle sliders; the 0.1 step is
+ * what makes this selector unambiguous.
+ */
+async function setTilt(page, deg = TILT_DEG) {
+  const tilt = page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
+  await expect(tilt).toBeVisible({ timeout: 15_000 })
+  await tilt.fill(String(deg))
+  // Asserted, not assumed — a silently ineffective camera control is the exact
+  // failure this helper replaces.
+  await expect(tilt).toHaveValue(String(deg))
+  // Filling leaves focus on the slider, and the export hotkeys are a window
+  // listener that ignores events whose target is an INPUT. Leaving focus here
+  // would make a later Digit1/Digit4 press vanish and the test time out waiting
+  // for a download, so the helper hands focus back rather than making every
+  // caller remember to.
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(500)
+}
+
 test('SVG export contains many lines and matches viewport layout', async ({ page }) => {
   // ── 1. Load app and wait for terrain to render ───────────────────────────
   await page.goto('http://localhost:5173')
@@ -42,10 +82,8 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
   // Give geometry time to compute after pixels load
   await page.waitForTimeout(5000)
 
-  // Set a steep tilt (~40°) so peaks clearly occlude lines behind them.
-  // 'x' increases tilt by 0.5° per press (80 presses = 40°)
-  for (let i = 0; i < 80; i++) await page.keyboard.press('KeyX')
-  await page.waitForTimeout(500)
+  // A tilt where peaks occlude what is behind them — see TILT_DEG.
+  await setTilt(page)
 
   // ── 2. Take viewport screenshot (the "ground truth") ─────────────────────
   const viewportShot = await page.screenshot({ fullPage: false })
@@ -165,8 +203,8 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
   // Stipple only. Mode: Lines is the one draw-mode section open by default.
   await setEnabled('Mode: Lines', false, false)
   await setEnabled('Mode: Stipple Dots', true, true)
-  // Steep tilt, so there is genuinely something behind the mountain to hide.
-  for (let i = 0; i < 80; i++) await page.keyboard.press('KeyX')
+  // A tilt where there is genuinely something behind the mountain to hide.
+  await setTilt(page)
   await page.waitForTimeout(3000)
 
   const dotCount = async () => {
