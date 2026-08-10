@@ -44,6 +44,8 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Whole-track projections.** A stretched spectrogram is only one way to look at a song, and not a flattering one. Four more fold the track so its structure becomes relief: **Disc** winds it into a record, and matching the turn count to the bar or phrase count makes repeats line up radially; **Similarity** compares every moment against every other, so repeated choruses are diagonal stripes and sections are blocks; **Weave** folds the track onto its own detected bar grid, where the groove stacks into vertical ridges; **Strata** stacks measured qualities — loudness, brightness, onset density, harmony — as separate layers over one timeline. All four land in the same heightmap slot, so every draw mode and exporter applies to them too.
 
+**Georeferenced input, stated rather than assumed.** A GeoTIFF reports its coordinate system in the sidebar — `WGS 84 / UTM zone 33N (EPSG:32633)` — and says when a reading rests on an assumption instead of implying a precision it lacks. GPX tracks are draped over the terrain by projecting WGS84 forward into the raster's own grid: geographic CRS, Web Mercator, and the WGS84/ETRS89/NAD83/NAD27 UTM zone blocks. National grids that would need Lambert or Gauss-Krüger maths plus a datum shift are named and declined rather than approximated, because an overlay that is quietly 400 m out is worse than one that says to run `gdalwarp` first. When a track does not appear, the panel distinguishes the three reasons — not projectable, not georeferenced, or projected fine and lying somewhere else — since all three otherwise look identical. Vertical exaggeration is suggested from the real ground size of a pixel, latitude included, so reprojecting a DEM does not change how steep it renders. See [Georeferencing](docs/Georeferencing.md).
+
 **Hydraulic erosion.** Droplet-based simulation following [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf), running off the main thread in a Web Worker.
 
 **Hologram particles.** Optional GPU-animated holographic point cloud over the terrain. A single time uniform drives per-particle float and two-octave fractal-noise displacement gated by a moving "scan" mask — all animation lives in the vertex shader, so nothing is looped or re-uploaded on the CPU per frame. Soft glowing sprites (bright core, glow-tinted halo, travelling scanline shimmer) are faked in the fragment shader, needing no post-processing pass and leaving the export paths intact. Configurable colour, size, glow, shimmer, float, noise amount/scale, flow speed, and reveal contrast.
@@ -74,6 +76,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 ## Documentation
 
 - [Draw mode mathematics](docs/Draw-Modes.md)
+- [Georeferencing: projections, GPX tracks, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)
 

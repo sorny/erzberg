@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-08-10
+
+A documentation and test-integrity release. Nothing changes about what the app
+computes, draws or exports. 0.9.2 rebuilt how georeferenced input is read and
+reported without documenting any of it; that gap is now closed. The one code
+change is to a test that had been steering its camera with a key nothing has
+listened for since v0.2.13.
+
+### Added
+- **[docs/Georeferencing.md](docs/Georeferencing.md)** — the projection readout and what each of its caveats means, the full table of transformable coordinate systems and why the national grids are declined rather than approximated, how a GPX track is placed and the three distinct reasons one fails to appear, the vertical-exaggeration formula with the measurement showing a reprojected DEM renders at the same relief, NoData handling, and the geotiff.js lazy-`fileDirectory` trap that makes a georeferenced file read as unreferenced without ever throwing. Also a note on adding a CRS: one table entry reaches the renderer, the STL exporter and the sidebar together, because all three ask the same classifier.
+- **README** — a Features entry for georeferenced input and GPX overlay, which had no coverage at all, and the new document in the Documentation list.
+
 ### Fixed
 - **Three export tests set their camera by pressing a key nothing listens for.** Each opened with `for (let i = 0; i < 80; i++) page.keyboard.press('KeyX')` and a comment about taking a steep tilt. `KeyX` stepped tilt by 0.5° up to a 90° clamp until v0.2.13 removed it (`hotkey trim`, alongside W/A/S/D, Y, E/R, T, G) — the tests were never updated, so for eleven releases the loop pressed a dead key and every one of them silently ran at the *default* tilt instead. They still passed, because occlusion does bite at 50°, but no test verified the angle it claimed to be testing at. Tilt is now set through the actual slider and asserted afterwards, since a silently ineffective camera control is the precise failure being repaired. Pinned at 50° — the value the thresholds and reference numbers were tuned against, so nothing moved: 255 105 SVG elements, 33 636 → 27 178 marks under Hillshade, both unchanged. Setting it explicitly also means a future change to the default camera fails these tests instead of quietly altering what they measure.
 
