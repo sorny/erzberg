@@ -3,6 +3,7 @@
  */
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
+import { suggestElevScale } from '../utils/geoCoords'
 
 // ── Image (PNG / JPG) loader ─────────────────────────────────────────────────
 
@@ -206,6 +207,66 @@ async function loadImagePixels(source) {
 
 const NODATA_SENTINELS = new Set([-9999, -9999.0, -32767, -32768, 3.4028234663852886e+38])
 
+// GeoTIFF's "this key is set, but to a value not in the EPSG registry" marker.
+// Treating it as a code would produce a CRS string nothing can classify.
+const USER_DEFINED = 32767
+
+/**
+ * Read one TIFF tag.
+ *
+ * `image.fileDirectory` is a lazy object in current geotiff.js — its own
+ * enumerable keys are bookkeeping (`actualizedFields`, `deferredFields`, …) and
+ * the tags are reachable only through `hasTag`/`getValue`. Plain property access
+ * therefore returns `undefined` for every tag *without throwing*, which is the
+ * quietest possible failure: georeferenced files read as unreferenced and files
+ * declaring a NoData value read as having none. The fallback branch keeps the
+ * older plain-object shape working.
+ */
+function tiffTag(fd, name) {
+  if (!fd) return undefined
+  if (typeof fd.getValue === 'function' && typeof fd.hasTag === 'function')
+    return fd.hasTag(name) ? fd.getValue(name) : undefined
+  return fd[name]
+}
+
+// ProjLinearUnitsGeoKey → metres. Only the three that occur in practice.
+const LINEAR_UNITS = { 9001: 1, 9002: 0.3048, 9003: 1200 / 3937 }
+
+/**
+ * The raster's CRS, as one of the strings `classifyCRS` understands.
+ *
+ * The geokeys are asked in order of how much they actually pin down: an EPSG
+ * code is definitive, the model type at least separates degrees from a grid, and
+ * only when a file records neither does the bbox magnitude get a vote —
+ * coordinates outside ±360 / ±90 cannot be degrees, so they must be a grid.
+ */
+function detectCrsCode(gk, bbox) {
+  const projCS = gk.ProjectedCSTypeGeoKey
+  const geogCS = gk.GeographicTypeGeoKey
+
+  if (projCS && projCS !== USER_DEFINED) return `EPSG:${projCS}`
+  if (gk.GTModelTypeGeoKey === 1) return 'EPSG:projected-unknown'
+  if (geogCS && geogCS !== USER_DEFINED) return `EPSG:${geogCS}`
+  if (gk.GTModelTypeGeoKey === 2) return 'EPSG:geographic-unknown'
+  if (bbox && (Math.abs(bbox[0]) > 360 || Math.abs(bbox[1]) > 90)) return 'EPSG:projected-unknown'
+  return 'EPSG:4326'
+}
+
+/**
+ * The CRS name the file states about itself, preferred over our own lookup so a
+ * raster in an unsupported grid can still be named in the sidebar. GeoTIFF
+ * citations conventionally end in '|' and are often NUL-padded.
+ */
+function citationName(gk) {
+  const raw = gk.PCSCitationGeoKey || gk.GTCitationGeoKey || gk.GeogCitationGeoKey
+  if (typeof raw !== 'string') return null
+  const s = raw.replace(/[|\0\s]+$/, '').trim()
+  if (!s) return null
+  // Some writers put a whole WKT string in here. The sidebar line is one row of
+  // a stats block, not a place to render a projection definition.
+  return s.length > 64 ? s.slice(0, 63) + '…' : s
+}
+
 async function loadGeoTiffPixels(file) {
   const { fromArrayBuffer } = await import('geotiff')
   const arrayBuffer = await file.arrayBuffer()
@@ -215,9 +276,14 @@ async function loadGeoTiffPixels(file) {
   const height = image.getHeight()
   const rasters = await image.readRasters()
   const band    = rasters[0]
-  const fileDir    = image.fileDirectory
-  let nodataValue  = null
-  if (fileDir.GDAL_NODATA != null) nodataValue = parseFloat(fileDir.GDAL_NODATA)
+  // The file's declared NoData value, which the sentinel list cannot stand in
+  // for: GDAL writes float DEMs with -3.4028235e+38, and only the *positive*
+  // float max is a sentinel, so a void in such a raster would otherwise be read
+  // as real ground 3.4e38 metres down — flattening the whole terrain to a
+  // plateau once it sets the normalisation range.
+  const rawNodata  = tiffTag(image.fileDirectory, 'GDAL_NODATA')
+  const parsed     = rawNodata != null ? parseFloat(rawNodata) : NaN   // trailing NUL and all
+  const nodataValue = Number.isFinite(parsed) ? parsed : null
 
   const isNodata = (v) => !isFinite(v) || (nodataValue !== null && v === nodataValue) || NODATA_SENTINELS.has(v)
 
@@ -254,46 +320,31 @@ async function loadGeoTiffPixels(file) {
     }
   }
 
-  // Extract geographic extent for GPX coordinate projection.
-  // CRS detection strategy: read ProjectedCSTypeGeoKey first (reliable when present),
-  // fall back to GTModelTypeGeoKey, then fall back to a bbox-value heuristic —
-  // coordinates outside ±360° / ±90° cannot be geographic degrees, so they must be
-  // projected meters (e.g. UTM). Default assumption is EPSG:4326 (geographic).
-  let bbox = null, crs = 'EPSG:4326', isGeographic = true
+  // Extract geographic extent and CRS for GPX coordinate projection.
+  let bbox = null, crs = 'EPSG:none', crsName = null, geoKeys = {}
   try {
-    bbox = image.getBoundingBox()
-    const gk = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
-    const projCS = gk.ProjectedCSTypeGeoKey
-
-    if (projCS) {
-      crs = projCS === 3857 ? 'EPSG:3857' : `EPSG:${projCS}`
-      isGeographic = false
-    } else if (gk.GTModelTypeGeoKey === 1) {
-      crs = 'EPSG:projected-unknown'
-      isGeographic = false
-    } else if (bbox && (Math.abs(bbox[0]) > 360 || Math.abs(bbox[1]) > 90)) {
-      crs = 'EPSG:projected-unknown'
-      isGeographic = false
-    } else if (gk.GTModelTypeGeoKey === 2 || gk.GeographicTypeGeoKey) {
-      isGeographic = true
+    geoKeys = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
+    // A plain TIFF carries none of the three placement tags, and its "bounding
+    // box" is then just the pixel grid. The old default of EPSG:4326 turned that
+    // grid into a claim about lon/lat, so every GPX point landed off the raster.
+    const fd = image.fileDirectory
+    if (tiffTag(fd, 'ModelTiepoint') || tiffTag(fd, 'ModelPixelScale') || tiffTag(fd, 'ModelTransformation')) {
+      bbox = image.getBoundingBox()
+      crs  = detectCrsCode(geoKeys, bbox)
+      crsName = citationName(geoKeys)
     }
-  } catch (_) {}
+  } catch (_) { bbox = null; crs = 'EPSG:none'; crsName = null }
 
-  // Suggest a vertical exaggeration from the real-world pixel size. A projected
-  // CRS (UTM, Web Mercator, …) already reports pixel size in metres — never scale
-  // it. Only a geographic CRS reports degrees, which must be converted to metres.
-  // Classify by CRS, NOT by magnitude: sub-metre lidar pixels are legitimately
-  // < 1 in metres, so a "< 1 ⇒ degrees" test mis-scales them ~111320× and flattens
-  // the terrain to the clamp floor.
+  // Suggest a vertical exaggeration from the real-world pixel size. Classify by
+  // CRS, NOT by magnitude: sub-metre lidar pixels are legitimately < 1 in metres,
+  // so a "< 1 ⇒ degrees" test mis-scales them ~111320× and flattens the terrain
+  // to the clamp floor. `suggestElevScale` owns the rest of the reasoning.
   let suggestedElevScale = null
   try {
-    const resolution = image.getResolution()
-    let pixelSizeM   = Math.abs(resolution[0])
-    if (pixelSizeM > 0) {
-      if (isGeographic) pixelSizeM = pixelSizeM * 111_320  // degrees → metres
-      suggestedElevScale = range / (pixelSizeM * 100)
-      suggestedElevScale = Math.max(0.1, Math.min(50, +suggestedElevScale.toFixed(2)))
-    }
+    suggestedElevScale = suggestElevScale(
+      range, Math.abs(image.getResolution()[0]), crs, bbox,
+      LINEAR_UNITS[geoKeys.ProjLinearUnitsGeoKey] ?? 1,   // feet → metres
+    )
   } catch (_) {}
 
   return {
@@ -301,7 +352,7 @@ async function loadGeoTiffPixels(file) {
     realElevMin: min, realElevMax: max, suggestedElevScale,
     dataWidth: hasValid ? (maxX - minX + 1) : width,
     dataHeight: hasValid ? (maxY - minY + 1) : height,
-    bbox, crs,
+    bbox, crs, crsName,
   }
 }
 
@@ -360,9 +411,9 @@ export function useHeightmap() {
     console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…'); setLoadError(null)
     return loadGeoTiffPixels(file)
-      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs }) => {
+      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs, crsName }) => {
         console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
-        setGeoTiffMeta(realElevMin, realElevMax, bbox, crs)
+        setGeoTiffMeta(realElevMin, realElevMax, bbox, crs, crsName)
         setHeightmap(pixels, nodataMask, width, height, file.name)
         setIsLoading(false); setLoadingMsg('')
         return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }

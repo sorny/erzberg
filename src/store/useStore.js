@@ -25,7 +25,10 @@ export const useStore = create((set) => ({
   geoTiffElevMin: null,   // metres (or native unit)
   geoTiffElevMax: null,
   geoTiffBbox: null,      // [minX, minY, maxX, maxY] in native CRS
-  geoTiffCRS: null,       // 'EPSG:4326' | 'EPSG:3857' | 'EPSG:<code>' | 'EPSG:projected-unknown'
+  // 'EPSG:<code>' | 'EPSG:projected-unknown' | 'EPSG:geographic-unknown' | 'EPSG:none'.
+  // classifyCRS() in utils/geoCoords.js is the only thing that interprets these.
+  geoTiffCRS: null,
+  geoTiffCRSName: null,   // the CRS name the file states about itself, if any
 
   setHeightmap: (pixels, mask, width, height, filename) =>
     set({
@@ -40,9 +43,11 @@ export const useStore = create((set) => ({
 
   setTextureImage: (img) => set({ textureImage: img }),
 
-  setGeoTiffMeta: (elevMin, elevMax, bbox, crs) =>
-    set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBbox: bbox ?? null, geoTiffCRS: crs ?? null }),
+  setGeoTiffMeta: (elevMin, elevMax, bbox, crs, crsName) =>
+    set({ geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBbox: bbox ?? null,
+          geoTiffCRS: crs ?? null, geoTiffCRSName: crsName ?? null }),
 
   clearGeoTiffMeta: () =>
-    set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null, geoTiffCRS: null }),
+    set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBbox: null,
+          geoTiffCRS: null, geoTiffCRSName: null }),
 }))

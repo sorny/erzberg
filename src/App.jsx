@@ -13,6 +13,7 @@ import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
+import { trackCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { parseGpx } from './utils/gpxParser'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
@@ -230,10 +231,12 @@ export default function App() {
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
   const geoTiffBbox       = useStore((s) => s.geoTiffBbox)
   const geoTiffCRS        = useStore((s) => s.geoTiffCRS)
+  const geoTiffCRSName    = useStore((s) => s.geoTiffCRSName)
 
   const soundscape = useSoundscape()
 
   const [gpxPoints, setGpxPoints] = useState([])
+  const [gpxError,  setGpxError]  = useState(null)
 
   const exportBaseName = heightmapFilename
     ? heightmapFilename.replace(/\.[^.]+$/, '')
@@ -505,7 +508,7 @@ export default function App() {
       resolution: Math.max(1, Math.ceil(Math.sqrt((width * height) / 600000))),
       elevScale: 0,
     }))
-    setGpxPoints([])
+    setGpxPoints([]); setGpxError(null)
   }, [autoZoom])
 
   // Loading a raster takes the heightmap slot, so stop any audio still driving it.
@@ -515,7 +518,7 @@ export default function App() {
       autoZoom({ width: dataWidth, height: dataHeight })
       setBaseElevScale(1)
       setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-      setGpxPoints([])
+      setGpxPoints([]); setGpxError(null)
     })
   }, [soundscape, loadFromPicker, autoZoom, autoResolution])
 
@@ -592,11 +595,31 @@ export default function App() {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.gpx' })
     input.onchange = async (e) => {
       const file = e.target.files[0]; if (!file) return
-      try { setGpxPoints(parseGpx(await file.text())) }
-      catch (err) { console.error('[GPX] Parse error:', err) }
+      setGpxError(null)
+      try {
+        const pts = parseGpx(await file.text())
+        setGpxPoints(pts)
+        // A GPX holding only waypoints parses cleanly and yields nothing; without
+        // this the upload looks like it worked and drew an empty track.
+        if (!pts.length) setGpxError('No track or route points found in this GPX file.')
+      } catch (err) {
+        console.error('[GPX] Parse error:', err)
+        setGpxPoints([])
+        setGpxError(err?.message || 'Could not read this GPX file.')
+      }
     }
     input.click()
   }, [])
+
+  // Whether the loaded track and the loaded raster actually describe the same
+  // place. GPX is WGS84 by definition, so a mismatch is always the GeoTIFF's
+  // projection or its extent — and both fail the same silent way, by dropping
+  // every point as out-of-bounds. Cheap enough to redo whenever either changes:
+  // one forward projection per point, and only on load, not per frame.
+  const gpxCoverage = useMemo(
+    () => trackCoverage(gpxPoints, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight),
+    [gpxPoints, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight],
+  )
 
   // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
@@ -703,9 +726,12 @@ export default function App() {
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
         geoTiffCRS={geoTiffCRS}
+        geoTiffCRSName={geoTiffCRSName}
         loadGpxFromPicker={loadGpxFromPicker}
         gpxPoints={gpxPoints}
-        onClearGpx={() => setGpxPoints([])}
+        gpxCoverage={gpxCoverage}
+        gpxError={gpxError}
+        onClearGpx={() => { setGpxPoints([]); setGpxError(null) }}
         onCameraPreset={handleCameraPreset}
         onSvg={() => { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }}
         onPng={() => setPngTrigger(n => n + 1)}

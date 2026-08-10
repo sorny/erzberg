@@ -6,6 +6,7 @@ import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
+import { classifyCRS, crsDisplayName } from '../utils/geoCoords'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
@@ -81,6 +82,60 @@ function HelpBox({ text }) {
       {text}
     </div>
   )
+}
+
+/**
+ * Why the GPX track is not on the terrain, when it is not.
+ *
+ * Everything this reports used to look identical on screen: an unsupported
+ * projection, a track from another valley and a raster with no georeferencing at
+ * all each ended as points silently dropped for being out of bounds. They need
+ * different fixes, so they get different sentences — and the two that the user
+ * can fix by reprojecting get the command that does it.
+ */
+function GpxDiagnostics({ crs, crsName, coverage, error }) {
+  const c = classifyCRS(crs)
+  const status = coverage?.status ?? 'empty'
+
+  const note = (color, children) => (
+    <div style={{
+      fontSize: 9, color, lineHeight: 1.5, marginBottom: 6,
+      background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
+      borderRadius: 4, padding: '6px 8px',
+    }}>{children}</div>
+  )
+  const warn = '#f97316'
+  const fix = <><br />Reproject it first: <code style={{ color: DIM }}>gdalwarp -t_srs EPSG:4326 in.tif out.tif</code></>
+
+  if (error) return note('#ef4444', error)
+
+  if (c.kind === 'none')
+    return note(warn, <>This GeoTIFF carries no georeferencing, so a track cannot be placed on it.</>)
+
+  if (!c.supported)
+    return note(warn, <>
+      Projection <b>{crsDisplayName(crs, crsName)}</b> is not one this tool can project GPX into.{fix}
+    </>)
+
+  if (status === 'outside')
+    return note(warn, <>
+      None of the {coverage.total} track points fall inside this GeoTIFF — the track and the raster
+      cover different areas{c.accuracy === 'guess' ? ', or the assumed UTM zone is wrong' : ''}.
+    </>)
+
+  if (status === 'partial')
+    return note(warn, <>
+      {coverage.inside} of {coverage.total} track points fall inside the GeoTIFF; the rest are clipped.
+    </>)
+
+  // Placed, but on an assumption worth stating — an inferred zone or an
+  // unapplied datum shift both put the line tens to hundreds of metres out.
+  if (status === 'ok' && c.accuracy === 'guess')
+    return note(MUTED, <>This GeoTIFF does not record its projection. The UTM zone is inferred from the track, so alignment is approximate.</>)
+  if (status === 'ok' && c.accuracy === 'approx')
+    return note(MUTED, <>{crsDisplayName(crs, crsName)} uses a datum this tool does not shift for; the track may sit up to a few hundred metres off.</>)
+
+  return null
 }
 
 function HelpBtn({ active, onClick }) {
@@ -430,8 +485,8 @@ export function Sidebar({
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
   soundscape, onSoundscapeFit,
-  geoTiffElevMin, geoTiffElevMax, geoTiffCRS,
-  loadGpxFromPicker, gpxPoints, onClearGpx,
+  geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
+  loadGpxFromPicker, gpxPoints, gpxCoverage, gpxError, onClearGpx,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
   onWebmToggle, webmActive,
@@ -602,6 +657,7 @@ export function Sidebar({
   const sv = (v) => setView(p => ({ ...p, ...v }))
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
+  const crsInfo     = classifyCRS(geoTiffCRS)
   const elevRange   = hasGeoTiff ? geoTiffElevMax - geoTiffElevMin : 0
   const elevCutToM  = (pct) => +(geoTiffElevMin + (pct / 100) * elevRange).toFixed(1)
   const mToElevCut  = (m)   => +(((m - geoTiffElevMin) / elevRange) * 100).toFixed(1)
@@ -1173,11 +1229,7 @@ export function Sidebar({
 
           {geoTiffElevMin != null && (
             <Section title="GPX Track" open={sec.gpxTrack} onToggle={() => tog('gpxTrack')} enabled={gpxPoints?.length > 0}>
-              {geoTiffCRS?.startsWith('unsupported') && (
-                <div style={{ fontSize:9, color:'#f97316', marginBottom:6 }}>
-                  GPX requires EPSG:4326 or EPSG:3857 GeoTIFF.
-                </div>
-              )}
+              <GpxDiagnostics crs={geoTiffCRS} crsName={geoTiffCRSName} coverage={gpxCoverage} error={gpxError} />
               <div style={{ display:'flex', gap:6, marginBottom:6 }}>
                 <button className="hmload" onClick={loadGpxFromPicker}
                   style={{ flex:1, padding:8, background:SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
@@ -1192,7 +1244,10 @@ export function Sidebar({
               </div>
               {gpxPoints?.length > 0 && (
                 <>
-                  <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>{gpxPoints.length} track points</div>
+                  <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
+                    {gpxPoints.length} track points
+                    {gpxCoverage?.status === 'partial' && ` · ${gpxCoverage.inside} on the raster`}
+                  </div>
                   <ModeStyleOverride prefix="Gpx" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
                 </>
               )}
@@ -1493,6 +1548,17 @@ export function Sidebar({
               <div style={{ marginTop:3, color: MUTED }}>
                 Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m
                 &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
+              </div>
+            )}
+            {/* Only a GeoTIFF has a projection to report — a PNG heightmap and a
+                frozen soundscape both clear geoTiffCRS, so this line stays absent
+                for them rather than claiming a CRS they do not have. */}
+            {geoTiffCRS && (
+              <div style={{ marginTop:1, color: crsInfo.supported ? MUTED : '#f97316', wordBreak:'break-word' }}>
+                Projection: {crsDisplayName(geoTiffCRS, geoTiffCRSName)}
+                {crsInfo.accuracy === 'guess'   && ' · assumed UTM'}
+                {crsInfo.accuracy === 'approx'  && ' · datum shift not applied'}
+                {!crsInfo.supported             && ' · GPX overlay unsupported'}
               </div>
             )}
           </div>

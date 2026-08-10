@@ -22,7 +22,7 @@
  *   stl_z =  world_y   (elevation, build direction in Z-up slicers)
  */
 
-import { geoToWorld, sampleTerrainElev } from './geoCoords'
+import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
 import { NODATA_SENTINEL_Y } from './terrain'
 
 // ── STL writer ────────────────────────────────────────────────────────────────
@@ -230,7 +230,7 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   writeBinarySTL(tris, `${base}.stl`)
 
   // ── GPX ribbon — separate file for multicolour printing ───────────────────
-  if (gpxPoints?.length > 1 && geoTiffBbox && geoTiffCRS?.startsWith('EPSG:') && p) {
+  if (gpxPoints?.length > 1 && p && isTrackProjectable(geoTiffCRS, geoTiffBbox)) {
     const peakOff   = Math.floor(p.gridOffsetX ?? 0)
     const lineOff   = Math.floor(p.gridOffsetY ?? 0)
     const { scl, halfW, halfH } = terrain

@@ -1,16 +1,218 @@
 /**
  * Geographic coordinate helpers shared between the geometry worker (GPX viewport
- * layer) and the STL exporter (GPX ribbon solid).
+ * layer), the STL exporter (GPX ribbon solid) and the sidebar readouts.
  *
- * Supported CRS for GeoTIFF bounding boxes:
- *   EPSG:4326  — WGS84 geographic (lon/lat). Default assumption when geokeys are absent.
- *   EPSG:3857  — Web Mercator. GPX lon/lat is converted to Mercator before bbox lookup.
- *   EPSG:326xx — UTM North zones 1–60 (standard WGS84 Transverse Mercator formulas).
- *   EPSG:327xx — UTM South zones 1–60.
- *   EPSG:projected-unknown — Any other projected CRS whose bbox has values outside
- *                            geographic range; UTM zone is inferred from the point's
- *                            own longitude.
+ * A GPX file has no projection to declare: the format defines its coordinates as
+ * WGS84 lon/lat, full stop. All the variety lives on the GeoTIFF side, so
+ * "matching the two projections" means one thing — projecting WGS84 forward into
+ * whatever grid the raster's bounding box is stated in. `classifyCRS` decides
+ * whether that forward step is one this file can actually make.
+ *
+ * That verdict has to be explicit rather than implied, because the failure is
+ * otherwise invisible: feeding degrees into a bbox measured in metres puts every
+ * point outside the extent, and points outside the extent are silently dropped
+ * as ordinary clipping. A track that is simply *absent* looks the same as a
+ * track that missed the tile.
+ *
+ * Transformable CRS:
+ *   Geographic (lon/lat)  — used directly. WGS84, ETRS89, NAD83, GDA94/2020 and
+ *                           friends are within a metre or two of each other, so
+ *                           no datum shift is applied; older datums (NAD27,
+ *                           ED50, MGI, …) are flagged `accuracy: 'approx'`
+ *                           because ignoring their shift costs 100–400 m.
+ *   Web Mercator          — EPSG:3857 and its aliases.
+ *   UTM                   — the WGS84 (326xx/327xx), ETRS89 (258xx), NAD83
+ *                           (269xx) and NAD27 (267xx) zone blocks, via the
+ *                           standard Transverse Mercator series below.
+ *   projected-unknown     — projected, but the file did not record which grid.
+ *                           The zone is guessed from the point's own longitude,
+ *                           which is right for a UTM tile and wrong for anything
+ *                           else; flagged `accuracy: 'guess'`.
+ *
+ * Everything else — national grids such as Austria Lambert (31287), Swiss LV95
+ * (2056) or OSGB (27700) — is reported unsupported rather than approximated.
+ * Reprojecting those needs Lambert/Gauss-Krüger maths plus a datum shift, and a
+ * silently wrong overlay is worse than a message saying to run the raster
+ * through `gdalwarp -t_srs EPSG:4326` first.
  */
+
+// ── CRS classification ────────────────────────────────────────────────────────
+
+// Geographic CRS whose datum sits close enough to WGS84 (≲2 m) that GPX
+// coordinates can be used unshifted.
+const GEOGRAPHIC_EXACT = new Map([
+  [4326, 'WGS 84'],
+  [4979, 'WGS 84 (3D)'],
+  [4327, 'WGS 84 (3D)'],
+  [4258, 'ETRS89'],
+  [4269, 'NAD83'],
+  [4152, 'NAD83(HARN)'],
+  [6318, 'NAD83(2011)'],
+  [4283, 'GDA94'],
+  [7844, 'GDA2020'],
+])
+
+// Geographic, but on a datum far enough from WGS84 that the unshifted overlay
+// is off by a visible amount. Still usable — just honest about it.
+const GEOGRAPHIC_APPROX = new Map([
+  [4267, 'NAD27'],
+  [4230, 'ED50'],
+  [4312, 'MGI'],
+  [4314, 'DHDN'],
+  [4265, 'Monte Mario'],
+  [4149, 'CH1903'],
+])
+
+const MERCATOR = new Map([
+  [3857, 'WGS 84 / Pseudo-Mercator'],
+  [3785, 'WGS 84 / Pseudo-Mercator'],
+  [900913, 'Google Mercator'],
+  [102100, 'WGS 84 / Pseudo-Mercator'],
+  [102113, 'WGS 84 / Pseudo-Mercator'],
+])
+
+// EPSG allocates UTM zones in contiguous blocks, code = base + zone, so one
+// range test per family covers every zone in it.
+const UTM_FAMILIES = [
+  { base: 32600, lo: 1,  hi: 60, south: false, datum: 'WGS 84', accuracy: 'exact'  },
+  { base: 32700, lo: 1,  hi: 60, south: true,  datum: 'WGS 84', accuracy: 'exact'  },
+  { base: 25800, lo: 28, hi: 38, south: false, datum: 'ETRS89', accuracy: 'exact'  },
+  { base: 26900, lo: 1,  hi: 23, south: false, datum: 'NAD83',  accuracy: 'exact'  },
+  { base: 26700, lo: 3,  hi: 22, south: false, datum: 'NAD27',  accuracy: 'approx' },
+]
+
+// Named purely so the sidebar can say what a rejected file actually is, which is
+// the difference between "unsupported" and "unsupported, and here is the fix".
+const KNOWN_UNSUPPORTED = new Map([
+  [31287, 'MGI / Austria Lambert'],
+  [31254, 'MGI / Austria GK West'],
+  [31255, 'MGI / Austria GK Central'],
+  [31256, 'MGI / Austria GK East'],
+  [31257, 'MGI / Austria GK M28'],
+  [31258, 'MGI / Austria GK M31'],
+  [31259, 'MGI / Austria GK M34'],
+  [3416,  'ETRS89 / Austria Lambert'],
+  [3035,  'ETRS89 / LAEA Europe'],
+  [3034,  'ETRS89 / LCC Europe'],
+  [2056,  'CH1903+ / LV95'],
+  [21781, 'CH1903 / LV03'],
+  [27700, 'OSGB36 / British National Grid'],
+  [2154,  'RGF93 / Lambert-93'],
+  [3395,  'WGS 84 / World Mercator'],
+  [5514,  'S-JTSK / Krovak East North'],
+])
+
+/**
+ * What can be done with a GeoTIFF's CRS string.
+ *
+ * Accepts the codes the loader emits: `EPSG:<n>`, plus the three sentinels
+ * `EPSG:projected-unknown`, `EPSG:geographic-unknown` and `EPSG:none`.
+ *
+ * Returns { kind, code, zone, isSouth, supported, accuracy, name }, where
+ * `kind` is 'geographic' | 'mercator' | 'utm' | 'projected' | 'none' and
+ * `accuracy` is 'exact' | 'approx' | 'guess' | null.
+ */
+export function classifyCRS(crs) {
+  const none = { kind: 'none', code: null, zone: null, isSouth: false, supported: false, accuracy: null, name: null }
+  if (!crs) return none
+  if (crs === 'EPSG:none') return none
+  if (crs === 'EPSG:projected-unknown')
+    return { ...none, kind: 'projected', supported: true, accuracy: 'guess', name: 'Projected grid, code not recorded' }
+  if (crs === 'EPSG:geographic-unknown')
+    return { ...none, kind: 'geographic', supported: true, accuracy: 'approx', name: 'Geographic, code not recorded' }
+
+  const m = /^EPSG:(\d+)$/.exec(crs)
+  if (!m) return none
+  const code = +m[1]
+
+  if (GEOGRAPHIC_EXACT.has(code))
+    return { ...none, kind: 'geographic', code, supported: true, accuracy: 'exact', name: GEOGRAPHIC_EXACT.get(code) }
+  if (GEOGRAPHIC_APPROX.has(code))
+    return { ...none, kind: 'geographic', code, supported: true, accuracy: 'approx', name: GEOGRAPHIC_APPROX.get(code) }
+  if (MERCATOR.has(code))
+    return { ...none, kind: 'mercator', code, supported: true, accuracy: 'exact', name: MERCATOR.get(code) }
+
+  for (const f of UTM_FAMILIES) {
+    const zone = code - f.base
+    if (zone < f.lo || zone > f.hi) continue
+    return {
+      ...none, kind: 'utm', code, zone, isSouth: f.south, supported: true, accuracy: f.accuracy,
+      name: `${f.datum} / UTM zone ${zone}${f.south ? 'S' : 'N'}`,
+    }
+  }
+
+  // EPSG keeps geographic CRS in the 4xxx block. One outside the tables above is
+  // still lon/lat and still usable — only its datum shift is unknown.
+  if (code >= 4000 && code <= 4999)
+    return { ...none, kind: 'geographic', code, supported: true, accuracy: 'approx', name: null }
+
+  return { ...none, kind: 'projected', code, supported: false, accuracy: null, name: KNOWN_UNSUPPORTED.get(code) ?? null }
+}
+
+/** One-line CRS description for the sidebar. `fileName` is the file's own citation. */
+export function crsDisplayName(crs, fileName = null) {
+  const c = classifyCRS(crs)
+  if (c.kind === 'none') return 'Not georeferenced'
+  const label = fileName || c.name
+  if (!c.code) return label ?? 'Unknown'
+  return label ? `${label} (EPSG:${c.code})` : `EPSG:${c.code}`
+}
+
+/**
+ * Metres per degree of longitude at the raster's own latitude.
+ *
+ * 111 320 is the equatorial figure, and meridians converge: at 47°N a degree of
+ * longitude is only ~75 km. The cosine is floored because a raster reaching the
+ * poles would otherwise drive the ground pixel to zero.
+ */
+export function metresPerLonDegree(bbox) {
+  const midLat = bbox ? (bbox[1] + bbox[3]) / 2 : 0
+  return 111_320 * Math.max(0.05, Math.cos(midLat * Math.PI / 180))
+}
+
+export const ELEV_SCALE_MIN = 0.1
+export const ELEV_SCALE_MAX = 50
+
+/**
+ * Vertical exaggeration that renders a raster at roughly true proportions.
+ *
+ * The mesh lays one grid step per pixel *column* and spans `100 × elevScale`
+ * world units vertically, so the figure that has to be right is the east–west
+ * ground size of one pixel — that alone fixes the ratio between horizontal and
+ * vertical world units.
+ *
+ * Which makes the latitude term load-bearing rather than a refinement. Reading a
+ * geographic raster's degrees with the equatorial 111 320 overstates that ground
+ * size by 1/cos(lat) — 1.48× in the Alps — and understates the exaggeration by
+ * the same factor. Symptom: `gdalwarp -t_srs EPSG:4326` of a projected DEM came
+ * back visibly flatter than the original it was made from, same terrain and same
+ * elevation range, because its ground pixel had silently grown by half.
+ *
+ * `metresPerUnit` converts a projected CRS's linear unit; degrees never reach it.
+ * Returns null when there is nothing real to scale against.
+ */
+export function suggestElevScale(elevRange, pixelSize, crs, bbox, metresPerUnit = 1) {
+  if (!(pixelSize > 0) || !(elevRange > 0)) return null
+  const kind = classifyCRS(crs).kind
+  if (kind === 'none') return null
+
+  const groundPx = kind === 'geographic'
+    ? pixelSize * metresPerLonDegree(bbox)
+    : pixelSize * metresPerUnit
+  if (!(groundPx > 0)) return null
+
+  const scale = elevRange / (groundPx * 100)
+  return Math.max(ELEV_SCALE_MIN, Math.min(ELEV_SCALE_MAX, +scale.toFixed(2)))
+}
+
+/** Whether a GPX track can be placed on this raster at all. */
+export function isTrackProjectable(crs, bbox) {
+  if (!bbox || bbox.length !== 4) return false
+  const [minX, minY, maxX, maxY] = bbox
+  if (!(isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY))) return false
+  if (maxX === minX || maxY === minY) return false
+  return classifyCRS(crs).supported
+}
 
 // ── WGS84 constants ───────────────────────────────────────────────────────────
 const WGS84_A  = 6378137.0           // semi-major axis (m)
@@ -18,20 +220,6 @@ const WGS84_F  = 1 / 298.257223563   // flattening
 const WGS84_E2 = 2 * WGS84_F - WGS84_F * WGS84_F  // eccentricity²
 
 // ── UTM helpers ───────────────────────────────────────────────────────────────
-
-/**
- * Parse EPSG codes for standard UTM zones.
- * EPSG:326xx → UTM Zone xx North
- * EPSG:327xx → UTM Zone xx South
- * Returns { zone, isSouth } or null.
- */
-function parseUtmEpsg(crs) {
-  const mN = crs?.match(/^EPSG:326(\d{2})$/)
-  if (mN) return { zone: parseInt(mN[1]), isSouth: false }
-  const mS = crs?.match(/^EPSG:327(\d{2})$/)
-  if (mS) return { zone: parseInt(mS[1]), isSouth: true }
-  return null
-}
 
 /**
  * Standard Transverse Mercator (WGS84 ellipsoid) → UTM easting / northing.
@@ -79,38 +267,67 @@ function inferUtmZone(lon, lat) {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
- * Convert WGS84 (lat, lon) → pixel space → world space using the GeoTIFF extent.
- * Returns { pixelCol, pixelRow, worldX, worldZ } or null if outside the extent.
+ * Project WGS84 (lat, lon) forward into the raster's own CRS.
+ * Returns [x, y] in that CRS's units, or null if the CRS is not transformable.
  *
- * Supported CRS: EPSG:4326 (geographic), EPSG:3857 (Web Mercator),
- *                EPSG:326xx / EPSG:327xx (UTM zones),
- *                EPSG:projected-unknown (UTM zone inferred from lon).
+ * Returning null is the load-bearing part: the previous version fell through to
+ * treating lon/lat as if they were already grid coordinates, which is how an
+ * unsupported CRS turned into an empty overlay instead of an error.
+ */
+export function projectWgs84(lat, lon, crs) {
+  const c = classifyCRS(crs)
+  if (!c.supported) return null
+
+  switch (c.kind) {
+    case 'geographic':
+      return [lon, lat]
+    case 'mercator':
+      return [
+        lon * 20037508.34 / 180,
+        Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180,
+      ]
+    case 'utm':
+      return wgs84ToUtm(lat, lon, c.zone, c.isSouth)
+    case 'projected': {
+      // 'projected-unknown' only — a coded projected CRS that got here is
+      // unsupported and was rejected above.
+      const inf = inferUtmZone(lon, lat)
+      return wgs84ToUtm(lat, lon, inf.zone, inf.isSouth)
+    }
+    default:
+      return null
+  }
+}
+
+/**
+ * WGS84 (lat, lon) → fractional pixel coordinates in the raster.
+ * Returns { col, row } unclamped, or null if the CRS is not transformable.
+ * Row 0 is the top of the image, hence the Y-flip.
+ */
+export function geoToPixel(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight) {
+  if (!geoTiffBbox) return null
+  const xy = projectWgs84(lat, lon, geoTiffCRS)
+  if (!xy) return null
+
+  const [minX, minY, maxX, maxY] = geoTiffBbox
+  return {
+    col: (xy[0] - minX) / (maxX - minX) * imageWidth,
+    row: (maxY - xy[1]) / (maxY - minY) * imageHeight,
+  }
+}
+
+/**
+ * Convert WGS84 (lat, lon) → pixel space → world space using the GeoTIFF extent.
+ * Returns { pixelCol, pixelRow, worldX, worldZ }, or null if the CRS cannot be
+ * transformed or the point falls outside the extent.
  */
 export function geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS,
                            imageWidth, imageHeight, peakOff, lineOff, halfW, halfH) {
-  const [minX, minY, maxX, maxY] = geoTiffBbox
+  const px = geoToPixel(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight)
+  if (!px) return null
 
-  let bx, by
-  if (geoTiffCRS === 'EPSG:3857') {
-    bx = lon * 20037508.34 / 180
-    by = Math.log(Math.tan((90 + lat) * Math.PI / 360)) / (Math.PI / 180) * 20037508.34 / 180
-  } else {
-    const utmInfo = parseUtmEpsg(geoTiffCRS)
-    if (utmInfo) {
-      ;[bx, by] = wgs84ToUtm(lat, lon, utmInfo.zone, utmInfo.isSouth)
-    } else if (geoTiffCRS === 'EPSG:projected-unknown') {
-      const inf = inferUtmZone(lon, lat)
-      ;[bx, by] = wgs84ToUtm(lat, lon, inf.zone, inf.isSouth)
-    } else {
-      // EPSG:4326 or any geographic CRS: bbox is in lon/lat
-      bx = lon; by = lat
-    }
-  }
-
-  const pixelCol = (bx - minX) / (maxX - minX) * imageWidth
-  const pixelRow = (maxY - by) / (maxY - minY) * imageHeight  // Y-flip: row 0 = top
-
-  if (pixelCol < 0 || pixelCol >= imageWidth || pixelRow < 0 || pixelRow >= imageHeight)
+  const { col: pixelCol, row: pixelRow } = px
+  if (!(pixelCol >= 0 && pixelCol < imageWidth && pixelRow >= 0 && pixelRow < imageHeight))
     return null
 
   return {
@@ -119,6 +336,34 @@ export function geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS,
     worldX: (pixelCol - peakOff) - halfW,
     worldZ: (pixelRow - lineOff) - halfH,
   }
+}
+
+/**
+ * How much of a GPX track actually lands on the raster — the check that turns a
+ * mismatch into a message instead of an empty overlay.
+ *
+ * Two different failures share the "no track appears" symptom and need
+ * different advice, so they are reported separately: 'unsupported' means the
+ * projection cannot be computed at all, 'outside' means it was computed fine and
+ * the track is simply somewhere else on Earth.
+ *
+ * Returns { status, inside, total }, status one of
+ * 'ok' | 'partial' | 'outside' | 'unsupported' | 'none' | 'empty'.
+ */
+export function trackCoverage(gpxPoints, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight) {
+  const total = gpxPoints?.length ?? 0
+  const base = { inside: 0, total }
+  if (!total) return { ...base, status: 'empty' }
+  if (classifyCRS(geoTiffCRS).kind === 'none') return { ...base, status: 'none' }
+  if (!isTrackProjectable(geoTiffCRS, geoTiffBbox)) return { ...base, status: 'unsupported' }
+
+  let inside = 0
+  for (const { lat, lon } of gpxPoints) {
+    const px = geoToPixel(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight)
+    if (px && px.col >= 0 && px.col < imageWidth && px.row >= 0 && px.row < imageHeight) inside++
+  }
+
+  return { inside, total, status: inside === 0 ? 'outside' : inside < total ? 'partial' : 'ok' }
 }
 
 /**

@@ -18,6 +18,7 @@
  */
 import { boxBlur, buildTerrain } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry, buildGpxGeometry } from './geometryBuilders'
+import { isTrackProjectable } from './geoCoords'
 
 // Cached source raster — replaced only by a message carrying `heightmapPixels`.
 let src = null
@@ -61,7 +62,7 @@ self.onmessage = (e) => {
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
 
-    if (p.gpxPoints?.length > 0 && p.geoTiffBbox && p.geoTiffCRS?.startsWith('EPSG:')) {
+    if (p.gpxPoints?.length > 0 && isTrackProjectable(p.geoTiffCRS, p.geoTiffBbox)) {
       const gpxLayer = buildGpxGeometry(terrain, p, src.heightmapWidth, src.heightmapHeight)
       if (gpxLayer) lineGeo.push(gpxLayer)
     }

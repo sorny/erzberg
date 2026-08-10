@@ -31,6 +31,31 @@ imports the module through the dev server and feeds it a synthetic 120 BPM signa
 with a four-bar chord cycle, so symmetry, tempo detection and the heightmap
 contract are checked against a signal whose answers are known.
 
+## `geotiff.tif` (NOT committed)
+
+Drives the `GeoTIFF load path` block in `tests/projection.spec.js`. 1200×700,
+EPSG:32633 (WGS 84 / UTM zone 33N), 10 m pixels, Float32, elevation
+641.36–2349.51 m, no NoData pixels despite declaring `-3.4028235e+38`.
+
+Gitignored, so **that block skips on a clean checkout** rather than failing —
+a missing fixture is not a regression. It reports itself as skipped, so the lost
+coverage stays visible. Drop any georeferenced GeoTIFF at
+`tests/testdata/geotiff.tif` to run it, but the assertions name this file's CRS
+and elevation range, so a different raster needs those updated from its own
+`gdalinfo`.
+
+Worth having one at all because it catches a class of bug no unit test can:
+geotiff.js exposes `fileDirectory` as a lazy object whose tags are reachable
+only through `hasTag`/`getValue`, so reading a tag as a plain property returns
+`undefined` *without throwing*. Every unit test passes while a georeferenced
+file reads as unreferenced. Its being in a **projected** CRS is also the point —
+an EPSG:4326 raster would still pass if CRS detection collapsed back to its old
+lon/lat default.
+
+The reprojection-invariance case in the same spec deliberately needs no fixture:
+it pins `suggestElevScale` against numbers measured from this file and from
+`gdalwarp -t_srs EPSG:4326` of it, so the regression stays covered even here.
+
 ## `benchmark.tif` (NOT committed)
 
 `tests/benchmark.spec.js` needs a real GeoTIFF and is gitignored (see

@@ -4,7 +4,7 @@
 
 import { cellElev, hasData, boxBlur, jitterNoise, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor } from './colorUtils'
-import { geoToWorld, sampleTerrainElev } from './geoCoords'
+import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -2184,7 +2184,7 @@ const GPX_Y_OFFSET = 0.5
 export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
   const { scl, halfW, halfH, minElev, maxElev } = terrain
   const { gpxPoints, geoTiffBbox, geoTiffCRS } = p
-  if (!gpxPoints?.length || !geoTiffBbox || !geoTiffCRS?.startsWith('EPSG:')) return null
+  if (!gpxPoints?.length || !isTrackProjectable(geoTiffCRS, geoTiffBbox)) return null
 
   const peakOff = Math.floor(p.gridOffsetX ?? 0)
   const lineOff = Math.floor(p.gridOffsetY ?? 0)

@@ -11,3 +11,4 @@ GEMINI.md
 CLAUDE.md
 .claude
 tests/testdata/benchmark.tif
+tests/testdata/geotiff.tif
