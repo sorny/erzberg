@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.4] - 2026-08-11
+
+A feature release: the loaded raster can now be clipped before it becomes
+terrain. Until now a heightmap was used whole — the only way to work on part of
+one was to crop it in another program and load it again, which cost the GeoTIFF's
+georeferencing and could not be undone. Edit Mode does it in place, keeps the
+original, and works the same on all three sources.
+
+### Added
+- **Edit Mode — clip the loaded heightmap before it becomes terrain.** `E`, or the ✂ button under the loader, switches the viewport to a flat greyscale view of the raster and the sidebar to an edit panel: a crop rectangle with handles, aspect locks and numeric fields, plus lasso and polygon selection for cutting out one massif, one catchment or one arbitrary shape. It applies to all three sources — PNG, GeoTIFF and Soundscapes — because all three write the same store slot. The clipped terrain is centred: `buildTerrain` already derives `halfW`/`halfH` from the bounding box of *valid* cells, so a selection expressed as a NoData mask lands in the middle of the view without any draw mode being taught about selections. Feather (0–64 px) softens the cut as an elevation ramp rather than mask opacity — the geometry mask is binary, so a partial weight has nowhere to live there; fading the value toward the selection's own lowest point instead makes the edge melt down to its base level, which is also what keeps a clipped STL printable.
+- The clip is **non-destructive**. The store now holds the raster twice: the source exactly as loaded, and the derived raster everything downstream consumes. Re-opening Edit Mode shows the full original with the selection still live, Cancel costs nothing because nothing is committed until Apply, and Clear restores the whole raster. It is also what lets a *streaming* Soundscape keep its clip: each pushed frame is a new source, re-clipped on the way through, and the clip is dropped only when the raster's dimensions change (freezing a whole track, resizing the window).
+- Cropping moves the georeferenced corners with the pixels. A GeoTIFF's bounding box is re-derived over the crop rectangle, so a GPX track stays on the terrain instead of being projected against the extent of a raster that no longer exists.
+
+### Fixed
+- **A resolution guard could leave the grid stuck at half the resolution asked for.** `useTerrainGeometry` clamps resolution when new pixels arrive, to stop a value chosen for a 1k raster from building an 8k one as a 64-megacell grid. It keyed on the pixel buffer's *identity* and used a stricter threshold (`/1000`) than `autoResolution` (`/1024`), so any buffer that changed without being a new picture — hydraulic erosion writing its result back, a Soundscape streaming, an Edit Mode clip being cleared — was clamped too, and a 1024² raster at resolution 1 clamped to 2 and stayed there, because nothing afterwards changes `p.resolution` to trigger the corrected rebuild. Now keyed on the raster's dimensions and aligned to the same 1024-cell budget, so the guard and the policy always agree on the value.
+
+### Changed
+- The panel's design tokens and control atoms (`Sl`, `InlineSl`, `Tog`, `Section`, …) moved out of `Sidebar.jsx` into `components/panel/ui.jsx` and are imported back. A pure move: Edit Mode's panel needs to look like it belongs to the same tool, and the alternative was a second copy of every control that would drift on the first tweak.
+- **Presets moved below Aspect Map in the sidebar**, out of the block of camera and view controls and down to where the surface overlays end — a preset sets the whole look, so it belongs next to what it sets rather than above it.
+- The Sidebar is hidden rather than unmounted while Edit Mode is open. Unmounting reset every section's open/closed state and the erosion settings, all of which live in the Sidebar's own state, so leaving Edit Mode silently collapsed the panel back to defaults.
+
+### Documentation
+- **[docs/Edit-Mode.md](docs/Edit-Mode.md)** — the source/derived split and when a clip is dropped, why centring falls out of `buildTerrain`'s existing valid-cell bounds, the even-odd scanline fill and why it samples pixel centres, the feather ramp and its chamfer distance transform, the bbox interpolation that keeps GPX tracks placed, how erosion writes back through a clip, and the interaction and memory notes for the canvas.
+
 ## [0.9.3] - 2026-08-10
 
 A documentation and test-integrity release. Nothing changes about what the app

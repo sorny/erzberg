@@ -38,6 +38,8 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 
 **Raw terrain view.** A one-toggle look at the data behind the art: the heightmap as a flat greyscale plane with everything else hidden, lowest point black and highest white, stretched so a raster occupying only part of the range still reads at full contrast. It shows the grid the draw modes actually work from — after resolution, blur, Levels and the elevation cuts — so it doubles as a live preview while tuning those. Flattening happens in the shader, not the geometry, so the toggle costs no rebuild and every exporter still sees the real terrain.
 
+**Edit Mode.** Press `E` and the viewport becomes a flat picture of the loaded raster: crop it with a handled rectangle (aspect locks, numeric fields), or cut an arbitrary region out of it with a lasso or a polygon. It works the same on a PNG, a GeoTIFF and a Soundscape, and the result is centred automatically — everything outside the selection becomes NoData, which the terrain builder already centres on. Feather ramps the clipped edge down to the terrain's own base level instead of ending it in a cliff. The clip is non-destructive: the original raster is kept, so Edit Mode can be re-entered to adjust it and cleared to get the whole heightmap back, and a GeoTIFF's bounding box is re-derived over the crop so a GPX track stays where it belongs. See [Edit Mode](docs/Edit-Mode.md).
+
 **Surface overlays.** Hillshade with physically-based ray-march cast shadows: ridgelines occlude sunlight using a horizon-angle comparison across a progressive-step heightmap ray, with configurable darkness, softness (penumbra), and quality. An amber sun indicator sphere with starburst ray lines marks the light source position in the 3D scene. Azimuth and altitude drive both the Lambert shading and the cast shadows. Slope shading adds a two-colour steepness gradient blended over the fill.
 
 **Soundscapes.** Upload an MP3 (or WAV / OGG / M4A) and the track becomes terrain. It is decoded and analysed once into a full spectrogram off-thread — radix-2 FFT, Hann-windowed STFT at 75% overlap, log or linear frequency binning — and playback then *streams* a scrolling window of that spectrogram into the heightmap slot a raster would occupy, so every draw mode, overlay and exporter works on it unchanged. The raw spectrogram is drawn in the sidebar with a playhead and a highlight marking the slice currently feeding the terrain; click or drag it to seek. Because the analysis is stored as dB over a fixed range, the noise gate and contrast controls re-slice the existing result instead of re-running the FFT. *Freeze Whole Track* writes the entire track as one static heightmap for the tools that need a terrain that holds still (erosion, STL, SVG).
@@ -76,6 +78,7 @@ A topographic visualisation tool built on React Three Fiber. Load a greyscale he
 ## Documentation
 
 - [Draw mode mathematics](docs/Draw-Modes.md)
+- [Edit Mode: cropping and selections](docs/Edit-Mode.md)
 - [Georeferencing: projections, GPX tracks, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)
