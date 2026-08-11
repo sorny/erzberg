@@ -141,11 +141,11 @@ export function Switch({ checked, onChange }) {
   )
 }
 
-export function ColorRow({ label, value, onChange }) {
+export function ColorRow({ label, value, onChange, testId }) {
   return (
     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
       <span style={{ fontSize: 12, color: DIM }}>{label}</span>
-      <input type="color" className="hmc" value={value} onChange={e => onChange(e.target.value)} />
+      <input type="color" className="hmc" data-testid={testId} value={value} onChange={e => onChange(e.target.value)} />
     </div>
   )
 }

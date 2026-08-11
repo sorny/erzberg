@@ -6,6 +6,8 @@ import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
+import { HYPSO_LAYER_IDS } from '../utils/drawModes'
+import { randomPreset } from '../utils/presetGenetics'
 import { classifyCRS, crsDisplayName } from '../utils/geoCoords'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
@@ -25,9 +27,6 @@ function fmtTime(sec) {
   const s = Math.floor(sec % 60)
   return `${m}:${String(s).padStart(2, '0')}`
 }
-
-// Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
-const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Curv', 'Swiss', 'Gpx']
 
 /**
  * Why the GPX track is not on the terrain, when it is not.
@@ -279,6 +278,13 @@ export function Sidebar({
   const [erosionProgress, setErosionProgress] = useState(0)
   const [lastPixels,      setLastPixels]      = useState(null)
   const erosionWorkerRef = useRef(null)
+
+  // --- Discovery State ---
+  const [lastPreset,  setLastPreset]  = useState(null)   // name of the last applied preset
+  const [rollSeed,    setRollSeed]    = useState(null)   // seed behind the current roll
+  const [rollHistory, setRollHistory] = useState([])
+  // Presets whose thumbnail failed to load, so the tile falls back to a label.
+  const [noThumb,     setNoThumb]     = useState(() => new Set())
   
   const setPixels = useStore(s => s.setPixels)
   const setHeightmap = useStore(s => s.setHeightmap)
@@ -437,7 +443,7 @@ export function Sidebar({
     }))
   }
 
-  const applyPreset = (preset) => {
+  const applyPreset = (preset, name = null) => {
     setStyle(prev => ({ ...prev, ...preset.style }))
     // Particle params live in the points state, not style — without this a
     // preset can never drive the hologram field. All presets carry a points
@@ -446,6 +452,36 @@ export function Sidebar({
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
     if (preset.bgGradientStops) setBgGradientStops(preset.bgGradientStops)
     syncSectionsToStyle(preset.style)
+    setLastPreset(name)
+  }
+
+  // ── Discovery: rolling a look ─────────────────────────────────────────────
+  const presetNames = Object.keys(externalPresets || {})
+
+  const roll = (seed) => {
+    const preset = randomPreset(seed)
+    applyPreset(preset, null)
+    return preset
+  }
+
+  const handleSurprise = () => {
+    const seed = Math.floor(Math.random() * 0xffffffff)
+    if (rollSeed != null) setRollHistory(h => [...h.slice(-9), rollSeed])
+    setRollSeed(seed)
+    roll(seed)
+  }
+
+  // Step back through recent rolls. The seed *is* the look, so history is a
+  // list of integers rather than a stack of 250-key snapshots.
+  //
+  // Read outside the updater rather than inside it: applying the preset is a
+  // side effect, and React is free to call a state updater more than once.
+  const handleUnroll = () => {
+    if (!rollHistory.length) return
+    const prev = rollHistory[rollHistory.length - 1]
+    setRollHistory(h => h.slice(0, -1))
+    setRollSeed(prev)
+    roll(prev)
   }
 
   // Stats
@@ -628,7 +664,7 @@ export function Sidebar({
             {/* Shared gradient editor: visible whenever ANY hypsometric consumer is
                 active — fill or any draw mode. (The old `style.lineHypsometric`
                 check was a dead legacy key, so this only ever showed for fill.) */}
-            {style.fillHypsometric || MODE_HYPSO_IDS.some(id => style[`hypso${id}`]) ? (
+            {style.fillHypsometric || HYPSO_LAYER_IDS.some(id => style[`hypso${id}`]) ? (
               <div style={{ marginBottom: 10, marginTop: 10 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
@@ -646,7 +682,7 @@ export function Sidebar({
               </Sub>
             )}
             
-            <ColorRow label="Background" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
+            <ColorRow label="Background" testId="bg-color" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
               <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
               {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={setBgGradientStops} isSimple />}
@@ -724,8 +760,62 @@ export function Sidebar({
           {/* ── Presets ────────────────────────────────────────────────────── */}
 
           <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
+            {/* Roll a look. The seed is shown because it *is* the look — note it
+                down and the same roll comes back. */}
+            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+              <button data-testid="surprise-me" onClick={handleSurprise} style={{
+                flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
+                borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
+              }}>🎲 Surprise me</button>
+              <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
+                style={{
+                  padding:'8px 10px', background: SURF, color: rollHistory.length ? DIM : MUTED,
+                  border:`1px solid ${BORDER}`, borderRadius:5,
+                  cursor: rollHistory.length ? 'pointer' : 'default', fontSize:11,
+                  opacity: rollHistory.length ? 1 : 0.5,
+                }}>↩</button>
+            </div>
+            {rollSeed != null && (
+              <div data-testid="roll-seed" style={{ fontSize:9, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
+                seed {rollSeed}
+              </div>
+            )}
+
+            <div style={{ fontSize:8, color: MUTED, fontWeight:700, margin:'10px 0 6px', letterSpacing:1 }}>
+              STYLES <span style={{ opacity:0.7, fontWeight:400 }}>({presetNames.length})</span>
+            </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              {Object.entries(externalPresets || {}).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+              {Object.entries(externalPresets || {}).map(([name, preset]) => {
+                const showThumb = !noThumb.has(name)
+                return (
+                  <button key={name} data-testid={`preset-${name}`} title={name}
+                    onClick={() => applyPreset(preset, name)}
+                    style={{
+                      position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
+                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT : BORDER}`,
+                      borderRadius:4, cursor:'pointer', overflow:'hidden', lineHeight:0,
+                    }}>
+                    {showThumb && (
+                      <img
+                        src={`${import.meta.env.BASE_URL || '/'}presets/thumbs/${encodeURIComponent(name)}.webp`}
+                        alt=""
+                        loading="lazy"
+                        onError={() => setNoThumb(s => new Set(s).add(name))}
+                        style={{ display:'block', width:'100%', aspectRatio:'16/10', objectFit:'cover' }}
+                      />
+                    )}
+                    <span style={{
+                      display:'block', lineHeight:1.2,
+                      ...(showThumb ? {
+                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 3px',
+                        background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
+                        color:'#f4f4f5', fontSize:9, textShadow:'0 1px 2px rgba(0,0,0,.9)',
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                      } : {}),
+                    }}>{name}</span>
+                  </button>
+                )
+              })}
             </div>
           </Section>
 
