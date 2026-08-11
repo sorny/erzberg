@@ -42,7 +42,7 @@ pixels.
 | Where | What lives there | Why |
 |---|---|---|
 | **Zustand** (`store/useStore.js`) | The raster: source pixels + mask + dimensions, the Edit Mode clip, the derived (clipped) raster, GeoTIFF metadata, the overlay texture | Large buffers that many unrelated components read. Selector-per-field, so loading a texture does not re-render the terrain hook. |
-| **React state** (`App.jsx`) | Every tweakable parameter — `terrain`, `style`, `points`, `view` | They change constantly while dragging and belong to the render tree. Keeping them out of the store keeps store writes rare. |
+| **React state** (`App.jsx`) | Every tweakable parameter — `terrain`, `style`, `points`, `view`, seeded from `src/defaults.js` | They change constantly while dragging and belong to the render tree. Keeping them out of the store keeps store writes rare. The defaults live in their own module so the preset randomiser can build on them without importing the root component. |
 | **Refs** | Camera echoes, in-flight worker bookkeeping, the Edit Mode drag | Values that change per frame and must never trigger a render. |
 
 The store's raster is held twice: `src*` as loaded, and the derived raster that
@@ -111,6 +111,29 @@ in their own colour for an X-ray effect.
 
 ---
 
+## Presets
+
+A preset is a JSON blob of `{ style, points, gradientStops, bgGradientStops }`
+in `public/presets/`, listed in `manifest.json` and fetched at startup.
+`applyPreset` in `Sidebar.jsx` spreads it over the current state — deliberately
+*not* including `terrain` or `view`, because resolution, zoom and pan describe
+the loaded raster rather than the look.
+
+Two things are generated from that set rather than written by hand:
+
+- **Thumbnails** (`npm run thumbs`) — one WebP per preset in
+  `public/presets/thumbs/`, rendered through the app's own PNG exporter so no
+  panel or gizmo is in frame. A missing one falls back to a text button, so the
+  sidebar never shows a broken image.
+- **Rolled looks** (`src/utils/presetGenetics.js`) — `randomPreset(seed)` builds
+  the same shape from a seeded RNG. It is a recipe, not a shuffle: surface first,
+  then draw modes drawn against the `cost` budget in `drawModes.js`, then a
+  palette, then at most one surface overlay, with the ink checked against the
+  background's luminance. Being seeded is what makes a roll reproducible, which
+  is why the history behind the ↩ button is a list of integers.
+
+---
+
 ## Exporters
 
 | Exporter | Reads | Note |
@@ -130,9 +153,11 @@ Edit Mode clips, erosion, mirroring, soundscapes — need no exporter support.
 
 - **A draw mode**: write a builder in `geometryBuilders.js` returning
   `{ id, positions, colors? }`, register it in `buildLineGeometry`, add its
-  params to `STYLE_DEF` in `App.jsx`, a `<Section>` in `Sidebar.jsx`, and its
-  params to the dependency list in `useTerrainGeometry`. Forgetting the last step
-  is the classic bug: the control moves and nothing happens.
+  params to `STYLE_DEF` in `src/defaults.js`, an entry in
+  `src/utils/drawModes.js` (which is what teaches the randomiser it exists), a
+  `<Section>` in `Sidebar.jsx`, and its params to the dependency list in
+  `useTerrainGeometry`. Forgetting the last step is the classic bug: the
+  control moves and nothing happens.
 - **A surface overlay**: it is a branch in the `SurfaceMesh` shader plus a
   uniform. Do not add it to the worker dependency list — that would make a
   colour change rebuild geometry.
@@ -142,6 +167,9 @@ Edit Mode clips, erosion, mirroring, soundscapes — need no exporter support.
 - **A whole-track projection**: a descriptor in `trackProjections.js` with a
   `build()` returning `{ pixels, width, height }`. The sidebar renders its
   parameter schema automatically. See [Soundscapes](Soundscapes.md).
+- **A preset**: save one from the app, drop the JSON in `public/presets/`, add
+  the filename to `manifest.json`, and run `npm run thumbs "Your Preset"` so it
+  arrives with a picture rather than a fallback label.
 
 ---
 

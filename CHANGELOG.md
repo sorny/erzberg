@@ -7,11 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.5] - 2026-08-11
+
+A release about finding things. The app could already render 56 curated looks
+and any point in a ~250-parameter space, and gave you almost no way to *find*
+one: the Presets section was 56 identical grey buttons, and the only route to
+anything not on that list was to know in advance what you wanted and go set it.
+Presets are now pictures, and there is a button that rolls a look for you.
+
+Also folds in the documentation rewrite that had been sitting unreleased.
+
+### Added
+- **Preset thumbnails.** The Presets section was 56 identical grey buttons — every look the app ships with, behind a name and nothing else. Each is now a picture. `npm run thumbs` (`scripts/generate-thumbs.js`, modelled on the existing `update-presets.js`) drives the dev server, applies each preset at the Iso camera and photographs it through the app's *own* 4K PNG exporter, so there is no sidebar and no orientation gizmo in frame, then scales it down in-browser — no image tooling needed on the host. WebP at 320×200: 434 KB for all 56, where PNG was 55 KB for a single stipple tile. A missing thumbnail falls back to the old text button rather than a broken image.
+- **Surprise me.** A seeded randomiser. Blind randomness over ~250 parameters produces mud, so this is a recipe: paper or ink, one to three draw modes drawn against a *cost budget* (three cheap layers is a picture, three expensive ones is a slideshow), a palette from the built-in ramps or a generated one, and at most one surface overlay — they compete for the same pixels. Ink is checked against the background's luminance, because roughly a fifth of early dark rolls came back as a black line on a black field: a valid point in the space, and not a picture anybody wanted. Measured over 300 rolls: no empty canvases, no low-contrast layers, 2.1 modes on average. The seed is displayed and the arrow steps back through recent rolls — the seed *is* the look, so the history is a list of integers rather than a stack of 250-key snapshots.
+
 ### Documentation
 - **The README was rewritten.** It had grown by accretion into a flat list of feature paragraphs — one of them 450 words in a single block — with no images, no usage, and no statement of what the app takes as input. It is now grouped by what someone actually wants to know in order (input → edit → draw → overlays → soundscapes → export → keyboard → performance), and the performance wall of text is a list of the specific claims it was already making.
 - **A gallery.** A visual tool with no visuals was the largest gap: six of the bundled presets rendered from the same sample heightmap, plus a shot of Edit Mode. They are produced by the app's own 4K PNG exporter rather than by screenshotting the page, so there is no sidebar and no orientation gizmo in frame — see [docs/images/README.md](docs/images/README.md) for how to regenerate them.
 - **[docs/Architecture.md](docs/Architecture.md)** — the map that the five per-feature documents did not have: the file → store → worker → renderer/exporter pipeline, why state lives in three different places, and the three-tier rule for what a change is allowed to cost (geometry rebuild / re-render / nothing). Includes the checklist for adding a draw mode, an overlay, a CRS or a projection, since forgetting to add a new mode's params to `useTerrainGeometry`'s dependency list is the classic silent bug.
 - A keyboard-shortcut table, which had never been written down anywhere.
+
+### Changed
+- The four default parameter blocks moved out of `App.jsx` into `src/defaults.js`, and the canonical draw-mode list into `src/utils/drawModes.js` (id, label, rebuild cost, randomiser ranges). Both were previously reachable only by importing the root component or by copying the list, and the randomiser needs both to build on. `Sidebar.jsx` now reads its hypsometric-layer list from the same place, so a new draw mode is described once.
 
 ## [0.9.4] - 2026-08-11
 

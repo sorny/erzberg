@@ -1,6 +1,6 @@
 {
   "name": "erzberg",
-  "version": "0.9.4",
+  "version": "0.9.5",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "playwright test",
     "test:ui": "playwright test --ui",
-    "update-presets": "node scripts/update-presets.js"
+    "update-presets": "node scripts/update-presets.js",
+    "thumbs": "node scripts/generate-thumbs.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

@@ -140,7 +140,15 @@ carry a seed — the same seed always reproduces the identical pattern, so a pie
 can be regenerated exactly.
 
 **56 style presets** ship with the app, each a complete look: draw modes,
-colours, gradients and particle settings.
+colours, gradients and particle settings — shown as thumbnails rather than a
+wall of identical buttons.
+
+**Surprise me.** A seeded randomiser that rolls a look rather than shuffling
+250 sliders: it picks paper or ink, one to three draw modes against a cost
+budget, a palette, and at most one surface overlay, then checks the ink against
+the background so nothing comes back invisible. The seed is shown and the arrow
+steps back through recent rolls — the seed *is* the look, so it can always be
+returned to.
 
 ---
 
@@ -311,7 +319,13 @@ npm run test             # Playwright end-to-end suite
 npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
 npm run update-presets   # round-trip all presets through the live app
+npm run thumbs           # regenerate the preset thumbnails
 ```
+
+`update-presets` and `thumbs` both drive the running dev server with Playwright,
+so start `npm run dev` first. `thumbs` renders each preset through the app's own
+PNG exporter and scales it down in-browser, so it needs no image tooling on the
+host.
 
 Tests run against a live dev server in non-headless Chrome with WebGL enabled,
 because the things worth asserting — what the geometry worker produced, what the
