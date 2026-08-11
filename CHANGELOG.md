@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- **The README was rewritten.** It had grown by accretion into a flat list of feature paragraphs — one of them 450 words in a single block — with no images, no usage, and no statement of what the app takes as input. It is now grouped by what someone actually wants to know in order (input → edit → draw → overlays → soundscapes → export → keyboard → performance), and the performance wall of text is a list of the specific claims it was already making.
+- **A gallery.** A visual tool with no visuals was the largest gap: six of the bundled presets rendered from the same sample heightmap, plus a shot of Edit Mode. They are produced by the app's own 4K PNG exporter rather than by screenshotting the page, so there is no sidebar and no orientation gizmo in frame — see [docs/images/README.md](docs/images/README.md) for how to regenerate them.
+- **[docs/Architecture.md](docs/Architecture.md)** — the map that the five per-feature documents did not have: the file → store → worker → renderer/exporter pipeline, why state lives in three different places, and the three-tier rule for what a change is allowed to cost (geometry rebuild / re-render / nothing). Includes the checklist for adding a draw mode, an overlay, a CRS or a projection, since forgetting to add a new mode's params to `useTerrainGeometry`'s dependency list is the classic silent bug.
+- A keyboard-shortcut table, which had never been written down anywhere.
+
 ## [0.9.4] - 2026-08-11
 
 A feature release: the loaded raster can now be clipped before it becomes
