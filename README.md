@@ -29,12 +29,12 @@ machine — no server, no upload, no account.
   <tr>
     <td width="33%"><img src="docs/images/preset-unknown-pleasures.png" alt="Unknown Pleasures preset"></td>
     <td width="33%"><img src="docs/images/preset-alpine-survey.png" alt="Alpine Survey preset"></td>
-    <td width="33%"><img src="docs/images/preset-woodcut.png" alt="Woodcut preset"></td>
+    <td width="33%"><img src="docs/images/preset-static.png" alt="Static preset"></td>
   </tr>
   <tr>
     <td align="center"><sub><b>Unknown Pleasures</b> — stacked ridgelines</sub></td>
     <td align="center"><sub><b>Alpine Survey</b> — hypsometric fill, hillshade, contours</sub></td>
-    <td align="center"><sub><b>Woodcut</b> — illumination engraving</sub></td>
+    <td align="center"><sub><b>Static</b> — slope-inverted stipple dots</sub></td>
   </tr>
   <tr>
     <td><img src="docs/images/preset-thermal-camera.png" alt="Thermal Camera preset"></td>
