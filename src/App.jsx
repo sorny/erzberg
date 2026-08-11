@@ -6,9 +6,12 @@
  */
 import { Canvas, useThree } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { EditPanel } from './components/EditPanel'
 import { ElevationProfile } from './components/ElevationProfile'
+import { HeightmapEditor } from './components/HeightmapEditor'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
+import { W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
@@ -17,6 +20,7 @@ import { trackCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { parseGpx } from './utils/gpxParser'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
+import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
 import { exportSTL } from './utils/stlExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
@@ -225,6 +229,12 @@ export default function App() {
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
   const heightmapFilename = useStore((s) => s.heightmapFilename)
+  const srcPixels         = useStore((s) => s.srcPixels)
+  const srcMask           = useStore((s) => s.srcMask)
+  const srcWidth          = useStore((s) => s.srcWidth)
+  const srcHeight         = useStore((s) => s.srcHeight)
+  const edit              = useStore((s) => s.edit)
+  const setEdit           = useStore((s) => s.setEdit)
   const textureImage      = useStore((s) => s.textureImage)
   const setTextureImage   = useStore((s) => s.setTextureImage)
   const geoTiffElevMin    = useStore((s) => s.geoTiffElevMin)
@@ -489,6 +499,59 @@ export default function App() {
     Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
   , [])
 
+  // ── Edit Mode ─────────────────────────────────────────────────────────────
+  // The draft lives here rather than in the store so Cancel is free: nothing
+  // downstream sees a selection until Apply commits it.
+  const [editMode,  setEditMode]  = useState(false)
+  const [editDraft, setEditDraft] = useState(null)
+  const [editTool,  setEditTool]  = useState('crop')
+  const [aspectKey, setAspectKey] = useState('free')
+  // The editor publishes its key handling here: Escape and Enter mean "cancel
+  // the half-drawn shape" / "close it" while one is in progress, and only
+  // otherwise mean "leave Edit Mode" / "apply".
+  const editKeysRef = useRef(null)
+
+  const aspect = useMemo(() => {
+    if (aspectKey === '1:1')  return 1
+    if (aspectKey === '4:3')  return 4 / 3
+    if (aspectKey === '16:9') return 16 / 9
+    if (aspectKey === 'src')  return srcHeight ? srcWidth / srcHeight : null
+    return null
+  }, [aspectKey, srcWidth, srcHeight])
+
+  const fitToRaster = useCallback((width, height) => {
+    autoZoom({ width, height })
+    setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height) }))
+  }, [autoZoom, autoResolution])
+
+  const openEditor = useCallback(() => {
+    if (!srcPixels) return
+    // A streamed soundscape would redraw the picture under the cursor 30×/s.
+    soundscape.pause()
+    setEditDraft(edit ?? { rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })
+    setEditMode(true)
+  }, [srcPixels, srcWidth, srcHeight, edit, soundscape])
+
+  const applyEditDraft = useCallback(() => {
+    const b = effectiveBounds(editDraft, srcWidth, srcHeight)
+    if (!b) return   // an empty selection would leave nothing on screen
+    // A full-extent rect with no shape and no feather is not a clip; storing it
+    // as one would copy the whole raster on every soundscape frame for nothing.
+    const isNoop = !editDraft?.shape && !(editDraft?.feather > 0)
+      && b.x === 0 && b.y === 0 && b.w === srcWidth && b.h === srcHeight
+    setEdit(isNoop ? null : editDraft)
+    setEditMode(false)
+    // Refit exactly as a fresh load does: a crop is a different picture, and
+    // keeping the old zoom shows a quarter-sized terrain a quarter of the size.
+    fitToRaster(b.w, b.h)
+  }, [editDraft, srcWidth, srcHeight, setEdit, fitToRaster])
+
+  const clearEdit = useCallback(() => {
+    setEdit(null)
+    setEditDraft({ rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })
+    if (srcWidth && srcHeight) fitToRaster(srcWidth, srcHeight)
+  }, [setEdit, srcWidth, srcHeight, fitToRaster])
+
   // ── Soundscapes ───────────────────────────────────────────────────────────
   // A streamed spectrogram window is small (512×512) and must render at
   // resolution 1 — decimating it further would throw away frequency rows. The
@@ -646,7 +709,19 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      // Edit Mode owns the keyboard while it is open — the export shortcuts
+      // would otherwise fire on a terrain the user cannot currently see.
+      if (editMode) {
+        if (e.code === 'Escape' && !editKeysRef.current?.escape?.()) setEditMode(false)
+        if (e.code === 'Enter') {
+          // Mid-shape, Enter closes the ring; otherwise it applies the clip.
+          if (editKeysRef.current?.drawing?.()) editKeysRef.current.closeShape()
+          else applyEditDraft()
+        }
+        return
+      }
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]) }
+      if (e.code === 'KeyE')   openEditor()
       if (e.code === 'Digit1') { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }
       if (e.code === 'Digit2') setPngTrigger(n => n + 1)
       if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
@@ -655,7 +730,7 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [handleWebmToggle, handleStl])
+  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   useEffect(() => {
@@ -707,7 +782,36 @@ export default function App() {
         />
       </Canvas>
 
+      {/* ── Edit Mode ────────────────────────────────────────────────────── */}
+      {editMode && (
+        <HeightmapEditor
+          srcPixels={srcPixels} srcMask={srcMask}
+          srcWidth={srcWidth}   srcHeight={srcHeight}
+          edit={editDraft}      onChange={setEditDraft}
+          tool={editTool}       aspect={aspect}
+          rightInset={PANEL_W}  keysRef={editKeysRef}
+        />
+      )}
+
+      {editMode && (
+        <EditPanel
+          filename={heightmapFilename}
+          srcWidth={srcWidth} srcHeight={srcHeight}
+          edit={editDraft}    onChange={setEditDraft}
+          tool={editTool}     setTool={setEditTool}
+          aspect={aspectKey}  setAspect={setAspectKey}
+          onApply={applyEditDraft}
+          onCancel={() => setEditMode(false)}
+          onReset={() => setEditDraft({ rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })}
+        />
+      )}
+
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
+      {/* Hidden rather than unmounted while editing: every section's open/closed
+          state and the erosion settings live in Sidebar's own state, and
+          unmounting silently reset all of them on the way back. `contents` keeps
+          the wrapper out of the layout — the panel positions itself. */}
+      <div style={{ display: editMode ? 'none' : 'contents' }}>
       <Sidebar
         terrain={terrain}   setTerrain={setTerrain}
         style={style}       setStyle={setStyle}
@@ -760,7 +864,11 @@ export default function App() {
         profileMode={profileMode}
         profileClicks={profileClicks}
         onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]) }}
+        onEditHeightmap={openEditor}
+        editSummary={describeEdit(edit, srcWidth, srcHeight)}
+        onClearEdit={clearEdit}
       />
+      </div>
 
       {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}

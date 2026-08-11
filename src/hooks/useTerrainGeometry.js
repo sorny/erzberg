@@ -25,7 +25,7 @@ export function useTerrainGeometry(p) {
 
   const workerRef = useRef(null)
   const startTimeRef = useRef(0)
-  const prevPixelsRef = useRef(null)
+  const prevDimsRef = useRef({ w: 0, h: 0 })
   const genRef = useRef(0)
   // True between postMessage and the matching onmessage.
   const busyRef = useRef(false)
@@ -119,12 +119,23 @@ export function useTerrainGeometry(p) {
     }
 
     // Guard against the race where heightmap pixels arrive before App.jsx has
-    // committed the auto-resolution state update. Only clamp on the render
-    // where pixels actually changed — user slider changes must never be clamped.
-    const pixelsJustChanged = prevPixelsRef.current !== heightmapPixels
-    prevPixelsRef.current = heightmapPixels
-    const safeResolution = pixelsJustChanged
-      ? Math.max(p.resolution, Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1000))
+    // committed the auto-resolution state update: a resolution chosen for a
+    // 1k raster would build an 8k one as a 64-megacell grid and hang.
+    //
+    // Keyed on the *dimensions*, not on the pixel buffer's identity. A buffer
+    // that changes at unchanged dimensions — erosion writing back, a Soundscape
+    // streaming, an Edit Mode clip being cleared — is not a new picture, and the
+    // resolution already on screen is by definition safe for its size. Clamping
+    // those left the resolution stuck at the guard's value, because nothing
+    // afterwards changes p.resolution to trigger the corrected rebuild.
+    //
+    // The threshold matches autoResolution()'s 1024-cell budget in App.jsx. When
+    // it was stricter (/1000), a 1024² raster clamped to 2 while App asked for
+    // 1, and the two never agreed.
+    const dimsChanged = prevDimsRef.current.w !== heightmapWidth || prevDimsRef.current.h !== heightmapHeight
+    prevDimsRef.current = { w: heightmapWidth, h: heightmapHeight }
+    const safeResolution = dimsChanged
+      ? Math.max(p.resolution, Math.ceil(Math.max(heightmapWidth, heightmapHeight) / 1024))
       : p.resolution
 
     const req = {

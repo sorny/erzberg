@@ -75,13 +75,18 @@ export function useSoundscape() {
   // ── Push one window into the heightmap store ──────────────────────────────
   // The filename is deliberately constant across pushes: it feeds the document
   // title and export base name, and rewriting it per frame would churn both.
+  //
+  // keepEdit: consecutive windows are the same picture at the same size, so an
+  // Edit Mode clip survives playback instead of being dropped 30 times a second.
+  // The store drops it anyway if the dimensions change, which is what makes
+  // freezing the whole track (or resizing the window) start clean.
   const pushFrame = useCallback((time) => {
     const s = specRef.current
     if (!s) return
     const o = optsRef.current
     const frame = Math.max(0, Math.min(s.frames - 1, Math.round((time * s.sampleRate) / s.hop)))
     const pixels = sliceWindow(s, frame, o.windowFrames, o.dbFloor, o.contrast)
-    setHeightmap(pixels, null, o.windowFrames, s.bins, fileNameRef.current || 'soundscape')
+    setHeightmap(pixels, null, o.windowFrames, s.bins, fileNameRef.current || 'soundscape', { keepEdit: true })
     setActive(true)
     markFrozen(false)   // any windowed push means we are streaming again
   }, [setHeightmap, markFrozen])

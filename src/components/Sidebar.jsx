@@ -12,17 +12,11 @@ import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/track
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { SpectrogramView } from './SpectrogramView'
-
-// ── Design tokens ─────────────────────────────────────────────────────────────
-const BG     = '#18181b'
-const SURF   = '#27272a'
-const BORDER = '#3f3f46'
-const TEXT   = '#e4e4e7'
-const DIM    = '#d4d4d8'
-const MUTED  = '#71717a'
-const ACCENT = '#3b82f6'
-const GREEN  = '#22c55e'
-const W      = 272   // panel width px
+import {
+  ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
+  ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
+  Sl, Sub, Tog, TogColor,
+} from './panel/ui'
 
 /** m:ss for the Soundscapes transport readout. */
 function fmtTime(sec) {
@@ -34,55 +28,6 @@ function fmtTime(sec) {
 
 // Every layer with a per-mode `hypso<Id>` toggle (draw modes + GPX track).
 const MODE_HYPSO_IDS = ['Lines', 'Cross', 'Pillars', 'Contours', 'Hachure', 'Flow', 'Dag', 'Pencil', 'Ridge', 'Valley', 'Stipple', 'Engrave', 'Curv', 'Swiss', 'Gpx']
-
-// ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
-function PanelStyles() {
-  return (
-    <style>{`
-      .hmr { -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:0;
-        height:3px; background:${BORDER}; border-radius:2px; outline:none; cursor:pointer; }
-      .hmr::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px;
-        border-radius:50%; background:${ACCENT}; cursor:pointer; transition:transform .1s; }
-      .hmr:hover::-webkit-slider-thumb { transform:scale(1.2); }
-      .hmr::-moz-range-thumb { width:13px; height:13px; border-radius:50%;
-        background:${ACCENT}; border:none; }
-      .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
-        border:1px solid ${BORDER}; border-radius:3px; cursor:pointer;
-        padding:2px; background:${SURF}; }
-      .hmc::-webkit-color-swatch-wrapper { padding:0; }
-      .hmc::-webkit-color-swatch { border:none; border-radius:2px; }
-      .hmeb:hover { background:${ACCENT} !important; border-color:${ACCENT} !important; color:#fff !important; }
-      .hmeb:hover .hmeh { color:rgba(255,255,255,.5) !important; }
-      .hmsb.on { background:${ACCENT} !important; color:#fff !important; border-color:${ACCENT} !important; }
-      .hmsb:hover:not(.on) { background:${BORDER} !important; color:${DIM} !important; }
-      .hmload:hover { background:${SURF} !important; color:${TEXT} !important; }
-      #hm-panel-body::-webkit-scrollbar { width:4px; }
-      #hm-panel-body::-webkit-scrollbar-thumb { background:${BORDER}; border-radius:2px; }
-      .hmi:hover { color:${TEXT} !important; border-color:${MUTED} !important; }
-      
-      .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:6px; 
-                 cursor:pointer; display:flex; flex-direction:column; align-items:center; 
-                 justify-content:center; font-size:12px; font-weight:700; transition:all 0.1s; aspect-ratio:1/1; }
-      .sym-btn.on { background:${ACCENT}; color:#fff; border-color:${ACCENT}; }
-      .sym-btn:hover:not(.on) { border-color:${MUTED}; color:${DIM}; }
-      .sym-label { font-size:8px; margin-top:2px; opacity:0.8; }
-    `}</style>
-  )
-}
-
-// ── UI Atomic Components ───────────────────────────────────────────────────────
-
-function HelpBox({ text }) {
-  return (
-    <div style={{
-      fontSize: 9, color: MUTED, background: 'rgba(0,0,0,0.2)',
-      padding: '6px 8px', borderRadius: 4, marginBottom: 8,
-      border: `1px solid ${BORDER}`, lineHeight: 1.4
-    }}>
-      {text}
-    </div>
-  )
-}
 
 /**
  * Why the GPX track is not on the terrain, when it is not.
@@ -138,18 +83,6 @@ function GpxDiagnostics({ crs, crsName, coverage, error }) {
   return null
 }
 
-function HelpBtn({ active, onClick }) {
-  return (
-    <span onClick={onClick} className="hmi" style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: 12, height: 12, borderRadius: '50%', border: `1px solid ${BORDER}`,
-      fontSize: 8, color: MUTED, cursor: 'pointer', marginLeft: 4,
-      background: active ? BORDER : 'transparent',
-      transition: 'all 0.1s'
-    }}>?</span>
-  )
-}
-
 function HypsometricRow({ value }) {
   const [show, setShow] = useState(false)
   return (
@@ -175,137 +108,6 @@ function HypsometricRow({ value }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2 }) {
-  const [showHelp, setShowHelp] = useState(false)
-  const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
-  return (
-    <div style={{ marginBottom: 8, ...(col2 && { gridColumn: '1/-1' }) }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 3 }}>
-        <span style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center' }}>
-          {label}
-          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
-        </span>
-        {hint && <span style={{ fontSize: 9, color: MUTED }}>{hint}</span>}
-      </div>
-      {showHelp && help && <HelpBox text={help} />}
-      <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
-        <input type="range" className="hmr" min={min} max={max} step={step} value={value}
-          onChange={e => onChange(parsed(e.target.value))} />
-        <span style={{ minWidth: 36, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
-          {fmt ? fmt(value) : value}
-        </span>
-      </div>
-    </div>
-  )
-}
-
-function Tog({ label, hint, help, checked, onChange, small }) {
-  const [showHelp, setShowHelp] = useState(false)
-  const fs = small ? 11 : 12
-  const tc = small ? MUTED : DIM
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: fs, color: tc, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
-          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
-        </span>
-        <Switch checked={checked} onChange={onChange} />
-      </div>
-      {showHelp && help && <HelpBox text={help} />}
-    </div>
-  )
-}
-
-function Switch({ checked, onChange }) {
-  return (
-    <label style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} style={{ display:'none' }} />
-      <span style={{ position:'absolute', inset:0, background: checked ? ACCENT : BORDER, borderRadius:9, transition:'background .15s' }}>
-        <span style={{
-          position:'absolute', width:14, height:14, borderRadius:'50%', background:'#fff',
-          top: 2, left: checked ? 18 : 2, transition:'left .15s', boxShadow:'0 1px 3px rgba(0,0,0,.4)',
-        }} />
-      </span>
-    </label>
-  )
-}
-
-function ColorRow({ label, value, onChange }) {
-  return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span style={{ fontSize: 12, color: DIM }}>{label}</span>
-      <input type="color" className="hmc" value={value} onChange={e => onChange(e.target.value)} />
-    </div>
-  )
-}
-
-function TogColor({ label, hint, help, checked, onToggle, color, onColor }) {
-  const [showHelp, setShowHelp] = useState(false)
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 12, color: DIM, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
-          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
-        </span>
-        <div style={{ display:'flex', alignItems:'center', gap: 8 }}>
-          {onColor && <input type="color" className="hmc" value={color} onChange={e => onColor(e.target.value)} />}
-          <Switch checked={checked} onChange={onToggle} />
-        </div>
-      </div>
-      {showHelp && help && <HelpBox text={help} />}
-    </div>
-  )
-}
-
-function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId }) {
-  const [showHelp, setShowHelp] = useState(false)
-  const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
-          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
-        </span>
-        <input type="range" className="hmr" data-testid={testId} min={min} max={max} step={step} value={value}
-          onChange={e => onChange(parsed(e.target.value))} />
-        <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
-          {fmt ? fmt(value) : value}
-        </span>
-      </div>
-      {showHelp && help && <HelpBox text={help} />}
-    </div>
-  )
-}
-
-/** Segmented button row — one exclusive choice, laid out like InlineSl. */
-function SegRow({ label, help, options, value, onChange }) {
-  const [showHelp, setShowHelp] = useState(false)
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
-        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
-          {label}
-          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
-        </span>
-        <div style={{ display:'flex', gap: 2, flex: 1 }}>
-          {options.map(([lbl, v]) => (
-            <button key={String(v)} onClick={() => onChange(v)} style={{
-              flex: 1, fontSize: 8, padding:'4px 0', borderRadius: 2, textTransform:'uppercase', cursor:'pointer',
-              background: value === v ? ACCENT : SURF,
-              color: value === v ? '#fff' : MUTED,
-              border: `1px solid ${value === v ? ACCENT : BORDER}`,
-            }}>{lbl}</button>
-          ))}
-        </div>
-      </div>
-      {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
@@ -360,54 +162,6 @@ function ProjectionParams({ params, values, onChange }) {
     }
   }
   return out
-}
-
-function Section({ title, open, onToggle, enabled, children }) {
-  return (
-    <div style={{ borderBottom: `1px solid ${BORDER}` }}>
-      <div onClick={onToggle} style={{
-        display:'flex', justifyContent:'space-between', alignItems:'center',
-        padding:'10px 14px', cursor:'pointer', userSelect:'none',
-      }}>
-        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center' }}>
-          {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, boxShadow:`0 0 6px ${GREEN}88` }} />}
-          {title}
-        </span>
-        <span style={{ 
-          fontSize:22, fontWeight:700, color: MUTED, lineHeight:1, display:'inline-block',
-          transform: open ? 'none' : 'rotate(-90deg)', transition:'transform .18s' 
-        }}>▾</span>
-      </div>
-      <div style={{ display:'grid', gridTemplateRows: open ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
-        <div style={{ minHeight:0, overflow:'hidden', padding: open ? '0 14px 12px' : '0 14px' }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function Sub({ children }) {
-  return (
-    <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
-      {children}
-    </div>
-  )
-}
-
-function ExpBtn({ label, hint, onClick, active }) {
-  return (
-    <button className="hmeb" onClick={onClick} style={{
-      flex:1, padding:'8px 0', textAlign:'center',
-      background: active ? ACCENT : SURF,
-      color: active ? '#fff' : DIM,
-      border:`1px solid ${active ? ACCENT : BORDER}`, borderRadius:5,
-      cursor:'pointer', fontSize:11, fontWeight:600,
-    }}>
-      {label}
-      {hint && <span className="hmeh" style={{ display:'block', fontSize:9, color: MUTED, fontWeight:400, marginTop:2 }}>{hint}</span>}
-    </button>
-  )
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
@@ -498,6 +252,7 @@ export function Sidebar({
   lineGeo, surfaceGeo, terrainData,
   hypsometricIntegral,
   profileMode, profileClicks, onProfileMode,
+  onEditHeightmap, editSummary, onClearEdit,
 }) {
   const [open, setOpen]     = useState(true)
   const [sec, setSec]       = useState({
@@ -759,6 +514,24 @@ export function Sidebar({
                 {heightmapFilename}
               </div>
             )}
+
+            {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
+            <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
+              disabled={!heightmapPixels}
+              style={{ width:'100%', marginTop:6, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
+                border:`1px solid ${editSummary ? ACCENT : BORDER}`, borderRadius:5,
+                cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
+              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:9 }}>E</span>
+            </button>
+            {editSummary && (
+              <div style={{ marginTop:5, display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:9, color: MUTED }}>
+                <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
+                <button data-testid="edit-clear" onClick={onClearEdit} style={{
+                  background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
+                  fontSize:9, padding:'1px 5px', cursor:'pointer', flexShrink:0,
+                }}>clear</button>
+              </div>
+            )}
           </div>
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
@@ -831,14 +604,6 @@ export function Sidebar({
               <InlineSl label="Pan X" min={-1000} max={1000} value={view.panX ?? 0} onChange={v => sv({ panX: v })} />
               <InlineSl label="Pan Y" min={-1000} max={1000} value={view.panY ?? 0} onChange={v => sv({ panY: v })} />
             </Sub>
-          </Section>
-
-          {/* ── Presets ────────────────────────────────────────────────────── */}
-
-          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              {Object.entries(externalPresets || {}).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
-            </div>
           </Section>
 
           {/* ── Global Style ───────────────────────────────────────────────── */}
@@ -954,6 +719,14 @@ export function Sidebar({
                 <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
               </Sub>
             )}
+          </Section>
+
+          {/* ── Presets ────────────────────────────────────────────────────── */}
+
+          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+              {Object.entries(externalPresets || {}).map(([name, preset]) => <button key={name} onClick={() => applyPreset(preset)} style={{ padding:'6px 4px', fontSize:10, background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:4, cursor:'pointer' }}>{name}</button>)}
+            </div>
           </Section>
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
