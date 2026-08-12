@@ -72,8 +72,15 @@ $$\text{halfW} = \frac{(c_{\min} + c_{\max}) \cdot \text{scl}}{2}, \qquad
 where $c_{\min} \ldots r_{\max}$ span the cells whose mask is 1. A selection
 expressed as a NoData mask is therefore centred by code that already exists, and
 every draw mode already skips masked cells — the same machinery a GeoTIFF's voids
-have always used. Nothing in `geometryBuilders.js` or the worker changed for
-this feature.
+have always used.
+
+Skipping masked cells turned out not to be the whole story, though. The raster
+stores $0$ in them, and $0$ is the *darkest* ground rather than absent ground, so
+anything that read a masked cell without meaning to — a bilinear tap straddling
+the edge, a blur window overlapping it, a finite-difference stencil reaching into
+it — pulled the terrain toward the bottom of the scene and drew the border of the
+selection instead of the landscape. That is fixed in the builders themselves;
+see [Draw-Modes.md § NoData and clipped edges](Draw-Modes.md#nodata-and-clipped-edges).
 
 The output raster is additionally **cropped to the selection's bounding box**
 (the crop rect narrowed to the shape's extent), so the geometry grid shrinks with

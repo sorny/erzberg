@@ -2,7 +2,7 @@
  * CPU-side geometry builders.
  */
 
-import { cellElev, hasData, boxBlur, jitterNoise, NODATA_SENTINEL_Y } from './terrain'
+import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor } from './colorUtils'
 import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
 
@@ -163,6 +163,21 @@ class U32List {
 const EMPTY_F64 = new Float64Array(0)
 const EMPTY_F32 = new Float32Array(0)
 const EMPTY_U8  = new Uint8Array(0)
+
+/**
+ * Neighbour tap for a finite-difference stencil, NoData-aware.
+ *
+ * `field[i]` is 0 wherever the grid has no data, and 0 is not "absent" — it is
+ * the darkest possible ground, so a difference taken against it is the steepest
+ * step anywhere on the terrain. Every derivative-based mode therefore used to
+ * find its strongest feature exactly along the border of a clipped selection and
+ * trace that outline instead of the landscape. Returning the centre value
+ * instead reads the missing side as flat, which is the convention `buildTerrain`
+ * already uses for slopes and `buildEngraving` for its shading normals.
+ */
+function neighbour(field, gridMask, i, o) {
+  return gridMask[i + o] ? field[i + o] : field[i]
+}
 
 function normElev(elev, minElev, maxElev) {
   return maxElev > minElev ? (elev - minElev) / (maxElev - minElev) : 0
@@ -397,6 +412,9 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = fal
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const positions = new F32List(), colors = new F32List()
+  // A solid raster takes the plain bilinear path — the renormalising one costs
+  // a mask read and a divide per sample, and this is the hottest loop here.
+  const sMask = terrain.hasNoData ? gridMask : null
 
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
   const shiftCells = (shift ?? 0) % lineStep
@@ -446,9 +464,13 @@ function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = fal
         const ci = Math.round(fc), ri = Math.round(fr)
         ok = hasData(gridMask, ri, ci, cols)
         if (ok) {
-          elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
+          // Masked bilinear: a tap straddling a clipped edge must not blend
+          // against the zeros parked in NoData, or the line dives to the floor.
+          const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+          ok = b === b                      // NaN ⇒ nothing to drape on
+          elev = (b - 0.5) * 100 * elevScale
           if (jitterAmt > 0) elev += jitterNoise(fc, fr) * jitterAmt
-          ok = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+          ok = ok && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
         }
       }
       if (ok && prevOk) {
@@ -1156,11 +1178,6 @@ function buildContoursTanaka(terrain, p, interval) {
 
 // ─── Flow lines ───────────────────────────────────────────────────────────────
 
-function sampleB(grid, rows, cols, fr, fc) {
-  const r0 = Math.max(0, Math.min(rows-1, Math.floor(fr))), c0 = Math.max(0, Math.min(cols-1, Math.floor(fc))), r1 = Math.min(rows-1, r0+1), c1 = Math.min(cols-1, c0+1), dr = fr-r0, dc = fc-c0
-  return grid[r0*cols+c0]*(1-dr)*(1-dc) + grid[r0*cols+c1]*(1-dr)*dc + grid[r1*cols+c0]*dr*(1-dc) + grid[r1*cols+c1]*dr*dc
-}
-
 /**
  * Streamlines traced down the gradient field — the path water would take.
  *
@@ -1184,6 +1201,8 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
   const { elevScale, elevMinCut, elevMaxCut } = p
   const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, mask = new Uint8Array(n), eps = 0.5
   const positions = new F32List(), colors = new F32List()
+  // Solid raster ⇒ plain bilinear; see buildAngleLines.
+  const sMask = terrain.hasNoData ? gridMask : null
   const seeds = []
   for (let rf = 0; rf < rows; rf += seedStep) {
     const r = Math.min(rows - 1, Math.round(rf))
@@ -1196,18 +1215,22 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
   for (const idx of seeds) {
     const r = Math.floor(idx / cols), c = idx % cols
     if (mask[idx]) continue
-    let fr = r, fc = c, b0 = sampleB(grid, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
+    let fr = r, fc = c, b0 = sampleBilinear(grid, sMask, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
     for (let s = 0; s < (maxLen ?? 100); s++) {
         if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
         const ri = Math.round(fr), ci = Math.round(fc)
         if (!gridMask[ri*cols+ci]) break
         mask[ri*cols+ci] = 1
-        const bL = sampleB(grid, rows, cols, fr, fc-eps), bR = sampleB(grid, rows, cols, fr, fc+eps), bU = sampleB(grid, rows, cols, fr-eps, fc), bD = sampleB(grid, rows, cols, fr+eps, fc)
+        // Masked taps: reading the zeros in NoData as ground would manufacture a
+        // cliff along the clipped edge and send every nearby path over it.
+        const bL = sampleBilinear(grid, sMask, rows, cols, fr, fc-eps), bR = sampleBilinear(grid, sMask, rows, cols, fr, fc+eps)
+        const bU = sampleBilinear(grid, sMask, rows, cols, fr-eps, fc), bD = sampleBilinear(grid, sMask, rows, cols, fr+eps, fc)
         const gx = bR-bL, gz = bD-bU, mag = Math.sqrt(gx*gx+gz*gz)
-        if (mag < 0.0005) break
+        if (!(mag >= 0.0005)) break      // also ends the path on a NaN tap
         const nfc = fc-(gx/mag)*(step??1), nfr = fr-(gz/mag)*(step??1)
         if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
-        const b1 = sampleB(grid, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
+        const b1 = sampleBilinear(grid, sMask, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
+        if (e1 !== e1) break
         if (inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) && inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut)) {
           positions.push6(fc*scl-halfW, e0, fr*scl-halfH, nfc*scl-halfW, e1, nfr*scl-halfH)
           const col0 = computeVertexColor(normElev(e0, minElev, maxElev), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
@@ -1279,7 +1302,9 @@ function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode,
   if (rows < 5 || cols < 5) return { positions: positions.toArray(), colors: colors.toArray() }
 
   // Second derivatives are noise amplifiers; pre-smooth before differencing.
-  const sm = boxBlur(grid, cols, rows, Math.max(0, radius ?? 1))
+  // Mask-aware, or the step down to the zeros in NoData would be the strongest
+  // curvature on the terrain and ring the whole selection with strokes.
+  const sm = boxBlur(grid, cols, rows, Math.max(0, radius ?? 1), terrain.hasNoData ? gridMask : null)
   const n = rows * cols
   const dirX = new Float32Array(n), dirY = new Float32Array(n)
   const strength = new Float32Array(n)
@@ -1290,9 +1315,13 @@ function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode,
     for (let c = 1; c < cols - 1; c++) {
       const i = r * cols + c
       if (!gridMask[i]) continue
-      const hxx = sm[i + 1] + sm[i - 1] - 2 * sm[i]
-      const hyy = sm[i + cols] + sm[i - cols] - 2 * sm[i]
-      const hxy = (sm[i + cols + 1] - sm[i + cols - 1] - sm[i - cols + 1] + sm[i - cols - 1]) / 4
+      // Stencil taps read NoData as flat, not as a cliff down to 0 — see
+      // `neighbour`. Without it the boundary of a clipped selection is the
+      // strongest curvature on the terrain, and it took the strokes with it.
+      const hxx = neighbour(sm, gridMask, i, 1) + neighbour(sm, gridMask, i, -1) - 2 * sm[i]
+      const hyy = neighbour(sm, gridMask, i, cols) + neighbour(sm, gridMask, i, -cols) - 2 * sm[i]
+      const hxy = (neighbour(sm, gridMask, i, cols + 1) - neighbour(sm, gridMask, i, cols - 1)
+                 - neighbour(sm, gridMask, i, -cols + 1) + neighbour(sm, gridMask, i, -cols - 1)) / 4
 
       const tr = hxx + hyy
       const det = hxx * hyy - hxy * hxy
@@ -1490,8 +1519,13 @@ function buildPencilShading(terrain, p, spacing, threshold) {
   const curvThreshold = threshold ?? 0.5
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
-      if (!gridMask[r*cols+c] || r <= 0 || r >= rows-1 || c <= 0 || c >= cols-1) continue
-      const curv = -(grid[(r-1)*cols+c] + grid[(r+1)*cols+c] + grid[r*cols+c-1] + grid[r*cols+c+1] - 4*grid[r*cols+c]) * 100
+      const i = r*cols + c
+      if (!gridMask[i] || r <= 0 || r >= rows-1 || c <= 0 || c >= cols-1) continue
+      // The Laplacian reads NoData as flat (see `neighbour`), so a clipped edge
+      // does not pack shading marks along the outline of the selection.
+      const curv = -(neighbour(grid, gridMask, i, -cols) + neighbour(grid, gridMask, i, cols)
+                   + neighbour(grid, gridMask, i, -1)    + neighbour(grid, gridMask, i, 1)
+                   - 4*grid[i]) * 100
       if (curv < curvThreshold) continue
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
@@ -1527,8 +1561,9 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   
-  // 1. Pre-smooth for stable second derivatives
-  const smoothed = boxBlur(grid, cols, rows, radius)
+  // 1. Pre-smooth for stable second derivatives — mask-aware, so the drop to
+  //    the zeros in NoData is not read as a crest along the selection edge.
+  const smoothed = boxBlur(grid, cols, rows, radius, terrain.hasNoData ? gridMask : null)
   const ridgeThreshold = (threshold ?? 0.5) * 0.1
   const step = Math.max(1, Math.round((spacing ?? 2) / scl))
   const positions = new F32List(), colors = new F32List()
@@ -1542,12 +1577,15 @@ function buildRidgeLines(terrain, p, spacing, radius, threshold) {
     for (let c = 1; c < cols - 1; c++) {
       const i = r * cols + c
       if (!gridMask[i]) continue
-      
-      // Finite differences for second derivatives
-      const hxx = smoothed[i+1] + smoothed[i-1] - 2*smoothed[i]
-      const hyy = smoothed[i+cols] + smoothed[i-cols] - 2*smoothed[i]
-      const hxy = (smoothed[i+cols+1] - smoothed[i+cols-1] - smoothed[i-cols+1] + smoothed[i-cols-1]) / 4
-      
+
+      // Finite differences for second derivatives, reading NoData as flat (see
+      // `neighbour`) so the border of a clipped selection is not the sharpest
+      // crest on the terrain and drawn as a ridge in its own right.
+      const hxx = neighbour(smoothed, gridMask, i, 1) + neighbour(smoothed, gridMask, i, -1) - 2*smoothed[i]
+      const hyy = neighbour(smoothed, gridMask, i, cols) + neighbour(smoothed, gridMask, i, -cols) - 2*smoothed[i]
+      const hxy = (neighbour(smoothed, gridMask, i, cols+1) - neighbour(smoothed, gridMask, i, cols-1)
+                 - neighbour(smoothed, gridMask, i, -cols+1) + neighbour(smoothed, gridMask, i, -cols-1)) / 4
+
       // Eigenvalues of Hessian J = [[hxx, hxy], [hxy, hyy]]
       // lambda = (tr(J) +- sqrt(tr(J)^2 - 4*det(J))) / 2
       const tr = hxx + hyy
@@ -1610,8 +1648,11 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   
   // The neighbourhood mean is just a box blur of the grid — separable and O(n),
-  // so the radius is free rather than costing a window scan per cell.
-  const blurred = boxBlur(grid, cols, rows, radius)
+  // so the radius is free rather than costing a window scan per cell. It is
+  // taken over the *valid* neighbours only: counting NoData as zero elevation
+  // would drag the mean down near a clipped edge and make every cell there read
+  // as a ridge.
+  const blurred = boxBlur(grid, cols, rows, radius, terrain.hasNoData ? gridMask : null)
   
   const step = Math.max(1, Math.round((spacing ?? 2) / scl))
   const positions = new F32List(), colors = new F32List()
@@ -1778,6 +1819,8 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const positions = new F32List(), colors = new F32List()
+  // Solid raster ⇒ plain bilinear; see buildAngleLines.
+  const sMask = terrain.hasNoData ? gridMask : null
 
   // Per-cell darkness from Lambert shading (same light convention as the
   // hillshade shader: az 315° = NW, altitude fixed at 45°).
@@ -1831,8 +1874,11 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
           const ci = Math.round(fc), ri = Math.round(fr), idx = ri * cols + ci
           ok = gridMask[idx] === 1 && darkness[idx] >= thresh
           if (ok) {
-            elev = (sampleB(grid, rows, cols, fr, fc) - 0.5) * 100 * elevScale
-            ok = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+            // Masked bilinear — a hatch stroke reaching a clipped edge must end
+            // at the ground, not drop a wall to the base of the scene.
+            const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+            elev = (b - 0.5) * 100 * elevScale
+            ok = b === b && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
           }
         }
         if (ok && inRun) {
@@ -1873,6 +1919,8 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
   const dens  = Math.max(0, Math.min(1, screeDensity ?? 0.5))
   const eps   = Math.max(0.001, scl * 0.003)         // stipple-style dot half-length
   const maxS  = maxSlope || 1
+  // Solid raster ⇒ plain bilinear; see buildAngleLines.
+  const sMask = terrain.hasNoData ? gridMask : null
 
   const rockPos = new F32List(), rockCol = new F32List()
   const screePos = new F32List(), screeCol = new F32List()
@@ -1899,12 +1947,20 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
         const len = (length ?? 1) * scl * step * (0.6 + slopeNorm * 1.2)
         // Slight seeded perpendicular wobble — engraver's hand, reproducible.
         const j = (rng() - 0.5) * 0.35
-        const sx = -ux * len, sz = -uz * len
-        const jx = -uz * len * j, jz = ux * len * j
-        const ex = wx + sx + jx, ez = wz + sz + jz
-        const e1 = (sampleB(grid, rows, cols,
-                            Math.max(0, Math.min(rows - 1, (ez + halfH) / scl)),
-                            Math.max(0, Math.min(cols - 1, (ex + halfW) / scl))) - 0.5) * 100 * elevScale
+        const sx = -ux * len - uz * len * j, sz = -uz * len + ux * len * j
+        // The steepest ground is exactly what a selection edge cuts through, so
+        // the far end of a cliff stroke is the one most likely to land outside
+        // the data — where it would drape on the NoData floor and read as a
+        // pillar. Shorten it until it is back on ground; drop it if it never is.
+        let ex = 0, ez = 0, e1 = NaN
+        for (let f = 1; f > 0.2; f -= 0.25) {
+          ex = wx + sx * f; ez = wz + sz * f
+          const b1 = sampleBilinear(grid, sMask, rows, cols,
+                                    Math.max(0, Math.min(rows - 1, (ez + halfH) / scl)),
+                                    Math.max(0, Math.min(cols - 1, (ex + halfW) / scl)))
+          if (b1 === b1) { e1 = (b1 - 0.5) * 100 * elevScale; break }
+        }
+        if (e1 !== e1) continue
         rockPos.push6(wx, elev, wz, ex, e1, ez)
         const col = computeVertexColor(normE, slopeNorm, Math.atan2(gz, gx), p)
         rockCol.pushRgb2(col)
@@ -1912,9 +1968,11 @@ function buildSwissRockScree(terrain, p, spacing, threshold, length, screeDensit
         // Scree dot: jittered within the cell, denser approaching the cliffs.
         const jc = c + (rng() - 0.5) * step, jr = r + (rng() - 0.5) * step
         const sx2 = jc * scl - halfW, sz2 = jr * scl - halfH
-        const se = (sampleB(grid, rows, cols,
-                            Math.max(0, Math.min(rows - 1, jr)),
-                            Math.max(0, Math.min(cols - 1, jc))) - 0.5) * 100 * elevScale
+        const sb = sampleBilinear(grid, sMask, rows, cols,
+                                  Math.max(0, Math.min(rows - 1, jr)),
+                                  Math.max(0, Math.min(cols - 1, jc)))
+        if (sb !== sb) continue          // jittered clean off the data
+        const se = (sb - 0.5) * 100 * elevScale
         screePos.push6(sx2 - eps, se, sz2, sx2 + eps, se, sz2)
         const col = computeVertexColor(normElev(se, minElev, maxElev), slopeNorm, 0, p)
         screeCol.pushRgb2(col)
@@ -2210,6 +2268,10 @@ export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
 
     const elevA = sampleTerrainElev(a.pixelCol, a.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
     const elevB = sampleTerrainElev(b.pixelCol, b.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
+    // NaN = the point projects onto NoData (outside a clipped selection). There
+    // is no ground to drape it on, so the track breaks rather than dropping to
+    // the base of the scene.
+    if (elevA !== elevA || elevB !== elevB) continue
 
     const normA = minElev < maxElev ? (elevA - minElev) / (maxElev - minElev) : 0
     const normB = minElev < maxElev ? (elevB - minElev) / (maxElev - minElev) : 0

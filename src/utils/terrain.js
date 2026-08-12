@@ -62,9 +62,19 @@ function boxBlurInt(pixels, width, height, r) {
  * The lerp writes back into `lo` rather than allocating a third buffer: at 8k
  * that is 268 MB of peak that bought nothing, `lo` is always a private result
  * of `boxBlurInt` here, and nothing else can be holding a reference to it.
+ *
+ * `mask` (optional, 1 = data) switches to *normalized convolution*: the window
+ * mean is taken over the valid samples alone instead of over the raw buffer,
+ * whose NoData cells hold 0. Without it, a blur next to a clipped edge averages
+ * real ground against those zeros and sags the terrain toward the floor for a
+ * radius' width all along the cut — a dark rim on the surface and, for the modes
+ * that differentiate a blurred field, a ring of phantom features tracing the
+ * selection. Pass it only when the mask actually has holes (`maskHasHoles`):
+ * it costs two extra blur passes and buys nothing on a solid raster.
  */
-export function boxBlur(pixels, width, height, radius) {
+export function boxBlur(pixels, width, height, radius, mask = null) {
   if (radius <= 0) return pixels
+  if (mask) return boxBlurMasked(pixels, mask, width, height, radius)
   const rLo = Math.floor(radius), rHi = Math.ceil(radius), frac = radius - rLo
   if (frac === 0) return boxBlurInt(pixels, width, height, rLo)
   const hi = boxBlurInt(pixels, width, height, rHi)
@@ -81,6 +91,43 @@ export function boxBlur(pixels, width, height, radius) {
 }
 
 /**
+ * Normalized convolution: blur the masked signal and the mask itself, then
+ * divide. Σ(w·v·m) / Σ(w·m) is the mean over *valid* samples in the window,
+ * which is what "blur, ignoring the holes" means.
+ *
+ * NoData cells keep their 0 rather than being filled in from their neighbours:
+ * every consumer gates on the mask, and inventing ground outside the selection
+ * would leak it into slope and curvature at the boundary — the very thing this
+ * is here to prevent.
+ */
+function boxBlurMasked(pixels, mask, width, height, radius) {
+  const n = pixels.length
+  // One scratch buffer serves both convolutions, and the quotient is written
+  // back over the numerator: at 8k every full-size Float32Array is 268 MB, so
+  // the peak here is three of them rather than five.
+  const scratch = new Float32Array(n)
+  for (let i = 0; i < n; i++) scratch[i] = mask[i] ? 1 : 0
+  const den = boxBlur(scratch, width, height, radius)      // Σ w·m
+  for (let i = 0; i < n; i++) scratch[i] = mask[i] ? pixels[i] : 0
+  const num = boxBlur(scratch, width, height, radius)      // Σ w·m·v
+  for (let i = 0; i < n; i++) {
+    // den is the share of the window that carried data. It goes to zero only
+    // where no valid cell is within reach at all — and a valid cell falls back
+    // to its own unblurred value there rather than to the NoData floor.
+    num[i] = mask[i] ? (den[i] > 1e-9 ? num[i] / den[i] : pixels[i]) : 0
+  }
+  return num
+}
+
+/** Whether a NoData mask actually excludes anything — the guard that keeps the
+ *  mask-aware paths off the hot path for the usual solid raster. */
+export function maskHasHoles(mask) {
+  if (!mask) return false
+  for (let i = 0; i < mask.length; i++) if (!mask[i]) return true
+  return false
+}
+
+/**
  * Build the terrain grid from loaded heightmap pixel data.
  * Respects the nodataMask to skip invalid pixels.
  *
@@ -91,8 +138,12 @@ export function boxBlur(pixels, width, height, radius) {
  */
 export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null) {
   const { resolution: scl, blurRadius, gridOffsetX, gridOffsetY, blackPoint, whitePoint, elevScale } = p
-  const blurred = preBlurred ?? boxBlur(rawPixels, imageWidth, imageHeight, blurRadius)
-  
+  // `??` is lazy, so the full-resolution mask scan only runs when this call is
+  // the one doing the blur — in the worker `preBlurred` is always supplied, and
+  // an 8k scan on every slider tick would be pure waste.
+  const blurred = preBlurred ??
+    boxBlur(rawPixels, imageWidth, imageHeight, blurRadius, maskHasHoles(nodataMask) ? nodataMask : null)
+
   // Calculate grid dimensions correctly based on resolution
   const peakOff = Math.floor(gridOffsetX ?? 0)
   const lineOff = Math.floor(gridOffsetY ?? 0)
@@ -104,15 +155,16 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
   const grid = new Float32Array(rows * cols)
   const gridMask = new Uint8Array(rows * cols)
   let minBrightness = 1, maxBrightness = 0
+  let holes = false
 
   for (let r = 0; r < rows; r++) {
     const py = r * scl + lineOff
     for (let c = 0; c < cols; c++) {
       const px = c * scl + peakOff
       const idx = py * imageWidth + px
-      
+
       if (nodataMask && (nodataMask[idx] === 0 || idx >= rawPixels.length)) {
-        grid[r * cols + c] = 0; gridMask[r * cols + c] = 0
+        grid[r * cols + c] = 0; gridMask[r * cols + c] = 0; holes = true
       } else {
         const raw = blurred[idx]
         const clamped = Math.max(bpN, Math.min(wpN, raw))
@@ -161,6 +213,12 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
 
   return {
     grid, gridMask, rows, cols, scl,
+    // Does the grid have holes at all? Every mask-aware path is a cost the
+    // ordinary solid raster should not pay, and the builders have no cheap way
+    // to find out for themselves. Answered as a by-product of the scan above,
+    // over the *grid* rather than the raster — that is the mask the builders
+    // index, and a subsampling resolution can step over a thin void entirely.
+    hasNoData: holes,
     halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2,
     halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2,
     minElev, maxElev, maxSlope, gridSlopes, elevScale,
@@ -199,4 +257,43 @@ export function cellElev(grid, r, c, cols, elevScale, jitterAmt = 0) {
 export function hasData(gridMask, r, c, cols) {
   if (!gridMask) return true
   return gridMask[r * cols + c] === 1
+}
+
+/**
+ * Bilinear brightness sample that never blends against NoData.
+ *
+ * The grid stores 0 for masked cells, and 0 is not "absent" — it is the darkest
+ * possible ground, which `(b − 0.5)·100·elevScale` puts at the very bottom of
+ * the scene. A plain bilinear tap whose 2×2 footprint straddles a clipped edge
+ * therefore returns a value pulled toward that floor, and any mode that drapes
+ * itself on fractional coordinates — Lines and Crosshatch at an oblique bearing,
+ * Engraving at every angle, Flow, Swiss rock — drew a segment plunging from the
+ * terrain down to the base along the whole cut. Read as pillars; the reason
+ * cropping with a lasso or an ellipse fringed the selection with them.
+ *
+ * The fix is normalized convolution again (cf. `boxBlurMasked`): weight only the
+ * corners that carry data and renormalise, so a tap next to the edge returns the
+ * height of the ground that IS there. Returns NaN when the footprint holds no
+ * data at all, which callers must treat as "no sample here" — a stroke ends
+ * rather than diving.
+ */
+export function sampleBilinear(grid, gridMask, rows, cols, fr, fc) {
+  const r0 = Math.max(0, Math.min(rows - 1, Math.floor(fr)))
+  const c0 = Math.max(0, Math.min(cols - 1, Math.floor(fc)))
+  const r1 = Math.min(rows - 1, r0 + 1), c1 = Math.min(cols - 1, c0 + 1)
+  const dr = fr - r0, dc = fc - c0
+  const i00 = r0 * cols + c0, i01 = r0 * cols + c1
+  const i10 = r1 * cols + c0, i11 = r1 * cols + c1
+  const w00 = (1 - dr) * (1 - dc), w01 = (1 - dr) * dc
+  const w10 = dr * (1 - dc),       w11 = dr * dc
+  if (!gridMask) {
+    return grid[i00] * w00 + grid[i01] * w01 + grid[i10] * w10 + grid[i11] * w11
+  }
+  // Branch-free: the mask is 0/1, so multiplying through drops the invalid
+  // corners from both the sum and its normaliser in one pass.
+  const m00 = gridMask[i00], m01 = gridMask[i01], m10 = gridMask[i10], m11 = gridMask[i11]
+  const wSum = w00 * m00 + w01 * m01 + w10 * m10 + w11 * m11
+  if (wSum <= 0) return NaN
+  return (grid[i00] * w00 * m00 + grid[i01] * w01 * m01 +
+          grid[i10] * w10 * m10 + grid[i11] * w11 * m11) / wSum
 }

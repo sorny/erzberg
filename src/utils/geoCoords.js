@@ -36,6 +36,8 @@
  * through `gdalwarp -t_srs EPSG:4326` first.
  */
 
+import { sampleBilinear } from './terrain'
+
 // ── CRS classification ────────────────────────────────────────────────────────
 
 // Geographic CRS whose datum sits close enough to WGS84 (≲2 m) that GPX
@@ -368,19 +370,18 @@ export function trackCoverage(gpxPoints, geoTiffBbox, geoTiffCRS, imageWidth, im
 
 /**
  * Bilinear terrain elevation sample at a given pixel position.
- * Returns world-space Y (elevation).
+ * Returns world-space Y (elevation), or NaN over NoData.
+ *
+ * Masked, so a track crossing the edge of a clipped raster follows the ground
+ * it has instead of being dragged toward the base of the scene by the zeros
+ * stored in NoData cells.
  */
 export function sampleTerrainElev(pixelCol, pixelRow, terrain, scl, peakOff, lineOff) {
-  const { grid, rows, cols, elevScale } = terrain
+  const { grid, gridMask, rows, cols, elevScale } = terrain
   const fc = (pixelCol - peakOff) / scl
   const fr = (pixelRow - lineOff) / scl
-  const c0 = Math.max(0, Math.min(cols - 2, Math.floor(fc)))
-  const r0 = Math.max(0, Math.min(rows - 2, Math.floor(fr)))
-  const c1 = c0 + 1, r1 = r0 + 1
-  const dc = fc - c0, dr = fr - r0
-  const b = grid[r0 * cols + c0] * (1 - dr) * (1 - dc)
-           + grid[r0 * cols + c1] * (1 - dr) * dc
-           + grid[r1 * cols + c0] * dr       * (1 - dc)
-           + grid[r1 * cols + c1] * dr       * dc
+  const b = sampleBilinear(grid, gridMask, rows, cols,
+                           Math.max(0, Math.min(rows - 1, fr)),
+                           Math.max(0, Math.min(cols - 1, fc)))
   return (b - 0.5) * 100 * elevScale
 }

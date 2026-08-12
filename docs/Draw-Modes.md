@@ -148,6 +148,55 @@ A line claims a disc of **half** the seed pitch, not the full separation — cla
 
 ---
 
+## NoData and clipped edges
+
+A raster can have holes: a GeoTIFF's NoData cells, a PNG's transparent pixels,
+and — most often — everything outside an ellipse, lasso or polygon selection in
+Edit Mode. `buildTerrain` records them in `gridMask` and stores $H = 0$ there.
+
+That zero is a trap, because 0 is not "absent": it is the darkest possible
+ground, and $(H - 0.5)\cdot 100 \cdot \text{elevScale}$ puts it at the very
+bottom of the scene. Reading it as terrain produces the artifact in three
+different shapes, and all fourteen modes now guard against it.
+
+**Sampling — normalized bilinear.** Modes that drape themselves on *fractional*
+grid coordinates (Lines and Crosshatch at an oblique bearing, Engraving at every
+angle, Flow, Swiss rock, GPX draping) take a 2×2 bilinear tap. A tap whose
+footprint straddles a clipped edge blends real ground against those zeros and
+returns a height near the floor — which drew a segment plunging from the terrain
+down to the base, all along the border of the selection. `sampleBilinear`
+weights only the corners that carry data and renormalises against them:
+
+$$H(\mathbf{p}) = \frac{\sum_k w_k\,m_k\,H_k}{\sum_k w_k\,m_k}$$
+
+where $m_k \in \{0,1\}$ is the corner's mask. A tap with no data under it at all
+returns NaN, which ends the stroke rather than diving. At 0° and 90° the Lines
+samples land exactly on grid cells, so those two angles never showed the
+artifact — which is why it read as an Engraving problem.
+
+**Blur — normalized convolution.** The same reasoning applies to every box blur:
+the terrain pre-blur, and the pre-smoothing inside Ridge, Curvature and Valley.
+Averaging across a hole drags the mean toward zero for a radius' width inside
+the valid region. `boxBlur` takes an optional mask and then computes
+$\sum w\,m\,v \,/\, \sum w\,m$ — the mean over the valid samples alone. It is
+only engaged when the mask actually has holes (`terrain.hasNoData`); a solid
+raster keeps the cheaper path, and its output is unchanged.
+
+**Stencils — NoData reads as flat.** Ridge, Curvature and Pencil Shading
+differentiate the field, and a second difference taken against a zero is the
+largest curvature anywhere on the terrain — so the border of a selection was
+found first and drawn as a crest. Each stencil tap now substitutes the centre
+value for a masked neighbour, which says "flat that way" instead of "a cliff
+that way". This matters most for Curvature, whose threshold is a fraction of the
+maximum strength on the terrain: the phantom rim *set* that maximum, and the
+mode collapsed to a few strokes clinging to the edge.
+
+Contours are the deliberate exception: marching squares treats a NoData corner
+as sitting just below every level, so isolines close against the edge of the
+data as shorelines rather than stopping short of it.
+
+---
+
 ## Ghost Occlusion
 
 All fourteen modes share the same depth-ordering system.

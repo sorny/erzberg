@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.7] - 2026-08-12
+
+A bug-fix release about one mistake made in four places. `buildTerrain` stores
+`0` in every cell the grid has no data for, and `0` is not "absent" — it is the
+darkest possible ground, which `(b − 0.5)·100·elevScale` maps to the very bottom
+of the scene. Anything that read one of those cells without meaning to drew the
+edge of the selection instead of the landscape. Clipping with the ellipse and
+lasso tools 0.9.6 added made it easy to hit; a GeoTIFF with NoData always could.
+
+### Fixed
+- **A clipped selection no longer fringes the draw modes with pillars.** Every mode that drapes itself on *fractional* grid coordinates takes a 2×2 bilinear tap, and a tap straddling the cut blended real ground against the NoData zeros — returning a height near the floor, so each mode drew a segment plunging from the terrain down to the base along the whole edge of the selection. Most visible in Engraving (which hatches at 45° at every setting) and in Lines and Crosshatch at an oblique bearing, where the samples fall between grid cells; at 0°/90° they land exactly on cells, which is why those two angles looked fine. Flow lines, Swiss rock hachures and scree, and GPX draping had the same fault. Sampling is now *normalized*: only the corners that carry data are weighted, and the tap is renormalised against them, so a stroke reaching the cut ends on the ground that is there. A tap with no data under it at all returns NaN, which ends the stroke rather than diving.
+- **Blur no longer sags the terrain along a clipped edge.** The box blur averaged real ground against the zeros in NoData, so the last blur-radius' width of the selection ramped down toward the floor — a dark rim on the surface and a genuine slope in the geometry. It is now a normalized convolution (`Σ w·m·v / Σ w·m`) whenever the raster actually has holes; a solid raster keeps the old, cheaper path untouched.
+- **Ridge, Curvature and Pencil Shading no longer trace the outline of the selection.** All three differentiate the height field, and a second difference taken against the NoData zeros is the strongest feature anywhere on the terrain — so the border of a crop was found first and drawn as a crest. Worse for Curvature, whose threshold is a fraction of the maximum strength on the terrain: the phantom rim set that maximum, and the mode fell to a handful of strokes clinging to the edge. Stencil taps now read NoData as flat, the convention `buildTerrain` already used for slopes and Engraving for its shading normals.
+- **Valley/Ridge (TPI) measures against real ground.** The neighbourhood mean counted NoData as zero elevation, which dragged it down near a clipped edge and made the cells there read as ridges.
+
+Output on a raster with no NoData is bit-identical to 0.9.6 for all fourteen modes.
+
 ## [0.9.6] - 2026-08-12
 
 Two additions to Edit Mode, both about not having to start over. Circles and

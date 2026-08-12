@@ -105,7 +105,9 @@ in a cliff.
 The clip is non-destructive: the original raster is kept, so Edit Mode can be
 re-entered to adjust it or cleared to get the whole heightmap back. It works the
 same on a PNG, a GeoTIFF and a Soundscape, and a GeoTIFF's bounding box is
-re-derived over the crop so a GPX track stays where it belongs.
+re-derived over the crop so a GPX track stays where it belongs. Every draw mode
+stops cleanly at the cut rather than reading the empty ground beyond it — see
+[NoData and clipped edges](docs/Draw-Modes.md#nodata-and-clipped-edges).
 → [Edit Mode](docs/Edit-Mode.md)
 
 ---

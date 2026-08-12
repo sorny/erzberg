@@ -16,7 +16,7 @@
  * All Float32Array / Uint32Array buffers are transferred (zero-copy) back to the
  * main thread via the Transferables list. After transfer the originals are detached.
  */
-import { boxBlur, buildTerrain } from './terrain'
+import { boxBlur, buildTerrain, maskHasHoles } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry, buildGpxGeometry } from './geometryBuilders'
 import { isTrackProjectable } from './geoCoords'
 
@@ -39,7 +39,11 @@ function blurredSource(p) {
   if (blurCache.pixels === src.heightmapPixels && blurCache.radius === radius) {
     return blurCache.result
   }
-  const result = boxBlur(src.heightmapPixels, src.heightmapWidth, src.heightmapHeight, radius)
+  // Blurring across a clipped edge would average real ground against the zeros
+  // parked in the NoData cells and sag the terrain toward the floor all along
+  // the cut, so a holed raster gets the mask-aware (normalized) blur.
+  const result = boxBlur(src.heightmapPixels, src.heightmapWidth, src.heightmapHeight, radius,
+                         src.hasNoData ? src.nodataMask : null)
   blurCache = { pixels: src.heightmapPixels, radius, result }
   return result
 }
@@ -48,7 +52,13 @@ self.onmessage = (e) => {
   const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, p, _gen } = e.data
 
   // A message with pixels refreshes the cache; one without reuses it.
-  if (heightmapPixels) src = { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight }
+  // `hasNoData` is scanned once per raster, not per rebuild: the mask is always
+  // present (the PNG loader builds one even for a fully opaque image), so the
+  // question that matters is whether it excludes anything.
+  if (heightmapPixels) {
+    src = { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
+            hasNoData: maskHasHoles(nodataMask) }
+  }
   if (!src) {
     self.postMessage({ error: 'No heightmap loaded in worker.', _gen })
     return

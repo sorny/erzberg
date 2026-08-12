@@ -243,11 +243,11 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
       const wp = geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS,
                             imageWidth, imageHeight, peakOff, lineOff, halfW, halfH)
       if (!wp) return null
-      return {
-        worldX: wp.worldX,
-        worldZ: wp.worldZ,
-        e: sampleTerrainElev(wp.pixelCol, wp.pixelRow, terrain, scl, peakOff, lineOff),
-      }
+      const e = sampleTerrainElev(wp.pixelCol, wp.pixelRow, terrain, scl, peakOff, lineOff)
+      // NoData under the point: treated exactly like being outside the extent,
+      // so the ribbon breaks there instead of diving to the base plate.
+      if (e !== e) return null
+      return { worldX: wp.worldX, worldZ: wp.worldZ, e }
     })
 
     // Split into continuous runs at null gaps
