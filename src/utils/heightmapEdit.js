@@ -4,7 +4,17 @@
  * An `edit` describes, in *source pixel coordinates*, which part of the loaded
  * raster is wanted:
  *
- *   { rect: {x,y,w,h}, shape: {type:'lasso'|'polygon', points:[x0,y0,x1,y1,…]}|null, feather: px }
+ *   { rect: {x,y,w,h}, shape: Shape|null, feather: px }
+ *
+ * where a Shape is either a ring of points or an ellipse:
+ *
+ *   { type: 'lasso'|'polygon', points: [x0,y0,x1,y1,…] }
+ *   { type: 'ellipse', cx, cy, rx, ry }
+ *
+ * The ellipse is kept as an ellipse rather than approximated by a ring: a
+ * 128-gon shows visible flats once the raster is a few thousand pixels wide, and
+ * the implicit test is both exact and cheaper to fill than a scanline crossing
+ * list.
  *
  * `applyEdit` turns it into a smaller raster the rest of the app consumes in
  * place of the loaded one. Two properties matter downstream:
@@ -27,9 +37,20 @@ function clampRect(rect, srcW, srcH) {
   return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
-/** Bounding box of a flat [x0,y0,x1,y1,…] point list, as a rect. */
-export function shapeBounds(points) {
-  if (!points || points.length < 6) return null   // fewer than 3 vertices is not an area
+/** Whether a shape encloses any area at all — the guard every caller needs. */
+export function isUsableShape(shape) {
+  if (!shape) return false
+  if (shape.type === 'ellipse') return shape.rx > 0.5 && shape.ry > 0.5
+  return shape.points?.length >= 6   // fewer than 3 vertices is not an area
+}
+
+/** Bounding box of a shape, as a rect. */
+export function shapeBounds(shape) {
+  if (!isUsableShape(shape)) return null
+  if (shape.type === 'ellipse') {
+    return { x: shape.cx - shape.rx, y: shape.cy - shape.ry, w: shape.rx * 2, h: shape.ry * 2 }
+  }
+  const points = shape.points
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   for (let i = 0; i < points.length; i += 2) {
     const x = points[i], y = points[i + 1]
@@ -49,7 +70,7 @@ export function effectiveBounds(edit, srcW, srcH) {
   const full = { x: 0, y: 0, w: srcW, h: srcH }
   let b = clampRect(edit?.rect ?? full, srcW, srcH)
   if (!b) return null
-  const sb = edit?.shape ? shapeBounds(edit.shape.points) : null
+  const sb = shapeBounds(edit?.shape)
   if (sb) {
     const x0 = Math.max(b.x, Math.floor(sb.x))
     const y0 = Math.max(b.y, Math.floor(sb.y))
@@ -89,6 +110,27 @@ function fillPolygon(out, points, b) {
       const cx1 = Math.min(b.w - 1, Math.floor(spans[k + 1] - b.x - 0.5))
       for (let c = cx0; c <= cx1; c++) out[rowOff + c] = 1
     }
+  }
+}
+
+/**
+ * Fill an ellipse into `out` (1 = inside), one row span at a time.
+ *
+ * Solving the ellipse equation for x per row gives the exact span directly, so
+ * this touches only the pixels it sets — testing every pixel in the bounding box
+ * would do 4/π times the work and get the same answer.
+ */
+function fillEllipse(out, { cx, cy, rx, ry }, b) {
+  const iry = 1 / Math.max(1e-6, ry)
+  for (let row = 0; row < b.h; row++) {
+    const dy = (b.y + row + 0.5 - cy) * iry
+    const dy2 = dy * dy
+    if (dy2 > 1) continue
+    const dx = Math.sqrt(1 - dy2) * rx
+    const c0 = Math.max(0, Math.ceil(cx - dx - b.x - 0.5))
+    const c1 = Math.min(b.w - 1, Math.floor(cx + dx - b.x - 0.5))
+    const off = row * b.w
+    for (let c = c0; c <= c1; c++) out[off + c] = 1
   }
 }
 
@@ -150,15 +192,16 @@ export function buildEditMask(edit, srcMask, srcW, srcH) {
   const b = effectiveBounds(edit, srcW, srcH)
   if (!b) return null
 
-  const hasShape = !!(edit?.shape && edit.shape.points?.length >= 6)
+  const shape = isUsableShape(edit?.shape) ? edit.shape : null
   const feather = Math.max(0, edit?.feather ?? 0)
-  const needsMask = hasShape || !!srcMask
+  const needsMask = !!shape || !!srcMask
 
   let mask = null
   if (needsMask) {
     mask = new Uint8Array(b.w * b.h)
-    if (hasShape) fillPolygon(mask, edit.shape.points, b)
-    else mask.fill(1)
+    if (!shape) mask.fill(1)
+    else if (shape.type === 'ellipse') fillEllipse(mask, shape, b)
+    else fillPolygon(mask, shape.points, b)
     // The raster's own voids (GeoTIFF NoData, transparent PNG pixels) are not
     // selectable ground; folding them in here means the feather also softens the
     // edge of a void rather than only the edge the user drew.
@@ -271,7 +314,7 @@ export function describeEdit(edit, srcW, srcH) {
   const b = effectiveBounds(edit, srcW, srcH)
   if (!b) return null
   const parts = [`${b.w}×${b.h} of ${srcW}×${srcH}`]
-  if (edit.shape) parts.push(edit.shape.type)
+  if (isUsableShape(edit.shape)) parts.push(edit.shape.type)
   if (edit.feather > 0) parts.push(`feather ${Math.round(edit.feather)}px`)
   return parts.join(' · ')
 }

@@ -14,14 +14,16 @@ import {
 
 const TOOLS = [
   ['▣ Crop',    'crop'],
+  ['⬭ Ellipse', 'ellipse'],
   ['✎ Lasso',   'lasso'],
   ['⬡ Polygon', 'polygon'],
 ]
 
 const HINTS = {
   crop:    'Drag on the image to draw a crop, or grab a handle to resize it. The terrain is rebuilt from the crop, so a smaller one also rebuilds faster.',
-  lasso:   'Drag to trace a free-hand outline. Everything outside it is dropped, and the raster is cut down to what is left.',
-  polygon: 'Click to place corners; click the first one again, press Enter, or double-click to close the shape.',
+  ellipse: 'Drag to draw an ellipse — hold Shift for a perfect circle. Drag inside it to move it, or use the eight handles to resize.',
+  lasso:   'Drag to trace a free-hand outline. Afterwards the points stay editable: drag one to move it, drag an edge to add one there, right-click one to remove it.',
+  polygon: 'Click to place corners; click the first one again, press Enter, or double-click to close. Once closed, drag its points to reshape it — or drag an edge to add a point.',
 }
 
 /** Integer field that only publishes a parseable value. */
@@ -101,7 +103,7 @@ export function EditPanel({
         </div>
 
         <div id="hm-panel-body" style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '12px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 3, marginBottom: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, marginBottom: 12 }}>
             {TOOLS.map(([label, id]) => (
               <button key={id} data-testid={`edit-tool-${id}`} onClick={() => setTool(id)} style={{
                 fontSize: 10, padding: '7px 0', borderRadius: 4, cursor: 'pointer',
@@ -138,7 +140,10 @@ export function EditPanel({
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
             <span>Shape</span>
             <span style={{ color: edit?.shape ? DIM : MUTED }}>
-              {edit?.shape ? `${edit.shape.type} · ${edit.shape.points.length / 2} pts` : 'none'}
+              {!edit?.shape ? 'none'
+                : edit.shape.type === 'ellipse'
+                  ? `ellipse · ${Math.round(edit.shape.rx * 2)}×${Math.round(edit.shape.ry * 2)}`
+                  : `${edit.shape.type} · ${edit.shape.points.length / 2} pts`}
             </span>
           </div>
           {edit?.shape && (

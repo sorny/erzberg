@@ -157,12 +157,14 @@ test('a lasso selection clips the terrain down to what it encloses', async ({ pa
   await page.locator('[data-testid="edit-apply"]').click()
   await expect(page.locator('[data-testid="heightmap-editor"]')).toHaveCount(0)
 
+  // Poll rather than read once: the readout still says 1024×1024 until the
+  // worker delivers, and a regex locator matches that perfectly well.
   const grid = page.locator('text=/Grid: \\d+×\\d+/')
-  await expect(grid).toBeVisible({ timeout: 20000 })
-  const text = await grid.innerText()
-  const [w, h] = text.match(/Grid: (\d+)×(\d+)/).slice(1).map(Number)
+  const readGrid = async () => (await grid.innerText()).match(/Grid: (\d+)×(\d+)/).slice(1).map(Number)
+  await expect.poll(async () => (await readGrid())[0], { timeout: 20000 }).toBeLessThan(900)
+
+  const [w, h] = await readGrid()
   expect(w).toBeGreaterThan(50)
-  expect(w).toBeLessThan(900)
   expect(h).toBeGreaterThan(50)
   expect(h).toBeLessThan(900)
 })
@@ -247,4 +249,95 @@ test('the polygon tool closes on Enter and clips to the ring', async ({ page }) 
   await page.locator('[data-testid="edit-apply"]').click()
   await expect(page.locator('[data-testid="heightmap-editor"]')).toHaveCount(0)
   await expect(page.locator('[data-testid="edit-summary"]')).toContainText('polygon')
+})
+
+test('the ellipse tool draws an ellipse, and Shift makes it a circle', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  await page.locator('[data-testid="edit-tool-ellipse"]').click()
+
+  const box = await page.locator('[data-testid="heightmap-editor"]').boundingBox()
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+
+  await page.mouse.move(cx - 200, cy - 100)
+  await page.mouse.down()
+  await page.mouse.move(cx + 100, cy + 120, { steps: 10 })
+  await page.mouse.up()
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('ellipse')
+
+  // An ellipse drawn freely is not round…
+  const free = await page.locator('[data-testid="edit-result"]').innerText()
+  const [fw, fh] = free.split('×').map(Number)
+  expect(Math.abs(fw - fh)).toBeGreaterThan(20)
+
+  // …but Shift makes the two axes equal, whatever the drag shape.
+  await page.mouse.move(cx - 180, cy - 120)
+  await page.mouse.down()
+  await page.mouse.move(cx + 40, cy + 30, { steps: 6 })
+  await page.keyboard.down('Shift')
+  await page.mouse.move(cx + 120, cy + 50, { steps: 6 })
+  await page.mouse.up()
+  await page.keyboard.up('Shift')
+
+  const circle = await page.locator('[data-testid="edit-result"]').innerText()
+  const [w, h] = circle.split('×').map(Number)
+  expect(Math.abs(w - h)).toBeLessThanOrEqual(1)
+
+  await page.locator('[data-testid="edit-apply"]').click()
+  await expect(page.locator('[data-testid="edit-summary"]')).toContainText('ellipse')
+})
+
+test('an ellipse selection fills the area an ellipse should', async ({ page }) => {
+  await boot(page)
+
+  const r = await page.evaluate(async () => {
+    const { applyEdit } = await import('/src/utils/heightmapEdit.js')
+    const w = 400, h = 300
+    const src = { pixels: new Float32Array(w * h).fill(0.5), mask: null, width: w, height: h }
+    const out = applyEdit(src, {
+      rect: { x: 0, y: 0, w, h },
+      shape: { type: 'ellipse', cx: 200, cy: 150, rx: 120, ry: 80 },
+      feather: 0,
+    })
+    let inside = 0
+    for (let i = 0; i < out.mask.length; i++) inside += out.mask[i]
+    return { w: out.width, h: out.height, inside, expected: Math.PI * 120 * 80 }
+  })
+
+  // Cropped to the ellipse's own bounding box, plus the inclusive edge pixel.
+  expect(r.w).toBeGreaterThanOrEqual(240)
+  expect(r.w).toBeLessThanOrEqual(242)
+  expect(r.h).toBeGreaterThanOrEqual(160)
+  expect(r.h).toBeLessThanOrEqual(162)
+  // πab, to within a pixel of quantisation around the perimeter.
+  expect(Math.abs(r.inside - r.expected) / r.expected).toBeLessThan(0.01)
+})
+
+test('a committed ring can be reshaped without redrawing it', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  await page.locator('[data-testid="edit-tool-polygon"]').click()
+
+  const box = await page.locator('[data-testid="heightmap-editor"]').boundingBox()
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+  const corners = [[-120, -100], [120, -100], [120, 100], [-120, 100]]
+  for (const [dx, dy] of corners) await page.mouse.click(cx + dx, cy + dy)
+  await page.keyboard.press('Enter')
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 4 pts')
+  const before = await page.locator('[data-testid="edit-result"]').innerText()
+
+  // Drag the top-left vertex further out — the selection must follow it.
+  await page.mouse.move(cx - 120, cy - 100)
+  await page.mouse.down()
+  await page.mouse.move(cx - 220, cy - 180, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForTimeout(300)
+  expect(await page.locator('[data-testid="edit-result"]').innerText()).not.toBe(before)
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 4 pts')
+
+  // Grabbing an edge splits it, right-clicking a point takes it away.
+  await page.mouse.click(cx + 120, cy)
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 5 pts')
+  await page.mouse.click(cx + 120, cy, { button: 'right' })
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 4 pts')
 })

@@ -13,7 +13,8 @@
  * work nobody sees.
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'
-import { effectiveBounds } from '../utils/heightmapEdit'
+import { simplifyFlat } from '../utils/geometryBuilders'
+import { effectiveBounds, isUsableShape } from '../utils/heightmapEdit'
 import { ACCENT, BORDER, MUTED, SURF } from './panel/ui'
 
 // Cap on the cached preview bitmap's long side. An 8k DEM downscaled to this is
@@ -22,6 +23,14 @@ import { ACCENT, BORDER, MUTED, SURF } from './panel/ui'
 const MAX_PREVIEW = 2048
 const HANDLE = 8          // handle hit radius / half-size, screen px
 const MIN_RECT = 4        // smallest crop, source px
+const VERTEX = 7          // vertex handle size, screen px
+const TAU = Math.PI * 2
+
+/** A ring of points, as opposed to an ellipse — the shapes whose vertices edit. */
+const isPointShape = (s) => !!s && s.type !== 'ellipse' && s.points?.length >= 6
+
+/** Tools that draw and edit rings of points. */
+const POINT_TOOLS = new Set(['lasso', 'polygon'])
 
 const HANDLES = [
   ['nw', 0, 0], ['n', 0.5, 0], ['ne', 1, 0],
@@ -137,8 +146,13 @@ export function HeightmapEditor({
 
     const ed = editRef.current
     const rect = ed?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
-    const poly = polyRef.current ?? (ed?.shape?.points ?? null)
-    const drawingPoly = !!polyRef.current
+    const drawingPts = polyRef.current
+    const drawingPoly = !!drawingPts
+    const shape = !drawingPoly && isUsableShape(ed?.shape) ? ed.shape : null
+    const ellipse = shape?.type === 'ellipse' ? shape : null
+    const ring = shape && !ellipse ? shape.points : null
+    // The path being drawn right now, whichever kind it is.
+    const poly = drawingPts ?? ring
 
     // Sub-path builders, deliberately *without* beginPath: the dim passes below
     // need the selection and a full-canvas rectangle in one path to fill the
@@ -149,13 +163,19 @@ export function HeightmapEditor({
       ctx.closePath()
     }
     const addRect = () => ctx.rect(sx(rect.x), sy(rect.y), rect.w * scale, rect.h * scale)
-    const addSelection = () => { if (poly && poly.length >= 6 && !drawingPoly) addPoly(poly); else addRect() }
+    const addEllipse = (el) => ctx.ellipse(sx(el.cx), sy(el.cy), el.rx * scale, el.ry * scale, 0, 0, TAU)
+    /** The committed shape if there is one, otherwise the crop rectangle. */
+    const addSelection = () => {
+      if (ellipse)   addEllipse(ellipse)
+      else if (ring) addPoly(ring)
+      else           addRect()
+    }
 
     // Everything the clip throws away, dimmed. Two even-odd fills rather than a
     // real intersection: outside the crop first, then — inside the crop only —
     // outside the shape.
     const dim = 'rgba(9,9,11,0.72)'
-    const hasShape = !!(poly && poly.length >= 6 && !drawingPoly)
+    const hasShape = !!shape
     ctx.fillStyle = dim
     ctx.beginPath()
     ctx.rect(0, 0, width, height)
@@ -168,7 +188,7 @@ export function HeightmapEditor({
       ctx.fillStyle = dim
       ctx.beginPath()
       ctx.rect(0, 0, width, height)
-      addPoly(poly)
+      if (ellipse) addEllipse(ellipse); else addPoly(ring)
       ctx.fill('evenodd')
       ctx.restore()
     }
@@ -211,7 +231,11 @@ export function HeightmapEditor({
     }
 
     // Selection outline
-    if (poly && poly.length >= 4) {
+    if (ellipse) {
+      ctx.strokeStyle = ACCENT
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); addEllipse(ellipse); ctx.stroke()
+    } else if (poly && poly.length >= 4) {
       ctx.strokeStyle = ACCENT
       ctx.lineWidth = 1.5
       ctx.beginPath()
@@ -232,6 +256,36 @@ export function HeightmapEditor({
         ctx.beginPath()
         ctx.arc(sx(poly[0]), sy(poly[1]), 6, 0, Math.PI * 2)
         ctx.stroke()
+      }
+    }
+
+    // Vertex handles — a committed ring stays editable, so a selection that came
+    // out nearly right can be nudged instead of redrawn from scratch.
+    if (ring && POINT_TOOLS.has(tool)) {
+      const active = dragRef.current?.mode === 'vertex' ? dragRef.current.index : -1
+      for (let i = 0; i < ring.length; i += 2) {
+        const hx = sx(ring[i]), hy = sy(ring[i + 1])
+        ctx.fillStyle = (i / 2) === active ? ACCENT : '#ffffff'
+        ctx.fillRect(hx - VERTEX / 2, hy - VERTEX / 2, VERTEX, VERTEX)
+        ctx.strokeStyle = 'rgba(0,0,0,.55)'
+        ctx.lineWidth = 1
+        ctx.strokeRect(hx - VERTEX / 2, hy - VERTEX / 2, VERTEX, VERTEX)
+      }
+    }
+
+    // Ellipse handles — the bounding box, same eight grips as the crop.
+    if (ellipse && tool === 'ellipse') {
+      const bx = ellipse.cx - ellipse.rx, by = ellipse.cy - ellipse.ry
+      const bw = ellipse.rx * 2, bh = ellipse.ry * 2
+      ctx.strokeStyle = 'rgba(255,255,255,0.25)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 3])
+      ctx.strokeRect(sx(bx), sy(by), bw * scale, bh * scale)
+      ctx.setLineDash([])
+      ctx.fillStyle = '#ffffff'
+      for (const [, fx, fy] of HANDLES) {
+        const hx = sx(bx + bw * fx), hy = sy(by + bh * fy)
+        ctx.fillRect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE)
       }
     }
   }, [preview, srcWidth, srcHeight, tool])
@@ -285,6 +339,54 @@ export function HeightmapEditor({
     return { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }
   }
 
+  /** Index of the vertex under the pointer, or -1. */
+  const hitVertex = (p, pts) => {
+    const tol = (VERTEX + 4) / viewRef.current.scale
+    for (let i = 0; i < pts.length; i += 2) {
+      if (Math.abs(p.x - pts[i]) <= tol && Math.abs(p.y - pts[i + 1]) <= tol) return i / 2
+    }
+    return -1
+  }
+
+  /**
+   * Where on the ring the pointer is, for inserting a vertex: the closest point
+   * on any edge, and the index it would be inserted before. The closing edge is
+   * included, which is why the loop wraps.
+   */
+  const hitEdge = (p, pts) => {
+    const tol = (VERTEX + 4) / viewRef.current.scale
+    const n = pts.length / 2
+    let best = null, bestD = tol
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n
+      const ax = pts[i * 2], ay = pts[i * 2 + 1]
+      const bx = pts[j * 2], by = pts[j * 2 + 1]
+      const dx = bx - ax, dy = by - ay
+      const len2 = dx * dx + dy * dy
+      if (len2 < 1e-9) continue
+      const t = Math.max(0, Math.min(1, ((p.x - ax) * dx + (p.y - ay) * dy) / len2))
+      const qx = ax + dx * t, qy = ay + dy * t
+      const d = Math.hypot(p.x - qx, p.y - qy)
+      if (d < bestD) { bestD = d; best = { after: i, x: qx, y: qy } }
+    }
+    return best
+  }
+
+  /** Replace the shape imperatively; commit happens on pointer-up. */
+  const setShapeLive = (shape) => {
+    editRef.current = { ...(editRef.current ?? { rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, feather: 0 }), shape }
+    draw()
+  }
+
+  /** The ellipse a drag is building, from two corners of its bounding box. */
+  const ellipseFromDrag = (a, b, circle) => {
+    let w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y)
+    if (circle) { const r = Math.max(w, h); w = r; h = r }
+    const sxg = b.x < a.x ? -1 : 1
+    const syg = b.y < a.y ? -1 : 1
+    return { type: 'ellipse', cx: a.x + sxg * w / 2, cy: a.y + syg * h / 2, rx: w / 2, ry: h / 2 }
+  }
+
   const hitHandle = (p, rect) => {
     const { scale } = viewRef.current
     const tol = (HANDLE + 3) / scale
@@ -297,6 +399,22 @@ export function HeightmapEditor({
 
   // ── Pointer ────────────────────────────────────────────────────────────────
   const onPointerDown = (e) => {
+    const shape = editRef.current?.shape ?? null
+
+    // Right-click drops a vertex. Alt is already the pan modifier, so it cannot
+    // also be the delete modifier.
+    if (e.button === 2) {
+      if (!polyRef.current && POINT_TOOLS.has(tool) && isPointShape(shape)) {
+        const i = hitVertex(toImage(e), shape.points)
+        // Three vertices are the fewest that still enclose anything.
+        if (i >= 0 && shape.points.length > 6) {
+          const points = [...shape.points]
+          points.splice(i * 2, 2)
+          commit({ shape: { ...shape, points } })
+        }
+      }
+      return
+    }
     if (e.button === 1 || e.altKey) {
       dragRef.current = { mode: 'pan', sx: e.clientX, sy: e.clientY, ox: viewRef.current.ox, oy: viewRef.current.oy }
       e.currentTarget.setPointerCapture(e.pointerId)
@@ -307,6 +425,40 @@ export function HeightmapEditor({
     const ed = editRef.current
     const rect = ed?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
     e.currentTarget.setPointerCapture(e.pointerId)
+
+    // An existing ring takes precedence over starting a new shape, so a selection
+    // that came out nearly right can be adjusted in place rather than redrawn.
+    // Grabbing a vertex moves it; grabbing an edge splits it and hands back the
+    // new vertex already under the cursor, which is one gesture instead of two.
+    if (POINT_TOOLS.has(tool) && !polyRef.current && isPointShape(shape)) {
+      const i = hitVertex(p, shape.points)
+      if (i >= 0) {
+        dragRef.current = { mode: 'vertex', index: i, points: [...shape.points] }
+        draw()
+        return
+      }
+      const edge = hitEdge(p, shape.points)
+      if (edge) {
+        const points = [...shape.points]
+        points.splice((edge.after + 1) * 2, 0, edge.x, edge.y)
+        dragRef.current = { mode: 'vertex', index: edge.after + 1, points }
+        setShapeLive({ ...shape, points })
+        return
+      }
+    }
+
+    if (tool === 'ellipse') {
+      const el = shape?.type === 'ellipse' ? shape : null
+      if (el) {
+        const box = { x: el.cx - el.rx, y: el.cy - el.ry, w: el.rx * 2, h: el.ry * 2 }
+        const handle = hitHandle(p, box)
+        if (handle) { dragRef.current = { mode: 'ellipse-resize', handle, box }; return }
+        const inside = ((p.x - el.cx) / el.rx) ** 2 + ((p.y - el.cy) / el.ry) ** 2 <= 1
+        if (inside && !e.shiftKey) { dragRef.current = { mode: 'ellipse-move', start: p, el }; return }
+      }
+      dragRef.current = { mode: 'ellipse-new', start: p }
+      return
+    }
 
     if (tool === 'crop') {
       const handle = hitHandle(p, rect)
@@ -365,6 +517,49 @@ export function HeightmapEditor({
       return
     }
 
+    if (d.mode === 'vertex') {
+      const points = d.points
+      points[d.index * 2]     = clamp(p.x, 0, srcWidth)
+      points[d.index * 2 + 1] = clamp(p.y, 0, srcHeight)
+      setShapeLive({ ...editRef.current.shape, points })
+      return
+    }
+
+    if (d.mode === 'ellipse-new') {
+      // Shift is read per move, so it can be pressed or released mid-drag.
+      setShapeLive(ellipseFromDrag(d.start, p, e.shiftKey))
+      return
+    }
+
+    if (d.mode === 'ellipse-move') {
+      const el = d.el
+      setShapeLive({ ...el, cx: el.cx + (p.x - d.start.x), cy: el.cy + (p.y - d.start.y) })
+      return
+    }
+
+    if (d.mode === 'ellipse-resize') {
+      const b = d.box
+      let x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h
+      const h = d.handle
+      if (h.includes('w')) x0 = Math.min(p.x, x1 - MIN_RECT)
+      if (h.includes('e')) x1 = Math.max(p.x, x0 + MIN_RECT)
+      if (h.includes('n')) y0 = Math.min(p.y, y1 - MIN_RECT)
+      if (h.includes('s')) y1 = Math.max(p.y, y0 + MIN_RECT)
+      if (e.shiftKey) {
+        // Grow the short axis to match the long one, anchored on whichever edge
+        // is *not* being dragged; an edge handle keeps the other axis centred.
+        const r = Math.max(x1 - x0, y1 - y0)
+        if (h.includes('w')) x0 = x1 - r
+        else if (h.includes('e')) x1 = x0 + r
+        else { const cx = (x0 + x1) / 2; x0 = cx - r / 2; x1 = cx + r / 2 }
+        if (h.includes('n')) y0 = y1 - r
+        else if (h.includes('s')) y1 = y0 + r
+        else { const cy = (y0 + y1) / 2; y0 = cy - r / 2; y1 = cy + r / 2 }
+      }
+      setShapeLive({ type: 'ellipse', cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, rx: (x1 - x0) / 2, ry: (y1 - y0) / 2 })
+      return
+    }
+
     if (d.mode === 'new') {
       const r = {
         x: Math.min(d.start.x, p.x), y: Math.min(d.start.y, p.y),
@@ -418,8 +613,18 @@ export function HeightmapEditor({
       polyRef.current = null
       // A click rather than a drag: no area, nothing to select.
       if (!pts || pts.length < 6) { draw(); return }
-      commit({ shape: { type: 'lasso', points: pts } })
+      // Decimate before committing. A drag emits a vertex every few screen
+      // pixels, and several hundred of them are both slow to scanline-fill and
+      // impossible to edit by hand afterwards. Douglas–Peucker at ~1.5 screen
+      // pixels is invisible on screen and typically cuts the count by 5–10×.
+      const eps = 1.5 / viewRef.current.scale
+      commit({ shape: { type: 'lasso', points: Array.from(simplifyFlat(pts, eps)) } })
       return
+    }
+
+    if (d.mode === 'ellipse-new' && !isUsableShape(editRef.current?.shape)) {
+      // A click, not a drag — leave whatever was there alone.
+      draw(); return
     }
     // Crop gestures already mutated editRef imperatively; publish the result.
     commit({})
@@ -504,7 +709,7 @@ export function HeightmapEditor({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        onDoubleClick={() => { if (tool === 'polygon') closePolygon() }}
+        onDoubleClick={() => { if (polyRef.current) closePolygon() }}
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
       />
@@ -522,8 +727,10 @@ export function HeightmapEditor({
           {bounds ? `${bounds.w}×${bounds.h} px` : 'empty selection'}
           {' · '}
           {tool === 'crop'    && 'drag to crop · handles to resize'}
-          {tool === 'lasso'   && 'drag to draw a free-hand selection'}
+          {tool === 'ellipse' && 'drag to draw · hold shift for a circle'}
+          {tool === 'lasso'   && 'drag to draw · then drag the points to adjust'}
           {tool === 'polygon' && 'click to add points · Enter or first point to close'}
+          {POINT_TOOLS.has(tool) && ' · drag a point to move it · drag an edge to add one · right-click to remove'}
           {' · alt-drag to pan · scroll to zoom'}
         </span>
       </div>

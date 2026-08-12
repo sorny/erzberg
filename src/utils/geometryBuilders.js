@@ -646,7 +646,7 @@ function chainLevelSegments(segE, segXY, nSegs, scratch) {
  */
 let _dpKeep = null
 let _dpStack = null
-function simplifyFlat(pts, eps, outBuf = null) {
+export function simplifyFlat(pts, eps, outBuf = null) {
   const n = pts.length / 2
   if (n < 3) return pts
   if (!_dpKeep || _dpKeep.length < n) _dpKeep = new Uint8Array(n * 2)
