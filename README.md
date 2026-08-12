@@ -92,13 +92,15 @@ projectable, not georeferenced, or projected fine and lying somewhere else.
 
 ## Edit Mode
 
-<img src="docs/images/edit-mode.png" alt="Edit Mode: a lasso selection with a feathered edge over the heightmap">
+<img src="docs/images/edit-mode.png" alt="Edit Mode: a lasso selection with editable points and a feathered edge over the heightmap">
 
 Press `E` and the viewport becomes a flat picture of the raster. Crop it with a
-handled rectangle (aspect locks, numeric fields), or cut out an arbitrary region
-with a lasso or polygon. The result is centred automatically, and Feather ramps
-the clipped edge down to the terrain's own base level instead of ending it in a
-cliff.
+handled rectangle (aspect locks, numeric fields), draw an ellipse — Shift for a
+perfect circle — or cut out an arbitrary region with a lasso or polygon. A lasso
+or polygon stays editable once closed: drag a point to move it, drag an edge to
+add one, right-click to remove. The result is centred automatically, and Feather
+ramps the clipped edge down to the terrain's own base level instead of ending it
+in a cliff.
 
 The clip is non-destructive: the original raster is kept, so Edit Mode can be
 re-entered to adjust it or cleared to get the whole heightmap back. It works the
@@ -243,6 +245,8 @@ with them.
 | `Esc` | Cancel the shape being drawn, leave Edit Mode, or cancel elevation-profile picking |
 | `Enter` | Close the shape being drawn, or apply the clip |
 | `Backspace` | Remove the last polygon vertex |
+| `Shift` | While drawing or resizing an ellipse, constrain it to a circle |
+| Right-click | Remove a point from a committed lasso or polygon |
 | `Q` | Toggle auto-rotate |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
 

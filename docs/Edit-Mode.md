@@ -1,8 +1,8 @@
 # Edit Mode
 
 Edit Mode clips the loaded raster before it becomes terrain: a crop rectangle,
-a free-hand lasso, or a polygon. It applies to every source — PNG, GeoTIFF and
-Soundscapes — because all three write the same store slot, and it is
+a free-hand lasso, a polygon, or an ellipse. It applies to every source — PNG,
+GeoTIFF and Soundscapes — because all three write the same store slot, and it is
 non-destructive: the raster as loaded is kept, so the clip can be adjusted or
 dropped at any time.
 
@@ -42,7 +42,11 @@ An `edit` is expressed entirely in source pixel coordinates, so it is
 independent of zoom, window size and device pixel ratio:
 
 ```js
-{ rect: {x, y, w, h}, shape: {type: 'lasso'|'polygon', points: [x0,y0,x1,y1,…]} | null, feather: px }
+{ rect: {x, y, w, h}, shape: Shape | null, feather: px }
+
+// a Shape is a ring of points, or an ellipse:
+{ type: 'lasso'|'polygon', points: [x0,y0,x1,y1,…] }
+{ type: 'ellipse', cx, cy, rx, ry }
 ```
 
 ### When the clip is dropped
@@ -82,6 +86,8 @@ After Apply the view refits exactly as a fresh load does — `autoZoom` plus
 
 ## Rasterizing a selection
 
+### Rings
+
 Lasso and polygon differ only in how their vertices are collected; both end as a
 closed ring filled with the even-odd rule. For each row, the ring's edges are
 intersected with the row's centre line $y_c = y + \tfrac{1}{2}$:
@@ -93,9 +99,23 @@ than corners is what keeps a hand-drawn rectangle from gaining a half-pixel
 fringe, and the pair-wise fill handles concave and horseshoe shapes (four or more
 crossings on one row) without a special case.
 
-A lasso emits a vertex per pointer move, thinned to one per ~3 screen pixels —
-otherwise a single stroke yields thousands of near-duplicate vertices for the
-scanline fill to grind through.
+A lasso emits a vertex per pointer move, thinned to one per ~3 screen pixels
+while drawing and then run through Douglas–Peucker (`simplifyFlat`, shared with
+the contour smoother) at ~1.5 screen pixels when the stroke is released. The
+decimation is invisible on screen and typically cuts the count by 5–10×, which
+matters twice over: the scanline fill has fewer edges to cross, and what comes
+back is few enough vertices to edit by hand.
+
+### Ellipses
+
+An ellipse is stored as an ellipse — `{cx, cy, rx, ry}` — not as a ring of
+sampled points. A 128-gon shows visible flats once the raster is a few thousand
+pixels wide, and the implicit form is both exact and cheaper: solving
+
+$$\left(\frac{x - c_x}{r_x}\right)^2 + \left(\frac{y - c_y}{r_y}\right)^2 \le 1$$
+
+for $x$ gives the filled span of each row directly, so the fill touches only the
+pixels it sets rather than testing the $4/\pi$ of the bounding box it does not.
 
 The raster's own voids (GeoTIFF NoData, transparent PNG pixels) are folded into
 the same mask, so a void's edge feathers like any other edge.
@@ -171,8 +191,19 @@ the ramp is not baked into the source and re-ramped on the next run.
   rect still covers the whole raster, a drag inside it draws a new one — there is
   no outside to start from, and moving it could not go anywhere. Shift forces a
   new rect at any size.
+- **Ellipse**: drag out its bounding box; hold **Shift** for a perfect circle,
+  which works while drawing *and* while resizing because the modifier is read on
+  every pointer move rather than latched at the start of the drag. Drag inside to
+  move it, or use the same eight handles the crop has.
 - **Polygon**: click to place vertices; close with the first vertex, `Enter`, or a
   double-click. `Backspace` removes the last vertex.
+- **Editing a committed ring**: a lasso or polygon stays editable after it is
+  closed, so a selection that came out nearly right does not have to be redrawn.
+  Drag a vertex to move it, drag an *edge* to split it and pull the new vertex
+  out in the same gesture, right-click a vertex to remove it (never below the
+  three that still enclose something). The vertex handles are drawn whenever a
+  ring exists and a ring tool is selected — the crop and ellipse tools have their
+  own handles in the same places, so they take over the pointer instead.
 - **View**: scroll to zoom about the cursor, alt-drag or middle-drag to pan, `Fit`
   to reset.
 - `Esc` cancels a half-drawn shape, and otherwise leaves Edit Mode without
@@ -194,4 +225,4 @@ release — a lasso emits a point per pointer move, and re-rendering the panel
 | `src/store/useStore.js` | Source/derived split, mask memo, `setEdit`, the `keepEdit` rule, erosion scatter-back |
 | `src/components/HeightmapEditor.jsx` | The 2D canvas: preview, overlays, pointer tools |
 | `src/components/EditPanel.jsx` | The right-hand panel while editing |
-| `tests/edit.spec.js` | End-to-end clip, clear, cancel, lasso, polygon, soundscape and GeoTIFF coverage |
+| `tests/edit.spec.js` | End-to-end clip, clear, cancel, lasso, polygon, ellipse, ring editing, soundscape and GeoTIFF coverage |

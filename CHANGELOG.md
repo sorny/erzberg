@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.6] - 2026-08-12
+
+Two additions to Edit Mode, both about not having to start over. Circles and
+ellipses previously had to be traced by hand with the lasso, and any selection
+that came out slightly wrong had to be redrawn from scratch — the vertices were
+thrown away the moment the ring closed.
+
+### Added
+- **An ellipse selection in Edit Mode**, with Shift for a perfect circle. It is stored as an ellipse rather than sampled into a polygon: a 128-gon shows visible flats once the raster is a few thousand pixels wide, and the implicit form is both exact and cheaper to fill — solving the ellipse equation for `x` gives each row's span directly, so the fill touches only the pixels it sets instead of testing the 4/π of the bounding box it does not. Shift is read on every pointer move rather than latched when the drag starts, so it snaps to a circle mid-drag and while resizing, not only at the outset.
+- **Lasso and polygon selections stay editable after they are closed.** Getting a hand-drawn outline slightly wrong meant redrawing the whole thing. Now the vertices remain: drag one to move it, drag an *edge* to split it and pull the new vertex out in the same gesture, right-click one to remove it (never below the three that still enclose an area). Lassos are additionally decimated on release with the Douglas–Peucker pass already used for contour smoothing (`simplifyFlat`, now exported) — a stroke that emitted 200 near-duplicate vertices comes back as 20-odd editable ones, which also gives the scanline fill fewer edges to cross.
+
 ## [0.9.5] - 2026-08-11
 
 A release about finding things. The app could already render 56 curated looks
