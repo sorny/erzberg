@@ -38,6 +38,34 @@ const HANDLES = [
   ['sw', 0, 1], ['s', 0.5, 1], ['se', 1, 1],
 ]
 
+/** The axis a box handle resizes along, as a cursor. */
+const RESIZE_CURSOR = {
+  nw: 'nwse-resize', se: 'nwse-resize',
+  ne: 'nesw-resize', sw: 'nesw-resize',
+  n:  'ns-resize',   s:  'ns-resize',
+  w:  'ew-resize',   e:  'ew-resize',
+}
+
+/**
+ * The cursor for what a press would do — the whole point of `pick` returning a
+ * named gesture rather than the drag state directly.
+ *
+ * A handle is only as discoverable as it is visible, and at 7–8 screen pixels
+ * these are small targets sitting on a busy greyscale raster. The cursor is what
+ * says "you have it" before the press, and which axis it will move along.
+ * `grabbing` while the gesture runs is the usual grab/grabbing pair.
+ */
+function cursorFor(hit, dragging) {
+  switch (hit.kind) {
+    case 'vertex':                     return dragging ? 'grabbing' : 'grab'
+    case 'edge':                       return 'copy'        // a press adds a vertex here
+    case 'resize': case 'ellipse-resize': return RESIZE_CURSOR[hit.handle]
+    case 'move':   case 'ellipse-move':   return dragging ? 'grabbing' : 'move'
+    case 'close':                      return 'pointer'     // clicking closes the ring
+    default:                           return 'crosshair'
+  }
+}
+
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v }
 
 /** Greyscale preview bitmap of the source raster, stretched to its own range. */
@@ -397,6 +425,70 @@ export function HeightmapEditor({
     return null
   }
 
+  /**
+   * What a left-press at `p` would start, as a named gesture plus whatever that
+   * gesture needs to begin.
+   *
+   * Split out of `onPointerDown` because the cursor has to answer the same
+   * question on every hover: two copies of this tree would drift, and a cursor
+   * promising a grab where the press actually draws a new shape is worse than no
+   * cursor at all. Shift is a parameter rather than read from a ref because it
+   * changes the answer — inside an existing selection it forces a new one — and
+   * must be re-read per event, not latched.
+   */
+  const pick = (p, shiftKey) => {
+    const ed = editRef.current
+    const shape = ed?.shape ?? null
+    const rect = ed?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
+
+    // An existing ring takes precedence over starting a new shape, so a selection
+    // that came out nearly right can be adjusted in place rather than redrawn.
+    if (POINT_TOOLS.has(tool) && !polyRef.current && isPointShape(shape)) {
+      const index = hitVertex(p, shape.points)
+      if (index >= 0) return { kind: 'vertex', index }
+      const edge = hitEdge(p, shape.points)
+      if (edge) return { kind: 'edge', edge }
+    }
+
+    if (tool === 'ellipse') {
+      const el = shape?.type === 'ellipse' ? shape : null
+      if (el) {
+        const box = { x: el.cx - el.rx, y: el.cy - el.ry, w: el.rx * 2, h: el.ry * 2 }
+        const handle = hitHandle(p, box)
+        if (handle) return { kind: 'ellipse-resize', handle, box }
+        const inside = ((p.x - el.cx) / el.rx) ** 2 + ((p.y - el.cy) / el.ry) ** 2 <= 1
+        if (inside && !shiftKey) return { kind: 'ellipse-move', el }
+      }
+      return { kind: 'ellipse-new' }
+    }
+
+    if (tool === 'crop') {
+      const handle = hitHandle(p, rect)
+      if (handle) return { kind: 'resize', handle, rect }
+      const inside = p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h
+      // A rect still covering the whole raster has no "outside" to start a new
+      // one from, so dragging inside it draws rather than moves — moving it
+      // could not go anywhere anyway. Shift forces a new one at any size.
+      const fullExtent = rect.x === 0 && rect.y === 0 && rect.w === srcWidth && rect.h === srcHeight
+      if (inside && !fullExtent && !shiftKey) return { kind: 'move', rect }
+      return { kind: 'new' }
+    }
+
+    if (tool === 'polygon') {
+      const pts = polyRef.current
+      if (pts && pts.length >= 6) {
+        const d = Math.hypot(p.x - pts[0], p.y - pts[1]) * viewRef.current.scale
+        if (d <= HANDLE + 4) return { kind: 'close' }
+      }
+      return { kind: 'polygon' }
+    }
+
+    return { kind: 'lasso' }
+  }
+
+  /** Cursor is written straight to the node: a hover must not re-render. */
+  const setCursor = (c) => { if (canvasRef.current) canvasRef.current.style.cursor = c }
+
   // ── Pointer ────────────────────────────────────────────────────────────────
   const onPointerDown = (e) => {
     const shape = editRef.current?.shape ?? null
@@ -418,85 +510,72 @@ export function HeightmapEditor({
     if (e.button === 1 || e.altKey) {
       dragRef.current = { mode: 'pan', sx: e.clientX, sy: e.clientY, ox: viewRef.current.ox, oy: viewRef.current.oy }
       e.currentTarget.setPointerCapture(e.pointerId)
+      setCursor('grabbing')
       return
     }
     if (e.button !== 0) return
     const p = toImage(e)
-    const ed = editRef.current
-    const rect = ed?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
     e.currentTarget.setPointerCapture(e.pointerId)
 
-    // An existing ring takes precedence over starting a new shape, so a selection
-    // that came out nearly right can be adjusted in place rather than redrawn.
-    // Grabbing a vertex moves it; grabbing an edge splits it and hands back the
-    // new vertex already under the cursor, which is one gesture instead of two.
-    if (POINT_TOOLS.has(tool) && !polyRef.current && isPointShape(shape)) {
-      const i = hitVertex(p, shape.points)
-      if (i >= 0) {
-        dragRef.current = { mode: 'vertex', index: i, points: [...shape.points] }
+    const hit = pick(p, e.shiftKey)
+    setCursor(cursorFor(hit, true))
+
+    switch (hit.kind) {
+      // Grabbing a vertex moves it; grabbing an edge splits it and hands back
+      // the new vertex already under the cursor — one gesture instead of two.
+      case 'vertex':
+        dragRef.current = { mode: 'vertex', index: hit.index, points: [...shape.points] }
         draw()
         return
-      }
-      const edge = hitEdge(p, shape.points)
-      if (edge) {
+
+      case 'edge': {
         const points = [...shape.points]
-        points.splice((edge.after + 1) * 2, 0, edge.x, edge.y)
-        dragRef.current = { mode: 'vertex', index: edge.after + 1, points }
+        points.splice((hit.edge.after + 1) * 2, 0, hit.edge.x, hit.edge.y)
+        dragRef.current = { mode: 'vertex', index: hit.edge.after + 1, points }
         setShapeLive({ ...shape, points })
         return
       }
-    }
 
-    if (tool === 'ellipse') {
-      const el = shape?.type === 'ellipse' ? shape : null
-      if (el) {
-        const box = { x: el.cx - el.rx, y: el.cy - el.ry, w: el.rx * 2, h: el.ry * 2 }
-        const handle = hitHandle(p, box)
-        if (handle) { dragRef.current = { mode: 'ellipse-resize', handle, box }; return }
-        const inside = ((p.x - el.cx) / el.rx) ** 2 + ((p.y - el.cy) / el.ry) ** 2 <= 1
-        if (inside && !e.shiftKey) { dragRef.current = { mode: 'ellipse-move', start: p, el }; return }
-      }
-      dragRef.current = { mode: 'ellipse-new', start: p }
-      return
-    }
+      case 'ellipse-resize': dragRef.current = { mode: 'ellipse-resize', handle: hit.handle, box: hit.box }; return
+      case 'ellipse-move':   dragRef.current = { mode: 'ellipse-move', start: p, el: hit.el };               return
+      case 'ellipse-new':    dragRef.current = { mode: 'ellipse-new', start: p };                            return
+      case 'resize':         dragRef.current = { mode: 'resize', handle: hit.handle, start: p, rect: hit.rect }; return
+      case 'move':           dragRef.current = { mode: 'move', start: p, rect: hit.rect };                   return
+      case 'new':            dragRef.current = { mode: 'new', start: p };                                    return
 
-    if (tool === 'crop') {
-      const handle = hitHandle(p, rect)
-      const inside = p.x >= rect.x && p.x <= rect.x + rect.w && p.y >= rect.y && p.y <= rect.y + rect.h
-      // A rect still covering the whole raster has no "outside" to start a new
-      // one from, so dragging inside it draws rather than moves — moving it
-      // could not go anywhere anyway. Shift forces a new one at any size.
-      const fullExtent = rect.x === 0 && rect.y === 0 && rect.w === srcWidth && rect.h === srcHeight
-      if (handle)                              dragRef.current = { mode: 'resize', handle, start: p, rect }
-      else if (inside && !fullExtent && !e.shiftKey) dragRef.current = { mode: 'move', start: p, rect }
-      else                                     dragRef.current = { mode: 'new', start: p }
-      return
-    }
+      case 'lasso':
+        polyRef.current = [clamp(p.x, 0, srcWidth), clamp(p.y, 0, srcHeight)]
+        dragRef.current = { mode: 'lasso' }
+        draw()
+        return
 
-    if (tool === 'lasso') {
-      polyRef.current = [clamp(p.x, 0, srcWidth), clamp(p.y, 0, srcHeight)]
-      dragRef.current = { mode: 'lasso' }
-      draw()
-      return
-    }
+      case 'close':
+        closePolygon()
+        return
 
-    if (tool === 'polygon') {
-      const pts = polyRef.current
-      const { scale } = viewRef.current
-      if (pts && pts.length >= 6) {
-        const d = Math.hypot(p.x - pts[0], p.y - pts[1]) * scale
-        if (d <= HANDLE + 4) { closePolygon(); return }
-      }
-      polyRef.current = [...(pts ?? []), clamp(p.x, 0, srcWidth), clamp(p.y, 0, srcHeight)]
-      draw()
+      case 'polygon':
+        polyRef.current = [...(polyRef.current ?? []), clamp(p.x, 0, srcWidth), clamp(p.y, 0, srcHeight)]
+        draw()
+        return
     }
   }
 
   const onPointerMove = (e) => {
     const d = dragRef.current
-    hoverRef.current = toImage(e)
+    const hover = toImage(e)
+    hoverRef.current = hover
 
-    if (!d) { if (tool === 'polygon' && polyRef.current) draw(); return }
+    if (!d) {
+      // Hovering: say what a press would do. Alt is the pan modifier and outranks
+      // whatever is underneath, since that is what the press would actually do.
+      setCursor(e.altKey ? 'grab' : cursorFor(pick(hover, e.shiftKey), false))
+      if (tool === 'polygon' && polyRef.current) draw()
+      return
+    }
+
+    // Mid-gesture the cursor was set on press and stays put: pointer capture
+    // means the pointer can wander off the handle it grabbed, and re-picking
+    // under it would flicker the cursor through whatever it passes over.
 
     if (d.mode === 'pan') {
       viewRef.current = { ...viewRef.current, ox: d.ox + (e.clientX - d.sx), oy: d.oy + (e.clientY - d.sy) }
@@ -606,6 +685,9 @@ export function HeightmapEditor({
     const d = dragRef.current
     dragRef.current = null
     if (e.currentTarget.hasPointerCapture?.(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    // Back to the hover cursor. Read against the shape the gesture just left
+    // behind, so releasing a vertex still reads as grabbable.
+    setCursor(e.altKey ? 'grab' : cursorFor(pick(toImage(e), e.shiftKey), false))
     if (!d || d.mode === 'pan') return
 
     if (d.mode === 'lasso') {
@@ -704,6 +786,10 @@ export function HeightmapEditor({
     >
       <canvas
         ref={canvasRef}
+        // `cursor` is the resting value only — the pointer handlers write
+        // canvas.style.cursor directly, because a hover must not re-render the
+        // panel. React leaves that write alone as long as the literal here never
+        // changes between renders; making it conditional would fight them.
         style={{ width: '100%', height: '100%', display: 'block', cursor: 'crosshair' }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}

@@ -341,3 +341,82 @@ test('a committed ring can be reshaped without redrawing it', async ({ page }) =
   await page.mouse.click(cx + 120, cy, { button: 'right' })
   await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 4 pts')
 })
+
+/**
+ * Read the canvas cursor after parking the pointer somewhere.
+ *
+ * The handles are 7–8 screen pixels on a busy greyscale raster, so the cursor is
+ * what tells you a press will grab one rather than start a new shape. These
+ * hover the exact screen points a gesture was made at — a drag's endpoints *are*
+ * the box corners, a click's position *is* the vertex — so nothing here has to
+ * know the editor's zoom or pan.
+ */
+async function cursorAt(page, x, y) {
+  await page.mouse.move(x, y)
+  await page.waitForTimeout(60)
+  return page.locator('[data-testid="heightmap-editor"] canvas')
+    .evaluate(el => getComputedStyle(el).cursor)
+}
+
+test('the cursor says which ring point the pointer has', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  await page.locator('[data-testid="edit-tool-polygon"]').click()
+
+  const box = await page.locator('[data-testid="heightmap-editor"]').boundingBox()
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+  const corners = [[-120, -100], [120, -100], [120, 100], [-120, 100]]
+  for (const [dx, dy] of corners) await page.mouse.click(cx + dx, cy + dy)
+  await page.keyboard.press('Enter')
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('polygon · 4 pts')
+
+  expect(await cursorAt(page, cx - 120, cy - 100), 'on a vertex').toBe('grab')
+  expect(await cursorAt(page, cx + 120, cy),       'midway along an edge').toBe('copy')
+  expect(await cursorAt(page, cx, cy),             'interior, no handle').toBe('crosshair')
+
+  // Mid-drag it stays `grabbing` even though the pointer has left the vertex —
+  // pointer capture means the gesture, not the ground under it, decides.
+  await page.mouse.move(cx - 120, cy - 100)
+  await page.mouse.down()
+  await page.mouse.move(cx - 40, cy - 30, { steps: 6 })
+  const held = await page.locator('[data-testid="heightmap-editor"] canvas')
+    .evaluate(el => getComputedStyle(el).cursor)
+  await page.mouse.up()
+  expect(held, 'while dragging a vertex').toBe('grabbing')
+})
+
+test('the cursor says which way a box handle resizes', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+
+  const box = await page.locator('[data-testid="heightmap-editor"]').boundingBox()
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2
+  const x0 = cx - 160, y0 = cy - 120, x1 = cx + 160, y1 = cy + 120
+
+  // The crop starts at the full extent, where a drag inside draws rather than
+  // moves — so draw a smaller one first. Its corners land on the drag endpoints.
+  await page.mouse.move(x0, y0)
+  await page.mouse.down()
+  await page.mouse.move(x1, y1, { steps: 10 })
+  await page.mouse.up()
+  await page.waitForTimeout(200)
+
+  expect(await cursorAt(page, x0, y0),           'crop nw corner').toBe('nwse-resize')
+  expect(await cursorAt(page, x1, y0),           'crop ne corner').toBe('nesw-resize')
+  expect(await cursorAt(page, (x0 + x1) / 2, y0), 'crop n edge').toBe('ns-resize')
+  expect(await cursorAt(page, x0, (y0 + y1) / 2), 'crop w edge').toBe('ew-resize')
+  expect(await cursorAt(page, cx, cy),           'inside the crop').toBe('move')
+  expect(await cursorAt(page, box.x + 6, box.y + 6), 'outside it').toBe('crosshair')
+
+  // The ellipse carries the same eight grips on its bounding box.
+  await page.locator('[data-testid="edit-tool-ellipse"]').click()
+  await page.mouse.move(x0, y0)
+  await page.mouse.down()
+  await page.mouse.move(x1, y1, { steps: 10 })
+  await page.mouse.up()
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('ellipse')
+
+  expect(await cursorAt(page, x0, y0),            'ellipse nw grip').toBe('nwse-resize')
+  expect(await cursorAt(page, (x0 + x1) / 2, y1), 'ellipse s grip').toBe('ns-resize')
+  expect(await cursorAt(page, cx, cy),            'inside the ellipse').toBe('move')
+})

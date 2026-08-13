@@ -98,9 +98,10 @@ Press `E` and the viewport becomes a flat picture of the raster. Crop it with a
 handled rectangle (aspect locks, numeric fields), draw an ellipse — Shift for a
 perfect circle — or cut out an arbitrary region with a lasso or polygon. A lasso
 or polygon stays editable once closed: drag a point to move it, drag an edge to
-add one, right-click to remove. The result is centred automatically, and Feather
-ramps the clipped edge down to the terrain's own base level instead of ending it
-in a cliff.
+add one, right-click to remove. The cursor names whichever handle it is over
+before you press, so the small ones are findable. The result is centred
+automatically, and Feather ramps the clipped edge down to the terrain's own base
+level instead of ending it in a cliff.
 
 The clip is non-destructive: the original raster is kept, so Edit Mode can be
 re-entered to adjust it or cleared to get the whole heightmap back. It works the

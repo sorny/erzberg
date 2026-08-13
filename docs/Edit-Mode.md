@@ -211,8 +211,24 @@ the ramp is not baked into the source and re-ramped on the next run.
   three that still enclose something). The vertex handles are drawn whenever a
   ring exists and a ring tool is selected — the crop and ellipse tools have their
   own handles in the same places, so they take over the pointer instead.
+- **The cursor names the grab.** A handle is 7–8 screen pixels on a busy
+  greyscale raster, which is not much to aim at, so the pointer says what a press
+  would do before you commit to it: `grab` over a ring vertex (`grabbing` while
+  it moves), `copy` over an edge — where a press *adds* a vertex — a directional
+  `↖↘`/`↕`/`↔` resize over each of the eight box grips, `move` inside a movable
+  selection, `pointer` over the vertex that would close a polygon, and `crosshair`
+  everywhere a press starts something new.
+
+  This is one hit test, not two: `pick()` returns the gesture a press would
+  start, and `onPointerDown` and the cursor both read it. Two copies of that
+  decision tree would drift, and a cursor promising a grab where the press
+  actually draws a new shape is worse than no cursor at all. The cursor is
+  written straight to `canvas.style` — a hover must not re-render the panel — and
+  is left alone mid-gesture, since pointer capture lets the pointer wander off the
+  handle it grabbed and re-picking under it would flicker.
 - **View**: scroll to zoom about the cursor, alt-drag or middle-drag to pan, `Fit`
-  to reset.
+  to reset. Holding alt shows `grab`, since that is what the press would do
+  regardless of what is underneath.
 - `Esc` cancels a half-drawn shape, and otherwise leaves Edit Mode without
   committing. `Enter` closes a shape, and otherwise applies.
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.8] - 2026-08-13
+
+Edit Mode gained editable vertices and ellipse grips in 0.9.6, and then said
+nothing about where any of them were. Every handle in the editor is 7–8 screen
+pixels on a busy greyscale raster, and the pointer was a crosshair over all of
+them and over the empty space between them alike.
+
+### Changed
+- **Edit Mode's cursor names the grab.** Whether a press would move a vertex, resize a box or start a whole new shape was something you found out by trying it. The cursor now answers first: `grab` over a ring vertex (`grabbing` while it moves), `copy` over an edge, where a press *adds* one, a directional resize over each of the eight crop and ellipse grips, `move` inside a movable selection, `pointer` over the vertex that closes a polygon, and `crosshair` wherever a press starts something new. Alt outranks all of them, since panning is what the press would actually do.
+- The hit test moved out of `onPointerDown` into a `pick()` that names the gesture a press would start, which both the press and the cursor now read. Two copies of that decision tree would drift, and a cursor promising a grab where the press draws a new shape is worse than no cursor at all. The cursor is written straight to `canvas.style` — a hover must not re-render the panel — and is left alone mid-gesture, since pointer capture lets the pointer wander off the handle it grabbed.
+
 ## [0.9.7] - 2026-08-12
 
 A bug-fix release about one mistake made in four places. `buildTerrain` stores
