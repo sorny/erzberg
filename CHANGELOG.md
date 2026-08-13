@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.14] - 2026-08-13
+
+### Added
+- **A range per audio channel**, under its amount: the slice of that signal's
+  0…1 which is stretched across the whole response. An amount slider could not
+  do this job — the band envelopes are auto-gained against the track's own
+  recent peak, so a track that is loud from end to end sits pinned near the top
+  and barely moves, and scaling something that is not varying only scales a
+  constant. On a synthetic envelope oscillating between 0.86 and 0.94:
+  unwindowed it swings 0.08 of its available range; windowed to that slice it
+  swings the full 1.0.
+- Each channel windows separately, because each is after something different in
+  the same track. Burst ships windowed at 0.15–0.90, since raw onset values sit
+  low and dense music produces a wall of small ones that disperses the flock;
+  Pulse and Size both read bass but are usually wanted at different thresholds.
+- The meter draws each window as a bracket behind its band's envelope cap, so
+  setting one is a matter of seeing where the track sits and putting the window
+  around it rather than guessing.
+### Fixed
+- **A rolled seed now describes the particle field completely.** `randomPreset`
+  seeded `style` from `STYLE_DEF` but `points` from a bare `{ showPoints: false }`,
+  and `applyPreset` merges over the previous state — so any particle key a roll
+  did not happen to set survived from the roll before it. Stepping back through
+  the roll history restored a seed and its style but kept the *later* roll's
+  particle colour, which makes the seed not quite the look. Latent since the
+  randomiser shipped and rare while that block set three keys; considerably less
+  rare since 0.9.9 put a dozen in it.
+
+### Added
+- `RangeSl`, a two-handle range control for the panel. Built from two stacked
+  native inputs with inert tracks and live thumbs, which keeps keyboard control
+  and the native feel a hand-rolled widget would lose. The handles cannot cross.
+
 ## [0.9.13] - 2026-08-13
 
 ### Added

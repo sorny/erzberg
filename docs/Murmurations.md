@@ -246,6 +246,32 @@ on-screen footprint carries a 1 Hz component of amplitude 358 against a
 neighbouring-frequency floor of 41, where a silent flock manages 61 against 34.
 The beat is a line in the flock's motion, not a wobble.
 
+### Ranges
+
+Each channel has an input **range** under its amount: the slice of that signal's
+0…1 which gets stretched across the whole response.
+
+This is the control a dense track needs, and an amount slider cannot substitute
+for it. The band envelopes are auto-gained against the track's own recent peak,
+so on something loud from end to end — drum and bass, the back half of most
+choruses — they sit near the top and barely move. Scaling a signal that is not
+varying only scales a constant. Measured on a synthetic envelope oscillating
+between 0.86 and 0.94: **unwindowed it swings 0.08 of its available range;
+windowed to exactly that slice it swings the full 1.0.** Same input, same
+amount, a reaction you can see.
+
+Each channel windows separately because each is looking for something different
+in the same track. Burst wants only the sharpest attacks and starts windowed at
+0.15–0.90, since raw onset values sit low and dense music produces a wall of
+small ones that would disperse the flock. Pace wants the broad shape of the
+whole thing. Pulse and Size both read bass but are usually wanted at different
+thresholds — a swell you can see before the flock has moved at all, against a
+kick you can feel.
+
+The meter draws each window as a bracket behind its band's envelope cap, so
+setting one is a matter of watching where the track actually sits and putting the
+window around it rather than guessing.
+
 ### The meter
 
 Above the sliders is a live readout of what the flock is hearing and what that
