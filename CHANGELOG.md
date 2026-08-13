@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.13] - 2026-08-13
+
+### Added
+- **A live meter for the audio reaction.** The spectrum at the playhead with the
+  three bands tinted behind it and each band's envelope drawn as a cap, over one
+  bar per channel showing its current contribution. The envelope caps are the
+  useful half: they are smoothed and auto-gained, so they sit nowhere near the
+  raw spectrum, and seeing both is how you tell a kick landing in the bass band
+  from one smearing into the mid. The channel bars make the sliders tunable by
+  eye — raise Pulse and watch its bar answer every kick, rather than raising it
+  and squinting at the flock.
+- The bars are derived by running the real `applyAudio` and `audioVisuals` over
+  neutral parameters and reading the result, not by restating their formulas in
+  the drawing code: a meter that drifts from what it meters is worse than none.
+- It draws in one `requestAnimationFrame` loop on a canvas and never re-renders
+  React, and an `IntersectionObserver` stops that loop when the section is
+  collapsed or scrolled out of view — a collapsed `Section` still renders its
+  children, so it would otherwise sample and repaint for a widget nobody sees.
+
 ## [0.9.12] - 2026-08-13
 
 ### Fixed

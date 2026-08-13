@@ -246,6 +246,35 @@ on-screen footprint carries a 1 Hz component of amplitude 358 against a
 neighbouring-frequency floor of 41, where a silent flock manages 61 against 34.
 The beat is a line in the flock's motion, not a wobble.
 
+### The meter
+
+Above the sliders is a live readout of what the flock is hearing and what that
+is doing to it — because "is the reaction visible enough" turned out to be a
+question I could not answer by eye, and neither can anyone else.
+
+The top row is the spectrum at the playhead, with the three bands tinted behind
+it and each band's *envelope* drawn as a cap. That distinction is the useful
+part: the envelope is smoothed and auto-gained, so it sits nowhere near the raw
+spectrum's height, and seeing both is how you tell a kick landing squarely in the
+bass band from one smearing into the mid.
+
+The bottom row is one bar per channel, showing its contribution right now. That
+is what makes the sliders tunable by eye: raise Pulse and watch its bar grow on
+every kick, instead of raising it and squinting at the flock.
+
+Those bars are derived by running the real `applyAudio` and `audioVisuals` over
+neutral parameters and reading what comes back, rather than by restating their
+formulas in the drawing code — a meter that drifts from the thing it is metering
+is worse than no meter.
+
+It samples the spectrogram independently rather than reading the simulation's
+state. Both are deterministic functions of the same playhead with the same
+constants, so they agree, and sampling independently means the meter keeps
+working while the flock is paused — which is exactly when you are setting it up.
+An `IntersectionObserver` stops the loop when the panel is collapsed or scrolled
+away: a collapsed `Section` still renders its children, so without it the meter
+would sample and repaint sixty times a second for something nobody can see.
+
 ### Sync
 
 `Sync` reads the spectrogram slightly *ahead* of the playhead, 40 ms by default.
