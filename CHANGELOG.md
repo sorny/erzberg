@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.12] - 2026-08-13
+
+### Fixed
+- **The flock's reaction to music was both faint and late.** Every mapping went
+  through a steering *force*, and a force changes velocity at `acc·dt` bounded
+  by the turn-rate limit before it changes position — so the integrator low-pass
+  filtered the beat into a vague swell a few hundred milliseconds after it. Two
+  new channels bypass it entirely: **Size** is a shader uniform, so sprites
+  swell and streaks lengthen on the exact frame the beat lands; **Burst** writes
+  velocity directly, throwing the flock outward from its own centre the instant
+  an onset arrives, and it re-forms on its own because no flocking rule was
+  touched. Envelope attack is down from 35 ms to 10 ms.
+- **Startle did nothing in the default configuration.** It acted only by
+  widening the predator's fear radius, and the predator is off by default — so
+  the most percussive control in the panel was a no-op unless you had found an
+  unrelated toggle. Onsets now always drive Burst; Startle is the extra on top
+  when a hawk is present.
+- Onsets fire on the *rise* of the flux envelope rather than its level, so one
+  attack is one trigger instead of a sustain for as long as the transient decays.
+- **Sync** reads the spectrogram slightly ahead of the playhead (40 ms by
+  default) to cancel the lag the force channels still carry. Lookahead is
+  possible only because the whole track is analysed before it plays.
+
+Measured against the test fixture, which bursts once a second: the flock's
+on-screen footprint now carries a 1 Hz component of amplitude 358 against a
+neighbouring-frequency floor of 41, where the silent flock manages 61 against
+34. The beat is a line in the flock's motion rather than a wobble — and there is
+a test asserting exactly that, since "is it visible" is otherwise a matter of
+opinion.
+
 ## [0.9.11] - 2026-08-13
 
 ### Fixed

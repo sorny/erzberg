@@ -213,12 +213,52 @@ whole feature lives outside the physics and `murmuration.js` never learns audio
 exists. It also means every mapping is something you could have dialled by hand,
 which keeps the result legible rather than magic.
 
-| Control | Feature | Effect |
-|---|---|---|
-| Pace | overall level | Flight speed, centred so an average passage flies at the dialled speed and quiet ones genuinely slow down |
-| Pulse | bass | Separation opens while cohesion eases — the flock *breathes* on the kick. Pulling both the same way only makes it vibrate |
-| Shimmer | high | Turbulence, on top of whatever is dialled in |
-| Startle | onsets | Widens the predator's fear radius, so an accented beat tears the same hole a strike does. Needs the predator on — it has nothing to act through otherwise |
+| Control | Feature | Acts through | Effect |
+|---|---|---|---|
+| **Size** | bass, level | uniform | Sprites swell on the kick and streaks lengthen with energy |
+| **Burst** | onsets | velocity | Throws the flock outward from its own centre |
+| Pace | overall level | speed clamp | Flight speed, centred so an average passage flies at the dialled speed and quiet ones genuinely slow down |
+| Pulse | bass | force | Separation opens while cohesion eases — the flock *breathes*. Pulling both the same way only makes it vibrate |
+| Shimmer | high | force | Turbulence, on top of whatever is dialled in |
+| Startle | onsets | force | Widens the predator's fear radius, so an accented beat tears the same hole a strike does. Needs the predator on; **Burst** does not |
+
+### Why the top two exist
+
+The first version of this drove only the force channels, and the result was both
+faint and late. That is not a tuning problem, it is the integrator: a steering
+force changes velocity at `acc·dt` bounded by the turn-rate limit, and only then
+changes position, so a beat arrives on screen as a vague swell a few hundred
+milliseconds afterwards. Modulating parameters is inherently low-pass.
+
+So the two most percussive channels bypass it. **Size** is a shader uniform —
+it changes on the frame it is set, with no lag at all. **Burst** writes velocity
+directly rather than applying a force, so an onset lands immediately; the speed
+clamp renormalises on the next substep, which turns the impulse into the flock
+snapping *outward*, and it re-forms on its own because no flocking rule was
+touched.
+
+It was also worth noticing that Startle — the most percussive control in the
+panel — routed through the predator's fear radius, and the predator is off by
+default. The punchiest mapping did nothing at all out of the box.
+
+Measured against the test fixture, which bursts once a second: the flock's
+on-screen footprint carries a 1 Hz component of amplitude 358 against a
+neighbouring-frequency floor of 41, where a silent flock manages 61 against 34.
+The beat is a line in the flock's motion, not a wobble.
+
+### Sync
+
+`Sync` reads the spectrogram slightly *ahead* of the playhead, 40 ms by default.
+The force channels still carry the integrator's lag, and a little lookahead
+cancels it. Reading the future is possible only because the whole track is
+analysed before it plays — an `AnalyserNode` on the output could not do this at
+any price. Raise it if the flock still feels behind the music, lower it if it
+anticipates.
+
+Past a Drive of about 1.5 the bursts arrive faster than the flock can re-form
+and it disperses into fragments. Measurably so: the 1 Hz prominence peaks at
+Drive 1 and *falls* by Drive 2, because saturated envelopes have less room left
+to modulate.
 
 Pausing releases the envelopes toward silence on the slow constant rather than
 cutting them, so the flock returns to its own behaviour instead of being yanked.
