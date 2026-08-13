@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.11] - 2026-08-13
+
+### Fixed
+- **Making the flock react to audio no longer replaces your terrain.** 0.9.10
+  wired the Particles panel's track loader to `useSoundscape`, and that hook's
+  entire purpose is to *become* the landscape — it pushes every analysed frame
+  into the heightmap store. So asking the birds to fly to a track silently threw
+  away the raster you were working on and put a spectrogram there instead, which
+  is not what anyone means by "react to audio". The flock now has its own audio
+  (`useFlockAudio`): it decodes, analyses and plays, and touches no store at all.
+  A loaded Soundscape is still used as a fallback, so the same file never has to
+  be uploaded twice, and the panel says which source it is listening to.
+- The flock's own analysis runs at 128 bins rather than the 512 a terrain needs —
+  three bands and a flux figure cannot use that resolution, and it analyses in a
+  fraction of the time.
+- Its track loops by default: a backdrop the flock reacts to should not silently
+  stop reacting partway through a session.
+
 ## [0.9.10] - 2026-08-13
 
 The flock could be steered by the landscape but not by anything happening in

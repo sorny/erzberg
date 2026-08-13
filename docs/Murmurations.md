@@ -159,21 +159,31 @@ is a 60 fps flock without them and an 18 fps one with.
 
 ## Listening to a track
 
-With a Soundscape loaded, the flock reacts to playback. There is no second
-analysis and no Web Audio graph: Soundscapes already decodes the track once into
-a full spectrogram and plays it through a plain `<audio>` element, so everything
-the flock needs is a read of *that* spectrogram at the playhead.
+Load a track in the Particles panel and the flock flies to it. **The terrain is
+not touched.** That distinction is the whole design: `useSoundscape` exists to
+*become* the landscape — every frame it analyses is pushed into the heightmap
+store — and wanting birds that react to music is not wanting your raster
+replaced by a spectrogram. So the flock has its own audio (`useFlockAudio`),
+which decodes, analyses and plays while touching no store at all.
 
-Three things follow from reading the analysis rather than the output:
+If a Soundscape *is* loaded, it is used as a fallback, so the same file never has
+to be uploaded twice. Own track first, Soundscape second, and the panel says
+which one it is listening to.
 
-- the flock and the terrain are two readings of one spectrogram at one instant,
-  so they cannot drift apart;
+Either way the features come from a *precomputed spectrogram read at the
+playhead*, not from an `AnalyserNode` on the output. Three things follow:
+
 - **scrubbing works** — the features are a function of time, not of a running
   stream, so dragging the playhead makes the flock react to where it lands;
+- it is deterministic: the same track at the same second gives the same reading;
 - it costs a few hundred array reads per frame instead of an FFT.
 
 The trade is that this is what the *file contains*, not what the speakers emit:
 volume, muting and the browser's output chain are invisible to it.
+
+The flock's own analysis is deliberately coarser than the Soundscapes one — 128
+bins rather than 512. Nothing here becomes a heightmap, and three bands plus a
+flux figure cannot use the resolution a terrain needs.
 
 ### What it hears
 

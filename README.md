@@ -206,10 +206,10 @@ returned to.
   streaks, each casting a shadow onto the terrain that grows and fades with how
   high it is flying, lit by the same sun as the hillshading. Pause with `Space`
   — and unlike the hologram, the positions live on the CPU, so exporting a
-  frozen flock gives an SVG of exactly what is on screen. Load a Soundscape and
-  the flock flies to it: it reads the same spectrogram the terrain is built from,
-  at the playhead, so bass opens it out, highs make it restless and onsets scatter
-  it. → [Murmurations](docs/Murmurations.md)
+  frozen flock gives an SVG of exactly what is on screen. Drop an MP3 on the
+  Particles panel and the flock flies to it — bass opens it out, highs make it
+  restless, onsets scatter it — while the terrain stays exactly the landscape you
+  loaded. → [Murmurations](docs/Murmurations.md)
 
 ---
 
