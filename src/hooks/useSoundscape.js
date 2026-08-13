@@ -63,6 +63,22 @@ export function useSoundscape() {
 
   const audioRef = useRef(null)
   const urlRef = useRef(null)
+  /**
+   * A stable handle on live playback, for consumers that run per frame.
+   *
+   * The murmuration reads the spectrogram at the playhead sixty times a second.
+   * It cannot use `spec`/`currentTime` from this hook's state: `currentTime` is
+   * deliberately only pushed at the stream tick rate, and re-rendering the tree
+   * per frame is the thing this codebase spends the most effort avoiding. So
+   * this ref is created once and hands out getters that read the live values —
+   * passing it down costs no renders at all.
+   */
+  const liveRef = useRef(null)
+  if (!liveRef.current) liveRef.current = {
+    getSpec: () => specRef.current,
+    getTime: () => audioRef.current?.currentTime ?? 0,
+    isPlaying: () => !!(audioRef.current && !audioRef.current.paused && !audioRef.current.ended),
+  }
   const workerRef = useRef(null)
   const pcmRef = useRef(null)        // decoded mono PCM, kept for re-analysis
   const sampleRateRef = useRef(44100)
@@ -354,7 +370,7 @@ export function useSoundscape() {
 
   return {
     fileName, duration, currentTime, isPlaying, isAnalyzing, progress, error, spec,
-    opts, setOpts, setProjParam, active, frozen,
+    opts, setOpts, setProjParam, active, frozen, liveRef,
     loadFromPicker, play, pause, toggle, stop, seek, freezeFullTrack, release,
     clearError: () => setError(null),
   }

@@ -26,6 +26,7 @@ export function Scene({
   webmRecording,
   exportBaseName,
   profileClickRef,
+  audioLive,
 }) {
   const { camera: currentCamera, gl, scene, size, invalidate } = useThree()
   const groupRef    = useRef()
@@ -373,7 +374,7 @@ export function Scene({
       )}
       <group ref={groupRef}>
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
-        <ParticleSystem ref={particleRef} terrain={terrain} p={p} />
+        <ParticleSystem ref={particleRef} terrain={terrain} p={p} audioLive={audioLive} />
       </group>
       {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
       {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}

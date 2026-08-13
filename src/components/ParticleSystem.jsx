@@ -26,6 +26,7 @@ import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
 import { hexToRgb } from '../utils/colorUtils'
 import { makeTerrainField, createFlock, stepFlock, updateTrails, updateShadows } from '../utils/murmuration'
+import { makeBandPlan, createAudioState, sampleAudio, applyAudio } from '../utils/audioFeatures'
 
 // ── GLSL: 3D simplex noise (Ashima / Stefan Gustavson, public domain) ─────────
 
@@ -281,12 +282,18 @@ const SHADOW_FRAG = /* glsl */ `
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p }, ref) {
+export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, audioLive }, ref) {
   const [pointsGeo, setPointsGeo] = useState(null)
   const positionsRef = useRef(null)   // static home buffer (hologram SVG export snapshot)
   const countRef     = useRef(0)
 
   const flying = p.particleMode === 'murmuration'
+
+  // Per-frame listening state. A ref, not state: these envelopes advance sixty
+  // times a second and nothing in the tree should re-render for them. The band
+  // plan is cached against the spectrogram object, so it is rebuilt only when
+  // the analysis is (a new track, or a change to fftSize/bins/logFreq).
+  const audioRef = useRef({ spec: null, plan: null, state: createAudioState() })
 
   const particleMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   PARTICLE_VERT,
@@ -559,7 +566,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
     if (!p.showPoints || !p.animateParticles) return
     const dt = Math.min(delta, 0.05)
     if (flock) {
-      stepFlock(flock.birds, dt, flock.field, flockParams(p))
+      stepFlock(flock.birds, dt, flock.field, liveParams(p, audioRef.current, audioLive, dt))
       flock.posAttr.needsUpdate = true
       flock.segAttr.needsUpdate = true
       if (p.flockShadow) { flock.shadowAttr.needsUpdate = true; flock.liftAttr.needsUpdate = true }
@@ -591,6 +598,39 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p },
   if (!pointsGeo) return null
   return <points geometry={pointsGeo} material={particleMat} renderOrder={PARTICLE_ORDER} />
 })
+
+/**
+ * The parameters for this frame: the sliders, then whatever the track is doing
+ * to them.
+ *
+ * Kept out of the simulation on purpose — `stepFlock` resolves its scales from
+ * params on every call, so audio reactivity is a transform on the way in and
+ * `murmuration.js` never learns that audio exists.
+ */
+function liveParams(p, audio, live, dt) {
+  const base = flockParams(p)
+  if (!p.flockAudio || !live?.current) return base
+
+  const spec = live.current.getSpec()
+  if (!spec) return base
+  // Rebuilding the band plan is only correct when the analysis itself changed;
+  // identity of the spec object is exactly that signal.
+  if (audio.spec !== spec) {
+    audio.spec = spec
+    audio.plan = makeBandPlan(spec)
+    audio.state = createAudioState()
+  }
+  const f = sampleAudio(spec, audio.plan, audio.state, live.current.getTime(), dt, live.current.isPlaying())
+  const drive = p.flockAudioDrive ?? 1
+  return applyAudio(base, {
+    level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle,
+  }, {
+    speed:     drive * (p.flockAudioSpeed ?? 1),
+    pulse:     drive * (p.flockAudioPulse ?? 1),
+    shimmer:   drive * (p.flockAudioShimmer ?? 1),
+    startle:   drive * (p.flockAudioStartle ?? 1),
+  })
+}
 
 /** The sliders the simulation reads, named as `murmuration.js` expects them. */
 function flockParams(p) {

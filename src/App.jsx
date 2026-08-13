@@ -649,6 +649,7 @@ export default function App() {
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
           exportBaseName={exportBaseName}
+          audioLive={soundscape.liveRef}
         />
       </Canvas>
 

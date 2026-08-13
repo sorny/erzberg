@@ -421,7 +421,14 @@ export function Sidebar({
   // Soundscapes controller. Aliased because `ss` is already the style setter,
   // and defaulted so the section degrades to an inert upload button if the
   // prop is ever omitted rather than throwing on first render.
-  const snd = soundscape ?? { opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {}, setProjParam: () => {} }
+  // The Particles section drives playback too now, so the no-soundscape
+  // fallback has to answer for the transport as well as the options — a missing
+  // prop would otherwise crash on the first click of the audio block's play
+  // button rather than degrading to an inert control.
+  const snd = soundscape ?? {
+    opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {}, setProjParam: () => {},
+    toggle: () => {}, isPlaying: false, fileName: '',
+  }
 
   // Whole-track projection the freeze button will render.
   const projection = getProjection(snd.opts?.projection)
@@ -1184,6 +1191,49 @@ export function Sidebar({
                       help="Same seed, same flock. The simulation runs on a fixed timestep, so a given seed produces the same shapes on any machine." />
                     <InlineSl label="Trail" min={0} max={4} step={0.1} value={points.flockTrail ?? 2} onChange={v => sp({ flockTrail: v })} fmt={v => v.toFixed(1)} testId="flock-trail"
                       help="Length of the velocity streak behind each bird. 0 draws dots only. Streaks export to SVG as their own plotter layer." />
+                    {/* Audio reactivity. The track is loaded through Soundscapes —
+                        one analysis drives both the terrain and the flock — so this
+                        block reaches over to that hook rather than owning a second
+                        file input, and says plainly when there is nothing to hear. */}
+                    <Tog label="React to audio" small checked={!!points.flockAudio} onChange={v => sp({ flockAudio: v })}
+                      help="Drives the flock from the Soundscapes track as it plays. It reads the same spectrogram the terrain is built from, at the playhead, so the two can never disagree about what the track is doing — and scrubbing works, because the flock follows time rather than a running stream. Note this is what the file contains, not what your speakers emit: the volume slider does not reach it." />
+                    {points.flockAudio && (
+                      <Sub>
+                        {!snd.fileName ? (
+                          <>
+                            <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                              No track loaded — the flock has nothing to listen to.
+                            </div>
+                            <button className="hmload" onClick={() => snd.loadFromPicker(onSoundscapeFit)}
+                              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}>
+                              ↑ Load audio
+                            </button>
+                          </>
+                        ) : (
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+                            <button onClick={snd.toggle} style={{ fontSize:11, padding:'4px 10px', borderRadius:3, cursor:'pointer', background: snd.isPlaying ? ACCENT : SURF, color: snd.isPlaying ? '#fff' : MUTED, border:`1px solid ${snd.isPlaying ? ACCENT : BORDER}` }}>
+                              {snd.isPlaying ? '❚❚' : '▶'}
+                            </button>
+                            <span style={{ fontSize:9, color:MUTED, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{snd.fileName}</span>
+                          </div>
+                        )}
+                        <InlineSl label="Drive" min={0} max={2} step={0.05} value={points.flockAudioDrive ?? 1} onChange={v => sp({ flockAudioDrive: v })} fmt={v => v.toFixed(2)} testId="flock-audio-drive"
+                          help="Master amount for everything below. 0 is silence to the flock however loud the track; past 1 the reaction is exaggerated beyond what the music is doing." />
+                        <InlineSl label="Pace" min={0} max={2} step={0.05} value={points.flockAudioSpeed ?? 1} onChange={v => sp({ flockAudioSpeed: v })} fmt={v => v.toFixed(2)} testId="flock-audio-speed"
+                          help="Loudness drives flight speed, centred so an averagely loud passage flies at the speed you dialled — quiet passages genuinely slow down rather than the flock only ever accelerating." />
+                        <InlineSl label="Pulse" min={0} max={2} step={0.05} value={points.flockAudioPulse ?? 1} onChange={v => sp({ flockAudioPulse: v })} fmt={v => v.toFixed(2)} testId="flock-audio-pulse"
+                          help="Bass opens the flock out: separation rises on the kick while cohesion eases, so it breathes on the beat. Pulling both the same way instead just makes it vibrate." />
+                        <InlineSl label="Shimmer" min={0} max={2} step={0.05} value={points.flockAudioShimmer ?? 1} onChange={v => sp({ flockAudioShimmer: v })} fmt={v => v.toFixed(2)} testId="flock-audio-shimmer"
+                          help="Hats, cymbals and air add turbulence on top of whatever is dialled in — the flock gets restless through the busy parts." />
+                        <InlineSl label="Startle" min={0} max={2} step={0.05} value={points.flockAudioStartle ?? 1} onChange={v => sp({ flockAudioStartle: v })} fmt={v => v.toFixed(2)} testId="flock-audio-startle"
+                          help="Onsets widen the hawk's fear radius, so an accented beat tears the same hole through the flock that a strike does. Needs Predator on — it has nothing to act through otherwise." />
+                        {!points.flockPredator && (points.flockAudioStartle ?? 1) > 0 && (
+                          <div style={{ fontSize:9, color:MUTED, marginTop:-2, marginBottom:6 }}>
+                            Startle needs Predator enabled below.
+                          </div>
+                        )}
+                      </Sub>
+                    )}
                     <Tog label="Shadow" small checked={points.flockShadow !== false} onChange={v => sp({ flockShadow: v })}
                       help="Drops each bird's shadow onto the terrain. The direction is the Hillshade sun — azimuth and altitude in the Hillshade section — so the flock is lit the same way the ground under it is, and the shadows swing when you move the sun. A low sun throws them long across the valley." />
                     {points.flockShadow !== false && (

@@ -1,4 +1,10 @@
 import { test, expect } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
+import path from 'node:path'
+
+// The Soundscapes fixture: 6 s mono, a 120 Hz→8 kHz sweep over a 300 Hz drone
+// with 1.5 kHz bursts once a second — so it has bass, air and onsets.
+const MP3 = path.join(path.dirname(fileURLToPath(import.meta.url)), 'testdata', 'sweep.mp3')
 
 // Switch inputs are display:none inside a label that is a *sibling* of the text
 // span, so clicking the label text does nothing — walk from the span instead.
@@ -226,6 +232,134 @@ test('shadows fall only on real terrain, never on empty space', async ({ page })
   // The culling must be real, not the result of drawing nothing at all.
   expect(r.culled, 'a low sun over a holed raster must cull some').toBeGreaterThan(100)
   expect(r.drawn, 'most of the flock must still have a shadow').toBeGreaterThan(r.culled)
+})
+
+/**
+ * Drives audioFeatures against a spectrogram built to order, so each assertion
+ * is about one property of the analysis rather than about a particular mp3.
+ * `shape(frame, bin)` returns the stored 0…1 magnitude.
+ */
+const runAudio = (page, opts) => page.evaluate(async ({ shapeSrc, seconds, dt, playing }) => {
+  const { makeBandPlan, createAudioState, sampleAudio, applyAudio } =
+    await import('/src/utils/audioFeatures.js')
+
+  const bins = 128, frames = 600, fftSize = 2048, sampleRate = 44100
+  const hop = fftSize / 4
+  const shape = new Function('f', 'b', 'bins', shapeSrc)
+  const data = new Float32Array(frames * bins)
+  for (let f = 0; f < frames; f++) for (let b = 0; b < bins; b++) {
+    data[f * bins + b] = shape(f, b, bins)
+  }
+  const spec = { data, frames, bins, hop, sampleRate, fftSize, logFreq: true,
+                 duration: (frames * hop) / sampleRate }
+
+  const plan = makeBandPlan(spec)
+  const state = createAudioState()
+  const trace = []
+  for (let t = 0; t < seconds; t += dt) {
+    sampleAudio(spec, plan, state, t, dt, playing)
+    trace.push({ level: state.level, bass: state.env[0], mid: state.env[1],
+                 high: state.env[2], startle: state.startle })
+  }
+  const last = trace[trace.length - 1]
+  const peakStartle = Math.max(...trace.map(x => x.startle))
+  // applyAudio is a pure transform on the way into the simulation.
+  const base = { speed: 1, cohesion: 1, separation: 1.5, turbulence: 0.5,
+                 predator: true, predatorFear: 1 }
+  const off = applyAudio(base, last, {})
+  const on  = applyAudio(base, { ...last, level: 1, bass: 1, high: 1, startle: 1 },
+                         { speed: 1, pulse: 1, shimmer: 1, startle: 1 })
+  return { last, peakStartle, off, on, bandRanges: plan.ranges }
+}, opts)
+
+test('the flock hears bands, onsets and silence', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+  // Log-spaced bins put the low frequencies in the first rows. Energy only
+  // there must read as bass and not as air.
+  const low = await runAudio(page, {
+    shapeSrc: 'return b < bins * 0.12 ? 0.9 : 0.02', seconds: 2, dt: 1 / 60, playing: true,
+  })
+  expect(low.last.bass, 'low-frequency energy must reach the bass band').toBeGreaterThan(0.7)
+  expect(low.last.high, 'and must not leak into the high band').toBeLessThan(0.3)
+
+  const high = await runAudio(page, {
+    shapeSrc: 'return b > bins * 0.75 ? 0.9 : 0.02', seconds: 2, dt: 1 / 60, playing: true,
+  })
+  expect(high.last.high, 'high-frequency energy must reach the high band').toBeGreaterThan(0.7)
+  expect(high.last.bass, 'and must not leak into the bass band').toBeLessThan(0.3)
+
+  // A steady tone has no attacks in it; a repeating broadband hit is all attack.
+  const steady = await runAudio(page, {
+    shapeSrc: 'return 0.6', seconds: 3, dt: 1 / 60, playing: true,
+  })
+  const beats = await runAudio(page, {
+    shapeSrc: 'return (f % 40) < 3 ? 0.95 : 0.05', seconds: 3, dt: 1 / 60, playing: true,
+  })
+  console.log(`startle — steady ${steady.peakStartle.toFixed(3)}, beats ${beats.peakStartle.toFixed(3)}`)
+  expect(beats.peakStartle, 'onsets must fire the startle envelope').toBeGreaterThan(0.5)
+  expect(steady.peakStartle, 'a steady tone must not').toBeLessThan(0.2)
+
+  // Auto-gain: a track 20 dB quieter still moves the flock, because the peak
+  // follower is relative to the track's own recent loudest.
+  const quiet = await runAudio(page, {
+    shapeSrc: 'return b < bins * 0.12 ? 0.09 : 0.002', seconds: 2, dt: 1 / 60, playing: true,
+  })
+  expect(quiet.last.bass, 'a quiet track must still drive the flock').toBeGreaterThan(0.7)
+
+  // Paused playback releases toward silence rather than freezing mid-gesture.
+  const paused = await runAudio(page, {
+    shapeSrc: 'return 0.9', seconds: 3, dt: 1 / 60, playing: false,
+  })
+  expect(paused.last.level, 'a stopped track must decay to silence').toBeLessThan(0.01)
+
+  // applyAudio must be inert at zero and move each target the right way at one.
+  expect(low.off.speed).toBe(1)
+  expect(low.off.separation).toBe(1.5)
+  expect(low.off.turbulence).toBe(0.5)
+  expect(low.on.speed, 'loud must fly faster').toBeGreaterThan(1)
+  expect(low.on.separation, 'bass must open the flock out').toBeGreaterThan(1.5)
+  expect(low.on.cohesion, 'and ease cohesion at the same time').toBeLessThan(1)
+  expect(low.on.turbulence, 'highs must add shimmer').toBeGreaterThan(0.5)
+  expect(low.on.predatorFear, 'onsets must widen the fear radius').toBeGreaterThan(1)
+})
+
+test('a track loaded from the Particles panel drives the live flock', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+  await openApp(page)
+
+  await page.locator('[data-testid="section-particles"]').click()
+  await togColorFor(page, 'Particles').click({ force: true })
+  await page.locator('[data-testid="particle-mode-murmuration"]').click()
+  await page.waitForTimeout(1500)
+
+  await toggleFor(page, 'React to audio').click({ force: true })
+  // With nothing loaded the block says so rather than pretending to listen.
+  await expect(page.locator('text=No track loaded')).toBeVisible()
+
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=↑ Load audio'),
+  ])
+  await chooser.setFiles(MP3)
+  // Analysis done when the warning gives way to the transport and the sliders.
+  await expect(page.locator('[data-testid="flock-audio-drive"]')).toBeVisible({ timeout: 30000 })
+  await expect(page.locator('text=No track loaded')).toHaveCount(0)
+
+  // Exercise the whole chain: the hook's stable live ref reaching the flock's
+  // useFrame, which is the part the pure analysis test cannot cover.
+  await page.locator('[data-testid="flock-audio-drive"]').fill('2')
+  await page.locator('xpath=//span[text()="sweep.mp3"]/preceding-sibling::button').click()
+  await page.waitForTimeout(2500)
+
+  const a = await frameSig(page)
+  await page.waitForTimeout(1200)
+  expect(await frameSig(page), 'the flock must keep flying while the track plays').not.toBe(a)
+
+  expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
 })
 
 test('Space pauses and resumes the flock, and the button follows', async ({ page }) => {

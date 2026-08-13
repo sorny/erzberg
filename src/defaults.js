@@ -162,6 +162,11 @@ export const POINTS_DEF = {
   // the flock is lit the same way the terrain under it is — see murmuration.js.
   flockShadow: true, flockShadowOpacity: 0.35, flockShadowSize: 1,
   flockShadowSpread: 1.5, flockShadowColor: '#000000',
+  // Audio reactivity. Reads the Soundscapes spectrogram at the playhead — the
+  // same analysis the terrain is built from — so the flock and the landscape
+  // never disagree about what the track is doing. See utils/audioFeatures.js.
+  flockAudio: false, flockAudioDrive: 1,
+  flockAudioSpeed: 1, flockAudioPulse: 1, flockAudioShimmer: 1, flockAudioStartle: 1,
 }
 export const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,
