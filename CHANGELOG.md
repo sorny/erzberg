@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.15] - 2026-08-13
+
+### Added
+- **A transport for the flock's track.** Play, restart, ±5 s, a scrub bar, a
+  loop toggle and a time readout — getting back to the beginning previously
+  meant loading the file again. Skipping wraps rather than clamping, so stepping
+  back from the first second of a looping track lands near its end.
+- Scrubbing seeks on `input` rather than on release, so the flock reacts while
+  you drag, which is how you find the bar you are looking for. Nothing
+  downstream needs resynchronising: the features are a function of time taken
+  from the precomputed spectrogram, not of a running stream, so the next frame
+  simply reads a different column.
+- The playhead is read in an animation frame and written straight to the DOM —
+  the range input's value and one text node. A scrubber backed by React state
+  would re-render the whole sidebar several times a second, which for a panel
+  this size is the most expensive thing on the page.
+
 ## [0.9.14] - 2026-08-13
 
 ### Added

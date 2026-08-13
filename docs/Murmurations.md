@@ -272,6 +272,26 @@ The meter draws each window as a bracket behind its band's envelope cap, so
 setting one is a matter of watching where the track actually sits and putting the
 window around it rather than guessing.
 
+### Transport
+
+Play, restart, ±5 s, a scrub bar and a loop toggle. Skipping *wraps* rather than
+clamping, so stepping back from the first second of a looping track lands near
+its end instead of pinning at zero.
+
+Seeking needs no resynchronisation of anything downstream, which is the same
+property that makes this design work at all: everything the flock reads is a
+function of *time*, taken from the precomputed spectrogram at `currentTime`
+rather than from a running stream. Drop the playhead anywhere and the next frame
+simply reads a different column. Scrubbing is wired to `input` rather than to
+release for that reason — the flock reacts as you drag, which is how you find
+the bar you were looking for.
+
+The playhead is read in an animation frame and written straight to the DOM: the
+range input's value and one text node. A scrubber backed by React state would
+re-render the entire sidebar several times a second, which for a panel this size
+is the most expensive thing on the page and exactly what the rest of the audio
+path is built to avoid.
+
 ### The meter
 
 Above the sliders is a live readout of what the flock is hearing and what that
