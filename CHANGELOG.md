@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.10] - 2026-08-13
+
+The flock could be steered by the landscape but not by anything happening in
+time. Soundscapes already decodes a track into a full spectrogram and plays it;
+this points the murmuration at the same analysis.
+
+### Added
+- **The murmuration reacts to live playback.** Load a Soundscape — from the
+  Particles panel now, as well as its own section — and the flock flies to it:
+  bass opens it out on the kick, highs make it restless through the busy parts,
+  overall loudness sets the pace, and onsets widen the hawk's fear radius so an
+  accented beat tears the same hole through the flock that a strike does. Four
+  amounts plus a master Drive. → [Murmurations](docs/Murmurations.md#listening-to-a-track)
+- It reads the *precomputed spectrogram at the playhead*, not an `AnalyserNode`.
+  There is no second FFT and no Web Audio graph, which buys three things: the
+  flock and the terrain are two readings of one analysis at one instant and
+  cannot drift apart; scrubbing works, because the features are a function of
+  time rather than of a running stream; and it costs a few hundred array reads
+  per frame. The trade is that this is what the file contains, not what the
+  speakers emit — the volume slider does not reach it.
+- Loudness is auto-gained against a running peak that halves every four seconds,
+  so a quiet track still moves the flock and a loud one does not pin every
+  slider. Onsets come from spectral flux measured against the last analysis
+  frame actually read — the analysis runs at ~86 fps and the renderer at 60, and
+  comparing against the last *render* reports zero on the frames where the
+  playhead has not reached a new column, which chops every onset into a flicker.
+- Audio is a parameter transform on the way into the simulation rather than a
+  new set of forces, so `murmuration.js` never learns audio exists and every
+  mapping is something that could have been dialled by hand.
+
 ## [0.9.9] - 2026-08-13
 
 The Particles section could draw one thing, and that thing did not move —

@@ -157,6 +157,62 @@ Shadows cost roughly **a third on top of the simulation**, since they add a
 terrain tap per bird. Free at the default 2 000; the reason the 100 000 ceiling
 is a 60 fps flock without them and an 18 fps one with.
 
+## Listening to a track
+
+With a Soundscape loaded, the flock reacts to playback. There is no second
+analysis and no Web Audio graph: Soundscapes already decodes the track once into
+a full spectrogram and plays it through a plain `<audio>` element, so everything
+the flock needs is a read of *that* spectrogram at the playhead.
+
+Three things follow from reading the analysis rather than the output:
+
+- the flock and the terrain are two readings of one spectrogram at one instant,
+  so they cannot drift apart;
+- **scrubbing works** — the features are a function of time, not of a running
+  stream, so dragging the playhead makes the flock react to where it lands;
+- it costs a few hundred array reads per frame instead of an FFT.
+
+The trade is that this is what the *file contains*, not what the speakers emit:
+volume, muting and the browser's output chain are invisible to it.
+
+### What it hears
+
+Three bands, because a kick, a voice and a cymbal pull the flock in visibly
+different directions while five bands mostly yield sliders nobody can hear:
+**bass** (20–160 Hz), **mid** (160 Hz–2 kHz), **high** (2–16 kHz). Each is
+peak-held over its bins, then run through an envelope with a fast attack and a
+slow release — percussion arrives instantly and decays, and equal rates give a
+flock that lags the beat and twitches after it.
+
+Loudness is **auto-gained** against a running peak that halves every four
+seconds. The stored values are absolute dB and music is not, so without it a
+quiet track never moves the flock and a loud one pins every slider.
+
+Onsets come from **spectral flux** — the summed *rise* between consecutive
+analysis frames, falls ignored, which is what finds attacks rather than
+amplitude. It is measured against the last frame actually read, not the last
+render: the analysis runs at ~86 frames a second and the renderer at 60, so on
+some frames the playhead has not reached a new column, and re-measuring against
+the same row would report zero and chop every onset into a flicker.
+
+### What it drives
+
+Audio is a **parameter transform on the way into the simulation**, not a new set
+of forces. `stepFlock` resolves its scales from params on every call, so the
+whole feature lives outside the physics and `murmuration.js` never learns audio
+exists. It also means every mapping is something you could have dialled by hand,
+which keeps the result legible rather than magic.
+
+| Control | Feature | Effect |
+|---|---|---|
+| Pace | overall level | Flight speed, centred so an average passage flies at the dialled speed and quiet ones genuinely slow down |
+| Pulse | bass | Separation opens while cohesion eases — the flock *breathes* on the kick. Pulling both the same way only makes it vibrate |
+| Shimmer | high | Turbulence, on top of whatever is dialled in |
+| Startle | onsets | Widens the predator's fear radius, so an accented beat tears the same hole a strike does. Needs the predator on — it has nothing to act through otherwise |
+
+Pausing releases the envelopes toward silence on the slow constant rather than
+cutting them, so the flock returns to its own behaviour instead of being yanked.
+
 ## The predator
 
 Optional, one agent, `O(n)` to evaluate. It pursues a point circling the flock's
