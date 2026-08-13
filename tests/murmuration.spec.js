@@ -372,6 +372,80 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
   expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
 })
 
+test('the beat is visible in the flock, not just present in the numbers', async ({ page }) => {
+  await openApp(page)
+
+  // Lines off: the flock has to be measurable on its own.
+  await page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ })
+    .first().locator('label').first().click({ force: true })
+  await page.locator('[data-testid="section-particles"]').click()
+  await togColorFor(page, 'Particles').click({ force: true })
+  await page.locator('[data-testid="particle-mode-murmuration"]').click()
+  await page.waitForTimeout(1500)
+  await toggleFor(page, 'React to audio').click({ force: true })
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=↑ Load audio'),
+  ])
+  await chooser.setFiles(MP3)
+  await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
+
+  /**
+   * The fixture bursts at 1.5 kHz exactly once a second, so a flock that is
+   * really reacting must carry a 1 Hz component in its on-screen footprint that
+   * a silent one does not. That is a far sharper question than "does it wobble":
+   * a flock drifting about produces plenty of broadband variation either way,
+   * which is why the first attempt at this measured nothing useful.
+   */
+  const beatAmplitude = (secs) => page.evaluate((s) => new Promise(res => {
+    const px = [], ts = []
+    const c = document.querySelector('canvas')
+    const o = document.createElement('canvas'); o.width = 320; o.height = 180
+    const x = o.getContext('2d'); const t0 = performance.now()
+    const tick = () => {
+      x.drawImage(c, 0, 0, c.width, c.height, 0, 0, 320, 180)
+      const d = x.getImageData(0, 0, 320, 180).data
+      let n = 0
+      for (let i = 0; i < d.length; i += 4) if (d[i + 2] > d[i] + 30 && d[i + 2] > 80) n++
+      px.push(n); ts.push((performance.now() - t0) / 1000)
+      performance.now() - t0 < s * 1000 ? requestAnimationFrame(tick) : res({ px, ts })
+    }
+    requestAnimationFrame(tick)
+  }), secs).then(({ px, ts }) => {
+    const mean = px.reduce((a, b) => a + b, 0) / px.length
+    const dev = px.map(v => v - mean)
+    const at = (f) => {
+      let re = 0, im = 0
+      for (let i = 0; i < dev.length; i++) {
+        const a = 2 * Math.PI * f * ts[i]
+        re += dev[i] * Math.cos(a); im += dev[i] * Math.sin(a)
+      }
+      return 2 * Math.hypot(re, im) / dev.length
+    }
+    return { beat: at(1.0), floor: (at(0.6) + at(0.8) + at(1.3) + at(1.6)) / 4 }
+  })
+
+  await page.locator('[data-testid="flock-audio-drive"]').fill('0')
+  await page.locator('[data-testid="flock-audio-play"]').click()
+  await page.waitForTimeout(2500)
+  const silent = await beatAmplitude(7)
+
+  await page.locator('[data-testid="flock-audio-drive"]').fill('1')
+  await page.waitForTimeout(2500)
+  const heard = await beatAmplitude(7)
+
+  console.log(`1 Hz — silent ${silent.beat.toFixed(1)} (floor ${silent.floor.toFixed(1)}), ` +
+              `reacting ${heard.beat.toFixed(1)} (floor ${heard.floor.toFixed(1)})`)
+
+  // Measured 358 against 61 with the reaction working, and 61/34 without. The
+  // thresholds sit well inside that gap so ordinary frame-rate noise cannot
+  // reach them.
+  expect(heard.beat / Math.max(1, silent.beat),
+    'the beat must show in the flock far more than it does in silence').toBeGreaterThan(2.5)
+  expect(heard.beat / Math.max(1, heard.floor),
+    'and it must be a line at the beat, not broadband wander').toBeGreaterThan(3)
+})
+
 test('Space pauses and resumes the flock, and the button follows', async ({ page }) => {
   await openApp(page)
   await page.locator('[data-testid="section-particles"]').click()

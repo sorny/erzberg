@@ -25,8 +25,8 @@ import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
 import { hexToRgb } from '../utils/colorUtils'
-import { makeTerrainField, createFlock, stepFlock, updateTrails, updateShadows } from '../utils/murmuration'
-import { makeBandPlan, createAudioState, sampleAudio, applyAudio } from '../utils/audioFeatures'
+import { makeTerrainField, createFlock, stepFlock, updateTrails, updateShadows, applyBurst, flockScales } from '../utils/murmuration'
+import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals } from '../utils/audioFeatures'
 
 // ── GLSL: 3D simplex noise (Ashima / Stefan Gustavson, public domain) ─────────
 
@@ -401,6 +401,8 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
       m.uniforms.uOpacity.value = p.pointOpacity ?? 1
       m.depthTest = !!p.depthOcclusion
     }
+    // Both sizes are re-set every frame by the audio path when it is running;
+    // this is the value they sit at when it is not.
     birdMat.uniforms.uSize.value = p.pointSize ?? 4
     const su = shadowMat.uniforms
     su.uSize.value    = (p.pointSize ?? 4) * (p.flockShadowSize ?? 1)
@@ -566,7 +568,19 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     if (!p.showPoints || !p.animateParticles) return
     const dt = Math.min(delta, 0.05)
     if (flock) {
-      stepFlock(flock.birds, dt, flock.field, liveParams(p, audioRef.current, audioLive, dt))
+      const heard = listen(p, audioRef.current, audioLive, dt)
+      // Onsets are applied as a velocity impulse *before* the step, so the beat
+      // lands on this frame rather than being integrated in over the next few.
+      if (heard.burst > 0 && flock.birds.n > 0) {
+        applyBurst(flock.birds, heard.burst * flockScales(flock.field, heard.params).cruise)
+      }
+      // Sprite size and streak length are uniforms, so they carry no lag at all —
+      // this is the half of the reaction that actually reads as being on the beat.
+      birdMat.uniforms.uSize.value = (p.pointSize ?? 4) * heard.visuals.size
+      shadowMat.uniforms.uSize.value =
+        (p.pointSize ?? 4) * (p.flockShadowSize ?? 1) * heard.visuals.size
+      heard.params.trail = (heard.params.trail ?? 0) * heard.visuals.trail
+      stepFlock(flock.birds, dt, flock.field, heard.params)
       flock.posAttr.needsUpdate = true
       flock.segAttr.needsUpdate = true
       if (p.flockShadow) { flock.shadowAttr.needsUpdate = true; flock.liftAttr.needsUpdate = true }
@@ -607,12 +621,13 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
  * params on every call, so audio reactivity is a transform on the way in and
  * `murmuration.js` never learns that audio exists.
  */
-function liveParams(p, audio, live, dt) {
+function listen(p, audio, live, dt) {
   const base = flockParams(p)
-  if (!p.flockAudio || !live?.current) return base
+  const inert = { params: base, visuals: { size: 1, trail: 1 }, burst: 0 }
+  if (!p.flockAudio || !live?.current) return inert
 
   const spec = live.current.getSpec()
-  if (!spec) return base
+  if (!spec) return inert
   // Rebuilding the band plan is only correct when the analysis itself changed;
   // identity of the spec object is exactly that signal.
   if (audio.spec !== spec) {
@@ -620,16 +635,25 @@ function liveParams(p, audio, live, dt) {
     audio.plan = makeBandPlan(spec)
     audio.state = createAudioState()
   }
-  const f = sampleAudio(spec, audio.plan, audio.state, live.current.getTime(), dt, live.current.isPlaying())
+  // Sampled slightly *ahead* of the playhead. The parameter channels are
+  // steering forces and the integrator delays them by a few hundred
+  // milliseconds; reading the future cancels some of that, and reading the
+  // future is only possible because the whole spectrogram already exists. A
+  // live AnalyserNode could not do this at any price.
+  const t = live.current.getTime() + (p.flockAudioSync ?? 0.04)
+  const f = sampleAudio(spec, audio.plan, audio.state, t, dt, live.current.isPlaying())
   const drive = p.flockAudioDrive ?? 1
-  return applyAudio(base, {
-    level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle,
-  }, {
-    speed:     drive * (p.flockAudioSpeed ?? 1),
-    pulse:     drive * (p.flockAudioPulse ?? 1),
-    shimmer:   drive * (p.flockAudioShimmer ?? 1),
-    startle:   drive * (p.flockAudioStartle ?? 1),
-  })
+  const feat = { level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle }
+  return {
+    params: applyAudio(base, feat, {
+      speed:     drive * (p.flockAudioSpeed ?? 1),
+      pulse:     drive * (p.flockAudioPulse ?? 1),
+      shimmer:   drive * (p.flockAudioShimmer ?? 1),
+      startle:   drive * (p.flockAudioStartle ?? 1),
+    }),
+    visuals: audioVisuals(feat, { size: drive * (p.flockAudioSize ?? 1) }),
+    burst: drive * (p.flockAudioBurst ?? 1) * 1.8 * f.onset,
+  }
 }
 
 /** The sliders the simulation reads, named as `murmuration.js` expects them. */

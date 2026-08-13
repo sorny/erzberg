@@ -1244,13 +1244,14 @@ export function Sidebar({
                           help="Bass opens the flock out: separation rises on the kick while cohesion eases, so it breathes on the beat. Pulling both the same way instead just makes it vibrate." />
                         <InlineSl label="Shimmer" min={0} max={2} step={0.05} value={points.flockAudioShimmer ?? 1} onChange={v => sp({ flockAudioShimmer: v })} fmt={v => v.toFixed(2)} testId="flock-audio-shimmer"
                           help="Hats, cymbals and air add turbulence on top of whatever is dialled in — the flock gets restless through the busy parts." />
+                        <InlineSl label="Size" min={0} max={2} step={0.05} value={points.flockAudioSize ?? 1} onChange={v => sp({ flockAudioSize: v })} fmt={v => v.toFixed(2)} testId="flock-audio-size"
+                          help="Bass swells the birds themselves, and loudness lengthens their streaks. These are shader uniforms, so unlike every force below they land on the exact frame the beat does — this is the control that makes the flock read as being *on* the music rather than responding to it." />
+                        <InlineSl label="Burst" min={0} max={2} step={0.05} value={points.flockAudioBurst ?? 1} onChange={v => sp({ flockAudioBurst: v })} fmt={v => v.toFixed(2)} testId="flock-audio-burst"
+                          help="An onset throws the flock outward from its own centre, written straight into the birds' velocity rather than applied as a force — so it happens immediately instead of being integrated in over the following half-second. The flock re-forms on its own, because none of the flocking rules have changed. Past about 1.5 the bursts arrive faster than it can re-form and it disperses into fragments, which is a look but not a flock." />
                         <InlineSl label="Startle" min={0} max={2} step={0.05} value={points.flockAudioStartle ?? 1} onChange={v => sp({ flockAudioStartle: v })} fmt={v => v.toFixed(2)} testId="flock-audio-startle"
-                          help="Onsets widen the hawk's fear radius, so an accented beat tears the same hole through the flock that a strike does. Needs Predator on — it has nothing to act through otherwise." />
-                        {!points.flockPredator && (points.flockAudioStartle ?? 1) > 0 && (
-                          <div style={{ fontSize:9, color:MUTED, marginTop:-2, marginBottom:6 }}>
-                            Startle needs Predator enabled below.
-                          </div>
-                        )}
+                          help="On top of Burst, onsets widen the hawk's fear radius so an accented beat tears the same hole a strike does. This one needs Predator on; Burst does not." />
+                        <InlineSl label="Sync" min={-0.15} max={0.3} step={0.01} value={points.flockAudioSync ?? 0.04} onChange={v => sp({ flockAudioSync: v })} fmt={v => `${Math.round(v * 1000)}ms`} testId="flock-audio-sync"
+                          help="How far ahead of the playhead the flock reads. Steering forces take a few hundred milliseconds to become visible motion, so a little lookahead cancels that and puts the reaction back on the beat. Reading the future is only possible because the whole track is analysed before it plays — raise it if the flock still feels behind, lower it if it anticipates." />
                       </Sub>
                     )}
                     <Tog label="Shadow" small checked={points.flockShadow !== false} onChange={v => sp({ flockShadow: v })}

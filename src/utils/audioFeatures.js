@@ -30,8 +30,8 @@ const BANDS = [
 // Envelope time constants, seconds. Attack is much faster than release because
 // that is how percussion reads: a kick arrives instantly and decays away. Equal
 // rates give a flock that lags the beat and then twitches after it.
-const ATTACK  = 0.035
-const RELEASE = 0.22
+const ATTACK  = 0.010
+const RELEASE = 0.16
 // The onset envelope is faster still on both ends — it is a startle, not a mood.
 const STARTLE_ATTACK  = 0.010
 const STARTLE_RELEASE = 0.45
@@ -71,6 +71,8 @@ export function createAudioState() {
   return {
     prevFrame: -1,
     prevRow: null,        // the bins of the last *different* frame, for flux
+    prevFluxEnv: 0,
+    onset: 0,             // rising edge of the flux envelope — fires once per attack
     env:  [0, 0, 0],      // bass, mid, high
     peak: [0, 0, 0],
     fluxEnv: 0,
@@ -104,6 +106,7 @@ export function sampleAudio(spec, plan, state, time, dt, playing = true) {
     for (let i = 0; i < 3; i++) st.env[i] += (0 - st.env[i]) * rel
     st.fluxEnv += (0 - st.fluxEnv) * rel
     st.startle += (0 - st.startle) * (1 - Math.exp(-step / STARTLE_RELEASE))
+    st.onset = 0
     st.level = (st.env[0] + st.env[1] + st.env[2]) / 3
     return st
   }
@@ -147,10 +150,18 @@ export function sampleAudio(spec, plan, state, time, dt, playing = true) {
       flux /= bins
       st.fluxPeak = Math.max(flux, st.fluxPeak * decay)
       const norm = st.fluxPeak > SILENCE * 0.25 ? Math.min(1, flux / st.fluxPeak) : 0
+      // The *rise* of the flux envelope, not its level: this fires once as an
+      // attack lands rather than staying high for as long as the transient
+      // decays, which is what makes it usable as a trigger.
+      st.onset = Math.max(0, norm - st.prevFluxEnv)
+      st.prevFluxEnv = norm
       st.fluxEnv = norm
     }
     st.prevRow.set(data.subarray(row, row + bins))
     st.prevFrame = frame
+  } else {
+    // No new analysis column this render — there is no new attack to report.
+    st.onset = 0
   }
   st.startle += (st.fluxEnv - st.startle) *
     (1 - Math.exp(-step / (st.fluxEnv > st.startle ? STARTLE_ATTACK : STARTLE_RELEASE)))
@@ -193,12 +204,31 @@ export function applyAudio(params, f, amt) {
   // Highs → shimmer, on top of whatever turbulence is dialled in.
   if (amt.shimmer) out.turbulence = (params.turbulence ?? 0) + amt.shimmer * 1.6 * high
 
-  // Onsets → a startle. Routed through the predator's fear radius rather than a
-  // new force: it is already the one term strong enough to tear a hole through
-  // the flock, and reusing it means an accented beat looks like the thing the
-  // flock is actually afraid of. Only meaningful while the predator is on.
+  // Onsets also widen the hawk's fear radius, so an accented beat tears the same
+  // hole a strike does — but only when there is a hawk. This used to be the
+  // *whole* of the onset mapping, which made the most percussive control in the
+  // panel do nothing at all in the default configuration, where the predator is
+  // off. The burst in `applyBurst` is the part that always fires.
   if (amt.startle && params.predator) {
     out.predatorFear = (params.predatorFear ?? 1) * (1 + amt.startle * 2.5 * startle)
   }
   return out
+}
+
+/**
+ * The parts of the reaction that must not go through the integrator.
+ *
+ * Sprite size and streak length are shader uniforms: they change on the frame
+ * they are set, with none of the several-hundred-millisecond lag that steering
+ * forces carry. That is what makes the flock look like it is *on* the beat
+ * rather than swelling vaguely after it, and it is why the punchiest mappings
+ * live here rather than in `applyAudio`.
+ */
+export function audioVisuals(f, amt) {
+  const bass = f.bass ?? 0
+  const level = f.level ?? 0
+  return {
+    size:  1 + (amt.size ?? 0) * 1.2 * bass,
+    trail: 1 + (amt.size ?? 0) * 1.0 * level,
+  }
 }

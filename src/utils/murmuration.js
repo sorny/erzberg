@@ -705,6 +705,43 @@ function writeShadows(flock, field, s, params) {
 }
 
 /**
+ * Kick the flock outward from its own centre, right now.
+ *
+ * Everything else audio touches is a *steering* term, and steering is a force:
+ * it changes velocity at `acc·dt` bounded by the turn-rate limit, and only then
+ * changes position. That integrator is a low-pass filter, so a beat arrives on
+ * screen as a swell a few hundred milliseconds late — which is exactly what a
+ * beat should not look like.
+ *
+ * This writes velocity directly instead, so an onset lands on the frame it
+ * happens. The speed clamp in the next substep renormalises, which means the
+ * burst reads as the flock snapping *outward* rather than as a change of pace —
+ * and it re-forms on its own afterwards, because none of the flocking rules have
+ * been touched.
+ *
+ * `speed` is in world units per second; the caller scales it by cruise.
+ */
+export function applyBurst(flock, speed) {
+  const { n, pos, vel } = flock
+  if (!(speed > 0)) return
+  let cx = 0, cy = 0, cz = 0
+  for (let i = 0; i < n; i++) { const j = i * 3; cx += pos[j]; cy += pos[j + 1]; cz += pos[j + 2] }
+  const inv = 1 / n
+  cx *= inv; cy *= inv; cz *= inv
+  for (let i = 0; i < n; i++) {
+    const j = i * 3
+    // Vertical halved: a flock that bursts spherically mostly goes up, out of
+    // its own flight envelope, and comes back as a bounce. Flattening it keeps
+    // the expansion in the plane you are looking across.
+    const dx = pos[j] - cx, dy = (pos[j + 1] - cy) * 0.5, dz = pos[j + 2] - cz
+    const m = Math.sqrt(dx * dx + dy * dy + dz * dz)
+    if (m < 1e-6) continue
+    const k = speed / m
+    vel[j] += dx * k; vel[j + 1] += dy * k; vel[j + 2] += dz * k
+  }
+}
+
+/**
  * Rewrite the streak buffer: one segment per bird, from its nose back along its
  * own velocity. Two vertices each, laid out for a `LineSegments`.
  */

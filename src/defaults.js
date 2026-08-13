@@ -167,6 +167,12 @@ export const POINTS_DEF = {
   // never disagree about what the track is doing. See utils/audioFeatures.js.
   flockAudio: false, flockAudioDrive: 1,
   flockAudioSpeed: 1, flockAudioPulse: 1, flockAudioShimmer: 1, flockAudioStartle: 1,
+  // The two that land *on* the beat rather than after it: Size is a shader
+  // uniform and Burst writes velocity directly, so neither waits for the
+  // integrator. Sync reads slightly ahead of the playhead to cancel the lag the
+  // force-based channels still carry — possible only because the whole
+  // spectrogram exists before playback starts.
+  flockAudioSize: 1, flockAudioBurst: 1, flockAudioSync: 0.04,
 }
 export const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,
