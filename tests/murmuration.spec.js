@@ -372,6 +372,53 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
   expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
 })
 
+test('the audio meter shows what the flock is hearing', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await openApp(page)
+
+  await page.locator('[data-testid="section-particles"]').click()
+  await togColorFor(page, 'Particles').click({ force: true })
+  await page.locator('[data-testid="particle-mode-murmuration"]').click()
+  await page.waitForTimeout(1200)
+  await toggleFor(page, 'React to audio').click({ force: true })
+
+  const meter = page.locator('[data-testid="flock-audio-meter"]')
+  await expect(meter, 'the meter is there before a track is').toBeVisible()
+
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=↑ Load audio'),
+  ])
+  await chooser.setFiles(MP3)
+  await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
+
+  // The meter is a 2D canvas of our own pixels, so it can simply be read back.
+  const meterSig = () => page.evaluate(() => {
+    const c = document.querySelector('[data-testid="flock-audio-meter"]')
+    const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data
+    let sum = 0, lit = 0
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i] + d[i + 1] + d[i + 2]
+      sum += v
+      if (v > 200) lit++
+    }
+    return { sum, lit }
+  })
+
+  await page.locator('[data-testid="flock-audio-play"]').click()
+  await page.waitForTimeout(1200)
+  const a = await meterSig()
+  await page.waitForTimeout(700)
+  const b = await meterSig()
+
+  console.log(`meter: ${a.lit} → ${b.lit} lit pixels`)
+  expect(a.lit, 'the meter must be drawing something').toBeGreaterThan(200)
+  expect(b.sum, 'and must be redrawing it as the track plays').not.toBe(a.sum)
+
+  expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
+})
+
 test('the beat is visible in the flock, not just present in the numbers', async ({ page }) => {
   await openApp(page)
 

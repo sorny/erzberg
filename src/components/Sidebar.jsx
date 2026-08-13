@@ -13,6 +13,7 @@ import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
+import { AudioMeter } from './AudioMeter'
 import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
@@ -432,6 +433,7 @@ export function Sidebar({
   const fa = flockAudio ?? {
     loadFromPicker: () => {}, toggle: () => {}, release: () => {},
     isPlaying: false, isAnalyzing: false, ready: false, fileName: '', progress: 0, error: null,
+    liveRef: { current: null },
   }
 
   // Whole-track projection the freeze button will render.
@@ -1236,6 +1238,9 @@ export function Sidebar({
                             </button>
                           </>
                         )}
+                        {/* The meter goes above the sliders on purpose: it is the
+                            thing you watch while you move them. */}
+                        <AudioMeter liveRef={fa.liveRef} points={points} />
                         <InlineSl label="Drive" min={0} max={2} step={0.05} value={points.flockAudioDrive ?? 1} onChange={v => sp({ flockAudioDrive: v })} fmt={v => v.toFixed(2)} testId="flock-audio-drive"
                           help="Master amount for everything below. 0 is silence to the flock however loud the track; past 1 the reaction is exaggerated beyond what the music is doing." />
                         <InlineSl label="Pace" min={0} max={2} step={0.05} value={points.flockAudioSpeed ?? 1} onChange={v => sp({ flockAudioSpeed: v })} fmt={v => v.toFixed(2)} testId="flock-audio-speed"
