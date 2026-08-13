@@ -342,15 +342,20 @@ export default function App() {
     // tilt/rotation/zoom change).
     if (vals.panX         != null) v.panX          = vals.panX
     if (vals.panY         != null) v.panY          = vals.panY
+    if (vals.panZ         != null) v.panZ          = vals.panZ
     if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
     if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
     
+    // Particle params live in their own group; without this branch the pause
+    // hotkey has nowhere to write and silently does nothing.
+    if (vals.animateParticles != null) setPoints(prev => ({ ...prev, animateParticles: vals.animateParticles }))
+
     if (Object.keys(t).length) setTerrain(prev => ({ ...prev, ...t }))
     if (Object.keys(s).length) setStyle(prev   => ({ ...prev, ...s }))
     if (Object.keys(v).length) setView(prev    => ({ ...prev, ...v }))
-  }, [setTerrain, setStyle, setView])
+  }, [setTerrain, setStyle, setView, setPoints])
 
   // ── Auto-zoom to fit terrain on load ─────────────────────────────────────
   const autoZoom = useCallback(({ width, height }) => {
@@ -564,7 +569,7 @@ export default function App() {
       top:   { tilt: 0,  rotation: 0 },
       front: { tilt: 90, rotation: 0 },
       iso:   { tilt: 45, rotation: -45 },
-      reset: { tilt: 50, rotation: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0 },
+      reset: { tilt: 50, rotation: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
     }
     const p = presets[name] || presets.reset
     setView(prev => ({ ...prev, ...p }))

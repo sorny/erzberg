@@ -179,7 +179,8 @@ export function exportSVG({
   surfaceGeo, groupMatrix,
   surfaceOccludes,
   depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
-  particlePositions, particleCount, particleColor, particleSize,
+  particlePositions, particleCount, particleColor, particleSize, particleSegments, particleOpacity,
+  particleShadows, particleShadowLift, particleShadowColor, particleShadowOpacity, particleShadowSize,
   elevMinCut, elevMaxCut,
   baseName,
 }) {
@@ -461,7 +462,78 @@ export function exportSVG({
     }
   }
 
-  if (svgLayers.length === 0 && projectedParticles.length === 0) return
+  // ── Murmuration shadows ─────────────────────────────────────────────────────
+  //
+  // Discs on the terrain, so unlike the birds they are *behind* things rather
+  // than in front and the depth test earns its keep: a shadow on the far slope
+  // must be hidden by the ridge in front of it.
+  const projectedShadows = []
+  if (particleShadows && particleCount > 0) {
+    for (let i = 0; i < particleCount; i++) {
+      // Negative lift = no ground under it; the shader culls these too.
+      if (particleShadowLift && particleShadowLift[i] < 0) continue
+      wld2.set(particleShadows[i*3], particleShadows[i*3+1], particleShadows[i*3+2])
+      if (groupMatrix) wld2.applyMatrix4(groupMatrix)
+      viw2.copy(wld2).applyMatrix4(camInv)
+      if (viw2.z >= 0) continue
+      const r = ((particleShadowSize ?? 4) * 300 / (-viw2.z)) * 0.5
+      wld2.project(camera)
+      const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
+      if (offCanvas1(cx, cy)) continue
+      if (surfViewZ) {
+        const surfZ = surfViewZ(cx, cy)
+        // No ghost pass: a hidden shadow is simply not there. Drawing it faint
+        // through a mountain would read as a smudge on the rock.
+        if (surfZ !== -Infinity && viw2.z < surfZ - bias) continue
+      }
+      projectedShadows.push({ cx, cy, r })
+      expandBB(cx-r, cy-r); expandBB(cx+r, cy+r)
+    }
+  }
+
+  // ── Murmuration streaks ─────────────────────────────────────────────────────
+  //
+  // One segment per bird, nose to tail. Unlike the hologram field — whose motion
+  // lives in the vertex shader and never reaches the CPU — the flock's positions
+  // ARE the buffer the renderer draws from, so this is the frame on screen.
+  const projectedTrails = []
+  if (particleSegments && particleCount > 0) {
+    for (let i = 0; i < particleCount; i++) {
+      const k = i * 6
+      let ax = particleSegments[k],     ay = particleSegments[k + 1], az = particleSegments[k + 2]
+      let bx = particleSegments[k + 3], by = particleSegments[k + 4], bz = particleSegments[k + 5]
+
+      // Same near-plane clip the line layers use: world→view is affine, so the
+      // view-space crossing parameter is the world-space one.
+      const za = viewZOf(ax, ay, az)
+      const zb = viewZOf(bx, by, bz)
+      if (za > nearZ && zb > nearZ) continue
+      if (za > nearZ || zb > nearZ) {
+        const t = (nearZ - za) / (zb - za)
+        const cx3 = ax + (bx - ax) * t, cy3 = ay + (by - ay) * t, cz3 = az + (bz - az) * t
+        if (za > nearZ) { ax = cx3; ay = cy3; az = cz3 }
+        else            { bx = cx3; by = cy3; bz = cz3 }
+      }
+
+      const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
+      if (offCanvas2(p0, p1)) continue
+
+      // Depth-tested at the head only. A streak is a couple of pixels long and
+      // the bird it hangs off is the thing being occluded; sampling both ends
+      // would double the cost to disagree with the dot in front of it.
+      let visible = true
+      if (surfViewZ) {
+        const surfZ = surfViewZ(p0[0], p0[1])
+        visible = surfZ === -Infinity || p0[2] >= surfZ - bias
+      }
+      if (!visible && ghostOpac <= 0) continue
+      projectedTrails.push({ x0: p0[0], y0: p0[1], x1: p1[0], y1: p1[1], visible })
+      expandBB(p0[0], p0[1]); expandBB(p1[0], p1[1])
+    }
+  }
+
+  if (svgLayers.length === 0 && projectedParticles.length === 0 &&
+      projectedTrails.length === 0 && projectedShadows.length === 0) return
 
   // Clamp the content bounding box to the canvas: partially visible segments
   // are kept whole, so the box can spill slightly past the edges. The export
@@ -528,7 +600,24 @@ export function exportSVG({
   }
 
   const pColor = particleColor ?? '#000000'
-  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : occlusionColor}" opacity="${visible ? 1 : ghostOpac}"/>`)
+  // The viewport sprite is a soft radial falloff; an SVG circle is a flat disc,
+  // so the export already only approximates it. Carrying the opacity across at
+  // least keeps a deliberately faint field faint on paper.
+  const pOpac = particleOpacity ?? 1
+  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : occlusionColor}" opacity="${(visible ? pOpac : ghostOpac).toFixed(3)}"/>`)
+  const shadowEls = projectedShadows.map(({ cx, cy, r }) =>
+    `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}"/>`)
+  const shadowGroup = shadowEls.length > 0
+    ? [`<g id="layer-flock-shadow" inkscape:groupmode="layer" inkscape:label="Flock shadow" fill="${particleShadowColor ?? '#000000'}" stroke="none" opacity="${(particleShadowOpacity ?? 0.35).toFixed(3)}">${shadowEls.join('')}</g>`]
+    : []
+  // Its own Inkscape layer, unlike the dots: a plotter run is sorted by layer,
+  // and streaks are the pen-drawn half of the flock.
+  const trailStroke = Math.max(0.3, (particleSize ?? 4) * 0.15)
+  const trailEls = projectedTrails.map(({ x0, y0, x1, y1, visible }) =>
+    `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${visible ? pColor : occlusionColor}" opacity="${(visible ? 0.75 * pOpac : ghostOpac).toFixed(3)}"/>`)
+  const trailGroup = trailEls.length > 0
+    ? [`<g id="layer-flock" inkscape:groupmode="layer" inkscape:label="Flock" fill="none" stroke-width="${trailStroke.toFixed(2)}" stroke-linecap="round">${trailEls.join('')}</g>`]
+    : []
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
@@ -536,6 +625,11 @@ export function exportSVG({
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...layerGroups,
+    // After the line layers, matching the viewport's render order: a shadow
+    // falls *on* the terrain, so it darkens the marks drawn there rather than
+    // hiding beneath them.
+    ...shadowGroup,
+    ...trailGroup,
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
     `</svg>`,
   ].join('\n')

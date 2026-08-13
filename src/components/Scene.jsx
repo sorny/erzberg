@@ -45,7 +45,9 @@ export function Scene({
   // We use a spherical coordinate system for the camera to keep it "orbiting" the center
   const BASE_DIST = 800
   
-  const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom, px, py) => {
+  // px/py are the two ground-plane axes (world X and Z — the panel calls them
+  // Pan X and Pan Y); pz raises the orbit target off the ground (world Y).
+  const updateCameraFromSliders = (tiltDeg, rotationDeg, zoom, px, py, pz) => {
     if (!activeCamera) return
     
     // For Perspective, distance changes. 
@@ -57,7 +59,7 @@ export function Scene({
     const phi = THREE.MathUtils.degToRad(Math.max(tiltDeg, 0.001))
     const theta = THREE.MathUtils.degToRad(rotationDeg)
 
-    const target = new THREE.Vector3(px || 0, 0, py || 0)
+    const target = new THREE.Vector3(px || 0, pz || 0, py || 0)
     activeCamera.position.setFromSphericalCoords(dist, phi, theta).add(target)
     activeCamera.lookAt(target)
 
@@ -92,12 +94,13 @@ export function Scene({
     orbitEchoRef.current = null // single-use: only the commit it announced may skip
     if (echo && echo.cam === activeCamera &&
         echo.tilt === p.tilt && echo.rotation === p.rotation && echo.zoom === p.zoom &&
-        echo.panX === (p.panX ?? 0) && echo.panY === (p.panY ?? 0)) {
+        echo.panX === (p.panX ?? 0) && echo.panY === (p.panY ?? 0) &&
+        echo.panZ === (p.panZ ?? 0)) {
       return // echo of an orbit-driven sync — the camera is already there
     }
     autoRotRef.current = p.rotation
-    updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY)
-  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.orthographic, activeCamera])
+    updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ)
+  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ, p.orthographic, activeCamera])
 
   useFrame(({ invalidate }, delta) => {
     if (!p.autoRotate) return
@@ -106,7 +109,7 @@ export function Scene({
     // (fired by updateCameraFromSliders → orbit.update()) keeps React state
     // following at the throttled sync rate.
     autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
-    updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY)
+    updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY, p.panZ)
     invalidate()  // keep the on-demand loop running while auto-rotating
   })
 
@@ -124,10 +127,10 @@ export function Scene({
   useEffect(() => {
     if (!cameraPreset?.name) return
     if (orbitRef?.current) {
-      orbitRef.current.target.set(p.panX || 0, 0, p.panY || 0)
+      orbitRef.current.target.set(p.panX || 0, p.panZ || 0, p.panY || 0)
       orbitRef.current.update()
     }
-  }, [cameraPreset, p.panX, p.panY])
+  }, [cameraPreset, p.panX, p.panY, p.panZ])
 
   const syncOrbitToState = () => {
     if (!orbitRef.current || !activeCamera) return
@@ -136,22 +139,42 @@ export function Scene({
     const relativePos = activeCamera.position.clone().sub(target)
     const sph = new THREE.Spherical().setFromVector3(relativePos)
 
-    const tilt = THREE.MathUtils.radToDeg(sph.phi)
-    const rotation = THREE.MathUtils.radToDeg(sph.theta)
+    // Quantised to the granularity the sidebar controls actually have — tilt and
+    // rotation step by 0.1°, the pans by 1 unit.
+    //
+    // The camera is continuous and these sliders are not, and writing a raw
+    // float into a control that cannot represent it breaks twice over. It
+    // *reads* wrong: the pan fields have no `fmt`, so a drag left them showing
+    // `-247.38194837`. And it *behaves* wrong: `<input type=range step=1>` snaps
+    // its value to the step grid, so the thumb sat somewhere the state was not,
+    // and the first click on the slider jumped the camera to the snapped value
+    // rather than nudging it. Rounding here means state, thumb and camera always
+    // agree, and a click moves exactly one step.
+    const tilt = Math.round(THREE.MathUtils.radToDeg(sph.phi) * 10) / 10
+    const rotation = Math.round(THREE.MathUtils.radToDeg(sph.theta) * 10) / 10
 
-    // Calculate zoom based on camera type
+    // Calculate zoom based on camera type. Not quantised: the Zoom slider is a
+    // derived percentage of a base this component does not know.
     const zoom = pc.orthographic
       ? (activeCamera.zoom / 2)
       : (BASE_DIST / sph.radius)
 
-    const panX = target.x
-    const panY = target.z
+    const panX = Math.round(target.x)
+    const panY = Math.round(target.z)
+    // Read back too, not just written: OrbitControls pans in screen space, so a
+    // mouse drag moves the target vertically as well. Before panZ existed that
+    // movement was thrown away on the next sync, which snapped the view back to
+    // ground level mid-gesture.
+    const panZ = Math.round(target.y)
 
-    if (Math.abs(tilt - pc.tilt) > 0.1 || Math.abs(rotation - pc.rotation) > 0.1 ||
-        Math.abs(zoom - pc.zoom) > 0.001 || Math.abs(panX - (pc.panX || 0)) > 1 || Math.abs(panY - (pc.panY || 0)) > 1) {
-      orbitEchoRef.current = { cam: activeCamera, tilt, rotation, zoom, panX, panY }
+    // Half a step, so a genuine one-step move registers rather than being eaten
+    // by the comparison it just became exactly equal to.
+    if (Math.abs(tilt - pc.tilt) > 0.05 || Math.abs(rotation - pc.rotation) > 0.05 ||
+        Math.abs(zoom - pc.zoom) > 0.001 || Math.abs(panX - (pc.panX || 0)) > 0.5 ||
+        Math.abs(panY - (pc.panY || 0)) > 0.5 || Math.abs(panZ - (pc.panZ || 0)) > 0.5) {
+      orbitEchoRef.current = { cam: activeCamera, tilt, rotation, zoom, panX, panY, panZ }
       autoRotRef.current = rotation
-      setParams({ tilt, rotation, zoom, panX, panY })
+      setParams({ tilt, rotation, zoom, panX, panY, panZ })
     }
   }
 
@@ -291,6 +314,15 @@ export function Scene({
         particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
         particleColor:     p.pointColor ?? '#000000',
         particleSize:      p.pointSize ?? 4,
+        particleOpacity:   p.pointOpacity ?? 1,
+        particleShadows:   p.showPoints && p.flockShadow && particleRef.current ? particleRef.current.getShadows() : null,
+        particleShadowLift:    p.showPoints && p.flockShadow && particleRef.current ? particleRef.current.getShadowLift() : null,
+        particleShadowColor:   p.flockShadowColor ?? '#000000',
+        particleShadowOpacity: p.flockShadowOpacity ?? 0.35,
+        particleShadowSize:    (p.pointSize ?? 4) * (p.flockShadowSize ?? 1),
+        // Murmuration streaks. Null in hologram mode, and null when the trail
+        // length is zero — the flock is dots then, and the circles above are it.
+        particleSegments:  p.showPoints && particleRef.current ? particleRef.current.getSegments() : null,
         baseName:          exportBaseName,
       })
       onSvgDone?.()

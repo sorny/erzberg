@@ -122,14 +122,46 @@ export const STYLE_DEF = {
 
 export const POINTS_DEF = {
   showPoints: false, pointColor: '#2e7bff', pointSize: 4,
+  // Scales the sprite's whole alpha falloff, core and halo together, so the
+  // soft edge keeps its profile instead of hard-cutting as it fades. Shared by
+  // both fields, and applied to the murmuration's streaks too.
+  pointOpacity: 1,
+  // Which field the Particles section draws. 'hologram' pins a particle to every
+  // terrain cell and displaces it in the vertex shader; 'murmuration' runs a
+  // boids flock on the CPU. They share the toggle, the size and the colours and
+  // nothing else — see src/utils/murmuration.js.
+  particleMode: 'hologram',
   // Grid-cell stride between particles: 1 = one per cell (dense carpet),
   // higher = sparse field. The only density control — the home buffer is
-  // otherwise one particle per valid terrain cell.
+  // otherwise one particle per valid terrain cell. Hologram mode only; the flock
+  // is sized by flockCount instead.
   particleSpacing: 1,
-  // Hologram field (GPU-animated). `animateParticles` toggles the motion.
+  // Hologram field (GPU-animated). `animateParticles` toggles the motion of
+  // both fields.
   animateParticles: true,
   holoGlowColor: '#7df9ff', holoFloat: 1, holoNoiseAmt: 1, holoNoiseScale: 1,
   holoFlowSpeed: 1, holoMaskContrast: 1.5, holoShimmer: 0.4,
+
+  // ── Murmuration ────────────────────────────────────────────────────────────
+  // Every weight below is a unitless multiplier. The distances and speeds they
+  // scale are fractions of the terrain's own extent (see the constants at the
+  // top of murmuration.js), so a setting that reads well on one heightmap reads
+  // well on the next instead of needing re-tuning per raster.
+  flockCount: 2000, flockSeed: 42, flockSpeed: 1,
+  flockCohesion: 1, flockAlignment: 1.2, flockSeparation: 1.5,
+  flockPerception: 1,
+  flockRoost: 1, flockRoostHeight: 1,   // pull toward, and height above, the summit
+  flockClearance: 1, flockLift: 1,      // ground clearance, ridge updraft
+  flockTurbulence: 0.5,
+  // Streaks, not dots, by default: at any distance where the whole flock fits on
+  // screen a bird is a couple of pixels, and it is the streak that shows which
+  // way the thing is moving.
+  flockTrail: 2,
+  flockPredator: false, flockPredatorFear: 1,
+  // Ground shadows. Direction comes from the hillshade sun (azimuth/altitude) so
+  // the flock is lit the same way the terrain under it is — see murmuration.js.
+  flockShadow: true, flockShadowOpacity: 0.35, flockShadowSize: 1,
+  flockShadowSpread: 1.5, flockShadowColor: '#000000',
 }
 export const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,
@@ -138,7 +170,9 @@ export const VIEW_DEF = {
   // fields are undersampled and "boil" during pan/rotate; 2× rendering cuts
   // hard pixel flips by ~97% (measured) at 4× fragment cost. Render-side only.
   renderScale: 1,
-  panX: 0, panY: 0,
+  // Orbit-target offset. X and Y are the two ground-plane axes (world X and
+  // Z); Z raises the target off the ground (world Y).
+  panX: 0, panY: 0, panZ: 0,
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
   showGuides: false, showRawTerrain: false,
 }

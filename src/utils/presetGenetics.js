@@ -226,6 +226,22 @@ export function randomPreset(seed) {
     points.particleSpacing = intBetween(rng, 1, 6)
     points.animateParticles = chance(rng, 0.6)
     points.holoGlowColor = hslToHex(paletteHue, 0.9, 0.65)
+
+    // Appended, not woven in: every draw above this point must keep taking its
+    // numbers in the same order it always has, or every previously rolled seed
+    // produces a different look — and seeds are shown to the user and stepped
+    // back through. New decisions go at the end.
+    points.particleMode = chance(rng, 0.4) ? 'murmuration' : 'hologram'
+    if (points.particleMode === 'murmuration') {
+      // Birds want to be small — a flock of 6px blobs reads as confetti.
+      points.pointSize = +between(rng, 1.5, 3.5).toFixed(1)
+      points.flockCount = intBetween(rng, 8, 40) * 100
+      points.flockSeed = intBetween(rng, 1, 999)
+      points.flockTrail = +between(rng, 0.5, 3.5).toFixed(1)
+      points.flockRoostHeight = +between(rng, 0.3, 2.5).toFixed(1)
+      points.flockTurbulence = +between(rng, 0, 1.2).toFixed(1)
+      points.flockPredator = chance(rng, 0.35)
+    }
   }
 
   // 9 ── sanity: something has to be visible

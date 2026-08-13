@@ -20,6 +20,26 @@ import {
   Sl, Sub, Tog, TogColor,
 } from './panel/ui'
 
+/**
+ * Square-law mapping for the flock-size slider.
+ *
+ * The range is 100 to 100 000 birds — 1000×. Linear, that puts everything anyone
+ * normally wants inside the first 2% of the track, where 1 500 and 3 000 are one
+ * pixel apart. Squaring the handle position spends half the track below 25 000
+ * and keeps the steps at the top (~630 birds) far finer than the eye can tell.
+ *
+ * The round-trip has to be exact or the readout lies: the panel shows
+ * `birdCount(birdSlider(count))`, so any position that does not map back to
+ * itself displays a number the flock does not have. 317² is 100 489, which the
+ * cap trims to 100 000 — and `round(√100000)` is 316, which reads back as
+ * 99 900. Hence the explicit top case: only the last position means "all of
+ * them", and every position below it is its own exact inverse.
+ */
+const BIRD_MAX = 100000
+const birdCount  = (v) => Math.min(BIRD_MAX, Math.round(v * v / 100) * 100)
+const birdSlider = (n) =>
+  n >= BIRD_MAX ? 317 : Math.max(10, Math.min(316, Math.round(Math.sqrt(n))))
+
 /** m:ss for the Soundscapes transport readout. */
 function fmtTime(sec) {
   if (!isFinite(sec) || sec < 0) sec = 0
@@ -637,8 +657,14 @@ export function Sidebar({
               {!view.orthographic && (
                 <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
               )}
-              <InlineSl label="Pan X" min={-1000} max={1000} value={view.panX ?? 0} onChange={v => sv({ panX: v })} />
-              <InlineSl label="Pan Y" min={-1000} max={1000} value={view.panY ?? 0} onChange={v => sv({ panY: v })} />
+              {/* fmt is not decoration: these mirror the orbit target, which a
+                  mouse pan moves continuously, and without it a drag left the
+                  field reading `-247.38194837`. Scene.jsx rounds at the source
+                  now; this keeps any stray float legible if one ever arrives. */}
+              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
+              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
+              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
+                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
             </Sub>
           </Section>
 
@@ -1118,22 +1144,113 @@ export function Sidebar({
           )}
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
-            <TogColor label="Hologram" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
+            <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <Sub>
-                <InlineSl label="Size" min={0.5} max={100} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} />
-                <InlineSl label="Spacing" min={1} max={16} step={1} value={points.particleSpacing ?? 1} onChange={v => sp({ particleSpacing: v })} fmt={v => `${v}`} />
-                <ColorRow label="Glow" value={points.holoGlowColor ?? '#00eaff'} onChange={v => sp({ holoGlowColor: v })} />
-                <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} />
-                <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
-                {points.animateParticles && (
-                  <Sub>
-                    <InlineSl label="Float"      min={0} max={5}  step={0.1} value={points.holoFloat ?? 1}       onChange={v => sp({ holoFloat: v })}       fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Noise"      min={0} max={5}  step={0.1} value={points.holoNoiseAmt ?? 1}    onChange={v => sp({ holoNoiseAmt: v })}    fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Noise scale" min={0.1} max={5} step={0.1} value={points.holoNoiseScale ?? 1} onChange={v => sp({ holoNoiseScale: v })} fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Flow speed" min={0} max={4}  step={0.1} value={points.holoFlowSpeed ?? 1}   onChange={v => sp({ holoFlowSpeed: v })}   fmt={v => v.toFixed(1)} />
-                    <InlineSl label="Reveal"     min={0.5} max={6} step={0.1} value={points.holoMaskContrast ?? 1.5} onChange={v => sp({ holoMaskContrast: v })} fmt={v => v.toFixed(1)} />
-                  </Sub>
+                <SegRow label="Field" testIdPrefix="particle-mode"
+                  options={[['Hologram', 'hologram'], ['Murmuration', 'murmuration']]}
+                  value={points.particleMode ?? 'hologram'} onChange={v => sp({ particleMode: v })}
+                  help="Hologram pins a particle to every terrain cell and shimmers them in place. Murmuration flies a boids flock over the relief: it avoids the ground, orbits a roost on the summit and rides the updraft on steep slopes." />
+                <InlineSl label="Size" min={0.5} max={250} step={0.5} value={points.pointSize} onChange={v => sp({ pointSize: v })} testId="particle-size"
+                  help="Sprite diameter in pixels at 300 units from the camera — points shrink with distance like anything else in the scene, so this is a reference size, not the size on screen. Drivers cap how large a single point may be drawn (often 255 px), and a big sprite close to the camera will hit that ceiling and stop growing. Birds want to be small: past about 4 a flock reads as confetti rather than as a flock." />
+                <InlineSl label="Opacity" min={0} max={1} step={0.05} value={points.pointOpacity ?? 1} onChange={v => sp({ pointOpacity: v })} fmt={v => v.toFixed(2)} testId="particle-opacity"
+                  help="Strength of the whole sprite — core, halo and, in murmuration mode, the velocity streaks. The radial falloff keeps its shape as this drops, so particles thin out rather than hard-edging. Below about 0.3 a dense field reads as a wash of colour instead of as countable marks, which is usually what you want when there are tens of thousands of them. It carries into SVG export as the fill opacity." />
+                <ColorRow label="Glow" value={points.holoGlowColor ?? '#00eaff'} onChange={v => sp({ holoGlowColor: v })}
+                  help="The rim colour blended into the outside of each sprite, against the main colour in its core. In murmuration mode it is also the far end of each velocity streak, which fades from this colour at the tail to the main colour at the bird." />
+
+                {(points.particleMode ?? 'hologram') === 'hologram' ? (
+                  <>
+                    <InlineSl label="Spacing" min={1} max={16} step={1} value={points.particleSpacing ?? 1} onChange={v => sp({ particleSpacing: v })} fmt={v => `${v}`} testId="particle-spacing" />
+                    <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} testId="holo-shimmer" />
+                    <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
+                    {points.animateParticles && (
+                      <Sub>
+                        <InlineSl label="Float"      min={0} max={5}  step={0.1} value={points.holoFloat ?? 1}       onChange={v => sp({ holoFloat: v })}       fmt={v => v.toFixed(1)} testId="holo-float" />
+                        <InlineSl label="Noise"      min={0} max={5}  step={0.1} value={points.holoNoiseAmt ?? 1}    onChange={v => sp({ holoNoiseAmt: v })}    fmt={v => v.toFixed(1)} testId="holo-noise" />
+                        <InlineSl label="Noise scale" min={0.1} max={5} step={0.1} value={points.holoNoiseScale ?? 1} onChange={v => sp({ holoNoiseScale: v })} fmt={v => v.toFixed(1)} testId="holo-noise-scale" />
+                        <InlineSl label="Flow speed" min={0} max={4}  step={0.1} value={points.holoFlowSpeed ?? 1}   onChange={v => sp({ holoFlowSpeed: v })}   fmt={v => v.toFixed(1)} testId="holo-flow" />
+                        <InlineSl label="Reveal"     min={0.5} max={6} step={0.1} value={points.holoMaskContrast ?? 1.5} onChange={v => sp({ holoMaskContrast: v })} fmt={v => v.toFixed(1)} testId="holo-reveal" />
+                      </Sub>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <InlineSl label="Birds" min={10} max={317} step={1}
+                      value={birdSlider(points.flockCount ?? 2000)}
+                      onChange={v => sp({ flockCount: birdCount(v) })}
+                      fmt={v => `${birdCount(v)}`} testId="flock-count"
+                      help="Cost is linear: about 0.15 ms of simulation per 1000 birds per step, so the full 100 000 is roughly a whole 60 fps frame on its own — and Shadow adds a third again on top, which takes 100 000 down to about 18 fps. Both together are comfortable to around 50 000. Past the budget the flock moves in slow motion rather than stuttering. Shapes read best somewhere between 2 000 and 20 000; past that it fills in to a solid mass." />
+                    <InlineSl label="Seed" min={1} max={999} step={1} value={points.flockSeed ?? 42} onChange={v => sp({ flockSeed: v })} fmt={v => `${v}`} testId="flock-seed"
+                      help="Same seed, same flock. The simulation runs on a fixed timestep, so a given seed produces the same shapes on any machine." />
+                    <InlineSl label="Trail" min={0} max={4} step={0.1} value={points.flockTrail ?? 2} onChange={v => sp({ flockTrail: v })} fmt={v => v.toFixed(1)} testId="flock-trail"
+                      help="Length of the velocity streak behind each bird. 0 draws dots only. Streaks export to SVG as their own plotter layer." />
+                    <Tog label="Shadow" small checked={points.flockShadow !== false} onChange={v => sp({ flockShadow: v })}
+                      help="Drops each bird's shadow onto the terrain. The direction is the Hillshade sun — azimuth and altitude in the Hillshade section — so the flock is lit the same way the ground under it is, and the shadows swing when you move the sun. A low sun throws them long across the valley." />
+                    {points.flockShadow !== false && (
+                      <Sub>
+                        <InlineSl label="Strength" min={0} max={1} step={0.05} value={points.flockShadowOpacity ?? 0.35} onChange={v => sp({ flockShadowOpacity: v })} fmt={v => v.toFixed(2)} testId="flock-shadow-opacity"
+                          help="How dark the shadows are where the bird is lowest. They always fade further as it climbs — this sets the near end of that range." />
+                        <InlineSl label="Sh. size" min={0.2} max={6} step={0.1} value={points.flockShadowSize ?? 1} onChange={v => sp({ flockShadowSize: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-size"
+                          help="Shadow diameter as a multiple of the bird's own Size. Above 1 the shadows read as a soft moving stain on the landscape rather than as countable dots." />
+                        <InlineSl label="Sh. spread" min={0} max={5} step={0.1} value={points.flockShadowSpread ?? 1.5} onChange={v => sp({ flockShadowSpread: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-spread"
+                          help="How much a shadow grows as its bird climbs — the depth cue that makes the flock read as flying rather than pasted onto the terrain. At 0 every shadow is the same size whatever the altitude." />
+                        {/* The same two style params the Hillshade section owns, surfaced
+                            here because that section hides them unless Hillshade is
+                            enabled — and the flock's shadows do not require it. One
+                            value, two places to reach it, so they cannot disagree. */}
+                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 315} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
+                          help="Which way the shadows fall: 0°=N, 90°=E, 315°=NW. This is the Hillshade sun — the same slider, shown here too because Hillshade hides it when it is switched off. Moving it here moves the terrain's shading as well." />
+                        <InlineSl label="Sun alt." min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
+                          help="Sun height above the horizon. Overhead drops each shadow straight under its bird; low sun throws the whole flock's shadow long across the valley. Clamped at 5° for the shadow maths, since a sun on the horizon casts to infinity." />
+                        <ColorRow label="Sh. colour" value={points.flockShadowColor ?? '#000000'} onChange={v => sp({ flockShadowColor: v })}
+                          help="Black reads as shadow; a dark tint of the background reads as haze. It is a flat colour with a soft edge, not a darkening of what is underneath, so on a dark background a shadow lighter than the terrain will look like glow." />
+                      </Sub>
+                    )}
+                    {/* A transport button rather than a toggle: freezing the flock is
+                        something you reach for constantly — to look at a shape, or to
+                        export the frame you are looking at — and it deserves to be
+                        the most obvious control in the block rather than one switch
+                        among fifteen. Same `animateParticles` param either way. */}
+                    <div style={{ display: 'flex', marginBottom: 8 }}>
+                      <ExpBtn
+                        label={points.animateParticles ? '❚❚  Pause' : '▶  Resume'}
+                        hint={points.animateParticles ? 'space — freeze the flock' : 'space — frozen'}
+                        active={!points.animateParticles}
+                        testId="flock-pause"
+                        onClick={() => sp({ animateParticles: !points.animateParticles })} />
+                    </div>
+                    {/* Not gated on the pause state, unlike the hologram's block: a
+                        pause you cannot adjust anything during is a worse pause, and
+                        the flock picks these up the moment it resumes. */}
+                    <Sub>
+                        <InlineSl label="Speed"      min={0.1} max={4} step={0.1} value={points.flockSpeed ?? 1}      onChange={v => sp({ flockSpeed: v })}      fmt={v => v.toFixed(1)} testId="flock-speed"
+                          help="Cruise speed, as a fraction of the terrain's width per second — 1 crosses the map in about eleven seconds. Everything else is measured against it: birds never fly slower than 0.65× or faster than 1.35× this, and every force below is a multiple of it, so a faster flock also pushes harder off the ground and away from the hawk." />
+                        <InlineSl label="Cohesion"   min={0} max={4} step={0.1} value={points.flockCohesion ?? 1}     onChange={v => sp({ flockCohesion: v })}   fmt={v => v.toFixed(1)} testId="flock-cohesion"
+                          help="Pull toward the centre of the neighbours a bird can see. High values ball the flock up tight; at 0 it disperses into a drifting haze and only the roost holds it on the map." />
+                        <InlineSl label="Alignment"  min={0} max={4} step={0.1} value={points.flockAlignment ?? 1.2}  onChange={v => sp({ flockAlignment: v })}  fmt={v => v.toFixed(1)} testId="flock-alignment"
+                          help="How strongly a bird matches its neighbours' heading. This is what makes a murmuration a single moving sheet rather than a swarm — and what lets a turn started at one edge travel across the whole flock." />
+                        <InlineSl label="Separation" min={0} max={4} step={0.1} value={points.flockSeparation ?? 1.5} onChange={v => sp({ flockSeparation: v })} fmt={v => v.toFixed(1)} testId="flock-separation"
+                          help="Push away from birds that get too close, weighted so an imminent collision outranks mere proximity. It sets the flock's texture: low values clump into blobs, high values open it into an even lattice." />
+                        <InlineSl label="Neighbours" min={0.2} max={3} step={0.1} value={points.flockPerception ?? 1} onChange={v => sp({ flockPerception: v })} fmt={v => v.toFixed(1)} testId="flock-perception"
+                          help="How far a bird looks for company. Each one flies with the eight nearest it finds — the topological rule real starlings follow — so this sets how far apart they can drift before losing touch. Small values shatter the flock into independent knots; large ones make it move as one sheet." />
+                        <InlineSl label="Turbulence" min={0} max={2} step={0.1} value={points.flockTurbulence ?? 0.5} onChange={v => sp({ flockTurbulence: v })} fmt={v => v.toFixed(1)} testId="flock-turbulence"
+                          help="A slow-drifting noise field nudging every bird. At 0 the flock is eerily smooth and settles into a steady orbit; a little roughness is what keeps it restless and stops the shape repeating." />
+                        <InlineSl label="Roost"      min={0} max={3} step={0.1} value={points.flockRoost ?? 1}        onChange={v => sp({ flockRoost: v })}      fmt={v => v.toFixed(1)} testId="flock-roost"
+                          help="Pull toward a roost above the highest ground. Nothing inside a free radius and ramping up beyond it, so the flock orbits the summit instead of collapsing onto it. At 0 it wanders until the map edges turn it back." />
+                        <InlineSl label="Height"     min={0} max={4} step={0.1} value={points.flockRoostHeight ?? 1}  onChange={v => sp({ flockRoostHeight: v })} fmt={v => v.toFixed(1)} testId="flock-roost-height"
+                          help="How high the roost sits above the summit, measured against the terrain's own relief rather than in scene units. It sets the altitude the whole flock centres on: low keeps it down among the ridges, high lifts it clear into the sky." />
+                        <InlineSl label="Clearance"  min={0.1} max={4} step={0.1} value={points.flockClearance ?? 1}  onChange={v => sp({ flockClearance: v })}  fmt={v => v.toFixed(1)} testId="flock-clearance"
+                          help="Minimum height above the terrain. The flock drapes over ridges rather than passing through them. No bird is ever drawn underground whatever this is set to — the low end just lets them skim closer." />
+                        <InlineSl label="Ridge lift" min={0} max={4} step={0.1} value={points.flockLift ?? 1}         onChange={v => sp({ flockLift: v })}       fmt={v => v.toFixed(1)} testId="flock-lift"
+                          help="Updraft over steep ground and sink over the flats, read from the terrain's own slope field and fading with height — the flock finds the ridgelines and traces them. At 0 the relief underneath stops influencing where it flies." />
+                        <Tog label="Predator" small checked={!!points.flockPredator} onChange={v => sp({ flockPredator: v })}
+                          help="A hawk that runs the flock down, circling past the centre so it keeps coming back rather than parking in the middle. The waves and holes that tear through real murmurations are a reaction to one." />
+                      {points.flockPredator && (
+                        <InlineSl label="Fear" min={0.2} max={4} step={0.1} value={points.flockPredatorFear ?? 1} onChange={v => sp({ flockPredatorFear: v })} fmt={v => v.toFixed(1)} testId="flock-fear"
+                          help="How close the hawk gets before birds break. A small radius punches a clean hole through the flock; a large one scatters the whole thing at once and it takes several seconds to re-form." />
+                      )}
+                    </Sub>
+                  </>
                 )}
               </Sub>
             )}

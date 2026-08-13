@@ -141,11 +141,18 @@ export function Switch({ checked, onChange }) {
   )
 }
 
-export function ColorRow({ label, value, onChange, testId }) {
+export function ColorRow({ label, help, value, onChange, testId }) {
+  const [showHelp, setShowHelp] = useState(false)
   return (
-    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-      <span style={{ fontSize: 12, color: DIM }}>{label}</span>
-      <input type="color" className="hmc" data-testid={testId} value={value} onChange={e => onChange(e.target.value)} />
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <span style={{ fontSize: 12, color: DIM, display:'flex', alignItems:'center' }}>
+          {label}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <input type="color" className="hmc" data-testid={testId} value={value} onChange={e => onChange(e.target.value)} />
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
@@ -221,7 +228,10 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
 export function Section({ title, open, onToggle, enabled, children }) {
   return (
     <div style={{ borderBottom: `1px solid ${BORDER}` }}>
-      <div onClick={onToggle} style={{
+      {/* A collapsed section is a zero-height grid row, so nothing inside it is
+          clickable until it is opened — the header needs a handle a spec can
+          find without matching on its uppercase-by-CSS title text. */}
+      <div onClick={onToggle} data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
         display:'flex', justifyContent:'space-between', alignItems:'center',
         padding:'10px 14px', cursor:'pointer', userSelect:'none',
       }}>
@@ -251,9 +261,9 @@ export function Sub({ children }) {
   )
 }
 
-export function ExpBtn({ label, hint, onClick, active }) {
+export function ExpBtn({ label, hint, onClick, active, testId }) {
   return (
-    <button className="hmeb" onClick={onClick} style={{
+    <button className="hmeb" onClick={onClick} data-testid={testId} style={{
       flex:1, padding:'8px 0', textAlign:'center',
       background: active ? ACCENT : SURF,
       color: active ? '#fff' : DIM,
