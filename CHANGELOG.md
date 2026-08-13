@@ -7,6 +7,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.9] - 2026-08-13
+
+The Particles section could draw one thing, and that thing did not move —
+"animated" meant a noise field displacing each particle around a home cell it
+never left. This adds a second field that actually goes somewhere, and fixes
+three things found while building it: the draw modes were painting over the
+particle field entirely, a mouse pan was writing unrepresentable floats into
+integer sliders, and the flock ran at half the speed it needed to.
+
+### Added
+- **Murmurations.** A boids flock over the terrain, selected by a new `Field`
+  switch in the Particles section. Separation, alignment and cohesion make it a
+  flock; four more forces make it a flock *over this landscape*: it holds a
+  clearance above the ground (sampled through the NoData-safe bilinear tap, so a
+  lasso crop does not pull it into a floor that is not there), orbits a roost
+  above the highest cell, rides updraft on steep ground and sinks over the flats
+  — reading the slope field `buildTerrain` already produces — and stays inside a
+  flight envelope around the roost height. An optional predator pursues the
+  flock and tears the waves and holes through it that a smooth boids blob never
+  produces on its own. Drawn as points with velocity streaks, up to 100 000 of
+  them at 60 fps. → [Murmurations](docs/Murmurations.md)
+- Birds fly with their eight nearest neighbours rather than with everything
+  inside the perception radius — the topological rule
+  [Ballerini et al. (PNAS 2008)](https://www.pnas.org/doi/10.1073/pnas.0711437105)
+  measured in real starlings, and the reason a murmuration stays cohesive as it
+  compresses and a predator's strike travels through it as a wave. It is also
+  what keeps the cost linear in population.
+- **The flock exports.** Its positions live on the CPU, so `getPositions()`
+  hands the exporter the live flock rather than a snapshot at rest — pause it
+  and the SVG is the frame on screen. Birds become `<circle>`
+  elements, depth-tested against the same software Z-buffer as the line layers;
+  streaks get their own Inkscape layer, `layer-flock`, since a plotter run is
+  sorted by layer. PNG and WebM needed no changes. STL still carries no
+  particles of any kind.
+- Every murmuration control carries a `?` explaining what it does and what
+  happens at the ends of its range, and `ColorRow` learned the same `help`
+  affordance the other panel primitives already had.
+- Rolling a preset can now produce a murmuration. The draw is appended after
+  every existing one so the RNG ordering — and therefore every previously rolled
+  seed's *style* — is unchanged.
+- **The flock casts shadows.** Each bird drops a soft dark disc onto the
+  terrain, grown and faded by how high it is flying — which is the whole depth
+  cue, and the difference between a flock that reads as airborne and one pasted
+  onto the landscape. Not a shadow map: this scene has no lights at all, so the
+  shadow is solved analytically, walking from the bird along the sun ray until
+  it meets the ground in exactly two terrain taps. The direction is the
+  *hillshade* sun, so the flock is lit the way the ground under it is and the
+  shadows swing when the azimuth moves. Strength, size, growth-with-altitude and
+  colour are all configurable, and the shadows export to SVG as their own
+  `layer-flock-shadow` plotter layer. A shadow is drawn only where there is
+  ground to receive it: the flock's own height sampler clamps to the grid edge
+  (right for a bird, which should not fall off the world), so shadows needed a
+  stricter one that reports no-ground outside the raster and inside any hole cut
+  from it — otherwise a low sun hung them in mid-air beside the terrain and
+  across lasso'd-out gaps. They cost about a third on top of the
+  simulation — free at the default 2 000 birds, and the reason the 100 000
+  ceiling is a 60 fps flock without them and an 18 fps one with.
+- **A Pause button, and `Space`.** Freezing the flock — to study a shape, or to
+  export the frame you are looking at — was buried in an `Animate` switch among
+  fifteen others. It is now a transport button at the top of the block, and
+  `Space` does it from the keyboard. The steering controls no longer fold away
+  while paused, since a pause you cannot adjust anything during is a worse pause.
+  `setParams` gained a `points` branch, without which the hotkey had nowhere to
+  write.
+- **Particles have an opacity.** The sprite's alpha was hard-coded in the
+  fragment shader — a fixed core-plus-halo falloff with nothing to turn, so the
+  only way to make a field fainter was to make it smaller. `Opacity` scales the
+  whole falloff, core and halo together, so particles thin out instead of
+  hard-edging, and it reaches the murmuration's streaks and the SVG export's
+  fill opacity as well. Both fields get it.
+- **Pan Z.** The camera panned across the ground plane but never off it. The
+  orbit target's height is now a slider alongside Pan X and Y. This also fixes a
+  latent bug: OrbitControls pans in *screen space*, so a mouse drag was already
+  moving the target vertically — and the state sync threw that away on the next
+  tick, snapping the view back to ground level mid-gesture.
+
+### Performance
+- **The flock runs 2.2× faster**, which is what makes 100 000 birds a 60 fps
+  field rather than a 30 fps one. Two findings, both from profiling. `Math.hypot`
+  was **27% of the entire step**: it guards against intermediate overflow that
+  cannot arise for three coordinates of a bird, and there were about ten per bird
+  per substep. And Reynolds' per-force clamp *provably never fired* — the
+  steering delta cannot exceed 2.35·cruise while `maxForce` is 2.5·cruise — so
+  removing it was bit-identical output for another 12%.
+- Neighbour cells are scanned nearest-first, which is the difference between
+  linear and quadratic scaling: a flock occupies a fixed volume however many
+  birds are in it, so the naive −1…+1 order walked twenty low-yield corner and
+  edge cells before reaching the bird's own. At 50 000 that was ~2 000 rejected
+  candidates before the neighbour cap could fire, and 114 ms per substep.
+- Cells are built by counting sort rather than a head/next linked list, so a cell
+  is walked as a contiguous slice instead of chasing pointers across a 600 KB
+  buffer. As a side-effect the update became simultaneous: no bird now sees some
+  of its neighbours already moved this substep.
+- The hologram's home buffer is released when the mode switches away from it —
+  ~25 MB at a 1024² grid, previously held until the next rebuild — and its
+  per-cell scan is skipped entirely in murmuration mode.
+- Dropped an inert `polygonOffset` from the new particle materials (WebGL exposes
+  only `POLYGON_OFFSET_FILL`, so it does nothing for points and lines) and the
+  `needsUpdate` flags from their uniform sync, which were rebuilding each
+  material's program-cache entry on every slider tick for no reason.
+
+### Fixed
+- **A mouse pan no longer leaves the Pan fields showing `-247.38194837`, nor
+  jumps the camera on the next click.** The camera is continuous and those
+  sliders step by 1, and the orbit sync wrote the raw target straight into them.
+  It read wrong, and it behaved wrong: `<input type=range step=1>` snaps its
+  value to the step grid, so the thumb sat where the state was not and the first
+  click jumped the camera to the snapped value instead of nudging it. The sync
+  now rounds to each control's own granularity — 0.1° for tilt and rotation, 1
+  unit for the pans — so state, thumb and camera always agree.
+- **The draw modes no longer paint over the particle field.** Occlusion in this
+  scene is decided by the depth-*writing* geometry — the fill surface and the
+  per-layer occlusion curtains — while every layer that paints marks draws with
+  `depthWrite: false`. Among those, order is settled entirely by `renderOrder`,
+  and the particle field sat at the default `0` while every line layer sets
+  `layerIndex + 1`. So the marks were painted over the field unconditionally: a
+  flock plainly in the air in front of the terrain came out with the line
+  pattern ruled straight across it. The field now paints last. It is still
+  depth-tested against the surface and the curtains — which is what actually
+  hides particles behind a mountain, and still culls ~39% of a hologram field on
+  the default terrain — so this only settles the order against marks that never
+  occluded anything in the first place. One bundled preset (Solar Wind) mixes
+  particles with a draw mode and will render with the field on top.
+
+### Changed
+- The Particles toggle is labelled `Particles` rather than `Hologram`, and
+  `Size`, `Opacity` and both colours are now shared by the two fields.
+  `Spacing` is a hologram control and shows only in that mode.
+- Particle `Size` reaches 250, up from 100.
+- Panel sections carry a `data-testid`, since a collapsed section is a
+  zero-height grid row and nothing inside it is reachable until it is opened.
+
 ## [0.9.8] - 2026-08-13
 
 Edit Mode gained editable vertices and ellipse grips in 0.9.6, and then said

@@ -196,6 +196,18 @@ returned to.
   gated by a moving scan mask; all animation lives in the vertex shader, so
   nothing is looped or re-uploaded per frame, and the glowing sprites are faked
   in the fragment shader with no post-processing pass.
+- **Murmurations** — the same field, flying. Up to 100 000 boids steered by the
+  landscape they are over: they keep their distance from the ground, orbit a
+  roost on the highest peak, ride the updraft on steep slopes, and scatter into
+  waves when the optional predator gives chase. Each bird flies with its eight
+  nearest neighbours rather than everything within a radius — the topological
+  rule real starlings follow — which is what keeps the flock cohesive at any
+  density and the cost linear in population. Drawn as birds with velocity
+  streaks, each casting a shadow onto the terrain that grows and fades with how
+  high it is flying, lit by the same sun as the hillshading. Pause with `Space`
+  — and unlike the hologram, the positions live on the CPU, so exporting a
+  frozen flock gives an SVG of exactly what is on screen.
+  → [Murmurations](docs/Murmurations.md)
 
 ---
 
@@ -311,6 +323,7 @@ The app is built to idle quietly and stay responsive under load.
 - [Edit Mode: cropping and selections](docs/Edit-Mode.md)
 - [Georeferencing: projections, GPX tracks, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
+- [Murmurations: boids over the terrain](docs/Murmurations.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)
 - [Changelog](CHANGELOG.md)
 

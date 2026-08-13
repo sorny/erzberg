@@ -26,7 +26,8 @@ allowed to cost anything.
         ┌───────────────┼────────────────┬─────────────────┐
         ▼               ▼                ▼                 ▼
   HeightmapLines   SurfaceMesh    ParticleSystem      exporters
-   (Line2 layers)   (shader)       (GPU animated)   SVG · PNG · STL
+   (Line2 layers)   (shader)     (GPU holo / CPU    SVG · PNG · STL
+                                   boids flock)
 ```
 
 Everything above the worker line is React; everything inside it is plain
@@ -73,6 +74,12 @@ curtains are geometry).
 when something invalidates it. Camera interaction moves the camera directly and
 mirrors into React state on a throttled trailing tick, so orbiting does not
 re-render the sidebar 60 times a second.
+
+The one thing that deliberately runs per frame is the murmuration
+([docs](Murmurations.md)) — a CPU flock stepped in `useFrame`, which then calls
+`invalidate()` to keep the demand loop alive. It is gated on `showPoints` for the
+same reason the hologram clock is: a hidden-but-animated field that keeps asking
+for frames pins the renderer at 60 fps drawing nothing.
 
 ---
 
