@@ -14,6 +14,7 @@ import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/track
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
+import { AudioTransport } from './AudioTransport'
 import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
@@ -433,7 +434,8 @@ export function Sidebar({
   const fa = flockAudio ?? {
     loadFromPicker: () => {}, toggle: () => {}, release: () => {},
     isPlaying: false, isAnalyzing: false, ready: false, fileName: '', progress: 0, error: null,
-    liveRef: { current: null },
+    liveRef: { current: null }, duration: 0, loop: true,
+    seek: () => {}, restart: () => {}, skip: () => {}, setLoop: () => {},
   }
 
   // Whole-track projection the freeze button will render.
@@ -1213,14 +1215,7 @@ export function Sidebar({
                           </div>
                         ) : null}
                         {fa.ready ? (
-                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                            <button onClick={fa.toggle} data-testid="flock-audio-play"
-                              style={{ fontSize:11, padding:'4px 10px', borderRadius:3, cursor:'pointer', background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? '#fff' : MUTED, border:`1px solid ${fa.isPlaying ? ACCENT : BORDER}` }}>
-                              {fa.isPlaying ? '❚❚' : '▶'}
-                            </button>
-                            <span style={{ fontSize:9, color:MUTED, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{fa.fileName}</span>
-                            <span onClick={fa.release} className="hmi" style={{ fontSize:9, color:MUTED, cursor:'pointer', padding:'0 4px' }}>✕</span>
-                          </div>
+                          <AudioTransport fa={fa} />
                         ) : (
                           <>
                             {snd.fileName ? (

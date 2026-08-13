@@ -32,6 +32,9 @@ export function useFlockAudio(fallbackLiveRef) {
   const [progress, setProgress] = useState(0)
   const [error, setError] = useState(null)
   const [ready, setReady] = useState(false)
+  // Looping is the sane default for a backdrop the flock reacts to, but not
+  // everyone wants a six-minute track on repeat while they work.
+  const [loop, setLoopState] = useState(true)
 
   const audioRef = useRef(null)
   const urlRef = useRef(null)
@@ -154,16 +157,50 @@ export function useFlockAudio(fallbackLiveRef) {
   const pause = useCallback(() => { audioRef.current?.pause(); setIsPlaying(false) }, [])
   const toggle = useCallback(() => { if (isPlaying) pause(); else play() }, [isPlaying, play, pause])
 
-  // Looping is the sane default for a backdrop the flock reacts to: a six-minute
-  // track ending mid-session should not silently stop the birds reacting.
+  /**
+   * Move the playhead. Everything the flock reads is a function of *time*
+   * — features come from the precomputed spectrogram at `currentTime`, not from
+   * a running stream — so seeking needs no resynchronisation of anything: the
+   * next frame simply reads a different column and the flock reacts to where it
+   * landed.
+   */
+  const seek = useCallback((t) => {
+    const a = audioRef.current
+    if (!a) return
+    a.currentTime = Math.max(0, Math.min(duration || 0, t))
+  }, [duration])
+
+  const restart = useCallback(() => {
+    const a = audioRef.current
+    if (!a) return
+    a.currentTime = 0
+    if (!isPlaying) play()
+  }, [isPlaying, play])
+
+  const skip = useCallback((delta) => {
+    const a = audioRef.current
+    if (!a) return
+    // Wrapping rather than clamping: skipping back from the first second of a
+    // looping track should land near its end, not pin at zero.
+    const d = duration || 0
+    let t = a.currentTime + delta
+    if (d > 0) t = ((t % d) + d) % d
+    a.currentTime = Math.max(0, t)
+  }, [duration])
+
+  const setLoop = useCallback((v) => {
+    setLoopState(v)
+    if (audioRef.current) audioRef.current.loop = v
+  }, [])
+
   useEffect(() => {
     if (!audioRef.current) audioRef.current = new Audio()
     const a = audioRef.current
-    a.loop = true
+    a.loop = loop
     const onEnded = () => setIsPlaying(false)
     a.addEventListener('ended', onEnded)
     return () => a.removeEventListener('ended', onEnded)
-  }, [])
+  }, [loop])
 
   useEffect(() => () => {
     workerRef.current?.terminate()
@@ -172,8 +209,9 @@ export function useFlockAudio(fallbackLiveRef) {
   }, [])
 
   return {
-    fileName, duration, isPlaying, isAnalyzing, progress, error, ready,
+    fileName, duration, isPlaying, isAnalyzing, progress, error, ready, loop,
     loadFromPicker, play, pause, toggle, release, liveRef,
+    seek, restart, skip, setLoop,
     clearError: () => setError(null),
   }
 }

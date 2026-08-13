@@ -423,6 +423,61 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
   expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
 })
 
+test('the flock track has a transport — restart, skip and scrub', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await openApp(page)
+
+  await page.locator('[data-testid="section-particles"]').click()
+  await togColorFor(page, 'Particles').click({ force: true })
+  await page.locator('[data-testid="particle-mode-murmuration"]').click()
+  await page.waitForTimeout(1200)
+  await toggleFor(page, 'React to audio').click({ force: true })
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.click('text=↑ Load audio'),
+  ])
+  await chooser.setFiles(MP3)
+  await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
+
+  // "0:04 / 0:06" → 4. The readout is written straight to the DOM by an
+  // animation frame rather than held in state, so reading it also proves that
+  // loop is running.
+  const at = async () => {
+    const txt = (await page.locator('[data-testid="flock-audio-time"]').textContent()).trim()
+    const [m, sec] = txt.split('/')[0].trim().split(':').map(Number)
+    return m * 60 + sec
+  }
+
+  await page.locator('[data-testid="flock-audio-play"]').click()
+  await page.waitForTimeout(2200)
+  expect(await at(), 'playing must advance the playhead').toBeGreaterThan(0)
+
+  // The complaint this answers: getting back to the start needed a re-upload.
+  await page.locator('[data-testid="flock-audio-restart"]').click()
+  await page.waitForTimeout(350)
+  expect(await at(), 'restart must return to the beginning').toBeLessThan(1)
+
+  // Skipping wraps rather than clamping, so stepping back from the first second
+  // of a looping track lands near its end instead of pinning at zero.
+  await page.locator('[data-testid="flock-audio-back"]').click()
+  await page.waitForTimeout(350)
+  expect(await at(), 'skipping back from the start must wrap round').toBeGreaterThan(0)
+
+  await page.locator('[data-testid="flock-audio-scrub"]').fill('0.5')
+  await page.waitForTimeout(350)
+  const mid = await at()
+  expect(mid, 'scrubbing must land where it was dropped').toBeGreaterThan(1)
+  expect(mid).toBeLessThan(5)
+
+  const loop = page.locator('[data-testid="flock-audio-loop"]')
+  await expect(loop).toBeVisible()
+  await loop.click()
+  await page.waitForTimeout(200)
+
+  expect(errors, `errors:\n${errors.join('\n')}`).toEqual([])
+})
+
 test('the audio meter shows what the flock is hearing', async ({ page }) => {
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
