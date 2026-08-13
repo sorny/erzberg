@@ -49,6 +49,20 @@ export function PanelStyles() {
                font-variant-numeric:tabular-nums; }
       .hmnum:focus { border-color:${ACCENT}; }
 
+      /* Dual-handle range. Two native inputs stacked: the tracks are inert and
+         only the thumbs take the pointer, which keeps keyboard control and the
+         native feel that a hand-rolled two-thumb widget throws away. */
+      .hmrr { -webkit-appearance:none; appearance:none; position:absolute; left:0; top:0;
+        width:100%; height:13px; margin:0; background:none; pointer-events:none; outline:none; }
+      .hmrr::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:11px;
+        height:11px; border-radius:50%; background:${ACCENT}; border:2px solid ${BG};
+        cursor:pointer; transition:transform .1s; }
+      .hmrr:hover::-webkit-slider-thumb { transform:scale(1.15); }
+      .hmrr::-moz-range-thumb { pointer-events:auto; width:11px; height:11px; border-radius:50%;
+        background:${ACCENT}; border:2px solid ${BG}; cursor:pointer; }
+      .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
+      .hmrr::-moz-range-track { background:none; border:none; }
+
       .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:6px;
                  cursor:pointer; display:flex; flex-direction:column; align-items:center;
                  justify-content:center; font-size:12px; font-weight:700; transition:all 0.1s; aspect-ratio:1/1; }
@@ -190,6 +204,50 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
           onChange={e => onChange(parsed(e.target.value))} />
         <span style={{ minWidth: 32, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
           {fmt ? fmt(value) : value}
+        </span>
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
+    </div>
+  )
+}
+
+/**
+ * Two-handle range, laid out like InlineSl.
+ *
+ * For windowing a signal: the pair says which slice of an input's 0…1 actually
+ * drives something. A single "amount" cannot express that — on a track that is
+ * loud all the way through, scaling a signal that never varies just scales a
+ * constant, and the only way to get movement back is to say that only the top
+ * of the range counts.
+ *
+ * The handles cannot cross: each clamps against the other with a gap, since an
+ * inverted or zero-width window has no sensible reading.
+ */
+export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max = 1, step = 0.01, testId }) {
+  const [showHelp, setShowHelp] = useState(false)
+  const GAP = step * 2
+  const pct = (v) => ((v - min) / (max - min)) * 100
+  const f = fmt ?? ((v) => v.toFixed(2))
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
+          {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+          {help && <HelpBtn active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <div style={{ position:'relative', flex:1, height:13, minWidth:0 }}>
+          <div style={{ position:'absolute', top:5, left:0, right:0, height:3, background: BORDER, borderRadius:2 }} />
+          <div style={{ position:'absolute', top:5, height:3, borderRadius:2, background: ACCENT,
+                        left:`${pct(lo)}%`, width:`${Math.max(0, pct(hi) - pct(lo))}%` }} />
+          <input type="range" className="hmrr" data-testid={testId && `${testId}-lo`}
+            min={min} max={max} step={step} value={lo}
+            onChange={(e) => onChange(Math.min(parseFloat(e.target.value), hi - GAP), hi)} />
+          <input type="range" className="hmrr" data-testid={testId && `${testId}-hi`}
+            min={min} max={max} step={step} value={hi}
+            onChange={(e) => onChange(lo, Math.max(parseFloat(e.target.value), lo + GAP))} />
+        </div>
+        <span style={{ minWidth: 52, textAlign:'right', fontSize: 9, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+          {f(lo)}–{f(hi)}
         </span>
       </div>
       {showHelp && help && <HelpBox text={help} />}

@@ -173,6 +173,16 @@ export const POINTS_DEF = {
   // force-based channels still carry — possible only because the whole
   // spectrogram exists before playback starts.
   flockAudioSize: 1, flockAudioBurst: 1, flockAudioSync: 0.04,
+  // Per-channel input windows: which slice of that channel's 0…1 signal is
+  // stretched across the full response. The default is the whole range, which
+  // suits a track with dynamics; a dense one needs the floor cut away before
+  // anything reads as a hit. Burst starts windowed because raw onset values sit
+  // low and a wall of small ones disperses the flock.
+  flockAudioPaceLo: 0, flockAudioPaceHi: 1,
+  flockAudioPulseLo: 0, flockAudioPulseHi: 1,
+  flockAudioShimmerLo: 0, flockAudioShimmerHi: 1,
+  flockAudioSizeLo: 0, flockAudioSizeHi: 1,
+  flockAudioBurstLo: 0.15, flockAudioBurstHi: 0.9,
 }
 export const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,

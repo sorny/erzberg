@@ -17,7 +17,7 @@
 import { hexToRgb } from './colorUtils'
 import { DRAW_MODES } from './drawModes'
 import { GRADIENT_PRESETS } from './gradientPresets'
-import { STYLE_DEF } from '../defaults'
+import { POINTS_DEF, STYLE_DEF } from '../defaults'
 
 // ── RNG ───────────────────────────────────────────────────────────────────────
 
@@ -218,7 +218,15 @@ export function randomPreset(seed) {
   style.gradientStops = gradientStops
 
   // 8 ── particles, rarely
-  const points = { showPoints: false }
+  //
+  // Seeded from the defaults, exactly as `style` is from STYLE_DEF above, so a
+  // roll always describes the particle field *completely*. `applyPreset` merges
+  // over the previous state, so a partial block — which this was — let any key a
+  // roll did not happen to set survive from the roll before it. The seed then
+  // stopped being the look: stepping back to an earlier roll restored its seed
+  // and its style but kept the *later* roll's particle colour. Rare while the
+  // block set three keys; much less so once it set a dozen.
+  const points = { ...POINTS_DEF, showPoints: false }
   if (chance(rng, 0.12)) {
     points.showPoints = true
     points.pointColor = inkColor(rng, gradientStops, onDark, bgLum)

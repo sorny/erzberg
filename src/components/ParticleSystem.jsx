@@ -26,7 +26,7 @@ import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
 import { hexToRgb } from '../utils/colorUtils'
 import { makeTerrainField, createFlock, stepFlock, updateTrails, updateShadows, applyBurst, flockScales } from '../utils/murmuration'
-import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals } from '../utils/audioFeatures'
+import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals, shapeFeatures, audioRanges } from '../utils/audioFeatures'
 
 // ── GLSL: 3D simplex noise (Ashima / Stefan Gustavson, public domain) ─────────
 
@@ -643,16 +643,18 @@ function listen(p, audio, live, dt) {
   const t = live.current.getTime() + (p.flockAudioSync ?? 0.04)
   const f = sampleAudio(spec, audio.plan, audio.state, t, dt, live.current.isPlaying())
   const drive = p.flockAudioDrive ?? 1
-  const feat = { level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle }
+  const ch = shapeFeatures(
+    { level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle, onset: f.onset },
+    audioRanges(p))
   return {
-    params: applyAudio(base, feat, {
+    params: applyAudio(base, ch, {
       speed:     drive * (p.flockAudioSpeed ?? 1),
       pulse:     drive * (p.flockAudioPulse ?? 1),
       shimmer:   drive * (p.flockAudioShimmer ?? 1),
       startle:   drive * (p.flockAudioStartle ?? 1),
     }),
-    visuals: audioVisuals(feat, { size: drive * (p.flockAudioSize ?? 1) }),
-    burst: drive * (p.flockAudioBurst ?? 1) * 1.8 * f.onset,
+    visuals: audioVisuals(ch, { size: drive * (p.flockAudioSize ?? 1) }),
+    burst: drive * (p.flockAudioBurst ?? 1) * 1.8 * ch.burst,
   }
 }
 

@@ -169,6 +169,56 @@ export function sampleAudio(spec, plan, state, time, dt, playing = true) {
   return st
 }
 
+/** Pull the five windows out of the params object, so the flock and the meter
+ *  cannot disagree about where they are. */
+export function audioRanges(p) {
+  return {
+    pace:    [p.flockAudioPaceLo ?? 0,    p.flockAudioPaceHi ?? 1],
+    pulse:   [p.flockAudioPulseLo ?? 0,   p.flockAudioPulseHi ?? 1],
+    shimmer: [p.flockAudioShimmerLo ?? 0, p.flockAudioShimmerHi ?? 1],
+    size:    [p.flockAudioSizeLo ?? 0,    p.flockAudioSizeHi ?? 1],
+    burst:   [p.flockAudioBurstLo ?? 0.15, p.flockAudioBurstHi ?? 0.9],
+  }
+}
+
+/**
+ * Map the slice `[lo, hi]` of a signal onto the full 0…1, clamped outside it.
+ *
+ * This is the control that makes a dense track usable. The band envelopes are
+ * already auto-gained against the track's own recent peak, so on something that
+ * is loud from end to end — drum and bass, most of a mix's chorus — they sit
+ * near the top and barely move, and an "amount" slider can only scale a signal
+ * that is not varying. Windowing to, say, 0.65–0.95 throws away the constant
+ * floor and stretches what is left across the whole range, which turns a wall of
+ * energy back into visible hits.
+ */
+export function window01(v, lo = 0, hi = 1) {
+  const a = Math.min(lo, hi - 1e-4)
+  const t = (v - a) / Math.max(1e-4, hi - a)
+  return t <= 0 ? 0 : t >= 1 ? 1 : t
+}
+
+/**
+ * Resolve raw features into one windowed value per channel.
+ *
+ * Each channel gets its own window because each is looking for something
+ * different in the same track: Burst wants only the sharpest attacks, while Pace
+ * wants the broad shape of the whole thing. Pulse and Size both read bass but
+ * are usually wanted at different thresholds — a swell you can see against a
+ * kick you can feel.
+ */
+export function shapeFeatures(f, r = {}) {
+  const w = (v, k) => window01(v, r[k]?.[0] ?? 0, r[k]?.[1] ?? 1)
+  return {
+    pace:    w(f.level ?? 0, 'pace'),
+    pulse:   w(f.bass ?? 0, 'pulse'),
+    shimmer: w(f.high ?? 0, 'shimmer'),
+    size:    w(f.bass ?? 0, 'size'),
+    burst:   w(f.onset ?? 0, 'burst'),
+    startle: w(f.startle ?? 0, 'burst'),
+  }
+}
+
 /**
  * Modulate the flock's parameters with what the track is doing.
  *
@@ -181,11 +231,11 @@ export function sampleAudio(spec, plan, state, time, dt, playing = true) {
  *
  * `amt` is 0…1-ish per target; 0 leaves that aspect alone.
  */
-export function applyAudio(params, f, amt) {
-  const level = f.level ?? 0
-  const bass = f.bass ?? f.env?.[0] ?? 0
-  const high = f.high ?? f.env?.[2] ?? 0
-  const startle = f.startle ?? 0
+export function applyAudio(params, ch, amt) {
+  const level = ch.pace ?? 0
+  const bass = ch.pulse ?? 0
+  const high = ch.shimmer ?? 0
+  const startle = ch.startle ?? 0
   const out = { ...params }
 
   // Loudness → pace. Centred at 0.45 so a track of average energy flies at
@@ -224,9 +274,9 @@ export function applyAudio(params, f, amt) {
  * rather than swelling vaguely after it, and it is why the punchiest mappings
  * live here rather than in `applyAudio`.
  */
-export function audioVisuals(f, amt) {
-  const bass = f.bass ?? 0
-  const level = f.level ?? 0
+export function audioVisuals(ch, amt) {
+  const bass = ch.size ?? 0
+  const level = ch.pace ?? 0
   return {
     size:  1 + (amt.size ?? 0) * 1.2 * bass,
     trail: 1 + (amt.size ?? 0) * 1.0 * level,

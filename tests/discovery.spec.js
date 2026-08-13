@@ -91,6 +91,29 @@ test('Surprise me rolls a look, and the arrow walks back', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
+test('a roll describes the whole look, not just the parts it changed', async ({ page }) => {
+  await boot(page)
+  const r = await page.evaluate(async () => {
+    const { randomPreset } = await import('/src/utils/presetGenetics.js')
+    const { POINTS_DEF, STYLE_DEF } = await import('/src/defaults.js')
+    // applyPreset merges over the previous state, so any key a roll omits is
+    // inherited from the roll before it — and the seed stops being the look.
+    let missingPoints = [], missingStyle = []
+    for (let s = 1; s <= 60; s++) {
+      const p = randomPreset(s)
+      for (const k of Object.keys(POINTS_DEF)) {
+        if (!(k in p.points) && !missingPoints.includes(k)) missingPoints.push(k)
+      }
+      for (const k of Object.keys(STYLE_DEF)) {
+        if (!(k in p.style) && !missingStyle.includes(k)) missingStyle.push(k)
+      }
+    }
+    return { missingPoints, missingStyle }
+  })
+  expect(r.missingPoints, 'every roll must fully specify the particle field').toEqual([])
+  expect(r.missingStyle, 'and the style').toEqual([])
+})
+
 test('a roll is reproducible and always leaves something visible', async ({ page }) => {
   await boot(page)
 

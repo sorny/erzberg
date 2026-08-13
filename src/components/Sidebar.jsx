@@ -18,7 +18,7 @@ import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
-  Sl, Sub, Tog, TogColor,
+  RangeSl, Sl, Sub, Tog, TogColor,
 } from './panel/ui'
 
 /**
@@ -1245,16 +1245,31 @@ export function Sidebar({
                           help="Master amount for everything below. 0 is silence to the flock however loud the track; past 1 the reaction is exaggerated beyond what the music is doing." />
                         <InlineSl label="Pace" min={0} max={2} step={0.05} value={points.flockAudioSpeed ?? 1} onChange={v => sp({ flockAudioSpeed: v })} fmt={v => v.toFixed(2)} testId="flock-audio-speed"
                           help="Loudness drives flight speed, centred so an averagely loud passage flies at the speed you dialled — quiet passages genuinely slow down rather than the flock only ever accelerating." />
+                        <RangeSl label="↳ range" lo={points.flockAudioPaceLo ?? 0} hi={points.flockAudioPaceHi ?? 1}
+                          onChange={(lo, hi) => sp({ flockAudioPaceLo: lo, flockAudioPaceHi: hi })} testId="flock-range-speed"
+                          help="Which slice of the loudness envelope drives the pace. A track that is loud from end to end sits pinned near the top, where an amount slider can only scale something that never varies — cut the floor away and what is left stretches across the whole response." />
                         <InlineSl label="Pulse" min={0} max={2} step={0.05} value={points.flockAudioPulse ?? 1} onChange={v => sp({ flockAudioPulse: v })} fmt={v => v.toFixed(2)} testId="flock-audio-pulse"
                           help="Bass opens the flock out: separation rises on the kick while cohesion eases, so it breathes on the beat. Pulling both the same way instead just makes it vibrate." />
+                        <RangeSl label="↳ range" lo={points.flockAudioPulseLo ?? 0} hi={points.flockAudioPulseHi ?? 1}
+                          onChange={(lo, hi) => sp({ flockAudioPulseLo: lo, flockAudioPulseHi: hi })} testId="flock-range-pulse"
+                          help="Which slice of the bass envelope counts as a kick. Raise the low handle until the constant bassline stops registering and only the hits do — this is the control for a busy drum and bass track." />
                         <InlineSl label="Shimmer" min={0} max={2} step={0.05} value={points.flockAudioShimmer ?? 1} onChange={v => sp({ flockAudioShimmer: v })} fmt={v => v.toFixed(2)} testId="flock-audio-shimmer"
                           help="Hats, cymbals and air add turbulence on top of whatever is dialled in — the flock gets restless through the busy parts." />
+                        <RangeSl label="↳ range" lo={points.flockAudioShimmerLo ?? 0} hi={points.flockAudioShimmerHi ?? 1}
+                          onChange={(lo, hi) => sp({ flockAudioShimmerLo: lo, flockAudioShimmerHi: hi })} testId="flock-range-shimmer"
+                          help="Which slice of the high band drives the restlessness. Narrow it to separate a ride cymbal from the wash of everything else above 2 kHz." />
                         <InlineSl label="Size" min={0} max={2} step={0.05} value={points.flockAudioSize ?? 1} onChange={v => sp({ flockAudioSize: v })} fmt={v => v.toFixed(2)} testId="flock-audio-size"
                           help="Bass swells the birds themselves, and loudness lengthens their streaks. These are shader uniforms, so unlike every force below they land on the exact frame the beat does — this is the control that makes the flock read as being *on* the music rather than responding to it." />
+                        <RangeSl label="↳ range" lo={points.flockAudioSizeLo ?? 0} hi={points.flockAudioSizeHi ?? 1}
+                          onChange={(lo, hi) => sp({ flockAudioSizeLo: lo, flockAudioSizeHi: hi })} testId="flock-range-size"
+                          help="Which slice of the bass envelope swells the birds. Usually wanted lower than Pulse: a visible swell reads well before the flock has moved at all." />
                         <InlineSl label="Burst" min={0} max={2} step={0.05} value={points.flockAudioBurst ?? 1} onChange={v => sp({ flockAudioBurst: v })} fmt={v => v.toFixed(2)} testId="flock-audio-burst"
                           help="An onset throws the flock outward from its own centre, written straight into the birds' velocity rather than applied as a force — so it happens immediately instead of being integrated in over the following half-second. The flock re-forms on its own, because none of the flocking rules have changed. Past about 1.5 the bursts arrive faster than it can re-form and it disperses into fragments, which is a look but not a flock." />
+                        <RangeSl label="↳ range" lo={points.flockAudioBurstLo ?? 0.15} hi={points.flockAudioBurstHi ?? 0.9}
+                          onChange={(lo, hi) => sp({ flockAudioBurstLo: lo, flockAudioBurstHi: hi })} testId="flock-range-burst"
+                          help="Which onsets count. Raw onset values sit low and dense music produces a wall of small ones, so this starts windowed — raise the low handle until only the accents fire, lower it to catch every hi-hat." />
                         <InlineSl label="Startle" min={0} max={2} step={0.05} value={points.flockAudioStartle ?? 1} onChange={v => sp({ flockAudioStartle: v })} fmt={v => v.toFixed(2)} testId="flock-audio-startle"
-                          help="On top of Burst, onsets widen the hawk's fear radius so an accented beat tears the same hole a strike does. This one needs Predator on; Burst does not." />
+                          help="On top of Burst, onsets widen the hawk's fear radius so an accented beat tears the same hole a strike does. Shares Burst's range. Needs Predator on; Burst does not." />
                         <InlineSl label="Sync" min={-0.15} max={0.3} step={0.01} value={points.flockAudioSync ?? 0.04} onChange={v => sp({ flockAudioSync: v })} fmt={v => `${Math.round(v * 1000)}ms`} testId="flock-audio-sync"
                           help="How far ahead of the playhead the flock reads. Steering forces take a few hundred milliseconds to become visible motion, so a little lookahead cancels that and puts the reaction back on the beat. Reading the future is only possible because the whole track is analysed before it plays — raise it if the flock still feels behind, lower it if it anticipates." />
                       </Sub>

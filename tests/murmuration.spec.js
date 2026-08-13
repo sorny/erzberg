@@ -240,7 +240,7 @@ test('shadows fall only on real terrain, never on empty space', async ({ page })
  * `shape(frame, bin)` returns the stored 0…1 magnitude.
  */
 const runAudio = (page, opts) => page.evaluate(async ({ shapeSrc, seconds, dt, playing }) => {
-  const { makeBandPlan, createAudioState, sampleAudio, applyAudio } =
+  const { makeBandPlan, createAudioState, sampleAudio, applyAudio, shapeFeatures } =
     await import('/src/utils/audioFeatures.js')
 
   const bins = 128, frames = 600, fftSize = 2048, sampleRate = 44100
@@ -263,11 +263,16 @@ const runAudio = (page, opts) => page.evaluate(async ({ shapeSrc, seconds, dt, p
   }
   const last = trace[trace.length - 1]
   const peakStartle = Math.max(...trace.map(x => x.startle))
-  // applyAudio is a pure transform on the way into the simulation.
+  // applyAudio is a pure transform on the way into the simulation, and it takes
+  // *channel* values — the per-channel windows are applied first, exactly as
+  // ParticleSystem and the meter do it. Handing it raw feature names reads every
+  // channel as zero, which is what this used to do before the windows existed.
   const base = { speed: 1, cohesion: 1, separation: 1.5, turbulence: 0.5,
                  predator: true, predatorFear: 1 }
-  const off = applyAudio(base, last, {})
-  const on  = applyAudio(base, { ...last, level: 1, bass: 1, high: 1, startle: 1 },
+  const full = { level: last.level, bass: last.bass, high: last.high,
+                 startle: last.startle, onset: 0 }
+  const off = applyAudio(base, shapeFeatures(full), {})
+  const on  = applyAudio(base, shapeFeatures({ level: 1, bass: 1, high: 1, startle: 1, onset: 1 }),
                          { speed: 1, pulse: 1, shimmer: 1, startle: 1 })
   return { last, peakStartle, off, on, bandRanges: plan.ranges }
 }, opts)
@@ -323,6 +328,52 @@ test('the flock hears bands, onsets and silence', async ({ page }) => {
   expect(low.on.cohesion, 'and ease cohesion at the same time').toBeLessThan(1)
   expect(low.on.turbulence, 'highs must add shimmer').toBeGreaterThan(0.5)
   expect(low.on.predatorFear, 'onsets must widen the fear radius').toBeGreaterThan(1)
+})
+
+test('windowing recovers dynamics from a signal that never lets up', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+  const r = await page.evaluate(async () => {
+    const { window01, shapeFeatures, audioRanges } = await import('/src/utils/audioFeatures.js')
+
+    // The window itself.
+    const map = [
+      [window01(0.5, 0, 1), 0.5],
+      [window01(0.5, 0.5, 1), 0],
+      [window01(0.75, 0.5, 1), 0.5],
+      [window01(1, 0.5, 1), 1],
+      [window01(0.2, 0.5, 1), 0],      // below the floor is silence, not negative
+      [window01(2, 0, 1), 1],          // and above the ceiling is simply full
+    ]
+
+    // The case this exists for. A dense track's envelope sits high and barely
+    // moves: 0.86…0.94 is a 0.08 swing out of a possible 1.0. Windowed to
+    // exactly that slice, the same input swings the full range.
+    const dense = []
+    for (let i = 0; i < 200; i++) dense.push(0.86 + 0.08 * (0.5 + 0.5 * Math.sin(i / 6)))
+    const spanOf = (vals) => Math.max(...vals) - Math.min(...vals)
+    const wide = dense.map(v => window01(v, 0, 1))
+    const tight = dense.map(v => window01(v, 0.86, 0.94))
+
+    // And that the per-channel plumbing routes each window to the right signal.
+    const ch = shapeFeatures(
+      { level: 0.9, bass: 0.9, high: 0.9, onset: 0.9, startle: 0.9 },
+      audioRanges({ flockAudioPulseLo: 0.8, flockAudioPulseHi: 1, flockAudioSizeLo: 0, flockAudioSizeHi: 1 }))
+
+    return { map, wideSpan: spanOf(wide), tightSpan: spanOf(tight), pulse: ch.pulse, size: ch.size }
+  })
+
+  for (const [got, want] of r.map) expect(got).toBeCloseTo(want, 5)
+
+  console.log(`dense signal swing — unwindowed ${r.wideSpan.toFixed(3)}, windowed ${r.tightSpan.toFixed(3)}`)
+  expect(r.wideSpan, 'a dense signal barely moves on its own').toBeLessThan(0.1)
+  expect(r.tightSpan, 'windowed to where it lives, it uses the whole range').toBeGreaterThan(0.9)
+
+  // Same bass value, two channels, two windows — Pulse gated at 0.8 reads half,
+  // Size ungated reads it whole.
+  expect(r.pulse).toBeCloseTo(0.5, 2)
+  expect(r.size).toBeCloseTo(0.9, 2)
 })
 
 test('the flock listens to its own track and leaves the terrain alone', async ({ page }) => {

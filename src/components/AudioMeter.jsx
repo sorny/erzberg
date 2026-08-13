@@ -19,7 +19,7 @@
  * would cost more than the feature it is reporting on.
  */
 import { useEffect, useRef } from 'react'
-import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals } from '../utils/audioFeatures'
+import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals, shapeFeatures, audioRanges } from '../utils/audioFeatures'
 import { BORDER, MUTED } from './panel/ui'
 
 const H_SPECTRUM = 46
@@ -101,7 +101,10 @@ export function AudioMeter({ liveRef, points }) {
       const playing = !!live.isPlaying?.()
       const t = (live.getTime?.() ?? 0) + (p.flockAudioSync ?? 0.04)
       const f = sampleAudio(spec, cache.plan, cache.state, t, dt, playing)
-      const feat = { level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2], startle: f.startle }
+      const raw = { level: f.level, bass: f.env[0], mid: f.env[1], high: f.env[2],
+                    startle: f.startle, onset: f.onset }
+      const ranges = audioRanges(p)
+      const ch = shapeFeatures(raw, ranges)
 
       // ── Spectrum ────────────────────────────────────────────────────────────
       const { data, bins, frames, hop, sampleRate } = spec
@@ -123,16 +126,31 @@ export function AudioMeter({ liveRef, points }) {
         if (h > 0.4) ctx.fillRect(b * bw, H_SPECTRUM - h, Math.max(0.7, bw - 0.3), h)
       }
 
+      // Each band's window, drawn as a bracket behind its envelope cap. Without
+      // this the range handles are guesswork: the whole point is to see where
+      // the track actually sits so you can put the window around it.
+      const yOf = (v) => H_SPECTRUM - 1 - v * (H_SPECTRUM - 3)
+      const BAND_RANGE = ['pace', 'pulse', 'shimmer']   // level shown over bass's band
+      cache.plan.ranges.forEach(([i0, i1], i) => {
+        const [lo, hi] = ranges[BAND_RANGE[i]] ?? [0, 1]
+        const x0 = i0 * bw, w = (i1 - i0) * bw
+        ctx.fillStyle = BAND_COLOURS[i] + '30'
+        ctx.fillRect(x0, yOf(hi), w, Math.max(1, yOf(lo) - yOf(hi)))
+        ctx.fillStyle = BAND_COLOURS[i] + '99'
+        ctx.fillRect(x0, yOf(lo), w, 1)
+        ctx.fillRect(x0, yOf(hi), w, 1)
+      })
+
       // Envelope caps: what the flock is actually reacting to, which is smoothed
       // and auto-gained and so sits nowhere near the raw spectrum's height.
       cache.plan.ranges.forEach(([i0, i1], i) => {
-        const y = H_SPECTRUM - 1 - f.env[i] * (H_SPECTRUM - 3)
+        const y = yOf(f.env[i])
         ctx.fillStyle = BAND_COLOURS[i]
         ctx.fillRect(i0 * bw, y, (i1 - i0) * bw, 1.5)
       })
 
       // Overall level, across the full width.
-      const ly = H_SPECTRUM - 1 - f.level * (H_SPECTRUM - 3)
+      const ly = yOf(f.level)
       ctx.strokeStyle = '#e4e4e7'
       ctx.globalAlpha = 0.5
       ctx.setLineDash([2, 3])
@@ -144,7 +162,7 @@ export function AudioMeter({ liveRef, points }) {
       // Derived by running the real transforms over neutral parameters and
       // reading what comes back, rather than by restating their formulas here —
       // a meter that drifts from the thing it is metering is worse than none.
-      onsetTrace = Math.max(onsetTrace * Math.pow(0.05, dt / 0.35), f.onset ?? 0)
+      onsetTrace = Math.max(onsetTrace * Math.pow(0.05, dt / 0.35), ch.burst ?? 0)
       const drive = p.flockAudioDrive ?? 1
       const amt = {
         speed:   drive * (p.flockAudioSpeed ?? 1),
@@ -153,8 +171,8 @@ export function AudioMeter({ liveRef, points }) {
         startle: drive * (p.flockAudioStartle ?? 1),
       }
       const neutral = { speed: 1, cohesion: 1, separation: 1, turbulence: 0, predator: true, predatorFear: 1 }
-      const out = applyAudio(neutral, feat, amt)
-      const vis = audioVisuals(feat, { size: drive * (p.flockAudioSize ?? 1) })
+      const out = applyAudio(neutral, ch, amt)
+      const vis = audioVisuals(ch, { size: drive * (p.flockAudioSize ?? 1) })
       const values = [
         Math.abs(out.speed - 1) / 0.7,
         (out.separation - 1) / 2,
