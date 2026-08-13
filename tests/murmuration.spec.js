@@ -325,11 +325,15 @@ test('the flock hears bands, onsets and silence', async ({ page }) => {
   expect(low.on.predatorFear, 'onsets must widen the fear radius').toBeGreaterThan(1)
 })
 
-test('a track loaded from the Particles panel drives the live flock', async ({ page }) => {
+test('the flock listens to its own track and leaves the terrain alone', async ({ page }) => {
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
   await openApp(page)
+
+  // The grid the default heightmap produces, before any audio is involved.
+  const grid = page.locator('text=/Grid: \\d+×\\d+/')
+  const gridBefore = await grid.textContent()
 
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
@@ -337,7 +341,6 @@ test('a track loaded from the Particles panel drives the live flock', async ({ p
   await page.waitForTimeout(1500)
 
   await toggleFor(page, 'React to audio').click({ force: true })
-  // With nothing loaded the block says so rather than pretending to listen.
   await expect(page.locator('text=No track loaded')).toBeVisible()
 
   const [chooser] = await Promise.all([
@@ -345,15 +348,22 @@ test('a track loaded from the Particles panel drives the live flock', async ({ p
     page.click('text=↑ Load audio'),
   ])
   await chooser.setFiles(MP3)
-  // Analysis done when the warning gives way to the transport and the sliders.
-  await expect(page.locator('[data-testid="flock-audio-drive"]')).toBeVisible({ timeout: 30000 })
-  await expect(page.locator('text=No track loaded')).toHaveCount(0)
+  await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
 
-  // Exercise the whole chain: the hook's stable live ref reaching the flock's
-  // useFrame, which is the part the pure analysis test cannot cover.
+  // The whole point. useSoundscape pushes every analysed frame into the
+  // heightmap store, so wiring this panel to it replaced the user's raster with
+  // a spectrogram the moment they asked the birds to react to music. The flock's
+  // audio must not touch the terrain at all.
+  await page.waitForTimeout(1500)
+  expect(await grid.textContent(), 'loading a track for the flock must not change the terrain').toBe(gridBefore)
+  await expect(page.locator('text=sweep.mp3 (full)')).toHaveCount(0)
+
+  // And it must actually drive the flock — the hook's stable live ref reaching
+  // the simulation's useFrame is the part the pure analysis test cannot cover.
   await page.locator('[data-testid="flock-audio-drive"]').fill('2')
-  await page.locator('xpath=//span[text()="sweep.mp3"]/preceding-sibling::button').click()
+  await page.locator('[data-testid="flock-audio-play"]').click()
   await page.waitForTimeout(2500)
+  expect(await grid.textContent(), 'nor must playing it').toBe(gridBefore)
 
   const a = await frameSig(page)
   await page.waitForTimeout(1200)

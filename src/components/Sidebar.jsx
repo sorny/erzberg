@@ -257,7 +257,7 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
-  soundscape, onSoundscapeFit,
+  soundscape, onSoundscapeFit, flockAudio,
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
   loadGpxFromPicker, gpxPoints, gpxCoverage, gpxError, onClearGpx,
   onCameraPreset,
@@ -428,6 +428,10 @@ export function Sidebar({
   const snd = soundscape ?? {
     opts: SOUNDSCAPE_DEFAULTS, loadFromPicker: () => {}, setOpts: () => {}, setProjParam: () => {},
     toggle: () => {}, isPlaying: false, fileName: '',
+  }
+  const fa = flockAudio ?? {
+    loadFromPicker: () => {}, toggle: () => {}, release: () => {},
+    isPlaying: false, isAnalyzing: false, ready: false, fileName: '', progress: 0, error: null,
   }
 
   // Whole-track projection the freeze button will render.
@@ -1191,31 +1195,46 @@ export function Sidebar({
                       help="Same seed, same flock. The simulation runs on a fixed timestep, so a given seed produces the same shapes on any machine." />
                     <InlineSl label="Trail" min={0} max={4} step={0.1} value={points.flockTrail ?? 2} onChange={v => sp({ flockTrail: v })} fmt={v => v.toFixed(1)} testId="flock-trail"
                       help="Length of the velocity streak behind each bird. 0 draws dots only. Streaks export to SVG as their own plotter layer." />
-                    {/* Audio reactivity. The track is loaded through Soundscapes —
-                        one analysis drives both the terrain and the flock — so this
-                        block reaches over to that hook rather than owning a second
-                        file input, and says plainly when there is nothing to hear. */}
+                    {/* Audio reactivity. Its own track, not a Soundscape: that
+                        hook exists to *replace the terrain* with a spectrogram, and
+                        wanting the birds to react to music is not wanting your
+                        raster overwritten. Nothing here touches the heightmap. */}
                     <Tog label="React to audio" small checked={!!points.flockAudio} onChange={v => sp({ flockAudio: v })}
-                      help="Drives the flock from the Soundscapes track as it plays. It reads the same spectrogram the terrain is built from, at the playhead, so the two can never disagree about what the track is doing — and scrubbing works, because the flock follows time rather than a running stream. Note this is what the file contains, not what your speakers emit: the volume slider does not reach it." />
+                      help="Flies the flock to a track. The audio is analysed for the birds alone — the terrain is left exactly as it is, unlike Soundscapes, which turns the track itself into the landscape. If a Soundscape does happen to be playing, the flock listens to that rather than making you load the same file twice. Note it reads the file's own content, so the volume slider does not reach it." />
                     {points.flockAudio && (
                       <Sub>
-                        {!snd.fileName ? (
+                        {fa.isAnalyzing ? (
+                          <div style={{ fontSize:10, color:MUTED, marginBottom:8 }}>Analysing… {fa.progress}%</div>
+                        ) : fa.error ? (
+                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                            {fa.error}
+                          </div>
+                        ) : null}
+                        {fa.ready ? (
+                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
+                            <button onClick={fa.toggle} data-testid="flock-audio-play"
+                              style={{ fontSize:11, padding:'4px 10px', borderRadius:3, cursor:'pointer', background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? '#fff' : MUTED, border:`1px solid ${fa.isPlaying ? ACCENT : BORDER}` }}>
+                              {fa.isPlaying ? '❚❚' : '▶'}
+                            </button>
+                            <span style={{ fontSize:9, color:MUTED, flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{fa.fileName}</span>
+                            <span onClick={fa.release} className="hmi" style={{ fontSize:9, color:MUTED, cursor:'pointer', padding:'0 4px' }}>✕</span>
+                          </div>
+                        ) : (
                           <>
-                            <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
-                              No track loaded — the flock has nothing to listen to.
-                            </div>
-                            <button className="hmload" onClick={() => snd.loadFromPicker(onSoundscapeFit)}
+                            {snd.fileName ? (
+                              <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
+                                Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
+                              </div>
+                            ) : (
+                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                                No track loaded — the flock has nothing to listen to.
+                              </div>
+                            )}
+                            <button className="hmload" onClick={fa.loadFromPicker} disabled={fa.isAnalyzing}
                               style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}>
                               ↑ Load audio
                             </button>
                           </>
-                        ) : (
-                          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8 }}>
-                            <button onClick={snd.toggle} style={{ fontSize:11, padding:'4px 10px', borderRadius:3, cursor:'pointer', background: snd.isPlaying ? ACCENT : SURF, color: snd.isPlaying ? '#fff' : MUTED, border:`1px solid ${snd.isPlaying ? ACCENT : BORDER}` }}>
-                              {snd.isPlaying ? '❚❚' : '▶'}
-                            </button>
-                            <span style={{ fontSize:9, color:MUTED, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{snd.fileName}</span>
-                          </div>
                         )}
                         <InlineSl label="Drive" min={0} max={2} step={0.05} value={points.flockAudioDrive ?? 1} onChange={v => sp({ flockAudioDrive: v })} fmt={v => v.toFixed(2)} testId="flock-audio-drive"
                           help="Master amount for everything below. 0 is silence to the flock however loud the track; past 1 the reaction is exaggerated beyond what the music is doing." />

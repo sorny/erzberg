@@ -14,6 +14,7 @@ import { Sidebar } from './components/Sidebar'
 import { W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
+import { useFlockAudio } from './hooks/useFlockAudio'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
@@ -109,6 +110,11 @@ export default function App() {
   const geoTiffCRSName    = useStore((s) => s.geoTiffCRSName)
 
   const soundscape = useSoundscape()
+  // The flock's own track. Separate from Soundscapes on purpose: that hook's job
+  // is to *become* the terrain, and wanting the birds to react to music is not
+  // wanting the raster replaced by a spectrogram. Falls back to a playing
+  // Soundscape so the same file never has to be loaded twice.
+  const flockAudio = useFlockAudio(soundscape.liveRef)
 
   const [gpxPoints, setGpxPoints] = useState([])
   const [gpxError,  setGpxError]  = useState(null)
@@ -649,7 +655,7 @@ export default function App() {
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
           exportBaseName={exportBaseName}
-          audioLive={soundscape.liveRef}
+          audioLive={flockAudio.liveRef}
         />
       </Canvas>
 
@@ -697,6 +703,7 @@ export default function App() {
         loadFromPicker={loadPngAndFit}
         loadGeoTiffFromPicker={loadGeoTiffAndFit}
         soundscape={soundscape}
+        flockAudio={flockAudio}
         onSoundscapeFit={fitSoundscape}
         geoTiffElevMin={geoTiffElevMin}
         geoTiffElevMax={geoTiffElevMax}
