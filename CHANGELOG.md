@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.17] - 2026-08-14
+
+The tool's main use is plotting, and an SVG export came out as whatever happened
+to be on screen: the page was the content's own bounding box, so its shape was
+an accident of where the geometry landed, and marks straddling the canvas edge
+were written whole — the file already carried strokes outside its own viewBox,
+which then had to be deleted by hand in Inkscape.
+
+### Added
+- **Paper framing.** A frame overlay showing where a sheet falls over the scene,
+  with Scale, Offset X/Y and an inner Margin, and an SVG export that contains
+  only what lands inside it. The page becomes the shape you composed for rather
+  than the one the geometry happened to occupy.
+- The picker lists **shapes, not sheet names**, grouped ISO / US / Ratio: ISO
+  A (which is also B and C), US Letter, Legal and Tabloid, square, 4:3, 3:2,
+  golden, 16:9, and a custom ratio. Naming A3, A4 and A5 separately — as the
+  first cut did — gave three entries that drew an identical frame, because the
+  whole point of the ISO series is that halving the long side reproduces the
+  1:√2 shape. Since the export carries pixel dimensions rather than millimetres,
+  the ratio is genuinely all there is to choose, so each entry shows it. Old
+  `a3`/`a4`/`a5` ids in saved presets still resolve to that shape.
+- Ratios are stored exactly rather than derived from rounded sheet dimensions:
+  ISO is 1:√2 by definition and 297 × 420 mm is itself a rounding of it, so
+  going via the millimetres baked in an error of 1e-4 — and rounded to three
+  places it made US Letter read 1:1.292 instead of its true 1:1.294.
+- **Cut at the boundary, not hidden behind it.** Lines are split at the page
+  edge by a Liang–Barsky clip in `addSeg`, the single funnel every segment from
+  all fourteen draw modes and the GPX track passes through; dots, particles and
+  flock shadows are kept or dropped by their centre, since a pen cannot
+  half-draw a dot. Verified by the test: 319 274 coordinates in a framed export,
+  none outside the page.
+- Dash phase survives the crop. Phase accumulates along a chain of segments, so
+  a clipped stroke carries `tHead × length` added to its offset — without that
+  the pattern restarts at the paper edge and stutters all along the frame.
+- The overlay is DOM (`position: fixed`, `pointerEvents: none`, z-index 500,
+  following `CenterGuides`), so it cannot reach either exporter, and it hides
+  during WebM recording as the gizmo does. It works in CSS pixels while the
+  exporter works in buffer pixels; both go through one `frameRect` that never
+  sees a device pixel, which is what keeps them agreeing across DPR and
+  supersampling changes.
+
+Framing is off by default and PNG and STL are untouched, so every existing
+export path is unchanged.
+
 ## [0.9.16] - 2026-08-14
 
 ### Fixed

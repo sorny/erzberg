@@ -140,6 +140,14 @@ mesh acting as a depth buffer, so lines occlude other lines instead of being
 swallowed by the terrain surface. Hidden segments can be drawn in their own
 colour and opacity for an X-ray effect.
 
+**Paper framing.** Turn on a frame and the viewport shows where a sheet falls
+over the scene — ISO A, US Letter/Legal/Tabloid, square, 4:3, 3:2, golden, 16:9
+or a ratio of your own, portrait or landscape, with an optional inner margin. SVG export then emits only what lands inside it, *cut at the
+boundary* rather than hidden behind a clip path: lines are split at the page
+edge and dots outside are dropped, so the file contains nothing to delete
+afterwards. The page becomes the shape you chose instead of whatever bounding
+box the geometry happened to occupy.
+
 **Reproducible randomness.** The stochastic modes (Stipple, Rock & Scree) each
 carry a seed — the same seed always reproduces the identical pattern, so a piece
 can be regenerated exactly.
