@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.16] - 2026-08-14
+
+### Fixed
+- **Particles are no longer far bigger in an SVG export than on screen.**
+  `gl_PointSize` is silently clamped to `ALIASED_POINT_SIZE_RANGE` — 511 on one
+  machine here, as little as 63 on others — while the exporter projected the
+  unclamped size. Both compute `size · 300 / −z`, so they agreed until that
+  product passed the ceiling and then diverged by however far past it the maths
+  went: at a close zoom with a large Size the viewport showed a sprite pinned at
+  the ceiling and the SVG showed one many times bigger. Measured at a 400% zoom
+  with Size 250: 579 px exported against a 511 px ceiling, and proportionally
+  far worse on hardware that stops at 63. The exporter now inherits the limit,
+  and the median sprite is untouched, so only the ones that were wrong change.
+- Applies to the hologram field, the flock and its shadows alike — all three are
+  point sprites and all three were clamped on screen but not on paper.
+
 ## [0.9.15] - 2026-08-13
 
 ### Added

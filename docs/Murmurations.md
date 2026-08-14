@@ -513,6 +513,16 @@ one part of the field the depth test genuinely culls in the exporter: a shadow o
 the far slope is hidden by the ridge in front of it, with no ghost pass, since a
 shadow showing faintly through a mountain reads as a smudge on the rock.
 
+**Sprites are clamped to what the GPU will draw.** `gl_PointSize` is silently
+limited to `ALIASED_POINT_SIZE_RANGE` — 511 on one machine here, as little as 63
+on others. The exporter computes the same `size · 300 / −z` as the vertex
+shader, so the two agree right up until that product passes the ceiling, and
+then they diverge by however far past it the maths went. At a close zoom with a
+large Size the viewport showed a sprite pinned at the ceiling while the SVG drew
+one many times bigger: measured at 579 px against a 511 px ceiling here, and
+proportionally far worse on hardware that stops at 63. The export inherits the
+limit, because the export is meant to be what the viewport shows.
+
 Birds land in the SVG as `<circle>` elements alongside the hologram's, projected
 and depth-tested against the same software Z-buffer the line layers use. Streaks
 get their own Inkscape layer, `layer-flock`, because a plotter run is sorted by
