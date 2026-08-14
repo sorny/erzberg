@@ -710,6 +710,49 @@ test('the field survives switching modes back and forth', async ({ page }) => {
   expect(errors, `page errors:\n${errors.join('\n')}`).toEqual([])
 })
 
+test('exported sprites are no bigger than the GPU will draw', async ({ page }) => {
+  await openApp(page)
+
+  const ceiling = await page.evaluate(() => {
+    const c = document.querySelector('canvas')
+    const gl = c.getContext('webgl2') || c.getContext('webgl')
+    return gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]
+  })
+
+  await page.locator('[data-testid="section-particles"]').click()
+  await togColorFor(page, 'Particles').click({ force: true })
+  await page.locator('[data-testid="particle-spacing"]').fill('16')
+  await page.locator('[data-testid="particle-size"]').fill('250')
+  // Zoomed right in, a size-250 sprite wants to be thousands of pixels across —
+  // which is where the viewport and the export used to part company.
+  await page.locator('input[type="range"][min="10"][max="400"]').first().fill('400')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(3000)
+
+  const [dl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 60_000 }),
+    page.keyboard.press('Digit1'),
+  ])
+  const svg = await dl.createReadStream().then(st => new Promise((res, rej) => {
+    const c = []; st.on('data', x => c.push(x)); st.on('end', () => res(Buffer.concat(c).toString())); st.on('error', rej)
+  }))
+
+  const radii = [...svg.matchAll(/<circle[^>]*r="([\d.]+)"/g)].map(m => parseFloat(m[1]))
+  const maxDia = Math.max(...radii) * 2
+  console.log(`GPU ceiling ${ceiling}px, largest exported sprite ${maxDia.toFixed(1)}px, ${radii.length} sprites`)
+
+  expect(radii.length, 'the field must actually be in the export').toBeGreaterThan(100)
+  // gl_PointSize is silently clamped to ALIASED_POINT_SIZE_RANGE. The exporter
+  // computes the same size · 300 / −z but had no such limit, so past the ceiling
+  // it drew sprites the viewport could never show — measured at 579px against a
+  // 511px ceiling here, and far worse on hardware that stops at 63.
+  expect(maxDia, 'no exported sprite may exceed what the GPU can draw').toBeLessThanOrEqual(ceiling + 1)
+  // …and the clamp must only bite at the top: ordinary sprites are untouched.
+  const median = radii.sort((a, b) => a - b)[Math.floor(radii.length / 2)] * 2
+  expect(median, 'normal sprites must not be shrunk by the clamp').toBeLessThan(ceiling)
+  expect(median).toBeGreaterThan(1)
+})
+
 test('SVG export carries the live flock, birds and streaks', async ({ page }) => {
   await openApp(page)
 

@@ -179,7 +179,7 @@ export function exportSVG({
   surfaceGeo, groupMatrix,
   surfaceOccludes,
   depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
-  particlePositions, particleCount, particleColor, particleSize, particleSegments, particleOpacity,
+  particlePositions, particleCount, particleColor, particleSize, particleSizeMax, particleSegments, particleOpacity,
   particleShadows, particleShadowLift, particleShadowColor, particleShadowOpacity, particleShadowSize,
   elevMinCut, elevMaxCut,
   baseName,
@@ -199,6 +199,20 @@ export function exportSVG({
   // is dropped, and the final viewBox is clamped to the canvas rect.
   const nearZ = -(camera.near ?? 0.1)
   const PAD = MARGIN
+
+  /**
+   * Half the largest point sprite the GPU will actually draw.
+   *
+   * `gl_PointSize` is silently clamped to `ALIASED_POINT_SIZE_RANGE` — 511 on
+   * one machine here, and as little as 63 on others — while this exporter was
+   * happily projecting the unclamped size. Both compute `size · 300 / −z`, so
+   * they agree until that product passes the ceiling, and then they diverge by
+   * however far past it the maths went: at a close zoom with a large Size the
+   * viewport shows a sprite pinned at the ceiling and the SVG shows one fifty
+   * times bigger. The export is supposed to be what the viewport shows, so it
+   * has to inherit the same limit.
+   */
+  const maxRadius = (particleSizeMax ?? Infinity) / 2
 
   const viewZOf = (x, y, z) => {
     wld2.set(x, y, z)
@@ -444,7 +458,7 @@ export function exportSVG({
       viw2.copy(wld2).applyMatrix4(camInv)
       if (viw2.z >= 0) continue
       
-      const r = ((particleSize ?? 4) * 300 / (-viw2.z)) * 0.5
+      const r = Math.min(maxRadius, ((particleSize ?? 4) * 300 / (-viw2.z)) * 0.5)
       wld2.project(camera)
       const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
       if (offCanvas1(cx, cy)) continue
@@ -476,7 +490,7 @@ export function exportSVG({
       if (groupMatrix) wld2.applyMatrix4(groupMatrix)
       viw2.copy(wld2).applyMatrix4(camInv)
       if (viw2.z >= 0) continue
-      const r = ((particleShadowSize ?? 4) * 300 / (-viw2.z)) * 0.5
+      const r = Math.min(maxRadius, ((particleShadowSize ?? 4) * 300 / (-viw2.z)) * 0.5)
       wld2.project(camera)
       const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
       if (offCanvas1(cx, cy)) continue

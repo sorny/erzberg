@@ -17,6 +17,19 @@ import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem } from './ParticleSystem'
 
+/**
+ * The largest point sprite this GPU will draw, from ALIASED_POINT_SIZE_RANGE.
+ * Infinity if the context cannot be reached, which leaves the exporter
+ * unclamped — the behaviour before this was known about, and the safe fallback.
+ */
+function maxPointSize(renderer) {
+  try {
+    const ctx = renderer?.getContext?.()
+    const range = ctx?.getParameter?.(ctx.ALIASED_POINT_SIZE_RANGE)
+    return range?.[1] ?? Infinity
+  } catch { return Infinity }
+}
+
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   getParams, setParams, orbitRef,
@@ -315,6 +328,10 @@ export function Scene({
         particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
         particleColor:     p.pointColor ?? '#000000',
         particleSize:      p.pointSize ?? 4,
+        // The GPU will not draw a point sprite larger than this, so neither may
+        // the exporter — see the note in svgExport. `gl` here is three's
+        // renderer, so the raw context has to be asked for the limit.
+        particleSizeMax:   maxPointSize(gl),
         particleOpacity:   p.pointOpacity ?? 1,
         particleShadows:   p.showPoints && p.flockShadow && particleRef.current ? particleRef.current.getShadows() : null,
         particleShadowLift:    p.showPoints && p.flockShadow && particleRef.current ? particleRef.current.getShadowLift() : null,
