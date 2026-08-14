@@ -196,4 +196,10 @@ export const VIEW_DEF = {
   panX: 0, panY: 0, panZ: 0,
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
   showGuides: false, showRawTerrain: false,
+  // Paper framing. The overlay shows where the page edges fall, and SVG export
+  // emits only what lands inside — cut at the boundary, not hidden behind a
+  // clip path. Offsets are fractions of the canvas so they survive a resize;
+  // margin is a fraction of the frame's shorter side. See utils/frame.js.
+  showFrame: false, framePaper: 'iso', frameLandscape: false, frameCustomRatio: 1.414,
+  frameScale: 0.85, frameOffsetX: 0, frameOffsetY: 0, frameMargin: 0,
 }

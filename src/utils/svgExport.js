@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three'
 import { DASH_SEGMENT_SIZES } from './stylePresets'
+import { clipSegment, insideRect } from './frame'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -182,6 +183,10 @@ export function exportSVG({
   particlePositions, particleCount, particleColor, particleSize, particleSizeMax, particleSegments, particleOpacity,
   particleShadows, particleShadowLift, particleShadowColor, particleShadowOpacity, particleShadowSize,
   elevMinCut, elevMaxCut,
+  // Paper framing. `frame` becomes the viewBox; `frameClip` is that rect inset
+  // by the margin and is what geometry is actually cut to. Both null when
+  // framing is off, which leaves every path below exactly as it was.
+  frame, frameClip,
   baseName,
 }) {
   const bias = occlusionBias ?? 0.1
@@ -260,12 +265,27 @@ export function exportSVG({
   const syBuf = new Float64Array(N_SAMPLES + 1)
   const visBuf = new Uint8Array(N_SAMPLES + 1)
 
+  // Everything outside this is not worth projecting. Without a frame it is the
+  // canvas, as before; with one it is the paper, so most off-frame geometry
+  // never reaches the occlusion walk at all.
+  const cull = frameClip
+    ? { x0: frameClip.x, y0: frameClip.y, x1: frameClip.x + frameClip.w, y1: frameClip.y + frameClip.h }
+    : { x0: 0, y0: 0, x1: width, y1: height }
+
   const offCanvas2 = (p0, p1) =>
-    (p0[0] < -PAD && p1[0] < -PAD) || (p0[0] > width  + PAD && p1[0] > width  + PAD) ||
-    (p0[1] < -PAD && p1[1] < -PAD) || (p0[1] > height + PAD && p1[1] > height + PAD)
+    (p0[0] < cull.x0 - PAD && p1[0] < cull.x0 - PAD) || (p0[0] > cull.x1 + PAD && p1[0] > cull.x1 + PAD) ||
+    (p0[1] < cull.y0 - PAD && p1[1] < cull.y0 - PAD) || (p0[1] > cull.y1 + PAD && p1[1] > cull.y1 + PAD)
 
   const offCanvas1 = (sx, sy) =>
-    sx < -PAD || sx > width + PAD || sy < -PAD || sy > height + PAD
+    sx < cull.x0 - PAD || sx > cull.x1 + PAD || sy < cull.y0 - PAD || sy > cull.y1 + PAD
+
+  /**
+   * A mark that cannot be cut in half — a stipple dot, a particle, a shadow.
+   * A pen either draws a dot or it does not, so these are kept or dropped by
+   * their centre; one whose centre is inside may overhang the paper edge by its
+   * own radius, which for a plotted dot is the right trade.
+   */
+  const dotInside = (x, y) => !frameClip || insideRect(x, y, frameClip)
 
   const zGeos = []
   if (surfaceOccludes && surfaceGeo && groupMatrix) {
@@ -314,6 +334,7 @@ export function exportSVG({
           const cz3 = (positions[i+2] + positions[i+5]) * 0.5
           const [sx, sy, lineZ] = project(cx3, cy3, cz3)
           if (lineZ > nearZ || offCanvas1(sx, sy)) continue
+          if (!dotInside(sx, sy)) continue
           const fill = (colors && colors.length > i + 2)
             ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
             : '#000000'
@@ -370,21 +391,42 @@ export function exportSVG({
           stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
         }
 
+        // The one funnel every segment passes through, visible and ghost alike,
+        // for all fourteen draw modes and the GPX track — so the paper crop
+        // belongs here rather than in each of them.
+        //
+        // The chain bookkeeping advances with the *original* segment even when
+        // only part of it survives, and the drawn piece carries `tHead × length`
+        // added to its dash offset. Dash phase accumulates along a chain, so
+        // without that a clipped stroke would restart its pattern at the paper
+        // edge, which is visible as a stutter all along the frame.
         const addSeg = (x0, y0, x1, y1, isVisible) => {
           const segLen = Math.hypot(x1 - x0, y1 - y0)
           if (segLen < 0.1) return
+          const c = frameClip ? clipSegment(x0, y0, x1, y1, frameClip)
+                              : { x0, y0, x1, y1, tHead: 0 }
+          const drawn = c ? Math.hypot(c.x1 - c.x0, c.y1 - c.y0) : 0
+
           if (isVisible) {
             if (visLastX === null || Math.hypot(x0 - visLastX, y0 - visLastY) > CONNECT_EPS) visCumLen = 0
-            visibleSegs.push({ x0, y0, x1, y1, stroke, dashOffset: visCumLen })
+            if (drawn >= 0.1) {
+              visibleSegs.push({ x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1, stroke,
+                                 dashOffset: visCumLen + c.tHead * segLen })
+              expandBB(c.x0, c.y0); expandBB(c.x1, c.y1)
+            }
             visCumLen += segLen
             visLastX = x1; visLastY = y1
           } else {
             if (ghostLastX === null || Math.hypot(x0 - ghostLastX, y0 - ghostLastY) > CONNECT_EPS) ghostCumLen = 0
-            ghostSegs.push({ x0, y0, x1, y1, stroke: occlusionColor || '#000000', dashOffset: ghostCumLen })
+            if (drawn >= 0.1) {
+              ghostSegs.push({ x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1,
+                               stroke: occlusionColor || '#000000',
+                               dashOffset: ghostCumLen + c.tHead * segLen })
+              expandBB(c.x0, c.y0); expandBB(c.x1, c.y1)
+            }
             ghostCumLen += segLen
             ghostLastX = x1; ghostLastY = y1
           }
-          expandBB(x0, y0); expandBB(x1, y1)
         }
 
         if (!surfViewZ) {
@@ -462,6 +504,7 @@ export function exportSVG({
       wld2.project(camera)
       const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
       if (offCanvas1(cx, cy)) continue
+      if (!dotInside(cx, cy)) continue
 
       let visible = true
       if (surfViewZ) {
@@ -494,6 +537,7 @@ export function exportSVG({
       wld2.project(camera)
       const cx = (wld2.x+1)*0.5*width, cy = (-wld2.y+1)*0.5*height
       if (offCanvas1(cx, cy)) continue
+      if (!dotInside(cx, cy)) continue
       if (surfViewZ) {
         const surfZ = surfViewZ(cx, cy)
         // No ghost pass: a hidden shadow is simply not there. Drawing it faint
@@ -529,8 +573,13 @@ export function exportSVG({
         else            { bx = cx3; by = cy3; bz = cz3 }
       }
 
-      const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
+      let p0 = project(ax, ay, az), p1 = project(bx, by, bz)
       if (offCanvas2(p0, p1)) continue
+      if (frameClip) {
+        const c = clipSegment(p0[0], p0[1], p1[0], p1[1], frameClip)
+        if (!c) continue
+        p0 = [c.x0, c.y0, p0[2]]; p1 = [c.x1, c.y1, p1[2]]
+      }
 
       // Depth-tested at the head only. A streak is a couple of pixels long and
       // the bird it hangs off is the thing being occluded; sampling both ends
@@ -549,16 +598,25 @@ export function exportSVG({
   if (svgLayers.length === 0 && projectedParticles.length === 0 &&
       projectedTrails.length === 0 && projectedShadows.length === 0) return
 
-  // Clamp the content bounding box to the canvas: partially visible segments
-  // are kept whole, so the box can spill slightly past the edges. The export
-  // mirrors the viewport — never larger than what is on screen. (Zoomed-out
-  // scenes keep their tight content box; the clamp is a no-op there.)
-  minX = Math.max(minX, 0); minY = Math.max(minY, 0)
-  maxX = Math.min(maxX, width); maxY = Math.min(maxY, height)
-  if (maxX <= minX || maxY <= minY) return
+  // With a frame, the page *is* the frame: the whole point is an output whose
+  // shape you chose rather than one the geometry happened to land in, so the
+  // content box plays no part and neither does MARGIN — the paper margin is
+  // already baked into frameClip, which the geometry above was cut to.
+  let vx, vy, vw, vh
+  if (frame) {
+    vx = frame.x; vy = frame.y; vw = frame.w; vh = frame.h
+  } else {
+    // Clamp the content bounding box to the canvas: partially visible segments
+    // are kept whole, so the box can spill slightly past the edges. The export
+    // mirrors the viewport — never larger than what is on screen. (Zoomed-out
+    // scenes keep their tight content box; the clamp is a no-op there.)
+    minX = Math.max(minX, 0); minY = Math.max(minY, 0)
+    maxX = Math.min(maxX, width); maxY = Math.min(maxY, height)
+    if (maxX <= minX || maxY <= minY) return
 
-  const vx = minX - MARGIN, vy = minY - MARGIN
-  const vw = (maxX - minX) + MARGIN * 2, vh = (maxY - minY) + MARGIN * 2
+    vx = minX - MARGIN; vy = minY - MARGIN
+    vw = (maxX - minX) + MARGIN * 2; vh = (maxY - minY) + MARGIN * 2
+  }
   
   const layerGroups = []
   for (const layer of svgLayers) {

@@ -15,6 +15,7 @@ import { W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
+import { FrameOverlay } from './components/FrameOverlay'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
@@ -353,6 +354,16 @@ export default function App() {
     if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
     if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir
     if (vals.showGuides   != null) v.showGuides    = vals.showGuides
+    // Framing round-trips like the rest of the view state; without these a
+    // preset would load its look but lose the page it was composed for.
+    if (vals.showFrame      != null) v.showFrame      = vals.showFrame
+    if (vals.framePaper     != null) v.framePaper     = vals.framePaper
+    if (vals.frameCustomRatio != null) v.frameCustomRatio = vals.frameCustomRatio
+    if (vals.frameLandscape != null) v.frameLandscape = vals.frameLandscape
+    if (vals.frameScale     != null) v.frameScale     = vals.frameScale
+    if (vals.frameOffsetX   != null) v.frameOffsetX   = vals.frameOffsetX
+    if (vals.frameOffsetY   != null) v.frameOffsetY   = vals.frameOffsetY
+    if (vals.frameMargin    != null) v.frameMargin    = vals.frameMargin
     
     // Particle params live in their own group; without this branch the pause
     // hotkey has nowhere to write and silently does nothing.
@@ -750,6 +761,7 @@ export default function App() {
 
       {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
+      {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} />}
 
       {/* ── WebM REC badge ───────────────────────────────────────────────── */}
       {webmActive && (

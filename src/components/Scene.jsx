@@ -13,6 +13,7 @@ import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { exportSVG } from '../utils/svgExport'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
+import { frameRect, insetRect, paperAspect } from '../utils/frame'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ParticleSystem } from './ParticleSystem'
@@ -324,6 +325,16 @@ export function Scene({
         depthOcclusion: p.depthOcclusion,
         occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
         elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,
+        // Buffer pixels, not CSS — `width`/`height` above come from
+        // gl.domElement. The overlay computes the same rect from the CSS size
+        // through the same function, which is what keeps the two agreeing
+        // across device pixel ratios and supersampling.
+        ...(p.showFrame ? (() => {
+          const f = frameRect(width, height,
+            paperAspect(p.framePaper ?? 'iso', !!p.frameLandscape, p.frameCustomRatio),
+            p.frameScale ?? 0.85, p.frameOffsetX ?? 0, p.frameOffsetY ?? 0)
+          return { frame: f, frameClip: insetRect(f, p.frameMargin ?? 0) }
+        })() : {}),
         particlePositions: p.showPoints && particleRef.current ? particleRef.current.getPositions() : null,
         particleCount:     p.showPoints && particleRef.current ? particleRef.current.getCount()     : 0,
         particleColor:     p.pointColor ?? '#000000',

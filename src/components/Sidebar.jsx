@@ -15,6 +15,7 @@ import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
+import { PAPERS, paperRatioLabel } from '../utils/frame'
 import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
@@ -664,6 +665,43 @@ export function Sidebar({
               </Sub>
             )}
             <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
+              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
+            {view.showFrame && (
+              <Sub>
+                <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
+                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
+                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
+                    onChange={e => sv({ framePaper: e.target.value })}
+                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                    {['ISO','US','Ratio'].map(group => (
+                      <optgroup key={group} label={group}>
+                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
+                          <option key={id} value={id}>
+                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {(view.framePaper ?? 'iso') === 'custom' && (
+                  <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
+                    help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
+                )}
+                <SegRow label="Format" testIdPrefix="frame-orient"
+                  options={[['Portrait', false],['Landscape', true]]}
+                  value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
+                  help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
+                <InlineSl label="Scale" min={0.1} max={1} step={0.01} value={view.frameScale ?? 0.85} onChange={v => sv({ frameScale: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-scale"
+                  help="How much of the viewport the sheet covers. Smaller crops tighter; at 100% the sheet touches whichever pair of edges its shape reaches first." />
+                <InlineSl label="Offset X" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetX ?? 0} onChange={v => sv({ frameOffsetX: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-x"
+                  help="Slides the sheet across the viewport, as a fraction of its width. The canvas fills the window and this panel floats over it, so a centred frame sits a little left of the free space — nudge it right to compose against what you can actually see." />
+                <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
+                <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
+                  help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
+              </Sub>
+            )}
           </Section>
 
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
