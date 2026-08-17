@@ -259,10 +259,10 @@ brightness, onset density and harmony as layers over one timeline.
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer projection with fill-based terrain occlusion, per-mode Inkscape/Illustrator layers, dash patterns faithfully reproduced |
+| **SVG** | Software Z-buffer projection with fill-based terrain occlusion, per-mode Inkscape/Illustrator layers, dash patterns faithfully reproduced. Shows progress and can be cancelled — a dense plate takes real time, and the page stays responsive throughout |
 | **PNG** | 4K with MSAA, trimmed to content |
 | **PNG α** | Transparent background |
-| **STL** | Watertight mesh for 3D printing |
+| **STL** | Watertight mesh for 3D printing. Shows progress and can be cancelled, like the SVG export |
 | **Heightmap PNG** | The processed greyscale raster |
 | **WebM** | Screen recording of the live canvas |
 | **Profile SVG** | The elevation cross-section as a standalone chart, ink on paper |

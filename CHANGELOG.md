@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.20] - 2026-08-17
+
+A dense plate could lock the tab hard enough that Chrome offered to kill the page.
+Not because the export is slow in any surprising way — a few hundred milliseconds
+on an ordinary plate, seconds on a heavy one — but because all of it ran as one
+unbroken block. Timestamping every frame during an export showed the shape
+exactly: a single 242 ms gap on the *default* scene, with every other frame at a
+healthy 17 ms. There was already an "Exporting SVG…" overlay; it simply froze the
+instant it appeared, which is why it never seemed to do anything.
+
+### Added
+- **The SVG export reports progress and can be cancelled.** It hands the main
+  thread back roughly every 24 ms, so the overlay paints, the bar advances through
+  its three phases — depth buffer, hiding lines behind terrain, assembling — and
+  there is a Cancel button on it. Longest unbroken stretch on the default plate:
+  **242 ms → 39 ms**, with no change in wall time. The work was never the problem;
+  doing it without pause was.
+- **The STL export gets the same, and an overlay it never had at all.** It was the
+  quieter version of the same bug: a fine-resolution plate blocked for 122 ms on
+  the default heightmap — proportional to raster size, so seconds on a real DEM —
+  with nothing on screen to say the app was doing anything rather than broken.
+  Now **122 ms → 47 ms**, with a bar and a Cancel. An overlay without the pacing
+  would have been the frozen overlay the SVG export already had.
+- Cancel unwinds at the next yield and writes nothing. For SVG the download is
+  simply the last statement; for STL the ordering is load-bearing, since the plate
+  is written before the optional GPX ribbon — the ribbon path takes no pacer, so
+  there is no yield after the first file exists and therefore no way to abandon a
+  half-written pair.
+- `utils/pacing.js`, shared by both writers, so there is one answer to "how does a
+  long export stay responsive" rather than two that drift.
+
+### Fixed
+- Triggering an export while one is running would previously have been impossible
+  — a synchronous block cannot overlap itself — and became possible the moment it
+  learned to yield. There is now a single export slot, and the `1` and `4`
+  shortcuts and both panel buttons are inert while it is taken. The slot is
+  claimed through a ref rather than state: a state updater runs on the next
+  render, so two triggers in the same tick would both find it empty and both
+  start.
+
+### Notes
+- **`scheduler.yield()` is the wrong primitive here, despite being the modern
+  one.** It resumes the caller as a *continuation*, ahead of rendering, so the
+  work interleaves but the frame never lands. Paced entirely through it the page
+  still froze for 121 ms at a stretch; through an ordinary `MessageChannel` task
+  boundary, 39 ms. What this needs is not a prompt resumption but a repaint. The
+  reasoning is in the code, because it is exactly the sort of thing someone
+  optimises back.
+- **A time budget is only kept as finely as it is checked.** The first cut
+  consulted the clock every 256th item to avoid allocating a promise per
+  iteration — but 256 segments carrying 64 occlusion samples each is 100 ms, so a
+  24 ms budget was producing 122 ms stalls. The pacer now splits into a cheap
+  synchronous `due()` asked on every 16th item and an `async yield()` that
+  allocates only when it really yields.
+- The flock loops are deliberately left unpaced. They read the *live* particle
+  buffers — handed out uncopied so an export catches the frame on screen — so a
+  yield mid-pass would splice two moments of the animation into one picture. They
+  are small beside the segment walk.
+- Output is unchanged, and checked rather than assumed: the same fixture still
+  exports 33636 marks with no fill layer and 27178 with hillshade, and the same
+  STL still carries 25209 triangles over the same Z range.
+- Every new test was confirmed to fail against the unpaced code first — SVG at
+  237 ms and STL at 147 ms against a 120 ms threshold, with progress collapsing
+  from a smooth `[0, 8, 17, 25, 43, 63, 85, 96]` to `[0, 0, 85]` and `[0]`.
+- PNG is deliberately left alone. It is one GPU render and readback at up to 8K,
+  so there is no loop to pace — it could gain an overlay to stop the freeze being
+  a mystery, but never a truthful progress bar.
+
 ## [0.9.19] - 2026-08-17
 
 No new features. This one went looking for what was already wrong, and the honest

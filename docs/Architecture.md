@@ -156,13 +156,45 @@ Two things are generated from that set rather than written by hand:
 |---|---|---|
 | SVG | `lineGeo` + `surfaceGeo` | Projects on the CPU with its own software Z-buffer, so occlusion matches the viewport without a GPU readback |
 | PNG / PNG α | The scene | Rendered offscreen into a 4× render target, trimmed to content via the alpha channel |
-| STL | `surfaceGeo` | Computes its own facet normals; must skip vertices parked at `NODATA_SENTINEL_Y` |
+| STL | `surfaceGeo` | Computes its own facet normals; must skip vertices parked at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
 | Heightmap PNG | `terrain.grid` | The processed raster, after resolution and levels |
 | WebM | The live canvas | `MediaRecorder` on the canvas stream |
 | Profile SVG | `profileData` | Written from the same `chartGeometry()` the popup draws, at export size and in an ink-on-paper palette |
 
 Because every exporter reads the *derived* terrain, features upstream of it —
 Edit Mode clips, erosion, mirroring, soundscapes — need no exporter support.
+
+### The SVG and STL exporters pace themselves
+
+They are the two that run long enough to matter, and both are pure CPU: a
+software Z-buffer plus an occlusion walk sampling each segment up to 64 times in
+one case, a few hundred thousand triangles written a float at a time in the
+other. Run as a single block, either is a tab the browser offers to kill. Both now
+hand the main thread back roughly every 24 ms through the shared pacer in
+`utils/pacing.js`, reporting how far along they are and checking whether the user
+has given up. Measured on the default plate: SVG 242 ms → 39 ms, STL (at the
+finest resolution) 122 ms → 47 ms, neither any slower overall.
+
+They share one overlay and one export slot, claimed through a ref rather than
+state — a state updater runs on the next render, so two triggers in the same tick
+would both find the slot empty and both start.
+
+Two things about that are easy to get wrong, and both were:
+
+- **`scheduler.yield()` is not the right primitive**, though it is the modern one.
+  It resumes the caller as a continuation, *ahead of rendering*, so the work
+  interleaves but the frame never lands — measured, an export paced entirely
+  through it still froze the page for 121 ms at a stretch. A `MessageChannel`
+  message is an ordinary task boundary the browser will paint across: 39 ms.
+- **A time budget is only kept as finely as it is checked.** Consulting the clock
+  every 256th item sounds thrifty until 256 segments at 64 samples each turn out
+  to be 100 ms, and a 24 ms budget produces 122 ms stalls. The pacer therefore
+  splits in two — a cheap synchronous `due()` that can be asked on nearly every
+  iteration, and an `async yield()` that allocates only when it actually yields.
+
+The flock loops are deliberately left unpaced: they read the *live* particle
+buffers, so pausing mid-pass would splice two different moments of the animation
+into one picture.
 
 ---
 
