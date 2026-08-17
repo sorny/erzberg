@@ -295,6 +295,9 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
   // the analysis is (a new track, or a change to fftSize/bins/logFreq).
   const audioRef = useRef({ spec: null, plan: null, state: createAudioState() })
 
+  // depthTest and the polygon offsets read here are seeds; the effect below (with
+  // p.depthOcclusion and p.occlusionBias in its deps) keeps them live. Rebuilding a
+  // ShaderMaterial to change render state would recompile the program.
   const particleMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   PARTICLE_VERT,
     fragmentShader: PARTICLE_FRAG,
@@ -318,6 +321,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     polygonOffset: true,
     polygonOffsetFactor: -(p.occlusionBias ?? 1),
     polygonOffsetUnits:  -(p.occlusionBias ?? 1),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
   // Both murmuration materials, created once alongside the hologram's and kept
@@ -525,6 +529,11 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     shadowGeo.setAttribute('aLift', liftAttr)
 
     return { field, birds, geo, trailGeo, shadowGeo, posAttr, segAttr, shadowAttr, liftAttr }
+    // Only the params that change the flock's *structure* belong here. The builder
+    // reads the rest through flockParams(p), but rebuilding on those would restart
+    // the simulation — every bird back to its seeded start — each time a steering
+    // slider moved. The behavioural params are read per frame instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terrain, p.showPoints, flying, p.flockCount, p.flockSeed, p.elevScale, p.jitterAmt])
 
   useEffect(() => {
@@ -538,6 +547,9 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     if (!flock) return
     updateTrails(flock.birds, flock.field, flockParams(p))
     flock.segAttr.needsUpdate = true
+    // flockParams(p) reads all of p, but only the trail length should re-lay the
+    // streaks; the rest are consumed per frame. See the note above the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flock, p.flockTrail])
 
   useEffect(() => {
@@ -545,6 +557,8 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     updateShadows(flock.birds, flock.field, flockParams(p))
     flock.shadowAttr.needsUpdate = true
     flock.liftAttr.needsUpdate = true
+    // As above: the shadow switch and the sun angles are what move the shadows.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flock, p.flockShadow, p.hillshadeAzimuth, p.hillshadeAltitude])
 
   useImperativeHandle(ref, () => ({

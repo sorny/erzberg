@@ -508,6 +508,14 @@ export default function App() {
 
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
+  //
+  // A fresh object every render, deliberately: it is the app's param bus, and
+  // every consumer reads fields off it rather than holding it. The cost is that
+  // useCallbacks listing `p` (handleStl below) cannot actually memoize — they
+  // degrade to plain functions, which for an export handler is harmless. Wrapping
+  // this in useMemo would mean memoizing the whole state merge to stabilise an
+  // identity nothing compares, so the lint rule is answered rather than obeyed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
     elevScale: baseElevScale + terrain.elevScale,
     gpxPoints, geoTiffBbox, geoTiffCRS,
@@ -626,6 +634,10 @@ export default function App() {
   }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
+  // Mount-only by intent, and the empty dep array is the whole mechanism: this is
+  // the sample plate the app opens with, so it must load exactly once. `load` is a
+  // useCallback whose identity tracks the store setters, and listing it would
+  // re-fetch the default over whatever the user had opened in the meantime.
   useEffect(() => {
     const baseUrl = import.meta.env.BASE_URL || '/'
     load(`${baseUrl}Heightmap.png`)

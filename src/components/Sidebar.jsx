@@ -310,10 +310,8 @@ export function Sidebar({
   const [noThumb,     setNoThumb]     = useState(() => new Set())
   
   const setPixels = useStore(s => s.setPixels)
-  const setHeightmap = useStore(s => s.setHeightmap)
   const heightmapWidth = useStore(s => s.heightmapWidth)
   const heightmapHeight = useStore(s => s.heightmapHeight)
-  const nodataMask = useStore(s => s.nodataMask)
 
   const handleRunErosion = () => {
     if (!heightmapPixels || isEroding) return
@@ -373,52 +371,6 @@ export function Sidebar({
     input.click()
   }
 
-  const handleMirrorX = () => {
-    if (!heightmapPixels) return
-    const W = heightmapWidth
-    const H = heightmapHeight
-    const newW = W * 2
-    const nextPixels = new Float32Array(newW * H)
-    const nextMask = nodataMask ? new Uint8Array(newW * H) : null
-
-    for (let y = 0; y < H; y++) {
-      for (let x = 0; x < W; x++) {
-        const sourceIdx = y * W + x
-        const destIdxL = y * newW + (W - 1 - x)
-        nextPixels[destIdxL] = heightmapPixels[sourceIdx]
-        if (nextMask) nextMask[destIdxL] = nodataMask[sourceIdx]
-        const destIdxR = y * newW + (W + x)
-        nextPixels[destIdxR] = heightmapPixels[sourceIdx]
-        if (nextMask) nextMask[destIdxR] = nodataMask[sourceIdx]
-      }
-    }
-    setHeightmap(nextPixels, nextMask, newW, H, heightmapFilename + ' (mirrored X)')
-  }
-
-  const handleMirrorY = () => {
-    if (!heightmapPixels) return
-    const W = heightmapWidth
-    const H = heightmapHeight
-    const newH = H * 2
-    const nextPixels = new Float32Array(W * newH)
-    const nextMask = nodataMask ? new Uint8Array(W * newH) : null
-
-    for (let y = 0; y < H; y++) {
-      const sourceRowOff = y * W
-      const destRowOffT = (H - 1 - y) * W
-      for (let x = 0; x < W; x++) {
-        nextPixels[destRowOffT + x] = heightmapPixels[sourceRowOff + x]
-        if (nextMask) nextMask[destRowOffT + x] = nodataMask[sourceRowOff + x]
-      }
-      const destRowOffB = (H + y) * W
-      for (let x = 0; x < W; x++) {
-        nextPixels[destRowOffB + x] = heightmapPixels[sourceRowOff + x]
-        if (nextMask) nextMask[destRowOffB + x] = nodataMask[sourceRowOff + x]
-      }
-    }
-    setHeightmap(nextPixels, nextMask, W, newH, heightmapFilename + ' (mirrored Y)')
-  }
-
   const tog = (name) => setSec(s => ({ ...s, [name]: !s[name] }))
 
   // Soundscapes controller. Aliased because `ss` is already the style setter,
@@ -455,9 +407,6 @@ export function Sidebar({
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
   const crsInfo     = classifyCRS(geoTiffCRS)
-  const elevRange   = hasGeoTiff ? geoTiffElevMax - geoTiffElevMin : 0
-  const elevCutToM  = (pct) => +(geoTiffElevMin + (pct / 100) * elevRange).toFixed(1)
-  const mToElevCut  = (m)   => +(((m - geoTiffElevMin) / elevRange) * 100).toFixed(1)
 
   const syncSectionsToStyle = (newStyle) => {
     setSec(prev => ({

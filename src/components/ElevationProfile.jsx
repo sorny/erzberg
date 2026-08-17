@@ -2,6 +2,14 @@ import { useMemo } from 'react'
 import { PROFILE_A, PROFILE_B } from './ProfileOverlay'
 
 /**
+ * Popup chart size. Module scope rather than render scope on purpose: declared
+ * inside the component, PAD was a fresh object on every render, so the chart
+ * useMemo could not list it as a dependency without recomputing every time.
+ * buildProfileSvg shadows all three with its larger print sizes.
+ */
+const SCREEN = { W: 480, H: 160, PAD: { top: 16, right: 16, bottom: 28, left: 48 } }
+
+/**
  * Chart geometry for a sampled section.
  *
  * Pure, and parameterised by size, because the same numbers are drawn twice: on
@@ -76,15 +84,15 @@ ${g.ticks.map(({ y, label }) => `  <text x="${PAD.left - 8}" y="${(y + 3.5).toFi
 }
 
 export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffElevMin, geoTiffElevMax, baseName = 'heightmap' }) {
-  const W = 480, H = 160, PAD = { top: 16, right: 16, bottom: 28, left: 48 }
+  const { W, H, PAD } = SCREEN
 
   const hasReal = geoTiffElevMin != null && geoTiffElevMax != null
   const realMin = hasReal ? geoTiffElevMin + (geoTiffElevMax - geoTiffElevMin) * elevMin : 0
   const realMax = hasReal ? geoTiffElevMin + (geoTiffElevMax - geoTiffElevMin) * elevMax : 100
 
-  const { pathD, fillD, ticks, innerW, innerH } = useMemo(
+  const { pathD, fillD, ticks, innerW } = useMemo(
     () => chartGeometry({ points, elevMin, elevMax, W, H, PAD, hasReal, realMin, realMax }),
-    [points, elevMin, elevMax, hasReal, realMin, realMax],
+    [points, elevMin, elevMax, W, H, PAD, hasReal, realMin, realMax],
   )
 
   const exportSvg = () => {

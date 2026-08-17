@@ -445,6 +445,8 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     return tex
   }, [needsHeightmapTex, heightmapPixels, heightmapWidth, heightmapHeight])
 
+  // Built once, then driven by the uniform-sync effects below — see the note there
+  // on why uniforms and render state are set rather than rebuilt.
   const surfMat = useMemo(() => new THREE.ShaderMaterial({
     vertexShader:   SURFACE_VERT,
     fragmentShader: SURFACE_FRAG,
@@ -505,6 +507,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uAspectMap:             { value: false },
       uAspectMapOpacity:      { value: 0.8 },
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
   useEffect(() => {
@@ -607,6 +610,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   useEffect(() => () => hmTexRef.current?.dispose(), [])
   useEffect(() => () => gradTexRef.current?.dispose(), [])
 
+  // Seed colour only; the effect below tracks p.meshColor.
   const wireMat = useMemo(() => new THREE.MeshBasicMaterial({
     color:               new THREE.Color(p.meshColor ?? '#888888'),
     wireframe:           true,
@@ -616,6 +620,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     polygonOffset:       true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits:  1,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
   useEffect(() => {

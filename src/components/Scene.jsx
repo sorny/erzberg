@@ -44,7 +44,7 @@ export function Scene({
   profileAnchors,
   audioLive,
 }) {
-  const { camera: currentCamera, gl, scene, size, invalidate } = useThree()
+  const { camera: currentCamera, gl, scene, invalidate } = useThree()
   const groupRef    = useRef()
   const particleRef = useRef()
   const persRef     = useRef()
@@ -117,6 +117,10 @@ export function Scene({
     }
     autoRotRef.current = p.rotation
     updateCameraFromSliders(p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ)
+    // updateCameraFromSliders is a plain per-render function reading pRef, so it
+    // changes identity every render; listing it would run this on every render and
+    // fight the orbit-echo guard above. The camera values it needs are the deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ, p.orthographic, activeCamera])
 
   useFrame(({ invalidate }, delta) => {
@@ -147,7 +151,7 @@ export function Scene({
       orbitRef.current.target.set(p.panX || 0, p.panZ || 0, p.panY || 0)
       orbitRef.current.update()
     }
-  }, [cameraPreset, p.panX, p.panY, p.panZ])
+  }, [cameraPreset, orbitRef, p.panX, p.panY, p.panZ])
 
   const syncOrbitToState = () => {
     if (!orbitRef.current || !activeCamera) return
@@ -368,6 +372,10 @@ export function Scene({
       })
       onSvgDone?.()
     }, 0)
+    // Trigger-counter effect: it fires when the counter moves and exports whatever
+    // the scene was at that render. Listing what it reads would re-export on any
+    // unrelated setting change after a trigger, which is the bug this shape avoids.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [svgTrigger])
 
   // PNG exports — activeCamera is intentionally excluded from deps. It is a plain
@@ -375,7 +383,9 @@ export function Scene({
   // would re-fire the export whenever any setting causes a re-render after a trigger
   // has been set. The closure already captures the current camera from the same render
   // that incremented the trigger counter, so no staleness risk.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (pngTrigger)      performHighResCapture(false) }, [pngTrigger])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true)  }, [pngAlphaTrigger])
 
   return (

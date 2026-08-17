@@ -162,6 +162,16 @@ export function useTerrainGeometry(p) {
     }
 
     send(req)
+    // This list IS the rebuild contract: a worker rebuild is expensive, so it names
+    // every param that changes the geometry and nothing else. Depending on `p`
+    // wholesale would rebuild the terrain on every colour pick and slider tick.
+    // `send` is held in sendRef and is stable by construction.
+    //
+    // Audited against the worker's actual reads: the only params it touches that are
+    // absent here are the weight/opacity/dash families (resolved render-side by
+    // layerStyle — see the NOTE below) and the fill switches, which reach this effect
+    // through the precomputed p.needsSurfaceShading. No knob is silently inert.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
     // Terrain Globals

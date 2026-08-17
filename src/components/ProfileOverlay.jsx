@@ -29,7 +29,7 @@ const N = 200
  * buildSurfaceUvs), and its vertices sit at `c*scl - halfW` / `r*scl - halfH`
  * with the elevation the grid holds — so this is that mapping, backwards.
  */
-export function uvToWorld(terrain, u, v) {
+function uvToWorld(terrain, u, v) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, elevScale } = terrain
   const c = Math.max(0, Math.min(cols - 1, u * (cols - 1)))
   const r = Math.max(0, Math.min(rows - 1, (1 - v) * (rows - 1)))

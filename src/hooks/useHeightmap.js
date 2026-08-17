@@ -345,7 +345,11 @@ async function loadGeoTiffPixels(file) {
       range, Math.abs(image.getResolution()[0]), crs, bbox,
       LINEAR_UNITS[geoKeys.ProjLinearUnitsGeoKey] ?? 1,   // feet → metres
     )
-  } catch (_) {}
+  } catch (_) {
+    // Deliberately silent: the suggestion is a convenience, and a raster whose
+    // resolution or unit keys cannot be read is still perfectly loadable. Left
+    // null, the caller keeps the user's current exaggeration.
+  }
 
   return {
     pixels, nodataMask, width, height,

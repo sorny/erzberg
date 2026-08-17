@@ -153,7 +153,7 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   if (!surfaceGeo || !terrain) return
 
   const { positions, indices } = surfaceGeo
-  const { rows, cols, gridMask } = terrain
+  const { rows, cols } = terrain
 
   // Nothing to export — an axis with both mirrors cleared yields zero octants and
   // so zero vertices. Bailing here rather than pressing on is the difference

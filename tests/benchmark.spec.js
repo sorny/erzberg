@@ -71,7 +71,10 @@ test('performance benchmark', async ({ page }) => {
   // Wait for computing overlay to appear then disappear (geometry worker)
   try {
     await page.waitForSelector('[data-testid="loading-overlay"]', { state: 'visible', timeout: 2000 })
-  } catch (_) {}
+  } catch (_) {
+    // The overlay is debounced, so a fast machine can finish the build before it
+    // ever appears. Missing it is not a failure — only the hidden wait below is.
+  }
   await page.waitForSelector('[data-testid="loading-overlay"]', { state: 'hidden', timeout: 60000 })
 
   // Wait for the last Viewport Updated log

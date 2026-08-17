@@ -1215,7 +1215,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
   for (const idx of seeds) {
     const r = Math.floor(idx / cols), c = idx % cols
     if (mask[idx]) continue
-    let fr = r, fc = c, b0 = sampleBilinear(grid, sMask, rows, cols, fr, fc), e0 = (b0 - 0.5)*100*elevScale
+    let fr = r, fc = c, e0 = (sampleBilinear(grid, sMask, rows, cols, fr, fc) - 0.5)*100*elevScale
     for (let s = 0; s < (maxLen ?? 100); s++) {
         if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
         const ri = Math.round(fr), ci = Math.round(fc)
@@ -1236,7 +1236,7 @@ function buildFlowLines(terrain, p, spacing, step, maxLen) {
           const col0 = computeVertexColor(normElev(e0, minElev, maxElev), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
           colors.pushRgb2(col0)
         } else if (!(inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) || inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut))) break
-        fr=nfr; fc=nfc; b0=b1; e0=e1
+        fr=nfr; fc=nfc; e0=e1
       }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }

@@ -90,6 +90,10 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
   }, [lidMat, opacity, depthOcclusion])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
+  // Built once; weight/opacity/depthOcclusion/resolution here are seed values only
+  // and the effect below keeps them live. Depending on them would rebuild the
+  // material on every slider tick — a new LineMaterial per frame of a drag, each
+  // one a shader compile, which is exactly what the split into memo + effect buys.
   const material = useMemo(() => new LineMaterial({
     linewidth: weight || 1,
     vertexColors: true,
@@ -99,6 +103,7 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
     depthTest: !!depthOcclusion,
     depthFunc: THREE.LessEqualDepth,
     opacity: opacity ?? 1,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
   const lines = useMemo(() => {
@@ -107,6 +112,7 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
   }, [geometry, material])
 
   // ── Ghost (Hidden) Pass ───────────────────────────────────────────────────
+  // Same build-once-then-sync split as the visible pass above.
   const ghostMaterial = useMemo(() => new LineMaterial({
     linewidth: weight || 1,
     vertexColors: false,
@@ -117,6 +123,7 @@ function LineLayer({ layer, weight, opacity, dash, depthOcclusion, occlusionOpac
     depthTest: true,
     depthFunc: THREE.GreaterDepth,
     opacity: occlusionOpacity ?? 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
   const ghostLines = useMemo(() => {
@@ -192,10 +199,16 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   // keeps apparent line thickness constant across devicePixelRatio *and* across
   // the View → Supersampling multiplier. Passing the drawing-buffer size instead
   // would shrink every line by a factor of dpr × renderScale.
+  // size.width/height are not read in the body and ESLint calls them unnecessary,
+  // but they are the point: gl.getSize() is an imperative read with no identity of
+  // its own, so the viewport dimensions are what tells this memo the answer has
+  // changed. Dropping them would freeze `resolution` at its mount value and every
+  // line would keep the thickness it had before the window was resized.
   const resolution = useMemo(() => {
     const s = new THREE.Vector2()
     gl.getSize(s)
     return s
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, size.width, size.height])
 
   return (
