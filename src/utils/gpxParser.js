@@ -14,10 +14,22 @@ export function parseGpx(xmlText) {
   const pts = []
   const collect = (selector) => {
     doc.querySelectorAll(selector).forEach(el => {
-      const lat = +el.getAttribute('lat')
-      const lon = +el.getAttribute('lon')
-      if (!isNaN(lat) && !isNaN(lon))
-        pts.push({ lat, lon, ele: parseFloat(el.querySelector('ele')?.textContent) || null })
+      // The attributes have to be *present*, not merely numeric. getAttribute
+      // returns null when one is missing and +null is 0, so testing the number
+      // alone accepted a malformed <trkpt> as a point at (0, 0) — which is not a
+      // sentinel but a real place in the Gulf of Guinea. It counted against the
+      // track's coverage report, making a track that landed perfectly well read
+      // back as only 'partial'.
+      const latAttr = el.getAttribute('lat'), lonAttr = el.getAttribute('lon')
+      if (latAttr === null || lonAttr === null) return
+      const lat = +latAttr, lon = +lonAttr
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return
+
+      // `parseFloat(…) || null` read a genuine 0 m as "no elevation recorded".
+      // Sea level is data, and a coastal track starts there. Nothing consumes
+      // `ele` yet, which is the reason to get it right now rather than later.
+      const ele = parseFloat(el.querySelector('ele')?.textContent)
+      pts.push({ lat, lon, ele: Number.isFinite(ele) ? ele : null })
     })
   }
 

@@ -110,9 +110,22 @@ export function useFlockAudio(fallbackLiveRef) {
       urlRef.current = URL.createObjectURL(file)
       if (!audioRef.current) audioRef.current = new Audio()
       const a = audioRef.current
+      // Paired, as release() pairs them: there is no 'pause' listener, only
+      // 'ended', so pausing without saying so left isPlaying true while the
+      // element sat paused. The transport then showed the new track as playing and
+      // its first click called pause() on something already paused — two clicks to
+      // start a track you had just loaded.
       a.pause()
+      setIsPlaying(false)
       a.src = urlRef.current
       a.currentTime = 0
+
+      // The previous track's analysis stops being an answer the moment this one
+      // becomes the loaded track. Held, the flock spent the whole of the new
+      // track's analysis reacting to the *old* spectrogram sampled at the new
+      // playhead — and if the worker below failed, kept doing so indefinitely,
+      // while source() went on reporting 'own'.
+      specRef.current = null
 
       setFileName(file.name)
       setDuration(audioBuf.duration)

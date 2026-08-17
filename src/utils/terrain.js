@@ -219,8 +219,18 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
     // over the *grid* rather than the raster — that is the mask the builders
     // index, and a subsampling resolution can step over a thin void entirely.
     hasNoData: holes,
+    // CENTRING OFFSETS, not half-extents, despite the names: world X of cell c is
+    // `c·scl − halfW`, which puts the *midpoint* of the valid-cell range at the
+    // origin. Every consumer that maps a cell to the world uses them that way.
     halfW: hasValid ? ((minC + maxC) * scl) / 2 : ((cols - 1) * scl) / 2,
     halfH: hasValid ? ((minR + maxR) * scl) / 2 : ((rows - 1) * scl) / 2,
+    // The actual half-extents, which are a different number as soon as the valid
+    // region is off-centre. For the full grid the two coincide — minC + maxC and
+    // maxC − minC are both cols − 1 — which is why using halfW for a size went
+    // unnoticed until an off-centre lasso crop: at valid columns 800…1000 of 1024,
+    // halfW is 900·scl while the region is only 200·scl wide.
+    spanHalfW: hasValid ? ((maxC - minC) * scl) / 2 : ((cols - 1) * scl) / 2,
+    spanHalfH: hasValid ? ((maxR - minR) * scl) / 2 : ((rows - 1) * scl) / 2,
     minElev, maxElev, maxSlope, gridSlopes, elevScale,
     // Brightness bounds over the valid cells. Raw terrain view stretches the
     // greyscale across them, so a heightmap occupying only the middle of the

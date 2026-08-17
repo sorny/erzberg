@@ -105,7 +105,13 @@ function mulberry32(a) {
  */
 export function makeTerrainField(terrain, elevScale, jitterAmt = 0) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, gridSlopes } = terrain
-  const span = Math.max(1e-3, 2 * Math.max(halfW, halfH))
+  // halfW/halfH are centring offsets — see buildTerrain. Every *size* here comes
+  // from the span fields instead: on an off-centre crop the offset is far larger
+  // than the terrain, which set the flock's radii and its containment wall to
+  // multiples of the ground that actually exists and let it drift off the data.
+  const spanHalfW = terrain.spanHalfW ?? halfW
+  const spanHalfH = terrain.spanHalfH ?? halfH
+  const span = Math.max(1e-3, 2 * Math.max(spanHalfW, spanHalfH))
 
   const heightAt = (x, z) => {
     const fc = (x + halfW) / scl
@@ -186,7 +192,7 @@ export function makeTerrainField(terrain, elevScale, jitterAmt = 0) {
   }
 
   return {
-    heightAt, groundAt, slopeAt, span, halfW, halfH,
+    heightAt, groundAt, slopeAt, span, halfW, halfH, spanHalfW, spanHalfH,
     roostX: bestC * scl - halfW,
     roostZ: bestR * scl - halfH,
     peakY: bestY,
@@ -392,8 +398,11 @@ function substep(flock, dt, field, s, params) {
   const fear2 = s.fear * s.fear
 
   const turbK = 20 / s.span   // ~3 noise features across the terrain
-  const boundX = field.halfW * BOUND_SOFT
-  const boundZ = field.halfH * BOUND_SOFT
+  // The containment wall is a distance from the origin, so it is a half-extent —
+  // field.halfW is a centring offset and put the wall well outside the terrain on
+  // any off-centre crop.
+  const boundX = field.spanHalfW * BOUND_SOFT
+  const boundZ = field.spanHalfH * BOUND_SOFT
   const boundSoft = 1 / (0.10 * s.span)
   const bandSoft = 1 / (0.50 * s.band)
 

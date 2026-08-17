@@ -173,6 +173,74 @@ test('murmuration mode animates on screen, and freezes when told to', async ({ p
   expect(errors, `page errors:\n${errors.join('\n')}`).toEqual([])
 })
 
+/**
+ * An off-centre crop, which is where `halfW` stops being a size.
+ *
+ * buildTerrain returns `halfW = (minC + maxC)·scl / 2` — the *midpoint* of the
+ * valid-cell range, because world X of cell c is `c·scl − halfW`. For the full
+ * grid that number also happens to equal the half-extent (minC + maxC and
+ * maxC − minC are both cols − 1), so every fixture built on a full grid — including
+ * the ones below — cannot tell the two apart. An Edit Mode lasso or crop breaks the
+ * coincidence: at valid columns 80…100 of 128 the offset is 90·scl while the
+ * terrain is 10·scl to a side, so the flock's radii and its containment wall came
+ * out an order of magnitude larger than the ground beneath them and it flew off
+ * the data entirely.
+ *
+ * The assertion is where the birds ended up rather than any internal constant:
+ * a flock over its terrain should be over its terrain.
+ */
+test('the flock stays over an off-centre crop instead of the whole grid', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+  const r = await page.evaluate(async () => {
+    const { makeTerrainField, createFlock, stepFlock } = await import('/src/utils/murmuration.js')
+    const rows = 128, cols = 128, scl = 4
+    const LO = 80, HI = 100          // the only valid cells, well off centre
+    const grid = new Float32Array(rows * cols)
+    const gridMask = new Uint8Array(rows * cols)
+    const gridSlopes = new Float32Array(rows * cols)
+    for (let y = LO; y <= HI; y++) for (let x = LO; x <= HI; x++) {
+      gridMask[y * cols + x] = 1
+      grid[y * cols + x] = 0.5 + 0.4 * Math.cos((x - LO) / 3) * Math.sin((y - LO) / 3)
+    }
+    for (let y = 0; y < rows - 1; y++) for (let x = 0; x < cols - 1; x++) {
+      const b = grid[y * cols + x]
+      gridSlopes[y * cols + x] = Math.hypot(grid[y * cols + x + 1] - b, grid[(y + 1) * cols + x] - b)
+    }
+    // Exactly what buildTerrain computes for this mask — offsets and extents both.
+    const terrain = {
+      grid, gridMask, gridSlopes, rows, cols, scl,
+      halfW: ((LO + HI) * scl) / 2, halfH: ((LO + HI) * scl) / 2,
+      spanHalfW: ((HI - LO) * scl) / 2, spanHalfH: ((HI - LO) * scl) / 2,
+    }
+    const field = makeTerrainField(terrain, 1, 0)
+
+    const params = { roost: 0.4 }
+    const flock = createFlock(2000, 7, field, params)
+    for (let i = 0; i < 600; i++) stepFlock(flock, 1 / 60, field, params)
+
+    // Fraction of birds standing over a cell that actually holds data.
+    let over = 0, maxR = 0
+    for (let i = 0; i < flock.n; i++) {
+      const x = flock.pos[i * 3], z = flock.pos[i * 3 + 2]
+      maxR = Math.max(maxR, Math.hypot(x, z))
+      const c = Math.round((x + terrain.halfW) / scl)
+      const rr = Math.round((z + terrain.halfH) / scl)
+      if (c >= 0 && c < cols && rr >= 0 && rr < rows && gridMask[rr * cols + c]) over++
+    }
+    return { frac: over / flock.n, maxR, spanHalfW: terrain.spanHalfW }
+  })
+
+  console.log(`off-centre crop: ${(r.frac * 100).toFixed(1)}% of birds over data, ` +
+              `furthest ${r.maxR.toFixed(0)} vs terrain half-extent ${r.spanHalfW}`)
+
+  // Generous: the flock is allowed to overshoot its terrain, not to ignore it.
+  expect(r.frac, 'most of the flock should be over the cells that hold data').toBeGreaterThan(0.5)
+  expect(r.maxR, 'no bird should be an order of magnitude off the terrain')
+    .toBeLessThan(r.spanHalfW * 4)
+})
+
 test('shadows fall only on real terrain, never on empty space', async ({ page }) => {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=erzberg', { timeout: 30000 })
@@ -575,8 +643,30 @@ test('the beat is visible in the flock, not just present in the numbers', async 
       }
       return 2 * Math.hypot(re, im) / dev.length
     }
-    return { beat: at(1.0), floor: (at(0.6) + at(0.8) + at(1.3) + at(1.6)) / 4 }
+    return {
+      beat: at(1.0), floor: (at(0.6) + at(0.8) + at(1.3) + at(1.6)) / 4,
+      // Provenance of the measurement, checked below before it is believed.
+      frames: px.length, distinct: new Set(px).size,
+    }
   })
+
+  /**
+   * A frozen canvas and a flock ignoring the audio are the same measurement.
+   *
+   * at() works on px minus its mean, so a *constant* series is zero at every
+   * frequency — beat and floor both exactly 0.0. Under frameloop="demand" that is
+   * what an occluded window produces: the scene stops redrawing while
+   * preserveDrawingBuffer keeps handing drawImage the last frame. Seen once in a
+   * full-suite run (`reacting 0.0 (floor 0.0)`) where the spec passes alone, and
+   * the failure blamed the flock for what the renderer did. Check the sample is
+   * real before reading anything into it.
+   */
+  const assertMeasurable = (name, m) => {
+    expect(m.frames, `${name}: only ${m.frames} frames sampled — requestAnimationFrame was throttled, ` +
+      'which usually means the browser window was not in the foreground').toBeGreaterThan(60)
+    expect(m.distinct, `${name}: the canvas held the same ${m.frames} frames throughout — the scene stopped ` +
+      'redrawing, so this run says nothing about whether the flock reacted').toBeGreaterThan(5)
+  }
 
   await page.locator('[data-testid="flock-audio-drive"]').fill('0')
   await page.locator('[data-testid="flock-audio-play"]').click()
@@ -588,7 +678,11 @@ test('the beat is visible in the flock, not just present in the numbers', async 
   const heard = await beatAmplitude(7)
 
   console.log(`1 Hz — silent ${silent.beat.toFixed(1)} (floor ${silent.floor.toFixed(1)}), ` +
-              `reacting ${heard.beat.toFixed(1)} (floor ${heard.floor.toFixed(1)})`)
+              `reacting ${heard.beat.toFixed(1)} (floor ${heard.floor.toFixed(1)})` +
+              ` [${silent.frames}/${heard.frames} frames, ${silent.distinct}/${heard.distinct} distinct]`)
+
+  assertMeasurable('silent', silent)
+  assertMeasurable('reacting', heard)
 
   // Measured 358 against 61 with the reaction working, and 61/34 without. The
   // thresholds sit well inside that gap so ordinary frame-rate noise cannot

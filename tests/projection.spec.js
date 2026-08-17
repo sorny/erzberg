@@ -140,6 +140,29 @@ test.describe('forward projection', () => {
     // Zone 32's central meridian is 9°E, so a point at 14.9°E is far east of it.
     expect(x).toBeGreaterThan(500_000)
   })
+
+  /**
+   * A zone that meets the dateline.
+   *
+   * Zone 1's central meridian is −177°, so a point at +179° lies 4° to its *west* —
+   * but subtracting the two longitudes gives +356°, and the Transverse Mercator
+   * series is a small-angle expansion in exactly that quantity. Unwrapped it
+   * returned an easting of −9.7e8, which put the point outside any raster and got
+   * it dropped as out-of-bounds: silent point loss, the failure the null returns
+   * above exist to prevent.
+   *
+   * The check is an identity rather than a constant — +179° and −181° name the same
+   * meridian, so they must project to the same grid coordinates.
+   */
+  test('a longitude across the dateline projects the same as its unwrapped twin', () => {
+    const east = projectWgs84(52, 179,  'EPSG:32601')
+    const west = projectWgs84(52, -181, 'EPSG:32601')
+    expect(east[0]).toBeCloseTo(west[0], 6)
+    expect(east[1]).toBeCloseTo(west[1], 6)
+    // And it lands on the grid: west of the false easting, inside a plausible zone.
+    expect(east[0]).toBeGreaterThan(0)
+    expect(east[0]).toBeLessThan(500_000)
+  })
 })
 
 /**
@@ -259,6 +282,63 @@ test.describe('projectability gate', () => {
     expect(isTrackProjectable('EPSG:32633', null)).toBe(false)
     expect(isTrackProjectable('EPSG:32633', [0, 0, 0, 0])).toBe(false)
     expect(isTrackProjectable('EPSG:32633', [0, 0, NaN, 10])).toBe(false)
+  })
+})
+
+/**
+ * What the GPX parser is willing to call a point.
+ *
+ * In the browser because parseGpx uses DOMParser, which Node does not have.
+ *
+ * The case worth guarding is a <trkpt> with no lat/lon: getAttribute returns null
+ * for a missing attribute, +null is 0, and an isNaN test passes it — so the parser
+ * invented a point at (0, 0). That is not a sentinel, it is the Gulf of Guinea,
+ * and note that the coverage tests above use exactly (0, 0) as their example of a
+ * track in the wrong place. A fabricated point is therefore indistinguishable from
+ * a real one: it counts in `total`, never in `inside`, and turns a track that
+ * landed perfectly into a 'partial' with a warning about it.
+ */
+test.describe('GPX parsing', () => {
+  const parse = (page, xml) => page.evaluate(async (x) => {
+    const { parseGpx } = await import('/src/utils/gpxParser.js')
+    return parseGpx(x)
+  }, xml)
+
+  const gpx = (body) => `<?xml version="1.0"?><gpx version="1.1"><trk><trkseg>${body}</trkseg></trk></gpx>`
+
+  test.beforeEach(async ({ page }) => { await page.goto('http://localhost:5173') })
+
+  test('drops a point that has no coordinates instead of inventing (0, 0)', async ({ page }) => {
+    const pts = await parse(page, gpx(`
+      <trkpt lat="47.5" lon="14.9"><ele>1200</ele></trkpt>
+      <trkpt><ele>1210</ele></trkpt>
+      <trkpt lat="47.6" lon="15.0"><ele>1220</ele></trkpt>
+      <trkpt lat="not-a-number" lon="15.1"></trkpt>
+    `))
+    expect(pts.map(p => [p.lat, p.lon])).toEqual([[47.5, 14.9], [47.6, 15.0]])
+  })
+
+  test('keeps a sea-level elevation instead of reading 0 as absent', async ({ page }) => {
+    // `parseFloat(…) || null` made these indistinguishable, and a coastal track
+    // starts at exactly 0 m. Nothing consumes `ele` yet; this is so it stays right
+    // for whatever does.
+    const pts = await parse(page, gpx(`
+      <trkpt lat="47.5" lon="14.9"><ele>0</ele></trkpt>
+      <trkpt lat="47.6" lon="15.0"></trkpt>
+    `))
+    expect(pts[0].ele).toBe(0)
+    expect(pts[1].ele).toBeNull()
+  })
+
+  test('falls back to route points only when there are no track points', async ({ page }) => {
+    const routeOnly = '<?xml version="1.0"?><gpx version="1.1"><rte>' +
+      '<rtept lat="47.5" lon="14.9"></rtept></rte></gpx>'
+    expect(await parse(page, routeOnly)).toHaveLength(1)
+    // A file with both prefers the track.
+    const both = '<?xml version="1.0"?><gpx version="1.1">' +
+      '<trk><trkseg><trkpt lat="1" lon="2"></trkpt></trkseg></trk>' +
+      '<rte><rtept lat="3" lon="4"></rtept></rte></gpx>'
+    expect(await parse(page, both)).toEqual([{ lat: 1, lon: 2, ele: null }])
   })
 })
 

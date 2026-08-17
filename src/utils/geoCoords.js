@@ -234,7 +234,17 @@ function wgs84ToUtm(lat, lon, zone, isSouth) {
   const lam0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180  // central meridian
 
   const phi  = lat * Math.PI / 180
-  const dlam = lon * Math.PI / 180 - lam0
+
+  // Wrapped into ±180°, because the difference of two longitudes is not yet an
+  // angular separation: a zone 1 raster has its central meridian at −177°, so a
+  // track point at +179° — 4° to its west — subtracts to +356° instead of −4°.
+  // The series below is a small-angle expansion and A⁵ of 6.2 rad is not small:
+  // the easting came out at −9.7e8, the point fell outside the raster, and it was
+  // dropped as out-of-bounds. Silent point loss is the exact failure the callers
+  // return null to avoid. A no-op for every zone that does not meet the dateline.
+  let dlam = lon * Math.PI / 180 - lam0
+  if (dlam >  Math.PI) dlam -= 2 * Math.PI
+  if (dlam < -Math.PI) dlam += 2 * Math.PI
 
   const sinPhi = Math.sin(phi), cosPhi = Math.cos(phi), tanPhi = Math.tan(phi)
   const N_r = WGS84_A / Math.sqrt(1 - WGS84_E2 * sinPhi * sinPhi)  // radius of curvature

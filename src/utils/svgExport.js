@@ -206,6 +206,26 @@ export function exportSVG({
   const PAD = MARGIN
 
   /**
+   * The paper crop, intersected with the canvas.
+   *
+   * `frame` stays exactly as given — it is the viewBox, and the page keeping the
+   * shape you chose is the entire point of framing, so it must not be trimmed to
+   * whatever happens to be on screen. What *is* trimmed is the region geometry is
+   * cut to, because beyond the canvas there is no scene to export: Offset X/Y
+   * reach ±50% at Scale 100%, which puts part of the frame off the drawing buffer.
+   * Culling against the untrimmed frame let that part through, and the depth
+   * sampler clamps its lookup to the buffer's edge pixel — so hidden-line removal
+   * out there was decided against the depth of the last on-screen column, with a
+   * seam at the boundary. Overhang now yields blank paper, which is the truth.
+   */
+  const clipRect = frameClip ? (() => {
+    const x0 = Math.max(frameClip.x, 0), y0 = Math.max(frameClip.y, 0)
+    const x1 = Math.min(frameClip.x + frameClip.w, width)
+    const y1 = Math.min(frameClip.y + frameClip.h, height)
+    return { x: x0, y: y0, w: Math.max(0, x1 - x0), h: Math.max(0, y1 - y0) }
+  })() : null
+
+  /**
    * Half the largest point sprite the GPU will actually draw.
    *
    * `gl_PointSize` is silently clamped to `ALIASED_POINT_SIZE_RANGE` — 511 on
@@ -268,8 +288,8 @@ export function exportSVG({
   // Everything outside this is not worth projecting. Without a frame it is the
   // canvas, as before; with one it is the paper, so most off-frame geometry
   // never reaches the occlusion walk at all.
-  const cull = frameClip
-    ? { x0: frameClip.x, y0: frameClip.y, x1: frameClip.x + frameClip.w, y1: frameClip.y + frameClip.h }
+  const cull = clipRect
+    ? { x0: clipRect.x, y0: clipRect.y, x1: clipRect.x + clipRect.w, y1: clipRect.y + clipRect.h }
     : { x0: 0, y0: 0, x1: width, y1: height }
 
   const offCanvas2 = (p0, p1) =>
@@ -285,7 +305,7 @@ export function exportSVG({
    * their centre; one whose centre is inside may overhang the paper edge by its
    * own radius, which for a plotted dot is the right trade.
    */
-  const dotInside = (x, y) => !frameClip || insideRect(x, y, frameClip)
+  const dotInside = (x, y) => !clipRect || insideRect(x, y, clipRect)
 
   const zGeos = []
   if (surfaceOccludes && surfaceGeo && groupMatrix) {
@@ -403,26 +423,34 @@ export function exportSVG({
         const addSeg = (x0, y0, x1, y1, isVisible) => {
           const segLen = Math.hypot(x1 - x0, y1 - y0)
           if (segLen < 0.1) return
-          const c = frameClip ? clipSegment(x0, y0, x1, y1, frameClip)
-                              : { x0, y0, x1, y1, tHead: 0 }
-          const drawn = c ? Math.hypot(c.x1 - c.x0, c.y1 - c.y0) : 0
+          // Framing off is the default and this is the funnel every segment of
+          // every mode passes through — a quarter of a million of them in this
+          // file's own measurement — so it must not allocate a rect and repeat
+          // the hypot just to arrive back at segLen.
+          let cx0 = x0, cy0 = y0, cx1 = x1, cy1 = y1, tHead = 0, drawn = segLen
+          if (clipRect) {
+            const c = clipSegment(x0, y0, x1, y1, clipRect)
+            if (c) { cx0 = c.x0; cy0 = c.y0; cx1 = c.x1; cy1 = c.y1; tHead = c.tHead
+                     drawn = Math.hypot(cx1 - cx0, cy1 - cy0) }
+            else   { drawn = 0 }
+          }
 
           if (isVisible) {
             if (visLastX === null || Math.hypot(x0 - visLastX, y0 - visLastY) > CONNECT_EPS) visCumLen = 0
             if (drawn >= 0.1) {
-              visibleSegs.push({ x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1, stroke,
-                                 dashOffset: visCumLen + c.tHead * segLen })
-              expandBB(c.x0, c.y0); expandBB(c.x1, c.y1)
+              visibleSegs.push({ x0: cx0, y0: cy0, x1: cx1, y1: cy1, stroke,
+                                 dashOffset: visCumLen + tHead * segLen })
+              expandBB(cx0, cy0); expandBB(cx1, cy1)
             }
             visCumLen += segLen
             visLastX = x1; visLastY = y1
           } else {
             if (ghostLastX === null || Math.hypot(x0 - ghostLastX, y0 - ghostLastY) > CONNECT_EPS) ghostCumLen = 0
             if (drawn >= 0.1) {
-              ghostSegs.push({ x0: c.x0, y0: c.y0, x1: c.x1, y1: c.y1,
+              ghostSegs.push({ x0: cx0, y0: cy0, x1: cx1, y1: cy1,
                                stroke: occlusionColor || '#000000',
-                               dashOffset: ghostCumLen + c.tHead * segLen })
-              expandBB(c.x0, c.y0); expandBB(c.x1, c.y1)
+                               dashOffset: ghostCumLen + tHead * segLen })
+              expandBB(cx0, cy0); expandBB(cx1, cy1)
             }
             ghostCumLen += segLen
             ghostLastX = x1; ghostLastY = y1
@@ -575,8 +603,8 @@ export function exportSVG({
 
       let p0 = project(ax, ay, az), p1 = project(bx, by, bz)
       if (offCanvas2(p0, p1)) continue
-      if (frameClip) {
-        const c = clipSegment(p0[0], p0[1], p1[0], p1[1], frameClip)
+      if (clipRect) {
+        const c = clipSegment(p0[0], p0[1], p1[0], p1[1], clipRect)
         if (!c) continue
         p0 = [c.x0, c.y0, p0[2]]; p1 = [c.x1, c.y1, p1[2]]
       }
@@ -693,7 +721,12 @@ export function exportSVG({
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
-    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(0)}" height="${vh.toFixed(0)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
+    // width/height at the same precision as the viewBox, so the page is not
+    // non-uniformly scaled by the rounding. With a frame the sheet's proportion is
+    // the whole point: an ISO 1500 × 1060.66 written as height="1061" over a
+    // 1060.7 viewBox lands at 1:1.4147 instead of 1:1.41421, and frame.js stores
+    // these ratios exactly rather than as rounded millimetres for that reason.
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(1)}" height="${vh.toFixed(1)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...layerGroups,
