@@ -16,6 +16,7 @@ import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
+import { ProfileOverlay } from './ProfileOverlay'
 import { ParticleSystem } from './ParticleSystem'
 
 /**
@@ -40,6 +41,7 @@ export function Scene({
   webmRecording,
   exportBaseName,
   profileClickRef,
+  profileAnchors,
   audioLive,
 }) {
   const { camera: currentCamera, gl, scene, size, invalidate } = useThree()
@@ -246,10 +248,19 @@ export function Scene({
     // handles depth-based scaling, and mutating the shared material reference
     // causes visible bleed into the live viewport after restore.
     const lineMaterials = []
+    // Viewport-only aids — the elevation-profile section and its pins — are in
+    // the scene graph, so this pass would bake them into the picture. The SVG
+    // and STL exporters work from worker geometry and never see them; this is
+    // the one export that renders the scene itself.
+    const hidden = []
     scene.traverse(obj => {
       if (obj.material?.isLineMaterial) {
         lineMaterials.push({ mat: obj.material, oldRes: obj.material.resolution.clone() })
         obj.material.resolution.set(targetW, targetH)
+      }
+      if (obj.userData?.viewportOnly && obj.visible) {
+        hidden.push(obj)
+        obj.visible = false
       }
     })
 
@@ -269,6 +280,7 @@ export function Scene({
     gl.clear()
     gl.render(scene, cam)
     gl.setRenderTarget(null)
+    for (const obj of hidden) obj.visible = true
     gl.setClearColor(oldClearColor, oldAlpha)
 
     // Read pixels from the render target.
@@ -403,6 +415,10 @@ export function Scene({
       <group ref={groupRef}>
         <HeightmapLines lineGeo={lineGeo} surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
         <ParticleSystem ref={particleRef} terrain={terrain} p={p} audioLive={audioLive} />
+        {/* Inside the same group as the drawn layers so mirroring and the
+            camera rig move it with them, but outside lineGeo so it never
+            reaches an exporter. */}
+        {!webmRecording && <ProfileOverlay terrain={terrain} anchors={profileAnchors} />}
       </group>
       {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
       {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}

@@ -163,6 +163,10 @@ export default function App() {
   const [profileMode,   setProfileMode]   = useState(false)
   const [profileClicks, setProfileClicks] = useState([])
   const [profileData,   setProfileData]   = useState(null)
+  // Where the section was taken, kept for as long as the chart is up so the
+  // scene can show the line it describes. Cleared with the chart, not with the
+  // mode — leaving profile mode is not the same as being done with the result.
+  const [profileAnchors, setProfileAnchors] = useState(null)
 
   const sampleProfile = useCallback((uv0, uv1) => {
     if (!heightmapPixels || !heightmapWidth || !heightmapHeight) return
@@ -188,11 +192,13 @@ export default function App() {
       if (val > maxV) maxV = val
     }
     setProfileData({ points: pts, elevMin: minV, elevMax: maxV })
+    setProfileAnchors([uv0, uv1])
     setProfileMode(false)
     setProfileClicks([])
   }, [heightmapPixels, heightmapWidth, heightmapHeight])
 
   const handleProfileClick = useCallback((uv) => {
+    setProfileAnchors(null)
     setProfileClicks(prev => {
       const next = [...prev, uv]
       if (next.length === 2) {
@@ -655,6 +661,7 @@ export default function App() {
           surfaceGeo={surfaceGeo}
           p={p}
           profileClickRef={profileClickRef}
+          profileAnchors={profileAnchors ?? (profileClicks.length ? profileClicks : null)}
           getParams={getParams}
           setParams={setParams}
           orbitRef={orbitRef}
@@ -805,9 +812,10 @@ export default function App() {
           points={profileData.points}
           elevMin={profileData.elevMin}
           elevMax={profileData.elevMax}
-          onClose={() => setProfileData(null)}
+          onClose={() => { setProfileData(null); setProfileAnchors(null) }}
           geoTiffElevMin={geoTiffElevMin}
           geoTiffElevMax={geoTiffElevMax}
+          baseName={exportBaseName}
         />
       )}
 
