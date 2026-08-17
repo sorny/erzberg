@@ -116,6 +116,15 @@ also generates an invisible curtain mesh writing depth, so lines are occluded by
 lines and by terrain rather than floating over it. Hidden segments can be drawn
 in their own colour for an X-ray effect.
 
+**Viewport aids** — the elevation-profile section and its pins (`ProfileOverlay`)
+— are in the scene graph rather than the DOM, because they have to sit on the
+terrain in three dimensions. That puts them in front of one exporter: SVG and STL
+read worker geometry and cannot see them, but the PNG capture renders the scene
+itself. They carry `userData.viewportOnly` and that pass hides them, the same
+bargain the DOM-based frame overlay gets for free. `ProfileOverlay` also owns
+`uvToWorld`, the inverse of the surface mesh's UV mapping — the one place that
+turns a raycast hit back into a grid position and an elevation.
+
 ---
 
 ## Presets
@@ -150,6 +159,7 @@ Two things are generated from that set rather than written by hand:
 | STL | `surfaceGeo` | Computes its own facet normals; must skip vertices parked at `NODATA_SENTINEL_Y` |
 | Heightmap PNG | `terrain.grid` | The processed raster, after resolution and levels |
 | WebM | The live canvas | `MediaRecorder` on the canvas stream |
+| Profile SVG | `profileData` | Written from the same `chartGeometry()` the popup draws, at export size and in an ink-on-paper palette |
 
 Because every exporter reads the *derived* terrain, features upstream of it —
 Edit Mode clips, erosion, mirroring, soundscapes — need no exporter support.

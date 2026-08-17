@@ -148,6 +148,15 @@ edge and dots outside are dropped, so the file contains nothing to delete
 afterwards. The page becomes the shape you chose instead of whatever bounding
 box the geometry happened to occupy.
 
+**Sections you can see.** Click two points and the elevation profile draws the
+cut it sampled: a pin at each end and a line draped over the surface between
+them, so the chart on screen is anchored to somewhere on the terrain rather than
+being a curve with no address. The section exports as its own SVG — ink on
+paper, with its axis, its elevation range and both ends labelled — to sit beside
+a plotted plate or in a document. Both are viewport aids: they are drawn over
+the scene but flagged out of the PNG capture and hidden while recording, so
+nothing composed for the screen lands in a print.
+
 **Reproducible randomness.** The stochastic modes (Stipple, Rock & Scree) each
 carry a seed — the same seed always reproduces the identical pattern, so a piece
 can be regenerated exactly.
@@ -197,8 +206,10 @@ returned to.
   off the main thread. → [Hydraulic erosion](docs/Hydraulic-Erosion.md)
 - **Mirror** — reflect the raster on X or Y for kaleidoscopic terrain, and
   render octants selectively.
-- **Analysis** — click two points for an elevation cross-section; the
-  hypsometric integral is reported continuously.
+- **Analysis** — click two points for an elevation cross-section, marked on the
+  terrain by a green pin at A, a red pin at B and a draped line between them.
+  The chart exports as a standalone SVG; the hypsometric integral is reported
+  continuously.
 - **Hologram particles** — an optional GPU-animated point cloud. A single time
   uniform drives per-particle float and two-octave fractal-noise displacement
   gated by a moving scan mask; all animation lives in the vertex shader, so
@@ -254,10 +265,11 @@ brightness, onset density and harmony as layers over one timeline.
 | **STL** | Watertight mesh for 3D printing |
 | **Heightmap PNG** | The processed greyscale raster |
 | **WebM** | Screen recording of the live canvas |
+| **Profile SVG** | The elevation cross-section as a standalone chart, ink on paper |
 
 Exports are named after the source file: uploading `graz.tif` produces
-`graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png` and
-`graz.webm`. Presets save and load as JSON, optionally carrying the heightmap
+`graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png`,
+`graz-profile.svg` and `graz.webm`. Presets save and load as JSON, optionally carrying the heightmap
 with them.
 
 ---

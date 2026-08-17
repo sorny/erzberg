@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.18] - 2026-08-17
+
+The elevation profile answered a question without saying what it was asked
+about: two clicks went into the terrain, a chart came out, and nothing in the
+scene said which two points it described. Orbit once and the section was
+anonymous — a curve you had to take on trust, sitting over a landscape it no
+longer pointed at.
+
+### Added
+- **The section is drawn on the terrain.** A pin at each end — green for A, red
+  for B — and the line between them draped over the surface at the same 200
+  samples the chart is built from, so it follows the ground instead of chording
+  through it. The pins appear as they are placed: A stands on the terrain while
+  you are still hunting for B.
+- The line is drawn twice, a white halo under a blue core. The plate background
+  is the user's to choose and neither colour survives it alone: on paper the
+  halo disappears and the core carries, on an inked plate the halo is what makes
+  the core visible. Blue is the chart's own line colour, and the popup's A and B
+  labels now carry the pin colours, which is what ties the two together.
+- Anchors live as long as the chart does, not as long as the picking mode —
+  leaving profile mode is not the same as being done with the result. Closing the
+  popup clears both.
+- **The profile exports as a standalone SVG**, named after the source like every
+  other export (`graz-profile.svg`). Ink on paper rather than the popup's dark
+  card: the file exists to sit beside a plotted plate or inside a document, and
+  both of those are white. It carries its own background rect so it does not
+  composite onto whatever is behind it, plus the axis, the elevation range, the
+  sample count and both ends labelled in the pin colours.
+- Screen and file are drawn from one `chartGeometry()`, parameterised by size.
+  Two copies of that arithmetic would be two charts that disagreed about where
+  the line goes.
+
+### Fixed
+- Viewport aids stay out of exports. The section is scene geometry, so unlike
+  the DOM frame overlay it *would* have been captured by the PNG pass, which
+  renders the scene itself — it now carries `userData.viewportOnly` and that
+  pass hides it, and it is suppressed during WebM recording as the frame overlay
+  already was. SVG and STL never saw it: they read worker geometry.
+
+### Notes
+- `material-depthTest` cannot be pierced onto drei's `<Line>`: it builds the
+  Line2's material itself, so at the moment R3F applies pierced props there is
+  nothing to pierce and the whole Canvas throws. The overlay sets depth state
+  through a ref instead.
+- The overlay's lines are transparent even at full opacity. Three renders the
+  opaque queue before the transparent one, so an opaque core is painted over by
+  its own translucent halo whatever the render order says.
+- Markers are sized against the terrain's footprint, not its relief: relief is a
+  couple of units on a flat spectrogram and a hundred on an alpine plate, and a
+  pin scaled to it is either a single pixel or a mast.
+
 ## [0.9.17] - 2026-08-14
 
 The tool's main use is plotting, and an SVG export came out as whatever happened
