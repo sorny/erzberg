@@ -236,3 +236,102 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
   expect(withHillshade,
     'hillshade must make the surface occlude, so fewer marks survive').toBeLessThan(withoutFill)
 })
+
+/**
+ * The export must not freeze the page.
+ *
+ * This is the complaint itself, asserted directly rather than through a proxy:
+ * a rAF loop timestamps every frame, so the largest gap between frames IS the
+ * stretch during which the tab was unresponsive and Chrome was deciding whether
+ * to offer to kill it. Measured before the export learned to pace itself, the
+ * default plate produced one unbroken 242 ms gap with every other frame at 17 ms.
+ * After, the longest is ~39 ms — the 24 ms budget plus a frame's overhead.
+ *
+ * The threshold sits at 120 ms: far above the ~39 ms the paced version produces,
+ * far below the 242 ms it replaced, and comfortably inside what reads as a live
+ * page. A dense scene makes the old number worse, never better, so this catches a
+ * regression to unpaced work on any plate.
+ */
+test('exporting never blocks the page for long enough to look hung', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await page.waitForTimeout(2500)
+
+  const r = await page.evaluate(async () => {
+    const gaps = []
+    const seen = []
+    let last = performance.now()
+    let running = true
+    const tick = () => {
+      const now = performance.now()
+      gaps.push(now - last)
+      last = now
+      // Sample the bar as it goes, to prove it advances rather than jumping.
+      const el = document.querySelector('[data-testid="export-progress"]')
+      if (el) seen.push(Number(el.dataset.pct))
+      if (running) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+
+    await new Promise((res) => setTimeout(res, 300))
+    const t0 = performance.now()
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit1', bubbles: true }))
+
+    // Wait for the overlay to appear and then go again.
+    const deadline = performance.now() + 60_000
+    let appeared = false
+    while (performance.now() < deadline) {
+      await new Promise((res) => setTimeout(res, 50))
+      const present = !!document.querySelector('[data-testid="loading-overlay"]')
+      if (present) appeared = true
+      if (appeared && !present) break
+    }
+    running = false
+    return {
+      longest: Math.max(...gaps),
+      total: performance.now() - t0,
+      appeared,
+      seen,
+    }
+  })
+
+  console.log(`export: ${r.total.toFixed(0)}ms wall, longest frozen stretch ${r.longest.toFixed(0)}ms, ` +
+              `progress samples ${JSON.stringify(r.seen.slice(0, 12))}`)
+
+  expect(r.appeared, 'the export overlay should appear').toBe(true)
+  expect(r.longest,
+    'the page must never sit unresponsive long enough to look hung').toBeLessThan(120)
+
+  // Progress must genuinely travel, not snap from nothing to done. Sampling at
+  // frame rate over a sub-second export catches only a handful of values, so the
+  // bar is asked to have been *somewhere* short of finished at least once.
+  const partial = r.seen.filter((v) => v > 0 && v < 100)
+  expect(partial.length, `the bar should report intermediate values, saw ${JSON.stringify(r.seen)}`)
+    .toBeGreaterThan(0)
+})
+
+test('Cancel abandons an export without writing a file', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await page.waitForTimeout(2500)
+
+  let downloads = 0
+  page.on('download', () => { downloads++ })
+
+  await page.keyboard.press('Digit1')
+  const cancel = page.locator('[data-testid="export-cancel"]')
+  await expect(cancel).toBeVisible({ timeout: 5000 })
+  await cancel.click()
+
+  // The overlay must close on its own — the run unwinds at its next yield.
+  await expect(page.locator('[data-testid="loading-overlay"]')).toBeHidden({ timeout: 15_000 })
+  await page.waitForTimeout(1500)
+  expect(downloads, 'a cancelled export must not download anything').toBe(0)
+
+  // And the app is still usable: a second export runs to completion.
+  const [dl] = await Promise.all([
+    page.waitForEvent('download', { timeout: 60_000 }),
+    page.keyboard.press('Digit1'),
+  ])
+  expect(dl.suggestedFilename()).toMatch(/\.svg$/)
+})

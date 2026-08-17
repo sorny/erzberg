@@ -24,10 +24,11 @@
 
 import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
 import { NODATA_SENTINEL_Y } from './terrain'
+import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 
 // ── STL writer ────────────────────────────────────────────────────────────────
 
-function writeBinarySTL(tris, filename) {
+async function writeBinarySTL(tris, filename, pacer = null, onPhase = null) {
   const triCount = tris.length / 9
   const buf = new ArrayBuffer(84 + triCount * 50)
   const dv  = new DataView(buf)
@@ -38,6 +39,10 @@ function writeBinarySTL(tris, filename) {
 
   let off = 84
   for (let t = 0; t < triCount; t++) {
+    if (pacer && (t & STRIDE) === 0 && pacer.due()) {
+      await pacer.yield()
+      onPhase?.(t / Math.max(1, triCount))
+    }
     const b  = t * 9
     const ax = tris[b],   ay = tris[b+1], az = tris[b+2]
     const bx = tris[b+3], by = tris[b+4], bz = tris[b+5]
@@ -149,8 +154,35 @@ function buildGpxRibbon(run, tris) {
 
 // ── Public export ─────────────────────────────────────────────────────────────
 
-export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName }) {
-  if (!surfaceGeo || !terrain) return
+/**
+ * Build the solid and write it.
+ *
+ * Async for the same reason the SVG writer is: a fine-resolution plate is a few
+ * hundred thousand triangles and, run as one block, it froze the page for 122 ms
+ * on the default heightmap alone — proportional to raster size, so seconds on a
+ * real DEM, with no overlay to show for it. It now breathes on the shared pacer.
+ *
+ * @returns 'done' | 'cancelled' | 'empty'
+ */
+export async function exportSTL({
+  surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName,
+  onProgress, shouldCancel,
+}) {
+  const pacer = makePacer(shouldCancel)
+  const report = makeReporter(onProgress)
+  try {
+    return await buildAndWrite({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName },
+                               pacer, report)
+  } catch (e) {
+    // The file is written last, so an abandoned export leaves nothing behind.
+    if (e === CANCELLED) return 'cancelled'
+    throw e
+  }
+}
+
+async function buildAndWrite({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName },
+                             pacer, report) {
+  if (!surfaceGeo || !terrain) return 'empty'
 
   const { positions, indices } = surfaceGeo
   const { rows, cols } = terrain
@@ -159,7 +191,7 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   // so zero vertices. Bailing here rather than pressing on is the difference
   // between no download and a multi-megabyte file of NaN floats: every bound
   // below would be Infinity, and the perimeter walk would read past the array.
-  if (!positions?.length || !indices?.length) return
+  if (!positions?.length || !indices?.length) return 'empty'
 
   const spx = (i) =>  positions[i * 3]
   const spy = (i) => -positions[i * 3 + 2]
@@ -182,7 +214,7 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
     const y = positions[indices[t] * 3 + 1]
     if (y < minWorldY) minWorldY = y
   }
-  if (!Number.isFinite(minWorldY)) return
+  if (!Number.isFinite(minWorldY)) return 'empty'
   const baseZ = minWorldY - 2
 
   const tris = []
@@ -191,7 +223,14 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
 
   // ── 1. Top surface ────────────────────────────────────────────────────────
   const nTri = indices.length / 3
+  report(0, 'Building solid…')
   for (let t = 0; t < nTri; t++) {
+    if ((t & STRIDE) === 0 && pacer.due()) {
+      await pacer.yield()
+      // The top surface is the bulk of the build; the walls and ribbon that
+      // follow are a perimeter, not an area. Half the bar covers it.
+      report(0.5 * (t / nTri), 'Building solid…')
+    }
     const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
     add(spx(a), spy(a), spz(a),
         spx(b), spy(b), spz(b),
@@ -212,7 +251,12 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   for (let r = rows - 2; r >= 1; r--)  edge(r * cols)
 
   const pn = perim.length
+  report(0.5, 'Building solid…')
   for (let i = 0; i < pn; i++) {
+    if ((i & STRIDE) === 0 && pacer.due()) {
+      await pacer.yield()
+      report(0.5 + 0.2 * (i / Math.max(1, pn)), 'Building solid…')
+    }
     const i0 = perim[i], i1 = perim[(i + 1) % pn]
     const ax = spx(i0), ay = spy(i0), az = spz(i0)
     const bx = spx(i1), by = spy(i1), bz = spz(i1)
@@ -221,13 +265,19 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
   }
 
   // ── 3. Base plate ─────────────────────────────────────────────────────────
+  report(0.7, 'Building solid…')
   for (let i = 0; i < pn; i++) {
+    if ((i & STRIDE) === 0 && pacer.due()) {
+      await pacer.yield()
+      report(0.7 + 0.1 * (i / Math.max(1, pn)), 'Building solid…')
+    }
     const i0 = perim[i], i1 = perim[(i + 1) % pn]
     add(0, 0, baseZ, spx(i0), spy(i0), baseZ, spx(i1), spy(i1), baseZ)
   }
 
   const base = baseName ?? 'heightmap'
-  writeBinarySTL(tris, `${base}.stl`)
+  report(0.8, 'Writing STL…')
+  await writeBinarySTL(tris, `${base}.stl`, pacer, (f) => report(0.8 + 0.2 * f, 'Writing STL…'))
 
   // ── GPX ribbon — separate file for multicolour printing ───────────────────
   if (gpxPoints?.length > 1 && p && isTrackProjectable(geoTiffCRS, geoTiffBbox)) {
@@ -236,7 +286,7 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
     const { scl, halfW, halfH } = terrain
     const imageWidth  = p.imageWidth
     const imageHeight = p.imageHeight
-    if (!imageWidth || !imageHeight) return
+    if (!imageWidth || !imageHeight) return 'done'   // the plate is written; only the ribbon is skipped
 
     // Map every GPX point to world space (null = outside extent)
     const allPts = gpxPoints.map(({ lat, lon }) => {
@@ -263,6 +313,6 @@ export function exportSTL({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiff
 
     const gpxTris = []
     for (const run of runs) buildGpxRibbon(run, gpxTris)
-    writeBinarySTL(gpxTris, `${base}-gpx.stl`)
+    await writeBinarySTL(gpxTris, `${base}-gpx.stl`)
   }
 }

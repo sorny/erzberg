@@ -160,3 +160,57 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
   await page.waitForTimeout(3000)
   expect(downloaded, 'no STL should be produced from empty geometry').toBe(false)
 })
+
+/**
+ * The STL export must not freeze the page either.
+ *
+ * Same probe as the SVG freeze test in export.spec.js: a rAF loop timestamps
+ * every frame, so the largest gap is the stretch during which the tab was
+ * unresponsive. STL had no overlay at all before this — a big DEM simply stopped
+ * the app with nothing on screen to explain it. Measured on the default plate at
+ * the finest resolution, the block was 122 ms; paced, 47 ms.
+ *
+ * Resolution is driven to 1 because that is what makes the triangle count large
+ * enough for the difference to exist at all.
+ */
+test('exporting STL keeps the page alive and says what it is doing', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await page.waitForTimeout(2500)
+
+  const driven = await page.evaluate(() => {
+    const el = [...document.querySelectorAll('input.hmr')].find((i) => i.max === '20' && i.min === '1')
+    if (!el) return false
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    setter.call(el, '1')
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })
+  expect(driven, 'the Resolution slider should be reachable').toBe(true)
+  await page.waitForTimeout(8000)
+
+  const r = await page.evaluate(async () => {
+    const gaps = []; const seen = []
+    let last = performance.now(); let running = true; let sawOverlay = false
+    const tick = () => {
+      const n = performance.now(); gaps.push(n - last); last = n
+      if (document.querySelector('[data-testid="loading-overlay"]')) sawOverlay = true
+      const el = document.querySelector('[data-testid="export-progress"]')
+      if (el) seen.push(Number(el.dataset.pct))
+      if (running) requestAnimationFrame(tick)
+    }
+    requestAnimationFrame(tick)
+    await new Promise((res) => setTimeout(res, 300))
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit4', bubbles: true }))
+    await new Promise((res) => setTimeout(res, 6000))
+    running = false
+    return { longest: Math.max(...gaps), sawOverlay, seen }
+  })
+
+  console.log(`STL export: longest frozen stretch ${r.longest.toFixed(0)}ms, ` +
+              `progress ${JSON.stringify(r.seen.slice(0, 10))}`)
+
+  expect(r.sawOverlay, 'an STL export should put an overlay up').toBe(true)
+  expect(r.longest,
+    'the page must never sit unresponsive long enough to look hung').toBeLessThan(120)
+})

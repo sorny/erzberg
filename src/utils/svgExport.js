@@ -10,6 +10,7 @@
 import * as THREE from 'three'
 import { DASH_SEGMENT_SIZES } from './stylePresets'
 import { clipSegment, insideRect } from './frame'
+import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -32,7 +33,8 @@ const N_SAMPLES = 64   // depth-test samples per segment (increased for precisio
  * back into a depth, reporting `-Infinity` — nothing here, never occlude —
  * wherever no occluder was drawn.
  */
-function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) {
+async function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut,
+                            pacer = null, onPhase = null) {
   const buf = new Float32Array(W * H).fill(0)
   const camInv = camera.matrixWorldInverse
   const wld = new THREE.Vector3()
@@ -46,6 +48,14 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
   // camera side of it project to garbage screen coordinates (the perspective
   // divide mirrors them), so triangles touching them must not be rasterised.
   const nearZ = -(camera.near ?? 0.1)
+
+  // Work total up front so the caller's bar is determinate rather than a guess.
+  let totalUnits = 0
+  for (const g of zGeos) {
+    if (!g.positions || g.positions.length === 0) continue
+    totalUnits += g.positions.length / 3 + g.indices.length / 3
+  }
+  let done = 0
 
   for (const geo of zGeos) {
     const { positions, indices, brightnessBuf } = geo
@@ -64,6 +74,10 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
     const vb  = brightnessBuf ? new Float32Array(nVerts) : null
 
     for (let i = 0; i < nVerts; i++) {
+      if (pacer && (i & STRIDE) === 0 && pacer.due()) {
+        await pacer.yield()
+        onPhase?.((done + i) / totalUnits)
+      }
       wld.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2])
       if (groupMatrix) wld.applyMatrix4(groupMatrix)
       viw.copy(wld).applyMatrix4(camInv)
@@ -75,8 +89,14 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
       if (vb) vb[i] = brightnessBuf[i]
     }
 
+    done += nVerts
+
     const nTri = indices.length / 3
     for (let t = 0; t < nTri; t++) {
+      if (pacer && (t & STRIDE) === 0 && pacer.due()) {
+        await pacer.yield()
+        onPhase?.((done + t) / totalUnits)
+      }
       const a = indices[t * 3], b = indices[t * 3 + 1], c = indices[t * 3 + 2]
       if (behind[a] || behind[b] || behind[c]) continue
       // Reject triangles fully outside the canvas — when zoomed in, that is
@@ -90,6 +110,7 @@ function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMaxCut) 
       }
       fillTriangle(vx[a], vy[a], vd[a], vx[b], vy[b], vd[b], vx[c], vy[c], vd[c], buf, W, H)
     }
+    done += nTri
   }
 
   return (sx, sy) => {
@@ -174,7 +195,34 @@ function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
-export function exportSVG({
+/**
+ * Project the scene and write an SVG.
+ *
+ * Async because it must be. The work is a few hundred milliseconds on an ordinary
+ * plate and many seconds on a dense one, and run as one block that is a tab the
+ * browser offers to kill — measured at a single 242 ms frame gap on the default
+ * scene, with every other frame at 17 ms. It now hands the main thread back about
+ * every 24 ms, which keeps the overlay painting, lets it report where it has got
+ * to, and gives the user somewhere to press Cancel.
+ *
+ * @param onProgress  (fraction 0…1, label) — called at yield points only.
+ * @param shouldCancel called at each yield; returning true unwinds without writing.
+ * @returns 'done' | 'cancelled' | 'empty'
+ */
+export async function exportSVG(opts) {
+  const pacer = makePacer(opts.shouldCancel)
+  try {
+    return await runExport(opts, pacer)
+  } catch (e) {
+    // The pacer throws this the moment Cancel is pressed. The download is the
+    // last statement of the run, so an abandoned export leaves no file behind.
+    if (e === CANCELLED) return 'cancelled'
+    throw e
+  }
+}
+
+async function runExport({
+  onProgress,
   lineGeo, lineStyles = {}, camera, width, height,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
@@ -188,7 +236,7 @@ export function exportSVG({
   // framing is off, which leaves every path below exactly as it was.
   frame, frameClip,
   baseName,
-}) {
+}, pacer) {
   const bias = occlusionBias ?? 0.1
   const ghostOpac = occlusionOpacity ?? 0
   const camInv = camera.matrixWorldInverse
@@ -319,12 +367,38 @@ export function exportSVG({
     }
   }
 
+  const willBuildZ = !!((depthOcclusion || surfaceOccludes) && zGeos.length > 0 && groupMatrix)
+
+  /**
+   * Where each phase sits on the bar.
+   *
+   * Fixed shares rather than a unit count spanning all three, because their units
+   * are not comparable — a triangle, a segment sampled up to 64 times and an
+   * emitted string element cost wildly different amounts, so a single counter
+   * would stall and then sprint. Ranges keep the bar monotonic and roughly
+   * truthful, which is all a progress bar owes anyone. With occlusion off there is
+   * no depth buffer, so the walk takes its share.
+   */
+  const PHASE = willBuildZ
+    ? { z: [0, 0.25], walk: [0.25, 0.85], build: [0.85, 1] }
+    : { z: [0, 0],    walk: [0, 0.8],     build: [0.8, 1] }
+
+  // Throttled in the reporter, so callers get whole percentage points and the
+  // loops below can report as freely as they like.
+  const emit = makeReporter(onProgress)
+  const report = (range, frac, label) => {
+    const f = frac < 0 ? 0 : frac > 1 ? 1 : frac
+    emit(range[0] + (range[1] - range[0]) * f, label)
+  }
+
   // Build the Z-buffer when depth occlusion is on, or when any fill layer is
   // drawing. A visible surface acts as a depth occluder here — it is never
   // rasterised into the SVG as polygons, only used to cull lines behind it,
   // which is what keeps the export matching the viewport.
-  const surfViewZ = ((depthOcclusion || surfaceOccludes) && zGeos.length > 0 && groupMatrix)
-    ? buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut)
+  report(PHASE.z, 0, 'Building depth buffer…')
+  const surfViewZ = willBuildZ
+    ? await buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut,
+                         pacer, (f) => report(PHASE.z, f, 'Building depth buffer…'))
     : null
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
@@ -334,6 +408,15 @@ export function exportSVG({
   }
 
   const svgLayers = []
+
+  // Segments across every layer, so the walk's share of the bar advances evenly
+  // rather than restarting per layer.
+  const WALK_LABEL = 'Hiding lines behind terrain…'
+  const walkTotal = Array.isArray(lineGeo)
+    ? lineGeo.reduce((n, l) => n + (l.positions ? l.positions.length / 6 : 0), 0)
+    : 0
+  let walkDone = 0
+  report(PHASE.walk, 0, WALK_LABEL)
 
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
@@ -348,6 +431,10 @@ export function exportSVG({
         const ghostDots = []
         const dotCount = positions.length / 6
         for (let s = 0; s < dotCount; s++) {
+          if ((s & STRIDE) === 0 && pacer.due()) {
+            await pacer.yield()
+            report(PHASE.walk, (walkDone + s) / Math.max(1, walkTotal), WALK_LABEL)
+          }
           const i = s * 6
           const cx3 = (positions[i] + positions[i+3]) * 0.5
           const cy3 = (positions[i+1] + positions[i+4]) * 0.5
@@ -371,6 +458,7 @@ export function exportSVG({
             expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
           }
         }
+        walkDone += dotCount
         if (visibleDots.length > 0 || ghostDots.length > 0) {
           svgLayers.push({ id, isPoints: true, visibleDots, ghostDots, dotR, weight, opacity })
         }
@@ -390,6 +478,10 @@ export function exportSVG({
       const CONNECT_EPS = 1.0
 
       for (let s = 0; s < segCount; s++) {
+        if ((s & STRIDE) === 0 && pacer.due()) {
+          await pacer.yield()
+          report(PHASE.walk, (walkDone + s) / Math.max(1, walkTotal), WALK_LABEL)
+        }
         const i = s * 6
         let ax = positions[i], ay = positions[i+1], az = positions[i+2]
         let bx = positions[i+3], by = positions[i+4], bz = positions[i+5]
@@ -514,12 +606,18 @@ export function exportSVG({
         }
       }
 
+      walkDone += segCount
       if (visibleSegs.length > 0 || ghostSegs.length > 0) {
         svgLayers.push({ id, visibleSegs, ghostSegs, weight, opacity, dash })
       }
     }
   }
 
+  // The flock loops below take no yields on purpose. They read the *live* buffers
+  // — ParticleSystem hands them out uncopied so an export catches the frame on
+  // screen — so pausing mid-pass would let the birds move and splice two different
+  // moments into one picture. They are small beside the segment walk, and staying
+  // atomic costs nothing measurable.
   const projectedParticles = []
   if (particlePositions && particleCount > 0) {
     for (let i = 0; i < particleCount; i++) {
@@ -624,7 +722,9 @@ export function exportSVG({
   }
 
   if (svgLayers.length === 0 && projectedParticles.length === 0 &&
-      projectedTrails.length === 0 && projectedShadows.length === 0) return
+      projectedTrails.length === 0 && projectedShadows.length === 0) return 'empty'
+
+  report(PHASE.build, 0, 'Assembling SVG…')
 
   // With a frame, the page *is* the frame: the whole point is an output whose
   // shape you chose rather than one the geometry happened to land in, so the
@@ -640,12 +740,35 @@ export function exportSVG({
     // scenes keep their tight content box; the clamp is a no-op there.)
     minX = Math.max(minX, 0); minY = Math.max(minY, 0)
     maxX = Math.min(maxX, width); maxY = Math.min(maxY, height)
-    if (maxX <= minX || maxY <= minY) return
+    if (maxX <= minX || maxY <= minY) return 'empty'
 
     vx = minX - MARGIN; vy = minY - MARGIN
     vw = (maxX - minX) + MARGIN * 2; vh = (maxY - minY) + MARGIN * 2
   }
   
+  const BUILD_LABEL = 'Assembling SVG…'
+  const buildTotal = svgLayers.reduce((n, l) => n +
+    (l.isPoints ? l.visibleDots.length + l.ghostDots.length
+                : l.visibleSegs.length + l.ghostSegs.length), 0)
+  let buildDone = 0
+
+  /**
+   * `array.map(…)` over a quarter of a million elements is itself a long block,
+   * so the element strings are produced in paced chunks like everything else.
+   */
+  const mapPaced = async (arr, fn) => {
+    const out = new Array(arr.length)
+    for (let i = 0; i < arr.length; i++) {
+      if ((i & STRIDE) === 0 && pacer.due()) {
+        await pacer.yield()
+        report(PHASE.build, (buildDone + i) / Math.max(1, buildTotal), BUILD_LABEL)
+      }
+      out[i] = fn(arr[i])
+    }
+    buildDone += arr.length
+    return out
+  }
+
   const layerGroups = []
   for (const layer of svgLayers) {
     const sw        = (layer.weight * 0.5).toFixed(3)
@@ -657,12 +780,12 @@ export function exportSVG({
     if (layer.isPoints) {
       const r = layer.dotR.toFixed(2)
       if (layer.ghostDots.length > 0) {
-        const els = layer.ghostDots.map(({ cx, cy, fill }) =>
+        const els = await mapPaced(layer.ghostDots, ({ cx, cy, fill }) =>
           `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
         inner.push(`<g stroke="none" opacity="${ghostOpac * layer.opacity}">${els.join('')}</g>`)
       }
       if (layer.visibleDots.length > 0) {
-        const els = layer.visibleDots.map(({ cx, cy, fill }) =>
+        const els = await mapPaced(layer.visibleDots, ({ cx, cy, fill }) =>
           `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
         inner.push(`<g stroke="none" opacity="${layer.opacity}">${els.join('')}</g>`)
       }
@@ -670,29 +793,28 @@ export function exportSVG({
       continue
     }
 
-    const buildLineEls = (segs) => {
+    const buildLineEls = async (segs) => {
       if (!dashSizes) {
-        return segs.map(({ x0, y0, x1, y1, stroke }) =>
+        return mapPaced(segs, ({ x0, y0, x1, y1, stroke }) =>
           `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
       }
+      // A dashed segment expands to however many on-pieces the pattern gives it,
+      // so this maps to arrays and flattens rather than one-for-one.
       const { dashPx, gapPx } = dashSizes
-      const els = []
-      for (const { x0, y0, x1, y1, stroke, dashOffset } of segs) {
-        for (const s of splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx)) {
-          els.push(`<line x1="${(s.x0-vx).toFixed(1)}" y1="${(s.y0-vy).toFixed(1)}" x2="${(s.x1-vx).toFixed(1)}" y2="${(s.y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
-        }
-      }
-      return els
+      const perSeg = await mapPaced(segs, ({ x0, y0, x1, y1, stroke, dashOffset }) =>
+        splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx).map((s) =>
+          `<line x1="${(s.x0-vx).toFixed(1)}" y1="${(s.y0-vy).toFixed(1)}" x2="${(s.x1-vx).toFixed(1)}" y2="${(s.y1-vy).toFixed(1)}" stroke="${stroke}"/>`).join(''))
+      return perSeg
     }
 
     // Ghost pass (Hidden)
     if (layer.ghostSegs.length > 0) {
-      const ghostEls = buildLineEls(layer.ghostSegs)
+      const ghostEls = await buildLineEls(layer.ghostSegs)
       inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`)
     }
     // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
-      const lineEls = buildLineEls(layer.visibleSegs)
+      const lineEls = await buildLineEls(layer.visibleSegs)
       inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${lineEls.join('')}</g>`)
     }
 
@@ -738,7 +860,13 @@ export function exportSVG({
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
     `</svg>`,
   ].join('\n')
+
+  // Last breath before the file exists, so Cancel is honoured right up to the
+  // point where honouring it still means "nothing was written".
+  await pacer.yield()
+  report(PHASE.build, 1, BUILD_LABEL)
   download(svg, `${baseName ?? 'heightmap'}.svg`, 'image/svg+xml')
+  return 'done'
 }
 
 function download(content, filename, mime) {

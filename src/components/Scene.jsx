@@ -35,7 +35,7 @@ function maxPointSize(renderer) {
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   getParams, setParams, orbitRef,
-  svgTrigger, onSvgDone, pngTrigger, pngAlphaTrigger,
+  svgTrigger, onSvgDone, onSvgProgress, svgCancelRef, pngTrigger, pngAlphaTrigger,
   bgGradientStops,
   cameraPreset,
   webmRecording,
@@ -328,8 +328,12 @@ export function Scene({
     const lineStyles = Array.isArray(lineGeo)
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}
-    setTimeout(() => {
-      exportSVG({
+    setTimeout(async () => {
+      const status = await exportSVG({
+        // The export paces itself and reports where it is; both are how the page
+        // survives a dense plate that used to block the main thread outright.
+        onProgress: onSvgProgress,
+        shouldCancel: svgCancelRef?.current,
         lineGeo, lineStyles, camera: activeCamera || currentCamera, width, height,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
@@ -370,7 +374,7 @@ export function Scene({
         particleSegments:  p.showPoints && particleRef.current ? particleRef.current.getSegments() : null,
         baseName:          exportBaseName,
       })
-      onSvgDone?.()
+      onSvgDone?.(status)
     }, 0)
     // Trigger-counter effect: it fires when the counter moves and exports whatever
     // the scene was at that render. Listing what it reads would re-export on any

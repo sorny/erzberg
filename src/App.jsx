@@ -67,7 +67,14 @@ function DprGuard({ onClamp }) {
 }
 
 // ── Loading overlay ───────────────────────────────────────────────────────────
-function LoadingOverlay({ msg }) {
+/**
+ * `progress` and `onCancel` are optional: without them this renders exactly as it
+ * always did, so the loading and computing overlays are unchanged. The SVG and
+ * STL exports pass both — they are the two that run long enough to be worth
+ * reporting on, or abandoning.
+ */
+function LoadingOverlay({ msg, progress = null, onCancel = null }) {
+  const pct = progress == null ? null : Math.round(Math.min(1, Math.max(0, progress)) * 100)
   return (
     <div data-testid="loading-overlay" style={{
       position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
@@ -76,6 +83,7 @@ function LoadingOverlay({ msg }) {
       <div style={{
         display:'flex', flexDirection:'column', alignItems:'center', gap:14,
         background:'#18181b', border:'1px solid #3f3f46', borderRadius:10, padding:'28px 40px',
+        minWidth: pct == null ? 0 : 260,
       }}>
         <div style={{
           width:32, height:32, border:'3px solid rgba(255,255,255,.12)',
@@ -83,6 +91,23 @@ function LoadingOverlay({ msg }) {
           animation:'hm-spin .7s linear infinite',
         }} />
         <span style={{ fontSize:14, color:'#e4e4e7', fontFamily:'system-ui,sans-serif' }}>{msg}</span>
+        {pct != null && (
+          <>
+            {/* Same shape as the spectrogram analyser's bar in the panel. */}
+            <div style={{ width:'100%', height:4, background:'#3f3f46', borderRadius:2, overflow:'hidden' }}>
+              <div data-testid="export-progress-fill"
+                   style={{ height:'100%', width:`${pct}%`, background:'#3b82f6', transition:'width .1s' }} />
+            </div>
+            <span data-testid="export-progress" data-pct={pct}
+                  style={{ fontSize:11, color:'#71717a', fontFamily:'system-ui,sans-serif' }}>{pct}%</span>
+          </>
+        )}
+        {onCancel && (
+          <button data-testid="export-cancel" onClick={onCancel} style={{
+            background:'none', border:'1px solid #3f3f46', borderRadius:5, cursor:'pointer',
+            color:'#d4d4d8', fontSize:11, padding:'4px 14px', fontFamily:'system-ui,sans-serif',
+          }}>Cancel</button>
+        )}
       </div>
       <style>{`@keyframes hm-spin { to { transform:rotate(360deg) } }`}</style>
     </div>
@@ -245,8 +270,69 @@ export default function App() {
   }, [])
 
   // ── Export triggers ───────────────────────────────────────────────────────
-  const [svgTrigger,        setSvgTrigger]        = useState(0)
-  const [isSvgExporting,    setIsSvgExporting]    = useState(false)
+  const [svgTrigger, setSvgTrigger] = useState(0)
+
+  /**
+   * One export job at a time, whichever writer is running.
+   *
+   * SVG and STL are the two exports slow enough to need saying something about —
+   * both are CPU work over hundreds of thousands of primitives — so they share a
+   * single overlay, a single progress channel and a single cancel, rather than
+   * each growing its own copy. `kind` is only used to word the overlay.
+   */
+  const [exportJob, setExportJob] = useState(null)   // { kind, pct, label }
+
+  /**
+   * Cancellation travels by ref, not state: the exporter asks on every yield, and
+   * a state read would hand it whatever value was captured when the run started.
+   */
+  const exportCancelRef = useRef(() => false)
+
+  // Held in state only so the overlay's button has something to call.
+  const [exportCancel, setExportCancel] = useState(null)
+
+  // Both writers throttle to whole percentage points before calling this (see
+  // makeReporter in utils/pacing), so each call here is a bar position that
+  // actually changed.
+  const handleExportProgress = useCallback((frac, label) => {
+    setExportJob((j) => (j ? { ...j, pct: Math.round(frac * 100), label } : j))
+  }, [])
+
+  /**
+   * Whether the slot is taken, held in a ref because the answer is needed *now*.
+   *
+   * Reading it from state would not do: a state updater runs during the next
+   * render, not at the moment it is called, so two triggers in the same tick
+   * would both see an empty slot and both start.
+   */
+  const exportBusyRef = useRef(false)
+
+  const finishExport = useCallback(() => {
+    exportBusyRef.current = false
+    setExportJob(null)
+    setExportCancel(null)
+    exportCancelRef.current = () => false
+  }, [])
+
+  /**
+   * Claim the single export slot, or refuse.
+   *
+   * The re-entry guard matters now in a way it did not before: a synchronous
+   * export could not overlap itself, and one that yields can.
+   */
+  const beginExport = useCallback((kind) => {
+    if (exportBusyRef.current) return false
+    exportBusyRef.current = true
+    let cancelled = false
+    exportCancelRef.current = () => cancelled
+    setExportCancel(() => () => { cancelled = true })
+    setExportJob({ kind, pct: 0, label: 'Preparing…' })
+    return true
+  }, [])
+
+  const beginSvgExport = useCallback(() => {
+    if (beginExport('svg')) setSvgTrigger(n => n + 1)
+  }, [beginExport])
   const [pngTrigger,        setPngTrigger]         = useState(0)
   const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
   const [webmActive, setWebmActive] = useState(false)
@@ -587,8 +673,25 @@ export default function App() {
 
   // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
-    exportSTL({ surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName: exportBaseName })
-  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, exportBaseName])
+    if (!beginExport('stl')) return
+    // A tick before the work starts, so the overlay is on screen rather than
+    // queued behind it — the same reason the SVG trigger defers.
+    setTimeout(async () => {
+      try {
+        await exportSTL({
+          surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p,
+          baseName: exportBaseName,
+          onProgress: handleExportProgress,
+          shouldCancel: exportCancelRef.current,
+        })
+      } finally {
+        // finally, not after: a throw here would otherwise leave the overlay up
+        // with no way to dismiss it.
+        finishExport()
+      }
+    }, 0)
+  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, exportBaseName,
+      beginExport, finishExport, handleExportProgress])
 
   const handleHeightmapExport = useCallback(() => {
     exportHeightmap(terrainData, exportBaseName)
@@ -623,7 +726,7 @@ export default function App() {
       }
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]) }
       if (e.code === 'KeyE')   openEditor()
-      if (e.code === 'Digit1') { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }
+      if (e.code === 'Digit1') beginSvgExport()
       if (e.code === 'Digit2') setPngTrigger(n => n + 1)
       if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
       if (e.code === 'Digit4') handleStl()
@@ -631,7 +734,9 @@ export default function App() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor])
+    // beginSvgExport belongs here for the same reason handleStl does: both claim
+    // the single export slot, and a stale copy would not see it taken.
+  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -678,7 +783,9 @@ export default function App() {
           setParams={setParams}
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
-          onSvgDone={() => setIsSvgExporting(false)}
+          onSvgDone={finishExport}
+          onSvgProgress={handleExportProgress}
+          svgCancelRef={exportCancelRef}
           pngTrigger={pngTrigger}
           pngAlphaTrigger={pngAlphaTrigger}
           bgGradientStops={bgGradientStops}
@@ -745,7 +852,7 @@ export default function App() {
         gpxError={gpxError}
         onClearGpx={() => { setGpxPoints([]); setGpxError(null) }}
         onCameraPreset={handleCameraPreset}
-        onSvg={() => { setIsSvgExporting(true); setSvgTrigger(n => n + 1) }}
+        onSvg={beginSvgExport}
         onPng={() => setPngTrigger(n => n + 1)}
         onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}
         onStl={handleStl}
@@ -798,7 +905,13 @@ export default function App() {
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
       {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
-      {isSvgExporting && !isLoading && <LoadingOverlay msg="Exporting SVG…" />}
+      {exportJob && !isLoading && (
+        <LoadingOverlay
+          msg={exportJob.label ?? (exportJob.kind === 'stl' ? 'Exporting STL…' : 'Exporting SVG…')}
+          progress={exportJob.pct / 100}
+          onCancel={exportCancel ?? undefined}
+        />
+      )}
 
       {/* ── Load error banner ────────────────────────────────────────────── */}
       {loadError && (
