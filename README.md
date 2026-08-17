@@ -357,6 +357,7 @@ The app is built to idle quietly and stay responsive under load.
 npm install
 npm run dev              # dev server at http://localhost:5173
 npm run build            # production build
+npm run lint             # ESLint — correctness rules only, no formatting
 npm run test             # Playwright end-to-end suite
 npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
@@ -369,12 +370,26 @@ so start `npm run dev` first. `thumbs` renders each preset through the app's own
 PNG exporter and scales it down in-browser, so it needs no image tooling on the
 host.
 
+`lint` carries correctness rules only — no stylistic ones, and none are planned.
+The house style is settled, and a formatter would produce a diff across the whole
+tree that buried the findings a linter exists to surface. `eslint.config.js`
+records why the React Compiler rules that ship with `eslint-plugin-react-hooks`
+v7 are declined: driving three.js *is* mutating material uniforms in an effect,
+so three of them flag working code in every r3f app.
+
 Tests run against a live dev server in non-headless Chrome with WebGL enabled,
 because the things worth asserting — what the geometry worker produced, what the
 SVG exporter drew, whether the drawing buffer was clamped — only exist in a real
 renderer. Some specs depend on fixtures that are gitignored for size; those skip
 with a message rather than failing. See
 [tests/testdata/README.md](tests/testdata/README.md).
+
+They also run **one at a time**, and that is not a compromise for a slow machine.
+Headed Chrome only foregrounds one window, and an occluded one has its
+`requestAnimationFrame` throttled and may stop compositing — so a parallel run of a
+suite that mostly reads rendered pixels reports starvation as feature failure. The
+cost is about six seconds: 14 workers on one GPU spent their time queueing rather
+than adding throughput. `playwright.config.js` carries the measurements.
 
 ---
 

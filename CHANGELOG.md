@@ -7,6 +7,228 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.19] - 2026-08-17
+
+No new features. This one went looking for what was already wrong, and the honest
+summary is that the bugs were not where a reading would have found them.
+
+Sixteen and a half thousand lines of React had never been checked by a linter. The
+`// eslint-disable-line` sitting in App.jsx was the tell: it suppressed a rule that
+had never once run, which makes it decoration rather than a decision. What a linter
+finds in a codebase this careful is not sloppiness — it is the residue of refactors
+that landed correctly and left something behind.
+
+Then a file-by-file sweep of the five densest modules. What it turned up were seven
+faults sharing one shape: a quantity that is *correct in the ordinary case and
+wrong in the exceptional one*, so no fixture could see it. `halfW` is a centring
+offset that equals the half-extent on any full grid, and only an off-centre crop
+tells them apart. Two longitudes subtract to an angular separation everywhere
+except across the dateline. `+null` is 0, which is a real place. A frame is inside
+the canvas until someone nudges it out. Each was invisible precisely where it was
+tested, which is the argument for sweeping rather than waiting for a bug report.
+
+Two of the four things that looked like regressions along the way were the test
+harness starving itself, and one of those had been reporting a frozen canvas as a
+feature failure. Both now say what they mean.
+
+### Added
+- **ESLint, correctness rules only** (`eslint.config.js`, `npm run lint`). Four
+  blocks for the four environments already in the tree: browser for `src`, worker
+  globals for `*.worker.js`, Node for the build and tooling, and Node *plus*
+  browser for specs and scripts — the bodies of `page.evaluate()` run in the page,
+  and pretending otherwise was 44 of the first run's reports.
+- No stylistic rules, and none are coming. The house style is settled and a
+  formatter would produce a 16.5k-line diff that buries the findings this exists
+  to surface.
+- The worker block is self-contained rather than an override, because flat config
+  *merges* `languageOptions.globals` across every block a file matches: listing
+  workers under `src/**` as well left `document` and `window` defined inside them,
+  which is the one thing that block exists to forbid. Excluding the workers from
+  the app block makes reaching for the DOM in a worker the lint error it should be
+  — verified both ways with a throwaway worker.
+
+### Fixed
+- **Two mirror handlers that no button had called since `38c3ee8`.** ~45 lines
+  implementing a destructive "double the heightmap" transform, orphaned when that
+  commit replaced the image-data buttons with the live 3D symmetry arrows. The
+  feature was not lost, it was superseded; removing them also orphaned two store
+  selectors, which the linter then found in turn.
+- Dead bindings elsewhere: an unused `gridMask` in the STL exporter (left over
+  from before the NoData sentinel replaced it), two elevation-unit converters and
+  the `elevRange` feeding only them, `innerH` in the profile chart, `size` in
+  Scene, `devices` in the Playwright config, and a `React` import that the
+  automatic JSX runtime made unnecessary.
+- A dead store in the flow-field builder: `b0` was written on every step of every
+  path walk and read only once, before the loop.
+- `uvToWorld` was exported from ProfileOverlay and imported by nobody.
+- The popup chart's `PAD` was a fresh object on every render, so the chart
+  `useMemo` could not honestly depend on it. Hoisted to module scope beside the
+  print sizes it is the counterpart to.
+- Both empty `catch` blocks say why they are empty now, rather than reading as
+  something forgotten.
+- **A murmuration spec that blamed the flock for what the renderer did.** "The
+  beat is visible in the flock" failed once in a full-suite run reporting
+  `reacting 0.0 (floor 0.0)` while passing alone at its usual ~230. Zero at *every*
+  probed frequency is the signature of a flat sample, not of a flock ignoring the
+  music: the amplitude is measured on the pixel series minus its mean, so a
+  canvas that never changes reads as zero everywhere. Under `frameloop="demand"`
+  an occluded window is exactly that — the scene stops redrawing while
+  `preserveDrawingBuffer` keeps handing `drawImage` the last frame. The capture
+  now reports how many frames it sampled and how many were distinct (421 and
+  ~340 in a healthy run) and asserts both before the beat ratios are believed, so
+  a throttled window says so instead of accusing the feature.
+
+- **A UTM zone that meets the dateline projected to nonsense.** `wgs84ToUtm`
+  subtracted its central meridian from the point's longitude and fed the result
+  straight into the Transverse Mercator series. Those are two longitudes, and
+  their difference is not yet an angular separation: zone 1's central meridian is
+  −177°, so a point at +179° — 4° to its *west* — came out as +356°. The series is
+  a small-angle expansion, and A⁵ of 6.2 radians is not small; the easting was
+  −9.7e8, which put the point outside any raster and got it dropped as ordinary
+  out-of-bounds clipping. Silent point loss is the exact failure the null returns
+  in this file exist to prevent. `dlam` is now wrapped into ±180°, which is a
+  no-op for every zone that does not touch the antimeridian — the mid-zone control
+  is bit-identical either way, and the fixed result matches the same point written
+  as −181°, where the question never arises.
+- **The GPX parser invented a point at (0, 0) from a `<trkpt>` with no
+  coordinates.** `getAttribute` returns null for a missing attribute, `+null` is 0,
+  and the `isNaN` guard passed it — so a malformed point became the Gulf of Guinea
+  rather than being dropped. It counted in the coverage report's `total` and never
+  in `inside`, which is how a track that landed perfectly well reported back as
+  'partial' with a warning about a raster that was fine. The coverage tests use
+  (0, 0) as their own example of a track in the wrong place, so a fabricated point
+  was indistinguishable from a real one.
+- A GPX elevation of exactly 0 m read as "no elevation recorded", because the
+  parser ended in `|| null`. Sea level is data, and a coastal track starts there.
+  Nothing consumes `ele` yet, which is the reason to fix it now rather than after
+  something does.
+- **The flock sized itself from a midpoint, not an extent, and flew off any
+  off-centre crop.** `buildTerrain` returns `halfW = (minC + maxC)·scl / 2`, which
+  is where the valid cells' *centre* sits — world X of cell c is `c·scl − halfW`,
+  and every other consumer uses it that way. `makeTerrainField` read it as a size.
+  For a full grid the two are the same number, since `minC + maxC` and
+  `maxC − minC` both come to `cols − 1`, so nothing caught it; a lasso crop of
+  columns 800…1000 of 1024 makes the offset 900·scl against a terrain 200·scl
+  wide. Every horizontal radius in the simulation is a fraction of that span, and
+  `BOUND_SOFT` — whose own comment reads "×the terrain half-extent" — placed the
+  containment wall ten times too far out. Measured on a 20×20-cell crop: 32% of
+  birds over data before, 96% after. `buildTerrain` now also returns the real
+  half-extents as `spanHalfW`/`spanHalfH`, and the offsets are documented as
+  offsets so the two cannot be confused again.
+- **A new flock track reacted to the previous track's audio.** `loadFile` swapped
+  the `<audio>` source and started a fresh analysis without clearing the old
+  spectrogram, so for the length of that analysis the flock danced to the last
+  track sampled at the new one's playhead — and if the spectrogram worker failed,
+  it never stopped, while `source()` reported `'own'` throughout.
+- Loading a track over a playing one left the transport showing it as playing:
+  `loadFile` paused the element without saying so, and there is no `'pause'`
+  listener, only `'ended'`. The first click of the play button then paused
+  something already paused, so starting the track you had just loaded took two
+  clicks. `release()` had always paired the two; `loadFile` was the outlier.
+- **A frame nudged off the canvas exported hidden-line results computed from
+  garbage.** With framing on, geometry was culled against the paper rather than
+  against the paper ∩ the canvas, and Offset X/Y reach ±50% at Scale 100%. The
+  depth sampler clamps its lookup into the buffer, so out there it returned the
+  *edge* column's depth — strokes were kept or hidden according to terrain
+  somewhere else entirely, with a seam at the boundary. The crop is now
+  intersected with the canvas, so overhang is blank paper. The `frame` itself is
+  deliberately *not* trimmed: it is the viewBox, and a page that quietly stops
+  being the shape you chose would be the worse bug.
+- The SVG's `width`/`height` were rounded to whole pixels against a one-decimal
+  `viewBox`, which non-uniformly scales the sheet. An ISO 1500 × 1060.66 frame
+  emitted `height="1061"` and came out at 1:1.4147 rather than 1:1.41421 — a
+  rounding `frame.js` avoids on purpose by storing ratios exactly instead of as
+  millimetres.
+- `addSeg`, the funnel every segment of every draw mode passes through, allocated
+  a rect and recomputed a length it already had on the framing-*off* path, which
+  is the default. Verified unchanged by output rather than by inspection: the same
+  fixture still exports 33636 and 27178 marks.
+- **The suite ran itself 14 ways parallel and starved its own tests.** Playwright
+  defaults to half the CPU count, so on a 28-core machine the suite opened 14
+  *headed* Chrome windows, each with a real WebGL context and — for the audio specs
+  — an AudioContext, against one GPU. Only one window can hold the foreground;
+  Chrome throttles `requestAnimationFrame` in the rest and can stop compositing
+  them. A warm run failed four tests, and none of them read as starvation: the SVG
+  occlusion spec reported 255 105 marks, which is exactly the *unoccluded* total
+  because its depth buffer was empty, and the beat spec reported a reaction of 0.0
+  against a noise floor of 0.0, which is a canvas that never redrew rather than a
+  flock ignoring the music. Two of the four were in behaviour no change here
+  touches, which is what identified the harness as the cause.
+  `workers: 1` now, and the trade is measured rather than assumed: 14 cold was
+  16.3 min, 14 warm was 4.6 min with four failures, one worker is 4.7 min with 99
+  passing. Serial costs about six seconds, because workers queueing for a single
+  GPU were never buying throughput. The cold/warm gap is the trap — a cold Vite
+  server staggers test starts and hides the contention, so the long-standing green
+  parallel baseline was evidence about the compile cache, not about concurrency.
+
+### Security
+- **`nanoid` 3.3.17 → 3.3.18**, clearing the one advisory `npm audit` reported
+  (GHSA-2v37-7h3g-55p8: a custom generator can loop indefinitely at size zero).
+  It arrives as a transitive dependency of `postcss`, which allows `^3.3.16`, so
+  the fix is a lockfile bump inside the existing range — `postcss` itself stays at
+  8.5.25 and `package.json` is untouched. Build-time only: nothing here reaches the
+  browser, and the app never calls nanoid with a custom generator. `npm audit` now
+  reports 0 vulnerabilities.
+- Confirmed inert rather than assumed: Vite content-hashes its assets, and a clean
+  rebuild emitted the same `index-BtBz-PVY.css` and `index-pB-hHpda.js` as before
+  the bump, so the shipped bundles are byte-identical.
+
+### Notes
+- The dateline, GPX-parser and off-centre-crop fixes carry regression tests, and
+  each was checked against the unfixed code first — a test that passes either way
+  is not a test. Where possible the assertion is an identity rather than a copied
+  constant: +179° and −181° name the same meridian, so they must project alike.
+- Fixture blind spot worth knowing about: every murmuration fixture built its
+  terrain on a full grid, where `halfW` coincides with the half-extent. The new
+  test uses an off-centre valid region, which is the only shape that can tell the
+  two apart.
+- `eslint-plugin-react-hooks` v7 ships the React Compiler ruleset — 16 rules, not
+  the 2 this needed. Three of them (`immutability`, `refs`, `set-state-in-effect`)
+  are structurally incompatible with react-three-fiber: driving three.js *is*
+  mutating material uniforms in an effect, and the audio and worker hooks keep
+  latest-value handles in refs read during render. Measured on this tree those
+  three produce 47 findings and every one describes working code, so the config
+  takes `rules-of-hooks` and `exhaustive-deps` and leaves the rest. The reasoning
+  is written into `eslint.config.js` so the next person does not re-derive it.
+- The 16 remaining `exhaustive-deps` sites are suppressed individually, each with
+  its reason, because in this architecture a narrow dependency list is usually the
+  design: a material is built once by a `useMemo` and kept live by a companion
+  effect, so depending on the values it seeds would recompile a shader on every
+  slider tick. Nothing was auto-fixed. ESLint 10 reports unused disable
+  directives by default, so a suppression that stops being true will say so.
+- `HeightmapLines`' `resolution` memo is the case that proves the point: ESLint
+  calls `size.width/height` unnecessary, but they are the change-signal for an
+  imperative `gl.getSize()` read. "Fixing" it would have frozen every line's
+  thickness at its mount value.
+- **The geometry rebuild contract was audited and is complete.** The 165-entry
+  dependency list in `useTerrainGeometry` was diffed against every `p.*` the
+  worker actually reads. The 21 apparent gaps are all accounted for: the
+  weight/opacity/dash families are resolved render-side by `layerStyle`, and the
+  fill switches reach the effect through the precomputed `p.needsSurfaceShading`.
+  No knob is silently inert.
+
+### Known, not fixed
+Three findings from the same sweep are left as they are, because each is a
+decision about how the tool should behave rather than a defect with one right
+answer:
+- **The beat reaction scales with frame rate.** `heard.burst` is a windowed
+  continuous value, not an edge-triggered pulse, so `applyBurst` fires on every
+  frame an onset stays above threshold and adds to velocity without a `dt` term.
+  A 144 Hz display therefore delivers roughly 2.4× the impulse of a 60 Hz one for
+  the same music. Either scaling by `dt` or triggering on the rising edge fixes
+  it, and the two feel different — the impulse timing here was tuned across five
+  releases, so which one is wanted is a taste call, not a bug fix.
+- **Weave's Bands control fights itself when Source is Onset.** Every sub-row gets
+  the same scalar `flux[frame]`, yet `bands` still divides the row budget
+  (`maxUnits = 512 / bands`), so raising it quarters the lap resolution to
+  produce duplicate rows; `bandLo`/`bandHi` are inert on that path too. Whether
+  Bands should be disabled there or mean something else is a design question.
+- **`detectBpm` scores long lags on very little evidence.** `acc /= flux.length - lag`
+  normalises by a support that shrinks toward a single sample, so a clip just over
+  the length guard gets a tempo set by `maxLag` rather than by its content. A
+  minimum-support floor is the obvious fix; what it should be depends on the
+  shortest clip worth reporting a tempo for.
+
 ## [0.9.18] - 2026-08-17
 
 The elevation profile answered a question without saying what it was asked

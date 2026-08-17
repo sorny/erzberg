@@ -69,6 +69,14 @@ UTM uses the standard Transverse Mercator series on the WGS84 ellipsoid,
 accurate to sub-metre within a zone. Zone ranges are bounded per family, so a
 neighbouring code such as EPSG:32661 (UPS North) is not read as "zone 61".
 
+The longitude difference feeding that series is wrapped into ±180° first. Two
+longitudes subtract to a number, and that number is only an angular separation
+once it is wrapped: zone 1's central meridian is −177°, so a point at +179° — 4°
+to its *west* — subtracts to +356°. The series is a small-angle expansion, and A⁵
+of 6.2 radians is not small, so the easting came back as −9.7 × 10⁸, the point
+landed outside every raster, and it was dropped as ordinary out-of-bounds
+clipping. The wrap is a no-op for every zone that does not meet the dateline.
+
 ### Not transformable
 
 National grids — Austria Lambert (31287), the Austrian Gauss-Krüger meridian
@@ -95,6 +103,15 @@ With a georeferenced GeoTIFF loaded, the **GPX Track** section takes a `.gpx`
 file. Track points (`<trk><trkseg><trkpt>`) are used first; route points
 (`<rte><rtept>`) are a fallback. Waypoints are not collected — they are
 unordered, and a track is what the overlay draws.
+
+A point needs its `lat` and `lon` attributes to be *present*, not merely numeric.
+`getAttribute` returns null for a missing one and `+null` is 0, so a numeric test
+alone accepted a malformed `<trkpt>` as a point at (0, 0) — which is not a sentinel
+but a real place in the Gulf of Guinea. Such a point counted in the coverage
+report's total and never in its inside count, so a track that landed perfectly on
+the raster reported back as only *partially* covered, blaming a raster that was
+fine. An `<ele>` of exactly 0 m is likewise kept rather than read as absent: sea
+level is data.
 
 Each point is projected into the raster's CRS, converted to fractional pixel
 coordinates, and lifted onto the terrain by bilinear elevation sampling. Points

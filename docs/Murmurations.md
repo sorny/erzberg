@@ -377,6 +377,17 @@ ridge lift never engaged at all. The floor under `vspan` keeps a heightmap
 flattened to nothing (`elevScale` 0, or a blank raster) from collapsing the flock
 onto the plane.
 
+`span` comes from `buildTerrain`'s `spanHalfW`/`spanHalfH`, the half-extents of
+the valid-cell box — *not* from `halfW`/`halfH`, which are the centring offsets
+that place that box's midpoint at the origin. The two are the same number on a
+full grid and diverge the moment a crop is off-centre, which is how this was
+originally wrong: on a lasso of columns 800–1000 of 1024, the offset is 900·scl
+against a terrain 200·scl wide, so every horizontal radius above and the
+`BOUND_SOFT` containment wall were an order of magnitude larger than the ground
+underneath them, and the flock simply left. Measured on a 20×20-cell crop: 32% of
+birds over data before the fix, 96% after. See
+[Edit-Mode.md § Centring is free](Edit-Mode.md).
+
 ---
 
 ## Fixed timestep

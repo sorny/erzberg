@@ -74,6 +74,21 @@ expressed as a NoData mask is therefore centred by code that already exists, and
 every draw mode already skips masked cells — the same machinery a GeoTIFF's voids
 have always used.
 
+Note what those two are, because the names invite the wrong reading: they are the
+**midpoint** of the valid range, an offset that puts its centre at the origin via
+$x = c \cdot \text{scl} - \text{halfW}$. They are not half-extents. On the full
+grid the distinction is invisible, since $c_{\min} + c_{\max}$ and
+$c_{\max} - c_{\min}$ both come to $\text{cols} - 1$ — which is exactly why a crop
+is the only thing that can expose code confusing the two. `buildTerrain` also
+returns the genuine half-extents as `spanHalfW`/`spanHalfH`:
+
+$$\text{spanHalfW} = \frac{(c_{\max} - c_{\min}) \cdot \text{scl}}{2}, \qquad
+  \text{spanHalfH} = \frac{(r_{\max} - r_{\min}) \cdot \text{scl}}{2}$$
+
+Anything that wants a *size* — a radius, a containment bound — wants these. The
+murmuration read `halfW` as a size and, on an off-centre crop, flew off the data;
+see [Murmurations.md § Two scales](Murmurations.md).
+
 Skipping masked cells turned out not to be the whole story, though. The raster
 stores $0$ in them, and $0$ is the *darkest* ground rather than absent ground, so
 anything that read a masked cell without meaning to — a bilinear tap straddling
