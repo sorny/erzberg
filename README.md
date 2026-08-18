@@ -75,18 +75,36 @@ before you load anything. Start with a style preset, then tune.
 | **GeoTIFF** | Real elevation, with the file's coordinate system reported rather than assumed, its declared NoData honoured, and vertical exaggeration suggested from the real ground size of a pixel. |
 | **Audio** | MP3 / WAV / OGG / M4A, analysed into a spectrogram that drives the terrain. |
 | **GPX** | Draped over a georeferenced raster as a track line. |
+| **GeoJSON** | Points, lines and polygons, draped the same way. |
+| **OpenStreetMap** | Queried live for the raster's own extent — roads, water, rail, landuse, buildings, lifts, peaks. |
+
+**Vector layers.** With a georeferenced raster loaded, tick what you want from
+OpenStreetMap and it arrives as named layers — *Roads · Motorway*, *Water ·
+Stream*, *Landuse · Forest* — one per tag class, and only for the classes that
+are actually there. Each layer has its own colour, weight, opacity and dash, can
+be hidden or removed, and areas can carry a fill that follows the slope rather
+than hanging over it as a flat lid. Inside a layer, features are listed
+individually and checkable — keep five peaks out of twenty-nine — and resting the
+pointer on one names it and lights it up, so a dot on the terrain becomes
+*Polster · 1910 m*. GeoJSON and GPX uploads join the same list. Everything is
+draped: simplified to what the DEM can express, then cut down to the grid step,
+so a motorway follows the ground over a ridge instead of tunnelling through it. Recolouring is a frame, not a rebuild.
+Layers carry into the SVG (one Inkscape layer each, so a plot is separable by
+pen), PNG and video exports.
+→ [Georeferencing](docs/Georeferencing.md)
 
 **Georeferenced input, stated rather than assumed.** A GeoTIFF reports its
 coordinate system in the sidebar — `WGS 84 / UTM zone 33N (EPSG:32633)` — and
 says when a reading rests on an assumption instead of implying a precision it
-lacks. Tracks are projected from WGS84 into the raster's own grid: geographic
+lacks. Features are projected from WGS84 into the raster's own grid: geographic
 CRS, Web Mercator, and the WGS84/ETRS89/NAD83/NAD27 UTM zone blocks. National
 grids needing Lambert or Gauss-Krüger maths plus a datum shift are named and
 declined rather than approximated — an overlay quietly 400 m out is worse than
-one that tells you to run `gdalwarp` first. When a track does not appear, the
-panel distinguishes the three reasons that otherwise look identical: not
-projectable, not georeferenced, or projected fine and lying somewhere else.
-→ [Georeferencing](docs/Georeferencing.md)
+one that tells you to run `gdalwarp` first. When features do not appear, the
+panel distinguishes the reasons that otherwise look identical: not projectable,
+not georeferenced, projected fine and lying somewhere else, or — for the OSM
+query alone, which needs the *inverse* projection — a raster that can be drawn
+on but not queried for.
 
 ---
 
@@ -106,7 +124,7 @@ level instead of ending it in a cliff.
 The clip is non-destructive: the original raster is kept, so Edit Mode can be
 re-entered to adjust it or cleared to get the whole heightmap back. It works the
 same on a PNG, a GeoTIFF and a Soundscape, and a GeoTIFF's bounding box is
-re-derived over the crop so a GPX track stays where it belongs. Every draw mode
+re-derived over the crop so vector layers stay where they belong. Every draw mode
 stops cleanly at the cut rather than reading the empty ground beyond it — see
 [NoData and clipped edges](docs/Draw-Modes.md#nodata-and-clipped-edges).
 → [Edit Mode](docs/Edit-Mode.md)
@@ -259,17 +277,17 @@ brightness, onset density and harmony as layers over one timeline.
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer projection with fill-based terrain occlusion, per-mode Inkscape/Illustrator layers, dash patterns faithfully reproduced. Shows progress and can be cancelled — a dense plate takes real time, and the page stays responsive throughout |
+| **SVG** | Software Z-buffer projection with fill-based terrain occlusion, one named Inkscape/Illustrator layer per draw mode and per vector layer, dash patterns faithfully reproduced. Shows progress and can be cancelled — a dense plate takes real time, and the page stays responsive throughout |
 | **PNG** | 4K with MSAA, trimmed to content |
 | **PNG α** | Transparent background |
-| **STL** | Watertight mesh for 3D printing. Shows progress and can be cancelled, like the SVG export |
+| **STL** | Watertight mesh for 3D printing. Shows progress and can be cancelled, like the SVG export. Vector layers with **STL ribbon** on get a second solid for multicolour printing — default on for GPX, off for OSM |
 | **Heightmap PNG** | The processed greyscale raster |
 | **WebM** | Screen recording of the live canvas |
 | **Profile SVG** | The elevation cross-section as a standalone chart, ink on paper |
 
 Exports are named after the source file: uploading `graz.tif` produces
 `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png`,
-`graz-profile.svg` and `graz.webm`. Presets save and load as JSON, optionally carrying the heightmap
+`graz-profile.svg`, `graz-vectors.stl` and `graz.webm`. Presets save and load as JSON, optionally carrying the heightmap
 with them.
 
 ---
@@ -330,7 +348,8 @@ The app is built to idle quietly and stay responsive under load.
 |---|---|
 | 3D engine | React Three Fiber + Three.js |
 | State | Zustand (raster data) + React state (all UI params) |
-| GIS parsing | GeoTIFF.js |
+| GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
+| Map data | OpenStreetMap via Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
 | Audio | Web Audio `decodeAudioData` + in-house radix-2 FFT (no dependency) |
@@ -343,7 +362,7 @@ The app is built to idle quietly and stay responsive under load.
 - [Architecture: how a file becomes a picture](docs/Architecture.md)
 - [Draw mode mathematics](docs/Draw-Modes.md)
 - [Edit Mode: cropping and selections](docs/Edit-Mode.md)
-- [Georeferencing: projections, GPX tracks, elevation](docs/Georeferencing.md)
+- [Georeferencing: projections, vector layers, OpenStreetMap, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
 - [Murmurations: boids over the terrain](docs/Murmurations.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)

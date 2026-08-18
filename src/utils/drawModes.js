@@ -79,10 +79,13 @@ export const DRAW_MODES = [
 export const DRAW_MODE_IDS = DRAW_MODES.map((m) => m.id)
 
 /**
- * Every layer carrying a per-mode `hypso<Id>` toggle — the draw modes plus the
- * GPX track, which is styled like one without being one.
+ * Every layer carrying a per-mode `hypso<Id>` toggle.
+ *
+ * The draw modes and only the draw modes: vector layers are hypsometric too, but
+ * theirs is a field on a layer record rather than a `hypso<Id>` param, because
+ * there is no fixed set of them to name here.
  */
-export const HYPSO_LAYER_IDS = [...DRAW_MODE_IDS, 'Gpx']
+export const HYPSO_LAYER_IDS = [...DRAW_MODE_IDS]
 
 /** Style keys belonging to one mode, used for block-level crossover. */
 export function modeKeys(id, style) {

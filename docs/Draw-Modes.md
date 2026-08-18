@@ -161,7 +161,7 @@ different shapes, and all fourteen modes now guard against it.
 
 **Sampling — normalized bilinear.** Modes that drape themselves on *fractional*
 grid coordinates (Lines and Crosshatch at an oblique bearing, Engraving at every
-angle, Flow, Swiss rock, GPX draping) take a 2×2 bilinear tap. A tap whose
+angle, Flow, Swiss rock, vector draping) take a 2×2 bilinear tap. A tap whose
 footprint straddles a clipped edge blends real ground against those zeros and
 returns a height near the floor — which drew a segment plunging from the terrain
 down to the base, all along the border of the selection. `sampleBilinear`

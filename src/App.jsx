@@ -16,12 +16,15 @@ import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
 import { FrameOverlay } from './components/FrameOverlay'
+import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
-import { trackCoverage } from './utils/geoCoords'
+import { featureCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
-import { parseGpx } from './utils/gpxParser'
+import { gpxToSource } from './utils/gpxParser'
+import { parseGeoJson } from './utils/geoJsonParser'
+import { layersFromSource, sourceRings } from './utils/vectorLayers'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
@@ -142,8 +145,105 @@ export default function App() {
   // Soundscape so the same file never has to be loaded twice.
   const flockAudio = useFlockAudio(soundscape.liveRef)
 
-  const [gpxPoints, setGpxPoints] = useState([])
-  const [gpxError,  setGpxError]  = useState(null)
+  const vectorSources      = useStore((s) => s.vectorSources)
+  const addVectorSource    = useStore((s) => s.addVectorSource)
+  const removeVectorSource = useStore((s) => s.removeVectorSource)
+  const clearVectorSources = useStore((s) => s.clearVectorSources)
+
+  // The style half of the vector layers. Coordinates live in the store; these
+  // are params like any other, which is what keeps recolouring one off the
+  // worker's rebuild path entirely.
+  const [vectorLayers, setVectorLayers] = useState([])
+  const [vectorError,  setVectorError]  = useState(null)
+  // Pointing at the terrain to name what is under the cursor. On by default;
+  // the escape hatch matters because a pick is O(segments) and a dense fetch is
+  // hundreds of thousands of them.
+  const [vectorIdentify, setVectorIdentify] = useState(true)
+
+  /** Adds an imported source and the layer records that go with it. */
+  const adoptVectorSource = useCallback((source) => {
+    addVectorSource(source)
+    setVectorLayers((prev) => [...prev, ...layersFromSource(source)])
+    setVectorError(null)
+  }, [addVectorSource])
+
+  /** Drops a whole source — its layers go with it, since nothing else uses it. */
+  const dropVectorSource = useCallback((sourceId) => {
+    removeVectorSource(sourceId)
+    setVectorLayers((prev) => prev.filter((l) => l.sourceId !== sourceId))
+  }, [removeVectorSource])
+
+  /**
+   * Removes one layer, and the source too once its last layer is gone —
+   * otherwise a fetch's coordinates would stay resident and keep being posted to
+   * the worker with nothing left to draw from them.
+   */
+  const removeVectorLayer = useCallback((id) => {
+    // Computed outside the updater rather than inside it: a state updater has to
+    // stay pure, and React is entitled to run it twice.
+    const gone = vectorLayers.find((l) => l.id === id)
+    const next = vectorLayers.filter((l) => l.id !== id)
+    setVectorLayers(next)
+    if (gone && !next.some((l) => l.sourceId === gone.sourceId)) removeVectorSource(gone.sourceId)
+  }, [vectorLayers, removeVectorSource])
+
+  const patchVectorLayer = useCallback((id, patch) => {
+    setVectorLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  }, [])
+
+  /** Everything vector goes away — a new raster is a different place. */
+  const dropVectors = useCallback(() => {
+    clearVectorSources()
+    setVectorLayers([])
+    setVectorError(null)
+  }, [clearVectorSources])
+
+  /**
+   * Re-applies a preset's saved vector styling to whatever is currently loaded.
+   *
+   * Matched on `bucket`, so a preset made against one OSM fetch styles the next
+   * fetch of the same area; layers the preset does not mention are left alone.
+   * A preset written before vector layers existed carries the old flat `*Gpx`
+   * params instead, and those are honoured for GPX layers so old preset files
+   * keep doing what they did.
+   */
+  const applyVectorStyles = useCallback((preset) => {
+    const byBucket = new Map((preset.vectorStyles ?? []).map((v) => [v.bucket, v]))
+    const legacy = preset.style?.colorGpx != null ? {
+      color:   preset.style.colorGpx,
+      weight:  preset.style.weightGpx,
+      opacity: preset.style.opacityGpx,
+      dash:    preset.style.dashGpx,
+    } : null
+    if (!byBucket.size && !legacy) return
+
+    setVectorLayers((prev) => prev.map((l) => {
+      const saved = byBucket.get(l.bucket)
+      if (saved) return { ...l, ...saved, id: l.id, sourceId: l.sourceId, count: l.count }
+      if (legacy && l.sourceKind === 'gpx') return { ...l, ...legacy }
+      return l
+    }))
+  }, [])
+
+  const loadVectorFile = useCallback((accept, parse) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept })
+    input.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return
+      setVectorError(null)
+      try {
+        adoptVectorSource(parse(await file.text(), file.name))
+      } catch (err) {
+        console.error('[Vector] Parse error:', err)
+        setVectorError(err?.message || `Could not read ${file.name}.`)
+      }
+    }
+    input.click()
+  }, [adoptVectorSource])
+
+  const loadGpxFromPicker = useCallback(
+    () => loadVectorFile('.gpx', gpxToSource), [loadVectorFile])
+  const loadGeoJsonFromPicker = useCallback(
+    () => loadVectorFile('.geojson,.json,application/geo+json', parseGeoJson), [loadVectorFile])
 
   const exportBaseName = heightmapFilename
     ? heightmapFilename.replace(/\.[^.]+$/, '')
@@ -358,13 +458,26 @@ export default function App() {
       heightmapDataURL = c.toDataURL('image/png')
     }
     const payload = { terrain, style, points, view, gradientStops, bgGradientStops }
+    // Vector layer *style* travels with a preset; the coordinates do not. A
+    // preset is a look, not a data set — and matching on `bucket` rather than on
+    // layer id is what lets last week's palette land on today's fresh fetch of
+    // the same valley.
+    if (vectorLayers.length) {
+      // `hidden` is stripped along with the identity fields: it holds feature
+      // *indices*, which mean nothing against a different fetch of the same
+      // area. Re-applying them would hide five arbitrary peaks rather than the
+      // five that were chosen. A preset is a look; a selection is data.
+      payload.vectorStyles = vectorLayers.map(
+        ({ id: _id, sourceId: _s, count: _c, hidden: _h, ...rest }) => rest)
+    }
     if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
     const data = JSON.stringify(payload, null, 2) + '\n'
     Object.assign(document.createElement('a'), {
       download: 'heightmap_preset.json',
       href: 'data:application/json,' + encodeURIComponent(data),
     }).click()
-  }, [terrain, style, points, view, gradientStops, bgGradientStops, heightmapPixels, heightmapWidth, heightmapHeight, heightmapFilename])
+  }, [terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers,
+      heightmapPixels, heightmapWidth, heightmapHeight, heightmapFilename])
 
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'), { type:'file', accept:'.json' })
@@ -378,11 +491,12 @@ export default function App() {
         if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
         if (d.gradientStops)   setGradientStops(d.gradientStops)
         if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
+        applyVectorStyles(d)
         if (d.heightmapDataURL) load(d.heightmapDataURL)
       } catch { alert('Invalid preset file.') }
     }
     input.click()
-  }, [load])
+  }, [load, applyVectorStyles])
 
   // ── Keyboard bridge for Controls.jsx ───
   const getParams = useCallback(
@@ -550,8 +664,8 @@ export default function App() {
       resolution: Math.max(1, Math.ceil(Math.sqrt((width * height) / 600000))),
       elevScale: 0,
     }))
-    setGpxPoints([]); setGpxError(null)
-  }, [autoZoom])
+    dropVectors()
+  }, [autoZoom, dropVectors])
 
   // Loading a raster takes the heightmap slot, so stop any audio still driving it.
   const loadPngAndFit = useCallback(() => {
@@ -560,9 +674,9 @@ export default function App() {
       autoZoom({ width: dataWidth, height: dataHeight })
       setBaseElevScale(1)
       setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-      setGpxPoints([]); setGpxError(null)
+      dropVectors()
     })
-  }, [soundscape, loadFromPicker, autoZoom, autoResolution])
+  }, [soundscape, loadFromPicker, autoZoom, autoResolution, dropVectors])
 
   const loadGeoTiffAndFit = useCallback(() => {
     soundscape.release()
@@ -604,7 +718,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
     elevScale: baseElevScale + terrain.elevScale,
-    gpxPoints, geoTiffBbox, geoTiffCRS,
+    vectorLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
   }
@@ -640,36 +754,17 @@ export default function App() {
     return () => clearTimeout(t)
   }, [isComputing, resultCount])
 
-  // ── GPX upload handler ────────────────────────────────────────────────────
-  const loadGpxFromPicker = useCallback(() => {
-    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.gpx' })
-    input.onchange = async (e) => {
-      const file = e.target.files[0]; if (!file) return
-      setGpxError(null)
-      try {
-        const pts = parseGpx(await file.text())
-        setGpxPoints(pts)
-        // A GPX holding only waypoints parses cleanly and yields nothing; without
-        // this the upload looks like it worked and drew an empty track.
-        if (!pts.length) setGpxError('No track or route points found in this GPX file.')
-      } catch (err) {
-        console.error('[GPX] Parse error:', err)
-        setGpxPoints([])
-        setGpxError(err?.message || 'Could not read this GPX file.')
-      }
-    }
-    input.click()
-  }, [])
-
-  // Whether the loaded track and the loaded raster actually describe the same
-  // place. GPX is WGS84 by definition, so a mismatch is always the GeoTIFF's
-  // projection or its extent — and both fail the same silent way, by dropping
-  // every point as out-of-bounds. Cheap enough to redo whenever either changes:
-  // one forward projection per point, and only on load, not per frame.
-  const gpxCoverage = useMemo(
-    () => trackCoverage(gpxPoints, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight),
-    [gpxPoints, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight],
-  )
+  // ── Vector layer coverage ─────────────────────────────────────────────────
+  // Whether the loaded features and the loaded raster actually describe the same
+  // place. GPX and GeoJSON are WGS84 by definition and OSM was queried for this
+  // very extent, so a mismatch is always the GeoTIFF's projection or its extent —
+  // and both fail the same silent way, by dropping every point as out-of-bounds.
+  // Cheap enough to redo whenever either changes: one forward projection per
+  // vertex, and only on load, not per frame.
+  const vectorCoverage = useMemo(() => {
+    const rings = vectorSources.flatMap(sourceRings)
+    return featureCoverage(rings, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight)
+  }, [vectorSources, geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight])
 
   // ── Export handlers ───────────────────────────────────────────────────────
   const handleStl = useCallback(() => {
@@ -679,7 +774,7 @@ export default function App() {
     setTimeout(async () => {
       try {
         await exportSTL({
-          surfaceGeo, terrain: terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p,
+          surfaceGeo, terrain: terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p,
           baseName: exportBaseName,
           onProgress: handleExportProgress,
           shouldCancel: exportCancelRef.current,
@@ -690,7 +785,7 @@ export default function App() {
         finishExport()
       }
     }, 0)
-  }, [surfaceGeo, terrainData, gpxPoints, geoTiffBbox, geoTiffCRS, p, exportBaseName,
+  }, [surfaceGeo, terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p, exportBaseName,
       beginExport, finishExport, handleExportProgress])
 
   const handleHeightmapExport = useCallback(() => {
@@ -846,11 +941,20 @@ export default function App() {
         geoTiffElevMax={geoTiffElevMax}
         geoTiffCRS={geoTiffCRS}
         geoTiffCRSName={geoTiffCRSName}
+        geoTiffBbox={geoTiffBbox}
         loadGpxFromPicker={loadGpxFromPicker}
-        gpxPoints={gpxPoints}
-        gpxCoverage={gpxCoverage}
-        gpxError={gpxError}
-        onClearGpx={() => { setGpxPoints([]); setGpxError(null) }}
+        loadGeoJsonFromPicker={loadGeoJsonFromPicker}
+        vectorSources={vectorSources}
+        vectorLayers={vectorLayers}
+        vectorCoverage={vectorCoverage}
+        vectorError={vectorError}
+        onPatchVectorLayer={patchVectorLayer}
+        onRemoveVectorLayer={removeVectorLayer}
+        onRemoveVectorSource={dropVectorSource}
+        onAdoptVectorSource={adoptVectorSource}
+        onVectorError={setVectorError}
+        vectorIdentify={vectorIdentify}
+        onVectorIdentify={setVectorIdentify}
         onCameraPreset={handleCameraPreset}
         onSvg={beginSvgExport}
         onPng={() => setPngTrigger(n => n + 1)}
@@ -888,6 +992,7 @@ export default function App() {
       {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
       {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} />}
+      {!webmActive && <FeatureTooltip layers={vectorLayers} />}
 
       {/* ── WebM REC badge ───────────────────────────────────────────────── */}
       {webmActive && (

@@ -61,3 +61,12 @@ it pins `suggestElevScale` against numbers measured from this file and from
 `tests/benchmark.spec.js` needs a real GeoTIFF and is gitignored (see
 `.gitignore`), so **that spec fails on any clean checkout** — a missing fixture,
 not a regression. Drop any GeoTIFF at `tests/testdata/benchmark.tif` to run it.
+
+## Vector layers
+
+`tests/vector.spec.js` needs `geotiff.tif` and nothing else. Overpass is never
+called: the spec routes `**/api/interpreter` to a small inline fixture, so the
+suite neither depends on a volunteer service being reachable nor costs it a
+query per run. The fixture's coordinates are derived from the raster's own
+bounding box at run time, so a different GeoTIFF dropped at that path still
+produces features that land on it.

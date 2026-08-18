@@ -12,7 +12,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { exportSVG } from '../utils/svgExport'
+import { OSM_ATTRIBUTION } from '../utils/osmFetch'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
+import { VectorPicker } from './VectorPicker'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
@@ -325,6 +327,9 @@ export function Scene({
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     // weight/opacity/dash live in params (not the worker geometry) — resolve per layer id.
+    // ODbL: if OpenStreetMap data is on screen, the credit goes into the file.
+    const attribution = p.vectorLayers?.some(l => l.visible && l.sourceKind === 'osm')
+      ? OSM_ATTRIBUTION : null
     const lineStyles = Array.isArray(lineGeo)
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}
@@ -334,7 +339,7 @@ export function Scene({
         // survives a dense plate that used to block the main thread outright.
         onProgress: onSvgProgress,
         shouldCancel: svgCancelRef?.current,
-        lineGeo, lineStyles, camera: activeCamera || currentCamera, width, height,
+        lineGeo, lineStyles, attribution, camera: activeCamera || currentCamera, width, height,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
         // hasFillLayer, not showFill: the viewport makes the surface a depth
@@ -436,6 +441,11 @@ export function Scene({
       </group>
       {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
       {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}
+      {/* Renders nothing — it reads the scene graph and listens on the canvas,
+          so it sits outside the terrain group it has no transform to inherit.
+          Off during profile picking, where a click already means something
+          else. */}
+      <VectorPicker enabled={p.vectorIdentify !== false && !p.profileMode} />
     </>
   )
 }

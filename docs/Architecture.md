@@ -9,19 +9,20 @@ allowed to cost anything.
 
 ```
   file ──> loader ──> STORE (source raster)
+    OSM / GeoJSON / GPX ──> STORE (vector sources)
                         │
                         ├── Edit Mode clip ──> derived raster
                         │
                         ▼
                   useTerrainGeometry            ← the only bridge to the worker
-                        │  postMessage({ pixels?, p })
+                        │  postMessage({ pixels?, vectorData?, p })
                         ▼
-  ┌──────────── geometry.worker ────────────┐
-  │  buildTerrain()      grid, slopes, bounds│
-  │  buildLineGeometry() 14 draw modes       │
-  │  buildGpxGeometry()  optional track      │
-  │  buildSurfaceGeometry() fill / depth mesh│
-  └──────────────────────────────────────────┘
+  ┌──────────── geometry.worker ─────────────┐
+  │  buildTerrain()       grid, slopes, bounds│
+  │  buildLineGeometry()  14 draw modes       │
+  │  buildVectorGeometry() draped features    │
+  │  buildSurfaceGeometry() fill / depth mesh │
+  └───────────────────────────────────────────┘
                         │  transferables (zero-copy)
         ┌───────────────┼────────────────┬─────────────────┐
         ▼               ▼                ▼                 ▼
@@ -42,7 +43,7 @@ pixels.
 
 | Where | What lives there | Why |
 |---|---|---|
-| **Zustand** (`store/useStore.js`) | The raster: source pixels + mask + dimensions, the Edit Mode clip, the derived (clipped) raster, GeoTIFF metadata, the overlay texture | Large buffers that many unrelated components read. Selector-per-field, so loading a texture does not re-render the terrain hook. |
+| **Zustand** (`store/useStore.js`) | The raster: source pixels + mask + dimensions, the Edit Mode clip, the derived (clipped) raster, GeoTIFF metadata, the overlay texture, and the vector sources | Large buffers that many unrelated components read. Selector-per-field, so loading a texture does not re-render the terrain hook. |
 | **React state** (`App.jsx`) | Every tweakable parameter — `terrain`, `style`, `points`, `view`, seeded from `src/defaults.js` | They change constantly while dragging and belong to the render tree. Keeping them out of the store keeps store writes rare. The defaults live in their own module so the preset randomiser can build on them without importing the root component. |
 | **Refs** | Camera echoes, in-flight worker bookkeeping, the Edit Mode drag | Values that change per frame and must never trigger a render. |
 
@@ -58,12 +59,20 @@ the one used for it. Three tiers, from most to least expensive:
 
 **1. Geometry rebuild (worker round-trip).** Anything that changes where a
 vertex is: resolution, blur, levels, elevation scale and cuts, jitter, mirroring,
-every draw mode's spacing/angle/threshold, the gradient stops (baked into line
-vertex colours), and the GPX track. The dependency list in
-`useTerrainGeometry` is the authoritative statement of this set.
+every draw mode's spacing/angle/threshold, and the gradient stops (baked into
+line vertex colours). The dependency list in `useTerrainGeometry` is the
+authoritative statement of this set.
 
-**2. Re-render only (GPU uniforms).** Line weight, opacity, dash pattern, fill
-colour, hillshade, slope shading, water, aspect, AO, raw terrain view. These are
+Vector layers sit here only for what moves their geometry — layer visibility,
+area fill, and which individual features are hidden — via `layerBuildKey`. Their
+colour, weight, opacity and dash are tier 2, which is the whole reason the layer
+panel feels live: a list of twenty OSM layers is something you recolour
+constantly, and each recolour must not cost a rebuild of all fourteen draw
+modes.
+
+**2. Re-render only (GPU uniforms).** Line weight, opacity, dash pattern, a
+vector layer's colour and its area fill colour/opacity, the feature highlight,
+terrain fill colour, hillshade, slope shading, water, aspect, AO, raw terrain view. These are
 resolved per layer at render time by `layerStyle(id, p)` and in the surface
 shader, so dragging them never enters the worker. Two exceptions are deliberate
 and documented at the dependency list: `needsSurfaceShading` (normals and UVs are
@@ -89,6 +98,14 @@ for frames pins the renderer at 60 fps drawing nothing.
   payload (an 8k GeoTIFF is a 256 MB `Float32Array`), and it does not change when
   a slider moves. The main thread sends pixels only when the loaded file — or the
   clip — actually changed; every other build carries just the params object.
+- **Vector sources are cached the same way**, and for a sharper version of the
+  same reason: an OSM fetch over an alpine tile is millions of coordinates.
+  Their *output* is cached too, keyed on the params that actually affect draping,
+  and on a cache hit the reply omits `vectorGeo` entirely — the main thread keeps
+  the arrays it already holds, which it must, because they were transferred out
+  of the worker and it no longer owns them. `null` would be indistinguishable
+  from "this raster has no vector layers", so the key is absent rather than
+  null.
 - **Results come back as transferables**, so the main thread never copies a
   rebuild's output, including surface normals.
 - **Requests are coalesced, not cancelled.** When builds arrive faster than they
@@ -134,6 +151,16 @@ in `public/presets/`, listed in `manifest.json` and fetched at startup.
 `applyPreset` in `Sidebar.jsx` spreads it over the current state — deliberately
 *not* including `terrain` or `view`, because resolution, zoom and pan describe
 the loaded raster rather than the look.
+
+A saved preset also carries `vectorStyles` — the vector layers' styling and
+nothing else. `hidden` is stripped along with the identity fields: it holds
+feature *indices*, which mean nothing against a different fetch of the same area,
+and re-applying them would hide five arbitrary peaks rather than the five that
+were chosen. A preset is a look, not a data set, so the coordinates stay out of
+it, and re-application matches on `bucket` rather than on layer id: last week's
+palette lands on today's fresh fetch of the same valley. Presets written before
+vector layers existed carry the old flat `*Gpx` params instead, and those are
+still honoured for GPX layers.
 
 Two things are generated from that set rather than written by hand:
 
@@ -219,6 +246,13 @@ into one picture.
 - **A preset**: save one from the app, drop the JSON in `public/presets/`, add
   the filename to `manifest.json`, and run `npm run thumbs "Your Preset"` so it
   arrives with a picture rather than a fallback label.
+- **An OSM category**: add an entry to `OSM_CATEGORIES` in
+  `utils/osmCategories.js` — Overpass selectors, a `bucketOf` that claims *only*
+  the tag values the category lists, labels and default styles. Nothing else
+  changes: the checklist, the layer naming, the draping and every exporter read
+  the catalogue. A `bucketOf` that claims too much steals from the categories
+  after it, silently and with a plausible-looking layer name, which is why they
+  all go through `pick(value, allowed)`.
 
 ---
 

@@ -1,8 +1,9 @@
 /**
  * Derives terrain grid and line geometry from the raw heightmap + visual params.
  */
-import { useState, useEffect, useRef, startTransition } from 'react'
+import { useState, useEffect, useMemo, useRef, startTransition } from 'react'
 import { useStore } from '../store/useStore'
+import { layerBuildKey } from '../utils/vectorLayers'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
 export function useTerrainGeometry(p) {
@@ -13,9 +14,11 @@ export function useTerrainGeometry(p) {
   const nodataMask      = useStore((s) => s.nodataMask)
   const heightmapWidth  = useStore((s) => s.heightmapWidth)
   const heightmapHeight = useStore((s) => s.heightmapHeight)
+  const vectorSources   = useStore((s) => s.vectorSources)
 
   const [terrain, setTerrain]       = useState(null)
   const [lineGeo, setLineGeo]       = useState(null)
+  const [vectorGeo, setVectorGeo]   = useState(null)
   const [surfaceGeo, setSurfaceGeo] = useState(null)
   const [isComputing, setIsComputing] = useState(false)
   // Increments on every delivered result. Consumers use it to tell "a build is
@@ -32,6 +35,9 @@ export function useTerrainGeometry(p) {
   // Which pixel buffer the live worker already holds, so we re-send the (large)
   // raster only when the loaded file actually changed or the worker was replaced.
   const workerPixelsRef = useRef(null)
+  // Same idea for the vector sources — an OSM fetch is millions of coordinates
+  // and must not be cloned into the worker on every slider tick.
+  const workerVectorRef = useRef(null)
   // Newest request that arrived while a build was running; only the latest is
   // kept, since intermediate states are never displayed.
   const pendingRef = useRef(null)
@@ -58,10 +64,16 @@ export function useTerrainGeometry(p) {
   const CANCEL_DURATION_FACTOR = 3
   const lastDurationRef = useRef(0)
 
+  // Everything about the vector layers that changes their geometry, as one
+  // string. Cheap to compute (a few dozen short joins) and the only vector
+  // dependency the rebuild effect has — see the note in its dependency list.
+  const vectorBuildKey = (p.vectorLayers ?? []).map(layerBuildKey).join(';')
+
   const ensureWorker = () => {
     if (workerRef.current) return
     workerRef.current = new GeometryWorker()
     workerPixelsRef.current = null
+    workerVectorRef.current = null
     workerRef.current.onmessage = (e) => {
       const elapsed = Math.round(performance.now() - startTimeRef.current)
       const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
@@ -72,6 +84,10 @@ export function useTerrainGeometry(p) {
         else {
           startTransition(() => {
             setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
+            // Absent, not null, means the worker's vector cache was still valid
+            // and it deliberately sent nothing — the arrays we already hold are
+            // the only copy, since they were transferred out of the worker.
+            if ('vectorGeo' in e.data) setVectorGeo(e.data.vectorGeo)
             setResultCount((n) => n + 1)
           })
           // Timing telemetry — also parsed by tests/benchmark.spec.js + performance.spec.js.
@@ -94,6 +110,8 @@ export function useTerrainGeometry(p) {
     // different worker than the one that was live when it was created.
     const needsPixels = workerPixelsRef.current !== req.pixels
     workerPixelsRef.current = req.pixels
+    const needsVectors = workerVectorRef.current !== req.vectors
+    workerVectorRef.current = req.vectors
     startTimeRef.current = performance.now()
     buildStartRef.current = startTimeRef.current
     busyRef.current = true
@@ -101,6 +119,7 @@ export function useTerrainGeometry(p) {
       ...(needsPixels
         ? { heightmapPixels: req.pixels, nodataMask: req.mask, heightmapWidth: req.w, heightmapHeight: req.h }
         : null),
+      ...(needsVectors ? { vectorData: req.vectors } : null),
       p: req.p,
       _gen: ++genRef.current,
     })
@@ -112,9 +131,10 @@ export function useTerrainGeometry(p) {
       workerRef.current?.terminate()
       workerRef.current = null
       workerPixelsRef.current = null
+      workerVectorRef.current = null
       pendingRef.current = null
       busyRef.current = false
-      setTerrain(null); setLineGeo(null); setSurfaceGeo(null); setIsComputing(false)
+      setTerrain(null); setLineGeo(null); setVectorGeo(null); setSurfaceGeo(null); setIsComputing(false)
       return
     }
 
@@ -142,6 +162,7 @@ export function useTerrainGeometry(p) {
       p: safeResolution !== p.resolution ? { ...p, resolution: safeResolution } : p,
       pixels: heightmapPixels, mask: nodataMask,
       w: heightmapWidth, h: heightmapHeight,
+      vectors: vectorSources,
     }
 
     setIsComputing(true)
@@ -255,12 +276,23 @@ export function useTerrainGeometry(p) {
     // worker rebuild. gradientStops stays: it is baked into line vertex colors.
     p.gradientStops,
 
-    // GPX Track
-    p.gpxPoints, p.geoTiffBbox, p.geoTiffCRS, p.colorGpx,
-    p.hypsoGpx, p.hypsoModeGpx, p.hypsoBandedGpx, p.hypsoIntervalGpx,
+    // Vector layers. `vectorBuildKey` is a string rather than p.vectorLayers
+    // itself, and that is the whole point: the layer array is replaced on every
+    // colour-picker tick, so depending on its identity would rebuild all
+    // fourteen draw modes to recolour one road. The key covers only what moves
+    // the geometry — see layerBuildKey in utils/vectorLayers.js.
+    vectorSources, vectorBuildKey, p.geoTiffBbox, p.geoTiffCRS,
   ])
 
   useEffect(() => () => workerRef.current?.terminate(), [])
 
-  return { terrain, lineGeo, surfaceGeo, isComputing, resultCount }
+  // One list for the renderer and the SVG exporter: vector layers are lineGeo
+  // entries in every respect, they just arrive on their own channel so a mode
+  // rebuild does not have to re-drape them.
+  const merged = useMemo(() => {
+    if (!vectorGeo?.length) return lineGeo
+    return [...(lineGeo ?? []), ...vectorGeo]
+  }, [lineGeo, vectorGeo])
+
+  return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount }
 }

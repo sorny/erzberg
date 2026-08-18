@@ -5,9 +5,15 @@
  *                     Three-part manifold with a 2-unit solid base below the
  *                     lowest terrain point. Always produced.
  *
- * heightmap_gpx.stl — GPX track ribbon. Only produced when a GPX track is
- *                     loaded and the GeoTIFF bbox / CRS are known.
- *                     The ribbon is built as per-segment independent closed
+ * heightmap-vectors.stl
+ *                   — Ribbons for the vector layers that ask for one. Only
+ *                     produced when at least one visible line or area layer has
+ *                     its STL ribbon switch on and the GeoTIFF bbox / CRS are
+ *                     known. GPX layers default it on, because a track ribbon
+ *                     beside the plate is what this file has always shipped;
+ *                     OSM and GeoJSON layers default it off, because a printed
+ *                     landscape wants a route on it, not every building.
+ *                     Each ribbon is built as per-segment independent closed
  *                     rectangular prisms (12 triangles each, all 6 faces
  *                     sealed with their own start/end caps). Miter joins are
  *                     intentionally avoided: averaged perpendiculars at sharp
@@ -22,8 +28,8 @@
  *   stl_z =  world_y   (elevation, build direction in Z-up slicers)
  */
 
-import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
 import { NODATA_SENTINEL_Y } from './terrain'
+import { drapedRuns } from './vectorGeometry'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 
 // ── STL writer ────────────────────────────────────────────────────────────────
@@ -80,17 +86,17 @@ async function writeBinarySTL(tris, filename, pacer = null, onPhase = null) {
   URL.revokeObjectURL(url)
 }
 
-// ── GPX ribbon builder ────────────────────────────────────────────────────────
+// ── Ribbon builder ────────────────────────────────────────────────────────
 
-const GPX_H  = 2.0   // ribbon height in world units (= 2 mm before slicer scaling)
-const GPX_HW = 3.0   // half-width in world units
+const RIB_H  = 2.0   // ribbon height in world units (= 2 mm before slicer scaling)
+const RIB_HW = 3.0   // half-width in world units
 
 /**
- * Build a watertight rectangular-tube ribbon for one continuous run of track
+ * Build a watertight rectangular-tube ribbon for one continuous run of draped
  * points. All 6 faces (top, bottom, left, right, start cap, end cap) are
  * emitted with correct outward normals.
  *
- * @param {Array<{worldX, worldZ, e}>} run  – consecutive in-extent track points
+ * @param {Array<{worldX, worldZ, e}>} run  – consecutive in-extent draped points
  * @param {number[]} tris                   – flat triangle accumulator (9 floats/tri)
  */
 /**
@@ -102,7 +108,7 @@ const GPX_HW = 3.0   // half-width in world units
  * non-manifold even when the edge topology is correct. Per-segment boxes are
  * provably non-self-intersecting and unconditionally manifold.
  */
-function buildGpxRibbon(run, tris) {
+function buildRibbon(run, tris) {
   // Deduplicate consecutive points that produce zero-length segments.
   const pts = [run[0]]
   for (let i = 1; i < run.length; i++) {
@@ -122,13 +128,13 @@ function buildGpxRibbon(run, tris) {
 
     const dx = x1 - x0, dz = z1 - z0
     const len = Math.sqrt(dx * dx + dz * dz)
-    const px = -dz / len * GPX_HW   // perpendicular offset in world X
-    const pz =  dx / len * GPX_HW   // perpendicular offset in world Z
+    const px = -dz / len * RIB_HW   // perpendicular offset in world X
+    const pz =  dx / len * RIB_HW   // perpendicular offset in world Z
 
     // 8 corners in STL space: stl_x = world_x, stl_y = -world_z, stl_z = world_y
-    const TL0 = [x0+px, -(z0+pz), e0+GPX_H],  TR0 = [x0-px, -(z0-pz), e0+GPX_H]
+    const TL0 = [x0+px, -(z0+pz), e0+RIB_H],  TR0 = [x0-px, -(z0-pz), e0+RIB_H]
     const BL0 = [x0+px, -(z0+pz), e0        ],  BR0 = [x0-px, -(z0-pz), e0        ]
-    const TL1 = [x1+px, -(z1+pz), e1+GPX_H],  TR1 = [x1-px, -(z1-pz), e1+GPX_H]
+    const TL1 = [x1+px, -(z1+pz), e1+RIB_H],  TR1 = [x1-px, -(z1-pz), e1+RIB_H]
     const BL1 = [x1+px, -(z1+pz), e1        ],  BR1 = [x1-px, -(z1-pz), e1        ]
 
     // Top (+stl_z, outward = up)
@@ -165,14 +171,13 @@ function buildGpxRibbon(run, tris) {
  * @returns 'done' | 'cancelled' | 'empty'
  */
 export async function exportSTL({
-  surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName,
+  surfaceGeo, terrain, vectorSources, p, baseName,
   onProgress, shouldCancel,
 }) {
   const pacer = makePacer(shouldCancel)
   const report = makeReporter(onProgress)
   try {
-    return await buildAndWrite({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName },
-                               pacer, report)
+    return await buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }, pacer, report)
   } catch (e) {
     // The file is written last, so an abandoned export leaves nothing behind.
     if (e === CANCELLED) return 'cancelled'
@@ -180,7 +185,7 @@ export async function exportSTL({
   }
 }
 
-async function buildAndWrite({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoTiffCRS, p, baseName },
+async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName },
                              pacer, report) {
   if (!surfaceGeo || !terrain) return 'empty'
 
@@ -279,40 +284,20 @@ async function buildAndWrite({ surfaceGeo, terrain, gpxPoints, geoTiffBbox, geoT
   report(0.8, 'Writing STL…')
   await writeBinarySTL(tris, `${base}.stl`, pacer, (f) => report(0.8 + 0.2 * f, 'Writing STL…'))
 
-  // ── GPX ribbon — separate file for multicolour printing ───────────────────
-  if (gpxPoints?.length > 1 && p && isTrackProjectable(geoTiffCRS, geoTiffBbox)) {
-    const peakOff   = Math.floor(p.gridOffsetX ?? 0)
-    const lineOff   = Math.floor(p.gridOffsetY ?? 0)
-    const { scl, halfW, halfH } = terrain
-    const imageWidth  = p.imageWidth
-    const imageHeight = p.imageHeight
-    if (!imageWidth || !imageHeight) return 'done'   // the plate is written; only the ribbon is skipped
+  // ── Vector ribbons — separate file for multicolour printing ───────────────
+  // Written after the plate, and with no pacer: once the first file exists there
+  // is nothing left to cancel, and yielding here would only widen the window in
+  // which a user sees one file and expects two.
+  const wanted = (p?.vectorLayers ?? []).filter((l) => l.visible && l.stlRibbon)
+  if (!wanted.length || !vectorSources?.length) return 'done'
+  if (!p.imageWidth || !p.imageHeight) return 'done'   // plate is written; only the ribbons are skipped
 
-    // Map every GPX point to world space (null = outside extent)
-    const allPts = gpxPoints.map(({ lat, lon }) => {
-      const wp = geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS,
-                            imageWidth, imageHeight, peakOff, lineOff, halfW, halfH)
-      if (!wp) return null
-      const e = sampleTerrainElev(wp.pixelCol, wp.pixelRow, terrain, scl, peakOff, lineOff)
-      // NoData under the point: treated exactly like being outside the extent,
-      // so the ribbon breaks there instead of diving to the base plate.
-      if (e !== e) return null
-      return { worldX: wp.worldX, worldZ: wp.worldZ, e }
-    })
-
-    // Split into continuous runs at null gaps
-    const runs = []
-    let cur = []
-    for (const pt of allPts) {
-      if (pt) { cur.push(pt) }
-      else    { if (cur.length >= 2) runs.push(cur); cur = [] }
-    }
-    if (cur.length >= 2) runs.push(cur)
-
-    if (runs.length === 0) return
-
-    const gpxTris = []
-    for (const run of runs) buildGpxRibbon(run, gpxTris)
-    await writeBinarySTL(gpxTris, `${base}-gpx.stl`)
+  const ribbonTris = []
+  for (const layer of wanted) {
+    const runs = drapedRuns(terrain, p, vectorSources, layer, p.imageWidth, p.imageHeight)
+    for (const run of runs) buildRibbon(run, ribbonTris)
   }
+  if (ribbonTris.length) await writeBinarySTL(ribbonTris, `${base}-vectors.stl`)
+
+  return 'done'
 }

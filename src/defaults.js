@@ -86,9 +86,9 @@ export const STYLE_DEF = {
   colorSwiss: '#000000', weightSwiss: 1, opacitySwiss: 1, dashSwiss: 'solid',
   hypsoSwiss: false, hypsoModeSwiss: 'elevation', hypsoBandedSwiss: false, hypsoIntervalSwiss: 10,
 
-  // GPX Track
-  colorGpx: '#a80000', weightGpx: 2, opacityGpx: 1, dashGpx: 'solid',
-  hypsoGpx: false, hypsoModeGpx: 'elevation', hypsoBandedGpx: false, hypsoIntervalGpx: 10,
+  // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
+  // records instead of flat params here — there is an unbounded number of them
+  // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.
 
   // Hillshade
   showHillshade: false, hillshadeAzimuth: 315, hillshadeAltitude: 45,

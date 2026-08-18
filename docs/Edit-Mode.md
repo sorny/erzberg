@@ -186,7 +186,7 @@ that function already assumes):
 $$x'_{\min} = x_{\min} + \frac{r_x}{W}\,\Delta x, \qquad
   y'_{\max} = y_{\max} - \frac{r_y}{H}\,\Delta y$$
 
-Without it a GPX track would keep being projected against an extent that no
+Without it vector layers would keep being projected against an extent that no
 longer exists, and would land in the wrong part of the terrain — silently, since
 points outside the raster are dropped as ordinary clipping.
 

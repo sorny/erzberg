@@ -4,7 +4,7 @@
 
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor } from './colorUtils'
-import { geoToWorld, sampleTerrainElev, isTrackProjectable } from './geoCoords'
+import { isVectorLayerId } from './vectorLayers'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +42,23 @@ export function needsSurfaceShading(p) {
 }
 
 export function layerStyle(id, p) {
+  // Vector layers carry their style on their own record instead of in flat
+  // `<prop><Id>` params, and they carry `color` here too — their geometry has no
+  // per-vertex colour buffer at all, so recolouring one is a material update
+  // rather than a worker rebuild. That is what makes a list of twenty OSM layers
+  // feel like a layer panel instead of a queue of rebuilds.
+  if (isVectorLayerId(id)) {
+    const l = p.vectorLayers?.find((v) => v.id === id)
+    if (!l) return { weight: 1, opacity: 1, dash: 'solid' }
+    return {
+      weight: l.weight, opacity: l.opacity, dash: l.dash, color: l.color,
+      fillColor: l.fillColor, fillOpacity: l.fillOpacity,
+      // Carried so the SVG's Inkscape layer is called "Roads · Motorway"
+      // rather than "vec:12" — the name is what makes a plot separable by pen.
+      name: l.name,
+    }
+  }
+
   switch (id) {
     case 'Contours-Minor':
       return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }
@@ -70,7 +87,7 @@ export function layerStyle(id, p) {
  * backing buffer is at most 2× the payload, which is cheaper than a final copy
  * for both the worker transfer and peak memory.
  */
-class F32List {
+export class F32List {
   constructor(cap = 4096) { this.a = new Float32Array(cap); this.n = 0 }
   _grow(need) {
     let cap = this.a.length * 2
@@ -139,7 +156,7 @@ class I32List {
   get length() { return this.n }
 }
 
-class U32List {
+export class U32List {
   constructor(cap = 4096) { this.a = new Uint32Array(cap); this.n = 0 }
   _grow(need) {
     let cap = this.a.length * 2
@@ -2216,78 +2233,5 @@ export function buildSurfaceGeometry(terrain, p) {
     normals: shade ? computeSurfaceNormals(finalPos, finalIndices) : NO_F32,
     uvs: shade ? buildSurfaceUvs(vertexCount * nOct, rows, cols) : NO_F32,
     metadata: { rows, cols, minB, maxB },
-  }
-}
-
-// ─── GPX Track ───────────────────────────────────────────────────────────────
-
-// Small Y lift so the track never clips into the terrain surface.
-const GPX_Y_OFFSET = 0.5
-
-/**
- * Build the GPX track as a standard lineGeo layer.
- *
- * Unlike the 14 draw modes this builder is called directly from the worker
- * after buildLineGeometry(), NOT via the MODES_CONFIG dispatch table, because:
- *   • GPX is geo-referenced and must not go through the mirror/symmetry loop.
- *   • It requires imageWidth/imageHeight which are worker top-level inputs,
- *     not terrain-derived values.
- *
- * Coordinate path: WGS84 lat/lon → (geoToWorld) → pixel space → world space →
- * bilinear terrain elevation sample → Y + GPX_Y_OFFSET.
- *
- * Points outside the GeoTIFF extent are mapped to null and skipped; the
- * resulting gaps produce disconnected segments (correct for clipped tracks).
- */
-export function buildGpxGeometry(terrain, p, imageWidth, imageHeight) {
-  const { scl, halfW, halfH, minElev, maxElev } = terrain
-  const { gpxPoints, geoTiffBbox, geoTiffCRS } = p
-  if (!gpxPoints?.length || !isTrackProjectable(geoTiffCRS, geoTiffBbox)) return null
-
-  const peakOff = Math.floor(p.gridOffsetX ?? 0)
-  const lineOff = Math.floor(p.gridOffsetY ?? 0)
-
-  const ctx = {
-    ...p,
-    lineColor:         p.colorGpx,
-    lineHypsometric:   p.hypsoGpx,
-    lineHypsoMode:     p.hypsoModeGpx,
-    lineBanded:        p.hypsoBandedGpx,
-    lineHypsoInterval: p.hypsoIntervalGpx,
-  }
-
-  const positions = new F32List(), colors = new F32List()
-
-  const worldPts = gpxPoints.map(({ lat, lon }) =>
-    geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight, peakOff, lineOff, halfW, halfH)
-  )
-
-  for (let i = 0; i < worldPts.length - 1; i++) {
-    const a = worldPts[i], b = worldPts[i + 1]
-    if (!a || !b) continue
-
-    const elevA = sampleTerrainElev(a.pixelCol, a.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
-    const elevB = sampleTerrainElev(b.pixelCol, b.pixelRow, terrain, scl, peakOff, lineOff) + GPX_Y_OFFSET
-    // NaN = the point projects onto NoData (outside a clipped selection). There
-    // is no ground to drape it on, so the track breaks rather than dropping to
-    // the base of the scene.
-    if (elevA !== elevA || elevB !== elevB) continue
-
-    const normA = minElev < maxElev ? (elevA - minElev) / (maxElev - minElev) : 0
-    const normB = minElev < maxElev ? (elevB - minElev) / (maxElev - minElev) : 0
-
-    positions.push6(a.worldX, elevA, a.worldZ, b.worldX, elevB, b.worldZ)
-    colors.pushRgb(computeVertexColor(normA, 0, 0, ctx))
-    colors.pushRgb(computeVertexColor(normB, 0, 0, ctx))
-  }
-
-  if (positions.length === 0) return null
-  // weight / opacity / dash resolved via layerStyle('Gpx', p) at render/export time.
-  return {
-    id: 'Gpx',
-    positions: positions.toArray(),
-    colors: colors.toArray(),
-    curtains: null,
-    lids: null,
   }
 }

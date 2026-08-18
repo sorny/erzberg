@@ -7,8 +7,11 @@ import { applyEdit, buildEditMask, cropBbox } from '../utils/heightmapEdit'
  *  - GeoTIFF NoData mask
  *  - filename display
  *  - overlay texture image
+ *  - vector sources (OSM / GeoJSON / GPX coordinates)
  *
- * All tweakable visual / terrain params live in React state in App.jsx.
+ * All tweakable visual / terrain params live in React state in App.jsx. That
+ * includes the vector *layers* — their colour and weight are params like any
+ * other, and only the coordinates they point at live here.
  *
  * ── Source vs. derived ───────────────────────────────────────────────────────
  * The raster is held twice: `src*` is exactly what was loaded, and
@@ -90,6 +93,24 @@ export const useStore = create((set) => ({
   // Overlay texture
   textureImage: null, // Image data (base64 or blob URL)
 
+  // Vector sources — packed WGS84 geometry from OSM, GeoJSON and GPX.
+  // See utils/vectorLayers.js for the shape. Held here rather than in React
+  // state for the same reason the raster is: an OSM fetch over an alpine tile is
+  // millions of coordinates, and it is posted to the geometry worker by
+  // identity. The matching *layer* records (colour, weight, visibility) live in
+  // App.jsx, joined to these by `sourceId`.
+  vectorSources: [],
+
+  // Which feature is under the cursor, and which one was last clicked or picked
+  // in the panel. Here rather than in App's `p` bus for a specific reason: `p`
+  // is rebuilt every render and is what gets postMessage'd to the geometry
+  // worker, so a pointer-move writing into it would re-render the whole sidebar
+  // and ripple into geometry. Read through selectors, a hover re-renders the two
+  // small components that care — the highlight and the tooltip — and nothing
+  // else. `x`/`y` are client pixels, for placing the tooltip.
+  vectorHover: null,     // { layerId, feature, x, y } | null
+  vectorSelected: null,  // { layerId, feature } | null
+
   // Real-world elevation metadata — only populated when a GeoTIFF is loaded
   geoTiffElevMin: null,   // metres (or native unit)
   geoTiffElevMax: null,
@@ -170,6 +191,22 @@ export const useStore = create((set) => ({
     }),
 
   setTextureImage: (img) => set({ textureImage: img }),
+
+  addVectorSource: (source) =>
+    set((s) => ({ vectorSources: [...s.vectorSources, source] })),
+
+  removeVectorSource: (id) =>
+    set((s) => ({
+      vectorSources: s.vectorSources.filter((v) => v.id !== id),
+      // A highlight pointing at coordinates that no longer exist would draw
+      // stale segments until the next pointer move.
+      vectorHover: null, vectorSelected: null,
+    })),
+
+  clearVectorSources: () => set({ vectorSources: [], vectorHover: null, vectorSelected: null }),
+
+  setVectorHover: (h) => set({ vectorHover: h }),
+  setVectorSelected: (v) => set({ vectorSelected: v }),
 
   setGeoTiffMeta: (elevMin, elevMax, bbox, crs, crsName) =>
     set((s) => {

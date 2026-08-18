@@ -1,12 +1,20 @@
 /**
- * Geographic coordinate helpers shared between the geometry worker (GPX viewport
- * layer), the STL exporter (GPX ribbon solid) and the sidebar readouts.
+ * Geographic coordinate helpers shared between the geometry worker (vector
+ * layers), the STL exporter (track ribbon solids), the OpenStreetMap query and
+ * the sidebar readouts.
  *
- * A GPX file has no projection to declare: the format defines its coordinates as
- * WGS84 lon/lat, full stop. All the variety lives on the GeoTIFF side, so
- * "matching the two projections" means one thing — projecting WGS84 forward into
- * whatever grid the raster's bounding box is stated in. `classifyCRS` decides
- * whether that forward step is one this file can actually make.
+ * GPX and GeoJSON have no projection to declare: both formats define their
+ * coordinates as WGS84 lon/lat, full stop. All the variety lives on the GeoTIFF
+ * side, so "matching the two projections" means one thing — projecting WGS84
+ * forward into whatever grid the raster's bounding box is stated in.
+ * `classifyCRS` decides whether that forward step is one this file can actually
+ * make.
+ *
+ * Asking OpenStreetMap what is inside the raster needs the *inverse* step as
+ * well, because Overpass only speaks WGS84: the extent has to be handed back out
+ * of the raster's grid before it can be a query. That direction is strictly
+ * narrower — see `isInvertible` — since a guessed forward projection has nothing
+ * to guess from on the way back.
  *
  * That verdict has to be explicit rather than implied, because the failure is
  * otherwise invisible: feeding degrees into a bbox measured in metres puts every
@@ -207,8 +215,8 @@ export function suggestElevScale(elevRange, pixelSize, crs, bbox, metresPerUnit 
   return Math.max(ELEV_SCALE_MIN, Math.min(ELEV_SCALE_MAX, +scale.toFixed(2)))
 }
 
-/** Whether a GPX track can be placed on this raster at all. */
-export function isTrackProjectable(crs, bbox) {
+/** Whether WGS84 features can be placed on this raster at all. */
+export function isProjectable(crs, bbox) {
   if (!bbox || bbox.length !== 4) return false
   const [minX, minY, maxX, maxY] = bbox
   if (!(isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY))) return false
@@ -269,6 +277,57 @@ function wgs84ToUtm(lat, lon, zone, isSouth) {
 }
 
 /**
+ * Standard Transverse Mercator (WGS84 ellipsoid) → WGS84 lat / lon.
+ *
+ * The exact inverse of `wgs84ToUtm` above, by the same Snyder series: the
+ * meridional arc is inverted through the footpoint latitude `phi1` — the
+ * latitude whose arc from the equator equals the point's own northing — and the
+ * remaining terms are expansions around it.
+ */
+function utmToWgs84(easting, northing, zone, isSouth) {
+  const k0 = 0.9996
+  const E0 = 500000
+  const N0 = isSouth ? 10000000 : 0
+  const lam0 = ((zone - 1) * 6 - 180 + 3) * Math.PI / 180
+
+  const e4 = WGS84_E2 * WGS84_E2, e6 = e4 * WGS84_E2
+  const ep2 = WGS84_E2 / (1 - WGS84_E2)
+
+  const M = (northing - N0) / k0
+  const mu = M / (WGS84_A * (1 - WGS84_E2 / 4 - 3 * e4 / 64 - 5 * e6 / 256))
+
+  // Third flattening, the expansion parameter of the footpoint series.
+  const e1 = (1 - Math.sqrt(1 - WGS84_E2)) / (1 + Math.sqrt(1 - WGS84_E2))
+  const e1_2 = e1 * e1, e1_3 = e1_2 * e1, e1_4 = e1_3 * e1
+  const phi1 = mu
+    + (3 * e1 / 2 - 27 * e1_3 / 32) * Math.sin(2 * mu)
+    + (21 * e1_2 / 16 - 55 * e1_4 / 32) * Math.sin(4 * mu)
+    + (151 * e1_3 / 96) * Math.sin(6 * mu)
+    + (1097 * e1_4 / 512) * Math.sin(8 * mu)
+
+  const sinPhi1 = Math.sin(phi1), cosPhi1 = Math.cos(phi1), tanPhi1 = Math.tan(phi1)
+  const C1 = ep2 * cosPhi1 * cosPhi1
+  const T1 = tanPhi1 * tanPhi1
+  const s = 1 - WGS84_E2 * sinPhi1 * sinPhi1
+  const N1 = WGS84_A / Math.sqrt(s)
+  const R1 = WGS84_A * (1 - WGS84_E2) / (s * Math.sqrt(s))
+  const D = (easting - E0) / (N1 * k0)
+
+  const lat = phi1 - (N1 * tanPhi1 / R1) * (
+    D ** 2 / 2
+    - (5 + 3 * T1 + 10 * C1 - 4 * C1 * C1 - 9 * ep2) * D ** 4 / 24
+    + (61 + 90 * T1 + 298 * C1 + 45 * T1 * T1 - 252 * ep2 - 3 * C1 * C1) * D ** 6 / 720
+  )
+  const lon = lam0 + (
+    D
+    - (1 + 2 * T1 + C1) * D ** 3 / 6
+    + (5 - 2 * C1 + 28 * T1 - 3 * C1 * C1 + 8 * ep2 + 24 * T1 * T1) * D ** 5 / 120
+  ) / cosPhi1
+
+  return [lat * 180 / Math.PI, lon * 180 / Math.PI]
+}
+
+/**
  * Infer UTM zone from a WGS84 longitude.
  * Used as a fallback when CRS code is unknown but bbox is clearly projected.
  */
@@ -312,6 +371,92 @@ export function projectWgs84(lat, lon, crs) {
 }
 
 /**
+ * Whether the raster's CRS can be projected *out of*, not just into.
+ *
+ * Strictly narrower than `classifyCRS(crs).supported`, and the difference is
+ * entirely 'projected-unknown': the forward path guesses its UTM zone from the
+ * point's own longitude, and a coordinate already in that grid has no longitude
+ * to guess from. Going forward a wrong guess is at least self-consistent for a
+ * real UTM tile; coming back it would place the extent in the wrong hemisphere
+ * with no way to notice. So the OSM query is refused for those rasters instead —
+ * uploads still work, since they only need the forward step.
+ */
+export function isInvertible(crs) {
+  const kind = classifyCRS(crs).kind
+  return classifyCRS(crs).supported && (kind === 'geographic' || kind === 'mercator' || kind === 'utm')
+}
+
+/**
+ * Project (x, y) in the raster's own CRS back out to WGS84.
+ * Returns [lat, lon], or null when the CRS cannot be inverted.
+ */
+export function unprojectWgs84(x, y, crs) {
+  const c = classifyCRS(crs)
+  if (!isInvertible(crs)) return null
+
+  switch (c.kind) {
+    case 'geographic':
+      return [y, x]
+    case 'mercator': {
+      const lon = x / 20037508.34 * 180
+      const t = y / 20037508.34 * 180
+      return [180 / Math.PI * (2 * Math.atan(Math.exp(t * Math.PI / 180)) - Math.PI / 2), lon]
+    }
+    case 'utm':
+      return utmToWgs84(x, y, c.zone, c.isSouth)
+    default:
+      return null
+  }
+}
+
+/**
+ * The raster's extent as a WGS84 envelope — [minLon, minLat, maxLon, maxLat].
+ * Returns null when the CRS cannot be inverted or the bbox is not usable.
+ *
+ * Nine samples rather than four corners, because a projected extent is not a
+ * rectangle in WGS84: a UTM tile's edges bow away from the central meridian, and
+ * at the corners of a wide tile the sag is a few hundred metres. Sampling the
+ * edge midpoints and the centre too costs nothing here and stops the Overpass
+ * query from clipping features that really are inside the raster.
+ */
+export function bboxToWgs84(bbox, crs) {
+  if (!bbox || bbox.length !== 4 || !isInvertible(crs)) return null
+  const [minX, minY, maxX, maxY] = bbox
+  if (!(isFinite(minX) && isFinite(minY) && isFinite(maxX) && isFinite(maxY))) return null
+
+  const midX = (minX + maxX) / 2, midY = (minY + maxY) / 2
+  let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity
+
+  for (const x of [minX, midX, maxX]) {
+    for (const y of [minY, midY, maxY]) {
+      const ll = unprojectWgs84(x, y, crs)
+      if (!ll) return null
+      const [lat, lon] = ll
+      if (!(isFinite(lat) && isFinite(lon))) return null
+      if (lon < minLon) minLon = lon
+      if (lon > maxLon) maxLon = lon
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
+  }
+  return [minLon, minLat, maxLon, maxLat]
+}
+
+/**
+ * Ground size of a WGS84 envelope, in kilometres — the figure the OSM panel
+ * shows so a query's cost is visible before it is sent.
+ */
+export function wgs84ExtentKm(bboxWgs84) {
+  if (!bboxWgs84) return null
+  const [minLon, minLat, maxLon, maxLat] = bboxWgs84
+  const midLat = (minLat + maxLat) / 2
+  return {
+    w: (maxLon - minLon) * 111.320 * Math.max(0.05, Math.cos(midLat * Math.PI / 180)),
+    h: (maxLat - minLat) * 110.574,
+  }
+}
+
+/**
  * WGS84 (lat, lon) → fractional pixel coordinates in the raster.
  * Returns { col, row } unclamped, or null if the CRS is not transformable.
  * Row 0 is the top of the image, hence the Y-flip.
@@ -351,28 +496,36 @@ export function geoToWorld(lat, lon, geoTiffBbox, geoTiffCRS,
 }
 
 /**
- * How much of a GPX track actually lands on the raster — the check that turns a
- * mismatch into a message instead of an empty overlay.
+ * How much of a vector source actually lands on the raster — the check that
+ * turns a mismatch into a message instead of an empty overlay.
  *
- * Two different failures share the "no track appears" symptom and need
- * different advice, so they are reported separately: 'unsupported' means the
- * projection cannot be computed at all, 'outside' means it was computed fine and
- * the track is simply somewhere else on Earth.
+ * Two different failures share the "nothing appears" symptom and need different
+ * advice, so they are reported separately: 'unsupported' means the projection
+ * cannot be computed at all, 'outside' means it was computed fine and the
+ * features are simply somewhere else on Earth.
+ *
+ * `rings` is the flat coordinate form every source normalises to — an array of
+ * Float64Arrays holding [lon, lat, lon, lat, …]. Counting vertices rather than
+ * features is deliberate: a single OSM way that half-crosses the tile edge is
+ * exactly the 'partial' case this exists to name.
  *
  * Returns { status, inside, total }, status one of
  * 'ok' | 'partial' | 'outside' | 'unsupported' | 'none' | 'empty'.
  */
-export function trackCoverage(gpxPoints, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight) {
-  const total = gpxPoints?.length ?? 0
+export function featureCoverage(rings, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight) {
+  let total = 0
+  for (const r of rings ?? []) total += r.length >> 1
   const base = { inside: 0, total }
   if (!total) return { ...base, status: 'empty' }
   if (classifyCRS(geoTiffCRS).kind === 'none') return { ...base, status: 'none' }
-  if (!isTrackProjectable(geoTiffCRS, geoTiffBbox)) return { ...base, status: 'unsupported' }
+  if (!isProjectable(geoTiffCRS, geoTiffBbox)) return { ...base, status: 'unsupported' }
 
   let inside = 0
-  for (const { lat, lon } of gpxPoints) {
-    const px = geoToPixel(lat, lon, geoTiffBbox, geoTiffCRS, imageWidth, imageHeight)
-    if (px && px.col >= 0 && px.col < imageWidth && px.row >= 0 && px.row < imageHeight) inside++
+  for (const r of rings) {
+    for (let i = 0; i < r.length; i += 2) {
+      const px = geoToPixel(r[i + 1], r[i], geoTiffBbox, geoTiffCRS, imageWidth, imageHeight)
+      if (px && px.col >= 0 && px.col < imageWidth && px.row >= 0 && px.row < imageHeight) inside++
+    }
   }
 
   return { inside, total, status: inside === 0 ? 'outside' : inside < total ? 'partial' : 'ok' }

@@ -8,7 +8,11 @@ import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
 import { HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
-import { classifyCRS, crsDisplayName } from '../utils/geoCoords'
+import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, wgs84ExtentKm } from '../utils/geoCoords'
+import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES } from '../utils/osmCategories'
+import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
+import { featureLabel, toggleHidden } from '../utils/vectorLayers'
+import { CANCELLED } from '../utils/pacing'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
@@ -52,15 +56,15 @@ function fmtTime(sec) {
 }
 
 /**
- * Why the GPX track is not on the terrain, when it is not.
+ * Why the vector layers are not on the terrain, when they are not.
  *
  * Everything this reports used to look identical on screen: an unsupported
  * projection, a track from another valley and a raster with no georeferencing at
  * all each ended as points silently dropped for being out of bounds. They need
- * different fixes, so they get different sentences — and the two that the user
- * can fix by reprojecting get the command that does it.
+ * different fixes, so they get different sentences — and the ones the user can
+ * fix by reprojecting get the command that does it.
  */
-function GpxDiagnostics({ crs, crsName, coverage, error }) {
+function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploadsOnly }) {
   const c = classifyCRS(crs)
   const status = coverage?.status ?? 'empty'
 
@@ -77,32 +81,435 @@ function GpxDiagnostics({ crs, crsName, coverage, error }) {
   if (error) return note('#ef4444', error)
 
   if (c.kind === 'none')
-    return note(warn, <>This GeoTIFF carries no georeferencing, so a track cannot be placed on it.</>)
+    return note(warn, <>This GeoTIFF carries no georeferencing, so features cannot be placed on it.</>)
 
   if (!c.supported)
     return note(warn, <>
-      Projection <b>{crsDisplayName(crs, crsName)}</b> is not one this tool can project GPX into.{fix}
+      Projection <b>{crsDisplayName(crs, crsName)}</b> is not one this tool can place WGS84 features in.{fix}
     </>)
+
+  // The asymmetry worth stating: uploads only need the forward projection, but
+  // asking OpenStreetMap what is inside the extent needs the inverse, and the
+  // inverse is the narrower of the two.
+  if (!isInvertible(crs))
+    return note(MUTED, <>
+      This GeoTIFF does not record its projection, so its extent cannot be turned into an
+      OpenStreetMap query. GeoJSON and GPX uploads still work.
+    </>)
+
+  if (!hasFeatures) return null
 
   if (status === 'outside')
     return note(warn, <>
-      None of the {coverage.total} track points fall inside this GeoTIFF — the track and the raster
-      cover different areas{c.accuracy === 'guess' ? ', or the assumed UTM zone is wrong' : ''}.
+      None of the {coverage.total.toLocaleString()} loaded vertices fall inside this GeoTIFF — the
+      features and the raster cover different areas{c.accuracy === 'guess' ? ', or the assumed UTM zone is wrong' : ''}.
     </>)
 
-  if (status === 'partial')
+  // Partial coverage means something different depending on where the features
+  // came from. An upload landing half off the raster is a mismatch worth
+  // flagging. An OSM fetch is *defined* by the raster's extent, and Overpass
+  // returns whole ways that cross its edge — so partial is the normal outcome
+  // there, and warning about it would cry wolf on every single fetch.
+  if (status === 'partial' && uploadsOnly)
     return note(warn, <>
-      {coverage.inside} of {coverage.total} track points fall inside the GeoTIFF; the rest are clipped.
+      {coverage.inside.toLocaleString()} of {coverage.total.toLocaleString()} vertices fall inside
+      the GeoTIFF; the rest are clipped.
     </>)
 
   // Placed, but on an assumption worth stating — an inferred zone or an
-  // unapplied datum shift both put the line tens to hundreds of metres out.
+  // unapplied datum shift both put the lines tens to hundreds of metres out.
   if (status === 'ok' && c.accuracy === 'guess')
-    return note(MUTED, <>This GeoTIFF does not record its projection. The UTM zone is inferred from the track, so alignment is approximate.</>)
+    return note(MUTED, <>This GeoTIFF does not record its projection. The UTM zone is inferred, so alignment is approximate.</>)
   if (status === 'ok' && c.accuracy === 'approx')
-    return note(MUTED, <>{crsDisplayName(crs, crsName)} uses a datum this tool does not shift for; the track may sit up to a few hundred metres off.</>)
+    return note(MUTED, <>{crsDisplayName(crs, crsName)} uses a datum this tool does not shift for; features may sit up to a few hundred metres off.</>)
 
   return null
+}
+
+/**
+ * The features inside one layer, with a checkbox each.
+ *
+ * A layer used to be the smallest thing that existed: you could hide all 29
+ * peaks or none. Per-feature visibility is the same concept one level down, live
+ * and with no apply step, which is why the checkbox *is* the state rather than a
+ * selection waiting to be committed.
+ *
+ * Two facts about real data shape this list. Most features are unnamed — a live
+ * alpine fetch had names on 52 of 621 tracks and on none of 245 scrub polygons —
+ * so named ones sort first and the rest get a stable `Track #118` to point at.
+ * And a layer can hold hundreds, so there is a filter box and a hard cap on
+ * rendered rows: 621 DOM rows inside a scrolling panel is a jank nobody asked
+ * for, and a virtualisation library would be a dependency for one list.
+ */
+const MAX_FEATURE_ROWS = 200
+
+function FeatureList({ layer, bucket, onPatch }) {
+  const [filter, setFilter] = useState('')
+  const hover = useStore((s) => s.vectorHover)
+  const selected = useStore((s) => s.vectorSelected)
+  const setHover = useStore((s) => s.setVectorHover)
+  const setSelected = useStore((s) => s.setVectorSelected)
+  const rowRef = useRef(null)
+
+  const hidden = useMemo(() => new Set(layer.hidden ?? []), [layer.hidden])
+
+  // Sorted named-first once per bucket, then filtered per keystroke — the sort
+  // is over every feature and has no business re-running as you type.
+  const ordered = useMemo(() => {
+    const idx = Array.from({ length: bucket.count }, (_, i) => i)
+    idx.sort((a, b) => {
+      const na = bucket.names.get(a), nb = bucket.names.get(b)
+      if (!!na !== !!nb) return na ? -1 : 1
+      if (na && nb) return na.localeCompare(nb)
+      return a - b
+    })
+    return idx
+  }, [bucket])
+
+  const matches = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return ordered
+    return ordered.filter((i) => featureLabel(bucket, i).toLowerCase().includes(q))
+  }, [ordered, filter, bucket])
+
+  // A feature picked on the terrain has to be findable in a list of hundreds.
+  useEffect(() => {
+    if (selected?.layerId === layer.id) rowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [selected, layer.id])
+
+  const shown = matches.slice(0, MAX_FEATURE_ROWS)
+  const visible = bucket.count - hidden.size
+
+  const bulk = (label, next, testId) => (
+    <button onClick={() => onPatch(layer.id, { hidden: next() })} data-testid={testId}
+      style={{
+        fontSize: 8, padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
+        background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
+      }}>{label}</button>
+  )
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+        <span style={{ fontSize: 9, color: MUTED }} data-testid={`feature-count-${layer.id}`}>
+          Showing {visible} of {bucket.count}
+        </span>
+        <span style={{ display: 'flex', gap: 3 }}>
+          {bulk('all', () => [], `feature-all-${layer.id}`)}
+          {bulk('none', () => Array.from({ length: bucket.count }, (_, i) => i), `feature-none-${layer.id}`)}
+        </span>
+      </div>
+
+      {bucket.count > 8 && (
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter…"
+          data-testid={`feature-filter-${layer.id}`}
+          style={{
+            width: '100%', boxSizing: 'border-box', marginBottom: 5, padding: '3px 6px',
+            fontSize: 10, background: SURF, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3,
+          }} />
+      )}
+
+      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+        {shown.map((i) => {
+          const isHover = hover?.layerId === layer.id && hover.feature === i
+          const isSel = selected?.layerId === layer.id && selected.feature === i
+          const note = bucket.notes.get(i)
+          return (
+            <div key={i} ref={isSel ? rowRef : null}
+              data-testid={`feature-${layer.id}-${i}`}
+              data-selected={isSel ? 'true' : undefined}
+              // Hovering a row is the other direction of the same question the
+              // picker answers: it writes the very same state, so the feature
+              // lights up on the terrain without this knowing how.
+              // No x/y: the highlight wants the hover, the tooltip does not —
+              // the row already says the name, and a floating label over the
+              // panel would just cover the next row.
+              onMouseEnter={() => setHover({ layerId: layer.id, feature: i, x: null, y: null })}
+              onMouseLeave={() => setHover(null)}
+              onClick={() => setSelected({ layerId: layer.id, feature: i })}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5, padding: '2px 3px', borderRadius: 3,
+                cursor: 'pointer',
+                background: isSel ? 'rgba(249,115,22,0.18)' : isHover ? 'rgba(59,130,246,0.18)' : 'transparent',
+              }}>
+              <input type="checkbox" checked={!hidden.has(i)}
+                data-testid={`feature-check-${layer.id}-${i}`}
+                onClick={(e) => e.stopPropagation()}
+                onChange={() => onPatch(layer.id, { hidden: toggleHidden(layer.hidden, i) })}
+                style={{ width: 11, height: 11, accentColor: ACCENT, cursor: 'pointer' }} />
+              <span style={{
+                flex: 1, fontSize: 9, color: hidden.has(i) ? MUTED : DIM,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>{featureLabel(bucket, i)}</span>
+              {note && <span style={{ fontSize: 8, color: MUTED, fontFamily: 'monospace' }}>{note}</span>}
+            </div>
+          )
+        })}
+      </div>
+
+      {matches.length > shown.length && (
+        <div style={{ fontSize: 8, color: MUTED, marginTop: 4 }}>
+          …and {matches.length - shown.length} more. Filter to narrow.
+        </div>
+      )}
+      {filter && matches.length === 0 && (
+        <div style={{ fontSize: 8, color: MUTED, marginTop: 4 }}>Nothing matches “{filter}”.</div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * The Vector Layers panel — sources at the top, one editable row per layer below.
+ *
+ * Deliberately additive: it replaces the old GPX Track section in place and
+ * leaves the fourteen draw-mode sections exactly as they are. The rows here are
+ * a list of *data* layers, which is a different thing from the draw modes and is
+ * why it does not try to be a unified layer stack.
+ */
+function VectorLayersPanel({
+  crs, crsName, bbox, coverage, error,
+  sources, layers,
+  onLoadGpx, onLoadGeoJson, onPatch, onRemove, onRemoveSource, onAdopt, onError,
+  identify, onIdentify,
+}) {
+  const [expanded, setExpanded] = useState(null)
+  const [featuresOpen, setFeaturesOpen] = useState(null)
+  const pickedFeature = useStore((s) => s.vectorSelected)
+
+  // Picking a feature on the terrain has to *show* you the feature. Without
+  // this the click sets the selection and lights the line up, but its row lives
+  // behind two collapsed disclosures — you would have to guess which of forty
+  // layers owns it and open them by hand, which is the work the click was
+  // supposed to save.
+  useEffect(() => {
+    if (!pickedFeature) return
+    setExpanded(pickedFeature.layerId)
+    setFeaturesOpen(pickedFeature.layerId)
+  }, [pickedFeature])
+  const [picked, setPicked] = useState(DEFAULT_OSM_CATEGORIES)
+  const [fetching, setFetching] = useState(false)
+  const [status, setStatus] = useState(null)
+  const abortRef = useRef(null)
+
+  const wgs = useMemo(() => bboxToWgs84(bbox, crs), [bbox, crs])
+  const size = useMemo(() => wgs84ExtentKm(wgs), [wgs])
+  const canQuery = !!wgs
+  const hasOsm = sources?.some((s) => s.kind === 'osm')
+
+  const toggleCat = (id) =>
+    setPicked((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
+
+  const runFetch = async () => {
+    if (!wgs || !picked.length) return
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setFetching(true)
+    setStatus('Querying OpenStreetMap…')
+    onError(null)
+    try {
+      const { source, cached } = await fetchOsm(wgs, picked, {
+        signal: ctrl.signal,
+        onProgress: (_f, label) => label && setStatus(label),
+        shouldCancel: () => ctrl.signal.aborted,
+      })
+      if (ctrl.signal.aborted) return
+      if (!source.buckets.length) {
+        onError('OpenStreetMap has nothing of the selected kinds inside this extent.')
+      } else {
+        onAdopt(source)
+        setStatus(cached ? 'From cache.' : null)
+      }
+    } catch (err) {
+      // An abort is the user's own decision and needs no error box.
+      if (err?.name !== 'AbortError' && err !== CANCELLED) {
+        console.error('[OSM] Fetch failed:', err)
+        onError(err?.message || 'Could not reach OpenStreetMap.')
+      }
+    } finally {
+      abortRef.current = null
+      setFetching(false)
+      if (!fetching) setStatus(null)
+    }
+  }
+
+  const btn = {
+    padding: 8, background: SURF, color: '#a1a1aa', border: `1px dashed ${BORDER}`,
+    borderRadius: 5, cursor: 'pointer', fontSize: 11,
+  }
+
+  return (
+    <>
+      {layers?.length > 0 && (
+        <div style={{ marginBottom: 8 }}>
+          <Tog label="Identify on hover" small checked={identify} onChange={onIdentify}
+               help="Rest the pointer on a feature to see its name and light it up; click to select it in the list. Each pick walks every drawn segment, so on a very dense fetch this is the switch to reach for." />
+        </div>
+      )}
+
+      <VectorDiagnostics crs={crs} crsName={crsName} coverage={coverage} error={error}
+                         hasFeatures={layers?.length > 0}
+                         uploadsOnly={sources?.some((s) => s.kind !== 'osm')} />
+
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        <button className="hmload" onClick={onLoadGeoJson} style={{ ...btn, flex: 1 }}
+                data-testid="load-geojson">↑ GeoJSON</button>
+        <button className="hmload" onClick={onLoadGpx} style={{ ...btn, flex: 1 }}
+                data-testid="load-gpx">↑ GPX</button>
+      </div>
+
+      {/* ── OpenStreetMap ───────────────────────────────────────────────── */}
+      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: 8, marginBottom: 10 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+          <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
+          {size && (
+            <span style={{ fontSize: 9, color: MUTED, fontFamily: 'monospace' }}>
+              {size.w.toFixed(1)} × {size.h.toFixed(1)} km
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginBottom: 8 }}>
+          {OSM_CATEGORIES.map((c) => {
+            const on = picked.includes(c.id)
+            return (
+              <button key={c.id} onClick={() => toggleCat(c.id)} disabled={!canQuery || fetching}
+                data-testid={`osm-cat-${c.id}`}
+                title={c.heavy ? 'Large in a populated extent' : undefined}
+                style={{
+                  fontSize: 8, padding: '4px 3px', borderRadius: 3, textAlign: 'left',
+                  cursor: canQuery && !fetching ? 'pointer' : 'default',
+                  opacity: canQuery ? 1 : 0.4,
+                  background: on ? ACCENT : SURF, color: on ? '#fff' : MUTED,
+                  border: `1px solid ${on ? ACCENT : BORDER}`,
+                }}>
+                {c.label}{c.heavy ? ' ⚠' : ''}
+              </button>
+            )
+          })}
+        </div>
+
+        <button onClick={fetching ? () => abortRef.current?.abort() : runFetch}
+          disabled={!canQuery || !picked.length}
+          data-testid="osm-fetch"
+          style={{
+            width: '100%', padding: 7, borderRadius: 4, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
+            background: fetching ? SURF : ACCENT, color: fetching ? MUTED : '#fff',
+            border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
+          }}>
+          {fetching ? '✕ Cancel' : 'Fetch from OpenStreetMap'}
+        </button>
+
+        {fetching && status && (
+          <div style={{ fontSize: 9, color: MUTED, marginTop: 6, textAlign: 'center' }}>{status}</div>
+        )}
+        {hasOsm && (
+          <div style={{ fontSize: 8, color: MUTED, marginTop: 6, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
+        )}
+      </div>
+
+      {/* ── Layers ──────────────────────────────────────────────────────── */}
+      {!layers?.length && (
+        <div style={{ fontSize: 9, color: MUTED, lineHeight: 1.6 }}>
+          Nothing loaded yet. Fetch the extent from OpenStreetMap, or upload a GeoJSON or GPX file —
+          features are draped on the terrain and carried into the SVG, PNG and video exports.
+        </div>
+      )}
+
+      {layers?.map((l) => {
+        const isOpen = expanded === l.id
+        return (
+          <div key={l.id} data-testid={`vector-layer-${l.id}`}
+               style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 6, marginBottom: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button onClick={() => onPatch(l.id, { visible: !l.visible })}
+                title={l.visible ? 'Hide' : 'Show'} data-testid={`vector-vis-${l.id}`}
+                style={{
+                  width: 16, height: 16, borderRadius: 3, cursor: 'pointer', fontSize: 9, lineHeight: 1,
+                  background: l.visible ? l.color : SURF, color: '#fff',
+                  border: `1px solid ${l.visible ? l.color : BORDER}`,
+                }}>{l.visible ? '' : '·'}</button>
+              <button onClick={() => setExpanded(isOpen ? null : l.id)}
+                style={{
+                  flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
+                  color: l.visible ? TEXT : MUTED, fontSize: 10, padding: 0,
+                }}>
+                {isOpen ? '▾' : '▸'} {l.name}
+              </button>
+              <span style={{ fontSize: 8, color: MUTED, fontFamily: 'monospace' }}>{l.count}</span>
+              <button onClick={() => onRemove(l.id)} title="Remove layer"
+                data-testid={`vector-remove-${l.id}`}
+                style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
+            </div>
+
+            {isOpen && (
+              <Sub>
+                {/* The very same control block the fourteen draw modes use. A
+                    layer record's field names are the mode params minus their
+                    suffix, so an empty prefix addresses them unchanged. */}
+                <ModeStyleOverride prefix="" style={l} ss={(patch) => onPatch(l.id, patch)} showHypso={false} />
+                {l.geom === 'area' && (
+                  <div style={{ marginTop: 8 }} data-testid={`vector-fill-${l.id}`}>
+                    <Tog label="Fill" small checked={l.fill} onChange={(v) => onPatch(l.id, { fill: v })} />
+                    {l.fill && (
+                      <Sub>
+                        <ColorRow label="Fill Colour" value={l.fillColor}
+                                  onChange={(v) => onPatch(l.id, { fillColor: v })} />
+                        <InlineSl label="Fill Op." min={0} max={1} step={0.01} value={l.fillOpacity}
+                                  fmt={(v) => Math.round(v * 100) + '%'}
+                                  onChange={(v) => onPatch(l.id, { fillOpacity: v })} />
+                      </Sub>
+                    )}
+                  </div>
+                )}
+                {l.geom !== 'point' && (
+                  <div style={{ marginTop: 8 }}>
+                    <Tog label="STL ribbon" small checked={l.stlRibbon}
+                         onChange={(v) => onPatch(l.id, { stlRibbon: v })} />
+                  </div>
+                )}
+
+                {(() => {
+                  const bucket = sources
+                    ?.find((src) => src.id === l.sourceId)
+                    ?.buckets.find((b) => b.key === l.bucket)
+                  if (!bucket) return null
+                  const open = featuresOpen === l.id
+                  return (
+                    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+                      <button onClick={() => setFeaturesOpen(open ? null : l.id)}
+                        data-testid={`features-toggle-${l.id}`}
+                        style={{
+                          width: '100%', textAlign: 'left', background: 'none', border: 'none',
+                          cursor: 'pointer', color: MUTED, fontSize: 8, fontWeight: 700,
+                          letterSpacing: 1, padding: 0,
+                        }}>
+                        {open ? '▾' : '▸'} FEATURES ({bucket.count})
+                      </button>
+                      {open && <FeatureList layer={l} bucket={bucket} onPatch={onPatch} />}
+                    </div>
+                  )
+                })()}
+              </Sub>
+            )}
+          </div>
+        )
+      })}
+
+      {sources?.length > 1 && (
+        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {sources.map((src) => (
+            <button key={src.id} onClick={() => onRemoveSource(src.id)}
+              title={`Remove every layer from ${src.label}`}
+              style={{
+                fontSize: 8, padding: '3px 6px', borderRadius: 3, cursor: 'pointer',
+                background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
+              }}>✕ {src.label}</button>
+          ))}
+        </div>
+      )}
+    </>
+  )
 }
 
 function HypsometricRow({ value }) {
@@ -187,7 +594,7 @@ function ProjectionParams({ params, values, onChange }) {
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
-function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, gradientStops, setGradientStops }) {
+function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
@@ -213,7 +620,10 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
         </div>
       )}
 
-      <div style={{ marginTop: 10 }}>
+      {/* Hypsometric is off the table for vector layers: a road has no elevation
+          of its own, so the tint would have to read the ground under it, which
+          is a different thing from what the draw modes mean by it. */}
+      {showHypso && <div style={{ marginTop: 10 }}>
         <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
         {isHypso && (
           <Sub>
@@ -244,7 +654,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
             )}
           </Sub>
         )}
-      </div>
+      </div>}
     </div>
   )
 }
@@ -262,7 +672,11 @@ export function Sidebar({
   loadFromPicker, loadGeoTiffFromPicker,
   soundscape, onSoundscapeFit, flockAudio,
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
-  loadGpxFromPicker, gpxPoints, gpxCoverage, gpxError, onClearGpx,
+  geoTiffBbox,
+  loadGpxFromPicker, loadGeoJsonFromPicker,
+  vectorSources, vectorLayers, vectorCoverage, vectorError,
+  onPatchVectorLayer, onRemoveVectorLayer, onRemoveVectorSource,
+  onAdoptVectorSource, onVectorError, vectorIdentify, onVectorIdentify,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
   onWebmToggle, webmActive,
@@ -283,7 +697,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     modeEngrave: false, modeCurv: false, modeSwiss: false,
-    hillshade: false, slopeShade: false, gpxTrack: false,
+    hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
     soundscapes: false,
@@ -471,15 +885,19 @@ export function Sidebar({
 
   // Stats
   let totalLinePos = 0
+  let totalFillIdx = 0
   if (Array.isArray(lineGeo)) {
     for (const L of lineGeo) {
       if (L.positions) totalLinePos += L.positions.length
+      // Area fills are drawn triangles like the surface is, so they belong in
+      // the triangle count rather than in a number nothing reports.
+      if (L.fills) totalFillIdx += L.fills.indices.length
     }
   }
 
   const segs  = lineGeo    ? (totalLinePos / 6).toLocaleString()     : '–'
   const verts = lineGeo    ? (totalLinePos / 3).toLocaleString()     : '–'
-  const tris  = surfaceGeo ? (surfaceGeo.indices.length  / 3).toLocaleString()   : '–'
+  const tris  = surfaceGeo ? ((surfaceGeo.indices.length + totalFillIdx) / 3).toLocaleString() : '–'
   const grid  = terrainData ? `${terrainData.cols}×${terrainData.rows}` : '–'
 
   return (
@@ -1119,29 +1537,19 @@ export function Sidebar({
           </Section>
 
           {geoTiffElevMin != null && (
-            <Section title="GPX Track" open={sec.gpxTrack} onToggle={() => tog('gpxTrack')} enabled={gpxPoints?.length > 0}>
-              <GpxDiagnostics crs={geoTiffCRS} crsName={geoTiffCRSName} coverage={gpxCoverage} error={gpxError} />
-              <div style={{ display:'flex', gap:6, marginBottom:6 }}>
-                <button className="hmload" onClick={loadGpxFromPicker}
-                  style={{ flex:1, padding:8, background:SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
-                  {gpxPoints?.length > 0 ? '↑ Replace GPX' : '↑ Load GPX (.gpx)'}
-                </button>
-                {gpxPoints?.length > 0 && (
-                  <button onClick={onClearGpx}
-                    style={{ padding:'8px 12px', background:SURF, color:MUTED, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
-                    ✕
-                  </button>
-                )}
-              </div>
-              {gpxPoints?.length > 0 && (
-                <>
-                  <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
-                    {gpxPoints.length} track points
-                    {gpxCoverage?.status === 'partial' && ` · ${gpxCoverage.inside} on the raster`}
-                  </div>
-                  <ModeStyleOverride prefix="Gpx" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={setGradientStops} />
-                </>
-              )}
+            <Section title="Vector Layers" open={sec.vectorLayers} onToggle={() => tog('vectorLayers')}
+                     enabled={vectorLayers?.length > 0}>
+              <VectorLayersPanel
+                crs={geoTiffCRS} crsName={geoTiffCRSName}
+                bbox={geoTiffBbox}
+                coverage={vectorCoverage} error={vectorError}
+                sources={vectorSources} layers={vectorLayers}
+                onLoadGpx={loadGpxFromPicker} onLoadGeoJson={loadGeoJsonFromPicker}
+                onPatch={onPatchVectorLayer} onRemove={onRemoveVectorLayer}
+                onRemoveSource={onRemoveVectorSource}
+                onAdopt={onAdoptVectorSource} onError={onVectorError}
+                identify={vectorIdentify} onIdentify={onVectorIdentify}
+              />
             </Section>
           )}
 
@@ -1610,7 +2018,7 @@ export function Sidebar({
                 Projection: {crsDisplayName(geoTiffCRS, geoTiffCRSName)}
                 {crsInfo.accuracy === 'guess'   && ' · assumed UTM'}
                 {crsInfo.accuracy === 'approx'  && ' · datum shift not applied'}
-                {!crsInfo.supported             && ' · GPX overlay unsupported'}
+                {!crsInfo.supported             && ' · vector overlay unsupported'}
               </div>
             )}
           </div>

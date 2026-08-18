@@ -157,6 +157,17 @@ function fillTriangle(x0, y0, d0, x1, y1, d1, x2, y2, d2, buf, W, H) {
   }
 }
 
+// ─── XML escaping ─────────────────────────────────────────────────────────────
+//
+// Layer names are user data now — a GeoJSON file called `a&b.geojson` becomes a
+// layer called `a&b`, and an unescaped `&` makes the whole SVG unparseable.
+
+const xmlAttr = (s) => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+// XML ids may not contain a colon, which every vector layer id does.
+const xmlId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '-')
+
 // ─── Dash segment splitter ────────────────────────────────────────────────────
 
 // Splits a screen-space line segment into actual on-sub-segments according to a
@@ -223,7 +234,7 @@ export async function exportSVG(opts) {
 
 async function runExport({
   onProgress,
-  lineGeo, lineStyles = {}, camera, width, height,
+  lineGeo, lineStyles = {}, camera, width, height, attribution = null,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   surfaceOccludes,
@@ -421,7 +432,14 @@ async function runExport({
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
-      const { weight = 1, opacity = 1, dash = 'solid' } = lineStyles[id] ?? {}
+      const { weight = 1, opacity = 1, dash = 'solid', color, name } = lineStyles[id] ?? {}
+      // Vector layers carry no per-vertex colour buffer unless hypsometric is
+      // on; their one colour arrives with the style instead, so it can be
+      // changed without a geometry rebuild. Fills are not exported: they are
+      // thousands of terrain-conforming quads that would need painter-order
+      // depth sorting against the Z-buffer, and this is a line-art format. The
+      // outline of every filled area is here, so nothing goes missing.
+      const flatStroke = color || '#000000'
       if (!positions || positions.length === 0) continue
 
       // ── Point layers (stipple dots) ──────────────────────────────────────────
@@ -444,7 +462,7 @@ async function runExport({
           if (!dotInside(sx, sy)) continue
           const fill = (colors && colors.length > i + 2)
             ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
-            : '#000000'
+            : flatStroke
           let visible = true
           if (surfViewZ) {
             const surfZ = surfViewZ(sx, sy)
@@ -460,7 +478,7 @@ async function runExport({
         }
         walkDone += dotCount
         if (visibleDots.length > 0 || ghostDots.length > 0) {
-          svgLayers.push({ id, isPoints: true, visibleDots, ghostDots, dotR, weight, opacity })
+          svgLayers.push({ id, name, isPoints: true, visibleDots, ghostDots, dotR, weight, opacity })
         }
         continue
       }
@@ -498,7 +516,7 @@ async function runExport({
           else            { bx = cx3; by = cy3; bz = cz3 }
         }
 
-        let stroke = '#000000'
+        let stroke = flatStroke
         if (colors && colors.length > i + 2) {
           stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
         }
@@ -608,7 +626,7 @@ async function runExport({
 
       walkDone += segCount
       if (visibleSegs.length > 0 || ghostSegs.length > 0) {
-        svgLayers.push({ id, visibleSegs, ghostSegs, weight, opacity, dash })
+        svgLayers.push({ id, name, visibleSegs, ghostSegs, weight, opacity, dash })
       }
     }
   }
@@ -773,8 +791,10 @@ async function runExport({
   for (const layer of svgLayers) {
     const sw        = (layer.weight * 0.5).toFixed(3)
     const dashSizes = DASH_SEGMENT_SIZES[layer.dash ?? 'solid'] ?? null
-    const modeId    = layer.id ?? 'Lines'
-    const modeLabel = modeId.replace(/([A-Z])/g, ' $1').trim()
+    const modeId    = xmlId(layer.id ?? 'Lines')
+    // Draw modes are CamelCase ids and get spaced out; vector layers carry a
+    // real name, which is the one worth putting on the pen layer.
+    const modeLabel = xmlAttr(layer.name ?? (layer.id ?? 'Lines').replace(/([A-Z])/g, ' $1').trim())
     const inner = []
 
     if (layer.isPoints) {
@@ -849,6 +869,10 @@ async function runExport({
     // 1060.7 viewBox lands at 1:1.4147 instead of 1:1.41421, and frame.js stores
     // these ratios exactly rather than as rounded millimetres for that reason.
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(1)}" height="${vh.toFixed(1)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
+    // OpenStreetMap data is ODbL: wherever it goes, the credit goes with it. A
+    // comment rather than drawn text, so it survives being opened in Inkscape
+    // without appearing on the plot.
+    ...(attribution ? [`<!-- ${xmlAttr(attribution)} -->`] : []),
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...layerGroups,

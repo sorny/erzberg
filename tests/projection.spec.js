@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import {
-  classifyCRS, crsDisplayName, geoToPixel, isTrackProjectable, metresPerLonDegree,
-  projectWgs84, suggestElevScale, trackCoverage,
+  bboxToWgs84, classifyCRS, crsDisplayName, featureCoverage, geoToPixel, isInvertible,
+  isProjectable, metresPerLonDegree, projectWgs84, suggestElevScale, unprojectWgs84,
+  wgs84ExtentKm,
 } from '../src/utils/geoCoords.js'
 
 /**
@@ -249,39 +250,135 @@ test.describe('pixel mapping', () => {
   })
 })
 
-test.describe('track coverage', () => {
-  const onTile  = [ERZBERG, { lat: ERZBERG.lat + 0.01, lon: ERZBERG.lon + 0.01 }]
-  const offTile = [{ lat: 0, lon: 0 }, { lat: 0.01, lon: 0.01 }]
+test.describe('feature coverage', () => {
+  // The flat [lon, lat, …] ring form every vector source normalises to.
+  const onTile  = [Float64Array.from([ERZBERG.lon, ERZBERG.lat, ERZBERG.lon + 0.01, ERZBERG.lat + 0.01])]
+  const offTile = [Float64Array.from([0, 0, 0.01, 0.01])]
 
-  test('distinguishes the ways a track fails to appear', () => {
-    const status = (pts, crs) => trackCoverage(pts, BBOX, crs, 1000, 1000).status
+  test('distinguishes the ways features fail to appear', () => {
+    const status = (rings, crs) => featureCoverage(rings, BBOX, crs, 1000, 1000).status
     expect(status(onTile, 'EPSG:32633')).toBe('ok')
     expect(status(offTile, 'EPSG:32633')).toBe('outside')       // right CRS, wrong place
     expect(status([...onTile, ...offTile], 'EPSG:32633')).toBe('partial')
     expect(status(onTile, 'EPSG:31287')).toBe('unsupported')    // cannot project at all
     expect(status(onTile, 'EPSG:none')).toBe('none')            // raster has no georeferencing
     expect(status([], 'EPSG:32633')).toBe('empty')
+    expect(status([new Float64Array(0)], 'EPSG:32633')).toBe('empty')
   })
 
-  test('counts the points that land on the raster', () => {
-    const c = trackCoverage([...onTile, ...offTile], BBOX, 'EPSG:32633', 1000, 1000)
+  test('counts the vertices that land on the raster', () => {
+    const c = featureCoverage([...onTile, ...offTile], BBOX, 'EPSG:32633', 1000, 1000)
     expect(c).toMatchObject({ inside: 2, total: 4 })
+  })
+})
+
+test.describe('inverse projection', () => {
+  // A degree of latitude is ~111 km, so 1e-5° is about a metre. Overpass is
+  // queried with the result, and a metre of slop there costs nothing — but a
+  // kilometre would clip features off the edge of the extent.
+  const METRE = 1e-5
+
+  test('round-trips every CRS family the forward path accepts', () => {
+    // Each point is inside the grid it is projected into. A UTM series is a
+    // small-angle expansion around its own central meridian: 120° away it does
+    // not merely lose accuracy, it returns nonsense, and testing that would be
+    // testing the wrong thing.
+    const cases = [
+      { lat: ERZBERG.lat, lon: ERZBERG.lon, crs: 'EPSG:4326'  },
+      { lat: ERZBERG.lat, lon: ERZBERG.lon, crs: 'EPSG:3857'  },
+      { lat: ERZBERG.lat, lon: ERZBERG.lon, crs: 'EPSG:32633' },
+      { lat: ERZBERG.lat, lon: ERZBERG.lon, crs: 'EPSG:25833' },
+      { lat: 39.74, lon: -104.99, crs: 'EPSG:26913' },   // Denver, NAD83 / UTM 13N
+    ]
+    for (const { lat, lon, crs } of cases) {
+      const [x, y] = projectWgs84(lat, lon, crs)
+      const [rLat, rLon] = unprojectWgs84(x, y, crs)
+      expect(rLat, crs).toBeCloseTo(lat, 5)
+      expect(rLon, crs).toBeCloseTo(lon, 5)
+    }
+  })
+
+  test('round-trips in the southern hemisphere and near a zone edge', () => {
+    const cases = [
+      { lat: -33.87, lon: 151.21, crs: 'EPSG:32756' },  // Sydney, UTM 56S
+      { lat: 60.0,   lon: 11.99,  crs: 'EPSG:32632' },  // just inside zone 32's west edge
+      { lat: 0.0,    lon: 15.0,   crs: 'EPSG:32633' },  // on the equator
+    ]
+    for (const { lat, lon, crs } of cases) {
+      const [x, y] = projectWgs84(lat, lon, crs)
+      const [rLat, rLon] = unprojectWgs84(x, y, crs)
+      expect(Math.abs(rLat - lat), crs).toBeLessThan(METRE)
+      expect(Math.abs(rLon - lon), crs).toBeLessThan(METRE)
+    }
+  })
+
+  test('refuses what it cannot invert, including a CRS it can project into', () => {
+    // The asymmetry that matters: forward works by guessing a zone from the
+    // point's longitude, and there is no longitude to guess from coming back.
+    expect(projectWgs84(ERZBERG.lat, ERZBERG.lon, 'EPSG:projected-unknown')).not.toBeNull()
+    expect(isInvertible('EPSG:projected-unknown')).toBe(false)
+    expect(unprojectWgs84(500000, 5265000, 'EPSG:projected-unknown')).toBeNull()
+
+    expect(isInvertible('EPSG:31287')).toBe(false)
+    expect(isInvertible('EPSG:none')).toBe(false)
+    expect(isInvertible(null)).toBe(false)
+    expect(isInvertible('EPSG:geographic-unknown')).toBe(true)
+  })
+})
+
+test.describe('extent as a WGS84 envelope', () => {
+  test('encloses the raster it came from', () => {
+    const env = bboxToWgs84(BBOX, 'EPSG:32633')
+    expect(env[0]).toBeLessThan(ERZBERG.lon)
+    expect(env[2]).toBeGreaterThan(ERZBERG.lon)
+    expect(env[1]).toBeLessThan(ERZBERG.lat)
+    expect(env[3]).toBeGreaterThan(ERZBERG.lat)
+    // 10 km square, so ~0.13° of longitude at 47.5°N and ~0.09° of latitude.
+    expect(env[2] - env[0]).toBeCloseTo(0.133, 2)
+    expect(env[3] - env[1]).toBeCloseTo(0.090, 2)
+  })
+
+  test('edge midpoints widen the envelope the corners alone would give', () => {
+    // An extent straddling its own central meridian is where the corners lie:
+    // a line of constant northing peaks in latitude *at* the CM, which is
+    // interior to this box, so the four corners all sit below the true top edge.
+    const straddle = [300000, 5200000, 700000, 5400000]   // CM of zone 33 is x = 500000
+    const env = bboxToWgs84(straddle, 'EPSG:32633')
+    const corners = [[straddle[0], straddle[1]], [straddle[0], straddle[3]],
+                     [straddle[2], straddle[1]], [straddle[2], straddle[3]]]
+      .map(([x, y]) => unprojectWgs84(x, y, 'EPSG:32633'))
+    const cornerMaxLat = Math.max(...corners.map(c => c[0]))
+    expect(env[3]).toBeGreaterThan(cornerMaxLat)
+    expect(env[3] - cornerMaxLat).toBeGreaterThan(0.01)   // ~3.5 km of missed extent
+  })
+
+  test('returns null rather than a wrong envelope', () => {
+    expect(bboxToWgs84(BBOX, 'EPSG:31287')).toBeNull()
+    expect(bboxToWgs84(BBOX, 'EPSG:projected-unknown')).toBeNull()
+    expect(bboxToWgs84(null, 'EPSG:32633')).toBeNull()
+    expect(bboxToWgs84([0, 0, NaN, 1], 'EPSG:32633')).toBeNull()
+  })
+
+  test('reports the ground size the OSM panel shows', () => {
+    const { w, h } = wgs84ExtentKm(bboxToWgs84(BBOX, 'EPSG:32633'))
+    expect(w).toBeCloseTo(10, 0)
+    expect(h).toBeCloseTo(10, 0)
   })
 })
 
 test.describe('projectability gate', () => {
   test('admits only what can actually be drawn', () => {
-    expect(isTrackProjectable('EPSG:32633', BBOX)).toBe(true)
-    expect(isTrackProjectable('EPSG:25832', BBOX)).toBe(true)
+    expect(isProjectable('EPSG:32633', BBOX)).toBe(true)
+    expect(isProjectable('EPSG:25832', BBOX)).toBe(true)
     // Both of these passed the old `crs?.startsWith('EPSG:')` gate.
-    expect(isTrackProjectable('EPSG:none', BBOX)).toBe(false)
-    expect(isTrackProjectable('EPSG:31287', BBOX)).toBe(false)
+    expect(isProjectable('EPSG:none', BBOX)).toBe(false)
+    expect(isProjectable('EPSG:31287', BBOX)).toBe(false)
   })
 
   test('rejects a missing or degenerate extent', () => {
-    expect(isTrackProjectable('EPSG:32633', null)).toBe(false)
-    expect(isTrackProjectable('EPSG:32633', [0, 0, 0, 0])).toBe(false)
-    expect(isTrackProjectable('EPSG:32633', [0, 0, NaN, 10])).toBe(false)
+    expect(isProjectable('EPSG:32633', null)).toBe(false)
+    expect(isProjectable('EPSG:32633', [0, 0, 0, 0])).toBe(false)
+    expect(isProjectable('EPSG:32633', [0, 0, NaN, 10])).toBe(false)
   })
 })
 
@@ -387,7 +484,7 @@ test.describe('GeoTIFF load path', () => {
     expect(meta).toContain('WGS 84 / UTM zone 33N (EPSG:32633)')
     // A supported, exact CRS earns no caveat.
     expect(meta).not.toContain('assumed UTM')
-    expect(meta).not.toContain('GPX overlay unsupported')
+    expect(meta).not.toContain('vector overlay unsupported')
     expect(meta).not.toContain('Not georeferenced')
   })
 
@@ -397,10 +494,13 @@ test.describe('GeoTIFF load path', () => {
     expect(await page.innerText('body')).toContain('Elevation: 641 – 2350 m')
   })
 
-  test('offers the GPX section with no complaint about the raster', async ({ page }) => {
+  test('offers the Vector Layers section with no complaint about the raster', async ({ page }) => {
+    // By test id, not by title text: Section uppercases its title in CSS and
+    // innerText reports what is rendered.
+    await expect(page.locator('[data-testid="section-vector-layers"]')).toHaveCount(1)
     const body = await page.innerText('body')
-    expect(body).toContain('Load GPX')
+    expect(body).toContain('Fetch from OpenStreetMap')
     expect(body).not.toContain('carries no georeferencing')
-    expect(body).not.toContain('is not one this tool can project GPX into')
+    expect(body).not.toContain('is not one this tool can place WGS84 features in')
   })
 })
