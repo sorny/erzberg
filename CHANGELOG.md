@@ -7,6 +7,117 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-18
+
+A GeoTIFF says where on Earth it sits. Until now the only thing that used that
+was a single GPX track — one file, one line, one colour. Everything else about a
+place, the roads and streams and forest and summits, had to be somewhere else.
+
+This release makes the raster's extent a question you can ask OpenStreetMap, and
+turns the answer into layers you can style, filter and point at. A live fetch
+over a 12 × 7 km alpine tile came back as 3 476 elements and 112 662 coordinates
+in 169 ms, sorted into 41 named layers: *Roads · Track (621)*, *Water · Stream
+(558)*, *Landuse · Forest (135)*, *Peaks (29)*.
+
+### Added
+- **Vector layers.** With a georeferenced raster loaded, a checklist of OSM
+  categories — roads, rail, waterways, water bodies, landuse, buildings,
+  aerialways, peaks, boundaries — becomes one Overpass query over the raster's own
+  extent. Each tag class that is actually present becomes its own layer, named
+  *category · subtype*, with its own colour, weight, opacity, dash, visibility and
+  removal. GeoJSON and GPX uploads join the same list.
+- **Areas can carry a fill that follows the ground.** Rasterised into a lattice in
+  pixel space rather than triangulated, so every corner takes its own elevation
+  sample and the fill hugs the slope instead of hanging over it as a flat lid.
+  Holes and multi-part polygons fall out of the even-odd rule rather than needing
+  a triangulator, which is why this adds no dependency.
+- **Per-feature selection.** A layer is no longer the smallest thing: expanding
+  one lists its features with a checkbox each, so five peaks can be kept out of
+  twenty-nine. Named features sort first, the rest get a stable `Track #118`, and
+  a filter box plus a cap on rendered rows keeps a 621-feature layer from becoming
+  621 DOM nodes.
+- **Pointing at the terrain names what is under the cursor.** Resting on a feature
+  shows its name and lights it up; clicking selects it, opens its layer and
+  scrolls its row into view. Hovering a row does the same from the other end —
+  both write one piece of state, so neither knows about the other.
+- **Inverse projection.** `unprojectWgs84`, `isInvertible` and `bboxToWgs84` in
+  `utils/geoCoords.js`, which is what lets the extent leave the raster's grid and
+  become a query at all.
+- Vector layers carry into the SVG export as one named Inkscape layer each — so a
+  plot is separable by pen — and into PNG, PNG α and WebM. STL writes a ribbon
+  solid for layers that ask for one, `<base>-vectors.stl`, default on for GPX and
+  off for everything else.
+- GPX track segments are kept apart rather than joined. A `<trkseg>` boundary is
+  the recording pausing, and joining two of them draws a straight line across
+  whatever lies between — on a mountain, a line through the mountain.
+
+### Changed
+- **The GPX Track section is now Vector Layers**, and a GPX file is one source
+  among three. Its `colorGpx` / `weightGpx` / `opacityGpx` / `dashGpx` params are
+  gone; presets written against them still work, applied to any GPX layer.
+- Presets carry `vectorStyles` — the layers' styling and nothing else. Coordinates
+  stay out, and so does the per-feature selection: `hidden` holds feature
+  *indices*, which mean nothing against a different fetch of the same area, so
+  re-applying them would hide five arbitrary peaks rather than the five chosen.
+- `trackCoverage` is now `featureCoverage` and reads the flat ring form every
+  source normalises to; `isTrackProjectable` is `isProjectable`.
+- The stats footer counts area-fill triangles, because they are drawn triangles
+  like the surface is.
+
+### Fixed
+- **A partial-coverage warning that cried wolf on every OSM fetch.** Overpass
+  returns whole ways that cross the bbox edge, so partial coverage is the normal
+  outcome there rather than a mismatch. It is now reported only when an upload is
+  loaded, where it means something.
+- **Peaks were nearly impossible to hover.** Three does not take a pick radius: it
+  tests `distance < (linewidth + threshold) / 2` in CSS pixels, so a weight-5 peak
+  at the original fixed threshold had a **5 px** target. The threshold is now
+  worked backwards from a wanted radius, per layer, so it cancels out however
+  thick each one is drawn. Measured across the same sweep of 440 pointer stops:
+  **0.5% → 9.5%** hit rate, and peaks reachable **2 of 29 → 22 of 29**.
+- **The hover tooltip truncated the names it existed to show.** It wraps now, and
+  flips to the other side of the cursor near an edge instead of sliding under the
+  sidebar. `Steinfeldspitze-Südwest-Gipfel` renders in full.
+- OSM category classification was permissive enough to steal from itself: Water
+  bodies ended with an unconditional `|| 'lake'` and swallowed every road and
+  stream that reached it, while Landuse claimed `natural=water` and `natural=peak`
+  before Water bodies or Peaks ever saw them. Every category now claims only the
+  tag values it lists.
+- `aerialway=t-bar` is spelled with a hyphen, not an underscore, and read back as
+  "Aerial · t-bar".
+- The STL exporter returned `undefined` on success rather than `'done'`.
+
+### Notes
+- **`bboxToWgs84` samples nine points, not four corners.** A projected extent is
+  not a rectangle in WGS84 — a line of constant northing peaks in latitude at the
+  central meridian — so an extent straddling its own CM has all four corners
+  *below* its true top edge, by a few kilometres on a wide tile.
+- **Simplify, then densify.** OSM geometry is drawn rather than recorded, and both
+  directions need correcting: a digitised riverbank carries more detail than a
+  30 m DEM can express, and a straight motorway can run 400 m between nodes, which
+  as one 3D segment puts the road through the ridge between them.
+- **Vector layers carry no per-vertex colour buffer.** One colour, resolved at
+  render time, so recolouring is a frame rather than a rebuild of all fourteen
+  draw modes — pinned by a test that counts worker rebuilds during a colour change
+  and expects zero. This is also why they have no hypsometric tint: a feature has
+  no elevation of its own, so it could only read the ground underneath, which is a
+  different thing from what the draw modes mean by it.
+- **The picker stays out of R3F's event system.** Attaching handlers to the line
+  objects would put them in its interaction list and raycast every one on every
+  pointer move. Raycasting a `LineSegments2` is O(segments) and the
+  bounding-sphere early-out never helps here, since every layer's sphere covers
+  the whole raster — so hovering is debounced to pointer-rest, a click picks
+  immediately, and a drag stays an orbit because the click path measures how far
+  the pointer travelled.
+- **Three Overpass endpoints, not two.** Both of the first pair were serving
+  504 "server is probably too busy" on the day this was written, on a query a
+  third instance answered in seconds. Two is not redundancy.
+- OpenStreetMap data is ODbL. `© OpenStreetMap contributors` appears in the panel
+  whenever OSM layers are loaded, and as a comment in every SVG that carries them.
+- Area fills are not exported to SVG. Correct output would need painter-order
+  depth sorting of thousands of triangles against the software Z-buffer, and this
+  is a line-art format; every filled area's outline is still there.
+
 ## [0.9.20] - 2026-08-17
 
 A dense plate could lock the tab hard enough that Chrome offered to kill the page.
