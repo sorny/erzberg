@@ -7,6 +7,217 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] — 2026-08-20
+
+### Added
+- **Vector layers are a stack you can drag.** There was no way to say what covers
+  what: a fetch drew in the order OpenStreetMap's catalogue happened to be
+  written in, and that was that. The list is now read the way every layer list is
+  read — top row is the front of the scene — and a row moves by its grip, or by
+  ↑/↓ with the grip focused. What changes with it is the whole picture: which ink
+  is on top on screen, and which pen draws last in the SVG.
+  A layer's own parts keep their order inside its slot, so a filled area now
+  covers the layers below it instead of only tinting them, and a fill at 100%
+  stays in the blended pass where the stack decides rather than in the opaque
+  one, which would draw it before every line in the scene wherever you dragged
+  it. Order travels with a preset. Uploads land on top, where you were looking.
+  None of this reaches the worker — the stack is sorted out of its build key, so
+  a drag across forty layers of a dense fetch is a frame rather than a re-drape
+  of a valley of roads per step.
+- **Point features can be drawn as an SVG icon instead of a dot.** Twenty-nine
+  summits were twenty-nine identical dots; now they can be twenty-nine triangles,
+  which is the surveyor's own symbol for one. Sixteen map-and-terrain marks ship
+  in `public/icons/`, all from [Maki](https://labs.mapbox.com/maki-icons) (CC0),
+  Mapbox's own POI set — so they are the marks a Mapbox style addresses by name,
+  `danger` being the skull and crossbones a style calls `danger-15`. The grid is the whole set at a glance, with the
+  category's own suggestion first; anything else is an upload of your own SVG.
+  A Lift slider raises a marker off its point with a leader line down to it,
+  which is what stops a summit icon being half-buried in the slope behind it.
+- **Icons are drawn solid, with their holes cut out.** These are silhouettes, so
+  a solid mountain is the mark Maki drew and the hollow outline of one is a
+  wireframe of it — Fill is on by default, in the icon's own colour at its own
+  opacity, since a summit going solid should not go the blue an area fill starts
+  at, and 45% is right for a lake seen through contours and not for a glyph.
+  The rings are sorted by containment before triangulation — a ring
+  inside an odd number of others is a hole, belonging to the smallest ring that
+  contains it — so the skull keeps its eye sockets and the mountain its inner
+  peak. Triangulation is three's `ShapeUtils` (earcut with hole bridging) rather
+  than the hand-rolled ear clipper this started with, which had no hole support
+  at all. Switching Fill off leaves the outline, which is what a plotter draws.
+  Viewport and raster exports only: the SVG is a line-art format and a fill is
+  triangles.
+- **Point features can be labelled with their name and their height.** A peak
+  fetched from OpenStreetMap already carries both — its `name` tag, and the
+  "1910m" the feature list shows from its `ele` — and they can now go on the
+  terrain. The lettering is geometry like everything else here, so it takes the
+  layer's colour and weight, the ghost occlusion and every exporter, and lands
+  in the SVG as strokes in a pen layer of its own (`Peaks · labels`) — the
+  lettering can be a different pen from the marks it labels. A feature with no
+  name is left unlabelled rather than numbered, and the panel prints the counts
+  ("18 of 29 named") so the gap reads as data rather than as a bug. Size, offset
+  across and up, alignment and fill are all live, and the type is inked apart
+  from the marks it labels — see the ink entry below. The label does share the
+  icon's *plane*, because a name lying flat beside an upright summit triangle
+  reads as a bug.
+  The face is **Space Mono**, the one the erzberg logo is set in (SIL OFL 1.1),
+  in regular, **bold**, *italic* and bold-italic — two switches, with regular as
+  neither, each a separate file rather than a slant applied to one of them.
+  Outlines cannot come from a browser — nothing hands back the curves of a glyph
+  — so `scripts/build-font.js` converts the TTFs ahead of time into ~70 kB of
+  path data each, covering ASCII, Latin-1 and the Latin Extended-A letters that
+  Austrian, Slovene and Czech place names need, and a face is fetched only when
+  a layer asks for it. `npm run font <ttf…>` regenerates them, and refuses a
+  proportional face: the layout is a cursor and an addition.
+- **An icon and a label each carry their own ink** — colour, stroke width and
+  opacity, then fill with its own colour and opacity, and whether that stroke
+  sits **outside** the shape or centred on its edge — independent of each other
+  and of the layer's. A mark drawn *from* a layer is not the layer: a point
+  layer's weight is its dot's **diameter**, 5 for a peak, and five units of
+  stroke on a 25-unit mountain is a blob, while the weight that draws that
+  mountain well closes up the counters of nine-point type. Amber summits under
+  grey lettering is an ordinary thing to want from one layer.
+  Everything but the stroke width starts as "the layer's own" and stays that way
+  until touched, with a *Match layer* button to put it back; a mark's fill falls
+  back through its own stroke colour first, so colouring an icon colours all of
+  it. This removed two hacks: choosing an icon — or uploading one — used to write
+  into the layer, thinning its weight and claiming its fill colour and opacity,
+  because the glyph had no ink of its own. Picking an icon now changes the icon.
+- **Strokes on filled marks sit outside the shape**, which is new — a line
+  renderer only knows centred, and half a stroke width taken out of every edge is
+  what closes up a glyph's counters. There is no geometric fix, since the width is
+  in CSS pixels and the offset would be a world distance that moves with the
+  camera; paint order does it instead, drawing the line at twice the width and the
+  fill over its inner half from a slot after this layer's lines and before the
+  next layer's anything. *Centred* is still there per mark. The SVG export writes
+  the width the slider says either way: a plotter draws one pass along the
+  outline, and doubling the pen would be a lie about the drawing.
+- **Icons can be turned in 3D.** *Face camera* keeps them square to the view as
+  you orbit; switching it off exposes Tilt and Spin, with a **Match view** button
+  that snaps them to the camera — the same drawing, pinned, for composing a frame
+  to export.
+
+### Changed
+- **A height reads `1910m`, not `1910 m`.** One string serves the feature list,
+  the tooltip and the label drawn on the terrain, and at the sizes a plot uses
+  the space was a gap as wide as a digit.
+- **Hiding a layer is its own control.** The row's colour swatch used to double
+  as the visibility toggle, which put "hide" and "delete" at opposite ends and
+  left the swatch doing two jobs. There is now an eye beside the ✕, and the
+  swatch is a colour chip that dims when the layer is hidden.
+- **Each OpenStreetMap request carries a deadline.** One budget per endpoint,
+  covering headers and body, set above the server's own `[timeout:180]`. A
+  socket that accepted the connection and went quiet used to park the panel for
+  ever — and, worse, defeat the mirror fallback, since the loop only advanced on
+  a rejection or a bad status. One budget rather than a short connect timeout
+  and a long transfer one, because Overpass withholds headers until the query has
+  finished running: a tight header deadline would kill the legitimate slow
+  queries this tool exists to make.
+
+### Notes
+- **The icon set is [Maki](https://labs.mapbox.com/maki-icons/) (CC0), a map set
+  drawn filled — which sounds wrong for a line renderer and is not.** Twenty
+  open-source sets were flattened through this very pipeline and compared, and
+  the first pick was a *stroke* UI set on the reasoning that a stroke flattens
+  straight into polylines while a filled glyph arrives as a hollow outline of
+  itself. It does arrive as a hollow outline of itself. That is the point: for a
+  map symbol the outline of the silhouette *is* the line drawing — the fill
+  boundary of a skull and crossbones is a skull and crossbones, and its eye
+  sockets are holes in the fill that come out as their own closed marks. The
+  stroke set bought a lighter line (`danger` is 111 segments where a stroke skull
+  was 52) and paid in vocabulary: no mountain, no volcano, no shelter, no
+  viewpoint, and fourteen kinds of arrow instead. Prefer Maki's solid variants to
+  its `-stroked` ones — a stroked ring is a filled band, so flattening traces
+  both its edges and draws two rings where one was meant.
+- **There is no path parser.** Every drawable SVG element is an
+  `SVGGeometryElement`, so `<path>`, `<circle>`, `<rect>`, `<ellipse>`, `<line>`,
+  `<polyline>` and `<polygon>` all go through `getTotalLength()` +
+  `getPointAtLength()` — arcs and béziers exact — and `getCTM()` folds in whatever
+  nesting and `transform` an uploaded file carries.
+- **Subpaths have to be split, and not by parsing the `d` attribute.**
+  `getPointAtLength` walks a multi-subpath path as one continuous
+  parameterisation and a move between subpaths has no length, so walking it end
+  to end draws a segment from where one subpath stopped to where the next began.
+  Splitting `d` is the obvious fix and is wrong: a subpath starting with a
+  relative `m` is relative to the previous subpath's end. Detecting the spatial
+  discontinuity cannot be fooled — a real segment sampled at step `s` never
+  advances more than `s`.
+- **Icon geometry is built on the main thread**, because those APIs only answer
+  inside a rendered document. That is where it belongs anyway: size, lift and
+  orientation become render-side like colour, so dragging them is a frame rather
+  than a rebuild, and it is what lets the icons follow the camera at all.
+- Choosing an icon also thins an untouched dot weight. A point layer's weight is
+  its dot's *diameter* — 5 for a peak — and the same number is the stroke width of
+  the glyph replacing it. Five pixels of stroke on a 25-pixel mountain is a red
+  blob, which is what the first working version looked like.
+
+### Fixed
+- **A query OpenStreetMap refused was then put to every other mirror.** 429 and
+  504 are about the server and are worth asking elsewhere; a 400 is about the
+  query and asking again only wastes a volunteer's bandwidth. The `throw` that
+  said so landed in the same function's own `catch`, which files anything that is
+  not an abort as "that endpoint failed" and moves on — so a malformed query was
+  re-POSTed down the whole list before the error ever surfaced.
+- **A preset saved before the stack existed came back inside out.** `vectorStyles`
+  used to be written ground-cover first, and reading one of those arrays as a
+  stack order puts landuse in front of roads. New presets carry a
+  `vectorStackOrder` flag and only a preset that sets it has its order applied;
+  an older one contributes its styles and says nothing about arrangement.
+- **A preset that carried an uploaded glyph made its layer vanish.**
+  `iconCustom` holds flattened geometry whose polylines are typed arrays, and
+  `JSON.stringify` writes those as `{"0":…}` objects with no `length` — so on
+  reload every loop over them ran zero times and the layer drew neither its icon
+  nor its dots, having been told it had an icon. A preset no longer carries the
+  upload, and `icon` falls back with it.
+- **An icon whose `viewBox` did not start at `0 0` was drawn off-centre.** The
+  origin was subtracted twice — once by `getCTM`, which carries the viewBox's own
+  translate, and once by hand — so an uploaded `viewBox="-12 -12 24 24"` file
+  landed half its own width out of place and could fall outside the unit box.
+  Every bundled icon starts at `0 0`, which is why nothing shipped looked wrong.
+- **Labels drew in front of the whole scene.** They are appended to the geometry
+  rather than substituted into it, and `renderOrder` comes from the array index,
+  so a layer dragged to the bottom of the stack sent its marks behind everything
+  and left its lettering on top of everything. A label now sits in its own
+  layer's slot, directly behind the marks it belongs to.
+- **A second uploaded glyph with the same file name kept drawing the first.** The
+  geometry memo told two custom icons apart by name alone, so replacing
+  `icon.svg` with a different `icon.svg` changed nothing until some unrelated
+  field was touched.
+- **A mark came apart into patches of fill and patches of stroke.** An icon or a
+  label is a flat drawing planted on a rough surface, so the terrain cuts through
+  its plane — and the two halves of it were being cut in different places,
+  because the fill carried a `polygonOffset` toward the camera and the stroke
+  carried none. Along that intersection the fill survived where the stroke was
+  rejected, and which of the two you saw changed with the camera. Both now take
+  the same bias, deeper than the one an area fill uses: an area fill is *of* the
+  surface and wants to hug it, while a marker stands a whole glyph's worth of
+  geometry through the ground it is planted in. Lift is still what stops a marker
+  being half-buried; this is what stops it being half-*eaten*.
+- **A mark's fill no longer writes depth**, so which of the fill and the stroke
+  covers the other is decided by the stroke's Outside/Centred setting rather than
+  per-pixel by the depth buffer. Exactly coplanar geometry plus a stroke that is
+  really a screen-space quad — its depth interpolated across its width — is a
+  coin toss, and it read as one. Area fills are unchanged: they still write
+  depth, which is what lets a lake at 100% cover the contours under it.
+- The picker reported the *geometry's* id for an icon layer (`vec:7#icons`) where
+  hover and selection name a layer, so a picked icon appeared nameless and its
+  row unmarked.
+- **The flattener sampled invisible geometry.** Icon sets pin their bounds with
+  `<path stroke="none" fill="none" d="M0 0h24v24H0z"/>`, and hit areas and
+  spacers are the same trick — each one drew a square around the icon it was
+  meant to size. It now asks for the *computed* paint, which also catches
+  `display:none` and a zero opacity.
+- **A fill at 100% opacity was still see-through.** The fill material was
+  permanently `transparent` with `depthWrite` off, so it stayed in the blended
+  pass no matter what the slider said, and the terrain surface and every layer
+  drawn after it composited over the top. At full opacity it is now genuinely
+  opaque, which puts it in the depth-sorted pass where it covers what is behind
+  it.
+- **The flattener scaled by the rendered size, not the viewBox.** `getCTM()`
+  includes the viewport transform, so an SVG sized in `em` or `%` — which is
+  most of them, and everything an icon CDN serves — came out shrunk by the ratio
+  between its CSS size and its viewBox. A 256-unit icon at the default 16 px
+  arrived at one sixteenth scale.
+
 ## [0.10.0] - 2026-08-18
 
 A GeoTIFF says where on Earth it sits. Until now the only thing that used that
