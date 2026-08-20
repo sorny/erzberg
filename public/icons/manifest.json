@@ -1,0 +1,70 @@
+{
+  "source": "Maki 8.2.0 (labs.mapbox.com/maki-icons)",
+  "license": "CC0 1.0 — see LICENSE in this directory",
+  "icons": [
+    {
+      "id": "triangle",
+      "label": "Summit"
+    },
+    {
+      "id": "mountain",
+      "label": "Mountain"
+    },
+    {
+      "id": "volcano",
+      "label": "Volcano"
+    },
+    {
+      "id": "viewpoint",
+      "label": "Viewpoint"
+    },
+    {
+      "id": "shelter",
+      "label": "Refuge"
+    },
+    {
+      "id": "campsite",
+      "label": "Campsite"
+    },
+    {
+      "id": "park-alt1",
+      "label": "Tree"
+    },
+    {
+      "id": "water",
+      "label": "Water"
+    },
+    {
+      "id": "marker",
+      "label": "Map pin"
+    },
+    {
+      "id": "arrow",
+      "label": "Waypoint"
+    },
+    {
+      "id": "danger",
+      "label": "Danger"
+    },
+    {
+      "id": "religious-christian",
+      "label": "Cross"
+    },
+    {
+      "id": "star",
+      "label": "Star"
+    },
+    {
+      "id": "circle",
+      "label": "Circle"
+    },
+    {
+      "id": "square",
+      "label": "Square"
+    },
+    {
+      "id": "cross",
+      "label": "X"
+    }
+  ]
+}

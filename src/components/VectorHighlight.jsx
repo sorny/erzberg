@@ -100,9 +100,20 @@ export function VectorHighlight({ lineGeo, resolution }) {
   const hover = useStore((s) => s.vectorHover)
   const selected = useStore((s) => s.vectorSelected)
 
+  // Keyed on the *layer* id, so a layer drawing icons (`vec:7#icons`) is found
+  // by the same key its dots would have been.
+  //
+  // Label text is skipped when the layer has anything else: pointing at a name
+  // should light up the summit it belongs to, not just the name. It still wins
+  // over nothing, so a layer drawing labels alone still highlights.
   const byId = useMemo(() => {
     const m = new Map()
-    for (const l of lineGeo ?? []) if (l.featureOfSegment) m.set(l.id, l)
+    for (const l of lineGeo ?? []) {
+      if (!l.featureOfSegment) continue
+      const base = l.id.split('#')[0]
+      if (l.isLabelText && m.has(base)) continue
+      m.set(base, l)
+    }
     return m
   }, [lineGeo])
 

@@ -31,7 +31,7 @@
 import { boxBlur, buildTerrain, maskHasHoles } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry } from './geometryBuilders'
 import { buildVectorGeometry } from './vectorGeometry'
-import { layerBuildKey } from './vectorLayers'
+import { vectorBuildSignature } from './vectorLayers'
 
 // Cached source raster — replaced only by a message carrying `heightmapPixels`.
 let src = null
@@ -52,9 +52,10 @@ let dataGen = 0
  * Everything a vector layer's *geometry* depends on.
  *
  * Colour, weight, opacity and dash are deliberately absent: `layerStyle`
- * resolves those at render time, so dragging them is free. `layerBuildKey`
- * carries the per-layer half (visibility, fill); the rest is the terrain the
- * features are draped on, which is exactly the param set `buildTerrain` reads.
+ * resolves those at render time, so dragging them is free. `vectorBuildSignature`
+ * carries the per-layer half (visibility, fill) and is sorted, so reordering the
+ * stack is free for the same reason; the rest is the terrain the features are
+ * draped on, which is exactly the param set `buildTerrain` reads.
  */
 function vectorSignature(p) {
   const layers = p.vectorLayers ?? []
@@ -64,7 +65,7 @@ function vectorSignature(p) {
     p.resolution, p.blurRadius, p.elevScale, p.elevMinCut, p.elevMaxCut,
     p.blackPoint, p.whitePoint, p.jitterAmt, p.gridOffsetX, p.gridOffsetY,
     p.geoTiffCRS, (p.geoTiffBbox ?? []).join(','),
-    layers.map(layerBuildKey).join(';'),
+    vectorBuildSignature(layers),
   ].join('|')
 }
 

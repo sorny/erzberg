@@ -1,7 +1,7 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
@@ -13,6 +13,7 @@ import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES } from '../utils/osmCategories'
 import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
 import { featureLabel, toggleHidden } from '../utils/vectorLayers'
 import { CANCELLED } from '../utils/pacing'
+import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
@@ -124,6 +125,456 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
     return note(MUTED, <>{crsDisplayName(crs, crsName)} uses a datum this tool does not shift for; features may sit up to a few hundred metres off.</>)
 
   return null
+}
+
+/**
+ * Choosing an SVG icon for a point layer, and orienting it in 3D.
+ *
+ * The picker previews each icon with an ordinary `<img>` pointed at the file in
+ * `public/icons/` — the same trick the preset tiles use for their thumbnails,
+ * and the reason the icons are shipped as files rather than generated into a
+ * module.
+ *
+ * Everything here is render-side: the worker never learns that icons exist, so
+ * dragging Size or Tilt is a frame, not a rebuild.
+ */
+/**
+ * Open eye, or struck through when the layer is hidden.
+ *
+ * Inline rather than one of the files in `public/icons/` — those are data the
+ * user draws *with*, fetched at runtime and flattened into terrain geometry.
+ * A control in the panel is not that, and routing it through the icon catalogue
+ * would make the chrome depend on the content.
+ */
+function EyeIcon({ off }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="2.6" />
+      {off && <path d="M3.5 3.5 20.5 20.5" />}
+    </svg>
+  )
+}
+
+function GripIcon() {
+  return (
+    <svg width="10" height="13" viewBox="0 0 10 13" fill="currentColor" aria-hidden="true">
+      {[2, 6.5, 11].map((cy) => (
+        <g key={cy}><circle cx="2" cy={cy} r="1.1" /><circle cx="8" cy={cy} r="1.1" /></g>
+      ))}
+    </svg>
+  )
+}
+
+/**
+ * Drag-to-reorder for the layer stack.
+ *
+ * Pointer events with capture rather than HTML5 drag-and-drop: the sidebar is a
+ * scrolling panel inside a WebGL page, and the native drag image, drop targets
+ * and `dragover` bookkeeping buy nothing here that `setPointerCapture` does not
+ * do in a third of the code. It also keeps the drag working with a pen or a
+ * finger, which HTML5 dragging does not.
+ *
+ * Rows are measured live rather than at drag start. They have to be: the list
+ * reflows the instant a move is committed, and an expanded layer is several
+ * times the height of a collapsed one, so a cached set of boxes is wrong from
+ * the first swap onwards.
+ */
+function useStackDrag(layers, onReorder) {
+  const rows = useRef(new Map())
+  const [dragging, setDragging] = useState(null)
+
+  const bindRow = useCallback((id) => (el) => {
+    if (el) rows.current.set(id, el)
+    else rows.current.delete(id)
+  }, [])
+
+  const start = (e, id) => {
+    if (e.button !== 0) return
+    e.preventDefault()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    setDragging(id)
+  }
+
+  const move = (e) => {
+    if (!dragging) return
+    const from = layers.findIndex((l) => l.id === dragging)
+    if (from < 0) return
+    const y = e.clientY
+
+    // A row is crossed at its midpoint, not at its edge. Swapping on entry
+    // reads fine while every row is the same height and falls apart as soon as
+    // one is expanded: the shorter row lands back under the cursor and the list
+    // oscillates between two orders for as long as you hold still.
+    let target = from
+    for (let i = 0; i < layers.length; i++) {
+      if (i === from) continue
+      const r = rows.current.get(layers[i].id)?.getBoundingClientRect()
+      if (!r) continue
+      if (i < from) {
+        // Going up, the topmost row whose upper half we have reached wins…
+        if (target === from && y < r.bottom - r.height / 2) target = i
+      } else if (y > r.top + r.height / 2) {
+        // …going down, the lowest one.
+        target = i
+      }
+    }
+    if (target !== from) onReorder(dragging, target)
+  }
+
+  const end = (e) => {
+    if (!dragging) return
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+    setDragging(null)
+  }
+
+  return { dragging, bindRow, start, move, end }
+}
+
+/**
+ * One mark's ink: stroke colour, width and opacity, then fill colour and
+ * opacity behind its own switch.
+ *
+ * The same block serves the icon and the labels, because they want the same six
+ * numbers and want them *separately* — a summit triangle is not the road that
+ * shares its colour, and lettering is neither. `prefix` picks which set of
+ * fields it writes; `layerStyle` reads them back with the matching cascade.
+ *
+ * Everything but the width shows the value in force rather than the value
+ * stored: a colour left at `null` displays the layer's, so the swatch is never
+ * blank and never lies. Touching it writes the field and parts company, which
+ * is what **Match layer** undoes.
+ */
+function Ink({ layer, set, prefix, help = {} }) {
+  const id = layer.id
+  const F = (k) => layer[prefix + k]
+  const color = F('Color') ?? layer.color
+  const opacity = F('Opacity') ?? layer.opacity
+  const inherited = ['Color', 'Opacity', 'FillColor', 'FillOpacity'].every((k) => F(k) == null)
+
+  return (
+    <>
+      <ColorRow label="Colour" value={color} testId={`${prefix}-color-${id}`}
+                onChange={(v) => set({ [`${prefix}Color`]: v })} />
+      <InlineSl label="Width" min={0.25} max={8} step={0.25} value={F('Weight')}
+        onChange={(v) => set({ [`${prefix}Weight`]: v })} testId={`${prefix}-weight-${id}`}
+        help={help.weight} />
+      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={opacity}
+        fmt={(v) => Math.round(v * 100) + '%'} testId={`${prefix}-opacity-${id}`}
+        onChange={(v) => set({ [`${prefix}Opacity`]: v })} help={help.opacity} />
+
+      <div data-testid={`${prefix}-fill-${id}`}>
+        <Tog label="Fill" small checked={F('Fill')}
+          onChange={(v) => set({ [`${prefix}Fill`]: v })} help={help.fill} />
+      </div>
+      {F('Fill') && (
+        <Sub>
+          {/* Falls back through this mark's *own* stroke colour before the
+              layer's, so colouring the mark colours all of it. */}
+          <ColorRow label="Fill Colour" value={F('FillColor') ?? color}
+                    testId={`${prefix}-fill-color-${id}`}
+                    onChange={(v) => set({ [`${prefix}FillColor`]: v })} />
+          <InlineSl label="Fill Op." min={0} max={1} step={0.01}
+            value={F('FillOpacity') ?? opacity} fmt={(v) => Math.round(v * 100) + '%'}
+            testId={`${prefix}-fill-opacity-${id}`}
+            onChange={(v) => set({ [`${prefix}FillOpacity`]: v })} />
+
+          {/* Only offered with a fill, because that is what makes the
+              difference: a stroke with no shape behind it has no inside to
+              sit in. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}>
+            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Stroke</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
+                <button key={text} onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
+                  data-testid={`${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
+                  style={{
+                    flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
+                    background: !!F('StrokeOutside') === v ? ACCENT : SURF,
+                    color: !!F('StrokeOutside') === v ? '#fff' : DIM,
+                    border: `1px solid ${!!F('StrokeOutside') === v ? ACCENT : BORDER}`,
+                  }}>{text}</button>
+              ))}
+            </div>
+          </div>
+        </Sub>
+      )}
+
+      {!inherited && (
+        <button data-testid={`${prefix}-match-${id}`}
+          onClick={() => set({
+            [`${prefix}Color`]: null, [`${prefix}Opacity`]: null,
+            [`${prefix}FillColor`]: null, [`${prefix}FillOpacity`]: null,
+          })}
+          style={{
+            width: '100%', padding: 5, margin: '2px 0 6px', fontSize: 9, borderRadius: 3,
+            cursor: 'pointer', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+          }}>Match layer</button>
+      )}
+    </>
+  )
+}
+
+/**
+ * Which way a layer's icon and its labels face.
+ *
+ * One block for both, because they are one mark: a name lying flat beside an
+ * upright summit triangle reads as a bug. It appears under whichever of the two
+ * is switched on, and only once.
+ */
+function Orientation({ layer, set, viewTilt, viewSpin }) {
+  return (
+    <>
+      <Tog label="Face camera" small checked={layer.iconFaceCamera}
+        onChange={(v) => set({ iconFaceCamera: v })}
+        help="Keeps the icon and its labels square to the view as you orbit. Switch it off to aim them by hand — useful when you are composing one particular frame to export." />
+      {!layer.iconFaceCamera && (
+        <Sub>
+          <InlineSl label="Tilt" min={0} max={90} step={1} value={layer.iconTilt}
+            fmt={(v) => `${Math.round(v)}°`} onChange={(v) => set({ iconTilt: v })}
+            testId={`icon-tilt-${layer.id}`} />
+          <InlineSl label="Spin" min={-180} max={180} step={1} value={layer.iconSpin}
+            fmt={(v) => `${Math.round(v)}°`} onChange={(v) => set({ iconSpin: v })}
+            testId={`icon-spin-${layer.id}`} />
+          <button onClick={() => set({ iconTilt: viewTilt, iconSpin: viewSpin })}
+            data-testid={`icon-match-${layer.id}`}
+            style={{
+              width: '100%', padding: 5, marginTop: 2, fontSize: 9, borderRadius: 3, cursor: 'pointer',
+              background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+            }}>Match view</button>
+        </Sub>
+      )}
+    </>
+  )
+}
+
+function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }) {
+  const [manifest, setManifest] = useState(null)
+
+  useEffect(() => { loadIconManifest().then(setManifest) }, [])
+
+  // Stable identity, or the `useMemo` below it re-runs on every render.
+  const icons = useMemo(() => manifest?.icons ?? [], [manifest])
+
+  /**
+   * The whole set, with the category's own suggestion first — a peak layer
+   * should be one click from a triangle rather than a hunt across the grid.
+   */
+  const shown = useMemo(() => {
+    const want = layer.suggestedIcon
+    const head = want ? icons.filter((i) => i.id === want) : []
+    return head.length ? [...head, ...icons.filter((i) => i.id !== want)] : icons
+  }, [icons, layer.suggestedIcon])
+
+  const set = (patch) => onPatch(layer.id, patch)
+
+  /**
+   * Choosing an icon changes nothing but the icon.
+   *
+   * It used to thin the layer's weight and claim its fill colour and opacity on
+   * the first pick, because the glyph was drawn with the *layer's* ink and that
+   * ink is a dot's diameter and a lake's blue. The icon now carries its own —
+   * see `Ink` — so there is nothing left to borrow and nothing to overwrite.
+   */
+  const choose = (id) => set({ icon: id })
+
+  const custom = layer.iconCustom
+
+  return (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>ICON</div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 3, marginBottom: 8 }}>
+        {/* Back to a plain dot. */}
+        <button onClick={() => set({ icon: null })} title="No icon — draw a dot"
+          data-testid={`icon-none-${layer.id}`}
+          style={{
+            aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
+            fontSize: 11, background: layer.icon ? SURF : ACCENT, color: layer.icon ? MUTED : '#fff',
+            border: `1px solid ${layer.icon ? BORDER : ACCENT}`,
+          }}>•</button>
+
+        {shown.map((ic) => {
+          const on = layer.icon === ic.id
+          return (
+            <button key={ic.id} onClick={() => choose(ic.id)} title={`${ic.label} — ${ic.id}`}
+              data-testid={`icon-${layer.id}-${ic.id}`}
+              style={{
+                aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
+                background: on ? ACCENT : SURF, border: `1px solid ${on ? ACCENT : BORDER}`, padding: 3,
+              }}>
+              <img src={iconUrl(ic.id)} alt={ic.label} loading="lazy"
+                style={{ width: '100%', height: '100%', filter: on ? 'invert(1)' : 'invert(0.72)' }} />
+            </button>
+          )
+        })}
+
+        {custom && (
+          <button onClick={() => set({ icon: 'custom' })} title={custom.name}
+            data-testid={`icon-${layer.id}-custom`}
+            style={{
+              aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
+              fontSize: 9, background: layer.icon === 'custom' ? ACCENT : SURF,
+              color: layer.icon === 'custom' ? '#fff' : MUTED,
+              border: `1px solid ${layer.icon === 'custom' ? ACCENT : BORDER}`,
+            }}>SVG</button>
+        )}
+      </div>
+
+      <div style={{ fontSize: 8, color: MUTED, marginBottom: 8, lineHeight: 1.5 }}>
+        Map &amp; terrain marks. Anything else is an SVG away.
+      </div>
+
+      <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
+        style={{
+          width: '100%', padding: 6, marginBottom: 8, background: SURF, color: '#a1a1aa',
+          border: `1px dashed ${BORDER}`, borderRadius: 4, cursor: 'pointer', fontSize: 10,
+        }}>↑ Custom SVG</button>
+
+      {overflowed && (
+        <div style={{ fontSize: 9, color: '#f97316', marginBottom: 6, lineHeight: 1.5 }}>
+          Too many features to draw as icons — this layer is still showing dots.
+        </div>
+      )}
+
+      {layer.icon && (
+        <>
+          <InlineSl label="Size" min={2} max={80} step={1} value={layer.iconSize}
+            onChange={(v) => set({ iconSize: v })} testId={`icon-size-${layer.id}`} />
+          <InlineSl label="Lift" min={0} max={120} step={1} value={layer.iconLift}
+            onChange={(v) => set({ iconLift: v })} testId={`icon-lift-${layer.id}`}
+            help="Raises the icon off the ground and draws a thin leader line down to the exact point. On steep relief it is what stops a summit marker being half-buried in the slope behind it." />
+          <Ink layer={layer} set={set} prefix="icon" help={{
+            weight: "The icon's own line width. It is not the layer's, because a point layer's weight is its dot's *diameter* — five for a peak — and five pixels of stroke on a 25-pixel mountain is a blob.",
+            opacity: "The icon's own opacity, so a marker can sit back from the lines it shares a layer with, or stand out from them.",
+            fill: "Draws the glyph solid, the way the icon was designed, with its holes cut out — the skull's eye sockets and the pin's dot stay open. Switch it off for the hollow outline, which is what a pen plotter draws. It shows in the viewport and in the PNG and video exports, but not in the SVG: that is a line-art format and a fill is triangles.",
+          }} />
+          <Orientation layer={layer} set={set} viewTilt={viewTilt} viewSpin={viewSpin} />
+        </>
+      )}
+    </div>
+  )
+}
+
+/**
+ * A point layer's features labelled with their own name and height.
+ *
+ * Both lines come from what the fetch already parsed — a peak's `name` tag and
+ * its `ele`, the same two strings the feature list below shows — so a label is
+ * never invented. A feature with no name simply goes unlabelled, which is why
+ * the counts are on screen: "18 of 29 named" is the difference between a plot
+ * that is missing labels and one whose data never had them.
+ *
+ * The text is Space Mono Bold, the face the erzberg logo is set in, flattened
+ * to line geometry like everything else here — so it takes the layer's colour
+ * and weight, and lands in the SVG as strokes a plotter can draw.
+ */
+function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin }) {
+  const set = (patch) => onPatch(layer.id, patch)
+  const on = layer.labelName || layer.labelHeight
+
+  const named = bucket?.names.size ?? 0
+  const noted = bucket?.notes.size ?? 0
+  const total = bucket?.count ?? 0
+
+  /**
+   * Bold and italic as two switches rather than a list of four faces: regular
+   * is neither, and bold-italic — which is a real file, not a slanted bold —
+   * falls out of both without a fourth button.
+   */
+  const face = (which, label, active) => (
+    <button key={which}
+      onClick={() => set(which === 'bold' ? { labelBold: !active } : { labelItalic: !active })}
+      data-testid={`label-${which}-${layer.id}`}
+      style={{
+        flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
+        fontWeight: which === 'bold' ? 700 : 400,
+        fontStyle: which === 'italic' ? 'italic' : 'normal',
+        background: active ? ACCENT : SURF,
+        color: active ? '#fff' : DIM,
+        border: `1px solid ${active ? ACCENT : BORDER}`,
+      }}>{label}</button>
+  )
+
+  const align = (value, label) => (
+    <button key={value} onClick={() => set({ labelAlign: value })}
+      data-testid={`label-align-${value}-${layer.id}`}
+      style={{
+        flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
+        background: layer.labelAlign === value ? ACCENT : SURF,
+        color: layer.labelAlign === value ? '#fff' : DIM,
+        border: `1px solid ${layer.labelAlign === value ? ACCENT : BORDER}`,
+      }}>{label}</button>
+  )
+
+  return (
+    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>LABELS</div>
+
+      <div data-testid={`label-name-${layer.id}`}>
+        <Tog label="Name" small checked={layer.labelName}
+          onChange={(v) => set({ labelName: v })}
+          help="Draws each feature's name beside it. A feature with no name in the data is left unlabelled rather than given a number — a plot of twenty-nine summits with nine of them called “#12” is worse than nine unlabelled ones." />
+      </div>
+      <div data-testid={`label-height-${layer.id}`}>
+        <Tog label="Height" small checked={layer.labelHeight}
+          onChange={(v) => set({ labelHeight: v })}
+          help="Draws the feature's elevation, as OpenStreetMap has it — the same “1910m” the feature list shows. It goes on its own line under the name, or on its own if the name is off." />
+      </div>
+
+      <div style={{ fontSize: 8, color: MUTED, margin: '6px 0 8px', lineHeight: 1.5 }}>
+        {total ? `${named} of ${total} named · ${noted} with a height` : 'Nothing to label here.'}
+      </div>
+
+      {on && (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 6px' }}>
+            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Face</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {face('bold', 'Bold', layer.labelBold)}
+              {face('italic', 'Italic', layer.labelItalic)}
+            </div>
+          </div>
+
+          <InlineSl label="Size" min={2} max={40} step={0.5} value={layer.labelSize}
+            onChange={(v) => set({ labelSize: v })} testId={`label-size-${layer.id}`} />
+          <InlineSl label="Offset ↔" min={-120} max={120} step={1} value={layer.labelDx}
+            onChange={(v) => set({ labelDx: v })} testId={`label-dx-${layer.id}`}
+            help="Moves the label across its own plane, so it can sit beside a marker rather than on it." />
+          <InlineSl label="Offset ↕" min={-120} max={200} step={1} value={layer.labelDy}
+            onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
+            help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 6px' }}>
+            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Align</span>
+            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+              {align('left', 'Left')}{align('center', 'Centre')}{align('right', 'Right')}
+            </div>
+          </div>
+
+          <Ink layer={layer} set={set} prefix="label" help={{
+            weight: "The lettering's own line width — the stroke that draws a summit triangle well is the stroke that closes up the counters of small type.",
+            opacity: "The lettering's own opacity. Type sitting on a dense contour field often wants to be quieter than the mark it labels — or louder than a layer you have faded back.",
+            fill: "Draws the lettering solid, with the counters of the letters cut out. Switch it off for outlined type, which is what a pen plotter draws and what the SVG export carries either way.",
+          }} />
+
+          {/* Orientation lives with the icon when there is one; a layer that
+              labels without a marker still needs to aim its text. */}
+          {!layer.icon && (
+            <Orientation layer={layer} set={set} viewTilt={viewTilt} viewSpin={viewSpin} />
+          )}
+
+          {overflowed && (
+            <div style={{ fontSize: 9, color: '#f97316', marginTop: 6, lineHeight: 1.5 }}>
+              Too many features to letter — this layer is drawing no labels. Hide
+              some features, or label fewer layers.
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
 }
 
 /**
@@ -270,12 +721,13 @@ function FeatureList({ layer, bucket, onPatch }) {
 function VectorLayersPanel({
   crs, crsName, bbox, coverage, error,
   sources, layers,
-  onLoadGpx, onLoadGeoJson, onPatch, onRemove, onRemoveSource, onAdopt, onError,
-  identify, onIdentify,
+  onLoadGpx, onLoadGeoJson, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
+  identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, viewTilt, viewSpin,
 }) {
   const [expanded, setExpanded] = useState(null)
   const [featuresOpen, setFeaturesOpen] = useState(null)
   const pickedFeature = useStore((s) => s.vectorSelected)
+  const drag = useStackDrag(layers ?? [], onReorder)
 
   // Picking a feature on the terrain has to *show* you the feature. Without
   // this the click sets the selection and lights the line up, but its row lives
@@ -416,20 +868,54 @@ function VectorLayersPanel({
         </div>
       )}
 
-      {layers?.map((l) => {
+      {layers?.map((l, i) => {
         const isOpen = expanded === l.id
+        const held = drag.dragging === l.id
         return (
-          <div key={l.id} data-testid={`vector-layer-${l.id}`}
-               style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 6, marginBottom: 6 }}>
+          <div key={l.id} data-testid={`vector-layer-${l.id}`} ref={drag.bindRow(l.id)}
+               style={{
+                 borderTop: `1px solid ${BORDER}`, paddingTop: 6, marginBottom: 6,
+                 // The row being dragged is dimmed rather than lifted out of the
+                 // list: the reorder is committed as the cursor crosses, so what
+                 // you are dragging is the real row in its real new place, and a
+                 // floating copy of it would be a second, lying one.
+                 opacity: held ? 0.55 : 1,
+                 background: held ? SURF : 'transparent',
+               }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button onClick={() => onPatch(l.id, { visible: !l.visible })}
-                title={l.visible ? 'Hide' : 'Show'} data-testid={`vector-vis-${l.id}`}
+              {/* Top of the list is the front of the scene, so this is also the
+                  control for what covers what. Arrow keys move it one step,
+                  which is the only way to do this without a pointer. */}
+              <button data-testid={`vector-grip-${l.id}`}
+                title={`Drag to reorder — ${i === 0 ? 'top of the stack, drawn in front' : `#${i + 1} of ${layers.length}`}`}
+                aria-label={`Reorder ${l.name}`}
+                onPointerDown={(e) => drag.start(e, l.id)}
+                onPointerMove={drag.move}
+                onPointerUp={drag.end}
+                onPointerCancel={drag.end}
+                onKeyDown={(e) => {
+                  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0
+                  if (!step) return
+                  e.preventDefault()
+                  onReorder(l.id, i + step)
+                }}
                 style={{
-                  width: 16, height: 16, borderRadius: 3, cursor: 'pointer', fontSize: 9, lineHeight: 1,
-                  background: l.visible ? l.color : SURF, color: '#fff',
-                  border: `1px solid ${l.visible ? l.color : BORDER}`,
-                }}>{l.visible ? '' : '·'}</button>
+                  background: 'none', border: 'none', padding: 0, display: 'flex',
+                  color: held ? TEXT : BORDER, cursor: held ? 'grabbing' : 'grab',
+                  touchAction: 'none', flexShrink: 0,
+                }}><GripIcon /></button>
+              {/* A colour chip, not a control. It used to double as the
+                  visibility toggle, which put "hide" and "delete" at opposite
+                  ends of the row and left the swatch doing two jobs — the eye
+                  below is the one that says what it does. */}
+              <span data-testid={`vector-swatch-${l.id}`} aria-hidden="true"
+                style={{
+                  width: 12, height: 12, borderRadius: 3, flexShrink: 0,
+                  background: l.color, opacity: l.visible ? 1 : 0.35,
+                  border: `1px solid ${BORDER}`,
+                }} />
               <button onClick={() => setExpanded(isOpen ? null : l.id)}
+                data-testid={`vector-name-${l.id}`}
                 style={{
                   flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
                   color: l.visible ? TEXT : MUTED, fontSize: 10, padding: 0,
@@ -437,7 +923,14 @@ function VectorLayersPanel({
                 {isOpen ? '▾' : '▸'} {l.name}
               </button>
               <span style={{ fontSize: 8, color: MUTED, fontFamily: 'monospace' }}>{l.count}</span>
-              <button onClick={() => onRemove(l.id)} title="Remove layer"
+              <button onClick={() => onPatch(l.id, { visible: !l.visible })}
+                title={l.visible ? 'Hide this layer' : 'Show this layer'}
+                aria-pressed={!l.visible} data-testid={`vector-vis-${l.id}`}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex',
+                  color: l.visible ? DIM : MUTED,
+                }}><EyeIcon off={!l.visible} /></button>
+              <button onClick={() => onRemove(l.id)} title="Remove this layer"
                 data-testid={`vector-remove-${l.id}`}
                 style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
             </div>
@@ -468,6 +961,24 @@ function VectorLayersPanel({
                          onChange={(v) => onPatch(l.id, { stlRibbon: v })} />
                   </div>
                 )}
+
+                {l.geom === 'point' && (
+                  <IconPicker layer={l} onPatch={onPatch} onCustom={onCustomIcon}
+                              overflowed={iconOverflow?.has(l.id)}
+                              viewTilt={viewTilt} viewSpin={viewSpin} />
+                )}
+
+                {(() => {
+                  const bucket = sources
+                    ?.find((src) => src.id === l.sourceId)
+                    ?.buckets.find((b) => b.key === l.bucket)
+                  if (!bucket) return null
+                  return l.geom === 'point' ? (
+                    <LabelPicker layer={l} bucket={bucket} onPatch={onPatch}
+                                 overflowed={labelOverflow?.has(l.id)}
+                                 viewTilt={viewTilt} viewSpin={viewSpin} />
+                  ) : null
+                })()}
 
                 {(() => {
                   const bucket = sources
@@ -675,8 +1186,9 @@ export function Sidebar({
   geoTiffBbox,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
-  onPatchVectorLayer, onRemoveVectorLayer, onRemoveVectorSource,
+  onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
   onAdoptVectorSource, onVectorError, vectorIdentify, onVectorIdentify,
+  onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
   onWebmToggle, webmActive,
@@ -1546,9 +2058,13 @@ export function Sidebar({
                 sources={vectorSources} layers={vectorLayers}
                 onLoadGpx={loadGpxFromPicker} onLoadGeoJson={loadGeoJsonFromPicker}
                 onPatch={onPatchVectorLayer} onRemove={onRemoveVectorLayer}
+                onReorder={onReorderVectorLayer}
                 onRemoveSource={onRemoveVectorSource}
                 onAdopt={onAdoptVectorSource} onError={onVectorError}
                 identify={vectorIdentify} onIdentify={onVectorIdentify}
+                onCustomIcon={onCustomIcon} iconOverflow={iconOverflow}
+                labelOverflow={labelOverflow}
+                viewTilt={view.tilt} viewSpin={view.rotation}
               />
             </Section>
           )}

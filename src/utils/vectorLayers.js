@@ -16,6 +16,16 @@
  * being touched, and what lets a preset re-apply a look to a *different* fetch of
  * the same area — buckets match by name, layer ids do not.
  *
+ * ── The stack ────────────────────────────────────────────────────────────────
+ * The layer array is a stack, and **index 0 is the top of it** — the layer drawn
+ * last and therefore in front, the row at the top of the panel. That is the
+ * convention every layer list the user has met already uses (QGIS, Photoshop,
+ * Figma), and it is what makes "drag it to the top" mean what it looks like.
+ *
+ * It is the *opposite* of paint order, so the one place that turns a stack into
+ * geometry — `merged` in hooks/useTerrainGeometry.js — reverses it. Nothing else
+ * in the pipeline may assume array order is paint order.
+ *
  * ── Why coordinates are packed rather than nested ────────────────────────────
  * An alpine extent with buildings is a few hundred thousand ways. As
  * `[{ rings: [[{lon, lat}, …] ] }]` that is millions of boxed objects: slow to
@@ -47,6 +57,62 @@ export const VECTOR_LAYER_DEF = {
   hidden: [],
   color: '#a80000', weight: 2, opacity: 1, dash: 'solid',
   fill: false, fillColor: '#1a78c2', fillOpacity: 0.45,
+
+  // Point layers only: an SVG icon drawn in place of the dot. All of these are
+  // render-side — the worker never sees an icon — so none of them belong in
+  // `layerBuildKey` and changing one is a frame rather than a rebuild.
+  icon: null,             // manifest id, 'custom', or null for a plain dot
+  iconSize: 18,           // world units, longest side
+  iconLift: 0,            // world units above the point; > 0 draws a leader line
+  iconFaceCamera: true,
+  iconTilt: 50, iconSpin: 0,
+  // Fills the closed shapes of a glyph, holes cut out. On by default, because
+  // the icons are a map set drawn as silhouettes: a solid mountain is the
+  // drawing, and the hollow outline of one is a wireframe of it. Viewport and
+  // raster exports only — the SVG export is a line-art format and these are
+  // triangles.
+  iconFill: true,
+  // ── The icon's own ink ────────────────────────────────────────────────────
+  // A mark drawn from a layer is not the layer: a summit triangle wants a
+  // heavier stroke than the road that shares its colour, and a glyph filled at
+  // the weight of a 5-unit dot is a blob. So the icon carries a full set of its
+  // own — stroke colour, width and opacity, then the same three for the fill.
+  //
+  // `null` means "the layer's", and the fill falls back through the icon's own
+  // stroke before reaching it: colouring an icon colours the whole mark, and
+  // parting its fill from its outline stays possible and stays deliberate.
+  // Width is the exception, a real number: inheriting a point layer's weight
+  // means inheriting its *dot diameter*, which is 5 for a peak.
+  iconColor: null, iconWeight: 1.5, iconOpacity: null,
+  iconFillColor: null, iconFillOpacity: null,
+  // Where the stroke sits relative to the shape's edge — see `strokeOutside` in
+  // `HeightmapLines`. Outside by default: a filled mark should keep the exact
+  // silhouette it was drawn with, and a centred stroke eats half its width out
+  // of it, which is what closes up a glyph's counters.
+  iconStrokeOutside: true,
+  iconCustom: null,       // { name, geo } from an uploaded SVG
+  // ── Labels ────────────────────────────────────────────────────────────────
+  // A point feature's own name and height, drawn on the terrain as geometry.
+  // Both off by default: a fetch that silently wrote twenty-nine names across a
+  // plot would be a surprise, and which of the two you want depends entirely on
+  // what the plot is for. `labelHeight` draws the feature's note, which for a
+  // point is what its `ele` tag said.
+  labelName: false, labelHeight: false,
+  labelSize: 9,           // world units per em — roughly the cap height
+  labelDx: 0,             // world units across the label's plane, from the point
+  labelDy: 22,            // …and up it, which is what clears an icon
+  labelAlign: 'center',   // 'left' | 'center' | 'right', about the point
+  labelFill: true,        // solid, like the icons; off leaves the outline
+  // ── The label's own ink ───────────────────────────────────────────────────
+  // The same six as the icon's, resolved the same way, and separate from them:
+  // a plot that letters in grey over red summits is an ordinary thing to want,
+  // and the weight that draws a triangle well closes up the counters of
+  // nine-point type. Width is a real number here too, for the same reason.
+  labelColor: null, labelWeight: 1, labelOpacity: null,
+  labelFillColor: null, labelFillOpacity: null,
+  labelStrokeOutside: true,
+  // Four real faces, not a slant or a smear applied to one of them.
+  labelBold: false, labelItalic: false,
   // Only 'gpx' sources default this on: the STL plate has always been shipped
   // with a track ribbon beside it, and OSM layers have no business there.
   stlRibbon: false,
@@ -137,8 +203,9 @@ function packBucket(key, label, geom, style, features) {
 
 /**
  * Group normalised features into packed buckets, in the order `bucketOrder`
- * gives — which is the order they will appear in the panel and in the scene, so
- * an OSM catalogue can put roads over landuse without the panel knowing why.
+ * gives — ground cover first, the things that sit on top of it last, so an OSM
+ * catalogue can put roads over landuse without the panel knowing why. That is
+ * paint order; `layersFromSource` flips it into stack order.
  *
  * Features are `{ bucket, geom, rings, name?, note?, id? }`, where each ring is
  * a flat [lon, lat, …] array. Buckets with no features simply do not appear; that is
@@ -208,6 +275,10 @@ export function sourceVertexCount(source) {
  * later edits live on the record and are never recomputed from the bucket.
  */
 export function layersFromSource(source) {
+  // Reversed: buckets arrive in paint order (ground cover first) and a stack is
+  // read the other way round, top first. Colours are still drawn from the
+  // fallback palette in bucket order, so which layer gets which colour does not
+  // depend on which end of the list it ends up at.
   return source.buckets.map((b) => ({
     ...VECTOR_LAYER_DEF,
     color: b.style?.color ?? nextFallbackColor(),
@@ -220,7 +291,24 @@ export function layersFromSource(source) {
     geom: b.geom,
     count: b.count,
     stlRibbon: source.kind === 'gpx',
-  }))
+  })).reverse()
+}
+
+/**
+ * Moves one layer to a new position in the stack, returning a new array.
+ *
+ * Out-of-range targets are clamped rather than rejected: this is driven by a
+ * pointer, and a drag that runs off the end of the list means "as far as it
+ * goes", not "do nothing".
+ */
+export function moveLayer(layers, id, toIndex) {
+  const from = layers.findIndex((l) => l.id === id)
+  if (from < 0) return layers
+  const to = Math.max(0, Math.min(layers.length - 1, toIndex))
+  if (to === from) return layers
+  const next = layers.slice()
+  next.splice(to, 0, next.splice(from, 1)[0])
+  return next
 }
 
 /**
@@ -235,6 +323,22 @@ export function layersFromSource(source) {
 export function layerBuildKey(l) {
   return `${l.id}|${l.sourceId}|${l.bucket}|${l.visible ? 1 : 0}|${l.fill ? 1 : 0}|` +
          `${l.hidden?.length ? l.hidden.join(',') : ''}`
+}
+
+/**
+ * The whole stack's build key — **sorted**, so it does not change when the stack
+ * is reordered.
+ *
+ * That sort is the entire reason dragging a layer is a frame rather than a
+ * rebuild. Draw order is decided on the main thread (`merged` in
+ * useTerrainGeometry, then `renderOrder` in HeightmapLines); the worker drapes
+ * the same coordinates onto the same terrain whichever end of the list a layer
+ * sits at, so telling it the order would only invalidate a cache that is still
+ * perfectly good. On a dense fetch that is the difference between a drag that
+ * follows the cursor and one that re-drapes a valley of roads per step.
+ */
+export function vectorBuildSignature(layers) {
+  return (layers ?? []).map(layerBuildKey).sort().join(';')
 }
 
 /** The layers whose geometry the worker has to build at all. */

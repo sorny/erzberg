@@ -115,7 +115,11 @@ export function VectorPicker({ enabled = true }) {
       hits.sort((a, b) => (b.isPoints - a.isPoints) || (a.distance - b.distance))
 
       for (const hit of hits) {
-        const layerId = hit.object.userData.vectorLayerId
+        // An icon layer's geometry is tagged `vec:7#icons`, but hover and
+        // selection name a *layer* — the panel row, the tooltip and the
+        // highlight all look records up by `vec:7`. Reporting the geometry's own
+        // id instead left a picked icon nameless and its row unmarked.
+        const layerId = hit.object.userData.vectorLayerId?.split('#')[0]
         const map = hit.object.userData.featureOfSegment
         const feature = map?.[hit.faceIndex]
         if (layerId && feature !== undefined) return { layerId, feature }

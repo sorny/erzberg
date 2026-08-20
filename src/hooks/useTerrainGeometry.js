@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useMemo, useRef, startTransition } from 'react'
 import { useStore } from '../store/useStore'
-import { layerBuildKey } from '../utils/vectorLayers'
+import { vectorBuildSignature } from '../utils/vectorLayers'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
 export function useTerrainGeometry(p) {
@@ -67,7 +67,12 @@ export function useTerrainGeometry(p) {
   // Everything about the vector layers that changes their geometry, as one
   // string. Cheap to compute (a few dozen short joins) and the only vector
   // dependency the rebuild effect has — see the note in its dependency list.
-  const vectorBuildKey = (p.vectorLayers ?? []).map(layerBuildKey).join(';')
+  // Sorted, so reordering the stack is not in it; draw order is resolved below.
+  const vectorBuildKey = vectorBuildSignature(p.vectorLayers)
+
+  // The stack, as one string, for the merge memo below. Ids only: what this has
+  // to notice is a layer moving, and a layer moving changes nothing else.
+  const vectorOrderKey = (p.vectorLayers ?? []).map((l) => l.id).join(',')
 
   const ensureWorker = () => {
     if (workerRef.current) return
@@ -289,10 +294,28 @@ export function useTerrainGeometry(p) {
   // One list for the renderer and the SVG exporter: vector layers are lineGeo
   // entries in every respect, they just arrive on their own channel so a mode
   // rebuild does not have to re-drape them.
+  //
+  // This is also the one place a stack becomes paint order. `p.vectorLayers` is
+  // top-first (see utils/vectorLayers.js); everything downstream — renderOrder in
+  // HeightmapLines, document order in the SVG export — is last-wins, so the stack
+  // is reversed here and nowhere else. Sorting rather than trusting the worker's
+  // order is what lets the reorder skip the rebuild entirely: on a cache hit the
+  // arrays we already hold arrive in whatever order they were first built in.
   const merged = useMemo(() => {
     if (!vectorGeo?.length) return lineGeo
-    return [...(lineGeo ?? []), ...vectorGeo]
-  }, [lineGeo, vectorGeo])
+    const rank = new Map((p.vectorLayers ?? []).map((l, i) => [l.id, i]))
+    // '#icons' entries stand in for their layer and rank with it. A layer that
+    // has just been removed can still be in `vectorGeo` for a render — removal is
+    // two state updates — and ranks below the stack rather than on top of it.
+    const orphan = rank.size
+    const at = (g) => rank.get(g.id.split('#')[0]) ?? orphan
+    const stacked = [...vectorGeo].sort((a, b) => at(b) - at(a))
+    return [...(lineGeo ?? []), ...stacked]
+    // `vectorOrderKey` stands in for p.vectorLayers, which is a new array on
+    // every colour-picker tick — re-sorting the whole stack for a recolour would
+    // hand HeightmapLines a new array and remount every layer in the scene.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineGeo, vectorGeo, vectorOrderKey])
 
   return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount }
 }

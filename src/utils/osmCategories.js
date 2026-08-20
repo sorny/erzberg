@@ -219,9 +219,19 @@ export const OSM_CATEGORIES = [
                      (t.mountain_pass === 'yes' ? 'pass' : null) ??
                      (t.tourism === 'alpine_hut' ? 'hut' : null),
     labels: { peak: 'Peaks', saddle: 'Saddles', volcano: 'Volcanoes', pass: 'Passes', hut: 'Alpine huts' },
+    // `suggestedIcon` is not applied — it only sorts to the front of the icon
+    // picker, so a peak layer is one click from looking like a peak while a
+    // point layer still arrives as the dot every preset and test expects.
+    //
+    // A triangle for a summit is the surveyor's own convention, not a
+    // second-best: it is what a trig point is drawn as on every topographic
+    // sheet, and it is the cleanest mark in the bundled set.
     styles: {
-      peak: { color: '#7a2020', weight: 5 },
-      hut:  { color: '#7a4a10', weight: 4 },
+      peak:    { color: '#7a2020', weight: 5, suggestedIcon: 'triangle' },
+      volcano: { color: '#7a2020', weight: 5, suggestedIcon: 'volcano' },
+      saddle:  { suggestedIcon: 'mountain' },
+      pass:    { suggestedIcon: 'arrow' },
+      hut:     { color: '#7a4a10', weight: 4, suggestedIcon: 'shelter' },
     },
     style: { color: '#3a3a3a', weight: 4 },
   },

@@ -48,14 +48,48 @@ export function layerStyle(id, p) {
   // rather than a worker rebuild. That is what makes a list of twenty OSM layers
   // feel like a layer panel instead of a queue of rebuilds.
   if (isVectorLayerId(id)) {
-    const l = p.vectorLayers?.find((v) => v.id === id)
+    // Geometry drawn *from* a layer is styled with it, so `vec:7#icons` and
+    // `vec:7#labels` both resolve back to `vec:7`.
+    const [base, kind] = id.split('#')
+    const l = p.vectorLayers?.find((v) => v.id === base)
     if (!l) return { weight: 1, opacity: 1, dash: 'solid' }
+    // Geometry drawn *from* a layer carries its own ink, all six of it: stroke
+    // colour, width and opacity, then fill colour and opacity behind the layer's
+    // own on/off. A summit triangle is not the road that shares its colour, and
+    // lettering is neither.
+    //
+    // The cascade is the whole design. Every one of these but the width is
+    // `null` by default and falls back to the layer's, so a mark matches its
+    // layer until it is told not to; the *fill* falls back through the mark's
+    // own stroke first, so colouring an icon colours the whole icon while
+    // parting its fill from its outline stays possible and stays deliberate.
+    if (kind === 'icons' || kind === 'labels') {
+      // `p` is the params object in this function; the prefix needs its own name.
+      const mark = kind === 'icons' ? 'icon' : 'label'
+      const color = l[`${mark}Color`] ?? l.color
+      const opacity = l[`${mark}Opacity`] ?? l.opacity
+      return {
+        weight: l[`${mark}Weight`] ?? l.weight,
+        opacity, dash: l.dash, color,
+        fillColor: l[`${mark}FillColor`] ?? color,
+        fillOpacity: l[`${mark}FillOpacity`] ?? opacity,
+        // Not a width: it says where the stroke sits relative to the filled
+        // shape's edge, and only the viewport can act on it. The SVG export
+        // reads `weight` and is right to — a plotter draws one pass along the
+        // outline whichever side of it the screen puts the ink on.
+        strokeOutside: !!l[`${mark}StrokeOutside`],
+        name: `${l.name} · ${kind}`,
+      }
+    }
+
     return {
-      weight: l.weight, opacity: l.opacity, dash: l.dash, color: l.color,
+      weight: l.weight,
+      opacity: l.opacity, dash: l.dash, color: l.color,
       fillColor: l.fillColor, fillOpacity: l.fillOpacity,
       // Carried so the SVG's Inkscape layer is called "Roads · Motorway"
-      // rather than "vec:12" — the name is what makes a plot separable by pen.
-      name: l.name,
+      // rather than "vec:12" — the name is what makes a plot separable by pen,
+      // and "Peaks · labels" is what makes the lettering its own pen.
+      name: kind ? `${l.name} · ${kind}` : l.name,
     }
   }
 

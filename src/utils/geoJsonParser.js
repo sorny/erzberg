@@ -150,6 +150,9 @@ export function parseGeoJson(text, label) {
       style: {
         color: nextFallbackColor(),
         weight: b.geom === 'point' ? 4 : 2,
+        // Sorted to the front of the icon picker; nothing is applied until the
+        // user picks it. A file's points could be anything, so the neutral one.
+        ...(b.geom === 'point' ? { suggestedIcon: 'marker' } : null),
       },
     }
   }

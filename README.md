@@ -83,12 +83,22 @@ OpenStreetMap and it arrives as named layers — *Roads · Motorway*, *Water ·
 Stream*, *Landuse · Forest* — one per tag class, and only for the classes that
 are actually there. Each layer has its own colour, weight, opacity and dash, can
 be hidden or removed, and areas can carry a fill that follows the slope rather
-than hanging over it as a flat lid. Inside a layer, features are listed
+than hanging over it as a flat lid. The list is a stack — top row is the front of
+the scene — and dragging a row by its grip changes what covers what, on screen and
+in the plot. Inside a layer, features are listed
 individually and checkable — keep five peaks out of twenty-nine — and resting the
 pointer on one names it and lights it up, so a dot on the terrain becomes
-*Polster · 1910 m*. GeoJSON and GPX uploads join the same list. Everything is
+*Polster · 1910 m*. Point features can carry their **name and height as labels**, set in the same
+Space Mono the logo uses — regular, bold or italic — and drawn as real geometry,
+so they plot as strokes in their own pen layer. The icon and the lettering each
+carry their own ink: colour, stroke width, opacity, a fill with its own colour and
+opacity, and whether the stroke sits outside the shape or centred on its edge —
+independent of each other and of the layer's. A
+summit with no name in the data is left unlabelled rather than numbered. They can also drop the dot for an **SVG icon** — one of
+sixteen map-and-terrain marks drawn solid, or your own file — lifted off the ground on a leader line and
+turned in 3D to match the view. GeoJSON and GPX uploads join the same list. Everything is
 draped: simplified to what the DEM can express, then cut down to the grid step,
-so a motorway follows the ground over a ridge instead of tunnelling through it. Recolouring is a frame, not a rebuild.
+so a motorway follows the ground over a ridge instead of tunnelling through it. Recolouring and restacking are a frame, not a rebuild.
 Layers carry into the SVG (one Inkscape layer each, so a plot is separable by
 pen), PNG and video exports.
 → [Georeferencing](docs/Georeferencing.md)
@@ -349,6 +359,8 @@ The app is built to idle quietly and stay responsive under load.
 | 3D engine | React Three Fiber + Three.js |
 | State | Zustand (raster data) + React state (all UI params) |
 | GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
+| Icons | Maki (CC0), flattened to polylines through the browser's own SVG geometry API |
+| Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way |
 | Map data | OpenStreetMap via Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
@@ -415,3 +427,7 @@ than adding throughput. `playwright.config.js` carries the measurements.
 ## License
 
 MIT — Copyright (c) 2026 sorny.
+
+The bundled icons in `public/icons/` are [Maki](https://labs.mapbox.com/maki-icons)
+(CC0 1.0, public domain — no attribution required), unmodified, and recorded in
+[`public/icons/LICENSE`](public/icons/LICENSE) anyway.

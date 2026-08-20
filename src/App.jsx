@@ -18,13 +18,16 @@ import { useFlockAudio } from './hooks/useFlockAudio'
 import { FrameOverlay } from './components/FrameOverlay'
 import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
+import { useVectorIcons } from './hooks/useVectorIcons'
+import { useVectorLabels } from './hooks/useVectorLabels'
+import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { featureCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
-import { layersFromSource, sourceRings } from './utils/vectorLayers'
+import { layersFromSource, moveLayer, sourceRings } from './utils/vectorLayers'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
@@ -160,10 +163,14 @@ export default function App() {
   // hundreds of thousands of them.
   const [vectorIdentify, setVectorIdentify] = useState(true)
 
-  /** Adds an imported source and the layer records that go with it. */
+  /**
+   * Adds an imported source and the layer records that go with it, on top of the
+   * stack — the newest thing loaded is the thing you want to see, and index 0 is
+   * the front of the scene.
+   */
   const adoptVectorSource = useCallback((source) => {
     addVectorSource(source)
-    setVectorLayers((prev) => [...prev, ...layersFromSource(source)])
+    setVectorLayers((prev) => [...layersFromSource(source), ...prev])
     setVectorError(null)
   }, [addVectorSource])
 
@@ -189,6 +196,15 @@ export default function App() {
 
   const patchVectorLayer = useCallback((id, patch) => {
     setVectorLayers((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)))
+  }, [])
+
+  /**
+   * Moves a layer within the stack. Pure state: the geometry the worker holds is
+   * the same geometry at either end of the list, so this never reaches it — see
+   * `vectorBuildSignature`.
+   */
+  const reorderVectorLayer = useCallback((id, toIndex) => {
+    setVectorLayers((prev) => moveLayer(prev, id, toIndex))
   }, [])
 
   /** Everything vector goes away — a new raster is a different place. */
@@ -217,12 +233,34 @@ export default function App() {
     } : null
     if (!byBucket.size && !legacy) return
 
-    setVectorLayers((prev) => prev.map((l) => {
-      const saved = byBucket.get(l.bucket)
-      if (saved) return { ...l, ...saved, id: l.id, sourceId: l.sourceId, count: l.count }
-      if (legacy && l.sourceKind === 'gpx') return { ...l, ...legacy }
-      return l
-    }))
+    setVectorLayers((prev) => {
+      const styled = prev.map((l) => {
+        const saved = byBucket.get(l.bucket)
+        if (saved) return { ...l, ...saved, id: l.id, sourceId: l.sourceId, count: l.count }
+        if (legacy && l.sourceKind === 'gpx') return { ...l, ...legacy }
+        return l
+      })
+      if (!byBucket.size) return styled
+
+      // Order is part of the look, and it travels for free: `vectorStyles` is
+      // written in stack order, so a preset made after arranging the stack puts
+      // it back. Buckets the preset never saw keep their order relative to each
+      // other and settle underneath — a preset that knows about three of forty
+      // layers has nothing to say about where the other thirty-seven go.
+      //
+      // Only for presets that say so. Before the stack existed the same array
+      // was written in *paint* order, ground cover first, and reading one of
+      // those as a stack order turns the picture inside out — landuse in front,
+      // roads behind. An old preset never meant anything by its order, so the
+      // honest thing is to take its styles and leave the arrangement alone.
+      if (!preset.vectorStackOrder) return styled
+
+      const rank = new Map([...byBucket.keys()].map((b, i) => [b, i]))
+      return styled
+        .map((l, i) => [l, rank.get(l.bucket) ?? rank.size + i])
+        .sort((a, b) => a[1] - b[1])
+        .map(([l]) => l)
+    })
   }, [])
 
   const loadVectorFile = useCallback((accept, parse) => {
@@ -239,6 +277,34 @@ export default function App() {
     }
     input.click()
   }, [adoptVectorSource])
+
+  /**
+   * Replaces one layer's icon with an uploaded SVG.
+   *
+   * Flattened at import rather than at draw time, so a file that cannot be read
+   * says so here — while the user is looking at the file picker — instead of
+   * becoming a layer that silently draws nothing.
+   */
+  const loadIconSvg = useCallback((layerId) => {
+    const input = Object.assign(document.createElement('input'),
+      { type: 'file', accept: '.svg,image/svg+xml' })
+    input.onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return
+      setVectorError(null)
+      try {
+        const geo = flattenSvg(await file.text())
+        // Only the icon: the glyph is drawn with the icon's own stroke width,
+        // so there is no longer a dot's diameter to thin out of the way. This
+        // used to reach into the layer and set `weight` to 1.5, which is the
+        // same hack the picker carried and is gone for the same reason.
+        patchVectorLayer(layerId, { icon: 'custom', iconCustom: { name: file.name, geo } })
+      } catch (err) {
+        console.error('[icons] Could not read', file.name, err)
+        setVectorError(`${file.name}: ${err?.message || 'could not be read as an icon.'}`)
+      }
+    }
+    input.click()
+  }, [patchVectorLayer])
 
   const loadGpxFromPicker = useCallback(
     () => loadVectorFile('.gpx', gpxToSource), [loadVectorFile])
@@ -467,8 +533,22 @@ export default function App() {
       // *indices*, which mean nothing against a different fetch of the same
       // area. Re-applying them would hide five arbitrary peaks rather than the
       // five that were chosen. A preset is a look; a selection is data.
+      //
+      // `iconCustom` goes too, and it is the same rule one level down: it holds
+      // an uploaded file's flattened geometry, whose `polylines` are typed
+      // arrays. `JSON.stringify` writes those as `{"0":…,"1":…}` objects, which
+      // come back with no `length` — so every loop over them runs zero times and
+      // the layer draws neither its icon nor its dots, having been told it has
+      // an icon. Rather than teach the format to rehydrate a glyph, the preset
+      // simply does not carry one: `icon` falls back with it.
       payload.vectorStyles = vectorLayers.map(
-        ({ id: _id, sourceId: _s, count: _c, hidden: _h, ...rest }) => rest)
+        ({ id: _id, sourceId: _s, count: _c, hidden: _h, iconCustom: _ic, ...rest }) =>
+          (rest.icon === 'custom' ? { ...rest, icon: null } : rest))
+      // Says that `vectorStyles` is in *stack* order, top of the list first.
+      // Presets written before the stack existed hold the same array in paint
+      // order, and there is no way to tell the two apart by looking — so the
+      // flag is what `applyVectorStyles` waits for before reordering anything.
+      payload.vectorStackOrder = true
     }
     if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
     const data = JSON.stringify(payload, null, 2) + '\n'
@@ -738,7 +818,21 @@ export default function App() {
   profileClickRef.current = handleProfileClick
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
-  const { terrain: terrainData, lineGeo, surfaceGeo, isComputing, resultCount } = useTerrainGeometry(p)
+  const { terrain: terrainData, lineGeo: workerGeo, surfaceGeo, isComputing, resultCount } = useTerrainGeometry(p)
+
+  // Point layers that asked for an icon get one here, in place of their dots.
+  // Downstream of the worker on purpose: flattening an SVG needs the DOM, and
+  // building it on this side is what makes size, lift and orientation a frame
+  // rather than a rebuild — and what lets the icons follow the camera at all.
+  const { lineGeo: iconGeo, overflowed: iconOverflow } =
+    useVectorIcons(workerGeo, vectorLayers, view.tilt, view.rotation)
+
+  // …and their names and heights go on top of that. Appended rather than
+  // substituted, and anchored on the worker's own dots rather than on whatever
+  // the icon pass left behind, which is the only place one segment per feature
+  // still exists.
+  const { lineGeo, overflowed: labelOverflow } =
+    useVectorLabels(iconGeo, workerGeo, vectorLayers, vectorSources, view.tilt, view.rotation)
 
   // The overlay means "nothing has come back for a while", not "a build is in
   // flight". Keying it on isComputing alone breaks under a continuous stream:
@@ -949,12 +1043,16 @@ export default function App() {
         vectorCoverage={vectorCoverage}
         vectorError={vectorError}
         onPatchVectorLayer={patchVectorLayer}
+        onReorderVectorLayer={reorderVectorLayer}
         onRemoveVectorLayer={removeVectorLayer}
         onRemoveVectorSource={dropVectorSource}
         onAdoptVectorSource={adoptVectorSource}
         onVectorError={setVectorError}
         vectorIdentify={vectorIdentify}
         onVectorIdentify={setVectorIdentify}
+        onCustomIcon={loadIconSvg}
+        iconOverflow={iconOverflow}
+        labelOverflow={labelOverflow}
         onCameraPreset={handleCameraPreset}
         onSvg={beginSvgExport}
         onPng={() => setPngTrigger(n => n + 1)}

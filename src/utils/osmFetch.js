@@ -13,8 +13,11 @@
  *    block and cannot be paced, but the walk over the elements can be, so it
  *    runs on the same cooperative pacer the exports use.
  *
- *  • **Being interruptible.** A query the user regrets has to stop, both the
- *    request (AbortController) and the bucketing (the pacer's cancel).
+ *  • **Being interruptible, and not waiting for ever.** A query the user regrets
+ *    has to stop — the request (AbortController) and the bucketing (the pacer's
+ *    cancel) both. Separately, an endpoint that accepts the connection and then
+ *    goes quiet must not park the UI: each attempt carries its own deadline, and
+ *    exhausting it moves on to the next mirror.
  *
  *  • **Not hammering the endpoint.** Overpass is a volunteer service. Identical
  *    queries are answered from a module-level cache, the request carries a
@@ -44,6 +47,23 @@ const ENDPOINTS = [
 // Server-side budget. Generous because the alternative to waiting is retrying,
 // and a retry costs the endpoint the whole query again.
 const QUERY_TIMEOUT_S = 180
+
+/**
+ * Client-side deadline for one endpoint, covering headers *and* body.
+ *
+ * One budget rather than a short connect timeout and a long transfer one, and
+ * the reason is specific to Overpass: it withholds response headers until the
+ * query has finished running, so "time to first byte" and "time the server spent
+ * thinking" are the same number. A tight header deadline would not catch a dead
+ * socket any faster — it would kill the legitimate slow queries this tool exists
+ * to make.
+ *
+ * Set above the server's own `[timeout:180]` so an endpoint honouring its
+ * contract always answers first, with data or with an error. Only a genuinely
+ * stalled connection reaches this, and reaching it moves on to the next mirror
+ * rather than failing the fetch.
+ */
+const ATTEMPT_TIMEOUT_MS = (QUERY_TIMEOUT_S + 45) * 1000
 
 // Rough guard on how much a single fetch may be asked to hold. Not a limit on
 // what Overpass will send — it is a limit on what this app will try to keep in
@@ -103,7 +123,10 @@ function classify(tags, cats) {
 function noteFor(tags) {
   if (tags.ele) {
     const m = parseFloat(tags.ele)
-    if (Number.isFinite(m)) return `${Math.round(m)} m`
+    // No space before the unit: this string is drawn on the terrain as a label
+    // as well as listed in the panel, and "1910 m" wraps its own width in a gap
+    // at the sizes a plot uses. One string, so the two never disagree.
+    if (Number.isFinite(m)) return `${Math.round(m)}m`
   }
   // `ref` only where it is a route number anyone would recognise. Austrian
   // streams carry one too — a watercourse register index — and "2728" under a
@@ -231,32 +254,63 @@ export async function bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
   })
 }
 
-/** POST the query, falling back to one mirror when the first endpoint declines. */
-async function requestOverpass(query, signal) {
+/**
+ * POST the query, falling through to the next mirror when one declines or stalls.
+ *
+ * Returns the response *body*, not the response, so the deadline covers the
+ * download too — an endpoint that sends headers and then dribbles the body is
+ * the same hang as one that never answers, and it has to fall through the same
+ * way.
+ *
+ * The distinction that matters in the catch is who did the aborting. A user
+ * pressing Cancel means stop; a deadline expiring means this endpoint is not
+ * answering, so try the next one. Before this, neither existed: a socket that
+ * accepted the connection and went quiet never rejected and never returned a
+ * status, so the loop never advanced and the panel waited for ever. The mirrors
+ * were unreachable precisely when they were most needed.
+ */
+async function fetchOverpassText(query, signal) {
   let lastError = null
   for (const url of ENDPOINTS) {
-    let res
+    const deadline = AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
+    const attempt = signal ? AbortSignal.any([signal, deadline]) : deadline
     try {
-      res = await fetch(url, {
+      const res = await fetch(url, {
         method: 'POST',
         body: new URLSearchParams({ data: query }),
-        signal,
+        signal: attempt,
       })
+      if (res.ok) return await res.text()
+
+      // 429 is rate limiting and 504 is the query outrunning the server's own
+      // budget; both are worth asking a different mirror. Anything else is about
+      // the query itself and asking again would only waste someone's bandwidth.
+      //
+      // Marked rather than thrown bare: this `throw` lands in this function's
+      // own `catch`, which files anything that is not an abort as "that mirror
+      // failed" and moves on — so a 400 was being re-POSTed to every endpoint in
+      // the list, which is precisely what the paragraph above says not to do.
+      if (res.status !== 429 && res.status !== 504) {
+        throw Object.assign(
+          new Error(`OpenStreetMap returned ${res.status} ${res.statusText}.`),
+          { overpassFinal: true })
+      }
+      lastError = new Error(
+        `Every OpenStreetMap endpoint is busy right now (${res.status}). ` +
+        `Overpass is a volunteer service — try again in a few minutes.`)
     } catch (err) {
-      if (err?.name === 'AbortError') throw err
-      lastError = err
-      continue
+      // The user pressed Cancel: stop, do not try anywhere else.
+      if (signal?.aborted) throw err
+      // Nor for an answer that says the query is wrong; see above.
+      if (err?.overpassFinal) throw err
+      if (err?.name === 'TimeoutError') {
+        lastError = new Error(
+          `No OpenStreetMap endpoint answered within ${Math.round(ATTEMPT_TIMEOUT_MS / 1000)} s. ` +
+          `Try a smaller extent, or fewer categories.`)
+      } else if (err instanceof Error && !(err.name === 'AbortError')) {
+        lastError = err
+      }
     }
-    if (res.ok) return res
-    // 429 is rate limiting and 504 is the query outrunning the server's own
-    // budget; both are worth asking a different mirror. Anything else is about
-    // the query itself and asking again would only waste someone's bandwidth.
-    if (res.status !== 429 && res.status !== 504) {
-      throw new Error(`OpenStreetMap returned ${res.status} ${res.statusText}.`)
-    }
-    lastError = new Error(
-      `Every OpenStreetMap endpoint is busy right now (${res.status}). ` +
-      `Overpass is a volunteer service — try again in a few minutes.`)
   }
   throw lastError ?? new Error('Could not reach OpenStreetMap.')
 }
@@ -283,10 +337,9 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
     elements = hit
   } else {
     report(0, 'Querying OpenStreetMap…')
-    const res = await requestOverpass(query, signal)
-    // Read as text first: the download is the long part and `res.json()` would
-    // hide it behind one unmeasurable await.
-    const text = await res.text()
+    // Text rather than `res.json()`: the download is the long part, and parsing
+    // it separately is what lets the progress bar move between the two.
+    const text = await fetchOverpassText(query, signal)
     report(0.5, 'Reading response…')
     await pacer.yield()
 

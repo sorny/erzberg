@@ -2,6 +2,7 @@
   "name": "erzberg",
   "version": "0.10.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +12,7 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "update-presets": "node scripts/update-presets.js",
+    "font": "node scripts/build-font.js",
     "thumbs": "node scripts/generate-thumbs.js"
   },
   "dependencies": {
@@ -35,6 +37,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
     "globals": "^17.11.0",
+    "opentype.js": "^2.0.0",
     "postcss": "^8.4.41",
     "tailwindcss": "^4.2.4",
     "vite": "^8.0.9"
