@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-08-21
+
+### Fixed
+- **Auto-rotate lurched before it started turning.** The canvas renders on
+  demand, so a still scene draws nothing — but the clock behind `useFrame` keeps
+  running, and the first frame after a quiet spell arrives with a `delta`
+  covering the whole spell. Integrating that raw spent all of it in one step:
+  after nine seconds of stillness the camera swung 96° before the second frame
+  ever ran, against a steady rate of 7.8°/s. The frame delta is clamped to 50 ms
+  now, so a stall can only ever cost motion rather than add it. The particle
+  field had guarded against this all along with its own `Math.min(delta, 0.05)`;
+  the clamp is one shared helper rather than two magic numbers.
+
 ## [1.0.1] — 2026-08-21
 
 A multi-agent review of the 1.0.0 diff found fourteen defects, most of them in
