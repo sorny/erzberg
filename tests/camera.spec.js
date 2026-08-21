@@ -87,3 +87,33 @@ test('Pan Z lifts the orbit target, and survives a mouse pan', async ({ page }) 
   await page.waitForTimeout(600)
   expect(await readout(page, 'pan-z')).toBe('250')
 })
+
+test('auto-rotate starts turning rather than jumping', async ({ page }) => {
+  // The canvas runs frameloop="demand", so a still scene draws nothing while the
+  // clock behind useFrame keeps running. The first frame after a quiet spell
+  // therefore arrives with a delta covering the whole spell, and integrating it
+  // raw spent all of it in one step: nine seconds of stillness swung the camera
+  // 96° before the second frame ever ran, against a steady 7.8°/s.
+  await openApp(page)
+
+  const rotation = page.locator('input.hmr[aria-label="Rotation"]')
+  // Long enough that an unclamped delta would be unmistakable.
+  await page.waitForTimeout(6000)
+
+  const before = Number(await rotation.inputValue())
+  await page.locator('input[type=checkbox][aria-label="Auto-rotate"]').click()
+  await page.waitForTimeout(220)
+  const firstStep = Math.abs(Number(await rotation.inputValue()) - before)
+
+  // …and the rate it settles into, to compare the first step against.
+  const settled = Number(await rotation.inputValue())
+  await page.waitForTimeout(1000)
+  const perSecond = Math.abs(Number(await rotation.inputValue()) - settled)
+
+  expect(perSecond, 'auto-rotate must actually be turning').toBeGreaterThan(1)
+  // The first step is one frame's worth, not six seconds' worth. Generous bound:
+  // it only has to be nearer a frame than a stall.
+  expect(firstStep,
+    `first step ${firstStep}° must be in scale with the steady ${perSecond}°/s`)
+    .toBeLessThan(perSecond)
+})

@@ -8,6 +8,7 @@
  */
 import { GizmoHelper, GizmoViewport, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
+import { frameDelta } from '../utils/frameClock'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
@@ -131,7 +132,12 @@ export function Scene({
     // re-render the whole app every frame. The orbit controls' change event
     // (fired by updateCameraFromSliders → orbit.update()) keeps React state
     // following at the throttled sync rate.
-    autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * delta * 40 * (p.autoRotateDir ?? 1)
+    //
+    // Clamped, because this is the first frame after an idle scene: on-demand
+    // rendering means the clock has been running while nothing drew, so turning
+    // auto-rotate on used to spend the whole idle in one step — 96° after nine
+    // seconds of stillness. See frameClock.
+    autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * frameDelta(delta) * 40 * (p.autoRotateDir ?? 1)
     updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY, p.panZ)
     invalidate()  // keep the on-demand loop running while auto-rotating
   })

@@ -22,6 +22,7 @@
  */
 import { useRef, useState, useMemo, useEffect, forwardRef, useImperativeHandle } from 'react'
 import { useFrame } from '@react-three/fiber'
+import { frameDelta } from '../utils/frameClock'
 import * as THREE from 'three'
 import { cellElev } from '../utils/terrain'
 import { hexToRgb } from '../utils/colorUtils'
@@ -580,7 +581,7 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     // essential — otherwise a hidden-but-"animated" field would pin the renderer at
     // 60fps doing nothing (animateParticles defaults on).
     if (!p.showPoints || !p.animateParticles) return
-    const dt = Math.min(delta, 0.05)
+    const dt = frameDelta(delta)
     if (flock) {
       const heard = listen(p, audioRef.current, audioLive, dt)
       // Onsets are applied as a velocity impulse *before* the step, so the beat
