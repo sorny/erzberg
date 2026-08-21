@@ -37,9 +37,14 @@ export function startWebM(canvas, durationSecs, onStateChange, baseName) {
     if (durationSecs > 0) {
       stopTimer = setTimeout(() => stopWebM(onStateChange), durationSecs * 1000)
     }
+    return true
   } catch (err) {
     console.error('[WebM] Failed to start recording:', err)
     recorder = null
+    // Reported rather than swallowed: the caller puts a "recording…" message on
+    // screen, and a browser whose captureStream throws would otherwise be told
+    // it had started something it had not.
+    return false
   }
 }
 

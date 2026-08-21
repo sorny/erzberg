@@ -277,46 +277,53 @@ export function Scene({
       cam.updateProjectionMatrix()
     }
 
-    // Render into the offscreen target
-    const oldClearColor = new THREE.Color()
-    gl.getClearColor(oldClearColor)
-    const oldAlpha = gl.getClearAlpha()
-    gl.setRenderTarget(rt)
-    gl.setClearColor(0x000000, 0)
-    gl.clear()
-    gl.render(scene, cam)
-    gl.setRenderTarget(null)
-    for (const obj of hidden) obj.visible = true
-    gl.setClearColor(oldClearColor, oldAlpha)
+    // Everything from here mutates shared scene state — line material resolutions
+    // and the camera's aspect — so the restore belongs in a finally. A throw in
+    // the middle used to leave the live viewport rendering at the capture's
+    // dimensions, with hairlines the wrong width, until the page was reloaded.
+    try {
 
-    // Read pixels from the render target.
-    // WebGL origin is bottom-left; flip vertically so (0,0) is top-left.
-    const raw = new Uint8Array(targetW * targetH * 4)
-    gl.readRenderTargetPixels(rt, 0, 0, targetW, targetH, raw)
-    rt.dispose()
+      // Render into the offscreen target
+      const oldClearColor = new THREE.Color()
+      gl.getClearColor(oldClearColor)
+      const oldAlpha = gl.getClearAlpha()
+      gl.setRenderTarget(rt)
+      gl.setClearColor(0x000000, 0)
+      gl.clear()
+      gl.render(scene, cam)
+      gl.setRenderTarget(null)
+      for (const obj of hidden) obj.visible = true
+      gl.setClearColor(oldClearColor, oldAlpha)
 
-    const flipped = new Uint8Array(targetW * targetH * 4)
-    const rowBytes = targetW * 4
-    for (let y = 0; y < targetH; y++) {
-      flipped.set(raw.subarray((targetH - 1 - y) * rowBytes, (targetH - y) * rowBytes), y * rowBytes)
-    }
+      // Read pixels from the render target.
+      // WebGL origin is bottom-left; flip vertically so (0,0) is top-left.
+      const raw = new Uint8Array(targetW * targetH * 4)
+      gl.readRenderTargetPixels(rt, 0, 0, targetW, targetH, raw)
+      rt.dispose()
 
-    // Write into a plain 2D canvas for the export utility
-    const offscreen = document.createElement('canvas')
-    offscreen.width = targetW
-    offscreen.height = targetH
-    const offCtx = offscreen.getContext('2d')
-    const imgData = offCtx.createImageData(targetW, targetH)
-    imgData.data.set(flipped)
-    offCtx.putImageData(imgData, 0, 0)
+      const flipped = new Uint8Array(targetW * targetH * 4)
+      const rowBytes = targetW * 4
+      for (let y = 0; y < targetH; y++) {
+        flipped.set(raw.subarray((targetH - 1 - y) * rowBytes, (targetH - y) * rowBytes), y * rowBytes)
+      }
 
-    captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha, exportBaseName)
+      // Write into a plain 2D canvas for the export utility
+      const offscreen = document.createElement('canvas')
+      offscreen.width = targetW
+      offscreen.height = targetH
+      const offCtx = offscreen.getContext('2d')
+      const imgData = offCtx.createImageData(targetW, targetH)
+      imgData.data.set(flipped)
+      offCtx.putImageData(imgData, 0, 0)
 
-    // Restore materials and camera
-    lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
-    if (cam.isPerspectiveCamera && oldAspect !== null) {
-      cam.aspect = oldAspect
-      cam.updateProjectionMatrix()
+      captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha, exportBaseName)
+    } finally {
+      // Restore materials and camera
+      lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
+      if (cam.isPerspectiveCamera && oldAspect !== null) {
+        cam.aspect = oldAspect
+        cam.updateProjectionMatrix()
+      }
     }
   }
 
@@ -399,7 +406,18 @@ export function Scene({
   // and that is why deferredCapture is excluded too: it is rebuilt every render
   // and listing it would defeat the trigger-counter shape entirely.
   const deferredCapture = (isAlpha) => setTimeout(() => {
-    try { performHighResCapture(isAlpha) } finally { onPngDone?.('done') }
+    let status = 'done'
+    try {
+      performHighResCapture(isAlpha)
+    } catch (err) {
+      // A lost context or a render target the GPU refuses leaves no file behind,
+      // and the toast used to announce one anyway — `finally` alone cannot tell
+      // the two apart.
+      console.error('[PNG] Capture failed:', err)
+      status = 'failed'
+    } finally {
+      onPngDone?.(status)
+    }
   }, 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (pngTrigger)      deferredCapture(false) }, [pngTrigger])

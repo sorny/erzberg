@@ -33,6 +33,14 @@ const FIELDS = ['terrain', 'style', 'points', 'view', 'gradientStops', 'bgGradie
 const VIEW_OMIT = ['zoom', 'panX', 'panY', 'panZ']
 
 /**
+ * The same rule one field over. `terrain.resolution` is only ever set by
+ * `autoResolution(width, height)` — it is the loaded raster's size, expressed as
+ * a grid step. Restoring a 12 000 px GeoTIFF's resolution of 12 onto the ~1024 px
+ * sample plate renders it on an 85×85 grid, with nothing on screen to say why.
+ */
+const TERRAIN_OMIT = ['resolution']
+
+/**
  * Reads the stored settings, or null.
  *
  * Never throws. Storage can be unavailable outright (Safari private browsing,
@@ -40,7 +48,7 @@ const VIEW_OMIT = ['zoom', 'panX', 'panY', 'panZ']
  * to "no session" rather than to a blank app — losing the restore is a small
  * disappointment, failing to boot is not.
  */
-export function loadSession() {
+export function loadSession(defaults) {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
@@ -48,14 +56,40 @@ export function loadSession() {
     if (!data || typeof data !== 'object') return null
     const out = {}
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
-    if (out.view) {
-      out.view = { ...out.view }
-      for (const k of VIEW_OMIT) delete out.view[k]
+    for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
+      if (!out[field]) continue
+      out[field] = { ...out[field] }
+      for (const k of omit) delete out[field][k]
     }
-    return Object.keys(out).length ? out : null
+    if (!Object.keys(out).length) return null
+    // A session that says nothing is not a session. Opening the app loads its
+    // sample plate, which sets `terrain.resolution` — a real state change, so
+    // the settings get written even though nobody touched anything. Without this
+    // the *second* visit would announce that settings had been restored when all
+    // that came back were the defaults it would have used anyway.
+    return defaults && !differsFromDefaults(out, defaults) ? null : out
   } catch {
     return null
   }
+}
+
+/**
+ * Whether a restored set actually says anything the defaults do not.
+ *
+ * Compared after the omitted keys have been stripped, and through the same merge
+ * the app performs — so a field the store has never heard of, and a field stored
+ * at its default value, both read as "nothing to restore".
+ */
+function differsFromDefaults(restored, defaults) {
+  for (const f of FIELDS) {
+    const def = defaults[f]
+    if (def == null) continue
+    const merged = Array.isArray(def)
+      ? (restored[f] ?? def)
+      : withDefaults(def, restored[f])
+    if (JSON.stringify(merged) !== JSON.stringify(def)) return true
+  }
+  return false
 }
 
 /**

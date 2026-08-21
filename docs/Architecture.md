@@ -150,10 +150,14 @@ A preset is a JSON blob of `{ style, points, gradientStops, bgGradientStops }`
 in `public/presets/`, listed in `manifest.json` and fetched at startup.
 The *session* is those four plus `terrain` and `view`: `utils/session.js`
 debounce-writes all six to `localStorage` and seeds React state from them at
-mount. The raster is not among them — it can be a 256 MB typed array against a
-synchronous ~5 MB string store — and neither are `zoom` or the pans, which
-describe the loaded image rather than the look and would frame the sample plate
-against a base they were never measured from.
+mount. The debounce has a ceiling as well as a delay — auto-rotate syncs the
+camera into `view` every 150 ms, which a plain trailing debounce reschedules
+forever — and a stored set that matches the defaults reads as no session, since
+loading the sample plate sets `terrain.resolution` and would otherwise write one
+on every untouched visit. The raster is not among them — it can be a 256 MB typed array against a
+synchronous ~5 MB string store — and neither are `zoom`, the pans or
+`terrain.resolution`, all of which describe the loaded image rather than the look
+and would be applied to a raster they were never measured against.
 
 `applyPreset` in `Sidebar.jsx` spreads it over the current state — deliberately
 *not* including `terrain` or `view`, because resolution, zoom and pan describe

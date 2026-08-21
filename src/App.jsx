@@ -121,12 +121,20 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
   )
 }
 
+// How long the settings must hold still before they are written, and the longest
+// a stream of changes may postpone that write. See the effect that uses them.
+const SAVE_DEBOUNCE_MS = 400
+const SAVE_MAX_WAIT_MS = 2000
+
 /** Extension and human name per export kind, for the line that reports one. */
 const EXPORT_KINDS = {
   svg:      ['svg', 'SVG'],
   stl:      ['stl', 'STL'],
   png:      ['png', 'PNG'],
-  pngAlpha: ['alpha.png', 'Transparent PNG'],
+  // `-alpha.png`, not `.alpha.png`: this string is joined to the base name and
+  // has to match what pngExport.js actually writes, or the one message whose
+  // whole job is to name the file names a file that is not there.
+  pngAlpha: ['-alpha.png', 'Transparent PNG'],
 }
 
 // ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────────
@@ -422,7 +430,11 @@ export default function App() {
    * values below and then only answers "was there a session?" for the note in
    * the panel. Re-reading storage later would fight the effect that writes it.
    */
-  const restored = useRef(loadSession())
+  const restored = useRef(loadSession({
+    terrain: TERRAIN_DEF, style: STYLE_DEF, points: POINTS_DEF, view: VIEW_DEF,
+    gradientStops: GRADIENT_PRESETS['Jet'],
+    bgGradientStops: [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }],
+  }))
   const [terrain, setTerrain] = useState(() => withDefaults(TERRAIN_DEF, restored.current?.terrain))
   const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored.current?.style))
   const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored.current?.points))
@@ -449,13 +461,34 @@ export default function App() {
     ?? [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
 
   // ── Keep the session ──────────────────────────────────────────────────────
-  // Debounced because a slider drag is a stream of state changes and this is a
-  // synchronous write: at 400 ms it lands once the hand stops, and the settle
-  // is far shorter than the time it takes to reach for the reload.
+  /**
+   * Debounced, with a ceiling, and not on the way in.
+   *
+   * Debounced because a slider drag is a stream of state changes and this is a
+   * synchronous write: at 400 ms it lands once the hand stops.
+   *
+   * The ceiling is what a plain debounce got wrong. Auto-rotate syncs the camera
+   * into `view` every 150 ms, and 150 < 400, so every re-run cleared the pending
+   * timer and set a new one — the write was rescheduled forever and nothing was
+   * ever stored while the plate was spinning, which is exactly the unattended
+   * hour this feature exists to protect. `SAVE_MAX_WAIT_MS` bounds how long a
+   * continuous stream can hold the write off.
+   *
+   * And the mount pass is skipped, or opening the app would store a session
+   * nobody made — so the *next* visit would announce that settings had been
+   * restored when all that came back were the defaults it would have used anyway.
+   */
+  const savePendingSince = useRef(0)
+  const skipNextSave = useRef(true)   // the mount pass
   useEffect(() => {
-    const t = setTimeout(
-      () => saveSession({ terrain, style, points, view, gradientStops, bgGradientStops }),
-      400)
+    if (skipNextSave.current) { skipNextSave.current = false; return }
+    if (!savePendingSince.current) savePendingSince.current = Date.now()
+    const waited = Date.now() - savePendingSince.current
+    const delay = Math.max(0, Math.min(SAVE_DEBOUNCE_MS, SAVE_MAX_WAIT_MS - waited))
+    const t = setTimeout(() => {
+      savePendingSince.current = 0
+      saveSession({ terrain, style, points, view, gradientStops, bgGradientStops })
+    }, delay)
     return () => clearTimeout(t)
   }, [terrain, style, points, view, gradientStops, bgGradientStops])
   const [webmDuration, setWebmDuration]   = useState(5)
@@ -614,8 +647,9 @@ export default function App() {
     // once it has: the overlay used to just vanish and leave the download shelf
     // as the only evidence anything happened.
     if (status === 'cancelled')   notify(`${name} export cancelled.`)
+    else if (status === 'failed')  notify(`${name} export failed — see the console.`)
     else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
-    else                          notify(`Wrote ${exportBaseName}.${ext}`)
+    else                          notify(`Wrote ${exportBaseName}${ext.startsWith('-') ? '' : '.'}${ext}`)
   }, [notify, exportBaseName])
 
   /**
@@ -696,7 +730,12 @@ export default function App() {
     setView({ ...VIEW_DEF, zoom: baseZoom })
     setGradientStops(GRADIENT_PRESETS['Jet'])
     setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+    // Clearing alone did nothing: the six setState calls above re-run the save
+    // effect, which wrote the defaults straight back 400 ms later. The skip is
+    // what makes the clear real.
     clearSession()
+    skipNextSave.current = true
+    savePendingSince.current = 0
     setSessionRestored(false)
     notify('All settings reset.', {
       action: 'Undo',
@@ -976,16 +1015,30 @@ export default function App() {
   }, [soundscape, loadGeoTiffFromPicker, autoZoom])
 
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
+  /**
+   * One callback for both ways a recording ends.
+   *
+   * The duration timer lives inside the recorder and calls `stopWebM` with
+   * whatever callback it was handed at the start — so wrapping the notification
+   * around the *manual* stop meant the ordinary case, letting it run out, wrote
+   * a file and said nothing at all.
+   */
+  const handleWebmState = useCallback((active) => {
+    setWebmActive(active)
+    if (!active) notify(`Wrote ${exportBaseName}.webm`)
+  }, [exportBaseName, notify])
+
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
     if (!canvas) return
     if (isRecording()) {
-      stopWebM(() => { setWebmActive(false); notify(`Wrote ${exportBaseName}.webm`) })
-    } else {
-      startWebM(canvas, webmDuration, setWebmActive, exportBaseName)
+      stopWebM(handleWebmState)
+    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName)) {
       notify(`Recording — ${webmDuration}s, or press 5 to stop.`)
+    } else {
+      notify('Could not start recording — this browser refused the canvas stream.')
     }
-  }, [webmDuration, exportBaseName, notify])
+  }, [webmDuration, exportBaseName, notify, handleWebmState])
 
   // ── Canvas pixel ratio ────────────────────────────────────────────────────
   // The canvas fills the window, so its CSS size is the window size. Supersampling
@@ -1158,11 +1211,6 @@ export default function App() {
       .then((r) => {
         // load() resolves null when it failed (the error banner is already shown).
         if (!r) { console.warn('[App] Default heightmap not found — use Load Heightmap.'); return }
-        // A restored session already carries a resolution the user chose, and it
-        // is for this same sample plate — overwriting it with the automatic one
-        // would quietly undo the only terrain setting that survives the reload
-        // by looking like it never happened.
-        if (restored.current?.terrain?.resolution != null) return
         setTerrain(prev => ({ ...prev, resolution: autoResolution(r.width, r.height) }))
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

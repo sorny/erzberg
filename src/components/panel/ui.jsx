@@ -173,12 +173,15 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
     const n = parseFloat(draft)
     setDraft(null)
     if (!isFinite(n)) return
-    const snapped = step && step < 1
-      ? Math.round(n / step) * step
-      : Math.round(n)
+    // Snapped to the slider's own grid, counted from `min` the way an
+    // `<input type=range>` counts. Only sub-1 steps used to snap, so typing 37
+    // into a step-5 Azimuth stored 37 while the thumb — which cannot represent
+    // it — sat at 35: two controls for one value, disagreeing on screen.
+    const grid = step || 1
+    const snapped = Math.round((n - min) / grid) * grid + min
     const clamped = Math.min(max, Math.max(min, snapped))
     // Float steps land on 0.30000000000000004 without this.
-    onChange(step && step < 1 ? parseFloat(clamped.toPrecision(12)) : clamped)
+    onChange(Number.isInteger(grid) ? Math.round(clamped) : parseFloat(clamped.toPrecision(12)))
   }
 
   const shown = editing ? draft : (fmt ? String(fmt(value)) : String(value))
@@ -417,19 +420,40 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
 export function Section({ title, terms, open, onToggle, enabled, icon, children }) {
   const ctx = useContext(SectionFilter)
   const q = ctx?.q ?? ''
+  /**
+   * A filtered-out section is *hidden*, never unmounted.
+   *
+   * Returning null looked equivalent and was not: a collapsed section has always
+   * kept its children mounted behind a zero-height grid row, so the panel's local
+   * state — a running Overpass fetch and the AbortController that could cancel
+   * it, the OSM category ticks, a layer's feature filter — survived being closed.
+   * Unmounting on a keystroke threw all of it away, and orphaned the request.
+   */
+  const ownTerms = terms ?? ctx?.terms?.[title]
+  // The panel counts matches from its own index, so a section missing from it
+  // would render while the counter said "No section matches". Cheap to notice
+  // here and invisible in a build.
+  if (import.meta.env.DEV && ctx && terms === undefined && ctx.terms?.[title] === undefined) {
+    console.warn(`[panel] Section "${title}" has no SECTION_TERMS entry — the filter will only match its title.`)
+  }
+  const matches = sectionMatches(title, ownTerms, q)
   // While filtering, a surviving section is open: the point of finding it is to
   // reach the control inside, and a hit that still needs a click is half an answer.
-  if (!sectionMatches(title, terms ?? ctx?.terms?.[title], q)) return null
   const isOpen = q ? true : open
   return (
-    <div style={{ borderBottom: `1px solid ${BORDER}` }}>
+    <div style={{ borderBottom: `1px solid ${BORDER}`, ...(matches ? null : { display: 'none' }) }}
+         data-filtered-out={matches ? undefined : 'true'}>
       {/* A collapsed section is a zero-height grid row, so nothing inside it is
           clickable until it is opened — the header needs a handle a spec can
           find without matching on its uppercase-by-CSS title text. It is a
           button because the keyboard needs a way in: everything inside a
           collapsed section is unreachable otherwise. */}
-      <button type="button" onClick={onToggle} className="hmsec"
-        aria-expanded={!!isOpen}
+      {/* Inert while filtering: the filter already forces every survivor open, so
+          a click here changed only the state behind it — and the section it had
+          silently collapsed reappeared that way once the field was cleared. */}
+      <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
+        aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
+        style={q ? { cursor: 'default' } : undefined}
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
           display:'flex', justifyContent:'space-between', alignItems:'center',
           padding:'10px 14px', cursor:'pointer', userSelect:'none', width:'100%',
