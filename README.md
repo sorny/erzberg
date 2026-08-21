@@ -65,6 +65,19 @@ npm run dev              # http://localhost:5173
 The app opens on a bundled sample heightmap, so there is something to look at
 before you load anything. Start with a style preset, then tune.
 
+**The panel remembers.** Terrain, style, particles, view and both gradients are
+written to the browser as you work and restored on the next visit, so a reload
+does not cost you the look you were building. The raster is deliberately not
+stored — the app opens on its sample plate and puts your settings back onto it.
+*Reset all* returns everything to defaults and offers an Undo for the eight
+seconds after.
+
+**Find a control.** Thirty-odd sections is a lot to remember the shape of, so the
+field at the top of the panel narrows it: type `azimuth` and only Hillshade is
+left, open, with the sun controls in it. Sections answer to their own vocabulary
+rather than only their titles, so it finds things that are switched off. Clearing
+the field puts the panel back exactly as it was.
+
 ---
 
 ## Input
@@ -78,9 +91,10 @@ before you load anything. Start with a style preset, then tune.
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
 | **OpenStreetMap** | Queried live for the raster's own extent — roads, water, rail, landuse, buildings, lifts, peaks. |
 
-**Vector layers.** With a georeferenced raster loaded, tick what you want from
-OpenStreetMap and it arrives as named layers — *Roads · Motorway*, *Water ·
-Stream*, *Landuse · Forest* — one per tag class, and only for the classes that
+**Vector layers.** The section is always in the panel, and says what it needs
+when it has nothing to work with. With a georeferenced raster loaded, tick what
+you want from OpenStreetMap and it arrives as named layers — *Roads · Motorway*,
+*Water · Stream*, *Landuse · Forest* — one per tag class, and only for the classes that
 are actually there. Each layer has its own colour, weight, opacity and dash, can
 be hidden or removed, and areas can carry a fill that follows the slope rather
 than hanging over it as a flat lid. The list is a stack — top row is the front of
@@ -189,9 +203,13 @@ nothing composed for the screen lands in a print.
 carry a seed — the same seed always reproduces the identical pattern, so a piece
 can be regenerated exactly.
 
+Every mode carries a small sample of its own marks in its panel header, so the
+list reads as fourteen ways of drawing rather than fourteen cartographic nouns.
+
 **56 style presets** ship with the app, each a complete look: draw modes,
 colours, gradients and particle settings — shown as thumbnails rather than a
-wall of identical buttons.
+wall of identical buttons. The tile you started from stays marked, and says
+*edited* once you have tuned away from it.
 
 **Surprise me.** A seeded randomiser that rolls a look rather than shuffling
 250 sliders: it picks paper or ink, one to three draw modes against a cost
@@ -297,7 +315,9 @@ brightness, onset density and harmony as layers over one timeline.
 
 Exports are named after the source file: uploading `graz.tif` produces
 `graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png`,
-`graz-profile.svg`, `graz-vectors.stl` and `graz.webm`. Presets save and load as JSON, optionally carrying the heightmap
+`graz-profile.svg`, `graz-vectors.stl` and `graz.webm` — and each one says which
+name it wrote when it finishes, rather than leaving the download shelf as the
+only evidence. Presets save and load as JSON, optionally carrying the heightmap
 with them.
 
 ---
@@ -313,7 +333,26 @@ with them.
 | `Shift` | While drawing or resizing an ellipse, constrain it to a circle |
 | Right-click | Remove a point from a committed lasso or polygon |
 | `Q` | Toggle auto-rotate |
+| `\` | Show or hide the control panel |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
+
+Every shortcut is a bare key. A chord — `⌘1`, `⌘E`, `Ctrl+5` — belongs to the
+browser or the OS and passes through untouched.
+
+---
+
+## Reach
+
+Nothing here is a 3D terrain tool anyone will use without sight, and pretending
+otherwise would be worse than saying so. What the controls owe is the part that
+plenty of sighted people depend on: every slider, toggle, colour well and
+segmented choice carries its own name, so voice control has something to say and
+a screen reader has something to read. Section headers are buttons with
+`aria-expanded`, which is what lets the keyboard open one — everything inside a
+collapsed section was unreachable before. A focused slider shows a ring, and its
+arrow keys were always the only way to set an exact value from the keyboard.
+Panel text is at or above 4.5:1 at the size it is set, and the smallest control
+sits in a 20 px hit box.
 
 ---
 
@@ -357,7 +396,7 @@ The app is built to idle quietly and stay responsive under load.
 | Layer | Library |
 |---|---|
 | 3D engine | React Three Fiber + Three.js |
-| State | Zustand (raster data) + React state (all UI params) |
+| State | Zustand (raster data) + React state (all UI params), persisted to `localStorage` between visits |
 | GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
 | Icons | Maki (CC0), flattened to polylines through the browser's own SVG geometry API |
 | Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way |

@@ -93,8 +93,10 @@ export function AudioTransport({ fa }) {
           style={{ fontSize: 9, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>0:00 / 0:00</span>
         <span style={{ fontSize: 9, color: MUTED, flex: 1, overflow: 'hidden',
                        textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fa.fileName}</span>
-        <span onClick={fa.release} className="hmi" title="Remove this track"
-          style={{ fontSize: 9, color: MUTED, cursor: 'pointer', padding: '0 3px' }}>✕</span>
+        <button type="button" onClick={fa.release} className="hmi" title="Remove this track"
+          aria-label={`Remove ${fa.fileName}`}>
+          <span aria-hidden="true" style={{ fontSize: 9, border: 'none' }}>✕</span>
+        </button>
       </div>
     </div>
   )

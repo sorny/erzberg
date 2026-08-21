@@ -42,7 +42,7 @@ test('performance benchmark', async ({ page }) => {
 
   const [fileChooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ GeoTIFF')
+    page.click('[data-testid="load-geotiff"]')
   ])
   await fileChooser.setFiles(filePath)
   console.log(`[Benchmark] File Selected: ${Date.now()}`)
@@ -166,9 +166,10 @@ test('performance benchmark', async ({ page }) => {
   // ─── PHASE 4: Full Reset ──────────────────────────────────────────────────
   console.log('--- Phase 4: Full Reset ---')
 
-  // Two Reset buttons exist: app-level (outside hm-panel-body) and camera-preset (inside).
-  // .first() targets the app-level Reset that resets all terrain/style/view params.
-  const resetBtn = page.locator('button').filter({ hasText: /^Reset$/ }).first()
+  // The app-level control is "Reset all" — the bare "Reset" inside the View
+  // section only recentres the camera, and matching /^Reset$/ would now measure
+  // that one instead while still passing, because it also zeroes rotation.
+  const resetBtn = page.locator('button').filter({ hasText: /^Reset all$/ }).first()
   await expect(resetBtn).toBeVisible({ timeout: 10000 })
 
   const resetStart = Date.now()

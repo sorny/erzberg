@@ -193,14 +193,24 @@ export function VectorPicker({ enabled = true }) {
     }
   }, [enabled, gl, camera, scene, invalidate, setHover, setSelected])
 
-  // Turning identification off has to clear what it left behind, or the last
-  // highlight stays lit with no way to dismiss it.
+  /**
+   * Turning identification off has to clear what it left behind.
+   *
+   * Both of them. This used to drop the hover alone, which left an orange
+   * *selection* lit with nothing able to dismiss it: the only way out of a
+   * selection is clicking empty terrain, and the listener that did that is
+   * removed by the effect above the moment `enabled` goes false. The highlight
+   * then stayed on the plate for the rest of the session, and into the PNG's
+   * absence and the SVG's, so it was not even wrong in a way that showed up in
+   * an export — just permanently on screen.
+   */
   useEffect(() => {
     if (enabled) return
     hoverRef.current = null
     setHover(null)
+    setSelected(null)
     invalidate()
-  }, [enabled, setHover, invalidate])
+  }, [enabled, setHover, setSelected, invalidate])
 
   return null
 }

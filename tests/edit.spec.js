@@ -208,7 +208,7 @@ test.describe('GeoTIFF', () => {
     await page.waitForSelector('text=erzberg', { timeout: 30000 })
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.click('text=↑ GeoTIFF'),
+      page.click('[data-testid="load-geotiff"]'),
     ])
     await chooser.setFiles(GEOTIFF)
     await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30000 })

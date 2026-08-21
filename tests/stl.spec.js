@@ -104,7 +104,7 @@ test('STL export is unaffected by NoData regions', async ({ page }) => {
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ PNG'),
+    page.click('[data-testid="load-png"]'),
   ])
   await chooser.setFiles({ name: 'nodata.png', mimeType: 'image/png', buffer: noDataHeightmap() })
   await page.waitForTimeout(4000)
@@ -134,9 +134,9 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
   // The viewport going blank is fair feedback; silently downloading a multi-MB
   // file of NaN floats is not.
   // The Mirror section is collapsed by default and its wrapper swallows clicks
-  // while closed, so it has to be opened rather than force-clicked through.
-  await page.locator('#hm-panel-body > div').filter({ hasText: /^Mirror/ }).first()
-    .locator('div').first().click()
+  // while closed, so it has to be opened rather than force-clicked through. The
+  // header is a button now — that is what the testid is there for.
+  await page.click('[data-testid="section-mirror"]')
   await page.waitForTimeout(400)
 
   for (const title of ['Mirror Right (+X)', 'Mirror Left (-X)']) {

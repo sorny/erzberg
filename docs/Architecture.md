@@ -148,6 +148,13 @@ turns a raycast hit back into a grid position and an elevation.
 
 A preset is a JSON blob of `{ style, points, gradientStops, bgGradientStops }`
 in `public/presets/`, listed in `manifest.json` and fetched at startup.
+The *session* is those four plus `terrain` and `view`: `utils/session.js`
+debounce-writes all six to `localStorage` and seeds React state from them at
+mount. The raster is not among them — it can be a 256 MB typed array against a
+synchronous ~5 MB string store — and neither are `zoom` or the pans, which
+describe the loaded image rather than the look and would frame the sample plate
+against a base they were never measured from.
+
 `applyPreset` in `Sidebar.jsx` spreads it over the current state — deliberately
 *not* including `terrain` or `view`, because resolution, zoom and pan describe
 the loaded raster rather than the look.
@@ -233,7 +240,14 @@ into one picture.
   `src/utils/drawModes.js` (which is what teaches the randomiser it exists), a
   `<Section>` in `Sidebar.jsx`, and its params to the dependency list in
   `useTerrainGeometry`. Forgetting the last step is the classic bug: the
-  control moves and nothing happens.
+  control moves and nothing happens. Two smaller ones go with the section: a
+  mark in `panel/modeMarks.jsx`, drawn at 22×13 as the mode's defining gesture
+  rather than a picture of terrain, and a line in `SECTION_TERMS` (below).
+- **A panel section**: add its title and the words it should answer to in
+  `SECTION_TERMS` in `Sidebar.jsx`. The filter's index is stated rather than
+  scraped from the rendered tree, because a mode's parameters only mount once
+  the mode is on — a section that cannot be found while it is switched off is
+  unfindable exactly when someone is looking for it.
 - **A surface overlay**: it is a branch in the `SurfaceMesh` shader plus a
   uniform. Do not add it to the worker dependency list — that would make a
   colour change rebuild geometry.

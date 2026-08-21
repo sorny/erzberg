@@ -23,6 +23,7 @@ import { useVectorLabels } from './hooks/useVectorLabels'
 import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
+import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
 import { featureCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
@@ -120,9 +121,101 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
   )
 }
 
+/** Extension and human name per export kind, for the line that reports one. */
+const EXPORT_KINDS = {
+  svg:      ['svg', 'SVG'],
+  stl:      ['stl', 'STL'],
+  png:      ['png', 'PNG'],
+  pngAlpha: ['alpha.png', 'Transparent PNG'],
+}
+
+// ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────────
+// A pure function of its arguments, so it lives out here rather than in a
+// useCallback — as a hook it had to be declared before its callers could list it
+// as a dependency, which is a layout constraint with nothing behind it.
+function autoResolution(width, height) {
+  return Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+/**
+ * One line at the foot of the screen, optionally with something to click.
+ *
+ * Two jobs, and they are the same shape. Exports used to end with the overlay
+ * simply vanishing — the app renames every file after the source raster, which
+ * is a genuinely careful touch it never got to mention. And a reset used to be
+ * unrecoverable, which an offered Undo fixes better than a confirm dialog: a
+ * dialog taxes the deliberate case to protect the accidental one.
+ */
+function Toast({ toast, onDismiss }) {
+  useEffect(() => {
+    if (!toast) return
+    const t = setTimeout(onDismiss, toast.action ? 9000 : 4500)
+    return () => clearTimeout(t)
+  }, [toast, onDismiss])
+  if (!toast) return null
+  return (
+    <div data-testid="toast" role="status" aria-live="polite" style={{
+      position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
+      background:'#27272a', border:'1px solid #52525b', borderRadius:8,
+      padding:'10px 14px', zIndex:4500, display:'flex', alignItems:'center', gap:14,
+      maxWidth:460, boxShadow:'0 4px 24px rgba(0,0,0,0.5)',
+      fontFamily:'system-ui,sans-serif', fontSize:13, color:'#e4e4e7',
+    }}>
+      <span style={{ flex:1 }}>{toast.msg}</span>
+      {toast.action && (
+        <button data-testid="toast-action" onClick={() => { toast.onAction?.(); onDismiss() }} style={{
+          background:'none', border:'1px solid #71717a', borderRadius:5, cursor:'pointer',
+          color:'#e4e4e7', fontSize:12, padding:'3px 10px', fontFamily:'system-ui,sans-serif',
+          whiteSpace:'nowrap',
+        }}>{toast.action}</button>
+      )}
+      <button onClick={onDismiss} aria-label="Dismiss" style={{
+        background:'none', border:'none', color:'#8f8f99', cursor:'pointer',
+        fontSize:15, lineHeight:1, padding:'0 2px',
+      }}>✕</button>
+    </div>
+  )
+}
+
+// ── Viewport hint ─────────────────────────────────────────────────────────────
+const HINT_KEY = 'erzberg.viewportHint.seen'
+
+/**
+ * What the 3D view can be done to, said once.
+ *
+ * Two thirds of the screen is a live scene that presents itself as a picture,
+ * and orbit/pan/zoom are the primary interaction of the whole tool. Edit Mode
+ * has had a bar like this all along — the main view is being held to the
+ * standard the app already set for itself.
+ *
+ * It goes away for good the first time someone orbits, because at that point it
+ * has been read; the dismiss button is for people who would rather not.
+ */
+function ViewportHint({ onDismiss }) {
+  return (
+    <div data-testid="viewport-hint" style={{
+      // Top-left, not bottom-left where Edit Mode puts its bar: the axis gizmo
+      // lives down there, and the toast and the error banner both come up the
+      // middle. Nothing else claims this corner.
+      position:'fixed', left:14, top:14, zIndex:600,
+      display:'flex', alignItems:'center', gap:8,
+      fontFamily:'system-ui,sans-serif', fontSize:11, color:'#e4e4e7',
+    }}>
+      <span style={{ background:'rgba(0,0,0,.55)', padding:'5px 9px', borderRadius:5 }}>
+        drag to orbit · scroll to zoom · right-drag to pan
+      </span>
+      <button onClick={onDismiss} aria-label="Dismiss the viewport hint" style={{
+        background:'rgba(0,0,0,.55)', border:'none', borderRadius:5, cursor:'pointer',
+        color:'#8f8f99', fontSize:12, lineHeight:1, padding:'6px 8px',
+      }}>✕</button>
+    </div>
+  )
+}
+
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError } = useHeightmap()
+  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
@@ -322,10 +415,21 @@ export default function App() {
   }, [heightmapFilename])
 
   // ── All tweakable state ───────────────────────────────────────────────────
-  const [terrain, setTerrain] = useState(TERRAIN_DEF)
-  const [style,   setStyle]   = useState(STYLE_DEF)
-  const [points,  setPoints]  = useState(POINTS_DEF)
-  const [view,    setView]    = useState(VIEW_DEF)
+  /**
+   * Read once, at mount, before the first render.
+   *
+   * A ref rather than state because nothing re-reads it: it seeds the initial
+   * values below and then only answers "was there a session?" for the note in
+   * the panel. Re-reading storage later would fight the effect that writes it.
+   */
+  const restored = useRef(loadSession())
+  const [terrain, setTerrain] = useState(() => withDefaults(TERRAIN_DEF, restored.current?.terrain))
+  const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored.current?.style))
+  const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored.current?.points))
+  const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored.current?.view))
+  // Cleared by the first Reset all, so the note stops claiming a session that
+  // is no longer what is on screen.
+  const [sessionRestored, setSessionRestored] = useState(() => restored.current != null)
   // Largest drawing buffer this context has been observed to actually deliver.
   // Infinity until DprGuard catches a clamp; only ever ratchets downward.
   const [maxBufferPx, setMaxBufferPx] = useState(Infinity)
@@ -340,8 +444,20 @@ export default function App() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  const [gradientStops,   setGradientStops]   = useState(GRADIENT_PRESETS['Jet'])
-  const [bgGradientStops, setBgGradientStops] = useState([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+  const [gradientStops,   setGradientStops]   = useState(() => restored.current?.gradientStops ?? GRADIENT_PRESETS['Jet'])
+  const [bgGradientStops, setBgGradientStops] = useState(() => restored.current?.bgGradientStops
+    ?? [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+
+  // ── Keep the session ──────────────────────────────────────────────────────
+  // Debounced because a slider drag is a stream of state changes and this is a
+  // synchronous write: at 400 ms it lands once the hand stops, and the settle
+  // is far shorter than the time it takes to reach for the reload.
+  useEffect(() => {
+    const t = setTimeout(
+      () => saveSession({ terrain, style, points, view, gradientStops, bgGradientStops }),
+      400)
+    return () => clearTimeout(t)
+  }, [terrain, style, points, view, gradientStops, bgGradientStops])
   const [webmDuration, setWebmDuration]   = useState(5)
   const [externalPresets, setExternalPresets] = useState({})
   // Intrinsic elevation scale derived from GeoTIFF metadata (metres / pixel ratio).
@@ -438,6 +554,17 @@ export default function App() {
   // ── Export triggers ───────────────────────────────────────────────────────
   const [svgTrigger, setSvgTrigger] = useState(0)
 
+  // ── Saying what happened ──────────────────────────────────────────────────
+  // A counter in the key so two identical messages in a row still read as two
+  // events: exporting the same file twice should restart the toast, not look
+  // like nothing happened the second time.
+  const [toast, setToast] = useState(null)
+  const toastSeq = useRef(0)
+  const notify = useCallback((msg, opts = {}) => {
+    setToast({ msg, seq: ++toastSeq.current, ...opts })
+  }, [])
+  const dismissToast = useCallback(() => setToast(null), [])
+
   /**
    * One export job at a time, whichever writer is running.
    *
@@ -472,13 +599,24 @@ export default function App() {
    * would both see an empty slot and both start.
    */
   const exportBusyRef = useRef(false)
+  // Which writer holds it, for the same reason: the message at the end names a
+  // file, and by then the job state has already been cleared.
+  const exportKindRef = useRef(null)
 
-  const finishExport = useCallback(() => {
+  const finishExport = useCallback((status = 'done') => {
+    const [ext, name] = EXPORT_KINDS[exportKindRef.current] ?? ['file', 'Export']
     exportBusyRef.current = false
+    exportKindRef.current = null
     setExportJob(null)
     setExportCancel(null)
     exportCancelRef.current = () => false
-  }, [])
+    // The app names every export after the source raster, which is worth saying
+    // once it has: the overlay used to just vanish and leave the download shelf
+    // as the only evidence anything happened.
+    if (status === 'cancelled')   notify(`${name} export cancelled.`)
+    else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
+    else                          notify(`Wrote ${exportBaseName}.${ext}`)
+  }, [notify, exportBaseName])
 
   /**
    * Claim the single export slot, or refuse.
@@ -489,6 +627,7 @@ export default function App() {
   const beginExport = useCallback((kind) => {
     if (exportBusyRef.current) return false
     exportBusyRef.current = true
+    exportKindRef.current = kind
     let cancelled = false
     exportCancelRef.current = () => cancelled
     setExportCancel(() => () => { cancelled = true })
@@ -501,8 +640,77 @@ export default function App() {
   }, [beginExport])
   const [pngTrigger,        setPngTrigger]         = useState(0)
   const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
+  /**
+   * The 4K capture is a synchronous render, a pixel read and a trim — long
+   * enough to feel like nothing happened, which is how a user ends up clicking
+   * PNG three times and queueing three captures. It now claims the same export
+   * slot as SVG and STL and puts up the same overlay; there is no Cancel because
+   * there is nothing to interrupt.
+   */
+  const beginPngExport = useCallback((alpha) => {
+    if (!beginExport(alpha ? 'pngAlpha' : 'png')) return
+    if (alpha) setPngAlphaTrigger(n => n + 1)
+    else       setPngTrigger(n => n + 1)
+  }, [beginExport])
   const [webmActive, setWebmActive] = useState(false)
   const [cameraPreset, setCameraPreset] = useState(null)
+
+  // ── What the viewport says it can do ──────────────────────────────────────
+  // `grab` is the resting state, `grabbing` while a drag is live, `crosshair`
+  // while the app is waiting to be told where to cut a section. Before this the
+  // canvas was the default arrow in every one of those states, which is the same
+  // cursor a picture has.
+  const [dragging, setDragging] = useState(false)
+  useEffect(() => {
+    if (!dragging) return
+    const end = () => setDragging(false)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+    return () => {
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+    }
+  }, [dragging])
+
+  const [showHint, setShowHint] = useState(() => {
+    try { return !localStorage.getItem(HINT_KEY) } catch { return true }
+  })
+  const dismissHint = useCallback(() => {
+    setShowHint(false)
+    try { localStorage.setItem(HINT_KEY, '1') } catch { /* it just shows again */ }
+  }, [])
+
+  /**
+   * Every setting back to its default — and a way back from that.
+   *
+   * The whole previous state is captured before anything moves, so Undo is a
+   * restore rather than a re-derivation. Cheap: these are five small plain
+   * objects, and the alternative was a control that threw away an hour of work
+   * on one click with nothing offered afterwards.
+   */
+  const handleResetAll = useCallback(() => {
+    const before = { terrain, style, points, view, gradientStops, bgGradientStops }
+    setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
+    setStyle(STYLE_DEF)
+    setPoints(POINTS_DEF)
+    setView({ ...VIEW_DEF, zoom: baseZoom })
+    setGradientStops(GRADIENT_PRESETS['Jet'])
+    setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+    clearSession()
+    setSessionRestored(false)
+    notify('All settings reset.', {
+      action: 'Undo',
+      onAction: () => {
+        setTerrain(before.terrain)
+        setStyle(before.style)
+        setPoints(before.points)
+        setView(before.view)
+        setGradientStops(before.gradientStops)
+        setBgGradientStops(before.bgGradientStops)
+      },
+    })
+  }, [terrain, style, points, view, gradientStops, bgGradientStops,
+      heightmapWidth, heightmapHeight, baseZoom, notify])
 
   const orbitRef = useRef()
 
@@ -573,10 +781,15 @@ export default function App() {
         if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
         applyVectorStyles(d)
         if (d.heightmapDataURL) load(d.heightmapDataURL)
-      } catch { alert('Invalid preset file.') }
+      } catch {
+        // Everything else that fails to load says so in the banner at the foot
+        // of the screen; a system dialog on top of a dark tool broke the frame
+        // and said nothing about what to check.
+        showError('That file isn’t an erzberg preset. Presets are the JSON written by Preset ⬇ in the Export section.')
+      }
     }
     input.click()
-  }, [load, applyVectorStyles])
+  }, [load, applyVectorStyles, showError])
 
   // ── Keyboard bridge for Controls.jsx ───
   const getParams = useCallback(
@@ -667,11 +880,6 @@ export default function App() {
     setView(prev => ({ ...prev, zoom }))
   }, [])
 
-  // ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────
-  const autoResolution = useCallback((width, height) =>
-    Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
-  , [])
-
   // ── Edit Mode ─────────────────────────────────────────────────────────────
   // The draft lives here rather than in the store so Cancel is free: nothing
   // downstream sees a selection until Apply commits it.
@@ -695,7 +903,7 @@ export default function App() {
   const fitToRaster = useCallback((width, height) => {
     autoZoom({ width, height })
     setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height) }))
-  }, [autoZoom, autoResolution])
+  }, [autoZoom])
 
   const openEditor = useCallback(() => {
     if (!srcPixels) return
@@ -756,7 +964,7 @@ export default function App() {
       setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
       dropVectors()
     })
-  }, [soundscape, loadFromPicker, autoZoom, autoResolution, dropVectors])
+  }, [soundscape, loadFromPicker, autoZoom, dropVectors])
 
   const loadGeoTiffAndFit = useCallback(() => {
     soundscape.release()
@@ -765,15 +973,19 @@ export default function App() {
       setBaseElevScale(suggestedElevScale ?? 1)
       setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
     })
-  }, [soundscape, loadGeoTiffFromPicker, autoZoom, autoResolution])
+  }, [soundscape, loadGeoTiffFromPicker, autoZoom])
 
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
     if (!canvas) return
-    if (isRecording()) stopWebM(() => setWebmActive(false))
-    else startWebM(canvas, webmDuration, setWebmActive, exportBaseName)
-  }, [webmDuration, exportBaseName])
+    if (isRecording()) {
+      stopWebM(() => { setWebmActive(false); notify(`Wrote ${exportBaseName}.webm`) })
+    } else {
+      startWebM(canvas, webmDuration, setWebmActive, exportBaseName)
+      notify(`Recording — ${webmDuration}s, or press 5 to stop.`)
+    }
+  }, [webmDuration, exportBaseName, notify])
 
   // ── Canvas pixel ratio ────────────────────────────────────────────────────
   // The canvas fills the window, so its CSS size is the window size. Supersampling
@@ -866,8 +1078,9 @@ export default function App() {
     // A tick before the work starts, so the overlay is on screen rather than
     // queued behind it — the same reason the SVG trigger defers.
     setTimeout(async () => {
+      let status = 'done'
       try {
-        await exportSTL({
+        status = await exportSTL({
           surfaceGeo, terrain: terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p,
           baseName: exportBaseName,
           onProgress: handleExportProgress,
@@ -876,15 +1089,17 @@ export default function App() {
       } finally {
         // finally, not after: a throw here would otherwise leave the overlay up
         // with no way to dismiss it.
-        finishExport()
+        finishExport(status)
       }
     }, 0)
   }, [surfaceGeo, terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p, exportBaseName,
       beginExport, finishExport, handleExportProgress])
 
   const handleHeightmapExport = useCallback(() => {
-    exportHeightmap(terrainData, exportBaseName)
-  }, [terrainData, exportBaseName])
+    const written = exportHeightmap(terrainData, exportBaseName)
+    if (written) notify(`Wrote ${written}`)
+    else notify('Nothing to write — no terrain is loaded.')
+  }, [terrainData, exportBaseName, notify])
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
@@ -902,6 +1117,11 @@ export default function App() {
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      // Bare keys only. Every shortcut below is a single unmodified key, so a
+      // chord belongs to the browser or the OS: on macOS Cmd+1 switches tab and
+      // would otherwise also write an SVG, and Cmd+5 would start a recording the
+      // user cannot see beginning.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       // Edit Mode owns the keyboard while it is open — the export shortcuts
       // would otherwise fire on a terrain the user cannot currently see.
       if (editMode) {
@@ -916,8 +1136,8 @@ export default function App() {
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]) }
       if (e.code === 'KeyE')   openEditor()
       if (e.code === 'Digit1') beginSvgExport()
-      if (e.code === 'Digit2') setPngTrigger(n => n + 1)
-      if (e.code === 'Digit3') setPngAlphaTrigger(n => n + 1)
+      if (e.code === 'Digit2') beginPngExport(false)
+      if (e.code === 'Digit3') beginPngExport(true)
       if (e.code === 'Digit4') handleStl()
       if (e.code === 'Digit5') handleWebmToggle()
     }
@@ -925,7 +1145,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
     // beginSvgExport belongs here for the same reason handleStl does: both claim
     // the single export slot, and a stale copy would not see it taken.
-  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport])
+  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport, beginPngExport])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -938,6 +1158,11 @@ export default function App() {
       .then((r) => {
         // load() resolves null when it failed (the error banner is already shown).
         if (!r) { console.warn('[App] Default heightmap not found — use Load Heightmap.'); return }
+        // A restored session already carries a resolution the user chose, and it
+        // is for this same sample plate — overwriting it with the automatic one
+        // would quietly undo the only terrain setting that survives the reload
+        // by looking like it never happened.
+        if (restored.current?.terrain?.resolution != null) return
         setTerrain(prev => ({ ...prev, resolution: autoResolution(r.width, r.height) }))
       })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -948,6 +1173,9 @@ export default function App() {
     : bgColor
   const noHmap    = !heightmapPixels
 
+  // Picking a section is a click, not a drag, and it wants the cursor that says so.
+  const canvasCursor = profileMode ? 'crosshair' : (dragging ? 'grabbing' : 'grab')
+
   return (
     <div className="w-full h-full" style={{ background: bgCss }}>
 
@@ -957,7 +1185,12 @@ export default function App() {
         dpr={canvasDpr}
         gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
         camera={{ position: [0, 400, 500], fov: 60, near: 5, far: 50000 }}
-        style={{ width:'100%', height:'100%' }}
+        style={{ width:'100%', height:'100%', cursor: canvasCursor }}
+        onPointerDown={() => { setDragging(true); dismissHint() }}
+        // The picture is the app's output; naming it is the difference between
+        // "canvas" and knowing what is on screen without seeing it.
+        aria-label={`3D view of ${heightmapFilename || 'the terrain'} — drag to orbit, scroll to zoom`}
+        role="application"
       >
         <BgSync color={bgColor} gradient={style.bgGradient} />
         <DprGuard onClamp={handleBufferClamp} />
@@ -977,6 +1210,7 @@ export default function App() {
           svgCancelRef={exportCancelRef}
           pngTrigger={pngTrigger}
           pngAlphaTrigger={pngAlphaTrigger}
+          onPngDone={finishExport}
           bgGradientStops={bgGradientStops}
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
@@ -1055,8 +1289,8 @@ export default function App() {
         labelOverflow={labelOverflow}
         onCameraPreset={handleCameraPreset}
         onSvg={beginSvgExport}
-        onPng={() => setPngTrigger(n => n + 1)}
-        onPngAlpha={() => setPngAlphaTrigger(n => n + 1)}
+        onPng={() => beginPngExport(false)}
+        onPngAlpha={() => beginPngExport(true)}
         onStl={handleStl}
         onHeightmap={handleHeightmapExport}
         onWebmToggle={handleWebmToggle}
@@ -1065,14 +1299,8 @@ export default function App() {
         onSavePreset={savePreset}
         onLoadPreset={loadPresetFromFile}
         externalPresets={externalPresets}
-        onReset={() => {
-          setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
-          setStyle(STYLE_DEF)
-          setPoints(POINTS_DEF)
-          setView({ ...VIEW_DEF, zoom: baseZoom })
-          setGradientStops(GRADIENT_PRESETS['Jet'])
-          setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
-        }}
+        onReset={handleResetAll}
+        sessionRestored={sessionRestored}
         baseZoom={baseZoom}
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}
@@ -1108,13 +1336,28 @@ export default function App() {
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
       {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
-      {exportJob && !isLoading && (
-        <LoadingOverlay
-          msg={exportJob.label ?? (exportJob.kind === 'stl' ? 'Exporting STL…' : 'Exporting SVG…')}
-          progress={exportJob.pct / 100}
-          onCancel={exportCancel ?? undefined}
-        />
-      )}
+      {exportJob && !isLoading && (() => {
+        // The PNG capture is one synchronous pass: there is no progress to
+        // report and nothing to interrupt, so it gets the plain spinner the
+        // overlay renders when neither is passed.
+        const isPng = exportJob.kind === 'png' || exportJob.kind === 'pngAlpha'
+        const msg = isPng
+          ? (exportJob.kind === 'pngAlpha' ? 'Capturing transparent PNG…' : 'Capturing PNG…')
+          : (exportJob.label ?? (exportJob.kind === 'stl' ? 'Exporting STL…' : 'Exporting SVG…'))
+        return (
+          <LoadingOverlay
+            msg={msg}
+            progress={isPng ? null : exportJob.pct / 100}
+            onCancel={isPng ? undefined : (exportCancel ?? undefined)}
+          />
+        )
+      })()}
+
+      {/* ── What the viewport can do ─────────────────────────────────────── */}
+      {showHint && !editMode && !webmActive && !noHmap && <ViewportHint onDismiss={dismissHint} />}
+
+      {/* ── What just happened ───────────────────────────────────────────── */}
+      <Toast key={toast?.seq} toast={toast} onDismiss={dismissToast} />
 
       {/* ── Load error banner ────────────────────────────────────────────── */}
       {loadError && (

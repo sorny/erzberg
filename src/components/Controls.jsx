@@ -19,6 +19,8 @@ export function Controls({ getParams, setParams, orbitRef }) {
       // click on any panel button leaves Space toggling that button instead.
       const tag = e.target.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
+      // Bare keys only — see the same guard in App.jsx.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const v = getParams()
 

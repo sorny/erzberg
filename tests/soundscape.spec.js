@@ -115,7 +115,7 @@ test('loading a PNG releases the soundscape', async ({ page }) => {
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ PNG'),
+    page.click('[data-testid="load-png"]'),
   ])
   await chooser.setFiles(path.join(here, '..', 'public', 'Heightmap.png'))
 

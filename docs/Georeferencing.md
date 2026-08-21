@@ -230,7 +230,13 @@ Three things make that work:
   layer's sphere covers the whole raster. So hovering is debounced to
   pointer-rest, a click picks immediately, and a drag stays an orbit because the
   click path measures how far the pointer travelled. **Identify on hover** turns
-  the whole thing off for a fetch dense enough to make even that too expensive.
+  the whole thing off for a fetch dense enough to make even that too expensive —
+  and takes both highlights with it. It has to: the only way out of a selection
+  is a click on empty terrain, and that listener goes with the picker, so a
+  selection left behind would stay lit for the rest of the session with nothing
+  able to dismiss it. Clicking an already-selected row in the feature list clears
+  it too, which is the same escape from the panel end — the list is how a
+  selection is made while Identify is off, so it is how one is undone.
 
 **Pick radius.** Three does not take one: it tests
 `distance < (material.linewidth + threshold) / 2` in CSS pixels, so the threshold

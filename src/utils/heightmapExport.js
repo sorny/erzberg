@@ -7,7 +7,8 @@
 
 export function exportHeightmap(terrainData, baseName) {
   const filename = `${baseName ?? 'export'}-heightmap.png`
-  if (!terrainData || !terrainData.grid) return
+  // Returns the name it wrote, or null — the caller reports which one happened.
+  if (!terrainData || !terrainData.grid) return null
 
   const { grid, rows, cols } = terrainData
   
@@ -63,4 +64,5 @@ export function exportHeightmap(terrainData, baseName) {
   link.download = filename
   link.href = canvas.toDataURL('image/png')
   link.click()
+  return filename
 }

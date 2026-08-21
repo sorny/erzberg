@@ -95,7 +95,7 @@ async function openVectorPanel(page) {
   await page.waitForSelector('text=erzberg', { timeout: 30000 })
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ GeoTIFF'),
+    page.click('[data-testid="load-geotiff"]'),
   ])
   await chooser.setFiles(FIXTURE)
   await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30000 })
@@ -585,6 +585,42 @@ test.describe('vector layers', () => {
       await page.waitForTimeout(180)
     }
     await expect(page.locator('[data-testid="feature-tooltip"]')).toHaveCount(0)
+  })
+
+  test('Identify off clears the highlight it can no longer dismiss', async ({ page }) => {
+    // The only way out of a selection on the terrain is a click on empty ground,
+    // and that listener goes with the picker. So turning Identify off while a
+    // feature is selected used to strand the orange highlight on the plate for
+    // the rest of the session — visible, undismissable, and not in any export,
+    // so nothing but the screen ever showed it was wrong.
+    await routeOverpass(page)
+    await openVectorPanel(page)
+    await page.click('[data-testid="osm-fetch"]')
+    await page.waitForSelector('text=Roads · Motorway')
+    await page.waitForTimeout(1500)
+
+    // Select from the panel rather than by sweeping the terrain: what is being
+    // tested is what happens to a selection, not how one is made.
+    const roadId = await isolateLayer(page, 'Roads · Motorway')
+    await page.locator(`[data-testid="vector-layer-${roadId}"]`)
+      .locator('button', { hasText: 'Roads · Motorway' }).click()
+    await page.click(`[data-testid="features-toggle-${roadId}"]`)
+    const row = page.locator(`[data-testid^="feature-${roadId}-"]`).first()
+    await row.click()
+    await expect(page.locator('[data-selected="true"]')).toHaveCount(1)
+
+    const identify = page.locator('input[type=checkbox][aria-label="Identify on hover"]')
+    await identify.click()
+    await page.waitForTimeout(600)
+    await expect(identify).not.toBeChecked()
+    await expect(page.locator('[data-selected="true"]')).toHaveCount(0)
+
+    // And a selection made from the list while Identify is off has to be
+    // undoable from the list — the terrain offers no way back in that state.
+    await row.click()
+    await expect(page.locator('[data-selected="true"]')).toHaveCount(1)
+    await row.click()
+    await expect(page.locator('[data-selected="true"]')).toHaveCount(0)
   })
 
   /** Opens a point layer's icon picker and returns its layer id. */

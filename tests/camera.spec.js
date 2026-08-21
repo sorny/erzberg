@@ -12,8 +12,13 @@ async function openApp(page) {
 }
 
 /** The number a slider row prints to the right of its track. */
+// The number beside a slider is an editable field now, not a span, so the value
+// is in `.value` — `textContent` on an input is always ''.
 const readout = (page, id) =>
-  page.locator(`[data-testid="${id}"]`).evaluate(n => n.parentElement.lastElementChild.textContent.trim())
+  page.locator(`[data-testid="${id}"]`).evaluate(n => {
+    const el = n.parentElement.lastElementChild
+    return (el.tagName === 'INPUT' ? el.value : el.textContent).trim()
+  })
 
 /** Right-button drag across the viewport — OrbitControls' screen-space pan. */
 async function dragPan(page, dx, dy) {

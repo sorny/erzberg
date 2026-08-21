@@ -116,7 +116,7 @@ export function EditPanel({
 
           <HelpBox text={HINTS[tool]} />
 
-          <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>CROP</div>
+          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>CROP</div>
           <SegRow
             label="Aspect"
             testIdPrefix="edit-aspect"
@@ -136,7 +136,7 @@ export function EditPanel({
             border: `1px solid ${BORDER}`, borderRadius: 4, cursor: 'pointer', fontSize: 10, marginBottom: 12,
           }}>Full extent</button>
 
-          <div style={{ fontSize: 8, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>SELECTION</div>
+          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>SELECTION</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
             <span>Shape</span>
             <span style={{ color: edit?.shape ? DIM : MUTED }}>

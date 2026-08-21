@@ -37,7 +37,7 @@ function maxPointSize(renderer) {
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   getParams, setParams, orbitRef,
-  svgTrigger, onSvgDone, onSvgProgress, svgCancelRef, pngTrigger, pngAlphaTrigger,
+  svgTrigger, onSvgDone, onSvgProgress, svgCancelRef, pngTrigger, pngAlphaTrigger, onPngDone,
   bgGradientStops,
   cameraPreset,
   webmRecording,
@@ -387,15 +387,24 @@ export function Scene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [svgTrigger])
 
-  // PNG exports — activeCamera is intentionally excluded from deps. It is a plain
-  // local variable (not state) so it changes reference on every render. Including it
-  // would re-fire the export whenever any setting causes a re-render after a trigger
-  // has been set. The closure already captures the current camera from the same render
-  // that incremented the trigger counter, so no staleness risk.
+  // PNG exports. Deferred a tick for the same reason the SVG export is: the whole
+  // capture is synchronous, so without the yield the overlay announcing it is
+  // queued behind the work it is announcing and never paints.
+  //
+  // activeCamera is intentionally excluded from deps. It is a plain local
+  // variable (not state) so it changes reference on every render. Including it
+  // would re-fire the export whenever any setting causes a re-render after a
+  // trigger has been set. The closure already captures the current camera from
+  // the same render that incremented the trigger counter, so no staleness risk —
+  // and that is why deferredCapture is excluded too: it is rebuilt every render
+  // and listing it would defeat the trigger-counter shape entirely.
+  const deferredCapture = (isAlpha) => setTimeout(() => {
+    try { performHighResCapture(isAlpha) } finally { onPngDone?.('done') }
+  }, 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (pngTrigger)      performHighResCapture(false) }, [pngTrigger])
+  useEffect(() => { if (pngTrigger)      deferredCapture(false) }, [pngTrigger])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (pngAlphaTrigger) performHighResCapture(true)  }, [pngAlphaTrigger])
+  useEffect(() => { if (pngAlphaTrigger) deferredCapture(true)  }, [pngAlphaTrigger])
 
   return (
     <>

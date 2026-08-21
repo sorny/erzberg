@@ -379,6 +379,10 @@ export function useHeightmap() {
   const [loadError,  setLoadError]  = useState(null)
 
   const clearError = useCallback(() => setLoadError(null), [])
+  // The banner is the app's one place for "that didn't work". Exposed so callers
+  // outside this hook — the preset loader, for one — can use it instead of
+  // reaching for alert().
+  const showError = useCallback((msg) => setLoadError(msg), [])
 
   const load = useCallback((source) => {
     setIsLoading(true); setLoadingMsg('Loading heightmap…'); setLoadError(null)
@@ -436,5 +440,5 @@ export function useHeightmap() {
     input.click()
   }, [loadGeoTiff])
 
-  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError }
+  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError, showError }
 }
