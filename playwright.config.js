@@ -36,7 +36,26 @@ export default defineConfig({
     channel: 'chrome',
     viewport: { width: 1280, height: 720 },
     launchOptions: {
-      args: ['--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist'],
+      /*
+       * The last three are about *focus*, not the GPU.
+       *
+       * Soundscape playback and the flock's audio meter are driven by
+       * requestAnimationFrame, and Chrome throttles rAF hard — often to a stop —
+       * in a window it considers backgrounded or occluded. A headed run whose
+       * window drifts behind anything therefore fails four audio specs with the
+       * same signature: the transport never advances, no terrain rebuilds
+       * arrive, and the flock hears nothing, while the AudioContext itself is
+       * perfectly healthy and its clock is ticking.
+       *
+       * That made the suite's greenness depend on which window happened to be in
+       * front, which is not a property a test suite should have.
+       */
+      args: [
+        '--use-gl=angle', '--enable-webgl', '--ignore-gpu-blocklist',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+      ],
     },
   },
   webServer: {
