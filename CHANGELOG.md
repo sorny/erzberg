@@ -7,6 +7,75 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-08-21
+
+A multi-agent review of the 1.0.0 diff found fourteen defects, most of them in
+what 1.0.0 had just added. Four were in the release's headline feature: settings
+that survive a reload did not survive an auto-rotating plate, and a first visit
+was announced as a restored one. They are fixed here, with regression tests for
+the cases the original tests were too agreeable to try.
+
+### Fixed
+- **Auto-rotate stopped anything being saved at all.** The camera syncs into
+  `view` every 150 ms while the plate spins and the save debounce was 400 ms, so
+  every re-run cleared the pending write and scheduled another — it was postponed
+  forever. The unattended hour with the scene turning is exactly the one the
+  feature exists to protect. The debounce now has a ceiling: a continuous stream
+  of changes can hold the write off for at most two seconds.
+- **A first visit was reported as a restored one.** Opening the app loads its
+  sample plate, which sets `terrain.resolution` — a real state change, so the
+  settings were written even though nobody had touched anything, and the *second*
+  visit announced that a session had been restored when all that came back were
+  the defaults it would have used anyway. A stored set that says nothing the
+  defaults do not is now no session at all.
+- **Reset all cleared the session and then wrote it straight back.** The six
+  state changes in the reset re-ran the save effect 400 ms later, so
+  `clearSession()` was dead code.
+- **A stored resolution was carried onto a raster it was never measured
+  against.** `terrain.resolution` comes from `autoResolution(width, height)`
+  exactly as zoom and pan do, and those were already excluded. Ending a session
+  on a 12 000 px GeoTIFF and reopening put the ~1024 px sample plate on an 85×85
+  grid, with nothing on screen to say why.
+- **A restored mode came back drawing with its controls hidden.** `applyPreset`
+  calls `syncSectionsToStyle` so that a look's own sections are open when it
+  lands; seeding the same style straight into React state at mount skipped it.
+- **The transparent-PNG toast named a file that did not exist.** The table said
+  `alpha.png` where the writer produces `-alpha.png`, so the one message whose
+  entire job is to name what was written said `Heightmap.alpha.png`.
+- **A recording that ran its course said nothing.** The duration timer lives
+  inside the recorder and calls `stopWebM` with the callback it was handed at the
+  start, so wrapping the notification around the *manual* stop meant the ordinary
+  case — letting it run out — wrote a file in silence. And `startWebM` swallowed
+  a failed `captureStream`, so a browser that refused the canvas was still told a
+  recording had begun.
+- **A failed PNG capture reported success.** `finally { onPngDone('done') }`
+  could not tell a completed export from a thrown one, so a lost context
+  announced a file that was never written — and skipped the restore at the end of
+  the capture, leaving the live viewport rendering at the capture's dimensions
+  with every hairline the wrong width until the page was reloaded.
+- **Filtering the panel unmounted sections instead of hiding them.** A collapsed
+  section has always kept its children mounted behind a zero-height row, so a
+  running Overpass fetch, the controller that could cancel it, the OSM category
+  ticks and a layer's feature filter all survived being closed. Typing in the new
+  filter threw them away and orphaned the request.
+- **A typed value could miss the slider's own step grid.** Only sub-1 steps
+  snapped, so 37 typed into a step-5 Azimuth was stored as 37 while the thumb —
+  which cannot represent it — sat at 35: two controls for one value, disagreeing
+  on screen.
+- **A section header click while filtering silently collapsed it.** The filter
+  forces every survivor open, so the click looked like it did nothing, and the
+  section reappeared collapsed once the field was cleared.
+- **A gradient change did not mark the preset as edited.** `applyPreset` writes
+  both gradients, so changing one by hand is as much a departure as moving a
+  slider — but the panel's gradient controls bypassed the check.
+- **`\` stopped working after clicking a section header.** Headers became buttons
+  in 1.0.0, and the handler skipped `BUTTON` — a guard `Controls.jsx` needs
+  because Space activates a focused button, and backslash activates nothing. The
+  shortcut stayed dead until focus moved elsewhere.
+- **A section missing from the filter's index would render uncounted.** It is
+  reported in development now, rather than showing "No section matches" beside a
+  section that plainly matches.
+
 ## [1.0.0] — 2026-08-21
 
 The drawing engine has been further along than the interface wrapped around it
