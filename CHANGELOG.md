@@ -7,6 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-08-21
+
+The drawing engine has been further along than the interface wrapped around it
+for a while. This release is that gap closed: a UX review drove the running app
+and came back with seventeen findings, and sixteen of them are here. Nothing in
+the panel moved — it is the same 272 px column of collapsible sections, in the
+same order — and every change below is additive to something that already
+existed.
+
+### Added
+- **Settings survive a reload.** Terrain, style, particles, view and both
+  gradients are written to the browser as you work and restored on the next
+  visit. A look here is built over an hour of nudging a few hundred parameters,
+  and a stray ⌘R used to return all of it to defaults with no prompt and no way
+  back — the escape hatch existed, *Preset ⬇* writes the same object as JSON, but
+  it sits in the Export section and nothing suggested it until after something
+  had been lost. The raster is deliberately not stored: it can be a 256 MB typed
+  array against a synchronous ~5 MB string store, and the app opens on its sample
+  plate anyway. Zoom and pan are left out too — they are derived from the loaded
+  image's dimensions, so a zoom carried over from a session that had a 12 000 px
+  GeoTIFF open would frame the sample wrongly *and* make the panel's "75%" read
+  against a base it was never measured from.
+- **Find a control.** One field at the top of the panel narrows thirty-one
+  sections to the ones that answer to what you typed, opened, with the control
+  inside. Sections answer to a stated vocabulary rather than only their titles,
+  because a mode's parameters are only mounted once the mode is on — so a filter
+  built from what happens to be rendered could never find `azimuth` while
+  Hillshade is off, which is exactly when someone is looking for it. Clearing the
+  field puts the panel back exactly as it was.
+- **Every draw mode shows its mark.** Thirteen rows reading MODE: ⟨cartographic
+  noun⟩ were interchangeable to anyone who did not already know what a
+  Strahler-order stream network looks like — which is most people, and exactly
+  the people browsing. Each header now carries a 22×13 sample of the mode's
+  defining gesture: the direction, rhythm and density of its strokes. Drawn
+  rather than rendered, because a shrunk screenshot of the real output is mud at
+  that size.
+- **Vector Layers is always in the panel.** The section used to be conditionally
+  rendered on a georeferenced raster, so the app's largest feature — OpenStreetMap,
+  GPX, GeoJSON, labels, icons — was simply absent from the default session. That
+  reads as "this tool doesn't do that" rather than "this tool needs a different
+  file first". It now shows a disabled state naming the requirement, with the
+  GeoTIFF loader in it.
+- **The viewport says what it can do.** `grab` at rest, `grabbing` mid-drag,
+  `crosshair` while it waits to be told where to cut a section — it was the
+  default arrow in all three, which is the cursor a picture has. A hint bar names
+  orbit, zoom and pan on first load and goes for good the first time you orbit.
+  Edit Mode has had a bar like this all along; the main view is now held to the
+  standard the app already set for itself.
+- **Exports say what they wrote.** Every export ends with the file name it chose
+  — `Wrote graz.svg` — which is the app finally mentioning a genuinely careful
+  touch it has always had and never got to show. PNG, PNG α and the heightmap
+  writer also put up the overlay while they work: the 4K capture is a synchronous
+  render, a pixel read and a trim, long enough to feel like nothing happened,
+  which is how three clicks became three queued captures.
+- **Slider values can be typed.** A 69 px track spends about 1.4 units of a
+  0–100 range on every pixel, and the output is a plot: spacing 4, angle 30°,
+  weight 1 are values you set, not values you approach. Click the number, type,
+  Enter — clamped to the slider's own range, Escape backs out. Edit Mode's crop
+  fields have done this all along.
+- **`\` shows and hides the panel.** "Show me the plate with nothing over it" is
+  the most-wanted action in a tool that makes pictures, and it used to mean
+  aiming at an unlabelled 22 px glyph.
+
+### Changed
+- **The panel header's Reset is now *Reset all*, and it offers an Undo.** Three
+  other controls use the word for something harmless — the camera preset row, the
+  mirror block, the crop — which taught that Reset is harmless, and then the
+  fourth one replaced terrain, style, points, view and both gradients with
+  defaults on one unconfirmed click. The scope is in the label now, and the whole
+  previous state is captured before anything moves, so the toast that follows can
+  hand it back. An Undo beats a confirm dialog here: a dialog taxes the deliberate
+  case to protect the accidental one.
+- **A preset tile says when you have left it.** `lastPreset` was cleared only by
+  a *Surprise me* roll, so the highlight survived every slider you moved and every
+  reset — in a wall of 56 thumbnails, the one piece of orientation the grid offers
+  was also the least trustworthy. The tile keeps its border, because where a look
+  started is worth knowing, and adds an *edited* tag rather than claiming the
+  settings still match.
+- **The panel's secondary text passes AA at the size it is set.** `MUTED` carried
+  section titles, every hint and every slider readout at 9–11 px while measuring
+  3.67:1 on the panel and 3.08:1 on a surface; it is now 5.53 and 4.65. White on
+  the accent was 3.68:1 under 8 px uppercase — the dash-pattern selector, which
+  decides how a line reaches paper, was a control you squinted at — so a filled
+  accent under white text is two steps deeper at 4.7:1, and the 8 px labels are
+  10 px.
+- **Every shortcut is a bare key.** A chord belongs to the browser or the OS and
+  now passes through untouched. See below for what that was costing.
+
+### Fixed
+- **⌘1 silently wrote an SVG, and ⌘5 started a screen recording.** The export
+  shortcuts tested the physical key and nothing else: there was a guard for
+  typing into a field and none for modifiers, so every accelerator built on
+  `1`–`5` or `E` fired the app's handler too. On macOS ⌘1–⌘9 switches browser
+  tabs — one of the most-pressed chords there is — so switching to your first tab
+  wrote a file to Downloads, and ⌘5 began a WebM capture whose only sign is a
+  badge at the top of a screen you have just navigated away from.
+- **Turning Identify on hover off left a highlight that could not be dismissed.**
+  The teardown cleared the hover but not the selection, and the only way out of a
+  selection is a click on empty terrain — through the very listener that teardown
+  had just removed. The orange highlight then stayed on the plate for the rest of
+  the session: visible, permanent, and absent from every export, so nothing but
+  the screen ever showed it was wrong. Clicking an already-selected row in the
+  feature list now clears it too, which is the same escape by the other door —
+  the list is how a selection is made while Identify is off, so it has to be how
+  one is undone.
+- **The keyboard could not open a section, so it could not reach what was
+  inside.** Section headers were `div`s with an `onClick` — no `tabindex`, no
+  `role`, no `aria-expanded` — and a collapsed section is a zero-height grid row.
+  A keyboard user could reach the controls in the three sections open by default
+  and never any of the rest. They are buttons now.
+- **A focused slider looked exactly like an unfocused one.** `.hmr` set
+  `outline: none` with nothing replacing it, while arrow-key nudging worked
+  perfectly — and it is the only way to set a precise value from the keyboard. In
+  a column of 31 identical sliders you pressed an arrow and watched the terrain to
+  find out which one had it.
+- **89 buttons and 31 sliders had no accessible names between them.** No
+  `aria-label`, no `<label for>`, no landmarks, no headings, an unlabelled canvas.
+  Voice control had nothing to match on and a screen reader got 31 anonymous
+  sliders in a row. The six panel primitives already receive the label string;
+  they now pass it on.
+- **The inline help was behind the smallest target in the interface.** A 12×12
+  `<span>` with an `onClick` — not a button, not focusable, well under any pointer
+  minimum — gating some of the best writing in the app. It is a button in a 20 px
+  hit box now, the ring unchanged. Sliders got the same treatment: the 3 px track
+  left the thumb's overflow as the entire target, and the band is 19 px without
+  the hairline moving.
+- **A bad preset file arrived as a browser alert.** Every other failure in the app
+  goes through a designed banner with a dismiss and a message built by
+  `friendlyError()`; this one broke the frame with a system dialog and said only
+  that you were wrong. It now names what to check.
+
 ## [0.10.1] — 2026-08-20
 
 ### Added
