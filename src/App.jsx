@@ -599,6 +599,20 @@ export default function App() {
   const dismissToast = useCallback(() => setToast(null), [])
 
   /**
+   * "Nothing here came from the user" — hold the next session write.
+   *
+   * The opening preset is applied by the panel as ordinary state changes, which
+   * the save effect cannot tell from somebody moving a slider. Without this a
+   * visitor who touched nothing would have a session written for them, and the
+   * *next* visit would announce a restore that returned only what the app would
+   * have opened with anyway — the exact fault v1.0.1 fixed.
+   */
+  const markPristine = useCallback(() => {
+    skipNextSave.current = true
+    savePendingSince.current = 0
+  }, [])
+
+  /**
    * One export job at a time, whichever writer is running.
    *
    * SVG and STL are the two exports slow enough to need saying something about —
@@ -705,6 +719,20 @@ export default function App() {
       window.removeEventListener('pointercancel', end)
     }
   }, [dragging])
+
+  /**
+   * Whether the control panel is showing — App's business now, because it
+   * decides how wide the picture is.
+   *
+   * The canvas used to span the whole window with the panel floating over its
+   * right-hand 272 px, so the scene was centred in 1440 while only 1168 of it
+   * could be seen: every composition sat off-centre and ran under the panel.
+   * Insetting the canvas instead of offsetting the camera keeps the projection
+   * untouched, which is what lets every exporter keep reading its dimensions
+   * from `gl.domElement` and get the framing the user actually composed.
+   */
+  const [panelOpen, setPanelOpen] = useState(true)
+  const viewInset = panelOpen ? PANEL_W : 0
 
   const [showHint, setShowHint] = useState(() => {
     try { return !localStorage.getItem(HINT_KEY) } catch { return true }
@@ -1046,10 +1074,22 @@ export default function App() {
   // context will actually hand back — asking for more than that renders off-centre.
   const canvasDpr = useMemo(() => {
     const desired = Math.min(window.devicePixelRatio || 1, 2) * (view.renderScale ?? 1)
-    const area = winSize.w * winSize.h
+    const area = (winSize.w - viewInset) * winSize.h
     if (!Number.isFinite(maxBufferPx) || !area) return desired
-    return Math.min(desired, Math.sqrt(maxBufferPx / area))
-  }, [view.renderScale, maxBufferPx, winSize])
+    /*
+     * Quantised, not just clamped.
+     *
+     * √(budget / area) is an irrational number, and a fractional ratio times a
+     * CSS width leaves three and the GL viewport rounding the same buffer to
+     * different integers — a one-pixel disagreement that means the scene is
+     * drawn through a viewport its framebuffer does not cover. Snapping the
+     * clamped ratio down to quarter steps lands the buffer on whole pixels for
+     * any sane canvas size, and costs a few percent of linear resolution in the
+     * rare case where the clamp engages at all.
+     */
+    const fitted = Math.sqrt(maxBufferPx / area)
+    return Math.min(desired, Math.max(0.5, Math.floor(fitted * 4) / 4))
+  }, [view.renderScale, maxBufferPx, winSize, viewInset])
 
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
@@ -1225,9 +1265,14 @@ export default function App() {
   const canvasCursor = profileMode ? 'crosshair' : (dragging ? 'grabbing' : 'grab')
 
   return (
-    <div className="w-full h-full" style={{ background: bgCss }}>
+    <div className="w-full h-full" style={{ background: bgCss, position: 'relative' }}>
 
-      {/* ── Canvas ──────────────────────────────────────────────────────── */}
+      {/* ── Canvas ──────────────────────────────────────────────────────────
+          Inset to the panel rather than sliding under it. Snapped rather than
+          transitioned: animating the width would reallocate the drawing buffer
+          every frame of the 220 ms slide, and the strip it briefly uncovers is
+          the same background the scene sits on. */}
+      <div style={{ position:'absolute', top:0, left:0, bottom:0, right: viewInset }}>
       <Canvas
         frameloop="demand"
         dpr={canvasDpr}
@@ -1266,6 +1311,7 @@ export default function App() {
           audioLive={flockAudio.liveRef}
         />
       </Canvas>
+      </div>
 
       {/* ── Edit Mode ────────────────────────────────────────────────────── */}
       {editMode && (
@@ -1298,6 +1344,8 @@ export default function App() {
           the wrapper out of the layout — the panel positions itself. */}
       <div style={{ display: editMode ? 'none' : 'contents' }}>
       <Sidebar
+        open={panelOpen} onOpenChange={setPanelOpen}
+        onPristine={markPristine}
         terrain={terrain}   setTerrain={setTerrain}
         style={style}       setStyle={setStyle}
         points={points}     setPoints={setPoints}
@@ -1365,8 +1413,8 @@ export default function App() {
 
       {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
-      {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} />}
-      {!webmActive && <FeatureTooltip layers={vectorLayers} />}
+      {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} rightInset={viewInset} />}
+      {!webmActive && <FeatureTooltip layers={vectorLayers} rightInset={viewInset} />}
 
       {/* ── WebM REC badge ───────────────────────────────────────────────── */}
       {webmActive && (

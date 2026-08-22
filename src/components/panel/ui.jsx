@@ -11,34 +11,80 @@ import { useContext, useEffect, useRef, useState } from 'react'
 import { SectionFilter, sectionMatches } from './filter'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-export const BG     = '#18181b'
-export const SURF   = '#27272a'
-export const BORDER = '#3f3f46'
-export const TEXT   = '#e4e4e7'
-export const DIM    = '#d4d4d8'
 /**
- * Secondary text. This carries section titles, every hint and every slider
- * readout, at 9–11 px — so it is a text colour before it is anything else, and
- * the old #71717a measured 3.67:1 on BG and 3.08:1 on SURF, both under AA at
- * those sizes. #8f8f99 reads 5.53 and 4.65 and is still clearly secondary
- * against DIM. Structural work (borders, tracks) belongs to BORDER, not here.
+ * One palette, published twice.
+ *
+ * `RAW` is the source of truth and the only place a colour is written down.
+ * `PanelStyles` publishes it as custom properties on `:root`, and the exports
+ * below are `var()` references — so every existing `style={{ background: SURF }}`
+ * keeps working unchanged while the values become editable from CSS, which is
+ * what makes a retune a token edit rather than four hundred inline ones.
+ *
+ * `HEX` is the same palette as literal colours, for the few consumers a custom
+ * property cannot reach: a 2D canvas resolves nothing, and hex-alpha suffixes
+ * (`#22c55e` + `88`) are string surgery. Six sites in the app, all marked.
  */
-export const MUTED  = '#8f8f99'
-export const ACCENT = '#3b82f6'
-/**
- * The accent as a *fill under white text*. White on ACCENT is 3.68:1, which is
- * fine for a 34 px toggle and not fine for a 10 px uppercase label. This is the
- * same hue two steps down: 4.7:1 under white, and still 3.77:1 against the panel
- * so the button's own edge stays visible.
- */
-export const ACCENT_DEEP = '#2f6fe0'
-export const GREEN  = '#22c55e'
+const RAW = {
+  bg:     '#18181b',
+  surf:   '#27272a',
+  border: '#3f3f46',
+  text:   '#e4e4e7',
+  dim:    '#d4d4d8',
+  /**
+   * Secondary text. This carries section titles, every hint and every slider
+   * readout, at 9–11 px — so it is a text colour before it is anything else, and
+   * the old #71717a measured 3.67:1 on BG and 3.08:1 on SURF, both under AA at
+   * those sizes. #8f8f99 reads 5.53 and 4.65 and is still clearly secondary
+   * against DIM. Structural work (borders, tracks) belongs to BORDER, not here.
+   */
+  muted:  '#8f8f99',
+  accent: '#3b82f6',
+  /**
+   * The accent as a *fill under white text*. White on ACCENT is 3.68:1, which is
+   * fine for a 34 px toggle and not fine for a 10 px uppercase label. This is the
+   * same hue two steps down: 4.7:1 under white, and still 3.77:1 against the panel
+   * so the button's own edge stays visible.
+   */
+  accentDeep: '#2f6fe0',
+  green:  '#22c55e',
+}
+
+/** The palette as literal colours, for canvas contexts and colour arithmetic. */
+export const HEX = RAW
+
+// Written out rather than generated: fast refresh only carries a module whose
+// non-component exports are literal constants, and `v('bg')` is a call.
+export const BG          = 'var(--hm-bg)'
+export const SURF        = 'var(--hm-surf)'
+export const BORDER      = 'var(--hm-border)'
+export const TEXT        = 'var(--hm-text)'
+export const DIM         = 'var(--hm-dim)'
+export const MUTED       = 'var(--hm-muted)'
+export const ACCENT      = 'var(--hm-accent)'
+export const ACCENT_DEEP = 'var(--hm-accent-deep)'
+export const GREEN       = 'var(--hm-green)'
+/** A number, not a colour — it is arithmetic (`right: open ? W : 0`). */
 export const W      = 272   // panel width px
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
 export function PanelStyles() {
   return (
     <style>{`
+      :root {
+        --hm-bg: ${RAW.bg};
+        --hm-surf: ${RAW.surf};
+        --hm-border: ${RAW.border};
+        --hm-text: ${RAW.text};
+        --hm-dim: ${RAW.dim};
+        --hm-muted: ${RAW.muted};
+        --hm-accent: ${RAW.accent};
+        --hm-accent-deep: ${RAW.accentDeep};
+        --hm-green: ${RAW.green};
+        /* Derived, because a custom property cannot carry a hex-alpha suffix. */
+        --hm-accent-ring: ${RAW.accent}80;
+        --hm-green-glow: ${RAW.green}88;
+      }
+
       /* The element is 19 px tall and transparent; the 3 px track is drawn by the
          track pseudo-element inside it. Same hairline as before, in a band a
          pointer can actually land on — the old 3 px box left the thumb's 13 px
@@ -55,8 +101,8 @@ export function PanelStyles() {
         background:${ACCENT}; border:none; }
       /* Arrow keys drive these, so which one has the keyboard has to be visible.
          :focus-visible keeps the ring off during a pointer drag. */
-      .hmr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px rgba(59,130,246,.5); }
-      .hmr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px rgba(59,130,246,.5); }
+      .hmr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
         border:1px solid ${BORDER}; border-radius:3px; cursor:pointer;
         padding:2px; background:${SURF}; }
@@ -111,8 +157,8 @@ export function PanelStyles() {
       .hmrr:hover::-webkit-slider-thumb { transform:scale(1.15); }
       .hmrr::-moz-range-thumb { pointer-events:auto; width:11px; height:11px; border-radius:50%;
         background:${ACCENT}; border:2px solid ${BG}; cursor:pointer; }
-      .hmrr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px rgba(59,130,246,.5); }
-      .hmrr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px rgba(59,130,246,.5); }
+      .hmrr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmrr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
       .hmrr::-moz-range-track { background:none; border:none; }
 
@@ -459,7 +505,7 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
           padding:'10px 14px', cursor:'pointer', userSelect:'none', width:'100%',
         }}>
         <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
-          {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:`0 0 6px ${GREEN}88` }} />}
+          {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
         </span>
@@ -474,6 +520,56 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * The panel's button.
+ *
+ * Fifty-seven of the sixty-three buttons in the panel carried their own inline
+ * font size, padding, radius, border, colour, background and cursor — the same
+ * element, seven decisions, fifty-seven times, which is how one panel ended up
+ * with four button font sizes and four button radii.
+ *
+ * What this owns is *appearance by state*: the four looks a button can have and
+ * what each does when it is hovered, pressed or disabled. Geometry stays
+ * overridable through `style`, because these sit in rows of genuinely different
+ * shapes — a full-width export tile and a two-character `all` are not the same
+ * button wearing different padding.
+ *
+ *   quiet    the default — a surface with an edge
+ *   ghost    no ground of its own; for dismissers and inline actions
+ *   primary  the accent, under white text
+ *   toggle   `on` decides which of the two it is
+ */
+const BTN_SIZES = {
+  xs: { fontSize: 9,  padding: '2px 6px', borderRadius: 3 },
+  sm: { fontSize: 10, padding: '3px 6px', borderRadius: 3 },
+  md: { fontSize: 11, padding: '5px 7px', borderRadius: 5 },
+}
+
+export function Btn({
+  variant = 'quiet', size = 'sm', on = false, block = false,
+  style, children, ...rest
+}) {
+  const look = variant === 'toggle'
+    ? (on ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
+          : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` })
+    : variant === 'primary'
+      ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
+      : variant === 'ghost'
+        ? { background: 'none', color: MUTED, border: 'none' }
+        : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` }
+
+  return (
+    <button type="button" {...rest} style={{
+      ...BTN_SIZES[size], ...look,
+      cursor: rest.disabled ? 'default' : 'pointer',
+      fontFamily: 'inherit',
+      ...(block && { flex: 1 }),
+      ...(rest.disabled && { opacity: 0.5 }),
+      ...style,
+    }}>{children}</button>
   )
 }
 

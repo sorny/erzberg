@@ -21,7 +21,7 @@ import { featureLabel } from '../utils/vectorLayers'
 const MAX_W = 320
 const CURSOR_GAP = 16
 
-export function FeatureTooltip({ layers }) {
+export function FeatureTooltip({ layers, rightInset = 0 }) {
   const hover = useStore((s) => s.vectorHover)
   const sources = useStore((s) => s.vectorSources)
   // A hover with no position came from a panel row, which is already showing the
@@ -41,7 +41,9 @@ export function FeatureTooltip({ layers }) {
   // it. The right edge matters most: the sidebar lives there, and a tooltip
   // that opens rightward from a feature near it would be half off-screen or
   // over the panel.
-  const flipX = hover.x + CURSOR_GAP + MAX_W > window.innerWidth
+  // Against the canvas's right edge, not the window's: past it lies the control
+  // panel, and a tooltip that declines to flip there slides underneath it.
+  const flipX = hover.x + CURSOR_GAP + MAX_W > window.innerWidth - rightInset
   const flipY = hover.y + CURSOR_GAP + 90 > window.innerHeight
 
   return (

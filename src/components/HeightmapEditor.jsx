@@ -15,7 +15,8 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { simplifyFlat } from '../utils/geometryBuilders'
 import { effectiveBounds, isUsableShape } from '../utils/heightmapEdit'
-import { ACCENT, BORDER, MUTED, SURF } from './panel/ui'
+// HEX for the canvas passes below — a 2D context cannot resolve var().
+import { ACCENT, BORDER, HEX, MUTED, SURF } from './panel/ui'
 
 // Cap on the cached preview bitmap's long side. An 8k DEM downscaled to this is
 // still far past what any screen shows, and holding the full raster as RGBA
@@ -260,11 +261,11 @@ export function HeightmapEditor({
 
     // Selection outline
     if (ellipse) {
-      ctx.strokeStyle = ACCENT
+      ctx.strokeStyle = HEX.accent
       ctx.lineWidth = 1.5
       ctx.beginPath(); addEllipse(ellipse); ctx.stroke()
     } else if (poly && poly.length >= 4) {
-      ctx.strokeStyle = ACCENT
+      ctx.strokeStyle = HEX.accent
       ctx.lineWidth = 1.5
       ctx.beginPath()
       ctx.moveTo(sx(poly[0]), sy(poly[1]))
@@ -274,7 +275,7 @@ export function HeightmapEditor({
       ctx.stroke()
 
       if (drawingPoly) {
-        ctx.fillStyle = ACCENT
+        ctx.fillStyle = HEX.accent
         for (let i = 0; i < poly.length; i += 2) {
           ctx.fillRect(sx(poly[i]) - 2.5, sy(poly[i + 1]) - 2.5, 5, 5)
         }

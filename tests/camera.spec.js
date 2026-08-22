@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -9,6 +10,7 @@ async function openApp(page) {
   // The Camera section is closed by default.
   await page.locator('[data-testid="section-camera"]').click()
   await page.waitForTimeout(400)
+  await resetToDefaults(page)
 }
 
 /** The number a slider row prints to the right of its track. */

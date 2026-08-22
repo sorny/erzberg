@@ -15,6 +15,7 @@ import { featureLabel, toggleHidden } from '../utils/vectorLayers'
 import { CANCELLED } from '../utils/pacing'
 import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
+import { STYLE_DEF } from '../defaults'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
@@ -25,7 +26,7 @@ import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
-  RangeSl, Sl, Sub, Tog, TogColor,
+  RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
 import { SectionFilter, sectionMatches } from './panel/filter'
 import { ModeMark } from './panel/modeMarks'
@@ -92,6 +93,16 @@ const SECTION_TERMS = {
   'Export':           'svg png stl webm plotter print heightmap preset save load download video recording',
   'Analysis':         'elevation profile cross-section transect chart a b pins',
 }
+
+/**
+ * The preset the app opens on for a visitor with no stored session.
+ *
+ * Chosen for what it shows rather than what it costs: hypsometric fill, contours
+ * and crosshatch over a warm paper ground, which is four of the tool's ideas at
+ * once. Checked at full size rather than by its thumbnail — several presets that
+ * read beautifully at 190 px are a thin scatter across a 1168 px plate.
+ */
+const OPENING_PRESET = 'Alpine Survey'
 
 /** m:ss for the Soundscapes transport readout. */
 function fmtTime(sec) {
@@ -382,12 +393,9 @@ function Orientation({ layer, set, viewTilt, viewSpin }) {
           <InlineSl label="Spin" min={-180} max={180} step={1} value={layer.iconSpin}
             fmt={(v) => `${Math.round(v)}°`} onChange={(v) => set({ iconSpin: v })}
             testId={`icon-spin-${layer.id}`} />
-          <button onClick={() => set({ iconTilt: viewTilt, iconSpin: viewSpin })}
+          <Btn size="xs" onClick={() => set({ iconTilt: viewTilt, iconSpin: viewSpin })}
             data-testid={`icon-match-${layer.id}`}
-            style={{
-              width: '100%', padding: 5, marginTop: 2, fontSize: 9, borderRadius: 3, cursor: 'pointer',
-              background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-            }}>Match view</button>
+            style={{ width: '100%', padding: 5, marginTop: 2, color: DIM }}>Match view</Btn>
         </Sub>
       )}
     </>
@@ -677,11 +685,8 @@ function FeatureList({ layer, bucket, onPatch }) {
   const visible = bucket.count - hidden.size
 
   const bulk = (label, next, testId) => (
-    <button onClick={() => onPatch(layer.id, { hidden: next() })} data-testid={testId}
-      style={{
-        fontSize: 10, padding: '2px 6px', borderRadius: 3, cursor: 'pointer',
-        background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
-      }}>{label}</button>
+    <Btn onClick={() => onPatch(layer.id, { hidden: next() })} data-testid={testId}
+      style={{ padding: '2px 6px' }}>{label}</Btn>
   )
 
   return (
@@ -1059,12 +1064,8 @@ function VectorLayersPanel({
       {sources?.length > 1 && (
         <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {sources.map((src) => (
-            <button key={src.id} onClick={() => onRemoveSource(src.id)}
-              title={`Remove every layer from ${src.label}`}
-              style={{
-                fontSize: 10, padding: '3px 6px', borderRadius: 3, cursor: 'pointer',
-                background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
-              }}>✕ {src.label}</button>
+            <Btn key={src.id} onClick={() => onRemoveSource(src.id)}
+              title={`Remove every layer from ${src.label}`}>✕ {src.label}</Btn>
           ))}
         </div>
       )}
@@ -1207,7 +1208,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
               <div style={{ marginTop: 8 }}>
                 <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 5, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
+                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'3px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
               </div>
@@ -1251,8 +1252,22 @@ export function Sidebar({
   hypsometricIntegral,
   profileMode, profileClicks, onProfileMode,
   onEditHeightmap, editSummary, onClearEdit,
+  open: openProp, onOpenChange, onPristine,
 }) {
-  const [open, setOpen]     = useState(true)
+  // Owned by App, because the canvas is inset to whatever this is. Falls back to
+  // local state so the panel still works if the props are ever left off.
+  const [openLocal, setOpenLocal] = useState(true)
+  const open = openProp ?? openLocal
+  // Read through a ref so the setter can stay stable: the backslash shortcut
+  // binds a window listener once, and a setter with a fresh identity every
+  // render would tear the listener down and rebuild it just as often.
+  const openRef = useRef(open)
+  openRef.current = open
+  const setOpen = useCallback((next) => {
+    const value = typeof next === 'function' ? next(openRef.current) : next
+    setOpenLocal(value)
+    onOpenChange?.(value)
+  }, [onOpenChange])
   const [filter, setFilter] = useState('')
   const q = filter.trim().toLowerCase()
   const filterCtx = useMemo(() => ({ q, terms: SECTION_TERMS }), [q])
@@ -1265,7 +1280,10 @@ export function Sidebar({
     [q]
   )
   const [sec, setSec]       = useState({
-    terrain: true, levels: true, view: true, camera: false, presets: false, style: true,
+    // Presets open, Levels closed: the grid of 56 looks is the most persuasive
+    // thing in the panel and it used to be the tenth section down, collapsed,
+    // below four surface overlays. A histogram is not what anyone needs first.
+    terrain: true, levels: false, view: true, camera: false, presets: true, style: true,
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
@@ -1380,7 +1398,7 @@ export function Sidebar({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [setOpen])
 
   // Soundscapes controller. Aliased because `ss` is already the style setter,
   // and defaulted so the section degrades to an inert upload button if the
@@ -1412,17 +1430,22 @@ export function Sidebar({
   // Every style or particle change that did not come from applyPreset means the
   // user has left the preset behind. applyPreset writes through setStyle/setPoints
   // directly, so it does not trip this.
-  const leftPreset = () => { if (lastPreset) setPresetEdited(true) }
+  // Has the user changed anything yet? The opening preset waits on 56 preset
+  // files, so it can arrive a second or more after the panel is usable — and
+  // applying it then would overwrite whatever had already been touched. Set by
+  // every parameter setter below, and read by the effect that would apply it.
+  const userTouched = useRef(false)
+  const leftPreset = () => { userTouched.current = true; if (lastPreset) setPresetEdited(true) }
   // applyPreset writes both gradients, so changing one by hand is as much a
   // departure from the preset as moving a slider. These wrap the setters for
   // the panel; applyPreset keeps using the raw props, which is what stops it
   // marking its own work as an edit.
   const sg  = (v) => { leftPreset(); setGradientStops(v) }
   const sbg = (v) => { leftPreset(); setBgGradientStops(v) }
-  const st = (v) => setTerrain(p => ({ ...p, ...v }))
+  const st = (v) => { leftPreset(); setTerrain(p => ({ ...p, ...v })) }
   const ss = (v) => { leftPreset(); setStyle(p => ({ ...p, ...v })) }
   const sp = (v) => { leftPreset(); setPoints(p => ({ ...p, ...v })) }
-  const sv = (v) => setView(p => ({ ...p, ...v }))
+  const sv = (v) => { leftPreset(); setView(p => ({ ...p, ...v })) }
 
   // The panel's own share of a reset: the preset tiles have to stop pointing at
   // a look the settings no longer hold.
@@ -1431,6 +1454,12 @@ export function Sidebar({
     setPresetEdited(false)
     setRollSeed(null)
     setRollHistory([])
+    // The disclosures follow the style back, as they follow it anywhere else.
+    // applyPreset has always re-synced them; a reset did not, so a look that had
+    // switched Lines off left that section collapsed — and the reset then turned
+    // Lines back on behind a shut disclosure, which is the one state this panel
+    // is not supposed to be able to reach.
+    syncSectionsToStyle(STYLE_DEF)
     onReset?.()
   }
 
@@ -1484,6 +1513,36 @@ export function Sidebar({
     if (sessionRestored) syncSectionsToStyle(style)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /**
+   * The look the app opens on.
+   *
+   * Bare defaults are a monochrome line drawing on white: correct, and the least
+   * interesting thing this tool can do. A first-time visitor decides in about two
+   * seconds, and the picture they landed on was the one picture that shows none
+   * of the range. Opening on a real preset costs nothing — this one carries no
+   * particles, no ray-marched shadows and no sky-view pass, so it is the same
+   * work the default was already doing — and it puts the Presets grid's selected
+   * tile on screen, which is how anyone learns the grid is there.
+   *
+   * The *defaults* are untouched: Reset all still goes to them, and so does the
+   * randomiser's starting point. This is an opening state, not a new baseline.
+   * A restored session wins, because that is somebody's actual work.
+   */
+  const openingApplied = useRef(false)
+  useEffect(() => {
+    if (openingApplied.current || sessionRestored) return
+    if (userTouched.current) { openingApplied.current = true; return }   // too late to be an opening
+    const preset = externalPresets?.[OPENING_PRESET]
+    if (!preset) return                       // manifest still in flight
+    openingApplied.current = true
+    applyPreset(preset, OPENING_PRESET)
+    // Not the user's doing, so it must not be stored as their session.
+    onPristine?.()
+    // applyPreset is rebuilt every render and the guard above is what makes this
+    // run once; listing it would re-apply the preset over the user's own edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalPresets, sessionRestored, onPristine])
 
   // ── Discovery: rolling a look ─────────────────────────────────────────────
   const presetNames = Object.keys(externalPresets || {})
@@ -1619,6 +1678,29 @@ export function Sidebar({
               </div>
             )}
 
+            {/* Which look is on, and a way to the other 55.
+                Opening the Presets section is not enough on its own: it is the
+                tenth section down, so the grid is still a scroll away from the
+                thing it is meant to be discovered from. This is the one line in
+                the panel that always says what you are looking at. */}
+            {lastPreset && (
+              <div style={{ marginTop:6, display:'flex', alignItems:'baseline', justifyContent:'center', gap:5, fontSize:10, color: MUTED }}>
+                <span>Style</span>
+                <button data-testid="jump-to-presets"
+                  onClick={() => {
+                    setSec(prev => ({ ...prev, presets: true }))
+                    document.querySelector('[data-testid="section-presets"]')
+                      ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                  }}
+                  title="Show all 56 styles"
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer',
+                           color: DIM, fontSize:10, fontFamily:'inherit',
+                           borderBottom:`1px solid ${BORDER}` }}>
+                  {lastPreset}{presetEdited ? ' · edited' : ''}
+                </button>
+              </div>
+            )}
+
             {/* Settings now survive a reload, which is only reassuring if it is
                 said out loud — otherwise the app looks like it opened on someone
                 else's defaults. */}
@@ -1682,9 +1764,9 @@ export function Sidebar({
               {[['Top', 'top', 'Look straight down'], ['Front', 'front', 'Look from the front'],
                 ['Iso', 'iso', 'Isometric three-quarter view'], ['Reset', 'reset', 'Reset the view only']]
                 .map(([label, name, hint]) => (
-                <button key={name} type="button" onClick={() => onCameraPreset(name)}
+                <Btn key={name} block onClick={() => onCameraPreset(name)}
                   title={hint} aria-label={name === 'reset' ? 'Reset view' : hint}
-                  style={{ flex:1, fontSize:10, padding:'3px 0', border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer', background: SURF, color: MUTED }}>{label}</button>
+                  style={{ padding:'3px 0' }}>{label}</Btn>
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
@@ -1794,7 +1876,7 @@ export function Sidebar({
             {style.fillHypsometric || HYPSO_LAYER_IDS.some(id => style[`hypso${id}`]) ? (
               <div style={{ marginBottom: 10, marginTop: 10 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <button key={name} onClick={() => sg(GRADIENT_PRESETS[name])} style={{ fontSize:9, padding:'3px 0', background: SURF, color: MUTED, border:`1px solid ${BORDER}`, borderRadius:3, cursor:'pointer' }}>{name}</button>)}
+                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => sg(GRADIENT_PRESETS[name])} style={{ padding:'3px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={sg} />
               </div>

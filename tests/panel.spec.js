@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 /**
  * The control panel itself — the filter, the typed values, the shortcut.
@@ -12,6 +13,7 @@ async function openApp(page) {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('[data-testid="section-terrain"]', { timeout: 30000 })
   await page.waitForTimeout(2500)
+  await resetToDefaults(page)
 }
 
 test.describe('panel', () => {

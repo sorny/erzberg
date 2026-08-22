@@ -19,14 +19,20 @@
 import { useEffect, useState } from 'react'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
 
-export function FrameOverlay({ view, bgColor }) {
-  const [size, setSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+export function FrameOverlay({ view, bgColor, rightInset = 0 }) {
+  const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
 
   useEffect(() => {
-    const onResize = () => setSize({ w: window.innerWidth, h: window.innerHeight })
+    const onResize = () => setWin({ w: window.innerWidth, h: window.innerHeight })
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
+
+  // The canvas is inset to the control panel, and the sheet falls on the canvas.
+  // Measuring the window instead put the frame a half-panel to the right of the
+  // crop the SVG exporter would actually cut, which is the one thing this
+  // overlay exists not to do.
+  const size = { w: win.w - rightInset, h: win.h }
 
   // Same brightness test CenterGuides uses, so the frame reads on paper and ink
   // alike rather than disappearing into whichever background is set.
@@ -49,7 +55,8 @@ export function FrameOverlay({ view, bgColor }) {
   const panel = (style) => <div style={{ position: 'absolute', background: veil, ...style }} />
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 500 }}>
+    <div style={{ position: 'fixed', top: 0, left: 0, bottom: 0, right: rightInset,
+                  pointerEvents: 'none', zIndex: 500 }}>
       {/* Four panels rather than one box-shadow: a shadow large enough to cover
           the window would have to be guessed at, and these are exact. */}
       {panel({ left: 0, top: 0, right: 0, height: Math.max(0, r.y) })}

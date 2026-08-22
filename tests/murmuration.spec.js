@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { resetToDefaults } from './helpers.js'
 
 // The Soundscapes fixture: 6 s mono, a 120 Hz→8 kHz sweep over a 300 Hz drone
 // with 1.5 kHz bursts once a second — so it has bass, air and onsets.
@@ -21,6 +22,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
+  await resetToDefaults(page)
 }
 
 /** Downsampled fingerprint of the canvas — see tests/rendering.spec.js. */

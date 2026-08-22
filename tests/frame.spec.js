@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 const toggleFor = (page, label) =>
   page.locator(`xpath=//span[text()="${label}"]/following-sibling::label`)
@@ -9,6 +10,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(2500)
+  await resetToDefaults(page)
 }
 
 test('the frame geometry fits, scales and clips', async ({ page }) => {

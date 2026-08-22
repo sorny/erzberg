@@ -20,7 +20,9 @@
  */
 import { useEffect, useRef } from 'react'
 import { makeBandPlan, createAudioState, sampleAudio, applyAudio, audioVisuals, shapeFeatures, audioRanges } from '../utils/audioFeatures'
-import { BORDER, MUTED } from './panel/ui'
+// HEX rather than the var() exports: this component paints on a 2D canvas,
+// which resolves literal colours only.
+import { BORDER, HEX } from './panel/ui'
 
 const H_SPECTRUM = 46
 const H_BARS = 24
@@ -86,7 +88,7 @@ export function AudioMeter({ liveRef, points }) {
       const spec = live?.getSpec?.() ?? null
 
       if (!spec) {
-        ctx.fillStyle = MUTED
+        ctx.fillStyle = HEX.muted
         ctx.font = '9px system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText('no track', W / 2, H / 2 + 3)
@@ -198,7 +200,7 @@ export function AudioMeter({ liveRef, points }) {
         const v = Math.max(0, Math.min(1, values[i] || 0))
         ctx.fillStyle = colour
         ctx.fillRect(x, top, cw * v, barH)
-        ctx.fillStyle = v > 0.02 ? colour : MUTED
+        ctx.fillStyle = v > 0.02 ? colour : HEX.muted
         ctx.fillText(label, x + cw / 2, top + barH + 8)
       })
 
@@ -208,7 +210,7 @@ export function AudioMeter({ liveRef, points }) {
       if (!playing) {
         ctx.fillStyle = 'rgba(20,20,23,0.72)'
         ctx.fillRect(0, 0, W, H_SPECTRUM)
-        ctx.fillStyle = MUTED
+        ctx.fillStyle = HEX.muted
         ctx.font = '9px system-ui, sans-serif'
         ctx.textAlign = 'center'
         ctx.fillText('paused', W / 2, H_SPECTRUM / 2 + 3)

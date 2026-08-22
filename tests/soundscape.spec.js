@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { resetToDefaults } from './helpers.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 // 6 s mono MP3: exponential 120 Hz→8 kHz sweep + steady 300 Hz drone + 1.5 kHz
@@ -13,6 +14,7 @@ async function openSoundscapes(page) {
   await page.waitForSelector('text=erzberg', { timeout: 30000 })
   const toggle = page.locator('[data-testid="sidebar-toggle"]')
   if ((await toggle.innerText()) === '◀') { await toggle.click(); await page.waitForTimeout(400) }
+  await resetToDefaults(page)
   await page.locator('text=SOUNDSCAPES').click()
   await page.waitForTimeout(300)
 }
@@ -21,7 +23,9 @@ async function openSoundscapes(page) {
 // children mounted inside a 0fr grid row — so the buttons exist but have no
 // height and are unclickable until the header is toggled.
 async function openPresets(page) {
-  await page.locator('text=PRESETS').first().click()
+  // Idempotent — the section ships open, so an unconditional click closes it.
+  const header = page.locator('[data-testid="section-presets"]')
+  if ((await header.getAttribute('aria-expanded')) !== 'true') await header.click()
   await page.waitForTimeout(300)
 }
 

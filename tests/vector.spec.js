@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fromArrayBuffer } from 'geotiff'
 import { unprojectWgs84 } from '../src/utils/geoCoords.js'
+import { resetToDefaults } from './helpers.js'
 
 /**
  * Vector layers — OpenStreetMap, GeoJSON and GPX draped on the terrain.
@@ -93,6 +94,7 @@ function overpassFixture() {
 async function openVectorPanel(page) {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await resetToDefaults(page)
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.click('[data-testid="load-geotiff"]'),

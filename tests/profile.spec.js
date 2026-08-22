@@ -7,6 +7,7 @@
  * the standalone SVG the popup writes.
  */
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -14,6 +15,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(3000)
+  await resetToDefaults(page)
 }
 
 /** Arms profile mode and clicks A then B on the terrain. */

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 // Section roots are direct children of #hm-panel-body, which disambiguates the
 // many identically-labelled "Enabled" toggles.
@@ -11,6 +12,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1200)
+  await resetToDefaults(page)
 }
 const segments = async (page) =>
   Number((await page.locator('text=/Segments: /').innerText()).match(/Segments: ([\d,]+)/)[1].replace(/,/g, ''))

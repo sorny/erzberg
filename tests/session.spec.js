@@ -99,13 +99,16 @@ test('a restored mode comes back with its section open', async ({ page }) => {
   // straight into React state at mount skipped it, so a reload left a mode
   // drawing with its controls behind a collapsed disclosure.
   await openApp(page)
-  const section = page.locator('[data-testid="section-mode:-contours"]')
-  await page.click('[data-testid="section-mode:-contours"]')
+  // Pillars rather than Contours: the opening preset already draws contours, so
+  // toggling that one would be switching a mode *off* and asserting the section
+  // opened for a mode that is not running.
+  const section = page.locator('[data-testid="section-mode:-pillars"]')
+  await page.click('[data-testid="section-mode:-pillars"]')
   await page.waitForTimeout(300)
   await section.locator('xpath=following-sibling::div[1]')
     .locator('input[type=checkbox]').first().click()
   await page.waitForTimeout(2000)
-  await page.click('[data-testid="section-mode:-contours"]')   // collapse it again
+  await page.click('[data-testid="section-mode:-pillars"]')   // collapse it again
   await page.waitForTimeout(400)
   await expect(section).toHaveAttribute('aria-expanded', 'false')
 

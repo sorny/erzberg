@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { resetToDefaults } from './helpers.js'
 
 /**
  * Play & discovery — preset thumbnails and the randomiser.
@@ -19,10 +20,14 @@ async function boot(page) {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=erzberg', { timeout: 30000 })
   await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await resetToDefaults(page)
 }
 
 async function openPresets(page) {
-  await page.locator('text=PRESETS').first().click()
+  // Idempotent: the section ships open, and clicking it unconditionally used to
+  // close it — leaving every tile inside a zero-height row and unclickable.
+  const header = page.locator('[data-testid="section-presets"]')
+  if ((await header.getAttribute('aria-expanded')) !== 'true') await header.click()
   await page.waitForTimeout(300)
 }
 
@@ -148,4 +153,28 @@ test('a roll is reproducible and always leaves something visible', async ({ page
   expect(r.blank).toBe(0)         // never hand back an empty canvas
   expect(r.invisible).toBe(0)     // never ink that matches its own background
   expect(r.maxCost).toBeLessThanOrEqual(9)   // never stack every expensive mode
+})
+
+test('the app opens on a style, not on bare defaults', async ({ page }) => {
+  /*
+   * The one place the shipped opening state is asserted.
+   *
+   * Every other spec calls resetToDefaults() so its precondition is stated
+   * rather than inherited — which is right, and would otherwise leave nothing at
+   * all covering what a first-time visitor actually meets.
+   */
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('[data-testid="section-presets"]', { timeout: 30000 })
+  await page.waitForTimeout(4000)
+
+  // The panel names the look, and the tile for it is the selected one.
+  await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveText('Alpine Survey')
+  await expect(page.locator('[data-testid="preset-edited"]')).toHaveCount(0)
+  await expect(page.locator('[data-testid="section-presets"]'))
+    .toHaveAttribute('aria-expanded', 'true')
+
+  // And it is an opening state, not a new baseline: Reset all still goes to the
+  // defaults, which carry no preset at all.
+  await resetToDefaults(page)
+  await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveCount(0)
 })

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
+import { resetToDefaults } from './helpers.js'
 
 /**
  * STL export content, which nothing covered before.
@@ -70,6 +71,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(2000)
+  await resetToDefaults(page)
 }
 
 const read = (dl) => dl.createReadStream().then((s) => new Promise((res, rej) => {

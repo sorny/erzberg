@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { resetToDefaults } from './helpers.js'
 
 // Switch inputs are display:none inside a label that is a *sibling* of the text
 // span, so clicking the label text does nothing — walk from the span instead.
@@ -11,6 +12,7 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
+  await resetToDefaults(page)
 }
 
 /**

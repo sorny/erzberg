@@ -17,6 +17,7 @@
 import { test, expect } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
+import { resetToDefaults } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 
@@ -176,6 +177,7 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
   await page.waitForSelector('text=erzberg', { timeout: 30_000 })
   const toggle = page.locator('[data-testid="sidebar-toggle"]')
   if ((await toggle.innerText()) === '◀') { await toggle.click(); await page.waitForTimeout(400) }
+  await resetToDefaults(page)
   await page.waitForTimeout(2500)
 
   /**
