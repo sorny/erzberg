@@ -247,6 +247,14 @@ into one picture.
   control moves and nothing happens. Two smaller ones go with the section: a
   mark in `panel/modeMarks.jsx`, drawn at 22×13 as the mode's defining gesture
   rather than a picture of terrain, and a line in `SECTION_TERMS` (below).
+- **A button**: use `Btn` from `panel/ui.jsx` — `variant` carries the look
+  (`quiet`, `ghost`, `primary`, `toggle`) and `style` carries the geometry, which
+  is genuinely per-row. Do not re-specify background, colour and border by hand;
+  that is how the panel came to hold four button radii.
+- **A colour**: add it to `RAW` in `panel/ui.jsx` and publish it in the `:root`
+  block beside the others, then export it as a `var()` reference. Only reach for
+  `HEX` if the consumer is a 2D canvas or needs to append an alpha suffix —
+  a custom property cannot serve either.
 - **A panel section**: add its title and the words it should answer to in
   `SECTION_TERMS` in `Sidebar.jsx`. The filter's index is stated rather than
   scraped from the rendered tree, because a mode's parameters only mount once

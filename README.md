@@ -62,8 +62,10 @@ npm install
 npm run dev              # http://localhost:5173
 ```
 
-The app opens on a bundled sample heightmap, so there is something to look at
-before you load anything. Start with a style preset, then tune.
+The app opens on a bundled sample heightmap under a style preset, so there is
+something worth looking at before you load anything — the picture is the landing
+page. Pick a different style from the grid, then tune. *Reset all* returns to
+bare defaults, which is a different thing from the look it opens on.
 
 **The panel remembers.** Terrain, style, particles, view and both gradients are
 written to the browser as you work and restored on the next visit, so a reload
@@ -342,6 +344,12 @@ browser or the OS and passes through untouched.
 ---
 
 ## Reach
+
+The panel runs on four type roles, three radii and one palette published as CSS
+custom properties, so a retune is a token edit rather than four hundred inline
+ones. Every control that fills with the accent under white text uses the deeper
+`#2f6fe0`, which reads 4.7:1 — the lighter accent is fine behind a 34 px toggle
+and not behind a 10 px uppercase label.
 
 Nothing here is a 3D terrain tool anyone will use without sight, and pretending
 otherwise would be worse than saying so. What the controls owe is the part that

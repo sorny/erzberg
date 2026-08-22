@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] — 2026-08-22
+
+A UI pass over the panel and the picture it frames. The panel's shape is
+unchanged — same 272 px column, same thirty-two sections, same order — and
+nothing here touches GIS, projection, worker, rendering or export logic.
+
+### Added
+- **The app opens on a look rather than on bare defaults.** A monochrome line
+  drawing on white is correct and is the least interesting thing this tool does,
+  and a first-time visitor decides in about two seconds. Alpine Survey costs no
+  more to draw — no particles, no ray-marched shadows, no sky-view pass — and it
+  puts the Presets grid's selected tile on screen, which is how anyone learns the
+  grid is there. One line under the file name names the current style and jumps
+  to the grid. The defaults are untouched: *Reset all* and the randomiser still
+  start from them, and a restored session still wins.
+- **A `Btn` primitive.** Fifty-seven of the panel's sixty-three buttons carried
+  their own font size, padding, radius, border, colour, background and cursor —
+  one element, seven decisions, fifty-seven times, which is how one panel came to
+  hold four button font sizes and four button radii. `Btn` owns appearance by
+  state — quiet, ghost, primary, toggle — and leaves geometry overridable,
+  because a full-width export tile and a two-character *all* are not one button
+  in different padding. Nine call sites so far; the rest are genuinely bespoke.
+
+### Changed
+- **The picture is composed for the part of the window you can see.** The canvas
+  spanned the whole window with the panel floating over its right-hand 272 px, so
+  every scene was centred in 1440 while only 1168 was visible — the plate ran
+  under the panel and off the edge. The canvas is inset now rather than the camera
+  offset, which leaves the projection alone and lets every exporter keep reading
+  its dimensions from `gl.domElement`. The paper frame follows the canvas too; it
+  had been drawing the crop guide half a panel right of where the SVG would cut.
+- **Design tokens are CSS custom properties.** One palette, published on `:root`,
+  with the JavaScript exports as `var()` references — so all 407 call sites kept
+  working untouched while the values became reachable from CSS. Six consumers
+  cannot use a custom property (two 2D canvases, one hex-alpha suffix) and take
+  the literal palette instead.
+- **Thirteen font sizes become four roles.** 7, 8 and 9 px all collapse into
+  micro 10; 11, 12 and 13 stay as body, label and display. Forty-seven sites. The
+  9 px text was carrying section titles, every hint and every slider readout, and
+  at that size on this ground it was a squint. It costs eighteen pixels of panel
+  height, measured like for like.
+- **Nine radii become three** — 2 for dense inline controls, 3 for small ones, 5
+  for buttons, tiles and surfaces. Only 4 and 6 had to move. The Switch's 9 px
+  track stays: that is a pill, not a radius on the scale.
+- **Every toggle button passes AA.** White on `#3b82f6` is 3.68:1 and these
+  labels are 9 and 10 px uppercase; `#2f6fe0` reads 4.7:1 under white and still
+  3.77:1 against the panel. The segmented rows have been on the deeper fill since
+  v1.0.0 — this is the rest of the panel catching up with a decision that was
+  only ever half applied.
+
+### Fixed
+- **`Reset all` restored the style but left the section disclosures where the
+  previous look had put them.** A style that switched Lines off collapsed that
+  section, and the reset then turned Lines back on behind a shut disclosure.
+- **The opening preset could overwrite work already in progress.** It is gated on
+  fifty-six preset files downloading, so on a slow connection it arrived after
+  the panel was usable. It now stands down once anything has been touched.
+- **A one-pixel viewport/buffer disagreement at 2× supersampling.** The narrower
+  canvas put the DPR clamp on an irrational ratio that three.js and GL rounded
+  differently; the clamp is quantised to quarter steps so the buffer lands on
+  whole pixels.
+
+### Testing
+- `tests/helpers.js` — `resetToDefaults()`, which states the baseline fifteen
+  specs had been inheriting from the opening look rather than declaring. Setup
+  only; no assertion was weakened. `discovery.spec.js` asserts the shipped
+  opening state so that coverage did not disappear with it.
+
 ## [1.0.2] — 2026-08-21
 
 ### Fixed
