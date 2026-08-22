@@ -99,10 +99,13 @@ export function PanelStyles() {
       .hmr:hover::-webkit-slider-thumb { transform:scale(1.2); }
       .hmr::-moz-range-thumb { width:13px; height:13px; border-radius:50%;
         background:${ACCENT}; border:none; }
-      /* Arrow keys drive these, so which one has the keyboard has to be visible.
-         :focus-visible keeps the ring off during a pointer drag. */
-      .hmr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
-      .hmr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      /* :focus, not :focus-visible.
+         Clicking a slider arms it for the arrow keys, so the state is real from
+         the click — and :focus-visible withholds the ring until the first
+         keypress, which hides it for exactly as long as it is the only thing
+         telling you which of thirty-one sliders an arrow key will move. */
+      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
         border:1px solid ${BORDER}; border-radius:3px; cursor:pointer;
         padding:2px; background:${SURF}; }
@@ -157,8 +160,8 @@ export function PanelStyles() {
       .hmrr:hover::-webkit-slider-thumb { transform:scale(1.15); }
       .hmrr::-moz-range-thumb { pointer-events:auto; width:11px; height:11px; border-radius:50%;
         background:${ACCENT}; border:2px solid ${BG}; cursor:pointer; }
-      .hmrr:focus-visible::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
-      .hmrr:focus-visible::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmrr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmrr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
       .hmrr::-moz-range-track { background:none; border:none; }
 
