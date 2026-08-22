@@ -270,7 +270,7 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
           {label}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        {hint && <span style={{ fontSize: 9, color: MUTED }}>{hint}</span>}
+        {hint && <span style={{ fontSize: 10, color: MUTED }}>{hint}</span>}
       </div>
       {showHelp && help && <HelpBox text={help} />}
       <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
@@ -362,7 +362,7 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+          {label}{hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <input type="range" className="hmr" data-testid={testId} aria-label={label}
@@ -397,7 +397,7 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
-          {label}{hint && <span style={{ fontSize: 9, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+          {label}{hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <div style={{ position:'relative', flex:1, height:13, minWidth:0 }}>
@@ -413,7 +413,7 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
             min={min} max={max} step={step} value={hi}
             onChange={(e) => onChange(lo, Math.max(parseFloat(e.target.value), lo + GAP))} />
         </div>
-        <span style={{ minWidth: 52, textAlign:'right', fontSize: 9, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+        <span style={{ minWidth: 52, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
           {f(lo)}–{f(hi)}
         </span>
       </div>
@@ -504,7 +504,7 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
           display:'flex', justifyContent:'space-between', alignItems:'center',
           padding:'10px 14px', cursor:'pointer', userSelect:'none', width:'100%',
         }}>
-        <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
+        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
           {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
@@ -543,7 +543,7 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
  *   toggle   `on` decides which of the two it is
  */
 const BTN_SIZES = {
-  xs: { fontSize: 9,  padding: '2px 6px', borderRadius: 3 },
+  xs: { fontSize: 10,  padding: '2px 6px', borderRadius: 3 },
   sm: { fontSize: 10, padding: '3px 6px', borderRadius: 3 },
   md: { fontSize: 11, padding: '5px 7px', borderRadius: 5 },
 }
@@ -595,7 +595,7 @@ export function ExpBtn({ label, hint, onClick, active, testId }) {
       cursor:'pointer', fontSize:11, fontWeight:600,
     }}>
       {label}
-      {hint && <span className="hmeh" style={{ display:'block', fontSize:9, color: active ? 'rgba(255,255,255,.75)' : MUTED, fontWeight:400, marginTop:2 }}>{hint}</span>}
+      {hint && <span className="hmeh" style={{ display:'block', fontSize:10, color: active ? 'rgba(255,255,255,.75)' : MUTED, fontWeight:400, marginTop:2 }}>{hint}</span>}
     </button>
   )
 }

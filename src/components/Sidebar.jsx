@@ -127,7 +127,7 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
 
   const note = (color, children) => (
     <div style={{
-      fontSize: 9, color, lineHeight: 1.5, marginBottom: 6,
+      fontSize: 10, color, lineHeight: 1.5, marginBottom: 6,
       background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
       borderRadius: 4, padding: '6px 8px',
     }}>{children}</div>
@@ -340,13 +340,13 @@ function Ink({ layer, set, prefix, help = {} }) {
               difference: a stroke with no shape behind it has no inside to
               sit in. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}>
-            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Stroke</span>
+            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Stroke</span>
             <div style={{ display: 'flex', gap: 3, flex: 1 }}>
               {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
                 <Btn key={text} block variant="toggle" on={!!F('StrokeOutside') === v}
                   onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
                   data-testid={`${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
-                  style={{ padding: '4px 0', fontSize: 9 }}>{text}</Btn>
+                  style={{ padding: '4px 0', fontSize: 10 }}>{text}</Btn>
               ))}
             </div>
           </div>
@@ -360,7 +360,7 @@ function Ink({ layer, set, prefix, help = {} }) {
             [`${prefix}FillColor`]: null, [`${prefix}FillOpacity`]: null,
           })}
           style={{
-            width: '100%', padding: 5, margin: '2px 0 6px', fontSize: 9, borderRadius: 3,
+            width: '100%', padding: 5, margin: '2px 0 6px', fontSize: 10, borderRadius: 3,
             cursor: 'pointer', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
           }}>Match layer</button>
       )}
@@ -464,7 +464,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
             data-testid={`icon-${layer.id}-custom`}
             style={{
               aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-              fontSize: 9, background: layer.icon === 'custom' ? ACCENT : SURF,
+              fontSize: 10, background: layer.icon === 'custom' ? ACCENT : SURF,
               color: layer.icon === 'custom' ? '#fff' : MUTED,
               border: `1px solid ${layer.icon === 'custom' ? ACCENT : BORDER}`,
             }}>SVG</button>
@@ -482,7 +482,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
         }}>↑ Custom SVG</button>
 
       {overflowed && (
-        <div style={{ fontSize: 9, color: '#f97316', marginBottom: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#f97316', marginBottom: 6, lineHeight: 1.5 }}>
           Too many features to draw as icons — this layer is still showing dots.
         </div>
       )}
@@ -537,7 +537,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
       onClick={() => set(which === 'bold' ? { labelBold: !active } : { labelItalic: !active })}
       data-testid={`label-${which}-${layer.id}`}
       style={{
-        flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
+        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
         fontWeight: which === 'bold' ? 700 : 400,
         fontStyle: which === 'italic' ? 'italic' : 'normal',
         background: active ? ACCENT : SURF,
@@ -550,7 +550,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
     <button key={value} onClick={() => set({ labelAlign: value })}
       data-testid={`label-align-${value}-${layer.id}`}
       style={{
-        flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
+        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
         background: layer.labelAlign === value ? ACCENT : SURF,
         color: layer.labelAlign === value ? '#fff' : DIM,
         border: `1px solid ${layer.labelAlign === value ? ACCENT : BORDER}`,
@@ -579,7 +579,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
       {on && (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 6px' }}>
-            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Face</span>
+            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
             <div style={{ display: 'flex', gap: 3, flex: 1 }}>
               {face('bold', 'Bold', layer.labelBold)}
               {face('italic', 'Italic', layer.labelItalic)}
@@ -596,7 +596,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
             help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 6px' }}>
-            <span style={{ fontSize: 9, color: DIM, width: 54 }}>Align</span>
+            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
             <div style={{ display: 'flex', gap: 3, flex: 1 }}>
               {align('left', 'Left')}{align('center', 'Centre')}{align('right', 'Right')}
             </div>
@@ -615,7 +615,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           )}
 
           {overflowed && (
-            <div style={{ fontSize: 9, color: '#f97316', marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: '#f97316', marginTop: 6, lineHeight: 1.5 }}>
               Too many features to letter — this layer is drawing no labels. Hide
               some features, or label fewer layers.
             </div>
@@ -688,7 +688,7 @@ function FeatureList({ layer, bucket, onPatch }) {
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-        <span style={{ fontSize: 9, color: MUTED }} data-testid={`feature-count-${layer.id}`}>
+        <span style={{ fontSize: 10, color: MUTED }} data-testid={`feature-count-${layer.id}`}>
           Showing {visible} of {bucket.count}
         </span>
         <span style={{ display: 'flex', gap: 3 }}>
@@ -739,7 +739,7 @@ function FeatureList({ layer, bucket, onPatch }) {
                 onChange={() => onPatch(layer.id, { hidden: toggleHidden(layer.hidden, i) })}
                 style={{ width: 11, height: 11, accentColor: ACCENT, cursor: 'pointer' }} />
               <span style={{
-                flex: 1, fontSize: 9, color: hidden.has(i) ? MUTED : DIM,
+                flex: 1, fontSize: 10, color: hidden.has(i) ? MUTED : DIM,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>{featureLabel(bucket, i)}</span>
               {note && <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{note}</span>}
@@ -865,7 +865,7 @@ function VectorLayersPanel({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
           {size && (
-            <span style={{ fontSize: 9, color: MUTED, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>
               {size.w.toFixed(1)} × {size.h.toFixed(1)} km
             </span>
           )}
@@ -903,7 +903,7 @@ function VectorLayersPanel({
         </button>
 
         {fetching && status && (
-          <div style={{ fontSize: 9, color: MUTED, marginTop: 6, textAlign: 'center' }}>{status}</div>
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 6, textAlign: 'center' }}>{status}</div>
         )}
         {hasOsm && (
           <div style={{ fontSize: 10, color: MUTED, marginTop: 6, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
@@ -912,7 +912,7 @@ function VectorLayersPanel({
 
       {/* ── Layers ──────────────────────────────────────────────────────── */}
       {!layers?.length && (
-        <div style={{ fontSize: 9, color: MUTED, lineHeight: 1.6 }}>
+        <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
           Nothing loaded yet. Fetch the extent from OpenStreetMap, or upload a GeoJSON or GPX file —
           features are draped on the terrain and carried into the SVG, PNG and video exports.
         </div>
@@ -1073,7 +1073,7 @@ function HypsometricRow({ value }) {
   const [show, setShow] = useState(false)
   return (
     <div style={{ marginBottom: 6 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:9, color:MUTED }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10, color:MUTED }}>
         <span style={{ display:'flex', alignItems:'center' }}>
           Hypso. Integral
           <HelpBtn active={show} onClick={() => setShow(s => !s)} />
@@ -1082,7 +1082,7 @@ function HypsometricRow({ value }) {
       </div>
       {show && (
         <div style={{
-          fontSize: 9, color: MUTED, background: 'rgba(0,0,0,0.2)',
+          fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
           padding: '6px 8px', borderRadius: 4, marginBottom: 8,
           border: `1px solid ${BORDER}`, lineHeight: 1.6
         }}>
@@ -1166,7 +1166,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
           {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
             <Btn key={d} block variant="toggle" on={style[`dash${prefix}`] === d}
               onClick={() => ss({ [`dash${prefix}`]: d })}
-              style={{ fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>
+              style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>
               {d.replace('-dash','')}</Btn>
           ))}
         </div>
@@ -1610,7 +1610,7 @@ export function Sidebar({
       }}>
         <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
           <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3', margin:0 }}>erzberg</h1>
-          <span style={{ fontSize:9, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
+          <span style={{ fontSize:10, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
           <a
             href="https://github.com/sorny/erzberg"
             target="_blank"
@@ -1707,14 +1707,14 @@ export function Sidebar({
               style={{ width:'100%', marginTop:6, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
                 border:`1px solid ${editSummary ? ACCENT : BORDER}`, borderRadius:5,
                 cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
-              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:9 }}>E</span>
+              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
             </button>
             {editSummary && (
-              <div style={{ marginTop:5, display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:9, color: MUTED }}>
+              <div style={{ marginTop:5, display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:10, color: MUTED }}>
                 <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
                 <button data-testid="edit-clear" onClick={onClearEdit} style={{
                   background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
-                  fontSize:9, padding:'1px 5px', cursor:'pointer', flexShrink:0,
+                  fontSize:10, padding:'1px 5px', cursor:'pointer', flexShrink:0,
                 }}>clear</button>
               </div>
             )}
@@ -1976,7 +1976,7 @@ export function Sidebar({
                 }}>↩</button>
             </div>
             {rollSeed != null && (
-              <div data-testid="roll-seed" style={{ fontSize:9, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
+              <div data-testid="roll-seed" style={{ fontSize:10, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
                 seed {rollSeed}
               </div>
             )}
@@ -2006,7 +2006,7 @@ export function Sidebar({
                     )}
                     {lastPreset === name && presetEdited && (
                       <span data-testid="preset-edited" style={{
-                        position:'absolute', top:3, right:3, fontSize:8, lineHeight:1,
+                        position:'absolute', top:3, right:3, fontSize:10, lineHeight:1,
                         padding:'2px 4px', borderRadius:2, background:'rgba(0,0,0,.72)',
                         color:'#f4f4f5', letterSpacing:'0.06em', textTransform:'uppercase',
                       }}>edited</span>
@@ -2016,7 +2016,7 @@ export function Sidebar({
                       ...(showThumb ? {
                         position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 3px',
                         background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
-                        color:'#f4f4f5', fontSize:9, textShadow:'0 1px 2px rgba(0,0,0,.9)',
+                        color:'#f4f4f5', fontSize:10, textShadow:'0 1px 2px rgba(0,0,0,.9)',
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                       } : {}),
                     }}>{name}</span>
@@ -2068,7 +2068,7 @@ export function Sidebar({
                     <div style={{ display: 'flex', gap: 3 }}>
                       {[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']].map(([label, val]) => (
                         <button key={val} onClick={() => ss({ pillarStyle: val })} style={{
-                          flex: 1, fontSize: 9, padding: '3px 0', borderRadius: 2,
+                          flex: 1, fontSize: 10, padding: '3px 0', borderRadius: 2,
                           background: (style.pillarStyle ?? 'line') === val ? ACCENT : SURF,
                           color: (style.pillarStyle ?? 'line') === val ? '#fff' : MUTED,
                           border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT : BORDER}`,
@@ -2401,7 +2401,7 @@ export function Sidebar({
                         ) : (
                           <>
                             {snd.fileName ? (
-                              <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
+                              <div style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
                                 Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
                               </div>
                             ) : (
@@ -2568,7 +2568,7 @@ export function Sidebar({
           </Section>
 
           <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}>
-            <div style={{ fontSize:9, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
+            <div style={{ fontSize:10, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />
               <button title="Mirror Up (+Y)" className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<div className="sym-label">+Y</div></button>
@@ -2586,7 +2586,7 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-            <div style={{ fontSize:9, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
+            <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
             <button onClick={() => ss({ 
@@ -2707,10 +2707,10 @@ export function Sidebar({
                           border:`1px solid ${projection.id === pj.id ? ACCENT : BORDER}` }}>{pj.label}</button>
                     ))}
                   </div>
-                  <div style={{ fontSize:9, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
+                  <div style={{ fontSize:10, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
 
                   {projection.id === 'weave' && (
-                    <div style={{ fontSize:9, color: MUTED, marginBottom:8 }}>
+                    <div style={{ fontSize:10, color: MUTED, marginBottom:8 }}>
                       Detected tempo: <span style={{ color:'#a1a1aa', fontVariantNumeric:'tabular-nums' }}>
                         {detectedBpm ? `${Math.round(detectedBpm)} BPM` : '—'}
                       </span>
@@ -2729,7 +2729,7 @@ export function Sidebar({
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
                   style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
                 >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
-                <div style={{ fontSize:9, color: MUTED, marginTop:6, lineHeight:1.4 }}>
+                <div style={{ fontSize:10, color: MUTED, marginTop:6, lineHeight:1.4 }}>
                   {snd.frozen
                     ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
                     : `Pauses playback and writes the entire track as one static heightmap — the ${projection.label} projection above. Useful for erosion, STL and SVG, which need a terrain that holds still.`}
@@ -2769,7 +2769,7 @@ export function Sidebar({
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}
           <Section title="Analysis" open={sec.analysis} onToggle={() => tog('analysis')}>
-            <div style={{ fontSize:9, color:MUTED, marginBottom:6 }}>
+            <div style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
               Click two points on the terrain to sample a cross-section.
             </div>
             <button

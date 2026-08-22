@@ -37,7 +37,7 @@ function NumField({ label, value, min, max, onChange, testId }) {
   }
   return (
     <label style={{ display: 'block' }}>
-      <span style={{ fontSize: 9, color: MUTED, display: 'block', marginBottom: 2 }}>{label}</span>
+      <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 2 }}>{label}</span>
       <input
         className="hmnum" data-testid={testId} value={text}
         onChange={(e) => setText(e.target.value)}
@@ -93,7 +93,7 @@ export function EditPanel({
         <div style={{ padding: '12px 14px 11px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#F0EBE3' }}>edit</span>
-            <span style={{ fontSize: 9, color: MUTED, fontWeight: 600 }}>CLIP HEIGHTMAP</span>
+            <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>CLIP HEIGHTMAP</span>
           </div>
           {filename && (
             <div style={{ marginTop: 5, fontSize: 10, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -179,7 +179,7 @@ export function EditPanel({
           <div style={{ display: 'flex' }}>
             {btn('Reset to full heightmap', onReset, 'ghost', 'edit-reset')}
           </div>
-          <div style={{ fontSize: 9, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>
             Applying keeps the original raster — re-open Edit Mode any time to adjust or drop the clip.
           </div>
         </div>
