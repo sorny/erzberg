@@ -106,7 +106,7 @@ export function EditPanel({
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, marginBottom: 12 }}>
             {TOOLS.map(([label, id]) => (
               <button key={id} data-testid={`edit-tool-${id}`} onClick={() => setTool(id)} style={{
-                fontSize: 10, padding: '7px 0', borderRadius: 4, cursor: 'pointer',
+                fontSize: 10, padding: '7px 0', borderRadius: 5, cursor: 'pointer',
                 background: tool === id ? ACCENT : SURF,
                 color: tool === id ? '#fff' : MUTED,
                 border: `1px solid ${tool === id ? ACCENT : BORDER}`,
@@ -133,7 +133,7 @@ export function EditPanel({
           </div>
           <button data-testid="edit-full-extent" onClick={() => setRect({ x: 0, y: 0, w: srcWidth, h: srcHeight })} style={{
             width: '100%', padding: '6px 0', background: SURF, color: MUTED,
-            border: `1px solid ${BORDER}`, borderRadius: 4, cursor: 'pointer', fontSize: 10, marginBottom: 12,
+            border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 12,
           }}>Full extent</button>
 
           <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>SELECTION</div>
@@ -149,7 +149,7 @@ export function EditPanel({
           {edit?.shape && (
             <button data-testid="edit-clear-shape" onClick={() => onChange({ rect, shape: null, feather })} style={{
               width: '100%', padding: '6px 0', background: SURF, color: MUTED,
-              border: `1px solid ${BORDER}`, borderRadius: 4, cursor: 'pointer', fontSize: 10, marginBottom: 8,
+              border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 8,
             }}>Clear shape</button>
           )}
           <InlineSl
@@ -162,7 +162,7 @@ export function EditPanel({
 
           <div style={{
             marginTop: 14, padding: '8px 10px', background: 'rgba(0,0,0,0.2)',
-            border: `1px solid ${BORDER}`, borderRadius: 4, fontSize: 10, color: MUTED, lineHeight: 1.6,
+            border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
             <div>Result <span style={{ color: bounds ? ACCENT : '#ef4444', fontVariantNumeric: 'tabular-nums' }} data-testid="edit-result">

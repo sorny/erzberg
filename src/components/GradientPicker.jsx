@@ -88,7 +88,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
         style={{
           position: 'relative',
           height: 18,
-          borderRadius: 4,
+          borderRadius: 5,
           background: cssGradient(stops),
           cursor: isSimple ? 'default' : 'crosshair',
           marginBottom: 10,

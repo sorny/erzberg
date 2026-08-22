@@ -162,7 +162,7 @@ export function PanelStyles() {
       .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
       .hmrr::-moz-range-track { background:none; border:none; }
 
-      .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:6px;
+      .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:5px;
                  cursor:pointer; display:flex; flex-direction:column; align-items:center;
                  justify-content:center; font-size:12px; font-weight:700; transition:all 0.1s; aspect-ratio:1/1; }
       .sym-btn.on { background:${ACCENT_DEEP}; color:#fff; border-color:${ACCENT_DEEP}; }
@@ -178,7 +178,7 @@ export function HelpBox({ text }) {
   return (
     <div style={{
       fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
-      padding: '6px 8px', borderRadius: 4, marginBottom: 8,
+      padding: '6px 8px', borderRadius: 5, marginBottom: 8,
       border: `1px solid ${BORDER}`, lineHeight: 1.45
     }}>
       {text}
@@ -552,12 +552,11 @@ export function Btn({
   variant = 'quiet', size = 'sm', on = false, block = false,
   style, children, ...rest
 }) {
-  // ACCENT rather than ACCENT_DEEP, because that is what the twenty toggle
-  // buttons in the panel are today and this migration is meant to be invisible.
-  // White on ACCENT is 3.68:1 and fails AA at these sizes — changing this one
-  // line lifts every toggle at once, which is the whole point of the primitive.
+  // ACCENT_DEEP, not ACCENT: white on ACCENT is 3.68:1 and these labels are 10 px
+  // uppercase. The deeper fill reads 4.7:1 under white and still 3.77:1 against
+  // the panel, so the button's own edge stays visible.
   const look = variant === 'toggle'
-    ? (on ? { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
+    ? (on ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
           : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` })
     : variant === 'primary'
       ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }

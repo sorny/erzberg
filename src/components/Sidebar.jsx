@@ -24,7 +24,7 @@ import { AudioTransport } from './AudioTransport'
 import { PAPERS, paperRatioLabel } from '../utils/frame'
 import { SpectrogramView } from './SpectrogramView'
 import {
-  ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
+  ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
   RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
@@ -129,7 +129,7 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
     <div style={{
       fontSize: 10, color, lineHeight: 1.5, marginBottom: 6,
       background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
-      borderRadius: 4, padding: '6px 8px',
+      borderRadius: 5, padding: '6px 8px',
     }}>{children}</div>
   )
   const warn = '#f97316'
@@ -451,7 +451,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
               data-testid={`icon-${layer.id}-${ic.id}`}
               style={{
                 aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-                background: on ? ACCENT : SURF, border: `1px solid ${on ? ACCENT : BORDER}`, padding: 3,
+                background: on ? ACCENT_DEEP : SURF, border: `1px solid ${on ? ACCENT_DEEP : BORDER}`, padding: 3,
               }}>
               <img src={iconUrl(ic.id)} alt={ic.label} loading="lazy"
                 style={{ width: '100%', height: '100%', filter: on ? 'invert(1)' : 'invert(0.72)' }} />
@@ -464,9 +464,9 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
             data-testid={`icon-${layer.id}-custom`}
             style={{
               aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-              fontSize: 10, background: layer.icon === 'custom' ? ACCENT : SURF,
+              fontSize: 10, background: layer.icon === 'custom' ? ACCENT_DEEP : SURF,
               color: layer.icon === 'custom' ? '#fff' : MUTED,
-              border: `1px solid ${layer.icon === 'custom' ? ACCENT : BORDER}`,
+              border: `1px solid ${layer.icon === 'custom' ? ACCENT_DEEP : BORDER}`,
             }}>SVG</button>
         )}
       </div>
@@ -478,7 +478,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
       <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
         style={{
           width: '100%', padding: 6, marginBottom: 8, background: SURF, color: '#a1a1aa',
-          border: `1px dashed ${BORDER}`, borderRadius: 4, cursor: 'pointer', fontSize: 10,
+          border: `1px dashed ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10,
         }}>↑ Custom SVG</button>
 
       {overflowed && (
@@ -540,9 +540,9 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
         flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
         fontWeight: which === 'bold' ? 700 : 400,
         fontStyle: which === 'italic' ? 'italic' : 'normal',
-        background: active ? ACCENT : SURF,
+        background: active ? ACCENT_DEEP : SURF,
         color: active ? '#fff' : DIM,
-        border: `1px solid ${active ? ACCENT : BORDER}`,
+        border: `1px solid ${active ? ACCENT_DEEP : BORDER}`,
       }}>{label}</button>
   )
 
@@ -551,9 +551,9 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
       data-testid={`label-align-${value}-${layer.id}`}
       style={{
         flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-        background: layer.labelAlign === value ? ACCENT : SURF,
+        background: layer.labelAlign === value ? ACCENT_DEEP : SURF,
         color: layer.labelAlign === value ? '#fff' : DIM,
-        border: `1px solid ${layer.labelAlign === value ? ACCENT : BORDER}`,
+        border: `1px solid ${layer.labelAlign === value ? ACCENT_DEEP : BORDER}`,
       }}>{label}</button>
   )
 
@@ -882,8 +882,8 @@ function VectorLayersPanel({
                   fontSize: 10, padding: '4px 3px', borderRadius: 3, textAlign: 'left',
                   cursor: canQuery && !fetching ? 'pointer' : 'default',
                   opacity: canQuery ? 1 : 0.4,
-                  background: on ? ACCENT : SURF, color: on ? '#fff' : MUTED,
-                  border: `1px solid ${on ? ACCENT : BORDER}`,
+                  background: on ? ACCENT_DEEP : SURF, color: on ? '#fff' : MUTED,
+                  border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
                 }}>
                 {c.label}{c.heavy ? ' ⚠' : ''}
               </button>
@@ -895,7 +895,7 @@ function VectorLayersPanel({
           disabled={!canQuery || !picked.length}
           data-testid="osm-fetch"
           style={{
-            width: '100%', padding: 7, borderRadius: 4, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
+            width: '100%', padding: 7, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
             background: fetching ? SURF : ACCENT, color: fetching ? MUTED : '#fff',
             border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
           }}>
@@ -1083,7 +1083,7 @@ function HypsometricRow({ value }) {
       {show && (
         <div style={{
           fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
-          padding: '6px 8px', borderRadius: 4, marginBottom: 8,
+          padding: '6px 8px', borderRadius: 5, marginBottom: 8,
           border: `1px solid ${BORDER}`, lineHeight: 1.6
         }}>
           <div style={{ marginBottom: 4 }}>HI = (mean − min) / (max − min)</div>
@@ -1184,9 +1184,9 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
                 <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
                   style={{ 
                     flex:1, fontSize:10, padding:'2px 0', borderRadius:2, 
-                    background: style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT : SURF, 
+                    background: style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : SURF, 
                     color: style[`hypsoMode${prefix}`] === m.toLowerCase() ? '#fff' : MUTED, 
-                    border:`1px solid ${style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT : BORDER}` 
+                    border:`1px solid ${style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : BORDER}` 
                   }}>{m}</button>
               ))}
             </div>
@@ -1629,7 +1629,7 @@ export function Sidebar({
               mirror block both use the word for something harmless, and this one
               throws away every setting in the app. */}
           <button onClick={handleResetAll} title="Return every setting to its default"
-            style={{ background:'none', border:`1px solid #52525b`, borderRadius:4, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset all</button>
+            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset all</button>
         </div>
 
         {/* Thirty-one sections over 2 700 px of scroll: without this the only way
@@ -1643,7 +1643,7 @@ export function Sidebar({
             onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFilter('') } }}
             placeholder="Find a control…" aria-label="Find a control"
             style={{
-              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:4,
+              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:5,
               color: TEXT, fontSize:11, padding:'5px 8px', outline:'none',
               fontFamily:'inherit',
             }}
@@ -1705,7 +1705,7 @@ export function Sidebar({
             <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
               disabled={!heightmapPixels}
               style={{ width:'100%', marginTop:6, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
-                border:`1px solid ${editSummary ? ACCENT : BORDER}`, borderRadius:5,
+                border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
                 cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
               ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
             </button>
@@ -1776,7 +1776,7 @@ export function Sidebar({
                     <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
                       style={{ 
                         fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, 
-                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT : SURF, 
+                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT_DEEP : SURF, 
                         color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
                       }}>
                       {label}
@@ -1794,7 +1794,7 @@ export function Sidebar({
                   <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
                   <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
                     onChange={e => sv({ framePaper: e.target.value })}
-                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
                     {['ISO','US','Ratio'].map(group => (
                       <optgroup key={group} label={group}>
                         {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
@@ -1852,7 +1852,7 @@ export function Sidebar({
                 {style.fillHypsometric && (
                   <Sub>
                     <div style={{ display:'flex', gap:2, marginBottom:6 }}>
-                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:10, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT : BORDER}` }}>{m}</button>)}
+                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:10, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : BORDER}` }}>{m}</button>)}
                     </div>
                     <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
                     {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
@@ -1992,8 +1992,8 @@ export function Sidebar({
                     onClick={() => applyPreset(preset, name)}
                     style={{
                       position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
-                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT : BORDER}`,
-                      borderRadius:4, cursor:'pointer', overflow:'hidden', lineHeight:0,
+                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT_DEEP : BORDER}`,
+                      borderRadius:5, cursor:'pointer', overflow:'hidden', lineHeight:0,
                     }}>
                     {showThumb && (
                       <img
@@ -2069,9 +2069,9 @@ export function Sidebar({
                       {[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']].map(([label, val]) => (
                         <button key={val} onClick={() => ss({ pillarStyle: val })} style={{
                           flex: 1, fontSize: 10, padding: '3px 0', borderRadius: 2,
-                          background: (style.pillarStyle ?? 'line') === val ? ACCENT : SURF,
+                          background: (style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : SURF,
                           color: (style.pillarStyle ?? 'line') === val ? '#fff' : MUTED,
-                          border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT : BORDER}`,
+                          border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : BORDER}`,
                           cursor: 'pointer',
                         }}>{label}</button>
                       ))}
@@ -2222,9 +2222,9 @@ export function Sidebar({
                       {[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']].map(([label, val]) => (
                         <button key={val} onClick={() => ss({ stippleDensityMode: val })} style={{
                           flex: 1, fontSize: 10, padding: '3px 0', borderRadius: 2,
-                          background: style.stippleDensityMode === val ? ACCENT : SURF,
+                          background: style.stippleDensityMode === val ? ACCENT_DEEP : SURF,
                           color: style.stippleDensityMode === val ? '#fff' : MUTED,
-                          border: `1px solid ${style.stippleDensityMode === val ? ACCENT : BORDER}`,
+                          border: `1px solid ${style.stippleDensityMode === val ? ACCENT_DEEP : BORDER}`,
                           cursor: 'pointer',
                         }}>{label}</button>
                       ))}
@@ -2263,9 +2263,9 @@ export function Sidebar({
                       <button key={v} onClick={() => ss({ dirModeCurv: v })}
                         style={{
                           flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
-                          background: style.dirModeCurv === v ? ACCENT : SURF,
+                          background: style.dirModeCurv === v ? ACCENT_DEEP : SURF,
                           color: style.dirModeCurv === v ? '#fff' : MUTED,
-                          border:`1px solid ${style.dirModeCurv === v ? ACCENT : BORDER}`,
+                          border:`1px solid ${style.dirModeCurv === v ? ACCENT_DEEP : BORDER}`,
                         }}>{lbl}</button>
                     ))}
                   </div>
@@ -2392,7 +2392,7 @@ export function Sidebar({
                         {fa.isAnalyzing ? (
                           <div style={{ fontSize:10, color:MUTED, marginBottom:8 }}>Analysing… {fa.progress}%</div>
                         ) : fa.error ? (
-                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'5px 7px', marginBottom:6 }}>
                             {fa.error}
                           </div>
                         ) : null}
@@ -2405,7 +2405,7 @@ export function Sidebar({
                                 Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
                               </div>
                             ) : (
-                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'5px 7px', marginBottom:6 }}>
                                 No track loaded — the flock has nothing to listen to.
                               </div>
                             )}
@@ -2526,7 +2526,7 @@ export function Sidebar({
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && !style.showFill && (
-              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 4, padding: '5px 7px', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '5px 7px', marginBottom: 6 }}>
                 Fill is disabled — texture will not appear until Fill is enabled.
               </div>
             )}
@@ -2544,7 +2544,7 @@ export function Sidebar({
                     <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                       <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
-                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
                         <option value="normal">Normal</option>
                         <option value="multiply">Multiply</option>
                         <option value="screen">Screen</option>
@@ -2610,7 +2610,7 @@ export function Sidebar({
             >↑ Audio (MP3 / WAV / OGG / M4A)</button>
 
             {snd.error && (
-              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:4, padding:'6px 8px', marginBottom:8 }}>
+              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'6px 8px', marginBottom:8 }}>
                 {snd.error}
               </div>
             )}
@@ -2664,18 +2664,18 @@ export function Sidebar({
                     {[1024, 2048, 4096].map(n => (
                       <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
                         style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2,
-                          background: snd.opts.fftSize === n ? ACCENT : SURF,
+                          background: snd.opts.fftSize === n ? ACCENT_DEEP : SURF,
                           color: snd.opts.fftSize === n ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT : BORDER}`, cursor:'pointer' }}>{n}</button>
+                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{n}</button>
                     ))}
                   </div>
                   <div style={{ display:'flex', gap:2, marginBottom:8 }}>
                     {[['Log', true], ['Linear', false]].map(([lbl, v]) => (
                       <button key={lbl} onClick={() => snd.setOpts({ logFreq: v })}
                         style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase',
-                          background: snd.opts.logFreq === v ? ACCENT : SURF,
+                          background: snd.opts.logFreq === v ? ACCENT_DEEP : SURF,
                           color: snd.opts.logFreq === v ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
+                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
                     ))}
                   </div>
                   <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
@@ -2702,9 +2702,9 @@ export function Sidebar({
                       <button key={pj.id} data-testid={`projection-${pj.id}`}
                         onClick={() => snd.setOpts({ projection: pj.id })}
                         style={{ fontSize:10, padding:'5px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
-                          background: projection.id === pj.id ? ACCENT : SURF,
+                          background: projection.id === pj.id ? ACCENT_DEEP : SURF,
                           color: projection.id === pj.id ? '#fff' : MUTED,
-                          border:`1px solid ${projection.id === pj.id ? ACCENT : BORDER}` }}>{pj.label}</button>
+                          border:`1px solid ${projection.id === pj.id ? ACCENT_DEEP : BORDER}` }}>{pj.label}</button>
                     ))}
                   </div>
                   <div style={{ fontSize:10, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
@@ -2727,7 +2727,7 @@ export function Sidebar({
                 <button
                   data-testid="soundscape-freeze"
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
-                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
                 >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
                 <div style={{ fontSize:10, color: MUTED, marginTop:6, lineHeight:1.4 }}>
                   {snd.frozen
