@@ -552,8 +552,12 @@ export function Btn({
   variant = 'quiet', size = 'sm', on = false, block = false,
   style, children, ...rest
 }) {
+  // ACCENT rather than ACCENT_DEEP, because that is what the twenty toggle
+  // buttons in the panel are today and this migration is meant to be invisible.
+  // White on ACCENT is 3.68:1 and fails AA at these sizes — changing this one
+  // line lifts every toggle at once, which is the whole point of the primitive.
   const look = variant === 'toggle'
-    ? (on ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
+    ? (on ? { background: ACCENT, color: '#fff', border: `1px solid ${ACCENT}` }
           : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` })
     : variant === 'primary'
       ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }

@@ -343,14 +343,10 @@ function Ink({ layer, set, prefix, help = {} }) {
             <span style={{ fontSize: 9, color: DIM, width: 54 }}>Stroke</span>
             <div style={{ display: 'flex', gap: 3, flex: 1 }}>
               {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
-                <button key={text} onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
+                <Btn key={text} block variant="toggle" on={!!F('StrokeOutside') === v}
+                  onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
                   data-testid={`${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
-                  style={{
-                    flex: 1, padding: '4px 0', fontSize: 9, cursor: 'pointer', borderRadius: 3,
-                    background: !!F('StrokeOutside') === v ? ACCENT : SURF,
-                    color: !!F('StrokeOutside') === v ? '#fff' : DIM,
-                    border: `1px solid ${!!F('StrokeOutside') === v ? ACCENT : BORDER}`,
-                  }}>{text}</button>
+                  style={{ padding: '4px 0', fontSize: 9 }}>{text}</Btn>
               ))}
             </div>
           </div>
@@ -1128,11 +1124,9 @@ function ProjectionParams({ params, values, onChange }) {
             {chips.map((c) => {
               const on = !!get(c)
               return (
-                <button key={c.key} title={c.help} data-testid={`proj-${c.key}`} onClick={() => onChange(c.key, !on)} style={{
-                  fontSize: 10, padding:'5px 0', borderRadius: 3, textTransform:'uppercase', cursor:'pointer',
-                  background: on ? ACCENT : SURF, color: on ? '#fff' : MUTED,
-                  border: `1px solid ${on ? ACCENT : BORDER}`,
-                }}>{c.label}</button>
+                <Btn key={c.key} variant="toggle" on={on} title={c.help} data-testid={`proj-${c.key}`}
+                  onClick={() => onChange(c.key, !on)}
+                  style={{ padding:'5px 0', textTransform:'uppercase' }}>{c.label}</Btn>
               )
             })}
           </div>
@@ -1170,13 +1164,10 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
       {showDash && (
         <div style={{ marginTop: 8, display:'flex', gap:2 }}>
           {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
-            <button key={d} onClick={() => ss({ [`dash${prefix}`]: d })}
-              style={{
-                flex:1, fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase',
-                background: style[`dash${prefix}`] === d ? ACCENT : SURF,
-                color: style[`dash${prefix}`] === d ? '#fff' : MUTED,
-                border:`1px solid ${style[`dash${prefix}`] === d ? ACCENT : BORDER}`
-              }}>{d.replace('-dash','')}</button>
+            <Btn key={d} block variant="toggle" on={style[`dash${prefix}`] === d}
+              onClick={() => ss({ [`dash${prefix}`]: d })}
+              style={{ fontSize:7, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>
+              {d.replace('-dash','')}</Btn>
           ))}
         </div>
       )}
