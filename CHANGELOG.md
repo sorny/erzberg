@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-08-22
+
+### Fixed
+- **A clicked slider now shows that it is armed.** The focus ring was on
+  `:focus-visible`, which withholds it until the first keypress — but clicking a
+  slider already arms it for the arrow keys, so the state was real from the click
+  and simply invisible. The moment you most need to know which of thirty-one
+  sliders an arrow will move is the moment right after clicking one, which was
+  exactly when the panel would not say. The original reasoning — that a pointer
+  user dragging does not need a ring — is true of a drag and false of a click,
+  and the click is the one that leaves state behind. Clicking anywhere else
+  clears it, as before.
+
+  The colour wells and section headers stay on `:focus-visible`: neither arms
+  anything for the keyboard the way a slider does, so the original argument still
+  holds for them.
+
 ## [1.1.0] — 2026-08-22
+
+*Released together with 1.1.1; 1.1.0 was tagged in the
+working branch but never deployed on its own.*
 
 A UI pass over the panel and the picture it frames. The panel's shape is
 unchanged — same 272 px column, same thirty-two sections, same order — and
