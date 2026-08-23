@@ -168,6 +168,11 @@ const xmlAttr = (s) => String(s)
 // XML ids may not contain a colon, which every vector layer id does.
 const xmlId = (s) => String(s).replace(/[^A-Za-z0-9_-]/g, '-')
 
+// Character data, not an attribute: quotes are legal here and a label is far
+// likelier to contain one than a layer name is — Hell's Gate, "The Nose".
+const xmlText = (s) => String(s)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
 // ─── Dash segment splitter ────────────────────────────────────────────────────
 
 // Splits a screen-space line segment into actual on-sub-segments according to a
@@ -483,6 +488,54 @@ async function runExport({
         continue
       }
 
+      /*
+       * ── Label layers, as text ────────────────────────────────────────────
+       *
+       * An outline-face label also arrives as `textRuns`, and when it does this
+       * writes `<text>` instead of forty little paths per word — so a name can
+       * be retyped in Inkscape rather than redrawn. The strokes are dropped for
+       * that layer: keeping both would mean every label plotted twice.
+       *
+       * Three world points per run become an exact 2-D affine. The up column is
+       * negated because SVG counts y downwards and an em box counts it up.
+       *
+       * Two honest losses against the stroke path this replaces. A run is
+       * depth-tested at its origin only, so a name is present or absent rather
+       * than disappearing behind a ridge letter by letter — the same bargain the
+       * flock's streaks take. And it is dropped whole if its origin falls
+       * outside the page, where a stroke would have been cut at the boundary.
+       */
+      if (layer.textRuns?.length) {
+        const runs = []
+        for (const run of layer.textRuns) {
+          const [ox, oy, oz] = run.origin
+          if (viewZOf(ox, oy, oz) > nearZ) continue
+          const O = project(ox, oy, oz)
+          if (offCanvas1(O[0], O[1])) continue
+          if (clipRect && !dotInside(O[0], O[1])) continue
+          if (surfViewZ) {
+            const surfZ = surfViewZ(O[0], O[1])
+            if (!(surfZ === -Infinity || O[2] >= surfZ - bias)) continue
+          }
+          const R = project(...run.emRight)
+          const U = project(...run.emUp)
+          runs.push({
+            text: run.text, anchor: run.anchor,
+            a: R[0] - O[0], b: R[1] - O[1],
+            c: -(U[0] - O[0]), d: -(U[1] - O[1]),
+            e: O[0], f: O[1],
+          })
+        }
+        if (runs.length) {
+          svgLayers.push({ id, name, isText: true, runs, style: layer.textStyle,
+                           color: flatStroke, weight, opacity })
+          // The strokes for this layer are not walked, so their share of the
+          // progress bar is credited here rather than silently going missing.
+          walkDone += positions.length / 6
+          continue
+        }
+      }
+
       // ── Line layers ──────────────────────────────────────────────────────────
       const visibleSegs = []
       const ghostSegs = []
@@ -766,8 +819,9 @@ async function runExport({
   
   const BUILD_LABEL = 'Assembling SVG…'
   const buildTotal = svgLayers.reduce((n, l) => n +
-    (l.isPoints ? l.visibleDots.length + l.ghostDots.length
-                : l.visibleSegs.length + l.ghostSegs.length), 0)
+    (l.isText   ? l.runs.length
+    : l.isPoints ? l.visibleDots.length + l.ghostDots.length
+                 : l.visibleSegs.length + l.ghostSegs.length), 0)
   let buildDone = 0
 
   /**
@@ -796,6 +850,36 @@ async function runExport({
     // real name, which is the one worth putting on the pen layer.
     const modeLabel = xmlAttr(layer.name ?? (layer.id ?? 'Lines').replace(/([A-Z])/g, ' $1').trim())
     const inner = []
+
+    if (layer.isText) {
+      const st = layer.style ?? {}
+      // font-size 1 with the em box carried in the matrix: the transform is the
+      // projection, so a perspective label keeps its foreshortening without the
+      // size having to be computed twice.
+      // stroke-width resolves in each element's *own* user space, and that space
+      // is scaled by the em box in the matrix — so the group's width would come
+      // out multiplied by the type size, and by more for a near label than a far
+      // one under perspective. Dividing by each run's own scale is what puts one
+      // pen width on the paper, which is the only reading a plotter has for it.
+      const els = await mapPaced(layer.runs, (r) => {
+        const scale = Math.hypot(r.a, r.b) || 1
+        return `<text transform="matrix(${r.a.toFixed(4)} ${r.b.toFixed(4)} ${r.c.toFixed(4)} ${r.d.toFixed(4)} ` +
+          `${(r.e - vx).toFixed(2)} ${(r.f - vy).toFixed(2)})" ` +
+          `font-size="1" stroke-width="${(layer.weight * 0.5 / scale).toPrecision(4)}" ` +
+          `text-anchor="${r.anchor}" xml:space="preserve">${xmlText(r.text)}</text>`
+      })
+      // Stroked and unfilled, like every other layer here — this is a line-art
+      // format and the paths these replace were the glyph outlines, drawn in the
+      // label's own ink. Filling instead would silently discard the stroke
+      // colour and weight, and would export a stroke-only label as a solid.
+      inner.push(
+        `<g fill="none" stroke="${layer.color || '#000000'}" stroke-width="${sw}" ` +
+        `opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round" ` +
+        `font-family="${xmlAttr(st.family ?? 'Space Mono')}, monospace" ` +
+        `font-weight="${st.weight ?? 400}" font-style="${st.style ?? 'normal'}">${els.join('')}</g>`)
+      layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
+      continue
+    }
 
     if (layer.isPoints) {
       const r = layer.dotR.toFixed(2)

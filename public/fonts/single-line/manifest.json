@@ -1,0 +1,247 @@
+[
+  {
+    "id": "EMSAllure",
+    "family": "EMS Allure",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSBird",
+    "family": "EMS Bird",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSBirdSwashCaps",
+    "family": "EMS Bird Swash Caps",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSBrush",
+    "family": "EMS Brush",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSCapitol",
+    "family": "EMS Capitol",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSCasualHand",
+    "family": "EMS Casual Hand",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSDecorousScript",
+    "family": "EMS Decorous Script",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSDelight",
+    "family": "EMS Delight",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSDelightSwashCaps",
+    "family": "EMS Delight Swash Caps",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSElfin",
+    "family": "EMS Elfin",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSFelix",
+    "family": "EMS Felix",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSHerculean",
+    "family": "EMS Herculean",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSInvite",
+    "family": "EMS Invite",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSLeague",
+    "family": "EMS League",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSLittlePrincess",
+    "family": "EMS Little Princess",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSMistyNight",
+    "family": "EMS Misty Night",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSNeato",
+    "family": "EMS Neato",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSNixish",
+    "family": "EMS Nixish",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSNixishItalic",
+    "family": "EMS Nixish Italic",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSOsmotron",
+    "family": "EMS Osmotron",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSPancakes",
+    "family": "EMS Pancakes",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSPepita",
+    "family": "EMS Pepita",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSQwandry",
+    "family": "EMS Qwandry",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSReadability",
+    "family": "EMS Readability",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSReadabilityItalic",
+    "family": "EMS Readability Italic",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSSociety",
+    "family": "EMS Society",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSSpaceRocks",
+    "family": "EMS SpaceRocks",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSSwiss",
+    "family": "EMS Swiss",
+    "group": "EMS"
+  },
+  {
+    "id": "EMSTech",
+    "family": "EMS Tech",
+    "group": "EMS"
+  },
+  {
+    "id": "HersheyGothEnglish",
+    "family": "Hershey Gothic English",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheyGothGerman",
+    "family": "Hershey Gothic German",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheyGothItalian",
+    "family": "Hershey Gothic Italian",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySans1",
+    "family": "Hershey Sans 1-stroke",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySansMed",
+    "family": "Hershey Sans medium",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheyScript1",
+    "family": "Hershey Script 1-stroke",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheyScriptMed",
+    "family": "Hershey Script medium",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySerifBold",
+    "family": "Hershey Serif bold",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySerifBoldItalic",
+    "family": "Hershey Serif bold italic",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySerifMed",
+    "family": "Hershey Serif medium",
+    "group": "Hershey"
+  },
+  {
+    "id": "HersheySerifMedItalic",
+    "family": "Hershey Serif medium italic",
+    "group": "Hershey"
+  },
+  {
+    "id": "TwinSans",
+    "family": "Twin Sans",
+    "group": "Hershey"
+  },
+  {
+    "id": "ISO3098",
+    "family": "ISO 3098",
+    "group": "ISO 3098"
+  },
+  {
+    "id": "ISO3098Italic",
+    "family": "ISO 3098 Italic",
+    "group": "ISO 3098"
+  },
+  {
+    "id": "Apple410",
+    "family": "Apple 410",
+    "group": "Plotter"
+  },
+  {
+    "id": "Commodore1520",
+    "family": "Commodore 1520",
+    "group": "Plotter"
+  },
+  {
+    "id": "DearPlotter",
+    "family": "DearPlotter",
+    "group": "Plotter"
+  },
+  {
+    "id": "ReliefSingleLine",
+    "family": "Relief SingleLine",
+    "group": "Relief"
+  },
+  {
+    "id": "ReliefSingleLineOrnament",
+    "family": "Relief SingleLine Ornament",
+    "group": "Relief"
+  },
+  {
+    "id": "ReliefPendot",
+    "family": "Relief SingleLine Pendot",
+    "group": "Relief"
+  }
+]

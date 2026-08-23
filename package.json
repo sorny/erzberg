@@ -13,7 +13,8 @@
     "test:ui": "playwright test --ui",
     "update-presets": "node scripts/update-presets.js",
     "font": "node scripts/build-font.js",
-    "thumbs": "node scripts/generate-thumbs.js"
+    "thumbs": "node scripts/generate-thumbs.js",
+    "fonts:single-line": "node scripts/build-single-line-fonts.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

@@ -251,6 +251,13 @@ into one picture.
   (`quiet`, `ghost`, `primary`, `toggle`) and `style` carries the geometry, which
   is genuinely per-row. Do not re-specify background, colour and border by hand;
   that is how the panel came to hold four button radii.
+- **A label face**: outline faces come from `scripts/build-font.js` and are
+  sampled at runtime; single-line faces come from
+  `scripts/build-single-line-fonts.js` and are *not* — they arrive pre-flattened,
+  because every `M` in a stroke font is the pen lifting and the sampler would
+  have to guess at what the data states outright. Both live in one key space,
+  stroke faces behind an `sl:` prefix, so "which faces does this scene need"
+  stays one set.
 - **A colour**: add it to `RAW` in `panel/ui.jsx` and publish it in the `:root`
   block beside the others, then export it as a `var()` reference. Only reach for
   `HEX` if the consumer is a 2D canvas or needs to append an alpha suffix —

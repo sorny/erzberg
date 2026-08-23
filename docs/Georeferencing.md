@@ -631,6 +631,8 @@ framing, and the STL base plate.
 | `src/components/VectorPicker.jsx` | Pointing at the terrain to identify a feature |
 | `src/components/VectorHighlight.jsx` | Lighting up the hovered / selected feature |
 | `src/utils/svgFlatten.js` | SVG → polylines, via the browser's own geometry API |
+| `src/utils/textGeometry.js` | Label text → polylines: outline faces sampled, stroke faces read straight |
+| `scripts/build-single-line-fonts.js` | The 49 single-line faces, flattened from oskay/svg-fonts, Relief SingleLine, ISO 3098 and three plotter ROM faces |
 | `src/utils/iconCatalogue.js` | The bundled set in `public/icons/`, and its flattened cache |
 | `src/hooks/useVectorIcons.js` | Placing, sizing, lifting and orienting the icons |
 | `src/utils/stlExport.js` | Ribbon solids for layers that ask for one |

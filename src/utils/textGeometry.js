@@ -52,6 +52,32 @@ export function fontStyleKey({ bold, italic } = {}) {
 }
 
 /**
+ * Single-line faces live in the same key space, behind a prefix.
+ *
+ * One string identifies a face wherever a face is asked for — the fetch, the
+ * cache, the "which faces does this scene need" set in useVectorLabels — and a
+ * prefix keeps that true across two collections that share no naming at all.
+ */
+const SL = 'sl:'
+export const singleLineKey = (id) => `${SL}${id}`
+export const isSingleLineKey = (key) => typeof key === 'string' && key.startsWith(SL)
+
+/** The bundled stroke faces, as `{ id, family, group }`. Fetched once. */
+let manifestPromise = null
+export function loadSingleLineManifest() {
+  if (!manifestPromise) {
+    manifestPromise = fetch(`${base()}fonts/single-line/manifest.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`manifest: ${r.status}`))))
+      .catch((err) => {
+        console.error('[text] single-line manifest unavailable:', err)
+        manifestPromise = null
+        return []
+      })
+  }
+  return manifestPromise
+}
+
+/**
  * One label face, fetched once.
  *
  * A missing font is a missing feature, not a broken app: nothing is lettered
@@ -61,9 +87,14 @@ export function loadTextFont(style) {
   const key = typeof style === 'string' ? style : fontStyleKey(style)
   let hit = fontPromises.get(key)
   if (!hit) {
-    hit = fetch(`${base()}fonts/space-mono-${key}.json`)
+    const url = isSingleLineKey(key)
+      ? `${base()}fonts/single-line/${key.slice(SL.length)}.json`
+      : `${base()}fonts/space-mono-${key}.json`
+    hit = fetch(url)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`fonts: ${r.status}`))))
-      .then((font) => ({ ...font, key }))
+      // `stroke` is what tells the two builders below apart: a stroke face
+      // arrives as polylines and needs none of the sampling an outline does.
+      .then((font) => ({ ...font, key, stroke: isSingleLineKey(key) }))
       .catch((err) => {
         console.error('[text] font unavailable:', key, err)
         fontPromises.delete(key)
@@ -83,12 +114,38 @@ export function loadTextFont(style) {
  */
 const glyphCache = new Map()
 
+/**
+ * A stroke face's glyph, which is already what this function exists to produce.
+ *
+ * The strokes were flattened at build time and arrive as flat coordinate runs in
+ * font units; all that is left is the divide into em. No sampling, no simplifier
+ * and — the part that matters — no guessing where the pen lifted, because every
+ * stroke is its own array. The outline path below has to infer that from a jump
+ * in arc length, which is the right tool for a contour and the wrong one here.
+ */
+function strokeGlyphPolylines(ch, font) {
+  const g = font.glyphs[ch]
+  if (!g) return []
+  const upm = font.unitsPerEm || 1000
+  return g[1].map((run) => {
+    const out = new Float32Array(run.length)
+    for (let i = 0; i < run.length; i++) out[i] = run[i] / upm
+    return out
+  })
+}
+
 function glyphPolylines(ch, font) {
   // Keyed by face as well as by character: an italic 'a' is not a slanted
   // roman one, it is a different drawing.
   const cacheKey = `${font.key}\u0000${ch}`
   const hit = glyphCache.get(cacheKey)
   if (hit) return hit
+
+  if (font.stroke) {
+    const built = strokeGlyphPolylines(ch, font)
+    glyphCache.set(cacheKey, built)
+    return built
+  }
 
   const d = font.glyphs[ch]
   if (!d) { glyphCache.set(cacheKey, []); return [] }
@@ -171,7 +228,15 @@ export function textPolylines(text, font) {
   const hit = textCache.get(cacheKey)
   if (hit) return hit
 
-  const adv = font.advance / font.unitsPerEm
+  const upm = font.unitsPerEm
+  // Space Mono is monospaced and carries one advance for the whole face; a
+  // stroke face is proportional and carries one per glyph, so an 'i' is not
+  // given the room of an 'm'. Everything downstream is unchanged either way —
+  // the advance only ever decides where the next glyph starts.
+  const advanceOf = font.stroke
+    ? (ch) => (font.glyphs[ch]?.[0] ?? font.defaultAdvance ?? upm / 2) / upm
+    : () => font.advance / upm
+
   const polylines = []
   let segments = 0
   let x = 0
@@ -186,14 +251,16 @@ export function textPolylines(text, font) {
       polylines.push(moved)
       segments += moved.length / 2 - 1
     }
-    x += adv
+    x += advanceOf(ch)
   }
 
   // Never unbounded: a label vocabulary is small, but a user typing into a
   // filter is not, and this is a module-level Map.
   if (textCache.size > 512) textCache.clear()
 
-  const built = { polylines, width: x, segments }
+  // The string travels with its geometry: the SVG exporter emits `<text>` for
+  // outline faces and would otherwise have to be told twice what was drawn.
+  const built = { text, polylines, width: x, segments }
   textCache.set(cacheKey, built)
   return built
 }

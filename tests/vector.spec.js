@@ -625,6 +625,152 @@ test.describe('vector layers', () => {
     await expect(page.locator('[data-selected="true"]')).toHaveCount(0)
   })
 
+  test('an outline label exports as text you can retype', async ({ page }) => {
+    /*
+     * A label is forty little unrelated paths in an editing tool, where a word
+     * should be. An outline face therefore also exports as `<text>` — the same
+     * string, at the same place, in the same face — so a name can be corrected
+     * in Inkscape rather than redrawn.
+     *
+     * A stroke face deliberately does not: those fonts are on nobody's machine,
+     * so `<text>` in one would be substituted for whatever the reader had, which
+     * is the opposite of the point of picking it.
+     */
+    await routeOverpass(page)
+    await openVectorPanel(page)
+    await page.click('[data-testid="osm-fetch"]')
+    await page.waitForSelector('text=Peaks')
+    await page.waitForTimeout(1500)
+
+    const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Peaks' }).first()
+    const id = (await row.getAttribute('data-testid')).replace('vector-layer-', '')
+    await row.locator('button', { hasText: 'Peaks' }).click()
+    await page.waitForSelector(`[data-testid="label-name-${id}"]`)
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
+    await page.waitForTimeout(2500)
+
+    const exportSvg = async () => {
+      const dl = page.waitForEvent('download', { timeout: 90000 })
+      await page.locator('canvas').first().click({ position: { x: 5, y: 5 } })
+      await page.keyboard.press('Digit1')
+      return readFileSync(await (await dl).path(), 'utf8')
+    }
+
+    const outlined = await exportSvg()
+    const texts = [...outlined.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1])
+    expect(texts, 'the peak names must arrive as text').toContain('Polster')
+    // Set in the face it was lettered in, and positioned by a real transform
+    // rather than baked into path data.
+    expect(outlined).toContain('font-family="Space Mono')
+    expect(outlined).toMatch(/<text transform="matrix\([^"]+\)" font-size="1"/)
+
+    await page.locator('text=Use single-line font').locator('..')
+      .locator('input[type=checkbox]').click()
+    await page.waitForTimeout(2500)
+    const stroked = await exportSvg()
+    expect(stroked.match(/<text[^>]*>/g), 'a stroke face exports strokes, not text').toBeNull()
+  })
+
+  test('a single-line face letters with strokes rather than outlines', async ({ page }) => {
+    /*
+     * The point of the feature, measured rather than asserted by eye.
+     *
+     * Every other label face in this app is an outline font flattened to
+     * contours, so a plotted letter is the *edge* of the letter and the pen goes
+     * round each glyph twice. A single-line face is the centre line instead. The
+     * same two labels should therefore reach the SVG as a fraction of the
+     * geometry, and the fill — which triangulates a closed contour — has to be
+     * gone, because a centre line encloses nothing.
+     */
+    await routeOverpass(page)
+    await openVectorPanel(page)
+    await page.click('[data-testid="osm-fetch"]')
+    await page.waitForSelector('text=Peaks')
+    await page.waitForTimeout(1500)
+
+    const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Peaks' }).first()
+    const id = (await row.getAttribute('data-testid')).replace('vector-layer-', '')
+    await row.locator('button', { hasText: 'Peaks' }).click()
+    await page.waitForSelector(`[data-testid="label-name-${id}"]`)
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
+    await page.waitForTimeout(2000)
+
+    const labelSegments = async () => page.evaluate(() => {
+      // The label layers carry their own ids; count what they contribute.
+      const el = document.querySelector('canvas[data-engine]')
+      return el ? Number(document.body.innerText.match(/Segments:\s*([\d,]+)/)[1].replace(/,/g, '')) : 0
+    })
+    const withOutline = await labelSegments()
+
+    // Fill is offered for an outline face…
+    await expect(page.locator(`[data-testid="label-fill-${id}"]`)).toHaveCount(1)
+    await expect(page.locator(`[data-testid="label-font-${id}"]`)).toHaveCount(0)
+
+    await page.locator('text=Use single-line font').locator('..')
+      .locator('input[type=checkbox]').click()
+    await page.waitForTimeout(2500)
+
+    // …and withdrawn for a stroke one, which has no interior to fill.
+    await expect(page.locator(`[data-testid="label-fill-${id}"]`)).toHaveCount(0)
+    const picker = page.locator(`[data-testid="label-font-${id}"]`)
+    await expect(picker).toHaveCount(1)
+    expect(await picker.locator('option').count(),
+      'every bundled face must be offered').toBeGreaterThan(30)
+
+    const withStroke = await labelSegments()
+    expect(withStroke, 'a stroke face must still draw something').toBeGreaterThan(0)
+    expect(withStroke, 'and must cost less geometry than the outline it replaces')
+      .toBeLessThan(withOutline)
+
+    // Switching face redraws rather than leaving the previous one on screen.
+    await picker.selectOption('EMSReadability')
+    await page.waitForTimeout(2500)
+    expect(await labelSegments()).toBeGreaterThan(0)
+  })
+
+  test('every bundled single-line face flattens into usable strokes', async ({ page }) => {
+    /*
+     * The set, not the arithmetic — the sibling of the icon test below.
+     *
+     * These faces are flattened at build time by a small path parser, so a
+     * command it does not know, or a number it tokenises wrongly, produces a
+     * glyph that is quietly missing a stroke rather than a build that fails.
+     * Two glyphs in the collection write a coordinate as `1e+03`, and exactly
+     * that bug is what this guards: nothing downstream would have noticed EMS
+     * Brush's Ä losing an arm. ISO 3098 raises the stakes — it is built from
+     * elliptical arcs, so a sweep flag read backwards would mirror every curve
+     * in the face and still produce plausible-looking output.
+     */
+    await page.goto('http://localhost:5173')
+    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+
+    const r = await page.evaluate(async () => {
+      const m = await import('/src/utils/textGeometry.js')
+      const manifest = await m.loadSingleLineManifest()
+      // Accented Latin included: the Relief faces exist in this app largely
+      // because the Hershey ones stop at the ASCII a place name needs to escape.
+      const sample = 'Präbichl 1227 — Erzberg ÖÄÜß'
+      const bad = []
+      for (const { id, family } of manifest) {
+        const font = await m.loadTextFont(m.singleLineKey(id))
+        if (!font?.stroke) { bad.push(`${id}: not loaded as a stroke face`); continue }
+        const built = m.textPolylines(sample, font)
+        const pts = built.polylines.flatMap((a) => Array.from(a))
+        if (!pts.length) bad.push(`${id}: lettered nothing`)
+        else if (!pts.every(Number.isFinite)) bad.push(`${id}: non-finite coordinates`)
+        else if (!(built.width > 1)) bad.push(`${id}: zero advance — ${family}`)
+        // A glyph is ~1 unit tall at size 1; a stray coordinate from a
+        // mis-parsed command lands orders of magnitude outside that.
+        else if (Math.max(...pts.map(Math.abs)) > 60) bad.push(`${id}: coordinate out of range`)
+      }
+      return { count: manifest.length, groups: [...new Set(manifest.map((e) => e.group))].sort(), bad }
+    })
+
+    expect(r.bad).toEqual([])
+    expect(r.count, 'the manifest must carry every built face').toBe(49)
+    expect(r.groups).toEqual(['EMS', 'Hershey', 'ISO 3098', 'Plotter', 'Relief'])
+  })
+
   /** Opens a point layer's icon picker and returns its layer id. */
   async function openIconPicker(page, layerName) {
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: layerName }).first()
@@ -1348,7 +1494,7 @@ test.describe('vector layers', () => {
       .toBeLessThan(pens2.length - 1)
   })
 
-  test('labels export as strokes, in their own pen layer', async ({ page }) => {
+  test('labels export in their own pen layer, stroked and unfilled', async ({ page }) => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
@@ -1371,9 +1517,28 @@ test.describe('vector layers', () => {
     // marks it labels — which is most of the reason to plot at all.
     const group = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*labels"[^>]*>([\s\S]*?)<\/g>/)
     expect(group, 'the label layer must export').not.toBeNull()
-    expect(group[1]).toContain('<line')
-    // Filled type is triangles, and the SVG is a line-art format.
+    // An outline face leaves as <text> so it stays editable; the sibling test
+    // above covers that. What matters here is the ink either form is drawn in:
+    // stroked in the label's own colour and weight, and never filled. Filling
+    // would drop the stroke ink entirely and turn a stroke-only label solid,
+    // and a filled glyph is triangles — this is a line-art format.
+    expect(group[1]).toMatch(/<text|<line/)
     expect(group[1]).not.toContain('<polygon')
+    const ink = group[0].match(/<g fill="none" stroke="(#[0-9a-f]{6})" stroke-width="([\d.]+)"/)
+    expect(ink, 'the lettering must carry a stroke, not a fill').not.toBeNull()
+    const penWidth = Number(ink[2])
+    expect(penWidth).toBeGreaterThan(0)
+
+    // A <text> run carries the projection in its matrix, and stroke-width
+    // resolves *inside* that scaled space — so a width inherited from the group
+    // would plot multiplied by the type size, and unequally between a near label
+    // and a far one. Every run must therefore restate it, pre-divided, and they
+    // must all come back to the same pen on the page.
+    for (const m of group[0].matchAll(/<text transform="matrix\(([\d.eE+-]+) ([\d.eE+-]+)[^"]*"[^>]*stroke-width="([\d.eE+-]+)"/g)) {
+      const scale = Math.hypot(Number(m[1]), Number(m[2]))
+      expect(scale, 'a label must be scaled by its em box').toBeGreaterThan(1)
+      expect(Number(m[3]) * scale).toBeCloseTo(penWidth, 2)
+    }
   })
 
   test('a glyph is filled with its holes cut out', async ({ page }) => {

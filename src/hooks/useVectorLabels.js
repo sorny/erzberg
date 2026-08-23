@@ -25,7 +25,7 @@
  */
 
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { loadTextFont, fontStyleKey, textPolylines } from '../utils/textGeometry'
+import { loadTextFont, fontStyleKey, singleLineKey, textPolylines } from '../utils/textGeometry'
 import { iconBasis, iconTriangles } from './useVectorIcons'
 
 // Segments one layer's labels may add. Text is expensive — "Polster" is 266 of
@@ -45,7 +45,15 @@ export function hasLabels(layer) {
 }
 
 /** Which face a layer letters in. */
+/**
+ * The face a layer letters in, as one key.
+ *
+ * A single-line face replaces the roman/bold/italic choice rather than joining
+ * it: those are four drawings of one typeface, and a stroke font is a different
+ * typeface with no bold to offer. Asking for both would mean inventing one.
+ */
 function fontStyleKeyOf(layer) {
+  if (layer?.labelSingleLine && layer?.labelFont) return singleLineKey(layer.labelFont)
   return fontStyleKey({ bold: layer?.labelBold, italic: layer?.labelItalic })
 }
 
@@ -106,7 +114,19 @@ function buildLabelLayer(dots, layer, bucket, font) {
   if (!jobs.length) return null
   if (segments > MAX_LABEL_SEGMENTS) return { overflow: true }
 
-  const shapes = layer.labelFill
+  /*
+   * A stroke face has no interior to fill.
+   *
+   * Filling an outline glyph is triangulating the region its contours enclose —
+   * the black of the letter. A single-line glyph is not a contour: it is the
+   * centre line of the stem, an open path that never closes. Triangulating it
+   * produces a smear roughly where the letter is, which is worse than nothing
+   * and looks like a rendering fault rather than a setting.
+   *
+   * So the setting is ignored rather than obeyed, and the panel hides it — the
+   * same call the bold and italic switches get, for the same reason.
+   */
+  const shapes = layer.labelFill && !font.stroke
     ? jobs.map((j) => j.blocks.map((b) => iconTriangles(b)))
     : null
   let triVerts = 0
@@ -115,6 +135,25 @@ function buildLabelLayer(dots, layer, bucket, font) {
       for (const sh of perLine) for (const s of sh) triVerts += s.tris.length
     }
   }
+
+  /**
+   * The same labels again, as text rather than as geometry — for the SVG only.
+   *
+   * The strokes below are what the viewport draws and what a plotter follows.
+   * They are also, in an editing tool, forty little unrelated paths where a
+   * word should be: retyping a name means redrawing it. So an outline face also
+   * records what it said and where, and the SVG exporter emits `<text>` from it.
+   *
+   * Only an outline face. A stroke font is not installed on anybody's machine,
+   * so `<text>` in one of those would be substituted for whatever Inkscape had
+   * to hand — which is the opposite of the point of choosing it.
+   *
+   * Three world points per run carry the whole placement: the baseline origin
+   * and one em along each of the label plane's axes. Their projections give the
+   * exporter an exact 2-D affine, perspective included, without it having to
+   * know anything about how a label is oriented.
+   */
+  const textRuns = font.stroke ? null : []
 
   const positions = new Float32Array(segments * 6)
   const featureOfSegment = new Int32Array(segments)
@@ -143,6 +182,21 @@ function buildLabelLayer(dots, layer, bucket, font) {
         out[at]     = ax + u * rx + v * ux
         out[at + 1] = ay + u * ry + v * uy
         out[at + 2] = az + u * rz + v * uz
+      }
+
+      if (textRuns) {
+        // Anchored at `dx` with SVG's own text-anchor rather than at the
+        // measured left edge, so the alignment still holds if the reader
+        // substitutes a different face for one it has not got.
+        const at = (u, v) => [ax + u * rx + v * ux, ay + u * ry + v * uy, az + u * rz + v * uz]
+        textRuns.push({
+          text: block.text,
+          feature,
+          origin: at(dx, y0),
+          emRight: at(dx + size, y0),
+          emUp: at(dx, y0 + size),
+          anchor: align === 'center' ? 'middle' : align === 'right' ? 'end' : 'start',
+        })
       }
 
       if (shapes) {
@@ -182,6 +236,13 @@ function buildLabelLayer(dots, layer, bucket, font) {
     // …but the *highlight* belongs on the mark: lighting up the text and
     // leaving the summit dark is not what "this one" looks like.
     isLabelText: true,
+    textRuns: textRuns?.length ? textRuns : null,
+    // What the reader should set it in, if it has it.
+    textStyle: textRuns?.length ? {
+      family: font.family ?? 'Space Mono',
+      weight: layer.labelBold ? 700 : 400,
+      style: layer.labelItalic ? 'italic' : 'normal',
+    } : null,
     fills: fw ? { positions: fillPos.subarray(0, fw), indices: fillIdx.subarray(0, fi) } : null,
   }
 }
@@ -228,7 +289,7 @@ export function useVectorLabels(lineGeo, dotsGeo, vectorLayers, vectorSources, v
   const key = (vectorLayers ?? [])
     .filter(hasLabels)
     .map((l) => `${l.id}|${l.labelName ? 1 : 0}|${l.labelHeight ? 1 : 0}|${l.labelSize}|` +
-                `${l.labelDx}|${l.labelDy}|${l.labelAlign}|${l.labelFill ? 1 : 0}|` +
+                `${l.labelDx}|${l.labelDy}|${l.labelAlign}|${l.labelFill && !l.labelSingleLine ? 1 : 0}|` +
                 `${fontStyleKeyOf(l)}|${l.iconFaceCamera ? 1 : 0}|${l.iconTilt}|${l.iconSpin}`)
     .join(';')
   const camKey = anyFaceCamera ? `${viewTilt}|${viewSpin}` : ''

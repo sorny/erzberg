@@ -113,6 +113,12 @@ export const VECTOR_LAYER_DEF = {
   labelStrokeOutside: true,
   // Four real faces, not a slant or a smear applied to one of them.
   labelBold: false, labelItalic: false,
+  // A single-line face draws the skeleton of a letter rather than its outline,
+  // so a plotter follows one stroke per stem instead of going round each glyph
+  // twice. Off by default: the outline faces are what the app has always
+  // lettered in, and this changes how every existing label plots.
+  labelSingleLine: false,
+  labelFont: 'HersheySans1',
   // Only 'gpx' sources default this on: the STL plate has always been shipped
   // with a track ribbon beside it, and OSM layers have no business there.
   stlRibbon: false,

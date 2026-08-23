@@ -17,6 +17,7 @@ import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
+import { loadSingleLineManifest } from '../utils/textGeometry'
 import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
@@ -302,7 +303,13 @@ function useStackDrag(layers, onReorder) {
  * blank and never lies. Touching it writes the field and parts company, which
  * is what **Match layer** undoes.
  */
-function Ink({ layer, set, prefix, help = {} }) {
+/**
+ * `noFill` is the single-line label case. A stroke face has no interior — its
+ * glyphs are centre lines, not contours — so a fill would triangulate an open
+ * path into a smear. The setting is kept on the layer rather than cleared, so
+ * switching back to an outline face restores what it was.
+ */
+function Ink({ layer, set, prefix, help = {}, noFill = false }) {
   const id = layer.id
   const F = (k) => layer[prefix + k]
   const color = F('Color') ?? layer.color
@@ -320,11 +327,13 @@ function Ink({ layer, set, prefix, help = {} }) {
         fmt={(v) => Math.round(v * 100) + '%'} testId={`${prefix}-opacity-${id}`}
         onChange={(v) => set({ [`${prefix}Opacity`]: v })} help={help.opacity} />
 
-      <div data-testid={`${prefix}-fill-${id}`}>
-        <Tog label="Fill" small checked={F('Fill')}
-          onChange={(v) => set({ [`${prefix}Fill`]: v })} help={help.fill} />
-      </div>
-      {F('Fill') && (
+      {!noFill && (
+        <div data-testid={`${prefix}-fill-${id}`}>
+          <Tog label="Fill" small checked={F('Fill')}
+            onChange={(v) => set({ [`${prefix}Fill`]: v })} help={help.fill} />
+        </div>
+      )}
+      {F('Fill') && !noFill && (
         <Sub>
           {/* Falls back through this mark's *own* stroke colour before the
               layer's, so colouring the mark colours all of it. */}
@@ -521,6 +530,10 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
  */
 function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin }) {
   const set = (patch) => onPatch(layer.id, patch)
+  // The bundled stroke faces, fetched once for the whole app and only when a
+  // label section is open — the manifest is names, not glyphs.
+  const [singleLineFonts, setSingleLineFonts] = useState([])
+  useEffect(() => { loadSingleLineManifest().then(setSingleLineFonts) }, [])
   const on = layer.labelName || layer.labelHeight
 
   const named = bucket?.names.size ?? 0
@@ -578,13 +591,44 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
       {on && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
-            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {face('bold', 'Bold', layer.labelBold)}
-              {face('italic', 'Italic', layer.labelItalic)}
+          <Tog label="Use single-line font" small checked={!!layer.labelSingleLine}
+            onChange={(v) => set({ labelSingleLine: v })}
+            help="Letters drawn as a single stroke down the middle of each stem, the way plotter fonts have worked since the 1960s. The faces the app otherwise letters in are outline fonts, so a plotted letter is the *edge* of the letter and the pen goes round every glyph twice. A single-line face is the skeleton instead: one pass, half the pen-down distance, and no double line where two strokes meet. It looks thinner on screen for the same reason it plots better." />
+
+          {layer.labelSingleLine ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
+              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
+              <select value={layer.labelFont ?? 'HersheySans1'}
+                onChange={(e) => set({ labelFont: e.target.value })}
+                data-testid={`label-font-${layer.id}`}
+                style={{
+                  flex: 1, minWidth: 0, background: SURF, color: DIM,
+                  border: `1px solid ${BORDER}`, borderRadius: 3,
+                  fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit',
+                }}>
+                {Object.entries(singleLineFonts.reduce((g, f) => {
+                  (g[f.group] ??= []).push(f); return g
+                }, {})).map(([group, faces]) => (
+                  <optgroup key={group} label={group}>
+                    {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
+                  </optgroup>
+                ))}
+              </select>
             </div>
-          </div>
+          ) : (
+            /* Bold and italic as two switches rather than a list of four faces:
+               regular is neither, and bold-italic — a real file, not a slanted
+               bold — falls out of both without a fourth button. They are hidden
+               for a stroke face because that is a different typeface with no
+               bold to offer; showing them would mean inventing one. */
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
+              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
+              <div style={{ display: 'flex', gap: 2, flex: 1 }}>
+                {face('bold', 'Bold', layer.labelBold)}
+                {face('italic', 'Italic', layer.labelItalic)}
+              </div>
+            </div>
+          )}
 
           <InlineSl label="Size" min={2} max={40} step={0.5} value={layer.labelSize}
             onChange={(v) => set({ labelSize: v })} testId={`label-size-${layer.id}`} />
@@ -602,7 +646,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
             </div>
           </div>
 
-          <Ink layer={layer} set={set} prefix="label" help={{
+          <Ink layer={layer} set={set} prefix="label" noFill={!!layer.labelSingleLine} help={{
             weight: "The lettering's own line width — the stroke that draws a summit triangle well is the stroke that closes up the counters of small type.",
             opacity: "The lettering's own opacity. Type sitting on a dense contour field often wants to be quieter than the mark it labels — or louder than a layer you have faded back.",
             fill: "Draws the lettering solid, with the counters of the letters cut out. Switch it off for outlined type, which is what a pen plotter draws and what the SVG export carries either way.",

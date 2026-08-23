@@ -1,0 +1,135 @@
+Single-line (stroke) fonts bundled with erzberg
+===============================================
+
+Built by `scripts/build-single-line-fonts.js` from
+
+    https://gitlab.com/oskay/svg-fonts
+    https://github.com/isdat-type/Relief-SingleLine
+    https://github.com/simoncozens/Relief-Pendot
+    https://github.com/golanlevin/p5-single-line-font-resources
+
+The first is Evil Mad Scientist Laboratories' collection of SVG fonts for
+Hershey Text v3, which carries the Hershey originals together with the "EMS"
+faces converted from openly-licensed typefaces. The others are the Relief
+SingleLine family. Only the geometry is reformatted here — the strokes are the
+ones the designers drew.
+
+
+THE HERSHEY FONTS
+-----------------
+
+The Hershey Fonts are a set of vector fonts with a liberal license.
+
+USE RESTRICTION:
+    This distribution of the Hershey Fonts may be used by anyone for
+    any purpose, commercial or otherwise, providing that:
+        1. The following acknowledgements must be distributed with
+            the font data:
+            - The Hershey Fonts were originally created by Dr.
+                A. V. Hershey while working at the U. S.
+                National Bureau of Standards.
+            - The format of the Font data in this distribution
+                was originally created by
+                    James Hurt
+                    Cognition, Inc.
+                    900 Technology Park Drive
+                    Billerica, MA 01821
+                    (mit-eddie!ci-dandelion!hurt)
+        2. The font data in this distribution may be converted into
+            any other format *EXCEPT* the format distributed by
+            the U.S. NTIS where each point is described
+            in eight bytes as "xxx yyy:", where xxx and yyy are
+            the coordinate values as ASCII numbers.
+
+The SVG conversion used here was prepared by Windell H. Oskay,
+www.evilmadscientist.com, from contents adapted from
+emergent.unpythonic.net/software/hershey by way of "Hershey Fonts in SVG" by
+Marty McGuire.
+
+
+THE EMS FONTS
+-------------
+
+Created by Evil Mad Scientist Laboratories from typefaces released under the
+SIL Open Font License 1.1, and distributed under those terms. Each face's own
+metadata block in the upstream SVG names its source typeface and designer —
+EMS Readability from Source Sans Pro Light (Paul D. Hunt, Adobe), EMS Osmotron
+from Orbitron (Matt McInerney), EMS Allure from Allura (Rob Leuschke), and so
+on. See the upstream repository for the full attribution list.
+
+TwinSans is a Hershey Sans variant by Keith Packard.
+
+
+THE RELIEF SINGLELINE FAMILY
+----------------------------
+
+Copyright 2022 The Relief SingleLine Project Authors
+(https://github.com/isdat-type/Relief-SingleLine).
+
+Designed by Élisa Garzelli and Noëlie Dayma of the Graphic Design Department of
+the institut supérieur des arts et du design de Toulouse (isdaT), in a project
+initiated and led by François Chastanet. Licensed under the SIL Open Font
+License, Version 1.1; the copyright statement reserves no font name. The full
+licence text ships in the upstream repository at OFL.txt.
+
+Unlike the faces above, Relief was drawn as single-line from the start rather
+than converted from an outline typeface, and covers 423 glyphs against the
+collection's 216 — most of accented Latin.
+
+Relief SingleLine Pendot is Simon Cozens' fork
+(https://github.com/simoncozens/Relief-Pendot), under the same licence. It
+differs from Relief in its dots: a period, a colon, an i or j tittle and every
+accent built on one is a single short stroke a plotter pen can dab, rather than
+a small circle the pen has to trace.
+
+
+ISO 3098
+--------
+
+The lettering standard for technical drawings, adopted 1974 — the alphabet the
+standard specifies for exactly the kind of drawing this app produces.
+
+Public domain. The letterforms are File:ISO3098.svg on Wikimedia Commons,
+released by its author (User:K7) as own work into the public domain, with no
+attribution required:
+
+    https://commons.wikimedia.org/wiki/File:ISO3098.svg
+
+The stroke data was extracted from that file and published as free to use by
+AZO (https://domisan.sakura.ne.jp/article/cadfont/cadfont.html), and converted
+to the SVG 1.1 font format by Golan Levin.
+
+
+THE PLOTTER FONTS
+-----------------
+
+Two of these are ROM data from machines that drew with a real pen, so their
+letterforms were shaped by the same constraint this app exports for.
+
+Commodore 1520 — the four-colour ballpoint plotter sold for the Commodore 64.
+Recovered from the plotter's ROM by Jim Brain, Gerrit Heitsch, Silver Dream and
+Stewart C. Russell (scruss), and released as the "fifteentwenty" font under the
+WTFPL: https://github.com/scruss/fifteentwenty
+
+Apple 410 — the Apple 410 Colour Plotter (c.1983), also sold as the Yokogawa
+YEW PL-1000. Its glyphs sit on a 16×16 lattice, one byte per character.
+Extracted from the firmware ROM by Adam Mayer (@phooky) under the MIT licence:
+https://github.com/phooky/Apple-410
+
+DearPlotter — drawn for pen plotters on purpose rather than by necessity, by
+Licia He (http://eyesofpanda.com/), commissioned by the Processing Foundation
+and the Tezos Foundation. The DearPlotter Font Generator is licensed CC BY-SA
+4.0 and the fonts it generates, including this one, under the SIL Open Font
+License 1.1.
+
+All three reach here through Golan Levin's SVG 1.1 font conversions in
+https://github.com/golanlevin/p5-single-line-font-resources
+
+
+WHY THESE ARE HERE
+------------------
+
+erzberg's other label faces are outline fonts: Space Mono flattened to contours,
+so a plotted letter draws both sides of every stem and the pen goes round each
+glyph twice. These are single-stroke faces — the skeleton rather than the
+outline — which is what a pen plotter is actually built to follow.

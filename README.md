@@ -106,7 +106,14 @@ individually and checkable — keep five peaks out of twenty-nine — and restin
 pointer on one names it and lights it up, so a dot on the terrain becomes
 *Polster · 1910 m*. Point features can carry their **name and height as labels**, set in the same
 Space Mono the logo uses — regular, bold or italic — and drawn as real geometry,
-so they plot as strokes in their own pen layer. The icon and the lettering each
+so they plot as strokes in their own pen layer, and exported as real `<text>` you
+can retype in Inkscape rather than paths you can only redraw. Or set them in a **single-line
+font**: 49 stroke faces — the Hershey originals, Evil Mad Scientist's EMS
+conversions, the Relief SingleLine family, ISO 3098 (the lettering standard for
+technical drawings), and three fonts that were born on a plotter — where a letter
+is the centre line of each stem rather than its outline. An outlined 'A' plots as two closed contours and the pen goes round it
+twice; the Hershey 'A' is three strokes. Measured on the same pair of labels,
+the SVG's label layer is a quarter of the size. The icon and the lettering each
 carry their own ink: colour, stroke width, opacity, a fill with its own colour and
 opacity, and whether the stroke sits outside the shape or centred on its edge —
 independent of each other and of the layer's. A
@@ -408,6 +415,7 @@ The app is built to idle quietly and stay responsive under load.
 | GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
 | Icons | Maki (CC0), flattened to polylines through the browser's own SVG geometry API |
 | Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way |
+| Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces; flattened by `npm run fonts:single-line` |
 | Map data | OpenStreetMap via Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
@@ -441,6 +449,7 @@ npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
 npm run update-presets   # round-trip all presets through the live app
 npm run thumbs           # regenerate the preset thumbnails
+npm run fonts:single-line # refetch and reflatten the 49 stroke faces
 ```
 
 `update-presets` and `thumbs` both drive the running dev server with Playwright,
