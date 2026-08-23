@@ -91,7 +91,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
           borderRadius: 5,
           background: cssGradient(stops),
           cursor: isSimple ? 'default' : 'crosshair',
-          marginBottom: 10,
+          marginBottom: 8,
           border: '1px solid #333',
         }}
       >
@@ -166,7 +166,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
             <div
               key={sortedIdx}
               style={{
-                display: 'flex', alignItems: 'center', gap: 3,
+                display: 'flex', alignItems: 'center', gap: 2,
                 background: '#2a2a30', borderRadius: 3, padding: '2px 4px',
                 fontSize: 10, color: '#aaa',
               }}

@@ -127,9 +127,9 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
 
   const note = (color, children) => (
     <div style={{
-      fontSize: 10, color, lineHeight: 1.5, marginBottom: 6,
+      fontSize: 10, color, lineHeight: 1.5, marginBottom: 4,
       background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
-      borderRadius: 5, padding: '6px 8px',
+      borderRadius: 5, padding: '4px 8px',
     }}>{children}</div>
   )
   const warn = '#f97316'
@@ -339,9 +339,9 @@ function Ink({ layer, set, prefix, help = {} }) {
           {/* Only offered with a fill, because that is what makes the
               difference: a stroke with no shape behind it has no inside to
               sit in. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
             <span style={{ fontSize: 10, color: DIM, width: 54 }}>Stroke</span>
-            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
               {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
                 <Btn key={text} block variant="toggle" on={!!F('StrokeOutside') === v}
                   onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
@@ -360,7 +360,7 @@ function Ink({ layer, set, prefix, help = {} }) {
             [`${prefix}FillColor`]: null, [`${prefix}FillOpacity`]: null,
           })}
           style={{
-            width: '100%', padding: 5, margin: '2px 0 6px', fontSize: 10, borderRadius: 3,
+            width: '100%', padding: 4, margin: '2px 0 4px', fontSize: 10, borderRadius: 3,
             cursor: 'pointer', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
           }}>Match layer</button>
       )}
@@ -391,7 +391,7 @@ function Orientation({ layer, set, viewTilt, viewSpin }) {
             testId={`icon-spin-${layer.id}`} />
           <Btn size="xs" onClick={() => set({ iconTilt: viewTilt, iconSpin: viewSpin })}
             data-testid={`icon-match-${layer.id}`}
-            style={{ width: '100%', padding: 5, marginTop: 2, color: DIM }}>Match view</Btn>
+            style={{ width: '100%', padding: 4, marginTop: 2, color: DIM }}>Match view</Btn>
         </Sub>
       )}
     </>
@@ -432,9 +432,9 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>ICON</div>
+      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>ICON</div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 3, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, marginBottom: 8 }}>
         {/* Back to a plain dot. */}
         <button onClick={() => set({ icon: null })} title="No icon — draw a dot"
           data-testid={`icon-none-${layer.id}`}
@@ -451,7 +451,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
               data-testid={`icon-${layer.id}-${ic.id}`}
               style={{
                 aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-                background: on ? ACCENT_DEEP : SURF, border: `1px solid ${on ? ACCENT_DEEP : BORDER}`, padding: 3,
+                background: on ? ACCENT_DEEP : SURF, border: `1px solid ${on ? ACCENT_DEEP : BORDER}`, padding: 2,
               }}>
               <img src={iconUrl(ic.id)} alt={ic.label} loading="lazy"
                 style={{ width: '100%', height: '100%', filter: on ? 'invert(1)' : 'invert(0.72)' }} />
@@ -477,12 +477,12 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
 
       <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
         style={{
-          width: '100%', padding: 6, marginBottom: 8, background: SURF, color: '#a1a1aa',
+          width: '100%', padding: 4, marginBottom: 8, background: SURF, color: '#a1a1aa',
           border: `1px dashed ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10,
         }}>↑ Custom SVG</button>
 
       {overflowed && (
-        <div style={{ fontSize: 10, color: '#f97316', marginBottom: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: '#f97316', marginBottom: 4, lineHeight: 1.5 }}>
           Too many features to draw as icons — this layer is still showing dots.
         </div>
       )}
@@ -559,7 +559,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>LABELS</div>
+      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>LABELS</div>
 
       <div data-testid={`label-name-${layer.id}`}>
         <Tog label="Name" small checked={layer.labelName}
@@ -572,15 +572,15 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           help="Draws the feature's elevation, as OpenStreetMap has it — the same “1910m” the feature list shows. It goes on its own line under the name, or on its own if the name is off." />
       </div>
 
-      <div style={{ fontSize: 10, color: MUTED, margin: '6px 0 8px', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 10, color: MUTED, margin: '4px 0 8px', lineHeight: 1.5 }}>
         {total ? `${named} of ${total} named · ${noted} with a height` : 'Nothing to label here.'}
       </div>
 
       {on && (
         <>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '2px 0 6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
             <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
-            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
               {face('bold', 'Bold', layer.labelBold)}
               {face('italic', 'Italic', layer.labelItalic)}
             </div>
@@ -595,9 +595,9 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
             onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
             help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: '4px 0 6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '4px 0 4px' }}>
             <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
-            <div style={{ display: 'flex', gap: 3, flex: 1 }}>
+            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
               {align('left', 'Left')}{align('center', 'Centre')}{align('right', 'Right')}
             </div>
           </div>
@@ -615,7 +615,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           )}
 
           {overflowed && (
-            <div style={{ fontSize: 10, color: '#f97316', marginTop: 6, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: '#f97316', marginTop: 4, lineHeight: 1.5 }}>
               Too many features to letter — this layer is drawing no labels. Hide
               some features, or label fewer layers.
             </div>
@@ -682,16 +682,16 @@ function FeatureList({ layer, bucket, onPatch }) {
 
   const bulk = (label, next, testId) => (
     <Btn onClick={() => onPatch(layer.id, { hidden: next() })} data-testid={testId}
-      style={{ padding: '2px 6px' }}>{label}</Btn>
+      style={{ padding: '2px 4px' }}>{label}</Btn>
   )
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
         <span style={{ fontSize: 10, color: MUTED }} data-testid={`feature-count-${layer.id}`}>
           Showing {visible} of {bucket.count}
         </span>
-        <span style={{ display: 'flex', gap: 3 }}>
+        <span style={{ display: 'flex', gap: 2 }}>
           {bulk('all', () => [], `feature-all-${layer.id}`)}
           {bulk('none', () => Array.from({ length: bucket.count }, (_, i) => i), `feature-none-${layer.id}`)}
         </span>
@@ -701,7 +701,7 @@ function FeatureList({ layer, bucket, onPatch }) {
         <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter…"
           data-testid={`feature-filter-${layer.id}`}
           style={{
-            width: '100%', boxSizing: 'border-box', marginBottom: 5, padding: '3px 6px',
+            width: '100%', boxSizing: 'border-box', marginBottom: 4, padding: '2px 4px',
             fontSize: 10, background: SURF, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3,
           }} />
       )}
@@ -729,7 +729,7 @@ function FeatureList({ layer, bucket, onPatch }) {
               // how you make one in that state, so it has to be how you undo one.
               onClick={() => setSelected(isSel ? null : { layerId: layer.id, feature: i })}
               style={{
-                display: 'flex', alignItems: 'center', gap: 5, padding: '2px 3px', borderRadius: 3,
+                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 2px', borderRadius: 3,
                 cursor: 'pointer',
                 background: isSel ? 'rgba(249,115,22,0.18)' : isHover ? 'rgba(59,130,246,0.18)' : 'transparent',
               }}>
@@ -853,7 +853,7 @@ function VectorLayersPanel({
                          hasFeatures={layers?.length > 0}
                          uploadsOnly={sources?.some((s) => s.kind !== 'osm')} />
 
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
         <button className="hmload" onClick={onLoadGeoJson} style={{ ...btn, flex: 1 }}
                 data-testid="load-geojson">↑ GeoJSON</button>
         <button className="hmload" onClick={onLoadGpx} style={{ ...btn, flex: 1 }}
@@ -861,8 +861,8 @@ function VectorLayersPanel({
       </div>
 
       {/* ── OpenStreetMap ───────────────────────────────────────────────── */}
-      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: 8, marginBottom: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: 8, marginBottom: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
           {size && (
             <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>
@@ -879,7 +879,7 @@ function VectorLayersPanel({
                 data-testid={`osm-cat-${c.id}`}
                 title={c.heavy ? 'Large in a populated extent' : undefined}
                 style={{
-                  fontSize: 10, padding: '4px 3px', borderRadius: 3, textAlign: 'left',
+                  fontSize: 10, padding: '4px 2px', borderRadius: 3, textAlign: 'left',
                   cursor: canQuery && !fetching ? 'pointer' : 'default',
                   opacity: canQuery ? 1 : 0.4,
                   background: on ? ACCENT_DEEP : SURF, color: on ? '#fff' : MUTED,
@@ -895,7 +895,7 @@ function VectorLayersPanel({
           disabled={!canQuery || !picked.length}
           data-testid="osm-fetch"
           style={{
-            width: '100%', padding: 7, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
+            width: '100%', padding: 8, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
             background: fetching ? SURF : ACCENT, color: fetching ? MUTED : '#fff',
             border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
           }}>
@@ -903,10 +903,10 @@ function VectorLayersPanel({
         </button>
 
         {fetching && status && (
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 6, textAlign: 'center' }}>{status}</div>
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{status}</div>
         )}
         {hasOsm && (
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 6, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
+          <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
         )}
       </div>
 
@@ -924,7 +924,7 @@ function VectorLayersPanel({
         return (
           <div key={l.id} data-testid={`vector-layer-${l.id}`} ref={drag.bindRow(l.id)}
                style={{
-                 borderTop: `1px solid ${BORDER}`, paddingTop: 6, marginBottom: 6,
+                 borderTop: `1px solid ${BORDER}`, paddingTop: 4, marginBottom: 4,
                  // The row being dragged is dimmed rather than lifted out of the
                  // list: the reorder is committed as the cursor crosses, so what
                  // you are dragging is the real row in its real new place, and a
@@ -932,7 +932,7 @@ function VectorLayersPanel({
                  opacity: held ? 0.55 : 1,
                  background: held ? SURF : 'transparent',
                }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               {/* Top of the list is the front of the scene, so this is also the
                   control for what covers what. Arrow keys move it one step,
                   which is the only way to do this without a pointer. */}
@@ -1072,7 +1072,7 @@ function VectorLayersPanel({
 function HypsometricRow({ value }) {
   const [show, setShow] = useState(false)
   return (
-    <div style={{ marginBottom: 6 }}>
+    <div style={{ marginBottom: 4 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10, color:MUTED }}>
         <span style={{ display:'flex', alignItems:'center' }}>
           Hypso. Integral
@@ -1083,7 +1083,7 @@ function HypsometricRow({ value }) {
       {show && (
         <div style={{
           fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
-          padding: '6px 8px', borderRadius: 5, marginBottom: 8,
+          padding: '4px 8px', borderRadius: 5, marginBottom: 8,
           border: `1px solid ${BORDER}`, lineHeight: 1.6
         }}>
           <div style={{ marginBottom: 4 }}>HI = (mean − min) / (max − min)</div>
@@ -1120,13 +1120,13 @@ function ProjectionParams({ params, values, onChange }) {
       out.push(
         <div key={p.group} style={{ marginBottom: 8 }}>
           <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{p.group}</div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 3 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap: 2 }}>
             {chips.map((c) => {
               const on = !!get(c)
               return (
                 <Btn key={c.key} variant="toggle" on={on} title={c.help} data-testid={`proj-${c.key}`}
                   onClick={() => onChange(c.key, !on)}
-                  style={{ padding:'5px 0', textTransform:'uppercase' }}>{c.label}</Btn>
+                  style={{ padding:'4px 0', textTransform:'uppercase' }}>{c.label}</Btn>
               )
             })}
           </div>
@@ -1153,7 +1153,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 6, letterSpacing: 1 }}>{label}</div>
+      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>{label}</div>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
         <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
         <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
@@ -1166,7 +1166,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
           {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
             <Btn key={d} block variant="toggle" on={style[`dash${prefix}`] === d}
               onClick={() => ss({ [`dash${prefix}`]: d })}
-              style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>
+              style={{ fontSize:10, padding:'2px 0', borderRadius:2, textTransform:'uppercase' }}>
               {d.replace('-dash','')}</Btn>
           ))}
         </div>
@@ -1175,11 +1175,11 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
       {/* Hypsometric is off the table for vector layers: a road has no elevation
           of its own, so the tint would have to read the ground under it, which
           is a different thing from what the draw modes mean by it. */}
-      {showHypso && <div style={{ marginTop: 10 }}>
+      {showHypso && <div style={{ marginTop: 8 }}>
         <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
         {isHypso && (
           <Sub>
-            <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+            <div style={{ display:'flex', gap:2, marginBottom:4 }}>
               {['Elevation', 'Slope', 'Aspect'].map(m => (
                 <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
                   style={{ 
@@ -1197,9 +1197,9 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
                 hidden behind enabling fill in Terrain Style. */}
             {gradientStops && setGradientStops && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 5, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
+                <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'3px 0' }}>{name}</Btn>)}
+                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
               </div>
@@ -1608,7 +1608,7 @@ export function Sidebar({
         boxShadow:'-3px 0 16px rgba(0,0,0,.4)',
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
-        <div style={{ padding:'12px 14px 11px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
+        <div style={{ padding:'12px 12px 12px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
           <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3', margin:0 }}>erzberg</h1>
           <span style={{ fontSize:10, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
           <a
@@ -1629,14 +1629,14 @@ export function Sidebar({
               mirror block both use the word for something harmless, and this one
               throws away every setting in the app. */}
           <button onClick={handleResetAll} title="Return every setting to its default"
-            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5, color:'#a1a1aa', fontSize:10, padding:'3px 7px', cursor:'pointer' }}>Reset all</button>
+            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5, color:'#a1a1aa', fontSize:10, padding:'2px 8px', cursor:'pointer' }}>Reset all</button>
         </div>
 
         {/* Thirty-one sections over 2 700 px of scroll: without this the only way
             to reach a control is to remember which header it lives under. The
             list, its order and its behaviour are untouched — clearing the field
             puts the panel back exactly as it was. */}
-        <div style={{ padding:'8px 14px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, position:'relative' }}>
+        <div style={{ padding:'8px 12px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, position:'relative' }}>
           <input
             type="search" value={filter} data-testid="panel-filter"
             onChange={(e) => setFilter(e.target.value)}
@@ -1644,7 +1644,7 @@ export function Sidebar({
             placeholder="Find a control…" aria-label="Find a control"
             style={{
               width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:5,
-              color: TEXT, fontSize:11, padding:'5px 8px', outline:'none',
+              color: TEXT, fontSize:11, padding:'4px 8px', outline:'none',
               fontFamily:'inherit',
             }}
           />
@@ -1658,13 +1658,13 @@ export function Sidebar({
 
         <div id="hm-panel-body" style={{ flex:1, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
           <SectionFilter.Provider value={filterCtx}>
-          <div style={{ padding:'12px 14px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+          <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
               <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
             </div>
             {heightmapFilename && (
-              <div style={{ marginTop:5, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              <div style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {heightmapFilename}
               </div>
             )}
@@ -1675,7 +1675,7 @@ export function Sidebar({
                 thing it is meant to be discovered from. This is the one line in
                 the panel that always says what you are looking at. */}
             {lastPreset && (
-              <div style={{ marginTop:6, display:'flex', alignItems:'baseline', justifyContent:'center', gap:5, fontSize:10, color: MUTED }}>
+              <div style={{ marginTop:4, display:'flex', alignItems:'baseline', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
                 <span>Style</span>
                 <button data-testid="jump-to-presets"
                   onClick={() => {
@@ -1696,7 +1696,7 @@ export function Sidebar({
                 said out loud — otherwise the app looks like it opened on someone
                 else's defaults. */}
             {sessionRestored && (
-              <div data-testid="session-restored" style={{ marginTop:6, fontSize:10, color: MUTED, textAlign:'center', lineHeight:1.5 }}>
+              <div data-testid="session-restored" style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', lineHeight:1.5 }}>
                 Settings restored from your last session.
               </div>
             )}
@@ -1704,17 +1704,17 @@ export function Sidebar({
             {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
             <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
               disabled={!heightmapPixels}
-              style={{ width:'100%', marginTop:6, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
+              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
                 border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
                 cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
               ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
             </button>
             {editSummary && (
-              <div style={{ marginTop:5, display:'flex', alignItems:'center', justifyContent:'center', gap:6, fontSize:10, color: MUTED }}>
+              <div style={{ marginTop:4, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
                 <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
                 <button data-testid="edit-clear" onClick={onClearEdit} style={{
                   background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
-                  fontSize:10, padding:'1px 5px', cursor:'pointer', flexShrink:0,
+                  fontSize:10, padding:'2px 4px', cursor:'pointer', flexShrink:0,
                 }}>clear</button>
               </div>
             )}
@@ -1727,13 +1727,13 @@ export function Sidebar({
             <Tog label="Raw terrain view"
               help="Shows the loaded heightmap itself: a flat greyscale plane with everything else hidden, lowest point black and highest white, stretched to fill the range. It reflects Resolution, Blur, Levels and the elevation cuts, so it doubles as a preview while tuning them. Exports are unaffected — this is a way of looking, not a change to the terrain."
               checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
               <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
               <Sl label="Elev scale" min={-10} max={10} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
               <Sl label="Blur" min={0} max={10} step={0.1} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.1} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
               <Sl label="Elev min cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
               <Sl label="Elev max cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
             </div>
@@ -1741,14 +1741,14 @@ export function Sidebar({
 
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
             <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint} onBlackChange={v => st({ blackPoint: v })} onWhiteChange={v => st({ whitePoint: v })} />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px', marginTop:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px', marginTop:4 }}>
               <Sl label="Shadows" min={0} max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
               <Sl label="Highlights" min={1} max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
             </div>
           </Section>
 
           <Section title="View" open={sec.view} onToggle={() => tog('view')}>
-            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               {/* Four camera presets. The last one is the *view* Reset, which is
                   not the panel header's "Reset all" — the label is short because
                   the row is, so the scope lives in the title and the name. */}
@@ -1757,10 +1757,10 @@ export function Sidebar({
                 .map(([label, name, hint]) => (
                 <Btn key={name} block onClick={() => onCameraPreset(name)}
                   title={hint} aria-label={name === 'reset' ? 'Reset view' : hint}
-                  style={{ padding:'3px 0' }}>{label}</Btn>
+                  style={{ padding:'2px 0' }}>{label}</Btn>
               ))}
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 10px' }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
               <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
@@ -1775,7 +1775,7 @@ export function Sidebar({
                   {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
                     <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
                       style={{ 
-                        fontSize:10, padding:'2px 10px', border:`1px solid ${BORDER}`, borderRadius:3, 
+                        fontSize:10, padding:'2px 8px', border:`1px solid ${BORDER}`, borderRadius:3, 
                         background: (view.autoRotateDir ?? 1) === dir ? ACCENT_DEEP : SURF, 
                         color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
                       }}>
@@ -1790,11 +1790,11 @@ export function Sidebar({
               help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
             {view.showFrame && (
               <Sub>
-                <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:8 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                   <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
                   <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
                     onChange={e => sv({ framePaper: e.target.value })}
-                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
                     {['ISO','US','Ratio'].map(group => (
                       <optgroup key={group} label={group}>
                         {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
@@ -1851,7 +1851,7 @@ export function Sidebar({
                 <Tog label="Hypsometric fill" small checked={style.fillHypsometric} onChange={v => ss({ fillHypsometric: v })} />
                 {style.fillHypsometric && (
                   <Sub>
-                    <div style={{ display:'flex', gap:2, marginBottom:6 }}>
+                    <div style={{ display:'flex', gap:2, marginBottom:4 }}>
                       {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:10, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : BORDER}` }}>{m}</button>)}
                     </div>
                     <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
@@ -1865,9 +1865,9 @@ export function Sidebar({
                 active — fill or any draw mode. (The old `style.lineHypsometric`
                 check was a dead legacy key, so this only ever showed for fill.) */}
             {style.fillHypsometric || HYPSO_LAYER_IDS.some(id => style[`hypso${id}`]) ? (
-              <div style={{ marginBottom: 10, marginTop: 10 }}>
+              <div style={{ marginBottom: 8, marginTop: 8 }}>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => sg(GRADIENT_PRESETS[name])} style={{ padding:'3px 0' }}>{name}</Btn>)}
+                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => sg(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={sg} />
               </div>
@@ -1962,14 +1962,14 @@ export function Sidebar({
           <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
             {/* Roll a look. The seed is shown because it *is* the look — note it
                 down and the same roll comes back. */}
-            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               <button data-testid="surprise-me" onClick={handleSurprise} style={{
                 flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
                 borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
               }}>🎲 Surprise me</button>
               <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
                 style={{
-                  padding:'8px 10px', background: SURF, color: rollHistory.length ? DIM : MUTED,
+                  padding:'8px 8px', background: SURF, color: rollHistory.length ? DIM : MUTED,
                   border:`1px solid ${BORDER}`, borderRadius:5,
                   cursor: rollHistory.length ? 'pointer' : 'default', fontSize:11,
                   opacity: rollHistory.length ? 1 : 0.5,
@@ -1981,7 +1981,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'10px 0 6px', letterSpacing:1 }}>
+            <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>
               STYLES <span style={{ opacity:0.7, fontWeight:400 }}>({presetNames.length})</span>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
@@ -2014,7 +2014,7 @@ export function Sidebar({
                     <span style={{
                       display:'block', lineHeight:1.2,
                       ...(showThumb ? {
-                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 3px',
+                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 2px',
                         background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
                         color:'#f4f4f5', fontSize:10, textShadow:'0 1px 2px rgba(0,0,0,.9)',
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -2063,12 +2063,12 @@ export function Sidebar({
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPillars} onChange={v => ss({ spacingPillars: v })} />
                   <InlineSl label="Gap" min={0} max={20} step={0.5} value={style.pillarGap} onChange={v => ss({ pillarGap: v })} />
                   <InlineSl label="Depth" min={0} max={100} step={1} value={style.pillarDepth} onChange={v => ss({ pillarDepth: v })} />
-                  <div style={{ marginBottom: 6 }}>
+                  <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Shape</span>
-                    <div style={{ display: 'flex', gap: 3 }}>
+                    <div style={{ display: 'flex', gap: 2 }}>
                       {[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']].map(([label, val]) => (
                         <button key={val} onClick={() => ss({ pillarStyle: val })} style={{
-                          flex: 1, fontSize: 10, padding: '3px 0', borderRadius: 2,
+                          flex: 1, fontSize: 10, padding: '2px 0', borderRadius: 2,
                           background: (style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : SURF,
                           color: (style.pillarStyle ?? 'line') === val ? '#fff' : MUTED,
                           border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : BORDER}`,
@@ -2218,10 +2218,10 @@ export function Sidebar({
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical dot pattern." min={1} max={999} step={1} value={style.seedStipple ?? 42} onChange={v => ss({ seedStipple: v })} />
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
-                    <div style={{ display: 'flex', gap: 3 }}>
+                    <div style={{ display: 'flex', gap: 2 }}>
                       {[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']].map(([label, val]) => (
                         <button key={val} onClick={() => ss({ stippleDensityMode: val })} style={{
-                          flex: 1, fontSize: 10, padding: '3px 0', borderRadius: 2,
+                          flex: 1, fontSize: 10, padding: '2px 0', borderRadius: 2,
                           background: style.stippleDensityMode === val ? ACCENT_DEEP : SURF,
                           color: style.stippleDensityMode === val ? '#fff' : MUTED,
                           border: `1px solid ${style.stippleDensityMode === val ? ACCENT_DEEP : BORDER}`,
@@ -2306,7 +2306,7 @@ export function Sidebar({
                    enabled={vectorLayers?.length > 0}>
             {geoTiffElevMin == null ? (
               <div data-testid="vector-needs-geotiff">
-                <div style={{ fontSize:11, color: MUTED, lineHeight:1.55, marginBottom:9 }}>
+                <div style={{ fontSize:11, color: MUTED, lineHeight:1.55, marginBottom:8 }}>
                   Roads, water, rail, landuse, buildings, lifts and peaks are queried
                   from OpenStreetMap for the raster&rsquo;s own extent, and GPX tracks
                   and GeoJSON are draped over it. All of that needs to know where on
@@ -2317,7 +2317,7 @@ export function Sidebar({
                            border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
                   ↑ GeoTIFF
                 </button>
-                <div style={{ fontSize:10, color: MUTED, marginTop:6, lineHeight:1.5 }}>
+                <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.5 }}>
                   A PNG heightmap has no coordinates to hang them on.
                 </div>
               </div>
@@ -2392,7 +2392,7 @@ export function Sidebar({
                         {fa.isAnalyzing ? (
                           <div style={{ fontSize:10, color:MUTED, marginBottom:8 }}>Analysing… {fa.progress}%</div>
                         ) : fa.error ? (
-                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'5px 7px', marginBottom:6 }}>
+                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
                             {fa.error}
                           </div>
                         ) : null}
@@ -2401,11 +2401,11 @@ export function Sidebar({
                         ) : (
                           <>
                             {snd.fileName ? (
-                              <div style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
+                              <div style={{ fontSize:10, color:MUTED, marginBottom:4 }}>
                                 Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
                               </div>
                             ) : (
-                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'5px 7px', marginBottom:6 }}>
+                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
                                 No track loaded — the flock has nothing to listen to.
                               </div>
                             )}
@@ -2526,14 +2526,14 @@ export function Sidebar({
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && !style.showFill && (
-              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '5px 7px', marginBottom: 6 }}>
+              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
                 Fill is disabled — texture will not appear until Fill is enabled.
               </div>
             )}
             {style.showTexture && (
               <Sub>
                 <button className="hmload" onClick={handleTexturePicker} style={{ 
-                  width:'100%', padding:8, marginBottom:10, background: SURF, color: DIM, 
+                  width:'100%', padding:8, marginBottom:8, background: SURF, color: DIM, 
                   border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
                 }}>
                   {textureImage ? 'Change Texture' : '↑ Load Image'}
@@ -2544,7 +2544,7 @@ export function Sidebar({
                     <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
                     <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
                       <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
-                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'3px 6px', cursor:'pointer' }}>
+                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
                         <option value="normal">Normal</option>
                         <option value="multiply">Multiply</option>
                         <option value="screen">Screen</option>
@@ -2553,7 +2553,7 @@ export function Sidebar({
                         <option value="add">Add</option>
                       </select>
                     </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:10 }}>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                       <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
                       <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
                     </div>
@@ -2586,7 +2586,7 @@ export function Sidebar({
               <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
               <div />
             </div>
-            <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:14, opacity:0.7, lineHeight:1.4, marginBottom:10 }}>
+            <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:12, opacity:0.7, lineHeight:1.4, marginBottom:8 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
             <button onClick={() => ss({ 
@@ -2594,7 +2594,7 @@ export function Sidebar({
               showMirrorPlusY:true, showMirrorMinusY:false,
               showMirrorPlusZ:true, showMirrorMinusZ:false
             })} style={{ 
-              width:'100%', padding:'6px 0', background: SURF, color: DIM, 
+              width:'100%', padding:'4px 0', background: SURF, color: DIM, 
               border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
             }}>Reset Symmetry</button>
           </Section>
@@ -2610,7 +2610,7 @@ export function Sidebar({
             >↑ Audio (MP3 / WAV / OGG / M4A)</button>
 
             {snd.error && (
-              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'6px 8px', marginBottom:8 }}>
+              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
                 {snd.error}
               </div>
             )}
@@ -2643,7 +2643,7 @@ export function Sidebar({
                   onSeek={snd.seek}
                 />
 
-                <div style={{ display:'flex', gap:6, alignItems:'center', marginBottom:8 }}>
+                <div style={{ display:'flex', gap:4, alignItems:'center', marginBottom:8 }}>
                   <button
                     data-testid="soundscape-play"
                     onClick={snd.toggle}
@@ -2659,7 +2659,7 @@ export function Sidebar({
                 </div>
 
                 <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:6, letterSpacing:1 }}>ANALYSIS</div>
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>ANALYSIS</div>
                   <div style={{ display:'flex', gap:2, marginBottom:8 }}>
                     {[1024, 2048, 4096].map(n => (
                       <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
@@ -2681,7 +2681,7 @@ export function Sidebar({
                   <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
                     min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
 
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'10px 0 6px', letterSpacing:1 }}>STREAM</div>
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>STREAM</div>
                   <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
                     min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
                   <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
@@ -2696,12 +2696,12 @@ export function Sidebar({
                     spectrogram is only one answer; the others fold the track so
                     its structure — repeats, sections, groove — becomes relief. */}
                 <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:6, letterSpacing:1 }}>WHOLE TRACK</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:6 }}>
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>WHOLE TRACK</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:4 }}>
                     {TRACK_PROJECTIONS.map(pj => (
                       <button key={pj.id} data-testid={`projection-${pj.id}`}
                         onClick={() => snd.setOpts({ projection: pj.id })}
-                        style={{ fontSize:10, padding:'5px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
+                        style={{ fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
                           background: projection.id === pj.id ? ACCENT_DEEP : SURF,
                           color: projection.id === pj.id ? '#fff' : MUTED,
                           border:`1px solid ${projection.id === pj.id ? ACCENT_DEEP : BORDER}` }}>{pj.label}</button>
@@ -2729,7 +2729,7 @@ export function Sidebar({
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
                   style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
                 >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
-                <div style={{ fontSize:10, color: MUTED, marginTop:6, lineHeight:1.4 }}>
+                <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.4 }}>
                   {snd.frozen
                     ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
                     : `Pauses playback and writes the entire track as one static heightmap — the ${projection.label} projection above. Useful for erosion, STL and SVG, which need a terrain that holds still.`}
@@ -2748,17 +2748,17 @@ export function Sidebar({
               <InlineSl label="Deposition" help="Speed of sediment drop." min={0.01} max={1} step={0.01} value={eDeposit} onChange={v => setEDeposit(v)} fmt={v => v.toFixed(2)} />
               <InlineSl label="Evaporation" help="Droplet shrinkage rate." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
             </Sub>
-            <div style={{ display:'flex', gap:6 }}>
+            <div style={{ display:'flex', gap:4 }}>
               <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
               <button onClick={handleUndoErosion} disabled={!lastPixels || isEroding} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: (lastPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (lastPixels && !isEroding) ? 1 : 0.5 }}>Undo</button>
             </div>
           </Section>
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
-            <div style={{ display:'flex', gap:5, marginBottom:6 }}>
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               <ExpBtn label="SVG" hint="1" onClick={onSvg} /><ExpBtn label="PNG" hint="2" onClick={onPng} /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} /><ExpBtn label="STL" hint="4" onClick={onStl} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:5, marginBottom:6 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
               <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
@@ -2769,13 +2769,13 @@ export function Sidebar({
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}
           <Section title="Analysis" open={sec.analysis} onToggle={() => tog('analysis')}>
-            <div style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
+            <div style={{ fontSize:10, color:MUTED, marginBottom:4 }}>
               Click two points on the terrain to sample a cross-section.
             </div>
             <button
               onClick={() => onProfileMode?.(!profileMode)}
               style={{
-                width:'100%', padding:'7px 0', borderRadius:5, cursor:'pointer', fontSize:11,
+                width:'100%', padding:'8px 0', borderRadius:5, cursor:'pointer', fontSize:11,
                 background: profileMode ? '#1d4ed8' : SURF,
                 color: profileMode ? '#fff' : '#a1a1aa',
                 border: `1px solid ${profileMode ? '#3b82f6' : BORDER}`,
@@ -2788,11 +2788,11 @@ export function Sidebar({
           </Section>
 
           {/* ── Stats ─────────────────────────────────────────────────────── */}
-          <div style={{ padding:'10px 14px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
+          <div style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
             <div>Segments: {segs} · Verts: {verts}</div>
             <div>Triangles: {tris} · Grid: {grid}</div>
             {geoTiffElevMin != null && geoTiffElevMax != null && (
-              <div style={{ marginTop:3, color: MUTED }}>
+              <div style={{ marginTop:2, color: MUTED }}>
                 Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m
                 &nbsp;(Δ {Math.round(geoTiffElevMax - geoTiffElevMin)} m)
               </div>
@@ -2801,7 +2801,7 @@ export function Sidebar({
                 frozen soundscape both clear geoTiffCRS, so this line stays absent
                 for them rather than claiming a CRS they do not have. */}
             {geoTiffCRS && (
-              <div style={{ marginTop:1, color: crsInfo.supported ? MUTED : '#f97316', wordBreak:'break-word' }}>
+              <div style={{ marginTop:2, color: crsInfo.supported ? MUTED : '#f97316', wordBreak:'break-word' }}>
                 Projection: {crsDisplayName(geoTiffCRS, geoTiffCRSName)}
                 {crsInfo.accuracy === 'guess'   && ' · assumed UTM'}
                 {crsInfo.accuracy === 'approx'  && ' · datum shift not applied'}

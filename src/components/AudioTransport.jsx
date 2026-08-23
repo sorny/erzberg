@@ -24,7 +24,7 @@ const fmt = (sec) => {
 }
 
 const btn = (extra = {}) => ({
-  padding: '4px 7px', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+  padding: '4px 8px', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
   borderRadius: 3, cursor: 'pointer', fontSize: 10, lineHeight: 1, ...extra,
 })
 
@@ -58,7 +58,7 @@ export function AudioTransport({ fa }) {
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
         <button data-testid="flock-audio-play" onClick={fa.toggle} title="Play / pause  (space)"
           style={btn({ background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? '#fff' : DIM,
                        borderColor: fa.isPlaying ? ACCENT : BORDER, minWidth: 26 })}>
@@ -88,7 +88,7 @@ export function AudioTransport({ fa }) {
         style={{ width: '100%' }}
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
         <span ref={timeRef} data-testid="flock-audio-time"
           style={{ fontSize: 10, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>0:00 / 0:00</span>
         <span style={{ fontSize: 10, color: MUTED, flex: 1, overflow: 'hidden',

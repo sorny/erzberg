@@ -72,7 +72,7 @@ export function EditPanel({
 
   const btn = (label, onClick, kind, testId) => (
     <button onClick={onClick} data-testid={testId} style={{
-      flex: 1, padding: '9px 0', borderRadius: 5, cursor: 'pointer',
+      flex: 1, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
       fontSize: 11, fontWeight: 600,
       background: kind === 'primary' ? ACCENT : SURF,
       color: kind === 'primary' ? '#fff' : DIM,
@@ -90,23 +90,23 @@ export function EditPanel({
         boxShadow: '-3px 0 16px rgba(0,0,0,.4)',
         fontFamily: 'system-ui,-apple-system,sans-serif',
       }}>
-        <div style={{ padding: '12px 14px 11px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
+        <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#F0EBE3' }}>edit</span>
             <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>CLIP HEIGHTMAP</span>
           </div>
           {filename && (
-            <div style={{ marginTop: 5, fontSize: 10, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <div style={{ marginTop: 4, fontSize: 10, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {filename}
             </div>
           )}
         </div>
 
-        <div id="hm-panel-body" style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '12px 14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 3, marginBottom: 12 }}>
+        <div id="hm-panel-body" style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '12px 12px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, marginBottom: 12 }}>
             {TOOLS.map(([label, id]) => (
               <button key={id} data-testid={`edit-tool-${id}`} onClick={() => setTool(id)} style={{
-                fontSize: 10, padding: '7px 0', borderRadius: 5, cursor: 'pointer',
+                fontSize: 10, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
                 background: tool === id ? ACCENT : SURF,
                 color: tool === id ? '#fff' : MUTED,
                 border: `1px solid ${tool === id ? ACCENT : BORDER}`,
@@ -116,7 +116,7 @@ export function EditPanel({
 
           <HelpBox text={HINTS[tool]} />
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>CROP</div>
+          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>CROP</div>
           <SegRow
             label="Aspect"
             testIdPrefix="edit-aspect"
@@ -125,18 +125,18 @@ export function EditPanel({
             value={aspect}
             onChange={setAspect}
           />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
             <NumField label="X" testId="edit-x" value={rect.x} min={0} max={srcWidth - 1}  onChange={(v) => setRect({ x: v })} />
             <NumField label="Y" testId="edit-y" value={rect.y} min={0} max={srcHeight - 1} onChange={(v) => setRect({ y: v })} />
             <NumField label="Width"  testId="edit-w" value={rect.w} min={1} max={srcWidth}  onChange={(v) => setRect({ w: v })} />
             <NumField label="Height" testId="edit-h" value={rect.h} min={1} max={srcHeight} onChange={(v) => setRect({ h: v })} />
           </div>
           <button data-testid="edit-full-extent" onClick={() => setRect({ x: 0, y: 0, w: srcWidth, h: srcHeight })} style={{
-            width: '100%', padding: '6px 0', background: SURF, color: MUTED,
+            width: '100%', padding: '4px 0', background: SURF, color: MUTED,
             border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 12,
           }}>Full extent</button>
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 6px', letterSpacing: 1 }}>SELECTION</div>
+          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>SELECTION</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
             <span>Shape</span>
             <span style={{ color: edit?.shape ? DIM : MUTED }}>
@@ -148,7 +148,7 @@ export function EditPanel({
           </div>
           {edit?.shape && (
             <button data-testid="edit-clear-shape" onClick={() => onChange({ rect, shape: null, feather })} style={{
-              width: '100%', padding: '6px 0', background: SURF, color: MUTED,
+              width: '100%', padding: '4px 0', background: SURF, color: MUTED,
               border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 8,
             }}>Clear shape</button>
           )}
@@ -161,7 +161,7 @@ export function EditPanel({
           />
 
           <div style={{
-            marginTop: 14, padding: '8px 10px', background: 'rgba(0,0,0,0.2)',
+            marginTop: 12, padding: '8px 8px', background: 'rgba(0,0,0,0.2)',
             border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
@@ -171,8 +171,8 @@ export function EditPanel({
           </div>
         </div>
 
-        <div style={{ padding: '10px 14px', borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <div style={{ padding: '8px 12px', borderTop: `1px solid ${BORDER}`, flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
             {btn('Apply', onApply, 'primary', 'edit-apply')}
             {btn('Cancel', onCancel, 'ghost', 'edit-cancel')}
           </div>
