@@ -7,6 +7,106 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-08-23
+
+### Added
+- **Single-line fonts for vector labels.** 49 stroke faces, behind a **Use
+  single-line font** toggle and a grouped picker on any point layer that letters
+  its features.
+
+  Every label face this app had was an *outline* font — Space Mono flattened to
+  contours — so a plotted letter is the edge of the letter and the pen goes round
+  each glyph twice, laying two lines down every stem and doubling them where
+  strokes meet. A single-line face is the skeleton instead: the Hershey 'A' is
+  three strokes to the outline 'A''s two closed contours. On the same pair of
+  labels the SVG's label layer comes out **4.07× smaller** (14.7 kB against
+  60.0 kB).
+
+  The faces are the Hershey originals and Evil Mad Scientist's EMS conversions
+  from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), plus the
+  [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) family —
+  the last of these drawn as single-line from the start rather than converted,
+  and carrying 423 glyphs against the collection's 216, which is the difference
+  between labelling *Präbichl* and not. Relief ships in two cuts: the original,
+  and Simon Cozens' **Pendot** fork, which redraws every dot in the font —
+  periods, colons, i and j tittles, the accents built on them — as a single short
+  stroke a pen can dab rather than a small circle it has to trace.
+
+  Two more groups sit alongside them. **ISO 3098** — regular and italic — is the
+  lettering standard for technical drawings, adopted in 1974: the only face here
+  that was specified for exactly the kind of drawing this app produces, rather
+  than drawn for something else and pressed into service. And three faces that
+  were born on a plotter: the **Commodore 1520**, the four-colour ballpoint
+  plotter sold for the C64, and the **Apple 410**, whose glyphs sit on a 16×16
+  lattice — both recovered from the machines' own ROMs, so their letterforms were
+  shaped by the same constraint this app exports for — together with
+  **DearPlotter**, which was drawn for pen plotters on purpose rather than by
+  necessity.
+
+  Licences travel with the data in `public/fonts/single-line/LICENSE.txt`: the
+  Hershey use-restriction requires its acknowledgement be distributed with the
+  font data; the EMS, Relief and DearPlotter faces are SIL OFL 1.1; ISO 3098 is
+  public domain; the Commodore 1520 is WTFPL and the Apple 410 MIT.
+
+  Two faces needed work beyond reformatting. ISO 3098 is built from elliptical
+  arcs — the standard defines the letterforms that way — so the build-time path
+  parser learned SVG's `A` command, endpoint parameterisation and all. And its
+  metrics had to be rebuilt rather than copied: the face reaches us from a
+  specimen sheet on Wikimedia Commons, so all 319 glyphs share one inherited
+  advance of 1100 units, which is the pitch of that sheet's grid. Against a mean
+  ink width of 437 that set text as `E r z b e r g`. The standard specifies its
+  own spacing in terms of cap height — letters `0.2h` apart, words `0.6h` — so
+  that is what the advances are now, and the strokes are untouched.
+
+  Unlike the outline faces, these are flattened at build time by
+  `npm run fonts:single-line` rather than sampled at runtime. The runtime sampler
+  would resample dead-straight strokes into hundreds of points only for
+  Douglas–Peucker to throw them away, and would have to *guess* where subpaths
+  break — which is the one thing a stroke font states outright, since every `M`
+  in it is the pen lifting.
+
+  Label fill is withdrawn while a stroke face is selected, and hidden in the
+  panel: `labelFill` triangulates a closed contour, and a centre line encloses
+  nothing.
+
+- **Outline labels export as editable `<text>`.** Exporting an SVG with labels on
+  used to write the lettering as paths, so a name could be re-coloured in
+  Inkscape but never retyped or respelled. Each label now leaves as a single
+  `<text>` element, in the face it was lettered in, positioned by an affine built
+  from three projected world points — so a perspective label keeps its
+  foreshortening without the size being computed twice.
+
+  It is still stroked and unfilled, like every other layer in this export: the
+  paths it replaces were the glyph outlines drawn in the label's own ink, and
+  filling instead would drop the stroke colour and weight and turn a stroke-only
+  label solid.
+
+  Two honest losses against the strokes it replaces. A run is depth-tested at its
+  origin only, so a name behind a ridge is present or absent rather than
+  disappearing letter by letter — the same bargain the flock's streaks take. And
+  a run whose origin falls off the page is dropped whole, where a stroke would
+  have been cut at the boundary.
+
+  This applies to outline faces only. A single-line face has no outline to
+  reconstruct and no installed font to set it in, so it keeps exporting strokes —
+  which is what a plotter wanted from it in the first place.
+
+### Changed
+- **The panel's spacing lands on a 4 px rhythm.** Twelve distinct margin values,
+  seven gaps and twelve paddings, none of them chosen against the others — 6 px
+  next to 8 px next to 5 px, because they were written months apart.
+
+  Rounded to the nearest multiple of four, ties down, with 2 kept as a sub-step
+  for hairline gaps. Ties round down because this panel's problem is length
+  rather than airiness: thirty-two sections over three and a half thousand
+  pixels, so where the scale was ambiguous the tighter step is the better
+  default. Margins go from twelve values to five, gaps from seven to three, and
+  the panel tightens by 48 px.
+
+  The injected CSS is deliberately untouched: it carries control geometry — a
+  3 px track inside a 19 px box, a 20 px help target, the thumb's −5 px margin —
+  which is mechanism rather than rhythm.
+
 ## [1.1.1] — 2026-08-22
 
 ### Fixed
