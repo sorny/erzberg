@@ -19,7 +19,7 @@
 
 Load a greyscale heightmap (8- or 16-bit PNG), a GeoTIFF, or an audio file, and
 render it as 3D line art, structural relief or an architectural sketch through
-fourteen independent draw modes. Export to SVG for a pen plotter, STL for a
+fifteen independent draw modes. Export to SVG for a pen plotter, STL for a
 printer, or 4K PNG for the wall.
 
 **Everything runs locally in your browser.** Your files never leave your
@@ -213,7 +213,7 @@ carry a seed — the same seed always reproduces the identical pattern, so a pie
 can be regenerated exactly.
 
 Every mode carries a small sample of its own marks in its panel header, so the
-list reads as fourteen ways of drawing rather than fourteen cartographic nouns.
+list reads as fifteen ways of drawing rather than fifteen cartographic nouns.
 
 **56 style presets** ship with the app, each a complete look: draw modes,
 colours, gradients and particle settings — shown as thumbnails rather than a

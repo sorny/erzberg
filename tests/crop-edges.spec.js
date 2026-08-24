@@ -66,6 +66,10 @@ async function measure(page, shape) {
       Engrave: { enabledEngrave: true, colorEngrave: '#000', angleEngrave: 45 },
       Flow:    { enabledFlow: true,    colorFlow: '#000' },
       Swiss:   { enabledSwiss: true,   colorSwiss: '#000' },
+      // Isophotes read the light rather than the ground, and light is a slope —
+      // so the step down into a hole is the brightest edge on the terrain and
+      // would ring the whole selection if the mask were not honoured.
+      Iso:     { enabledIso: true,     colorIso: '#000' },
     }
     const stats = { holes, relief }
     for (const [name, cfg] of Object.entries(modes)) {
@@ -95,7 +99,7 @@ test('a clipped selection does not fringe the draw modes with plunging strokes',
   expect(clipped.holes, 'the ellipse must actually clip the grid').toBeGreaterThan(500)
   expect(solid.holes, 'the plain rect crop is the control — no holes').toBe(0)
 
-  for (const mode of ['Lines', 'Cross', 'Engrave', 'Flow']) {
+  for (const mode of ['Lines', 'Cross', 'Engrave', 'Flow', 'Iso']) {
     expect(clipped[mode].segs, `${mode} must still draw`).toBeGreaterThan(50)
     // The pit is the only wall on this terrain and these modes step over it
     // rather than down it, so the honest count is zero.

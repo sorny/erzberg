@@ -251,6 +251,9 @@ export function useTerrainGeometry(p) {
     p.seedStipple, p.colorStipple,
     p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
     // Mode: Engraving
+    p.enabledIso, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso,
+    p.colorIso,
+    p.hypsoIso, p.hypsoModeIso, p.hypsoBandedIso, p.hypsoIntervalIso,
     p.enabledEngrave, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave,
     p.colorEngrave,
     p.hypsoEngrave, p.hypsoModeEngrave, p.hypsoBandedEngrave, p.hypsoIntervalEngrave,

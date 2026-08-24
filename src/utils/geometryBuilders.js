@@ -276,6 +276,7 @@ export function buildLineGeometry(terrain, p) {
     { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave) },
     { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
+    { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
   ]
 
   const finalLayers = []
@@ -1856,6 +1857,63 @@ function mulberry32(seed) {
   }
 }
 
+// ─── Illumination ────────────────────────────────────────────────────────────
+
+/**
+ * Per-cell darkness: 1 − Lambert illumination, tone-curved.
+ *
+ * The same light convention as the hillshade shader — azimuth 315° is NW, and
+ * the altitude is fixed at 45° — so a scene lit one way on screen is lit the
+ * same way in every mode that hatches by light.
+ *
+ * NoData is `-1` rather than 0. Zero is a legitimate darkness (fully lit), so a
+ * caller could not tell "bright" from "absent"; every reader here tests for the
+ * negative explicitly instead.
+ *
+ * `radius` pre-smooths the height field before differencing it. Illumination is
+ * a *derivative* of elevation, so unlike a contour it inherits every cell-scale
+ * bump the terrain has and amplifies it — the same reason Ridge and Curvature
+ * blur before taking their second derivatives. Engraving passes 0 and is
+ * unaffected: it thresholds the field, where noise costs a ragged stroke end,
+ * while Isophotes traces its level set, where noise costs a fractal.
+ *
+ * Shared by Engraving, which hatches where this exceeds a threshold, and
+ * Isophotes, which traces its level set.
+ */
+function lambertDarkness(terrain, sunAzimuth, gamma, elevScale, radius = 0) {
+  const { gridMask, rows, cols, scl } = terrain
+  // Mask-aware, or the step down to the zeros in NoData would read as a cliff
+  // and ring the whole selection with lines.
+  const grid = radius > 0
+    ? boxBlur(terrain.grid, cols, rows, radius, terrain.hasNoData ? gridMask : null)
+    : terrain.grid
+  const azRad  = ((sunAzimuth ?? 315) * Math.PI) / 180
+  const altRad = Math.PI / 4
+  const Lx = Math.cos(azRad) * Math.cos(altRad)
+  const Ly = Math.sin(altRad)
+  const Lz = Math.sin(azRad) * Math.cos(altRad)
+  const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
+  const gam = gamma ?? 1
+
+  const darkness = new Float32Array(rows * cols)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) { darkness[i] = -1; continue }
+      const b = grid[i]
+      const bL = (c > 0        && gridMask[i - 1])    ? grid[i - 1]    : b
+      const bR = (c < cols - 1 && gridMask[i + 1])    ? grid[i + 1]    : b
+      const bU = (r > 0        && gridMask[i - cols]) ? grid[i - cols] : b
+      const bD = (r < rows - 1 && gridMask[i + cols]) ? grid[i + cols] : b
+      const gx = (bR - bL) * dScale, gz = (bD - bU) * dScale
+      const inv = 1 / Math.sqrt(gx * gx + gz * gz + 1)
+      const lambert = Math.max(0, (-gx * Lx + Ly - gz * Lz) * inv)
+      darkness[i] = Math.pow(1 - lambert, gam)
+    }
+  }
+  return darkness
+}
+
 // ─── Engraving (illumination cross-hatch) ────────────────────────────────────
 
 /**
@@ -1873,33 +1931,7 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
   // Solid raster ⇒ plain bilinear; see buildAngleLines.
   const sMask = terrain.hasNoData ? gridMask : null
 
-  // Per-cell darkness from Lambert shading (same light convention as the
-  // hillshade shader: az 315° = NW, altitude fixed at 45°).
-  const azRad  = ((sunAzimuth ?? 315) * Math.PI) / 180
-  const altRad = Math.PI / 4
-  const Lx = Math.cos(azRad) * Math.cos(altRad)
-  const Ly = Math.sin(altRad)
-  const Lz = Math.sin(azRad) * Math.cos(altRad)
-  const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
-  const gam = gamma ?? 1
-
-  const n = rows * cols
-  const darkness = new Float32Array(n)
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      if (!gridMask[i]) { darkness[i] = -1; continue }  // -1 = NoData, never hatched
-      const b = grid[i]
-      const bL = (c > 0        && gridMask[i - 1])    ? grid[i - 1]    : b
-      const bR = (c < cols - 1 && gridMask[i + 1])    ? grid[i + 1]    : b
-      const bU = (r > 0        && gridMask[i - cols]) ? grid[i - cols] : b
-      const bD = (r < rows - 1 && gridMask[i + cols]) ? grid[i + cols] : b
-      const gx = (bR - bL) * dScale, gz = (bD - bU) * dScale
-      const inv = 1 / Math.sqrt(gx * gx + gz * gz + 1)
-      const lambert = Math.max(0, (-gx * Lx + Ly - gz * Lz) * inv)
-      darkness[i] = Math.pow(1 - lambert, gam)
-    }
-  }
+  const darkness = lambertDarkness(terrain, sunAzimuth, gamma, elevScale)
 
   const nLevels = Math.max(1, Math.min(4, Math.round(levels ?? 3)))
   const HATCH_OFFSETS = [0, 90, 45, 135]
@@ -1942,6 +1974,149 @@ function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma
         }
         inRun = ok
         prevC = fc; prevR = fr; prevE = elev
+      }
+    }
+  }
+
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Isophotes (illumination contours) ───────────────────────────────────────
+
+/**
+ * Lines of constant illumination.
+ *
+ * A contour joins points of equal *height*; an isophote joins points of equal
+ * *light*. They are the same construction over a different field, and they read
+ * completely differently on the page: a contour describes the ground as a
+ * surveyor does, in level steps, while an isophote wraps the terrain the way a
+ * reflection wraps a polished object — bunching where the surface turns away
+ * from the sun and opening out where it faces it. Neither Engraving nor Hachure
+ * gets there: both hatch *by* the light, and this draws the light itself.
+ *
+ * Three differences from Contours, all of them consequences of the field:
+ *
+ * - **The lines are not level.** A contour sits at one elevation and can be
+ *   emitted at a constant y. An isophote crosses elevations freely, so every
+ *   crossing is draped onto the surface with a masked bilinear tap.
+ * - **Levels are fractions of the light, not of the terrain.** Darkness runs
+ *   [0,1], so the levels are evenly spaced strictly inside it — at 0 or 1 the
+ *   whole field is on one side and nothing is drawn.
+ * - **NoData is a hole, not a shoreline.** Contours deliberately treat a masked
+ *   corner as lying below every level so isolines close along the edge of the
+ *   data. That is right for a coastline and wrong here: there is no illumination
+ *   where there is no ground, and an isophote drawn round the edge of a
+ *   selection would be describing the selection rather than the terrain. Cells
+ *   with any masked corner are skipped.
+ *
+ * Always chained. Marching squares emits in scan order, so consecutive segments
+ * in the buffer are unrelated — chaining is what makes a stroke a stroke, and it
+ * is also what lets the SVG exporter write each one as a single polyline.
+ */
+function buildIsophotes(terrain, p, levels, sunAzimuth, gamma, smoothing, radius) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const smooth = Math.max(0, Math.min(4, Math.round(smoothing ?? 0)))
+
+  const darkness = lambertDarkness(terrain, sunAzimuth, gamma, elevScale, Math.max(0, radius ?? 6))
+  const nLevels = Math.max(1, Math.min(24, Math.round(levels ?? 8)))
+
+  const positions = new F32List(), colors = new F32List()
+  const ex = _edgeX, ey = _edgeY, eid = _edgeId
+  const scratch = getChainScratch(rows * cols * 2)
+
+  for (let k = 0; k < nLevels; k++) {
+    const level = (k + 1) / (nLevels + 1)
+    const segE = new I32List(), segXY = new F64List()
+
+    for (let r = 0; r < rows - 1; r++) {
+      const row0 = r * cols, row1 = row0 + cols
+      for (let c = 0; c < cols - 1; c++) {
+        const d00 = darkness[row0 + c],     d10 = darkness[row0 + c + 1]
+        const d01 = darkness[row1 + c],     d11 = darkness[row1 + c + 1]
+        // Any corner without ground and the cell is not part of the field.
+        if (d00 < 0 || d10 < 0 || d01 < 0 || d11 < 0) continue
+
+        const idx = (d00 >= level ? 8 : 0) | (d10 >= level ? 4 : 0) |
+                    (d11 >= level ? 2 : 0) | (d01 >= level ? 1 : 0)
+        if (idx === 0 || idx === 15) continue
+
+        ex[0] = c + edgeLerp01(d00, d10, level); ey[0] = r
+        ex[1] = c + 1;                           ey[1] = r + edgeLerp01(d10, d11, level)
+        ex[2] = c + edgeLerp01(d01, d11, level); ey[2] = r + 1
+        ex[3] = c;                               ey[3] = r + edgeLerp01(d00, d01, level)
+
+        const base = (row0 + c) * 2
+        eid[0] = base                    // top    → H(r,   c)
+        eid[1] = (row0 + c + 1) * 2 + 1  // right  → V(r,   c+1)
+        eid[2] = (row1 + c) * 2          // bottom → H(r+1, c)
+        eid[3] = base + 1                // left   → V(r,   c)
+
+        const pairs = MARCHING_TABLE[idx]
+        for (let pi = 0; pi < pairs.length; pi += 2) {
+          const e0 = pairs[pi], e1 = pairs[pi + 1]
+          segE.push2(eid[e0], eid[e1])
+          segXY.push4(ex[e0], ey[e0], ex[e1], ey[e1])
+        }
+      }
+    }
+
+    if (segE.length === 0) continue
+    const chains = chainLevelSegments(segE.a, segXY.a, segE.length / 2, scratch)
+
+    for (const chain of chains) {
+      const pts = smooth > 0
+        ? simplifyFlat(
+            chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth),
+            SMOOTH_SIMPLIFY_EPS,
+          )
+        : chain.pts
+
+      /*
+       * Drape as we walk, carrying the previous point so a break in the surface
+       * — NoData under the tap, or a vertex outside the elevation cut — ends the
+       * stroke instead of drawing a chord across the hole.
+       *
+       * Every step is taken in unit cells even when the path skips further.
+       * Smoothing ends in a Douglas–Peucker pass, which is free to replace a
+       * curve with a chord up to nineteen cells long, and that chord is
+       * *horizontally* faithful but says nothing about the ground under it: the
+       * two ends drape onto the surface and the segment between them cuts
+       * through whatever lies in the way. Contours can decimate safely because
+       * they are level and a chord stays on the line; an isophote crosses the
+       * relief, so it has to be re-walked at the resolution the terrain is
+       * stored at. Measured on a clipped dome: max span 18.79 cells before,
+       * 1.41 — one diagonal grid edge — after.
+       */
+      let prevC = 0, prevR = 0, prevE = 0, inRun = false
+      let lastC = 0, lastR = 0
+      const step = (fc, fr) => {
+        const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+        const elev = (b - 0.5) * 100 * elevScale
+        const ok = b === b && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+        if (ok && inRun) {
+          positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
+                          fc * scl - halfW, elev, fr * scl - halfH)
+          const ci = Math.min(cols - 1, Math.max(0, Math.round(fc)))
+          const ri = Math.min(rows - 1, Math.max(0, Math.round(fr)))
+          const col = computeVertexColor(normElev(elev, minElev, maxElev),
+                                         gridSlopes[ri * cols + ci] / (maxSlope || 1), 0, p)
+          colors.pushRgb2(col)
+        }
+        inRun = ok
+        prevC = fc; prevR = fr; prevE = elev
+      }
+
+      for (let i = 0; i < pts.length; i += 2) {
+        const fc = pts[i], fr = pts[i + 1]
+        if (i === 0) { step(fc, fr) }
+        else {
+          const n = Math.max(1, Math.ceil(Math.hypot(fc - lastC, fr - lastR)))
+          for (let k = 1; k <= n; k++) step(lastC + (fc - lastC) * k / n,
+                                            lastR + (fr - lastR) * k / n)
+        }
+        lastC = fc; lastR = fr
       }
     }
   }

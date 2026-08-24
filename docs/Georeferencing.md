@@ -200,7 +200,7 @@ is what keeps recolouring one a frame rather than a worker rebuild. There is no
 hypsometric tint: a feature has no elevation of its own — OSM carries none and a
 GPX `<ele>` would disagree with the raster it is drawn on — so the tint could
 only read the ground underneath, which is a different thing from what the
-fourteen draw modes mean by it.
+fifteen draw modes mean by it.
 
 ### Individual features
 
@@ -320,7 +320,7 @@ symbol, the outline of the silhouette *is* the line drawing. The fill boundary o
 and crossbones is a skull and crossbones; its eye sockets and teeth are holes in the fill
 and come out as their own closed marks. A stroke set buys a lighter line and pays in
 vocabulary — the UI set used before this has no mountain, no volcano, no shelter, no
-viewpoint, which is precisely the vocabulary a terrain plot needs, and it has fourteen
+viewpoint, which is precisely the vocabulary a terrain plot needs, and it has fifteen
 kinds of arrow instead. Maki is 215 marks drawn for maps.
 
 The cost is real and bounded: tracing both sides of every limb roughly doubles the

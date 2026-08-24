@@ -19,7 +19,7 @@ allowed to cost anything.
                         ▼
   ┌──────────── geometry.worker ─────────────┐
   │  buildTerrain()       grid, slopes, bounds│
-  │  buildLineGeometry()  14 draw modes       │
+  │  buildLineGeometry()  15 draw modes       │
   │  buildVectorGeometry() draped features    │
   │  buildSurfaceGeometry() fill / depth mesh │
   └───────────────────────────────────────────┘
@@ -67,7 +67,7 @@ Vector layers sit here only for what moves their geometry — layer visibility,
 area fill, and which individual features are hidden — via `layerBuildKey`. Their
 colour, weight, opacity and dash are tier 2, which is the whole reason the layer
 panel feels live: a list of twenty OSM layers is something you recolour
-constantly, and each recolour must not cost a rebuild of all fourteen draw
+constantly, and each recolour must not cost a rebuild of all fifteen draw
 modes.
 
 **2. Re-render only (GPU uniforms).** Line weight, opacity, dash pattern, a

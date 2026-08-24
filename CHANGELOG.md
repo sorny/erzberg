@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Isophotes — a fifteenth draw mode.** Lines of constant *illumination*. A
+  contour joins points of equal height; an isophote joins points of equal light,
+  which is the same construction over a different field and reads nothing like it
+  on paper: the lines wrap the terrain the way a reflection wraps a polished
+  object, bunching where the surface turns away from the sun and opening out
+  where it faces it. Turning the Sun moves every line, which no other isoline in
+  this app does.
+
+  The Lambert field it traces is the one Engraving already hatches by, now shared
+  rather than written twice. Where Engraving *thresholds* that field, this
+  *traces its level set*.
+
+  Two things the mode needs that Contours does not, both consequences of
+  illumination being a **slope** rather than a height:
+
+  - **A Detail radius.** A normal is a derivative of elevation, so the field
+    inherits every cell-scale bump the DEM has and magnifies it — the same reason
+    Ridge and Curvature blur before differentiating. Measured on the reference
+    terrain, the level set runs to **1 386 994** segments at radius 0 and
+    **87 372** at 6: the difference between a solid black mass and a drawing.
+    The default is 6, and the control is exposed because crags and broad forms
+    want different answers.
+  - **A unit-cell drape.** An isophote is not level, so every vertex is draped
+    onto the surface. Smoothing ends in a Douglas–Peucker pass which may replace
+    a curve with a chord up to nineteen cells long, and such a chord is
+    horizontally faithful while saying nothing about the ground beneath it — its
+    two ends land on the surface and the segment cuts through the relief between
+    them. Contours may decimate safely because a chord stays on the line. The
+    walk now takes unit-cell steps: max span 18.79 cells → 1.41, one diagonal
+    grid edge, and no plunging strokes at a clipped edge.
+
+  NoData is a hole rather than a shoreline. Contours deliberately close isolines
+  along the edge of the data, which is right for a coastline; there is no
+  illumination where there is no ground, so an isophote drawn around a selection
+  would be describing the selection rather than the terrain.
+
+
 ## [1.2.0] — 2026-08-23
 
 ### Added

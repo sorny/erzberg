@@ -82,6 +82,7 @@ const SECTION_TERMS = {
   'Mode: Ridge':      'hessian crest eigenvalue peaks arete',
   'Mode: Valley':     'topographic position index tpi troughs gully',
   'Mode: Stipple Dots': 'dots density stochastic seed slope elevation pointillism',
+  'Mode: Isophotes':  'illumination contours constant light reflection lines sun isophote',
   'Mode: Engraving':  'copperplate illumination cross-hatch shadows stacked directions',
   'Mode: Curvature':  'streamlines principal direction field wrap shape',
   'Mode: Rock & Scree': 'swisstopo cliff hachures debris dots talus seed',
@@ -1322,7 +1323,7 @@ export function Sidebar({
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
-    modeEngrave: false, modeCurv: false, modeSwiss: false,
+    modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1515,6 +1516,7 @@ export function Sidebar({
       modeRidge:    !!newStyle.enabledRidge,
       modeValley:   !!newStyle.enabledValley,
       modeStipple:  !!newStyle.enabledStipple,
+      modeIso:      !!newStyle.enabledIso,
       modeEngrave:  !!newStyle.enabledEngrave,
       modeCurv:     !!newStyle.enabledCurv,
       modeSwiss:    !!newStyle.enabledSwiss,
@@ -2276,6 +2278,22 @@ export function Sidebar({
                   </div>
                 </Sub>
                 <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Isophotes" icon={<ModeMark kind="isophotes" />} open={sec.modeIso} onToggle={() => tog('modeIso')} enabled={style.enabledIso}>
+            <Tog label="Enabled" checked={style.enabledIso} onChange={v => ss({ enabledIso: v })} />
+            {style.enabledIso && (
+              <>
+                <Sub>
+                  <InlineSl label="Levels" help="How many lines of constant light to trace. A contour joins points of equal height; an isophote joins points of equal illumination, so the lines bunch where the surface turns away from the sun and open out where it faces it." min={1} max={24} step={1} value={style.levelsIso} onChange={v => ss({ levelsIso: v })} />
+                  <InlineSl label="Sun" help="Light azimuth. Turning it moves every line, because the lines *are* the light — unlike contours, which stay put whatever the sun does." min={0} max={360} step={5} value={style.sunAzimuthIso} onChange={v => ss({ sunAzimuthIso: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Contrast" help="Tone curve exponent. >1 pushes the lines toward the shadows; <1 spreads them onto the lit slopes." min={0.3} max={3} step={0.1} value={style.gammaIso} onChange={v => ss({ gammaIso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="How much the ground is smoothed before the light is measured off it. Illumination is a *slope*, not a height, so it inherits every bump the terrain has and magnifies it — at 0 the lines fracture into noise. Turn it down for crags, up for broad forms." min={0} max={12} step={0.5} value={style.radiusIso} onChange={v => ss({ radiusIso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Smoothing" help="Chaikin passes over each finished line. Rounds the staircase left by tracing a level set across grid cells." min={0} max={4} step={1} value={style.smoothingIso} onChange={v => ss({ smoothingIso: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Iso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fourteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fifteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -146,6 +146,55 @@ Both selections are by **magnitude**, not sign, so a mode does not change meanin
 
 A line claims a disc of **half** the seed pitch, not the full separation — claiming the full pitch makes adjacent seeds collide on their first step and chops every stroke into a stub.
 
+## 15. Isophotes
+
+Lines of constant *illumination*. A contour joins points of equal height; an
+isophote joins points of equal light, which is the same construction over a
+different field and reads nothing like it on the page: the lines wrap the terrain
+the way a reflection wraps a polished object, bunching where the surface turns
+away from the sun and opening out where it faces it.
+
+**The field.** Per-cell darkness is $D = (1 - \max(0, \mathbf{n}\cdot\mathbf{l}))^{\gamma}$
+— the same Lambert quantity Engraving (§12) hatches by, computed by the shared
+`lambertDarkness` helper against the same light convention as the hillshade
+shader (azimuth 315° = NW, altitude fixed at 45°). Where Engraving *thresholds*
+this field to decide stroke density, Isophotes *traces its level set*.
+
+**Pre-smoothing is not optional.** Illumination is a surface normal, and a normal
+is a derivative of elevation, so the field inherits every cell-scale bump the
+terrain has and amplifies it — the same reason Ridge (§9) and Curvature (§14)
+blur before differentiating. The `radius` parameter box-blurs the height field
+(mask-aware) before the normals are taken. On the reference terrain the level set
+runs to **1 386 994** segments at radius 0 and **87 372** at radius 6, which is
+the difference between a solid black mass and a drawing. The default is 6.
+
+**Levels** are a count, not an interval: darkness is a fraction rather than a
+measurement, so there is no natural unit to step by the way contours step by
+metres. $L$ levels sit at $k/(L+1)$ for $k = 1 \ldots L$ — strictly inside
+$(0,1)$, because at 0 or 1 the whole field lies on one side and nothing is drawn.
+
+**Chaining and draping.** Marching squares emits in scan order, so segments are
+chained into polylines (§4's `chainLevelSegments`) before anything else — that is
+what makes a stroke a stroke, and what lets the SVG exporter write each one as a
+single `<polyline>`. Optional Chaikin smoothing then rounds the staircase left by
+tracing a level set across grid cells.
+
+Unlike a contour, an isophote is **not level**: it crosses elevations freely, so
+every vertex is draped onto the surface with a masked bilinear tap, and the walk
+takes unit-cell steps even where the smoothed path skips further. That last part
+matters — smoothing ends in a Douglas–Peucker pass which may replace a curve with
+a chord up to nineteen cells long, and while such a chord is horizontally
+faithful it says nothing about the ground beneath it. Contours may decimate
+safely because a chord stays on the line; an isophote would cut through the
+relief.
+
+**NoData is a hole, not a shoreline.** Contours (§4) deliberately treat a masked
+corner as lying below every level so isolines close along the edge of the data.
+That is right for a coastline and wrong here: there is no illumination where
+there is no ground, and an isophote drawn around the edge of a selection would be
+describing the selection rather than the terrain. Cells with any masked corner
+are skipped.
+
 ---
 
 ## NoData and clipped edges
@@ -157,7 +206,7 @@ Edit Mode. `buildTerrain` records them in `gridMask` and stores $H = 0$ there.
 That zero is a trap, because 0 is not "absent": it is the darkest possible
 ground, and $(H - 0.5)\cdot 100 \cdot \text{elevScale}$ puts it at the very
 bottom of the scene. Reading it as terrain produces the artifact in three
-different shapes, and all fourteen modes now guard against it.
+different shapes, and all fifteen modes now guard against it.
 
 **Sampling — normalized bilinear.** Modes that drape themselves on *fractional*
 grid coordinates (Lines and Crosshatch at an oblique bearing, Engraving at every
@@ -199,7 +248,7 @@ data as shorelines rather than stopping short of it.
 
 ## Ghost Occlusion
 
-All fourteen modes share the same depth-ordering system.
+All fifteen modes share the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

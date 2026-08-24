@@ -73,6 +73,17 @@ export const STYLE_DEF = {
   stippleDensityMode: 'slope', stippleGamma: 1.2, stippleJitter: 0.8, seedStipple: 42,
   hypsoStipple: false, hypsoModeStipple: 'elevation', hypsoBandedStipple: false, hypsoIntervalStipple: 10,
   // Engraving (illumination cross-hatch)
+  // Isophotes — lines of constant illumination. `levels` is a count rather than
+  // an interval: darkness is a fraction, not a measurement, so there is no
+  // natural unit to step by the way contours step by metres.
+  // `radiusIso` defaults high because illumination is a slope rather than a
+  // height: measured off the raw DEM it fractures into noise. On the reference
+  // terrain the level set goes 1 386 994 segments at radius 0 to 87 372 at 6,
+  // which is where it stops being a black mass and starts being a drawing.
+  enabledIso: false, levelsIso: 8, sunAzimuthIso: 315, gammaIso: 1, smoothingIso: 1, radiusIso: 6,
+  colorIso: '#000000', weightIso: 1, opacityIso: 1, dashIso: 'solid',
+  hypsoIso: false, hypsoModeIso: 'elevation', hypsoBandedIso: false, hypsoIntervalIso: 10,
+
   enabledEngrave: false, spacingEngrave: 3, angleEngrave: 45, levelsEngrave: 3, sunAzimuthEngrave: 315, gammaEngrave: 1.5,
   colorEngrave: '#000000', weightEngrave: 1, opacityEngrave: 1, dashEngrave: 'solid',
   hypsoEngrave: false, hypsoModeEngrave: 'elevation', hypsoBandedEngrave: false, hypsoIntervalEngrave: 10,

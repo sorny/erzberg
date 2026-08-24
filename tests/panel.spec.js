@@ -31,7 +31,7 @@ test.describe('panel', () => {
 
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(32)
+    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(33)
   })
 
   test('a filtered-out section is hidden, not unmounted', async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe('panel', () => {
     await page.waitForTimeout(400)
     const inDom = await page.locator('[data-testid^="section-"]').count()
     const onScreen = await page.locator('[data-testid^="section-"]:visible').count()
-    expect(inDom).toBe(32)
+    expect(inDom).toBe(33)
     expect(onScreen).toBe(1)
   })
 

@@ -2,7 +2,7 @@
  * A sample of what each draw mode puts on paper, small enough to sit in a
  * section header.
  *
- * Fourteen rows reading MODE: ⟨cartographic noun⟩ are interchangeable to anyone
+ * Fifteen rows reading MODE: ⟨cartographic noun⟩ are interchangeable to anyone
  * who does not already know what a Strahler-order stream network looks like —
  * which is most people, and exactly the people browsing. Seeing the mark is the
  * whole point of the section, so the mark goes in the row rather than three
@@ -113,6 +113,18 @@ const MARKS = {
     </g>
   ),
   // Copperplate: parallel rules that thicken into the shadow.
+  // Lines of constant light. Nested like contours, but deliberately uneven:
+  // they crowd where the surface turns away from the sun and open out where it
+  // faces the sun, which is the whole difference from a level set of height.
+  isophotes: (
+    <g {...BASE}>
+      <path d="M2 1.5 C3.5 4.5, 3.5 8.5, 2 11.5" />
+      <path d="M4 1.5 C6 4.5, 6 8.5, 4 11.5" />
+      <path d="M6.5 1.5 C9 4.5, 9 8.5, 6.5 11.5" />
+      <path d="M10 1.5 C13 4.5, 13 8.5, 10 11.5" />
+      <path d="M15 1.5 C18.5 4.5, 18.5 8.5, 15 11.5" />
+    </g>
+  ),
   engraving: (
     <g {...BASE}>
       <path d="M1 2 L21 2"   strokeWidth="0.6" />

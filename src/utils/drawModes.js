@@ -62,6 +62,10 @@ export const DRAW_MODES = [
     pick: { spacing: [0.3, 1.2], gamma: [0.6, 2.2], jitter: [0.2, 1] },
   },
   {
+    id: 'Iso', label: 'Isophotes', cost: 2,
+    pick: { levels: [4, 12], gamma: [0.7, 1.8], smoothing: [0, 2], radius: [4, 9] },
+  },
+  {
     id: 'Engrave', label: 'Engraving', cost: 3,
     pick: { spacing: [2, 8], angle: [0, 180], levels: [2, 4], gamma: [0.8, 2.2] },
   },
