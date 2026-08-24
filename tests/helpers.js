@@ -15,7 +15,25 @@ export async function resetToDefaults(page) {
   // applies on top and the baseline is silently the opening look after all.
   await page.waitForSelector('[data-testid="jump-to-presets"]', { timeout: 20000 })
     .catch(() => {})   // a restored session means no opening preset is coming
-  await page.locator('button', { hasText: /^Reset all$/ }).click()
+
+  /*
+   * Wait for the control before pressing it, rather than letting `click()`
+   * auto-wait against whatever is left of the test budget.
+   *
+   * This has twice ended a run with `Test timeout of 60000ms exceeded — waiting
+   * for locator('button')…`, in different specs, which reads as though the app
+   * failed to render. It is worth knowing what that log did *not* say: there was
+   * no `locator resolved to` line and no `attempting click action`. A button
+   * covered by the computing overlay produces both of those, so the panel was
+   * genuinely not in the DOM yet — the app was still booting, twenty seconds
+   * after the preset wait above had already given up on it.
+   *
+   * Waiting here buys no extra budget; it makes the failure say which precondition
+   * was not met instead of blaming the click, and it fails fifteen seconds sooner.
+   */
+  const reset = page.locator('button', { hasText: /^Reset all$/ })
+  await reset.waitFor({ state: 'visible', timeout: 45_000 })
+  await reset.click()
   // The toast sits bottom-centre at a high z-index for nine seconds and would
   // swallow clicks aimed at anything under it.
   await page.locator('[data-testid="toast"] button[aria-label="Dismiss"]')

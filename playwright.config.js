@@ -30,6 +30,22 @@ export default defineConfig({
    * test starts and hides the contention, so a green parallel run is evidence about
    * the compile cache, not about concurrency being safe.
    */
+  /*
+   * One retry, for the machine rather than for the code.
+   *
+   * Three runs of this suite have failed on infrastructure in a single sitting,
+   * with three different signatures: twice the panel had not rendered inside the
+   * budget, once the browser process went away mid-`evaluate` (`Target page,
+   * context or browser has been closed`). None reproduced — each passed alone
+   * immediately afterwards — and no code change addresses a renderer that dies,
+   * which is why this is a retry and not a longer timeout.
+   *
+   * It does not hide regressions. A real one fails both attempts and the run is
+   * red; a retried pass is reported as **flaky**, not as green, so the count is
+   * still visible in the summary. If that number climbs, the answer is to look
+   * at the machine, not to raise this.
+   */
+  retries: 1,
   workers: 1,
   use: {
     headless: false,
