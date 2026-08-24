@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-08-24
+
+### Fixed
+- **A square-degree pixel is not square on the ground.** `gdalwarp -t_srs
+  EPSG:4326 -tr 0.0005 0.0005` on an Austrian DEM gives a cell 55 m north–south
+  and 37 m east–west, because a degree of longitude at 47°N is two thirds of a
+  degree of latitude. Nothing about the file is wrong — every GIS draws it
+  correctly — which is what makes it the renderer's job to notice.
+
+  The mesh lays one world unit per pixel on *both* axes, so the country came out
+  48% too wide, and the surface normals hillshade reads were tilted by the same
+  factor. Contours, the STL and the SVG all inherit that grid.
+
+  The correction therefore goes at the raster, before anything measures it. The
+  cell's real shape is worked out from the CRS — degrees through cos(lat) for
+  longitude and a near-constant 110 574 for latitude, projected units through the
+  file's declared linear unit, so a US survey foot grid does not read as oblong
+  — and the raster is resampled to whatever shape squares it up. Web Mercator
+  needs no special case: its 1/cos(lat) inflation applies to both axes at once,
+  so its cell stays square and only the ratio matters here. A 1% tolerance keeps
+  already-square files off the resample path entirely.
+
+  The *finer* axis is the one that shrinks. Stretching the coarser one instead
+  would keep every sample, at the price of inventing detail along the other and
+  paying up to 1/cos(lat) more memory for it — 1.5× in the Alps, 3× at 70°N —
+  and nothing isotropic downstream could use resolution that axis does not have.
+
+  The resample is an area mean rather than a nearest sample, because the Alpine
+  ratio is 1.474 and divides nothing evenly: rounding to whole rows steps visibly
+  on a ramp. NoData is kept out of the mean rather than averaged in — one -9999
+  folded into a neighbour drags a real 1000 m cell to -4500 and takes the whole
+  normalisation range with it — and a cell with no valid source at all comes out
+  NaN, which every NoData test in the loader already rejects.
+
+  The elevation-scale suggestion now reads the resampled column size rather than
+  the file's, since squaring the pixel changed how much ground a column covers
+  and that is the figure the suggestion turns on.
+
 ## [1.3.0] — 2026-08-24
 
 ### Changed
