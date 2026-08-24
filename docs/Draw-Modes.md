@@ -61,6 +61,13 @@ whole level first, and then every segment at that level is tested against every
 label box. This is what a printed sheet does: the number masks whatever lies
 under it, wherever it came from.
 
+The numbers carry their own ink — colour, weight and opacity — resolved at draw
+time like every other layer's. The colour defaults to the contours' so the labels
+match their lines until told otherwise; a red index elevation over grey contours
+is a normal thing for a sheet to do. This is the one draw-mode layer with a
+*flat* colour: every other is coloured per vertex from the hypsometric buffer,
+and a number is not at an elevation the way the line it sits on is.
+
 With a GeoTIFF loaded the label is metres. With a PNG the app has no idea what
 the brightness means, and the world elevation is the wrong answer there — it is
 centred on zero, so half an ordinary hill comes out negative. The label is then

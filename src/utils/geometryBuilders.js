@@ -103,8 +103,21 @@ export function layerStyle(id, p) {
     case 'Contours-Tanaka-Dark':
       return { weight: p.tanakaWeightDark ?? 0.5, opacity: p.opacityContours, dash: p.dashContours }
     case 'Contours-Labels':
-      // Always solid: a dashed numeral is not a numeral.
-      return { weight: p.labelWeightContours ?? 1, opacity: p.opacityContours, dash: 'solid' }
+      /*
+       * The one draw-mode layer that carries a flat colour.
+       *
+       * Every other one is coloured per vertex, hypsometrically or not, and the
+       * renderer reads that buffer. Lettering has no such buffer — a number is
+       * not at an elevation the way a contour is — so it took the `color || '#000000'`
+       * fallback and came out black whatever the contours were set to.
+       *
+       * `null` means "follow the contours", the same cascade the vector layers'
+       * ink uses: the numbers match their lines until told otherwise. Which is
+       * usually what is wanted, and occasionally exactly not — a red index
+       * elevation on grey contours is a normal thing for a sheet to do.
+       */
+      return { weight: p.labelWeightContours ?? 1, opacity: p.opacityContours, dash: 'solid',
+               color: p.labelColorContours ?? p.colorContours ?? '#000000' }
     case 'Gpx':
       return { weight: p.weightGpx, opacity: p.opacityGpx, dash: p.dashGpx }
     case 'Swiss-Rock':

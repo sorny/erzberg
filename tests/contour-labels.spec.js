@@ -221,3 +221,45 @@ test('no contour is drawn through a label, and clearance is adjustable', async (
   expect(wide.anchors, 'a wider clearance must cost some placements')
     .toBeLessThan(dflt.anchors)
 })
+
+test('labels carry their own ink, and follow the contours until they do', async ({ page }) => {
+  /*
+   * Every other draw-mode layer is coloured per vertex — the hypsometric buffer
+   * the renderer reads — and lettering has no such buffer, because a number is
+   * not at an elevation the way the line it sits on is. So it fell through to
+   * `color || '#000000'` and came out black whatever the contours were set to.
+   *
+   * The layer now resolves a flat colour of its own, defaulting to the contours'
+   * so the numbers match their lines until told otherwise. What is asserted is
+   * both halves of that: the inheritance, and the override.
+   */
+  await contoursOnly(page)
+  await page.locator('input[aria-label="Label heights"]').click({ force: true })
+  await page.waitForTimeout(2500)
+
+  // Bounded to the layer's own group: the next `<g id="layer-` begins the
+  // following one, and a window running past it reads the wrong layer's ink.
+  const inkOf = (svg, name) => {
+    const i = svg.indexOf(`<g id="layer-${name}"`)
+    if (i < 0) return 'MISSING'
+    const next = svg.indexOf('<g id="layer-', i + 1)
+    const m = svg.slice(i, next < 0 ? svg.length : next).match(/stroke="(#[0-9a-f]{6}|rgb\([^)]*\))"/)
+    return m ? m[1] : 'NO-STROKE'
+  }
+
+  expect(inkOf(await exportSvg(page), 'Contours-Labels'),
+    'the numbers start out in the contour colour').toBe('#000000')
+
+  const well = page.locator('[data-testid="contour-label-color"]')
+  await expect(well).toBeVisible()
+  await well.fill('#cc0000')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(2500)
+
+  const after = await exportSvg(page)
+  expect(inkOf(after, 'Contours-Labels'), 'and take an ink of their own').toBe('#cc0000')
+  // The lines are untouched. They are written per vertex as `rgb(...)`, which is
+  // the very reason the flat lettering needed a colour of its own.
+  expect(inkOf(after, 'Contours-Major'), 'the contours keep their own colouring')
+    .not.toBe('#cc0000')
+})

@@ -50,6 +50,8 @@ export const STYLE_DEF = {
   // labels; `labelSpacingContours` is how far apart along a contour, in the same
   // units, so both read against the terrain rather than against the screen.
   labelContours: false, labelSizeContours: 9, labelSpacingContours: 140, labelPadContours: 4,
+  // `null` follows the contour colour, like the vector layers' ink cascade.
+  labelColorContours: null,
   labelMajorOnlyContours: true, labelSingleLineContours: false, labelFontContours: 'HersheySans1',
   labelWeightContours: 1,
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,

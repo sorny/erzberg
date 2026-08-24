@@ -46,8 +46,7 @@ function contourFontKey(style) {
 /**
  * Builds the `Contours-Labels` layer, or null when there is nothing to letter.
  */
-function buildContourLabelLayer(anchors, style, font, elevMin, elevMax) {
-  const size = style.labelSizeContours ?? 9
+function buildContourLabelLayer(anchors, size, font, elevMin, elevMax) {
   const positions = []
   const textRuns = font.stroke ? null : []
 
@@ -130,6 +129,18 @@ export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax)
     return () => { alive = false }
   }, [fontKey, fonts])
 
+  /*
+   * Only what the *geometry* depends on: the em size and the face.
+   *
+   * `style` is a fresh object on every edit, so depending on it rebuilt every
+   * label on every slider drag anywhere in the panel — and the colour control
+   * below would have been the worst of them, redrawing the lettering on each
+   * frame of a drag to change something the renderer resolves at draw time.
+   * Colour, weight and opacity all reach these through `layerStyle`, which is
+   * the whole reason recolouring is a re-render rather than a rebuild.
+   */
+  const size = style?.labelSizeContours ?? 9
+
   return useMemo(() => {
     if (!fontKey || !Array.isArray(lineGeo)) return lineGeo
     const host = lineGeo.find((l) => l.labelAnchors?.length)
@@ -137,7 +148,7 @@ export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax)
     const font = fonts[fontKey]
     if (!font) return lineGeo
 
-    const built = buildContourLabelLayer(host.labelAnchors, style, font, geoTiffElevMin, geoTiffElevMax)
+    const built = buildContourLabelLayer(host.labelAnchors, size, font, geoTiffElevMin, geoTiffElevMax)
     if (!built) return lineGeo
 
     // Directly behind the contours it belongs to, not appended: `layerIndex`
@@ -149,5 +160,5 @@ export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax)
       if (entry === host) out.push(built)
     }
     return out
-  }, [lineGeo, fonts, fontKey, style, geoTiffElevMin, geoTiffElevMax])
+  }, [lineGeo, fonts, fontKey, size, geoTiffElevMin, geoTiffElevMax])
 }
