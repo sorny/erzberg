@@ -129,10 +129,13 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
   writeFileSync(path.join(OUT, 'export.svg'), svgBuf)
 
   // ── 5. Assert SVG structure ───────────────────────────────────────────────
-  const lineCount = (svgText.match(/<line /g) || []).length
-  console.log(`SVG line element count: ${lineCount}`)
+  // Both stroke elements: connected strokes are joined into `<polyline>` on
+  // export, so counting only `<line>` would measure the leftovers rather than
+  // the drawing and pass on a nearly empty file.
+  const lineCount = (svgText.match(/<line |<polyline /g) || []).length
+  console.log(`SVG stroke element count: ${lineCount}`)
 
-  // Must contain many lines, not just one
+  // Must contain many strokes, not just one
   expect(lineCount).toBeGreaterThan(50)
   // Must have a viewBox
   expect(svgText).toContain('viewBox')
@@ -336,4 +339,96 @@ test('Cancel abandons an export without writing a file', async ({ page }) => {
     page.keyboard.press('Digit1'),
   ])
   expect(dl.suggestedFilename()).toMatch(/\.svg$/)
+})
+
+/** Exports an SVG via the hotkey and returns its text. */
+async function exportSvgText(page) {
+  // The export hotkey is a window listener that ignores events aimed at an
+  // INPUT, so focus has to leave the sidebar first.
+  await page.locator('canvas').first().click({ position: { x: 5, y: 5 } })
+  const dl = page.waitForEvent('download', { timeout: 120_000 })
+  await page.keyboard.press('Digit1')
+  let svg = ''
+  for await (const chunk of await (await dl).createReadStream()) svg += chunk
+  return svg
+}
+
+/** Every segment drawn by the file, expanded back out of any polylines. */
+function drawnSegments(svg) {
+  let count = 0, length = 0
+  for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/g)) {
+    count++; length += Math.hypot(+m[3] - +m[1], +m[4] - +m[2])
+  }
+  const polylines = [...svg.matchAll(/<polyline points="([^"]+)"/g)]
+  for (const m of polylines) {
+    const pts = m[1].split(' ').map((p) => p.split(',').map(Number))
+    for (let i = 1; i < pts.length; i++) {
+      count++; length += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1])
+    }
+  }
+  return { count, length, polylines: polylines.length }
+}
+
+test('a continuous stroke exports as one polyline, losing nothing', async ({ page }) => {
+  /*
+   * A terrain line is one pen stroke, and nothing upstream treats it as one: the
+   * geometry is `LineSegments`, so it reaches the exporter as thousands of
+   * two-point pieces, and the occlusion walk cuts it again at every visibility
+   * transition. Written out one `<line>` each — which is what this used to do,
+   * 228 670 of them on the default scene — a plot of that file is a plot of
+   * thousands of separate paths, and a plotter lifts the pen between paths.
+   *
+   * What matters here is that joining them back is *lossless*. Fewer elements is
+   * the easy half and a wrong join would produce that too, so what is pinned is
+   * the expansion: every polyline broken back into segments must return the same
+   * count and the same total drawn length.
+   */
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  await setTilt(page)
+
+  const svg = await exportSvgText(page)
+  const { count, length, polylines } = drawnSegments(svg)
+  console.log(`joined: ${polylines} polylines carrying ${count} segments`)
+
+  expect(polylines, 'connected strokes must join into polylines').toBeGreaterThan(100)
+  // The point of the change: far fewer elements than the segments they carry.
+  expect(polylines * 20, 'a polyline must carry many segments on average').toBeLessThan(count)
+  expect(count, 'joining must not drop or invent geometry').toBeGreaterThan(50_000)
+  expect(length, 'nor change how much ink lands on the page').toBeGreaterThan(1000)
+
+  /*
+   * `fill="none"` on every group holding a polyline. A `<line>` has no interior
+   * so these groups never needed it; a `<polyline>` does, and the initial SVG
+   * fill is black — without this each joined stroke plots as a filled
+   * silhouette. It is the one way this could fail while still producing a
+   * perfectly plausible element count.
+   */
+  const polyGroups = [...svg.matchAll(/<g ([^>]*)>(?=[^<]*<polyline)/g)].map((m) => m[1])
+  expect(polyGroups.length).toBeGreaterThan(0)
+  for (const g of polyGroups) expect(g, 'a polyline group must not fill').toContain('fill="none"')
+})
+
+test('a dashed layer still exports as separate pieces', async ({ page }) => {
+  // Dashes are cut into on-pieces by `splitDashSegment` before they are written,
+  // so they are genuinely disconnected and must not be rejoined — doing so would
+  // draw the gaps back in.
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  await setTilt(page)
+
+  // Mode: Lines is the one draw-mode section open by default.
+  const lines = page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ }).first()
+  await lines.getByRole('button', { name: 'dashed', exact: true }).click()
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(1500)
+
+  const svg = await exportSvgText(page)
+  const layer = svg.match(/<g id="layer-Lines"[\s\S]*?<\/g>\s*<\/g>/)?.[0] ?? ''
+  expect(layer, 'the dashed Lines layer must export').not.toBe('')
+  expect((layer.match(/<line /g) || []).length,
+    'a dashed stroke stays in pieces').toBeGreaterThan(100)
+  expect(layer, 'and is never joined into a polyline').not.toContain('<polyline')
 })

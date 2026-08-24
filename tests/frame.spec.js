@@ -146,6 +146,16 @@ test('a framed SVG export contains nothing outside the page', async ({ page }) =
   for (const m of svg.matchAll(/<line x1="([-\d.]+)" y1="([-\d.]+)" x2="([-\d.]+)" y2="([-\d.]+)"/g)) {
     note(+m[1], +m[2]); note(+m[3], +m[4])
   }
+  // Polylines carry the overwhelming majority of the drawing — connected
+  // strokes are joined into one element on export — so a scan that reads only
+  // `<line>` would check a few hundred coordinates out of a quarter of a
+  // million and report a clean page it never actually looked at.
+  for (const m of svg.matchAll(/<polyline points="([^"]+)"/g)) {
+    for (const pt of m[1].split(' ')) {
+      const [x, y] = pt.split(',')
+      note(+x, +y)
+    }
+  }
   for (const m of svg.matchAll(/<circle cx="([-\d.]+)" cy="([-\d.]+)"/g)) note(+m[1], +m[2])
 
   console.log(`framed export: ${n} coordinates, ${outside} outside, page ${vw}×${vh}, x ${minX.toFixed(1)}..${maxX.toFixed(1)}`)
@@ -174,7 +184,7 @@ test('framing off leaves the export exactly as it was', async ({ page }) => {
     const c = []; s.on('data', x => c.push(x)); s.on('end', () => res(Buffer.concat(c).toString())); s.on('error', rej)
   }))
   expect(svg).toContain('viewBox')
-  expect((svg.match(/<line /g) || []).length).toBeGreaterThan(50)
+  expect((svg.match(/<line |<polyline /g) || []).length).toBeGreaterThan(50)
   const [, vw, vh] = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number)
   // The unframed viewBox follows the content, which on the default terrain is
   // nothing like A3.

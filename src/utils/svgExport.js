@@ -15,6 +15,21 @@ import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
 
+/**
+ * How close two screen-space endpoints must be to count as the same pen stroke.
+ *
+ * Serves two readers. The occlusion walk uses it to keep a dash pattern flowing
+ * across the many little segments one terrain line is cut into; the writer uses
+ * it to fold those same segments back into one `<polyline>`. Both are asking the
+ * same question — "did the pen ever leave the paper between these two?" — so
+ * they must not answer it differently, which is why this is one constant and not
+ * two.
+ *
+ * A pixel is the right scale: the segments being joined were split by a
+ * per-pixel depth buffer, so anything closer than that was never a real gap.
+ */
+const CONNECT_EPS = 1.0
+
 // ─── Software depth buffer (view-space Z) ─────────────────────────────────────
 
 /**
@@ -546,7 +561,6 @@ async function runExport({
       let visCumLen = 0, ghostCumLen = 0
       let visLastX = null, visLastY = null
       let ghostLastX = null, ghostLastY = null
-      const CONNECT_EPS = 1.0
 
       for (let s = 0; s < segCount; s++) {
         if ((s & STRIDE) === 0 && pacer.due()) {
@@ -828,7 +842,7 @@ async function runExport({
    * `array.map(…)` over a quarter of a million elements is itself a long block,
    * so the element strings are produced in paced chunks like everything else.
    */
-  const mapPaced = async (arr, fn) => {
+  const mapPaced = async (arr, fn, credit = arr.length) => {
     const out = new Array(arr.length)
     for (let i = 0; i < arr.length; i++) {
       if ((i & STRIDE) === 0 && pacer.due()) {
@@ -837,7 +851,10 @@ async function runExport({
       }
       out[i] = fn(arr[i])
     }
-    buildDone += arr.length
+    // `credit` is what the progress bar was promised, which is not always what
+    // this wrote: joining segments into polylines maps over fewer elements than
+    // `buildTotal` counted, and without it the bar stops short of full.
+    buildDone += credit
     return out
   }
 
@@ -897,10 +914,59 @@ async function runExport({
       continue
     }
 
+    /**
+     * Folds the segments back into the strokes they were cut from.
+     *
+     * One terrain line is a single pen stroke, but almost nothing downstream of
+     * the builder treats it as one: the geometry is `LineSegments`, so it
+     * arrives here as hundreds of independent two-point pieces, and the
+     * occlusion walk cuts it again at every visibility transition. Written out
+     * one `<line>` each, a plot of them is a plot of hundreds of separate
+     * paths — and a plotter lifts the pen between separate paths.
+     *
+     * Two segments continue the same stroke when the second starts where the
+     * first ended and both carry the same ink. The endpoint test is the same
+     * `CONNECT_EPS` the dash bookkeeping already trusts. The ink test is not
+     * optional: `stroke` is per segment, because a hypsometric layer changes
+     * colour along its length, and merging across a colour change would silently
+     * repaint part of the line. Contour segments at one level share a colour, so
+     * they still join into long runs.
+     */
+    const joinRuns = async (segs) => {
+      const runs = []
+      let run = null
+      for (let i = 0; i < segs.length; i++) {
+        if ((i & STRIDE) === 0 && pacer.due()) await pacer.yield()
+        const s = segs[i]
+        if (run && run.stroke === s.stroke &&
+            Math.hypot(s.x0 - run.x, s.y0 - run.y) <= CONNECT_EPS) {
+          run.pts.push(s.x1, s.y1)
+        } else {
+          if (run) runs.push(run)
+          run = { stroke: s.stroke, pts: [s.x0, s.y0, s.x1, s.y1] }
+        }
+        run.x = s.x1; run.y = s.y1
+      }
+      if (run) runs.push(run)
+      return runs
+    }
+
     const buildLineEls = async (segs) => {
       if (!dashSizes) {
-        return mapPaced(segs, ({ x0, y0, x1, y1, stroke }) =>
-          `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${stroke}"/>`)
+        const runs = await joinRuns(segs)
+        return mapPaced(runs, ({ pts, stroke }) => {
+          // A run of one is still a `<line>`: it is shorter than the equivalent
+          // two-point polyline, and it keeps the element every plotter and
+          // editor handles most simply.
+          if (pts.length === 4) {
+            return `<line x1="${(pts[0]-vx).toFixed(1)}" y1="${(pts[1]-vy).toFixed(1)}" x2="${(pts[2]-vx).toFixed(1)}" y2="${(pts[3]-vy).toFixed(1)}" stroke="${stroke}"/>`
+          }
+          let d = ''
+          for (let i = 0; i < pts.length; i += 2) {
+            d += `${i ? ' ' : ''}${(pts[i]-vx).toFixed(1)},${(pts[i+1]-vy).toFixed(1)}`
+          }
+          return `<polyline points="${d}" stroke="${stroke}"/>`
+        }, segs.length)
       }
       // A dashed segment expands to however many on-pieces the pattern gives it,
       // so this maps to arrays and flattens rather than one-for-one.
@@ -914,12 +980,15 @@ async function runExport({
     // Ghost pass (Hidden)
     if (layer.ghostSegs.length > 0) {
       const ghostEls = await buildLineEls(layer.ghostSegs)
-      inner.push(`<g stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`)
+      // `fill="none"` is load-bearing now that these groups can hold a
+      // `<polyline>`: a line has no interior, but a polyline does, and the
+      // initial fill is black — every joined stroke would paint as a solid.
+      inner.push(`<g fill="none" stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`)
     }
     // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
       const lineEls = await buildLineEls(layer.visibleSegs)
-      inner.push(`<g stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${lineEls.join('')}</g>`)
+      inner.push(`<g fill="none" stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${lineEls.join('')}</g>`)
     }
 
     layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)

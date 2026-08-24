@@ -1005,7 +1005,10 @@ test.describe('vector layers', () => {
     for await (const chunk of await download.createReadStream()) svg += chunk
     const group = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
     expect(group, 'the icon layer must still export').not.toBeNull()
-    expect(group[1]).toContain('<line')
+    // Stroked line art, in whichever element carries it: a mark whose outline
+    // runs unbroken joins into a `<polyline>`, and one that does not stays a
+    // `<line>`. What must never appear is a filled shape.
+    expect(group[1]).toMatch(/<line |<polyline /)
     expect(group[1]).not.toContain('<polygon')
 
     // Switching Fill off leaves the outline, which is what a plotter draws.
@@ -1522,7 +1525,7 @@ test.describe('vector layers', () => {
     // stroked in the label's own colour and weight, and never filled. Filling
     // would drop the stroke ink entirely and turn a stroke-only label solid,
     // and a filled glyph is triangles — this is a line-art format.
-    expect(group[1]).toMatch(/<text|<line/)
+    expect(group[1]).toMatch(/<text|<line |<polyline /)
     expect(group[1]).not.toContain('<polygon')
     const ink = group[0].match(/<g fill="none" stroke="(#[0-9a-f]{6})" stroke-width="([\d.]+)"/)
     expect(ink, 'the lettering must carry a stroke, not a fill').not.toBeNull()
@@ -1616,9 +1619,10 @@ test.describe('vector layers', () => {
 
     const asIcons = await peaksGroup()
     expect(asIcons.length).toBe(1)
-    // Its own pen layer name, and strokes — a plotter can draw this.
+    // Its own pen layer name, and strokes — a plotter can draw this. Either
+    // stroke element counts; what matters is that it is no longer a circle.
     expect(asIcons[0][1]).toContain('icons')
-    expect(asIcons[0][2]).toContain('<line')
+    expect(asIcons[0][2]).toMatch(/<line |<polyline /)
     expect(asIcons[0][2]).not.toContain('<circle')
   })
 
