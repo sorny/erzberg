@@ -925,15 +925,41 @@ function prepareContourLevels(terrain, p, interval) {
   // divide by zero into levelVal = 0/0 = NaN and lvlStep = Infinity, which makes
   // the caller's `for (k = kLo; k <= kHi; k++)` bound NaN and skip silently — the
   // same empty output, arrived at by accident and impossible to debug.
-  if (!elevScale) {
+  // A non-positive interval is the same kind of answer: the ladder below would
+  // be an infinite number of levels, which is an allocation, not a drawing.
+  if (!elevScale || !(step > 0)) {
     return { step, numSteps: 0, levelElev: EMPTY_F64, levelVal: EMPTY_F64,
              levelActive: EMPTY_U8, levelRgb: EMPTY_F32, lvlStep: 0 }
   }
 
-  // Use a small epsilon to ensure we catch 0.0 if the terrain starts there
-  const startElev = Math.ceil((minElev - 1e-7) / step) * step
-  const maxElevPossible = Math.ceil(maxElev / step) * step
-  const numSteps = Math.max(0, Math.floor((maxElevPossible - startElev) / step) + 1)
+  /*
+   * THE LADDER IS ANCHORED TO THE TERRAIN'S FLOOR, not to the multiples of
+   * `step` that happen to land in world elevation.
+   *
+   * World elevation is centred on zero and stretched by the exaggeration slider
+   * — `minElev` is `(minBrightness − 0.5) · 100 · elevScale` — so a ladder of
+   * multiples of `step` meets the ground at an offset that has nothing to do
+   * with the terrain. With the usual full-range raster at exaggeration 1 the
+   * ground runs −50…50, and a 30-unit interval puts its lowest line 20 units up:
+   * two thirds of an interval of valley floor with no contour in it at all.
+   * Change the interval, or nudge the exaggeration, and that offset jumps to
+   * some other fraction of a step — so the set of lines reshuffles instead of
+   * simply subdividing, and the numbers `useContourLabels` prints come out as
+   * 1, 5, 9 rather than the multiples of the interval it promises.
+   *
+   * Anchored at `minElev`: the bottom band is always exactly one interval thick,
+   * the levels are the same terrain-relative set at any exaggeration, and the
+   * labels read 0 at the floor and climb by the slider's own number.
+   *
+   * Level 0 sits *on* the floor. On solid ground it draws nothing — every corner
+   * is at or above it — because it is the datum the rest are counted from rather
+   * than a line; where the raster has NoData it draws the shoreline, the ground
+   * meeting the hole at its lowest.
+   */
+  const startElev = minElev
+  // The +1e-9 is for the top: a range that is an exact whole number of steps
+  // must not lose its last level to a division landing at 24.999999997.
+  const numSteps = Math.floor((maxElev - minElev) / step + 1e-9) + 1
 
   const levelElev = new Float64Array(numSteps)
   const levelVal = new Float64Array(numSteps)
@@ -941,8 +967,14 @@ function prepareContourLevels(terrain, p, interval) {
   const levelRgb = new Float32Array(numSteps * 3)
   for (let i = 0; i < numSteps; i++) {
     const elev = startElev + i * step
+    // The floor level is *tested* a hair below the ground it names (a millionth
+    // of an interval — invisible, and far above rounding). Exactly on the floor,
+    // a rounding error either way decides between "nothing to draw" and a
+    // hairline traced around every cell sitting at the minimum, which is the one
+    // place a large flat area — a lake bed, a quarry floor — is likely to be.
+    const testElev = i === 0 ? elev - step * 1e-6 : elev
     levelElev[i] = elev
-    levelVal[i] = elev / (100 * elevScale) + 0.5
+    levelVal[i] = testElev / (100 * elevScale) + 0.5
     levelActive[i] = inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) ? 1 : 0
     const col = computeVertexColor(normElev(elev, minElev, maxElev), 0, 0, p)
     levelRgb[i * 3] = col[0]; levelRgb[i * 3 + 1] = col[1]; levelRgb[i * 3 + 2] = col[2]
@@ -1180,8 +1212,14 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
 
       // Conservative level-index range (±1 slack for float safety); the exact
       // idx === 0 / 15 test below filters identically to the per-level scan.
-      const kLo = anyMasked ? 0 : Math.max(0, Math.floor((vmin - lvl0) / lvlStep))
-      const kHi = Math.min(numSteps - 1, Math.floor((vmax - lvl0) / lvlStep) + 1)
+      // Ordered by *index*, not by value: elevScale is signed, and a negative
+      // one runs the levels down the brightness range, so vmin maps to the high
+      // index and vmax to the low one. Reading them the other way round gave
+      // kLo > kHi for any cell spanning more than a level — an inverted terrain
+      // drew contours on its gentle ground and nothing at all on its cliffs.
+      const kA = (vmin - lvl0) / lvlStep, kB = (vmax - lvl0) / lvlStep
+      const kLo = anyMasked ? 0 : Math.max(0, Math.floor(Math.min(kA, kB)))
+      const kHi = Math.min(numSteps - 1, Math.floor(Math.max(kA, kB)) + 1)
 
       for (let k = kLo; k <= kHi; k++) {
         if (!levelActive[k]) continue
@@ -1399,8 +1437,11 @@ function buildContoursTanaka(terrain, p, interval) {
       if (m11) { v = grid[row1 + c + 1]; if (v < vmin) vmin = v; if (v > vmax) vmax = v }
       const anyMasked = !(m00 && m10 && m01 && m11)
 
-      const kLo = anyMasked ? 0 : Math.max(0, Math.floor((vmin - lvl0) / lvlStep))
-      const kHi = Math.min(numSteps - 1, Math.floor((vmax - lvl0) / lvlStep) + 1)
+      // Ordered by index rather than by value — a negative elevScale runs the
+      // levels down the brightness range (see buildContours).
+      const kA = (vmin - lvl0) / lvlStep, kB = (vmax - lvl0) / lvlStep
+      const kLo = anyMasked ? 0 : Math.max(0, Math.floor(Math.min(kA, kB)))
+      const kHi = Math.min(numSteps - 1, Math.floor(Math.max(kA, kB)) + 1)
 
       for (let k = kLo; k <= kHi; k++) {
         if (!levelActive[k]) continue

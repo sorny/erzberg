@@ -24,6 +24,19 @@ Major contours are identified by a phase-offset rule: a contour at elevation $e$
 
 When a GeoTIFF is loaded, contour intervals are expressed in the file's native elevation unit (metres).
 
+**Where the levels sit.** The ladder is anchored to the terrain's own floor:
+levels are at $\min + k \cdot \text{interval}$, so the bottom band is always
+exactly one interval thick, the same terrain-relative set of lines is drawn at
+any vertical exaggeration, and the labels are the multiples of the interval,
+reading 0 at the lowest ground. Level 0 sits on the floor itself: on solid ground
+it draws nothing — every corner is at or above it — and where the raster has
+NoData it draws the shoreline, the ground meeting the hole at its lowest.
+Anchoring instead to the multiples of the interval that fall in *world*
+elevation, which is what the app did before, left the lowest line an arbitrary
+fraction of an interval above the ground — at exaggeration 1 a 30-unit interval
+put it two thirds of an interval up, with the whole valley floor below it unlined
+— and reshuffled every level whenever the exaggeration slider moved.
+
 **Smoothing (form lines).** With smoothing enabled, each level's raw marching-squares segments are first chained into polylines, then refined by Chaikin corner-cutting: every pass replaces each vertex with two points at the $\tfrac14$ and $\tfrac34$ positions of its adjacent edges, converging toward a quadratic B-spline. Closed rings are smoothed as loops; open chains keep their endpoints pinned so border-anchored lines stay put. The result is the soft, hand-drawn "form line" look. Smoothing operates purely in the horizontal plane — each line stays at its constant contour elevation — and composes with the *Close contours* option (border-bridging segments are added after smoothing).
 
 **Labels.** With labelling on, each contour's height is printed *into* the line:
@@ -68,7 +81,9 @@ is a normal thing for a sheet to do. This is the one draw-mode layer with a
 *flat* colour: every other is coloured per vertex from the hypsometric buffer,
 and a number is not at an elevation the way the line it sits on is.
 
-With a GeoTIFF loaded the label is metres. With a PNG the app has no idea what
+With a GeoTIFF loaded the label is metres — read back through the histogram, not
+around it, since brightness 0 is wherever the Shadows handle sits rather than the
+file's lowest elevation. With a PNG the app has no idea what
 the brightness means, and the world elevation is the wrong answer there — it is
 centred on zero, so half an ordinary hill comes out negative. The label is then
 height above the lowest ground, which is non-negative and still spaced by exactly
