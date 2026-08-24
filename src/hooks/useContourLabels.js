@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { loadTextFont, fontStyleKey, singleLineKey, textPolylines } from '../utils/textGeometry'
+import { gridValueToMetres } from '../utils/geoCoords'
 
 /**
  * Letters the contour labels the worker reserved room for.
@@ -31,9 +32,13 @@ const BASELINE_LIFT = 0.35
  * both honest and readable — the bottom contour reads 0 and they climb from
  * there, spaced by exactly the interval the slider is set to.
  */
-function levelLabel(anchor, elevMin, elevMax) {
+function levelLabel(anchor, elevMin, elevMax, blackPoint, whitePoint) {
   if (elevMin == null || elevMax == null) return String(Math.round(anchor.rel))
-  return String(Math.round(elevMin + anchor.v * (elevMax - elevMin)))
+  // Through the histogram, not around it: `anchor.v` is a brightness the
+  // Shadows/Highlights handles have already clipped and restretched, so the file
+  // range alone would name the wrong metre — and by a different amount at each
+  // end, which is exactly the error a reader cannot see.
+  return String(Math.round(gridValueToMetres(anchor.v, elevMin, elevMax, blackPoint, whitePoint)))
 }
 
 /** The face a contour label is set in — the same key space as vector labels. */
@@ -46,12 +51,12 @@ function contourFontKey(style) {
 /**
  * Builds the `Contours-Labels` layer, or null when there is nothing to letter.
  */
-function buildContourLabelLayer(anchors, size, font, elevMin, elevMax) {
+function buildContourLabelLayer(anchors, size, font, elevMin, elevMax, blackPoint, whitePoint) {
   const positions = []
   const textRuns = font.stroke ? null : []
 
   for (const a of anchors) {
-    const text = levelLabel(a, elevMin, elevMax)
+    const text = levelLabel(a, elevMin, elevMax, blackPoint, whitePoint)
     const built = textPolylines(text, font)
     if (!built) continue
 
@@ -116,7 +121,8 @@ function buildContourLabelLayer(anchors, size, font, elevMin, elevMax) {
  * enough to hold a number, or while the face is still on the wire — a missing
  * font is a missing label, not a broken scene.
  */
-export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax) {
+export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax,
+                                 blackPoint = 0, whitePoint = 255) {
   const fontKey = style?.labelContours ? contourFontKey(style) : null
   const [fonts, setFonts] = useState({})
 
@@ -148,7 +154,8 @@ export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax)
     const font = fonts[fontKey]
     if (!font) return lineGeo
 
-    const built = buildContourLabelLayer(host.labelAnchors, size, font, geoTiffElevMin, geoTiffElevMax)
+    const built = buildContourLabelLayer(host.labelAnchors, size, font,
+                                        geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint)
     if (!built) return lineGeo
 
     // Directly behind the contours it belongs to, not appended: `layerIndex`
@@ -160,5 +167,5 @@ export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax)
       if (entry === host) out.push(built)
     }
     return out
-  }, [lineGeo, fonts, fontKey, size, geoTiffElevMin, geoTiffElevMax])
+  }, [lineGeo, fonts, fontKey, size, geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint])
 }

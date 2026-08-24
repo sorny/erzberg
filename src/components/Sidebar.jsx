@@ -8,7 +8,7 @@ import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import ErosionWorker from '../utils/erosion.worker?worker'
 import { HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
-import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, wgs84ExtentKm } from '../utils/geoCoords'
+import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, metresPerWorldUnit, wgs84ExtentKm } from '../utils/geoCoords'
 import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES } from '../utils/osmCategories'
 import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
 import { featureLabel, toggleHidden } from '../utils/vectorLayers'
@@ -1507,6 +1507,44 @@ export function Sidebar({
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
   const crsInfo     = classifyCRS(geoTiffCRS)
 
+  /*
+   * THE CONTOUR INTERVAL IN REAL METRES.
+   *
+   * The stored interval is in world units, because that is what the marching
+   * squares in the worker threshold against and what a preset written on a PNG
+   * means. But a slider labelled "(m)" has to be metres, and a world unit is
+   * only worth a metre by coincidence: it is the raster's elevation range,
+   * clipped by Shadows/Highlights, spread over 100 × the exaggeration.
+   *
+   * So the metres are *derived*, both ways — displayed from the stored value,
+   * and divided back out of whatever the user types. Nothing new is stored,
+   * which is what keeps presets, sessions and the worker out of it.
+   *
+   * The consequence, and it is a real one: the exaggeration slider is part of
+   * the conversion, so moving it re-reads this number (and moves the contours
+   * with it, exactly as it always has). The readout is never stale — it says
+   * what the lines on screen are actually worth — but it is not a setting that
+   * pins itself. The help text says so.
+   *
+   * `terrainData` is the built terrain rather than the panel's own state: its
+   * `elevScale` is the effective one (intrinsic + the user's offset), and its
+   * elevation range is what the raster actually holds after a crop, so the
+   * bounds below track the ground rather than a nominal full-range raster.
+   */
+  const mPerWorld = hasGeoTiff && terrainData
+    ? metresPerWorldUnit(geoTiffElevMin, geoTiffElevMax, terrainData.elevScale,
+                         terrain.blackPoint, terrain.whitePoint)
+    : null
+  const reliefM = mPerWorld ? (terrainData.maxElev - terrainData.minElev) * mPerWorld : 0
+  // Bounds from the relief, not fixed. A flat 0.1 m floor is a reasonable finest
+  // line on a quarry wall and 17 000 contours on an alpine sheet, so what the
+  // ends are pinned to is a *count* — about a thousand lines at one end, two at
+  // the other — which stays sensible on both.
+  const roundUp = (v) => Math.max(0.1, Math.ceil(v * 10) / 10)
+  const intervalMin = reliefM > 0 ? roundUp(reliefM / 1000) : 0.1
+  const intervalMax = reliefM > 0 ? Math.max(intervalMin + 0.1, Math.floor(reliefM * 5) / 10) : 100
+  const metreInterval = mPerWorld ? style.intervalContours * mPerWorld : 0
+
   const syncSectionsToStyle = (newStyle) => {
     setSec(prev => ({
       ...prev,
@@ -2148,8 +2186,12 @@ export function Sidebar({
             {style.enabledContours && (
               <>
                 <Sub>
-                  {hasGeoTiff ? (
-                    <InlineSl label="Interval (m)" min={0.1} max={100} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)+'m'} />
+                  {mPerWorld ? (
+                    <InlineSl label="Interval (m)" testId="contour-interval-m"
+                      help="Real ground metres, read through the raster's elevation range, the Shadows/Highlights handles and the current vertical exaggeration. The interval itself is kept in world units, so moving the exaggeration changes what it is worth on the ground — this number follows the lines rather than pinning them."
+                      min={intervalMin} max={intervalMax} step={0.1} value={metreInterval}
+                      onChange={v => ss({ intervalContours: v / mPerWorld })}
+                      fmt={v => (v >= 100 ? String(Math.round(v)) : v.toFixed(1)) + 'm'} />
                   ) : (
                     <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
                   )}

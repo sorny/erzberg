@@ -283,6 +283,44 @@ export function suggestElevScale(elevRange, pixelSize, crs, bbox, metresPerUnit 
   return Math.max(ELEV_SCALE_MIN, Math.min(ELEV_SCALE_MAX, +scale.toFixed(2)))
 }
 
+/**
+ * WHAT ONE WORLD ELEVATION UNIT IS WORTH ON THE GROUND.
+ *
+ * The renderer knows nothing about metres. A GeoTIFF's elevations are
+ * normalised to 0…1 on load, the histogram's Shadows/Highlights then clip and
+ * restretch that, and the mesh finally lays the result across `100 · elevScale`
+ * world units centred on zero. Three linear maps, and every one of them has a
+ * slider on it — which is why anything that wants to *say* metres has to ask
+ * here rather than assume the range it remembers.
+ *
+ * Returns null when the raster has no elevations of its own (a PNG heightmap),
+ * because there is no honest answer then, and the caller must say so rather
+ * than print a number.
+ */
+export function metresPerWorldUnit(elevMin, elevMax, elevScale, blackPoint = 0, whitePoint = 255) {
+  if (elevMin == null || elevMax == null) return null
+  // Signed scale, unsigned answer: a negative exaggeration turns the terrain
+  // upside down, and the distance between two contours is a distance either way.
+  const scale = Math.abs(elevScale ?? 0)
+  if (!(scale > 0) || !(elevMax > elevMin)) return null
+  const span = Math.max(1e-6, (whitePoint - blackPoint) / 255)
+  return ((elevMax - elevMin) * span) / (100 * scale)
+}
+
+/**
+ * What a grid brightness — 0…1 *after* the histogram — reads as on the raster.
+ *
+ * The inverse of the clip-and-restretch: brightness 0 is the Shadows handle, not
+ * the file's lowest elevation, so a raised handle moves what the whole ladder of
+ * numbers says. Everything below it is clamped flat onto that value, which is
+ * what the drawing shows too.
+ */
+export function gridValueToMetres(v, elevMin, elevMax, blackPoint = 0, whitePoint = 255) {
+  const bp = blackPoint / 255
+  const span = Math.max(1e-6, whitePoint / 255 - bp)
+  return elevMin + (bp + v * span) * (elevMax - elevMin)
+}
+
 /** Whether WGS84 features can be placed on this raster at all. */
 export function isProjectable(crs, bbox) {
   if (!bbox || bbox.length !== 4) return false

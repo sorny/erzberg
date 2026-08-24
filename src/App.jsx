@@ -1142,7 +1142,8 @@ export default function App() {
   // Contour labels are lettered here for the same reason the vector ones are:
   // the worker reserved the gaps and knows where the numbers go, but it has no
   // fonts and no idea what the raster's brightness means in metres.
-  const lineGeo = useContourLabels(vectorLabelled, style, geoTiffElevMin, geoTiffElevMax)
+  const lineGeo = useContourLabels(vectorLabelled, style, geoTiffElevMin, geoTiffElevMax,
+                                   terrain.blackPoint, terrain.whitePoint)
 
   // The overlay means "nothing has come back for a while", not "a build is in
   // flight". Keying it on isComputing alone breaks under a continuous stream:

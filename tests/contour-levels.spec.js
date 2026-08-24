@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
 
@@ -127,4 +128,127 @@ test('an inverted terrain still draws contours on its cliffs', async ({ page }) 
   // Inverted, it is the same scarp read the other way — not necessarily segment
   // for segment, but the same order of drawing, and emphatically not zero.
   expect(r.down, 'the scarp draws inverted').toBeGreaterThan(r.up * 0.5)
+})
+
+// ── The interval in metres ────────────────────────────────────────────────────
+
+const GEOTIFF = 'tests/testdata/geotiff.tif'
+
+/** Switches a draw mode's section toggle, by the section's own title. */
+async function setMode(page, title, on) {
+  const row = page.locator('#hm-panel-body > div').filter({ hasText: new RegExp(`^${title}`) }).first()
+  const tog = row.locator('label').first()
+  await tog.scrollIntoViewIfNeeded()
+  if ((await tog.locator('input').isChecked()) !== on) await tog.click({ force: true })
+}
+
+/** Exports an SVG and returns its text. */
+async function exportSvg(page) {
+  await page.locator('canvas').first().click({ position: { x: 5, y: 5 } })
+  const dl = page.waitForEvent('download', { timeout: 120_000 })
+  await page.keyboard.press('Digit1')
+  let svg = ''
+  for await (const c of await (await dl).createReadStream()) svg += c
+  return svg
+}
+
+test.describe('the interval slider says metres', () => {
+  test.skip(!existsSync(GEOTIFF), `${GEOTIFF} not present (gitignored) — see tests/testdata/README.md`)
+
+  /*
+   * The slider was labelled "(m)" and passed its number through as world units.
+   * A world unit is worth a metre only by coincidence: it is the file's
+   * elevation range, clipped by Shadows/Highlights, spread over 100 × the
+   * exaggeration. On this raster — 641…2350 m — the two differ by more than a
+   * factor of ten.
+   *
+   * What settles it is not the conversion but the drawing: with the slider at
+   * 100 m, the elevations the contours print must be 100 apart, in the file's
+   * own metres.
+   */
+  test('a 100 m interval prints elevations 100 m apart', async ({ page }) => {
+    test.setTimeout(240_000)
+    await page.goto(PAGE)
+    await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+    await resetToDefaults(page)
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.click('[data-testid="load-geotiff"]'),
+    ])
+    await chooser.setFiles(GEOTIFF)
+    await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
+
+    await setMode(page, 'Mode: Lines', false)
+    await page.getByText('Mode: Contours', { exact: true }).click()
+    await setMode(page, 'Mode: Contours', true)
+    await page.waitForTimeout(1500)
+
+    const slider = page.locator('[data-testid="contour-interval-m"]')
+    await expect(slider, 'a GeoTIFF gets the metre slider').toBeVisible()
+    await slider.fill('100')
+    // Every level lettered, so a gap in the numbers means a missing contour
+    // rather than a minor one.
+    await page.locator('input[aria-label="Major Every"]').fill('1')
+    await page.locator('input[aria-label="Label heights"]').click({ force: true })
+    await page.waitForTimeout(4000)
+
+    const svg = await exportSvg(page)
+    const nums = [...svg.matchAll(/<text[^>]*>(\d+)<\/text>/g)].map((m) => +m[1])
+    const uniq = [...new Set(nums)].sort((a, b) => a - b)
+    expect(uniq.length, 'several levels must be lettered').toBeGreaterThan(3)
+
+    // Real elevations off the file, not heights above the lowest ground.
+    expect(uniq[0], 'below the raster floor').toBeGreaterThanOrEqual(641)
+    expect(uniq[uniq.length - 1], 'above the raster ceiling').toBeLessThanOrEqual(2350)
+
+    // Every level is a whole number of intervals from the lowest one — ±1 for
+    // the rounding each printed number carries — and the closest pair is one
+    // interval apart, which is what says 100 rather than some multiple of it.
+    let closest = Infinity
+    for (const v of uniq) {
+      const off = (v - uniq[0]) % 100
+      expect(Math.min(off, 100 - off), `${v} is not a whole interval above ${uniq[0]}`).toBeLessThanOrEqual(1)
+    }
+    for (let i = 1; i < uniq.length; i++) closest = Math.min(closest, uniq[i] - uniq[i - 1])
+    expect(Math.abs(closest - 100), 'the interval itself must be 100 m').toBeLessThanOrEqual(1)
+  })
+
+  /*
+   * The conversion runs through the exaggeration, so the readout is not a
+   * setting that pins itself: raise the exaggeration and the same stored world
+   * interval covers less ground, which the number has to admit. Pinned here
+   * because the direction is the half that can be silently inverted — and a
+   * slider that read *more* metres as the terrain stretched would be worse than
+   * the bug this replaces.
+   */
+  test('the metre readout follows the exaggeration', async ({ page }) => {
+    test.setTimeout(120_000)
+    await page.goto(PAGE)
+    await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+    await resetToDefaults(page)
+
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.click('[data-testid="load-geotiff"]'),
+    ])
+    await chooser.setFiles(GEOTIFF)
+    await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
+
+    await page.getByText('Mode: Contours', { exact: true }).click()
+    await setMode(page, 'Mode: Contours', true)
+    await page.waitForTimeout(1500)
+
+    const slider = page.locator('[data-testid="contour-interval-m"]')
+    await slider.fill('100')
+    await page.waitForTimeout(2000)
+    const before = parseFloat(await slider.inputValue())
+    expect(before, 'the slider holds what it was set to').toBeCloseTo(100, 0)
+
+    await page.locator('input[aria-label="Elev scale"]').fill('4')
+    await page.waitForTimeout(3000)
+    const after = parseFloat(await slider.inputValue())
+    expect(after, 'a taller terrain makes a world unit worth fewer metres').toBeLessThan(before)
+    expect(after, 'and it is still a real interval').toBeGreaterThan(0)
+  })
 })

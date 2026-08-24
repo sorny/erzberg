@@ -22,7 +22,23 @@ Isolines are computed with Marching Squares. The terrain is thresholded at each 
 
 Major contours are identified by a phase-offset rule: a contour at elevation $e$ is major if $\lfloor e / \text{majorInterval} \rfloor \neq \lfloor (e - \text{interval}) / \text{majorInterval} \rfloor$. Major and minor contours are written into separate layers so they can be styled independently.
 
-When a GeoTIFF is loaded, contour intervals are expressed in the file's native elevation unit (metres).
+**The interval, in metres.** With a GeoTIFF loaded the interval slider is in the
+file's own metres — converted, not assumed. A world elevation unit is worth a
+metre only by coincidence: it is the file's elevation range, clipped by the
+Shadows/Highlights handles, spread over $100 \times \text{elevScale}$ world
+units. `metresPerWorldUnit` is the one place that arithmetic lives, and the
+contour labels read the raster through its companion `gridValueToMetres`, so the
+number on the slider and the numbers printed into the lines cannot drift apart.
+
+The interval is *stored* in world units, which is what the marching squares
+threshold against and what a preset written on a PNG means. The metres are
+derived both ways — displayed from the stored value, divided back out of what
+the user sets — so nothing about presets, sessions or the worker changes. The
+consequence is that the exaggeration slider is part of the conversion: moving it
+changes what the interval is worth on the ground, and the readout follows the
+lines rather than pinning them. The slider's range follows the raster too, from
+about a thousand contours down to two, so a 40 m quarry and a 3 000 m mountain
+both get a usable slider.
 
 **Where the levels sit.** The ladder is anchored to the terrain's own floor:
 levels are at $\min + k \cdot \text{interval}$, so the bottom band is always
