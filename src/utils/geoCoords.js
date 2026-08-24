@@ -180,6 +180,74 @@ export function metresPerLonDegree(bbox) {
   return 111_320 * Math.max(0.05, Math.cos(midLat * Math.PI / 180))
 }
 
+/**
+ * Mean metres per degree of latitude.
+ *
+ * Unlike its longitude counterpart this is very nearly a constant — 110 574 at
+ * the equator to 111 694 at the pole, 1% end to end — so one figure is ample for
+ * deciding what shape a pixel is.
+ */
+const METRES_PER_LAT_DEGREE = 110_574
+
+/**
+ * Ground size of one pixel, in metres, as `{ x, y }` — east–west, north–south.
+ *
+ * These are the same number less often than one would hope, and the gap is not
+ * small. A geographic raster's square *degree* pixel is not square on the
+ * *ground*: at 47°N a degree of longitude is 75 km against a degree of
+ * latitude's 111, so `gdalwarp -t_srs EPSG:4326 -tr 0.0005 0.0005` yields a cell
+ * 55 m tall and 37 m wide. Projected grids are usually square but are not
+ * required to be — `-tr 30 20` is legal.
+ *
+ * Web Mercator's ground distances are inflated by 1/cos(lat), but inflated
+ * *equally* in both axes, so its cell stays square and the un-corrected figures
+ * below carry the right ratio. Only the ratio is load-bearing.
+ *
+ * Returns null when the raster declares nothing to measure against.
+ */
+export function groundPixelSize(resX, resY, crs, bbox, metresPerUnit = 1) {
+  const ax = Math.abs(resX), ay = Math.abs(resY)
+  if (!(ax > 0) || !(ay > 0)) return null
+  const kind = classifyCRS(crs).kind
+  if (kind === 'none') return null
+  if (kind === 'geographic')
+    return { x: ax * metresPerLonDegree(bbox), y: ay * METRES_PER_LAT_DEGREE }
+  return { x: ax * metresPerUnit, y: ay * metresPerUnit }
+}
+
+/**
+ * The raster shape that would make one pixel square on the ground.
+ *
+ * The mesh lays one world unit per pixel on both axes — `c·scl − halfW` and
+ * `r·scl − halfH`, one `scl` — and the surface normals that hillshade reads are
+ * built from that same grid. So a cell that is 55 m one way and 37 m the other
+ * is not a subtle inaccuracy: it stretches the terrain by half its width and
+ * tilts every north–south slope. Correcting it at the raster is what keeps the
+ * one-unit-per-pixel assumption true everywhere downstream, rather than
+ * threading a second step through every builder, exporter and normal.
+ *
+ * The *finer* axis is the one that shrinks. Squaring up by stretching the
+ * coarser axis instead would preserve every sample, at the price of inventing
+ * detail along one of them and paying up to 1/cos(lat) more memory for it — 1.5×
+ * in the Alps, 3× at 70°N. Nothing isotropic downstream could use resolution the
+ * other axis does not have anyway, so the honest move is to meet at the coarser
+ * figure.
+ *
+ * Returns null when the pixel is already square, when the shape cannot be known,
+ * or when the correction would collapse an axis below `minPx`.
+ */
+export function squareGroundShape(width, height, ground, minPx = 2, tolerance = 0.01) {
+  if (!ground || !(width > 0) || !(height > 0)) return null
+  const { x, y } = ground
+  if (!(x > 0) || !(y > 0)) return null
+  if (Math.abs(y / x - 1) <= tolerance) return null
+
+  const newWidth  = x < y ? Math.max(minPx, Math.round(width * (x / y))) : width
+  const newHeight = y < x ? Math.max(minPx, Math.round(height * (y / x))) : height
+  if (newWidth === width && newHeight === height) return null
+  return { width: newWidth, height: newHeight }
+}
+
 export const ELEV_SCALE_MIN = 0.1
 export const ELEV_SCALE_MAX = 50
 

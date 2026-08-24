@@ -14,6 +14,53 @@
  */
 export const NODATA_SENTINEL_Y = -10000
 
+/**
+ * Area-average a raster onto a different grid, skipping NoData.
+ *
+ * Used to square up a pixel that is not square on the ground. Every destination
+ * cell covers an axis-aligned rectangle of source cells and takes their mean
+ * weighted by how much of each it actually overlaps, so a non-integer ratio
+ * (1.474, for a square-degree raster in the Alps) does not beat between keeping
+ * and dropping whole rows. A cell whose rectangle holds no valid source is NaN,
+ * which every `isNodata` here already rejects on the `!isFinite` test — the
+ * declared NoData value is deliberately not reused, since a raster that declares
+ * none would then have no fill to write.
+ *
+ * Downsampling only, in the sense that matters: the caller shrinks the finer
+ * axis rather than stretching the coarser one, so this never has to invent a
+ * value between two samples.
+ */
+export function areaResample(src, width, height, newWidth, newHeight, isNodata) {
+  const out = new Float32Array(newWidth * newHeight)
+  const sx = width / newWidth, sy = height / newHeight
+
+  for (let r = 0; r < newHeight; r++) {
+    const y0 = r * sy, y1 = y0 + sy
+    const ry0 = Math.floor(y0), ry1 = Math.min(height - 1, Math.ceil(y1) - 1)
+    for (let c = 0; c < newWidth; c++) {
+      const x0 = c * sx, x1 = x0 + sx
+      const rx0 = Math.floor(x0), rx1 = Math.min(width - 1, Math.ceil(x1) - 1)
+
+      let sum = 0, wsum = 0
+      for (let y = ry0; y <= ry1; y++) {
+        const wy = Math.min(y + 1, y1) - Math.max(y, y0)
+        if (wy <= 0) continue
+        const row = y * width
+        for (let x = rx0; x <= rx1; x++) {
+          const wx = Math.min(x + 1, x1) - Math.max(x, x0)
+          if (wx <= 0) continue
+          const v = src[row + x]
+          if (isNodata(v)) continue
+          const w = wx * wy
+          sum += v * w; wsum += w
+        }
+      }
+      out[r * newWidth + c] = wsum > 0 ? sum / wsum : NaN
+    }
+  }
+  return out
+}
+
 // Separable box blur: horizontal window mean per row, then vertical window mean
 // per column. Because the horizontal window (and its clamped count) depends only
 // on x, mean-of-means equals the 2D box mean exactly — identical output to an

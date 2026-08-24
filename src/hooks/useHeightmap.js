@@ -3,7 +3,8 @@
  */
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { suggestElevScale } from '../utils/geoCoords'
+import { groundPixelSize, squareGroundShape, suggestElevScale } from '../utils/geoCoords'
+import { areaResample } from '../utils/terrain'
 
 // ── Image (PNG / JPG) loader ─────────────────────────────────────────────────
 
@@ -272,10 +273,10 @@ async function loadGeoTiffPixels(file) {
   const arrayBuffer = await file.arrayBuffer()
   const tiff   = await fromArrayBuffer(arrayBuffer)
   const image  = await tiff.getImage()
-  const width  = image.getWidth()
-  const height = image.getHeight()
+  let width  = image.getWidth()
+  let height = image.getHeight()
   const rasters = await image.readRasters()
-  const band    = rasters[0]
+  let band      = rasters[0]
   // The file's declared NoData value, which the sentinel list cannot stand in
   // for: GDAL writes float DEMs with -3.4028235e+38, and only the *positive*
   // float max is a sentinel, so a void in such a raster would otherwise be read
@@ -286,6 +287,46 @@ async function loadGeoTiffPixels(file) {
   const nodataValue = Number.isFinite(parsed) ? parsed : null
 
   const isNodata = (v) => !isFinite(v) || (nodataValue !== null && v === nodataValue) || NODATA_SENTINELS.has(v)
+
+  // Extent and CRS, read before anything measures the raster: what shape the
+  // pixels are is a question about the projection, and the answer decides the
+  // grid everything below is built on.
+  let bbox = null, crs = 'EPSG:none', crsName = null, geoKeys = {}
+  try {
+    geoKeys = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
+    // A plain TIFF carries none of the three placement tags, and its "bounding
+    // box" is then just the pixel grid. The old default of EPSG:4326 turned that
+    // grid into a claim about lon/lat, so every GPX point landed off the raster.
+    const fd = image.fileDirectory
+    if (tiffTag(fd, 'ModelTiepoint') || tiffTag(fd, 'ModelPixelScale') || tiffTag(fd, 'ModelTransformation')) {
+      bbox = image.getBoundingBox()
+      crs  = detectCrsCode(geoKeys, bbox)
+      crsName = citationName(geoKeys)
+    }
+  } catch (_) { bbox = null; crs = 'EPSG:none'; crsName = null }
+
+  const metresPerUnit = LINEAR_UNITS[geoKeys.ProjLinearUnitsGeoKey] ?? 1   // feet → metres
+  let resolution
+  try { resolution = image.getResolution() } catch (_) { resolution = null }
+
+  // Square the pixel up on the ground before it becomes a grid. Everything
+  // downstream — the mesh, the surface normals hillshade reads, the contour
+  // chains, the STL — assumes one world unit per pixel on both axes, and a
+  // square-degree raster in the Alps breaks that assumption by half its width.
+  // Resampling here is what makes the assumption true rather than threading a
+  // second axis step through every consumer of it.
+  let squared = null
+  if (resolution) {
+    const ground = groundPixelSize(resolution[0], resolution[1], crs, bbox, metresPerUnit)
+    const shape  = squareGroundShape(width, height, ground)
+    if (shape) {
+      band = areaResample(band, width, height, shape.width, shape.height, isNodata)
+      squared = { from: [width, height], to: [shape.width, shape.height], ground }
+      width = shape.width; height = shape.height
+      console.log(`[GeoTIFF] ground pixel ${ground.x.toFixed(1)} × ${ground.y.toFixed(1)} m — ` +
+                  `resampled ${squared.from.join('×')} → ${squared.to.join('×')} to square it`)
+    }
+  }
 
   let min = Infinity, max = -Infinity
   for (let i = 0; i < band.length; i++) {
@@ -320,30 +361,18 @@ async function loadGeoTiffPixels(file) {
     }
   }
 
-  // Extract geographic extent and CRS for GPX coordinate projection.
-  let bbox = null, crs = 'EPSG:none', crsName = null, geoKeys = {}
-  try {
-    geoKeys = (image.getGeoKeys ? image.getGeoKeys() : image.geoKeys) ?? {}
-    // A plain TIFF carries none of the three placement tags, and its "bounding
-    // box" is then just the pixel grid. The old default of EPSG:4326 turned that
-    // grid into a claim about lon/lat, so every GPX point landed off the raster.
-    const fd = image.fileDirectory
-    if (tiffTag(fd, 'ModelTiepoint') || tiffTag(fd, 'ModelPixelScale') || tiffTag(fd, 'ModelTransformation')) {
-      bbox = image.getBoundingBox()
-      crs  = detectCrsCode(geoKeys, bbox)
-      crsName = citationName(geoKeys)
-    }
-  } catch (_) { bbox = null; crs = 'EPSG:none'; crsName = null }
-
   // Suggest a vertical exaggeration from the real-world pixel size. Classify by
   // CRS, NOT by magnitude: sub-metre lidar pixels are legitimately < 1 in metres,
   // so a "< 1 ⇒ degrees" test mis-scales them ~111320× and flattens the terrain
   // to the clamp floor. `suggestElevScale` owns the rest of the reasoning.
   let suggestedElevScale = null
   try {
+    // The *resampled* column size, not the file's: squaring the pixel above
+    // changed how much ground one column covers, and this is the figure the
+    // whole suggestion turns on.
     suggestedElevScale = suggestElevScale(
-      range, Math.abs(image.getResolution()[0]), crs, bbox,
-      LINEAR_UNITS[geoKeys.ProjLinearUnitsGeoKey] ?? 1,   // feet → metres
+      range, Math.abs(resolution[0]) * (squared ? squared.from[0] / squared.to[0] : 1),
+      crs, bbox, metresPerUnit,
     )
   } catch (_) {
     // Deliberately silent: the suggestion is a convenience, and a raster whose

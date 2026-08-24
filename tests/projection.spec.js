@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import {
-  bboxToWgs84, classifyCRS, crsDisplayName, featureCoverage, geoToPixel, isInvertible,
-  isProjectable, metresPerLonDegree, projectWgs84, suggestElevScale, unprojectWgs84,
-  wgs84ExtentKm,
+  bboxToWgs84, classifyCRS, crsDisplayName, featureCoverage, geoToPixel, groundPixelSize,
+  isInvertible, isProjectable, metresPerLonDegree, projectWgs84, squareGroundShape,
+  suggestElevScale, unprojectWgs84, wgs84ExtentKm,
 } from '../src/utils/geoCoords.js'
+import { areaResample } from '../src/utils/terrain.js'
 
 /**
  * GeoTIFF CRS handling, which nothing covered before.
@@ -379,6 +380,121 @@ test.describe('projectability gate', () => {
     expect(isProjectable('EPSG:32633', null)).toBe(false)
     expect(isProjectable('EPSG:32633', [0, 0, 0, 0])).toBe(false)
     expect(isProjectable('EPSG:32633', [0, 0, NaN, 10])).toBe(false)
+  })
+})
+
+/**
+ * Squaring the pixel on the ground.
+ *
+ * The bug: `gdalwarp -t_srs EPSG:4326 -tr 0.0005 0.0005` on an Austrian DEM
+ * gives a cell 55 m north–south and 37 m east–west, because a degree of
+ * longitude at 47°N is two thirds of a degree of latitude. The mesh lays one
+ * world unit per pixel on *both* axes, so the country came out 48% too wide, and
+ * the surface normals hillshade reads were tilted by the same factor. Nothing
+ * about the file is wrong — every GIS draws it correctly — which is what makes
+ * it the renderer's job to notice.
+ */
+test.describe('ground pixel shape', () => {
+  // The real case: austria_epsg4326.tif before it was rewarped.
+  const AT_BBOX = [9.5065, 46.244, 17.295, 49.141]
+
+  test('measures a square-degree pixel as the oblong it is', () => {
+    const g = groundPixelSize(0.0005, 0.0005, 'EPSG:4326', AT_BBOX)
+    expect(g.y).toBeCloseTo(55.29, 1)          // 0.0005° of latitude
+    expect(g.x).toBeCloseTo(37.46, 1)          // …of longitude, at 47.7°N
+    expect(g.y / g.x).toBeCloseTo(1.476, 2)    // the 48% the render was out by
+  })
+
+  test('leaves a square projected pixel alone', () => {
+    const g = groundPixelSize(10, 10, 'EPSG:32633', null)
+    expect(g).toEqual({ x: 10, y: 10 })
+    expect(squareGroundShape(1200, 700, g)).toBeNull()
+  })
+
+  test('converts a projected raster’s linear unit before comparing', () => {
+    // A US survey foot grid is square; the ratio must not depend on the unit.
+    const g = groundPixelSize(30, 30, 'EPSG:26918', null, 1200 / 3937)
+    expect(g.x).toBeCloseTo(g.y, 9)
+    expect(squareGroundShape(500, 500, g)).toBeNull()
+  })
+
+  test('catches a projected grid that is genuinely oblong', () => {
+    // -tr 30 20 is legal and this path should not be geographic-only.
+    const g = groundPixelSize(30, 20, 'EPSG:32633', null)
+    expect(squareGroundShape(900, 900, g)).toEqual({ width: 900, height: 600 })
+  })
+
+  test('shrinks the finer axis rather than stretching the coarser', () => {
+    const g = groundPixelSize(0.0005, 0.0005, 'EPSG:4326', AT_BBOX)
+    const shape = squareGroundShape(15577, 5794, g)
+    // East–west is the finer axis here, so columns go and rows stay put.
+    expect(shape.height).toBe(5794)
+    expect(shape.width).toBe(Math.round(15577 * (g.x / g.y)))
+    expect(shape.width).toBeLessThan(15577)
+    // And the result really is square on the ground, which is the whole point.
+    const after = groundPixelSize(0.0005 * 15577 / shape.width, 0.0005, 'EPSG:4326', AT_BBOX)
+    expect(after.x / after.y).toBeCloseTo(1, 3)
+  })
+
+  test('does nothing without a CRS to measure against', () => {
+    expect(groundPixelSize(1, 1, 'EPSG:none', null)).toBeNull()
+    expect(groundPixelSize(0, 1, 'EPSG:4326', AT_BBOX)).toBeNull()
+    expect(squareGroundShape(100, 100, null)).toBeNull()
+  })
+
+  test('ignores a difference too small to see', () => {
+    // Half a percent out. Resampling the whole raster to chase that would cost
+    // more than it fixes, and would re-grid files that are already square.
+    const g = groundPixelSize(1, 1.005, 'EPSG:32633', null)
+    expect(squareGroundShape(1000, 1000, g)).toBeNull()
+  })
+})
+
+/**
+ * The resample that does the squaring.
+ */
+test.describe('areaResample', () => {
+  const isNodata = (v) => !isFinite(v) || v === -9999
+
+  test('preserves a constant field exactly', () => {
+    const src = new Float32Array(60).fill(7)
+    const out = areaResample(src, 10, 6, 7, 6, isNodata)
+    expect(out).toHaveLength(42)
+    for (const v of out) expect(v).toBeCloseTo(7, 5)
+  })
+
+  test('averages by overlap, not by nearest sample', () => {
+    // Two source columns into one: the destination cell covers both equally.
+    const out = areaResample(new Float32Array([0, 10]), 2, 1, 1, 1, isNodata)
+    expect(out[0]).toBeCloseTo(5, 6)
+    // Three into two: the middle source is split 50/50 between the two outputs.
+    const thirds = areaResample(new Float32Array([0, 30, 60]), 3, 1, 2, 1, isNodata)
+    expect(thirds[0]).toBeCloseTo(10, 6)   // (0·1 + 30·0.5) / 1.5
+    expect(thirds[1]).toBeCloseTo(50, 6)   // (30·0.5 + 60·1) / 1.5
+  })
+
+  test('keeps NoData out of the mean instead of averaging it in', () => {
+    // The failure this guards: -9999 folded into a neighbouring average drags a
+    // real 1000 m cell to -4500 and takes the whole normalisation range with it.
+    const out = areaResample(new Float32Array([1000, -9999]), 2, 1, 1, 1, isNodata)
+    expect(out[0]).toBeCloseTo(1000, 6)
+  })
+
+  test('reports a wholly empty cell as NaN, which every isNodata already rejects', () => {
+    const out = areaResample(new Float32Array([-9999, -9999]), 2, 1, 1, 1, isNodata)
+    expect(Number.isNaN(out[0])).toBe(true)
+    expect(isNodata(out[0])).toBe(true)
+  })
+
+  test('holds a ramp’s shape through a non-integer ratio', () => {
+    // 1.474 is the Alpine case and divides nothing evenly. A resample that
+    // rounded to whole rows would step; an area mean stays monotone.
+    const n = 100
+    const src = Float32Array.from({ length: n }, (_, i) => i)
+    const out = areaResample(src, n, 1, Math.round(n / 1.474), 1, isNodata)
+    for (let i = 1; i < out.length; i++) expect(out[i]).toBeGreaterThan(out[i - 1])
+    expect(out[0]).toBeGreaterThan(0)
+    expect(out[out.length - 1]).toBeLessThan(n - 1)
   })
 })
 
