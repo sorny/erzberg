@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The SVG and STL exporters load on demand.** Both are pure opt-in paths and
+  both are already called behind a deferred boundary with the progress overlay
+  up, so there is no user gesture to lose. Entry chunk 1 447 → 1 427 kB raw,
+  418 → 410 kB gzipped.
+
+  That is a smaller win than expected, and the reason is worth writing down so it
+  is not re-investigated. Measured from a sourcemap build: of 3 493 kB of source
+  reaching the bundle, **three is 2 058 kB — 59%** — and React's runtime another
+  12%. Both are needed on first paint, because the app is a canvas.
+
+  three also cannot be trimmed from here. Since 0.16x it ships as two prebuilt
+  files rather than per-class modules, and its exports map offers only `"."`, so
+  the 725 modules under its `src/` are unreachable. As one enormous module it
+  barely tree-shakes — `AnimationMixer`, `AudioListener`, `PositionalAudio` and
+  `CubeCamera` are all in the output and nothing here uses any of them.
+
+  Which puts the ceiling on splitting app code at roughly 4%. The flock and the
+  audio pipeline are therefore left eager on purpose: a Suspense boundary inside
+  the canvas and a ref through `React.lazy` is real risk in the most
+  timing-sensitive code in the project, and it would buy two or three percent.
+  The reasoning now lives in `vite.config.js` beside the raised warning limit,
+  which says "this is expected" rather than silencing a problem.
+
 ### Fixed
 - **The flock's beat impulse no longer scales with frame rate.** `burst` is an
   envelope rather than an event — it stays above zero for several frames after an

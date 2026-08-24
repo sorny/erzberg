@@ -12,7 +12,6 @@ import { frameDelta } from '../utils/frameClock'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
-import { exportSVG } from '../utils/svgExport'
 import { OSM_ATTRIBUTION } from '../utils/osmFetch'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { VectorPicker } from './VectorPicker'
@@ -347,6 +346,12 @@ export function Scene({
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}
     setTimeout(async () => {
+      // Loaded on demand. The exporter carries the software Z-buffer, the dash
+      // splitter and the whole SVG writer, and a session that never presses
+      // Export should not pay for them on first paint. Safe here because the
+      // work is already deferred behind the overlay `beginExport` put up — there
+      // is no user gesture left to lose.
+      const { exportSVG } = await import('../utils/svgExport')
       const status = await exportSVG({
         // The export paces itself and reports where it is; both are how the page
         // survives a dense plate that used to block the main thread outright.

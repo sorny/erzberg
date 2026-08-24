@@ -33,7 +33,6 @@ import { layersFromSource, moveLayer, sourceRings } from './utils/vectorLayers'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
-import { exportSTL } from './utils/stlExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
@@ -1179,6 +1178,8 @@ export default function App() {
     setTimeout(async () => {
       let status = 'done'
       try {
+        // On demand, for the same reason as the SVG exporter above it.
+        const { exportSTL } = await import('./utils/stlExport')
         status = await exportSTL({
           surfaceGeo, terrain: terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p,
           baseName: exportBaseName,
