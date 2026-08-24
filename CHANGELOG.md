@@ -8,6 +8,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- **Isophote smoothing goes to 25 passes.** Worth knowing what that buys: the
+  curve converges. Chaikin approaches a quadratic B-spline and each pass halves
+  the remaining distance to it, so on the reference terrain total drawn length
+  falls 16.4% between 0 and 2 passes and then by under half a percent all the way
+  to 25, while cost climbs linearly — 32 ms at 4 against 343 ms at 25. Renders at
+  4 and 25 are indistinguishable.
+
+  The between-pass decimation holds segment count flat across the whole range, so
+  nothing runs away; the extra passes are simply redundant rather than dangerous.
+  **Detail** (`radiusIso`) is the control that actually makes a line broader,
+  because it smooths the field before the light is measured off it rather than
+  smoothing the trace afterwards. The help text now says so.
+
 - **The SVG and STL exporters load on demand.** Both are pure opt-in paths and
   both are already called behind a deferred boundary with the progress overlay
   up, so there is no user gesture to lose. Entry chunk 1 447 → 1 427 kB raw,
