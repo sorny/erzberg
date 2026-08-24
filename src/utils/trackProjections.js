@@ -112,7 +112,18 @@ export function onsetEnvelope(spec) {
  */
 export function detectBpm(flux, frameRate) {
   const minLag = Math.max(2, Math.floor((60 / 200) * frameRate))
-  const maxLag = Math.min(flux.length - 1, Math.ceil((60 / 60) * frameRate))
+  /*
+   * Every lag must correlate over at least half the signal.
+   *
+   * The score below divides by the overlap to keep long and short lags
+   * comparable, and that is right until the overlap gets small: at a lag of
+   * `flux.length - 1` it was averaging a single product and calling it a
+   * correlation. A clip only just longer than one beat period would then be
+   * handed a tempo decided by `maxLag` — that is, by the length of the clip
+   * rather than by anything in it. Halving the reach costs nothing real, since
+   * a tempo inferred from one or two cycles was never a measurement.
+   */
+  const maxLag = Math.min(Math.floor(flux.length / 2), Math.ceil((60 / 60) * frameRate))
   if (maxLag <= minLag) return 0
 
   let mean = 0
@@ -449,7 +460,16 @@ function applySparsity(s, frac) {
  */
 function buildWeave(spec, params, tone) {
   const cols = params.cols | 0
-  const bands = Math.max(1, params.bands | 0)
+  /*
+   * Bands only mean something for the spectrum.
+   *
+   * The onset envelope is one number per frame, so every sub-row of a lap would
+   * be handed the identical value — and because the row budget is split
+   * `WEAVE_MAX_ROWS / bands`, asking for more of them bought duplicate rows at
+   * the price of laps. The control did not merely do nothing there; it made the
+   * output worse. Pinned to one for this source, and the help text says so.
+   */
+  const bands = params.source === 'onset' ? 1 : Math.max(1, params.bands | 0)
   const beatsPerBar = Math.max(1, params.beatsPerBar | 0)
   const phase = params.phase ?? 0
   const frameRate = spec.sampleRate / spec.hop
@@ -762,7 +782,7 @@ export const TRACK_PROJECTIONS = [
       { key: 'phase', label: 'Phase', min: -1, max: 1, step: 0.01, value: 0, fmt: (v) => v.toFixed(2),
         help: 'Shifts the downbeat. Nudge it until the ridges stand upright.' },
       { key: 'bands', label: 'Bands', min: 1, max: 8, step: 1, value: 1,
-        help: 'Frequency sub-rows per fold unit. Above 1 the fold becomes a woven texture rather than a stripe chart.' },
+        help: 'Frequency sub-rows per fold unit. Above 1 the fold becomes a woven texture rather than a stripe chart. Applies to the Energy source only — an onset envelope is one number per frame, so it has no bands to split.' },
       { key: 'source', label: 'Source', type: 'seg', value: 'energy',
         options: [['Energy', 'energy'], ['Onsets', 'onset']],
         help: 'Energy weaves the spectrum; Onsets weaves only the attacks, which isolates the rhythm.' },

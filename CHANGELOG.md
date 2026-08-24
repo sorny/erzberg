@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **The flock's beat impulse no longer scales with frame rate.** `burst` is an
+  envelope rather than an event — it stays above zero for several frames after an
+  onset — so a fixed kick on each of them added up in proportion to how many
+  frames the machine happened to draw. Measured over one onset envelope:
+
+  |            |  30 Hz |  60 Hz | 144 Hz |
+  |------------|-------:|-------:|-------:|
+  | before     | 1074.3 | 1995.2 | 4574.4 |
+  | after      | 2148.7 | 1995.2 | 1906.0 |
+
+  A 144 Hz display hit the flock 2.29× as hard as a 60 Hz one for the same music,
+  against the 2.4× this was estimated at when it was first written down.
+
+  The impulse is now scaled by the frame time, normalised to 60 Hz so the tuned
+  values keep their meaning: 60 fps is unchanged and every other rate matches it.
+  The remaining spread is discretisation — a rectangle sum of a decaying ramp
+  sampled six times at 30 Hz against twelve at 60 — and shrinks as the rate
+  rises. Edge-triggering would also have removed the dependence, but it turns a
+  swell into a pop and would have meant retuning every burst value.
+
+- **`detectBpm` no longer scores long lags on almost no evidence.** The
+  autocorrelation divides by the overlap so long and short lags compare fairly,
+  which stops being true once the overlap is small: the ceiling of
+  `flux.length - 1` meant the longest lag averaged a *single* product and called
+  it a correlation, so a clip barely longer than one beat period was handed a
+  tempo decided by its own length. Every lag now correlates over at least half
+  the signal. A clean 120 BPM pulse still reads 120.
+
+- **Weave's Bands control no longer fights itself on the Onsets source.** An
+  onset envelope is one number per frame, so every frequency sub-row of a lap was
+  handed the identical value — and because the row budget is split
+  `WEAVE_MAX_ROWS / bands`, asking for more of them bought duplicate rows at the
+  price of laps. It did not merely do nothing there; it made the output worse.
+  Pinned to one for that source, with the help text saying so. Unchanged for
+  Energy, where bands are real.
+
 ### Added
 - **Contour labels.** Each contour's height, printed *into* the line: the contour
   stops, the number sits in the gap at the line's own angle, and the contour

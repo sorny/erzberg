@@ -584,10 +584,24 @@ export const ParticleSystem = forwardRef(function ParticleSystem({ terrain, p, a
     const dt = frameDelta(delta)
     if (flock) {
       const heard = listen(p, audioRef.current, audioLive, dt)
-      // Onsets are applied as a velocity impulse *before* the step, so the beat
-      // lands on this frame rather than being integrated in over the next few.
+      /*
+       * Onsets are applied as a velocity impulse *before* the step, so the beat
+       * lands on this frame rather than being integrated in over the next few.
+       *
+       * Scaled by the frame time, because `burst` is an envelope rather than an
+       * event: it stays above zero for several frames after an onset, and a
+       * fixed kick on each of them adds up in proportion to how many frames the
+       * machine happened to draw. A 144 Hz display delivered about 2.4x the
+       * impulse of a 60 Hz one for the same music.
+       *
+       * Normalised to 60 Hz rather than left in seconds so the existing values
+       * keep their meaning: at 60 fps this is exactly what it was before, and
+       * every other rate now matches it. `dt` is the clamped delta, so a stall
+       * cannot deliver one enormous kick either.
+       */
       if (heard.burst > 0 && flock.birds.n > 0) {
-        applyBurst(flock.birds, heard.burst * flockScales(flock.field, heard.params).cruise)
+        const impulse = heard.burst * flockScales(flock.field, heard.params).cruise
+        applyBurst(flock.birds, impulse * dt * 60)
       }
       // Sprite size and streak length are uniforms, so they carry no lag at all —
       // this is the half of the reaction that actually reads as being on the beat.
