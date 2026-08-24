@@ -945,9 +945,9 @@ function prepareContourLevels(terrain, p, interval) {
  * angle, and the contour resumes. That is what makes a sheet of nested curves
  * readable, and it is the one thing this app's contours have never done.
  *
- * Runs on the chained polyline, in grid units, and returns both halves of the
- * answer: `anchors` for the main thread to letter (the worker has no fonts), and
- * `cuts` — arclength spans this chain must not draw.
+ * Runs on the chained polyline, in grid units, and returns placements only.
+ * What gets erased for them is the caller's job, and is decided against every
+ * chain at the level rather than only this one — see the two passes there.
  *
  * Placement is by arclength rather than by vertex, so it does not bunch where
  * marching squares happened to emit points close together, and each candidate is
@@ -1004,7 +1004,7 @@ function placeContourLabels(pts, closed, spacing, gap) {
     return worst + Math.max(0, gap - len)
   }
 
-  const anchors = [], cuts = []
+  const anchors = []
   const first = closed ? gap : Math.max(gap, (total % spacing) / 2 + gap / 2)
   for (let s = first; s <= total - gap; s += spacing) {
     // Nudge to the straightest spot within a third of the spacing.
@@ -1026,10 +1026,10 @@ function placeContourLabels(pts, closed, spacing, gap) {
     // so no camera-relative rule would hold; this is the same convention a
     // north-up sheet uses.
     if (b[0] < a[0]) ang += Math.PI
+
     anchors.push({ c: m[0], r: m[1], angle: ang })
-    cuts.push(best - gap / 2, best + gap / 2)
   }
-  return anchors.length ? { anchors, cuts, cum } : null
+  return anchors.length ? anchors : null
 }
 
 function edgeLerp01(va, vb, level) {
@@ -1105,7 +1105,20 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
    * the same rounding, so the gap matches the number that lands in it.
    */
   const levelText = (k) => String(Math.round(levelElev[k] - minElev))
-  const labelGapFor = (text) => (text.length * 0.62 + 0.45) * labelEm
+  // Clearance either side of the digits, in world units like Size and Spacing.
+  // Explicit rather than the fudge factor it replaces: how much air a label
+  // wants is a matter of taste and of pen width, not something to hard-code.
+  const labelPadGrid = Math.max(0, p.labelPadContours ?? 4) / scl
+  const labelGapFor = (text) => text.length * 0.62 * labelEm + 2 * labelPadGrid
+  /*
+   * Half the height of the digits, plus the same clearance the sides get.
+   *
+   * Nominal, like the width: cap height is a property of the font, and the font
+   * is on the main thread. 0.36 em is a little over half the cap height of every
+   * face here, which is the right way to be wrong — the box is used to reject
+   * placements, so erring tall only moves a label along the contour.
+   */
+  const labelHalfHeightGrid = 0.36 * labelEm + labelPadGrid
 
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
@@ -1217,6 +1230,24 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
       const y = levelElev[k]
       const cr = levelRgb[k * 3], cg = levelRgb[k * 3 + 1], cb = levelRgb[k * 3 + 2]
 
+      /*
+       * Two passes, because a label has to mask every line at its level — not
+       * just the one it sits on.
+       *
+       * Cutting by arclength along the label's own chain is what the first
+       * version did, and it leaves two gaps. A contour that hairpins comes back
+       * within a few units of the digits while being a long way off along the
+       * curve, so nothing removed it; and a *different* chain at the same level
+       * — the far side of a narrow ridge, the next ring in a tight nest — was
+       * never considered at all. Measured on the reference terrain, 14 of 182
+       * labels had a contour drawn straight through them.
+       *
+       * So placements are collected first, and then every segment at this level
+       * is tested against every label box. That subsumes the arclength cut (the
+       * box *is* the gap), and it is what a printed sheet does: the number masks
+       * whatever lies under it, wherever it came from.
+       */
+      const prepared = []
       for (const chain of chains) {
         // Decimation only pays after smoothing: raw marching-squares points are
         // already minimal (one per grid-edge crossing), so there is nothing
@@ -1232,19 +1263,21 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
               SMOOTH_SIMPLIFY_EPS,
             )
           : chain.pts
-        const np = pts.length / 2
+        prepared.push({ pts, closed: chain.closed })
+      }
 
-        // Which levels get lettered. Labelling every minor contour is a page of
-        // numbers with a drawing behind it, so the default is the index
-        // contours only — which is what a printed sheet does.
-        const label = (wantLabels && (isMajor || !(p.labelMajorOnlyContours ?? true)))
-          ? placeContourLabels(pts, chain.closed, labelSpacingGrid, labelGapFor(levelText(k)))
-          : null
-        if (label) {
-          for (const a of label.anchors) {
-            // World coordinates, not grid: the hook that letters these has no
-            // reason to know the raster's cell size or centring, and the angle
-            // survives the conversion because both axes scale alike.
+      // Which levels get lettered. Labelling every minor contour is a page of
+      // numbers with a drawing behind it, so the default is the index contours
+      // only — which is what a printed sheet does.
+      const boxes = []
+      if (wantLabels && (isMajor || !(p.labelMajorOnlyContours ?? true))) {
+        const gap = labelGapFor(levelText(k))
+        for (const c of prepared) {
+          const placed = placeContourLabels(c.pts, c.closed, labelSpacingGrid, gap)
+          if (!placed) continue
+          for (const a of placed) {
+            boxes.push({ c: a.c, r: a.r, ca: Math.cos(a.angle), sa: Math.sin(a.angle),
+                         halfW: gap / 2, halfH: labelHalfHeightGrid })
             labelAnchors.push({ x: a.c * scl - halfW, z: a.r * scl - halfH,
                                 y, angle: a.angle, v: levelVal[k],
                                 // Height above the lowest ground, for a raster
@@ -1252,20 +1285,33 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
                                 rel: levelElev[k] - minElev })
           }
         }
+      }
 
-        for (let i = 0; i < np - 1; i++) {
-          // Skip the stretches reserved for lettering. Segments are about one
-          // grid edge long, so dropping a whole one errs a fraction of a
-          // character wide — and errs toward more air, which is the safe side.
-          if (label) {
-            const a = label.cum[i], b = label.cum[i + 1]
-            let cut = false
-            for (let ci = 0; ci < label.cuts.length; ci += 2) {
-              if (b > label.cuts[ci] && a < label.cuts[ci + 1]) { cut = true; break }
-            }
-            if (cut) continue
+      /**
+       * Is any of this segment under a label?
+       *
+       * Endpoints and midpoint, not a full clip. Segments here are about one
+       * grid edge long against a box several ems wide, so a segment crossing
+       * without any of the three landing inside would have to be longer than the
+       * box — and erring toward cutting is the safe direction anyway.
+       */
+      const masked = (x0, y0, x1, y1) => {
+        for (const b of boxes) {
+          for (let t = 0; t <= 2; t++) {
+            const px = x0 + (x1 - x0) * t / 2, py = y0 + (y1 - y0) * t / 2
+            const dx = px - b.c, dy = py - b.r
+            if (Math.abs(dx * b.ca + dy * b.sa) <= b.halfW &&
+                Math.abs(-dx * b.sa + dy * b.ca) <= b.halfH) return true
           }
+        }
+        return false
+      }
+
+      for (const { pts } of prepared) {
+        const np = pts.length / 2
+        for (let i = 0; i < np - 1; i++) {
           const j = i * 2
+          if (boxes.length && masked(pts[j], pts[j + 1], pts[j + 2], pts[j + 3])) continue
           tp.push6(pts[j]     * scl - halfW, y, pts[j + 1] * scl - halfH,
                    pts[j + 2] * scl - halfW, y, pts[j + 3] * scl - halfH)
           tc.push6(cr, cg, cb, cr, cg, cb)

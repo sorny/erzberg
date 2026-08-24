@@ -48,10 +48,18 @@ elevation range and drawing it needs a font, and neither exists in the worker. S
 `useContourLabels` on the main thread decides *what it says* and letters it —
 the same division `useVectorLabels` already makes for point features.
 
-The gap is sized from the character count at a generous nominal advance, since
-the true width is a property of a font the worker cannot see. It errs wide: a gap
-slightly too large reads as air, one slightly too small has the contour touching
-the digits.
+The gap is sized from the character count at a nominal advance, since the true
+width is a property of a font the worker cannot see, plus a configurable
+clearance either side.
+
+Erasure is by *box*, not by arclength along the label's own chain. Arclength
+leaves two ways for a line to cross the digits: a contour that hairpins returns
+within a few units of the number while being far away along the curve, and a
+different chain at the same level — the far side of a narrow ridge, the next ring
+in a tight nest — is not considered at all. So placements are collected for the
+whole level first, and then every segment at that level is tested against every
+label box. This is what a printed sheet does: the number masks whatever lies
+under it, wherever it came from.
 
 With a GeoTIFF loaded the label is metres. With a PNG the app has no idea what
 the brightness means, and the world elevation is the wrong answer there — it is

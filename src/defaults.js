@@ -49,7 +49,7 @@ export const STYLE_DEF = {
   // Contour labels. `labelSizeContours` is world units per em, like the vector
   // labels; `labelSpacingContours` is how far apart along a contour, in the same
   // units, so both read against the terrain rather than against the screen.
-  labelContours: false, labelSizeContours: 9, labelSpacingContours: 140,
+  labelContours: false, labelSizeContours: 9, labelSpacingContours: 140, labelPadContours: 4,
   labelMajorOnlyContours: true, labelSingleLineContours: false, labelFontContours: 'HersheySans1',
   labelWeightContours: 1,
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,

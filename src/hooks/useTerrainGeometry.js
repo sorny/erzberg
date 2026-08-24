@@ -231,6 +231,7 @@ export function useTerrainGeometry(p) {
     // Labels move the contour geometry itself — the line is broken where a
     // number goes — so every one of these is a rebuild, not a re-render.
     p.labelContours, p.labelSizeContours, p.labelSpacingContours, p.labelMajorOnlyContours,
+    p.labelPadContours,
     // Mode: Hachure
     p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure,
     p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,

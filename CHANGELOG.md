@@ -104,6 +104,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ground — the world elevation is centred on zero, so using it would label half
   of an ordinary hill negative.
 
+  Every contour at the label's level is erased inside the box the digits occupy,
+  not just the one the label sits on. Reserving room by cutting the label's own
+  chain *by arclength* leaves two ways for a line to end up across the number: a
+  contour that hairpins comes back within a few units of the digits while being a
+  long way off along the curve, and a different chain at the same level — the far
+  side of a narrow ridge, the next ring in a tight nest — was never considered at
+  all. On the reference terrain that put a line through 14 of 182 labels; it is
+  now 0 of 182, with no placements lost.
+
+  **Clearance** sets how much blank space each side gets, in the same world units
+  as Size, replacing what was a hard-coded fudge factor. 0 lets the line run up to
+  the digits; wider costs placements, because a contour that cannot hold the
+  number plus its margin is left unlabelled rather than mislabelled — 182 labels
+  at the default 4, 93 at 20.
+
   Outline faces export as editable `<text>` in their own pen layer; a stroke face
   letters its digits as strokes, the same bargain the vector labels take.
 

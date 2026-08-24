@@ -132,3 +132,92 @@ test('a stroke face letters the numbers as strokes', async ({ page }) => {
   expect(layer, 'a stroke face draws its digits').toMatch(/<line |<polyline /)
   expect(layer).not.toContain('<text')
 })
+
+test('no contour is drawn through a label, and clearance is adjustable', async ({ page }) => {
+  /*
+   * The bug this guards.
+   *
+   * Room was reserved by cutting the label's own chain *by arclength*, which
+   * leaves two ways for a line to end up across the digits. A contour that
+   * hairpins comes back within a few units of the number while being a long way
+   * off along the curve, so nothing removed it; and a different chain at the
+   * same level — the far side of a narrow ridge, the next ring in a tight nest —
+   * was never considered at all. On the reference terrain that put a contour
+   * through 14 of 182 labels.
+   *
+   * Every segment at the level is now tested against every label box, so what is
+   * asserted is the property rather than the mechanism: nothing at a label's own
+   * elevation may cross the box the digits occupy.
+   */
+  await page.goto(PAGE)
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+
+  const measure = async (pad) => page.evaluate(async (pad) => {
+    const { buildLineGeometry } = await import('/src/utils/geometryBuilders.js')
+    const { buildTerrain } = await import('/src/utils/terrain.js')
+    const { TERRAIN_DEF, STYLE_DEF } = await import('/src/defaults.js')
+    const { loadTextFont, fontStyleKey, textPolylines } = await import('/src/utils/textGeometry.js')
+
+    // The real raster: a synthetic dome has no hairpins and cannot show this.
+    const img = await new Promise((res, rej) => {
+      const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = '/Heightmap.png'
+    })
+    const cv = document.createElement('canvas')
+    cv.width = img.width; cv.height = img.height
+    cv.getContext('2d').drawImage(img, 0, 0)
+    const id = cv.getContext('2d').getImageData(0, 0, cv.width, cv.height).data
+    const px = new Float32Array(cv.width * cv.height)
+    for (let i = 0, j = 0; i < id.length; i += 4, j++) px[j] = id[i] / 255
+
+    const P = { ...TERRAIN_DEF, ...STYLE_DEF, enabledLines: false, enabledContours: true,
+                labelContours: true, elevScale: 6, labelPadContours: pad }
+    const t = buildTerrain(px, new Uint8Array(cv.width * cv.height).fill(1), cv.width, cv.height, P)
+    const major = buildLineGeometry(t, P).find((l) => l.id === 'Contours-Major')
+    const font = await loadTextFont(fontStyleKey({}))
+    const size = P.labelSizeContours
+    const LIFT = 0.35
+
+    let intruded = 0
+    for (const a of major.labelAnchors) {
+      const built = textPolylines(String(Math.round(a.rel)), font)
+      let lo = Infinity, hi = -Infinity, vLo = Infinity, vHi = -Infinity
+      for (const poly of built.polylines) for (let i = 0; i < poly.length; i += 2) {
+        if (poly[i] < lo) lo = poly[i]
+        if (poly[i] > hi) hi = poly[i]
+        if (poly[i+1] < vLo) vLo = poly[i+1]
+        if (poly[i+1] > vHi) vHi = poly[i+1]
+      }
+      const ca = Math.cos(a.angle), sa = Math.sin(a.angle)
+      const halfAdv = (built.width * size) / 2
+      const ox = a.x - ca * halfAdv, oz = a.z - sa * halfAdv
+      const inkL = (ox + ca * lo * size - a.x) * ca + (oz + sa * lo * size - a.z) * sa
+      const inkR = (ox + ca * hi * size - a.x) * ca + (oz + sa * hi * size - a.z) * sa
+      const perpLo = (vLo - LIFT) * size, perpHi = (vHi - LIFT) * size
+
+      const p = major.positions
+      for (let i = 0; i < p.length; i += 3) {
+        if (Math.abs(p[i + 1] - a.y) > 0.01) continue       // this label's level only
+        const dx = p[i] - a.x, dz = p[i + 2] - a.z
+        const across = -dx * sa + dz * ca
+        if (across < perpLo || across > perpHi) continue     // above or below the glyphs
+        const along = dx * ca + dz * sa
+        if (along > inkL && along < inkR) { intruded++; break }
+      }
+    }
+    return { anchors: major.labelAnchors.length, intruded }
+  }, pad)
+
+  const dflt = await measure(4)
+  console.log(`clearance 4: ${dflt.anchors} labels, ${dflt.intruded} with a line through them`)
+  expect(dflt.anchors, 'the terrain must carry plenty of labels').toBeGreaterThan(80)
+  expect(dflt.intruded, 'no contour may cross its own label').toBe(0)
+
+  // Clearance is real: more of it erases more line, so fewer contours fit a
+  // label at all. (It is not merely accepted and ignored.)
+  const wide = await measure(20)
+  console.log(`clearance 20: ${wide.anchors} labels, ${wide.intruded} with a line through them`)
+  expect(wide.intruded).toBe(0)
+  expect(wide.anchors, 'a wider clearance must cost some placements')
+    .toBeLessThan(dflt.anchors)
+})
