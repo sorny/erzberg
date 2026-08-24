@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] — 2026-08-24
+
+### Fixed
+- **Contour levels are anchored to the ground, not to round world elevations.**
+  The ladder started at the first multiple of the interval at or above the
+  terrain's floor. World elevation is centred on zero and stretched by the
+  exaggeration slider, so where that multiple lands has nothing to do with the
+  terrain: on a full-range raster at exaggeration 1 the ground runs −50…50, and a
+  30-unit interval put its lowest line 20 units up — two thirds of an interval of
+  valley floor with no contour in it. Change the interval, or nudge the
+  exaggeration, and the offset jumped to some other fraction of a step, so the
+  lines reshuffled instead of subdividing, and the labels — documented as
+  multiples of the interval climbing from 0 — read 1, 5, 9.
+
+  Levels now sit at `min + k · interval`. The bottom band is exactly one interval
+  thick whatever the interval and whatever the exaggeration, and the numbers are
+  the slider's own. Level 0 is the floor itself: on solid ground it draws
+  nothing, every corner being at or above it, and on a raster with NoData it
+  draws the shoreline. Its threshold is tested a millionth of an interval below
+  the floor, because *on* the floor a rounding error either way decides between
+  nothing and a hairline traced around every cell at the minimum — which is
+  exactly where a lake bed or a quarry floor is.
+
+- **The contour interval slider says "(m)" and now means it.** It passed its
+  number through as world elevation units, and a world unit is worth a metre only
+  by coincidence: it is the raster's elevation range, clipped by the
+  Shadows/Highlights handles, spread over 100 × the vertical exaggeration. On a
+  641–2350 m alpine tile the slider's "4.0 m" was drawing contours 40 m apart —
+  out by a factor of ten, and by a different factor on the next file.
+
+  The metres are now converted, both ways: displayed from the stored value and
+  divided back out of whatever is set. The interval itself is still stored in
+  world units — what the marching squares threshold against, and what a preset
+  written on a PNG means — so presets, sessions and the worker are untouched. The
+  slider's range follows the raster as well, from about a thousand contours down
+  to two, which is a usable slider on a 40 m quarry and on a 3000 m mountain.
+
+  The exaggeration is part of that conversion, so moving it changes what the
+  interval is worth on the ground and the readout follows the lines rather than
+  pinning them. That is the existing behaviour of the interval, now legible
+  instead of silent.
+
+- **A contour label ignored the Shadows and Highlights handles.** The printed
+  elevation mapped brightness back through the file's full range, but those
+  handles clip and restretch it first — brightness 0 is wherever Shadows sits,
+  not the file's lowest ground. Every number on a raster with the handles moved
+  was wrong, and wrong by a different amount at each end of the range, which is
+  precisely the error a reader cannot catch. Slider and labels now share one
+  conversion (`metresPerWorldUnit` / `gridValueToMetres`), so they cannot drift
+  apart.
+
+- **An inverted terrain lost the contours on its steep ground.** The cell-major
+  scan maps a cell's value range to a range of level indices, and read the low
+  index off the low value. A negative exaggeration runs the levels *down* the
+  brightness range, so the two came out crossed for any cell spanning more than
+  one level: gentle ground still drew, cliffs drew nothing, and a full-range
+  scarp drew nothing at all. The bounds are now ordered by index.
+
 ## [1.3.2] — 2026-08-24
 
 ### Fixed
