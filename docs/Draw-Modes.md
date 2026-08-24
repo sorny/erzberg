@@ -26,6 +26,39 @@ When a GeoTIFF is loaded, contour intervals are expressed in the file's native e
 
 **Smoothing (form lines).** With smoothing enabled, each level's raw marching-squares segments are first chained into polylines, then refined by Chaikin corner-cutting: every pass replaces each vertex with two points at the $\tfrac14$ and $\tfrac34$ positions of its adjacent edges, converging toward a quadratic B-spline. Closed rings are smoothed as loops; open chains keep their endpoints pinned so border-anchored lines stay put. The result is the soft, hand-drawn "form line" look. Smoothing operates purely in the horizontal plane — each line stays at its constant contour elevation — and composes with the *Close contours* option (border-bridging segments are added after smoothing).
 
+**Labels.** With labelling on, each contour's height is printed *into* the line:
+the contour stops, the number sits in the gap at the line's own angle, and the
+contour resumes. Setting the number beside the line instead is what makes a page
+of nested curves unreadable, which is why a printed sheet does it this way.
+
+Placement runs on the chained polyline in arclength, not per vertex, so labels do
+not bunch where marching squares happened to emit points closely. Each candidate
+is nudged to the straightest spot in a window around it, measured as the greatest
+deviation of the curve from the chord across the label's own span; a stretch that
+is still bent at its best is left unlabelled rather than mislabelled, because the
+number is set on one baseline and on a hairpin it would float off the line it
+names. The text runs left-to-right in $+x$ — a fixed convention rather than a
+camera-relative one, since the scene orbits.
+
+The work is split across the worker boundary, and the split is forced. Placing a
+label needs the contour as one chained *stroke*, and breaking the line for it
+moves geometry — both worker work. But naming the level needs the raster's real
+elevation range and drawing it needs a font, and neither exists in the worker. So
+`buildContours` decides *where* and emits placements in world coordinates, and
+`useContourLabels` on the main thread decides *what it says* and letters it —
+the same division `useVectorLabels` already makes for point features.
+
+The gap is sized from the character count at a generous nominal advance, since
+the true width is a property of a font the worker cannot see. It errs wide: a gap
+slightly too large reads as air, one slightly too small has the contour touching
+the digits.
+
+With a GeoTIFF loaded the label is metres. With a PNG the app has no idea what
+the brightness means, and the world elevation is the wrong answer there — it is
+centred on zero, so half an ordinary hill comes out negative. The label is then
+height above the lowest ground, which is non-negative and still spaced by exactly
+the interval the slider is set to.
+
 ## 5. Hachure
 
 The terrain gradient $\nabla H = (H_x, H_y)$ is estimated at each sampled cell using central differences. A short stroke is drawn from the cell centre in the direction of $-\nabla H$, with length proportional to $|\nabla H|$. Cells below a slope threshold are skipped.

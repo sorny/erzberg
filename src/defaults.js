@@ -46,6 +46,12 @@ export const STYLE_DEF = {
   pillarGap: 0, pillarDepth: 0, pillarStyle: 'line', pillarSize: 0.8, pillarSegments: 8, pillarLidColor: '#ffffff',
   // Contours
   enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
+  // Contour labels. `labelSizeContours` is world units per em, like the vector
+  // labels; `labelSpacingContours` is how far apart along a contour, in the same
+  // units, so both read against the terrain rather than against the screen.
+  labelContours: false, labelSizeContours: 9, labelSpacingContours: 140,
+  labelMajorOnlyContours: true, labelSingleLineContours: false, labelFontContours: 'HersheySans1',
+  labelWeightContours: 1,
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
   majorIntervalContours: 10, majorWeightContours: 2, majorOffsetContours: 1, closeRingsContours: false, smoothingContours: 0,
   // Hachure

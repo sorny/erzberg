@@ -20,6 +20,7 @@ import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useVectorIcons } from './hooks/useVectorIcons'
 import { useVectorLabels } from './hooks/useVectorLabels'
+import { useContourLabels } from './hooks/useContourLabels'
 import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
@@ -1136,8 +1137,13 @@ export default function App() {
   // substituted, and anchored on the worker's own dots rather than on whatever
   // the icon pass left behind, which is the only place one segment per feature
   // still exists.
-  const { lineGeo, overflowed: labelOverflow } =
+  const { lineGeo: vectorLabelled, overflowed: labelOverflow } =
     useVectorLabels(iconGeo, workerGeo, vectorLayers, vectorSources, view.tilt, view.rotation)
+
+  // Contour labels are lettered here for the same reason the vector ones are:
+  // the worker reserved the gaps and knows where the numbers go, but it has no
+  // fonts and no idea what the raster's brightness means in metres.
+  const lineGeo = useContourLabels(vectorLabelled, style, geoTiffElevMin, geoTiffElevMax)
 
   // The overlay means "nothing has come back for a while", not "a build is in
   // flight". Keying it on isComputing alone breaks under a continuous stream:

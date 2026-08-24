@@ -19,7 +19,7 @@
 
 Load a greyscale heightmap (8- or 16-bit PNG), a GeoTIFF, or an audio file, and
 render it as 3D line art, structural relief or an architectural sketch through
-fifteen independent draw modes. Export to SVG for a pen plotter, STL for a
+fifteen independent draw modes, with contours that letter their own heights. Export to SVG for a pen plotter, STL for a
 printer, or 4K PNG for the wall.
 
 **Everything runs locally in your browser.** Your files never leave your

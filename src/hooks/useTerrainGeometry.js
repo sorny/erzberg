@@ -228,6 +228,9 @@ export function useTerrainGeometry(p) {
     p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,
     p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours,
     p.tanakaContours, p.tanakaSunAzimuth,
+    // Labels move the contour geometry itself — the line is broken where a
+    // number goes — so every one of these is a rebuild, not a re-render.
+    p.labelContours, p.labelSizeContours, p.labelSpacingContours, p.labelMajorOnlyContours,
     // Mode: Hachure
     p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure,
     p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,

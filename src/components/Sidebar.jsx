@@ -74,7 +74,7 @@ const SECTION_TERMS = {
   'Mode: Lines':      'ridgelines parallel spacing shift angle bearing unknown pleasures dash weight opacity',
   'Mode: Crosshatch': 'hatch two directions perpendicular angle spacing',
   'Mode: Pillars':    'extrusion cuboid cylinder columns pins bars',
-  'Mode: Contours':   'isolines marching squares interval chaikin smoothing form lines closing metres',
+  'Mode: Contours':   'isolines marching squares interval chaikin smoothing form lines closing metres labels heights elevation numbers annotate',
   'Mode: Hachure':    'slope strokes ticks direction swiss',
   'Mode: Flow':       'drainage euler streamlines water paths',
   'Mode: Network':    'strahler stream order flow accumulation rivers',
@@ -1305,6 +1305,11 @@ export function Sidebar({
     onOpenChange?.(value)
   }, [onOpenChange])
   const [filter, setFilter] = useState('')
+  // The bundled stroke faces, for the contour-label face picker. `LabelPicker`
+  // fetches the same manifest for the vector labels; `loadSingleLineManifest`
+  // caches at module level, so asking twice costs one request.
+  const [singleLineFonts, setSingleLineFonts] = useState([])
+  useEffect(() => { loadSingleLineManifest().then(setSingleLineFonts) }, [])
   const q = filter.trim().toLowerCase()
   const filterCtx = useMemo(() => ({ q, terms: SECTION_TERMS }), [q])
   // Counted with the same predicate each Section uses, over the same index it
@@ -2158,6 +2163,35 @@ export function Sidebar({
                   <Tog label="Close contours" checked={!!style.closeRingsContours} onChange={v => ss({ closeRingsContours: v })} />
                   {!style.tanakaContours && (
                     <InlineSl label="Smoothing" help="Chaikin corner-cutting passes. 0 = crisp marching-squares lines; higher = soft, flowing form lines." min={0} max={4} step={1} value={style.smoothingContours ?? 0} onChange={v => ss({ smoothingContours: v })} />
+                  )}
+                  <Tog label="Label heights" help="Prints each contour's elevation into the line itself — the contour stops, the number sits in the gap at the line's own angle, and the contour resumes. That is what makes a sheet of nested curves readable, and it is why a printed map does it this way rather than setting the number beside the line." checked={!!style.labelContours} onChange={v => ss({ labelContours: v })} />
+                  {style.labelContours && (
+                    <Sub>
+                      <InlineSl label="Size" help="World units per em — the same measure the vector labels use, so both read against the terrain rather than against the screen." min={2} max={40} step={0.5} value={style.labelSizeContours} onChange={v => ss({ labelSizeContours: v })} />
+                      <InlineSl label="Spacing" help="How far apart along a contour. A number every few hundred units reads as a map; one every few tens reads as a ticker tape." min={40} max={600} step={10} value={style.labelSpacingContours} onChange={v => ss({ labelSpacingContours: v })} />
+                      <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.labelWeightContours} onChange={v => ss({ labelWeightContours: v })} />
+                      <Tog label="Major only" small help="Labelling every minor contour is a page of numbers with a drawing behind it. A printed sheet labels the index contours, which is what this does." checked={!!style.labelMajorOnlyContours} onChange={v => ss({ labelMajorOnlyContours: v })} />
+                      <Tog label="Use single-line font" small help="Sets the numbers in a stroke face, so the pen draws each digit once instead of tracing its outline." checked={!!style.labelSingleLineContours} onChange={v => ss({ labelSingleLineContours: v })} />
+                      {style.labelSingleLineContours && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
+                          <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
+                          <select value={style.labelFontContours ?? 'HersheySans1'}
+                            onChange={(e) => ss({ labelFontContours: e.target.value })}
+                            data-testid="contour-label-font"
+                            style={{ flex: 1, minWidth: 0, background: SURF, color: DIM,
+                                     border: `1px solid ${BORDER}`, borderRadius: 3,
+                                     fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                            {Object.entries(singleLineFonts.reduce((g, f) => {
+                              (g[f.group] ??= []).push(f); return g
+                            }, {})).map(([group, faces]) => (
+                              <optgroup key={group} label={group}>
+                                {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
+                              </optgroup>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </Sub>
                   )}
                   <Tog label="Tanaka illumination" help="Split contours into thick-bright (illuminated side) and thin-dark (shadow side) layers." checked={!!style.tanakaContours} onChange={v => ss({ tanakaContours: v })} />
                   {style.tanakaContours && (

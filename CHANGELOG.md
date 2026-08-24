@@ -8,6 +8,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Contour labels.** Each contour's height, printed *into* the line: the contour
+  stops, the number sits in the gap at the line's own angle, and the contour
+  resumes. Setting the number beside the line is what makes a page of nested
+  curves unreadable, and it is the one thing this app's contours have never done.
+
+  Placement runs in arclength along the chained stroke rather than per vertex, so
+  labels do not bunch where marching squares happened to emit points closely, and
+  each is nudged to the straightest spot in a window around it. A stretch still
+  bent at its best is left unlabelled rather than mislabelled — the number sits
+  on one baseline, and on a hairpin it would float off the curve it names.
+
+  The work is split across the worker boundary because it has to be. Placing a
+  label needs the contour as one chained stroke and breaking the line for it
+  moves geometry, both worker work; naming the level needs the raster's real
+  elevation range and drawing it needs a font, and neither exists in the worker.
+  So the worker emits placements in world coordinates and `useContourLabels`
+  letters them, the same division `useVectorLabels` already makes.
+
+  With a GeoTIFF the label is metres. With a PNG it is height above the lowest
+  ground — the world elevation is centred on zero, so using it would label half
+  of an ordinary hill negative.
+
+  Outline faces export as editable `<text>` in their own pen layer; a stroke face
+  letters its digits as strokes, the same bargain the vector labels take.
+
 - **Isophotes — a fifteenth draw mode.** Lines of constant *illumination*. A
   contour joins points of equal height; an isophote joins points of equal light,
   which is the same construction over a different field and reads nothing like it

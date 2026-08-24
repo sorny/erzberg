@@ -102,6 +102,9 @@ export function layerStyle(id, p) {
       return { weight: p.tanakaWeightBright ?? 2.5, opacity: p.opacityContours, dash: p.dashContours }
     case 'Contours-Tanaka-Dark':
       return { weight: p.tanakaWeightDark ?? 0.5, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Contours-Labels':
+      // Always solid: a dashed numeral is not a numeral.
+      return { weight: p.labelWeightContours ?? 1, opacity: p.opacityContours, dash: 'solid' }
     case 'Gpx':
       return { weight: p.weightGpx, opacity: p.opacityGpx, dash: p.dashGpx }
     case 'Swiss-Rock':
@@ -362,6 +365,10 @@ export function buildLineGeometry(terrain, p) {
           curtains: { positions: cPbase, indices: cIbase },
           lids: hasLids ? { positions: baseLidP, colors: baseLidC, indices: baseLidI } : null,
           isPoints: res.isPoints ?? false,
+          // Placements for the main thread to letter. Not geometry, so it rides
+          // the un-mirrored path only: a mirrored label reads backwards, and a
+          // kaleidoscope of reversed numbers is not what the option is for.
+          labelAnchors: res.labelAnchors ?? null,
         })
         continue
       }
@@ -930,6 +937,101 @@ function prepareContourLevels(terrain, p, interval) {
   return { step, numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep: step / (100 * elevScale) }
 }
 
+/**
+ * Where to letter a contour, and where to break it so the lettering fits.
+ *
+ * A topographic map does not print the elevation *beside* the line, it prints it
+ * *in* the line: the contour stops, the number sits in the gap at the line's own
+ * angle, and the contour resumes. That is what makes a sheet of nested curves
+ * readable, and it is the one thing this app's contours have never done.
+ *
+ * Runs on the chained polyline, in grid units, and returns both halves of the
+ * answer: `anchors` for the main thread to letter (the worker has no fonts), and
+ * `cuts` — arclength spans this chain must not draw.
+ *
+ * Placement is by arclength rather than by vertex, so it does not bunch where
+ * marching squares happened to emit points close together, and each candidate is
+ * nudged to the straightest spot in a window around it. Straightness matters
+ * because the label is set on a single baseline: on a hairpin the text would
+ * float off the line it belongs to, and a reader would have to guess which curve
+ * it names.
+ *
+ * `gap` is the room to reserve. It is an estimate — the true width is a property
+ * of the font, which lives on the main thread — so it is deliberately generous:
+ * a gap slightly too wide reads as air, one slightly too narrow has the contour
+ * touching the digits.
+ */
+function placeContourLabels(pts, closed, spacing, gap) {
+  const np = pts.length / 2
+  if (np < 3) return null
+
+  // Arclength at each vertex.
+  const cum = new Float64Array(np)
+  for (let i = 1; i < np; i++) {
+    const dx = pts[i * 2] - pts[i * 2 - 2], dy = pts[i * 2 + 1] - pts[i * 2 - 1]
+    cum[i] = cum[i - 1] + Math.hypot(dx, dy)
+  }
+  const total = cum[np - 1]
+  // No room for even one label with a margin of its own width either side.
+  if (total < gap * 3) return null
+
+  /** The point and tangent at arclength `s`, by walking the cumulative table. */
+  const at = (s) => {
+    let lo = 0, hi = np - 1
+    while (lo < hi - 1) { const mid = (lo + hi) >> 1; if (cum[mid] <= s) lo = mid; else hi = mid }
+    const seg = cum[hi] - cum[lo]
+    const t = seg > 1e-9 ? (s - cum[lo]) / seg : 0
+    return [pts[lo * 2] + (pts[hi * 2] - pts[lo * 2]) * t,
+            pts[lo * 2 + 1] + (pts[hi * 2 + 1] - pts[lo * 2 + 1]) * t]
+  }
+
+  // How far the curve strays from the chord across the label's own span. Zero on
+  // a straight stretch; large on a hairpin, where the baseline would leave the line.
+  const bend = (s) => {
+    const a = at(s - gap / 2), b = at(s + gap / 2)
+    const dx = b[0] - a[0], dy = b[1] - a[1]
+    const len = Math.hypot(dx, dy)
+    if (len < 1e-6) return Infinity
+    let worst = 0
+    for (let k = 1; k < 6; k++) {
+      const m = at(s - gap / 2 + (gap * k) / 6)
+      // Perpendicular distance from the chord.
+      const d = Math.abs((m[0] - a[0]) * dy - (m[1] - a[1]) * dx) / len
+      if (d > worst) worst = d
+    }
+    // Penalise a chord shorter than the text as well: that is a curve doubling
+    // back, where the label would overhang both ends.
+    return worst + Math.max(0, gap - len)
+  }
+
+  const anchors = [], cuts = []
+  const first = closed ? gap : Math.max(gap, (total % spacing) / 2 + gap / 2)
+  for (let s = first; s <= total - gap; s += spacing) {
+    // Nudge to the straightest spot within a third of the spacing.
+    let best = s, bestBend = bend(s)
+    const win = Math.min(spacing / 3, total / 4)
+    for (let d = -win; d <= win; d += win / 4) {
+      const cand = s + d
+      if (cand - gap / 2 < 0 || cand + gap / 2 > total) continue
+      const b = bend(cand)
+      if (b < bestBend) { bestBend = b; best = cand }
+    }
+    // Still bent past half the text height at its best: this stretch cannot hold
+    // a straight baseline, so leave the contour unbroken rather than mislabel it.
+    if (bestBend > gap * 0.25) continue
+
+    const a = at(best - gap / 2), b = at(best + gap / 2), m = at(best)
+    let ang = Math.atan2(b[1] - a[1], b[0] - a[0])
+    // Upright rule: keep the text running left-to-right in +x. The scene orbits,
+    // so no camera-relative rule would hold; this is the same convention a
+    // north-up sheet uses.
+    if (b[0] < a[0]) ang += Math.PI
+    anchors.push({ c: m[0], r: m[1], angle: ang })
+    cuts.push(best - gap / 2, best + gap / 2)
+  }
+  return anchors.length ? { anchors, cuts, cum } : null
+}
+
 function edgeLerp01(va, vb, level) {
   return Math.abs(vb - va) < 1e-10 ? 0.5 : (level - va) / (vb - va)
 }
@@ -973,17 +1075,37 @@ const SMOOTH_SIMPLIFY_EPS = 0.02
  */
 function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRings, smoothing) {
   if (p.tanakaContours) return buildContoursTanaka(terrain, p, interval)
-  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev } = terrain
   const smooth = Math.max(0, Math.min(4, Math.round(smoothing ?? 0)))
   // Smoothing and ring-closing both need the per-level segments chained into
   // polylines first, so they share the post-scan path.
-  const needsChains = closeRings || smooth > 0
+  // Labels are placed along a *stroke*, so the raw scan-order segments have to be
+  // chained first — the same reason smoothing and ring-closing need it.
+  const wantLabels = !!p.labelContours
+  const needsChains = closeRings || smooth > 0 || wantLabels
 
   const minorPos = new F32List(), minorCol = new F32List()
   const majorPos = new F32List(), majorCol = new F32List()
 
   const { numSteps, levelElev, levelVal, levelActive, levelRgb, lvlStep } =
     prepareContourLevels(terrain, p, interval)
+
+  // Room to reserve for the digits, in grid units. The true width belongs to the
+  // font and the font lives on the main thread, so this is an estimate from the
+  // character count at a generous advance — see `placeContourLabels`.
+  const labelEm = (p.labelSizeContours ?? 9) / scl
+  const labelSpacingGrid = Math.max(labelEm * 4, (p.labelSpacingContours ?? 140) / scl)
+  const labelAnchors = wantLabels ? [] : null
+  /*
+   * What the label says, and how much room it needs.
+   *
+   * The digits are decided here only to size the gap; the main thread formats
+   * the text it actually letters, because turning a level into metres needs the
+   * raster's real elevation range and that never reaches the worker. Both use
+   * the same rounding, so the gap matches the number that lands in it.
+   */
+  const levelText = (k) => String(Math.round(levelElev[k] - minElev))
+  const labelGapFor = (text) => (text.length * 0.62 + 0.45) * labelEm
 
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
@@ -1111,7 +1233,38 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
             )
           : chain.pts
         const np = pts.length / 2
+
+        // Which levels get lettered. Labelling every minor contour is a page of
+        // numbers with a drawing behind it, so the default is the index
+        // contours only — which is what a printed sheet does.
+        const label = (wantLabels && (isMajor || !(p.labelMajorOnlyContours ?? true)))
+          ? placeContourLabels(pts, chain.closed, labelSpacingGrid, labelGapFor(levelText(k)))
+          : null
+        if (label) {
+          for (const a of label.anchors) {
+            // World coordinates, not grid: the hook that letters these has no
+            // reason to know the raster's cell size or centring, and the angle
+            // survives the conversion because both axes scale alike.
+            labelAnchors.push({ x: a.c * scl - halfW, z: a.r * scl - halfH,
+                                y, angle: a.angle, v: levelVal[k],
+                                // Height above the lowest ground, for a raster
+                                // with no elevation of its own to report.
+                                rel: levelElev[k] - minElev })
+          }
+        }
+
         for (let i = 0; i < np - 1; i++) {
+          // Skip the stretches reserved for lettering. Segments are about one
+          // grid edge long, so dropping a whole one errs a fraction of a
+          // character wide — and errs toward more air, which is the safe side.
+          if (label) {
+            const a = label.cum[i], b = label.cum[i + 1]
+            let cut = false
+            for (let ci = 0; ci < label.cuts.length; ci += 2) {
+              if (b > label.cuts[ci] && a < label.cuts[ci + 1]) { cut = true; break }
+            }
+            if (cut) continue
+          }
           const j = i * 2
           tp.push6(pts[j]     * scl - halfW, y, pts[j + 1] * scl - halfH,
                    pts[j + 2] * scl - halfW, y, pts[j + 3] * scl - halfH)
@@ -1131,7 +1284,11 @@ function buildContours(terrain, p, interval, majorInterval, majorOffset, closeRi
 
   return {
     'Contours-Minor': { positions: minorPos.toArray(), colors: minorCol.toArray() },
-    'Contours-Major': { positions: majorPos.toArray(), colors: majorCol.toArray() },
+    // The anchors ride with the major layer because that is what they label by
+    // default. They are placements, not geometry: the main thread letters them,
+    // since neither the fonts nor the raster's metre range exist in here.
+    'Contours-Major': { positions: majorPos.toArray(), colors: majorCol.toArray(),
+                        labelAnchors: labelAnchors?.length ? labelAnchors : null },
   }
 }
 const MARCHING_TABLE = { 1:[3,2], 2:[2,1], 3:[3,1], 4:[0,1], 5:[0,3,2,1], 6:[0,2], 7:[0,3], 8:[0,3], 9:[0,2], 10:[0,1,2,3], 11:[0,1], 12:[3,1], 13:[2,1], 14:[3,2] }
