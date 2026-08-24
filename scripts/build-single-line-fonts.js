@@ -373,7 +373,7 @@ function dropRedundantDots(polylines) {
 function respace(glyphs, capHeight) {
   const gap = 0.2 * capHeight
   const wordSpace = 0.6 * capHeight
-  for (const [ch, g] of Object.entries(glyphs)) {
+  for (const g of Object.values(glyphs)) {
     const [, polylines] = g
     let lo = Infinity, hi = -Infinity
     for (const p of polylines) {

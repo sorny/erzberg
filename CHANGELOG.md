@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-08-24
+
+### Fixed
+- Dropped an unused loop binding in the single-line font build script, which
+  `eslint` flagged; `respace` only ever touched the glyph values, never the
+  character keys.
+
 ## [1.3.1] — 2026-08-24
 
 ### Fixed
