@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-08-24
+
 ### Changed
 - **Isophote smoothing goes to 25 passes.** Worth knowing what that buys: the
   curve converges. Chaikin approaches a quadratic B-spline and each pass halves
@@ -112,6 +114,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   side of a narrow ridge, the next ring in a tight nest — was never considered at
   all. On the reference terrain that put a line through 14 of 182 labels; it is
   now 0 of 182, with no placements lost.
+
+  The numbers carry their own **colour**, resolved at draw time like any other
+  layer's ink and defaulting to the contours' so they match their lines until
+  told otherwise. This is the only draw-mode layer with a flat colour — every
+  other is coloured per vertex from the hypsometric buffer, and lettering has no
+  such buffer, because a number is not at an elevation the way the line it sits
+  on is. Without one it fell through to `color || '#000000'` and came out black
+  whatever the contours were set to.
 
   **Clearance** sets how much blank space each side gets, in the same world units
   as Size, replacing what was a hard-coded fudge factor. 0 lets the line run up to
