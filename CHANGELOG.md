@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-08-25
+
+### Added
+- **OpenStreetMap over a whole province.** Fetching an extent the size of Styria
+  did not work and could not have: the panel asked for every road class down to
+  `footway` and every waterway down to `ditch`, over 16 000 km². Measured against
+  the live API, that is about 1.2 million elements and a gigabyte of inlined
+  geometry — past Overpass's own 180 s budget, past the 400 000 this can drape,
+  and past what a tab can hold. It failed after minutes of waiting, and said only
+  that it had failed.
+
+  The extent now picks a **detail tier** by area (a 200 × 5 km valley is a small
+  fetch, so area rather than the longer side). Under 2 500 km² nothing changes.
+  Between that and 22 500 km² the footways, tracks, ditches and drains go, and
+  only woods and lakes with more than a kilometre of shore are asked for. Above
+  it, the trunk network, the rivers, the large woods and lakes, the peaks. Styria
+  at that tier is 56 000 elements and 72 MB, which arrives in under a minute —
+  and is the better sheet anyway, since every footpath in a province plots as a
+  black smear. The tier is named in the panel, and one click overrides it.
+
+  Two levers do the narrowing and both are server-side, because what matters is
+  what is never sent: fewer tag values, and `(if:length() > n)` to drop small
+  polygons and stubs by perimeter. 43 048 forest ways over Styria become 342 at a
+  10 km perimeter, and the ones that survive are the forests you would draw.
+
+- **A large fetch is measured before it is downloaded.** `out count;` runs the
+  same search and answers with a number instead of a gigabyte, so an extent that
+  cannot be draped is refused in seconds instead of after four minutes. Only when
+  the answer is no does a second, per-category count run — it buys a refusal that
+  names the offender, which is rarely the one you would guess: over Styria the
+  heaviest category is not Buildings, which is already off by default, but
+  Landuse & natural at 317 758 elements. Below 2 500 km² no count is run at all;
+  a fetch that size has never been too large, and Overpass is a volunteer
+  service.
+
 ## [1.3.3] — 2026-08-24
 
 ### Fixed
