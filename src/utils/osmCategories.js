@@ -49,6 +49,69 @@ const RAILWAY_VALUES = new Set([
 const PEAK_VALUES = new Set(['peak', 'saddle', 'volcano'])
 const ADMIN_LEVELS = new Set(['2', '4', '6', '8'])
 
+/**
+ * DETAIL TIERS — how much to ask for at what size.
+ *
+ * "Everything OSM has for this extent" stops being a query anyone wants long
+ * before the servers refuse it. Measured over 1 250 km² around Graz: 97 092 road
+ * ways, of which 6 152 are motorway…tertiary; 13 828 waterways, of which the
+ * rivers and canals are 162. Over the whole of Styria the same tick boxes ask
+ * for about 1.2 million elements and a gigabyte of inlined geometry — past
+ * Overpass's own 180 s budget, past `MAX_ELEMENTS`, and past what a tab can
+ * hold. The same extent asked for at `broad` is 56 000 elements and 72 MB, which
+ * arrives in under a minute.
+ *
+ * And it is the better drawing. Every footpath and drainage ditch in Styria,
+ * plotted at that scale, is a black smear — generalising is what a cartographer
+ * does to a small-scale sheet anyway, not a compromise forced by the transport.
+ *
+ * Two levers, both server-side, because what matters is what is never sent:
+ *  • **Fewer classes.** Coarser tiers name fewer tag values.
+ *  • **Bigger features only.** `(if:length() > n)` drops small polygons and
+ *    stubs by perimeter in metres — 43 048 forest ways over Styria become 342 at
+ *    10 km, and the ones that survive are the forests you would draw.
+ *
+ * Relations are never length-filtered: they are the few hundred large
+ * multipolygons in any extent, and they are what the coarse tiers are for.
+ */
+export const OSM_DETAIL_TIERS = ['full', 'mid', 'broad']
+
+/** What each tier is called where a user can see it. */
+export const OSM_DETAIL_LABEL = {
+  full:  'everything',
+  mid:   'main features',
+  broad: 'major features only',
+}
+
+// Area rather than the longer side: a 200 × 5 km river valley is a small fetch
+// and must not be generalised as though it were a province.
+const MID_ABOVE_KM2   = 2_500      // 50 × 50 km
+const BROAD_ABOVE_KM2 = 22_500     // 150 × 150 km
+
+/** Which tier an extent of this many square kilometres asks for. */
+export function detailTierFor(areaKm2) {
+  if (!(areaKm2 > 0)) return 'full'
+  if (areaKm2 > BROAD_ABOVE_KM2) return 'broad'
+  if (areaKm2 > MID_ABOVE_KM2) return 'mid'
+  return 'full'
+}
+
+/**
+ * A category's selectors at one tier.
+ *
+ * A category with nothing to say at a tier keeps the next finer one's list, so
+ * `coarse` only has to name what actually changes — Peaks and Admin boundaries
+ * are a few thousand elements over a whole province and are the same at every
+ * size.
+ */
+export function selectorsFor(category, tier) {
+  const coarse = category.coarse
+  if (!coarse) return category.selectors
+  if (tier === 'broad') return coarse.broad ?? coarse.mid ?? category.selectors
+  if (tier === 'mid') return coarse.mid ?? category.selectors
+  return category.selectors
+}
+
 // Ordering is load-bearing twice over: it is the order layers appear in the
 // panel, and the order they are drawn in, so ground cover has to come before the
 // things that sit on top of it.
@@ -65,6 +128,22 @@ export const OSM_CATEGORIES = [
       'way["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"]',
       'relation["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"]',
     ],
+    // 317 758 elements over Styria at full detail — the single heaviest thing on
+    // the panel, ahead of roads. By perimeter: 43 087 above 1 km, 8 328 above 3.
+    coarse: {
+      mid: [
+        'way["landuse"~"^(forest|meadow|farmland|orchard|vineyard|quarry|residential|industrial|cemetery)$"](if:length()>1000)',
+        'relation["landuse"~"^(forest|meadow|farmland|orchard|vineyard|quarry|residential|industrial|cemetery)$"]',
+        'way["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"](if:length()>1000)',
+        'relation["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"]',
+      ],
+      broad: [
+        'way["landuse"~"^(forest|meadow|farmland|orchard|vineyard|quarry|residential|industrial|cemetery)$"](if:length()>3000)',
+        'relation["landuse"~"^(forest|meadow|farmland|orchard|vineyard|quarry|residential|industrial|cemetery)$"]',
+        'way["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"](if:length()>3000)',
+        'relation["natural"~"^(wood|scrub|grassland|heath|glacier|scree|bare_rock|sand|wetland)$"]',
+      ],
+    },
     // Strict: a category must claim only the values it actually lists. The
     // permissive version (`t.landuse || t.natural`) swallowed `natural=water`
     // and `natural=peak` before Water bodies and Peaks ever saw them, and the
@@ -100,6 +179,22 @@ export const OSM_CATEGORIES = [
       'way["landuse"~"^(reservoir|basin)$"]',
       'relation["landuse"~"^(reservoir|basin)$"]',
     ],
+    // 21 149 lakes over Styria, 773 of them with a shore over 2 km. A pond that
+    // plots as three pixels is not a lake anyone loses.
+    coarse: {
+      mid: [
+        'way["natural"="water"](if:length()>1000)',
+        'relation["natural"="water"]',
+        'way["landuse"~"^(reservoir|basin)$"](if:length()>1000)',
+        'relation["landuse"~"^(reservoir|basin)$"]',
+      ],
+      broad: [
+        'way["natural"="water"](if:length()>2000)',
+        'relation["natural"="water"]',
+        'way["landuse"~"^(reservoir|basin)$"](if:length()>2000)',
+        'relation["landuse"~"^(reservoir|basin)$"]',
+      ],
+    },
     // The `|| 'lake'` this used to end with was unconditional, so every element
     // that reached this category — every road, every stream — came back a lake.
     // The default now applies only to something already tagged as water.
@@ -118,6 +213,12 @@ export const OSM_CATEGORIES = [
     geom: 'line',
     heavy: false,
     selectors: ['way["waterway"~"^(river|stream|canal|ditch|drain)$"]'],
+    // Ditches and drains are field drainage: thousands of them, none of them a
+    // feature of the landscape at 1:250 000.
+    coarse: {
+      mid:   ['way["waterway"~"^(river|stream|canal)$"]'],
+      broad: ['way["waterway"~"^(river|canal)$"]'],
+    },
     bucketOf: (t) => pick(t.waterway, WATERWAY_VALUES),
     labels: { river: 'River', stream: 'Stream', canal: 'Canal', ditch: 'Ditch', drain: 'Drain' },
     styles: {
@@ -137,6 +238,19 @@ export const OSM_CATEGORIES = [
       'service|track|path|footway|cycleway|bridleway|steps|living_street|' +
       'motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"]',
     ],
+    // 97 092 road ways in 1 250 km² around Graz; 6 152 of them motorway…tertiary.
+    // The link classes stay with their parents at every tier — a ramp with no
+    // motorway to belong to is a stub hanging in a field.
+    coarse: {
+      mid: [
+        'way["highway"~"^(motorway|trunk|primary|secondary|tertiary|unclassified|residential|' +
+        'motorway_link|trunk_link|primary_link|secondary_link|tertiary_link)$"]',
+      ],
+      broad: [
+        'way["highway"~"^(motorway|trunk|primary|secondary|' +
+        'motorway_link|trunk_link|primary_link|secondary_link)$"]',
+      ],
+    },
     // Link roads are ramps of their parent class, not a class of their own; a
     // panel row called "Roads · Secondary link" is noise.
     bucketOf: (t) => pick((t.highway || '').replace(/_link$/, ''), HIGHWAY_VALUES),
@@ -167,6 +281,9 @@ export const OSM_CATEGORIES = [
     geom: 'line',
     heavy: false,
     selectors: ['way["railway"~"^(rail|narrow_gauge|light_rail|tram|subway|funicular|monorail)$"]'],
+    // Trams and subways are a city's internals: at province scale they draw as a
+    // blot over one town and nothing anywhere else.
+    coarse: { broad: ['way["railway"~"^(rail|narrow_gauge)$"]'] },
     bucketOf: (t) => pick(t.railway, RAILWAY_VALUES),
     labels: {
       rail: 'Rail', narrow_gauge: 'Narrow gauge', light_rail: 'Light rail',
@@ -181,6 +298,13 @@ export const OSM_CATEGORIES = [
     geom: 'line',
     heavy: false,
     selectors: ['way["aerialway"]', 'way["piste:type"]'],
+    // Pistes are the dense half — every marked run in every ski area. The lifts
+    // themselves are few enough to keep until the very coarsest tier, where only
+    // the big cable cars and gondolas survive.
+    coarse: {
+      mid:   ['way["aerialway"]', 'way["piste:type"](if:length()>1000)'],
+      broad: ['way["aerialway"~"^(cable_car|gondola|chair_lift)$"]'],
+    },
     bucketOf: (t) => t.aerialway ?? (t['piste:type'] ? 'piste' : null),
     // Hyphens, not underscores: OSM spells these `t-bar`, `j-bar`, `magic_carpet`.
     labels: {
@@ -200,6 +324,13 @@ export const OSM_CATEGORIES = [
     // flagged and off by default rather than quietly included.
     heavy: true,
     selectors: ['way["building"]', 'relation["building"]'],
+    // Ticked deliberately, so it is not silently dropped at size — but a
+    // province of house footprints is millions of elements, and what survives by
+    // perimeter is the halls, churches and blocks that are landmarks anyway.
+    coarse: {
+      mid:   ['way["building"](if:length()>200)', 'relation["building"]'],
+      broad: ['way["building"](if:length()>500)', 'relation["building"]'],
+    },
     bucketOf: (t) => (t.building ? 'building' : null),
     labels: { building: 'Buildings' },
     style: { color: '#5a4a3a', weight: 0.5, fillColor: '#a89880', fillOpacity: 0.6 },

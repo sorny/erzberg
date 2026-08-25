@@ -166,6 +166,43 @@ Overpass is a volunteer service. One query per fetch, `out geom` so no second
 pass is needed to resolve node references, identical queries answered from an
 in-memory cache, and the next mirror tried on a 429 or 504.
 
+#### How much to ask for
+
+"Everything OSM has for this extent" stops being answerable long before a user
+stops asking for it. Measured against the live API: 1 250 km² around Graz holds
+97 092 road ways — 6 152 of them motorway…tertiary — and 13 828 waterways, of
+which 162 are rivers or canals. Over the whole of Styria the default tick boxes
+come to roughly 1.2 million elements and a gigabyte of inlined geometry: past the
+server's 180 s budget, past `MAX_ELEMENTS`, and past what a tab can hold. The
+same extent asked for coarsely is 56 000 elements and 72 MB, in under a minute.
+
+So the **extent picks a detail tier** — by area, not by the longer side, since a
+200 × 5 km valley is a small fetch:
+
+| Tier | Extent | What narrows |
+|---|---|---|
+| `full` | under 2 500 km² | nothing — every class, as before |
+| `mid` | 2 500 – 22 500 km² | no footways, tracks, ditches or drains; woods and lakes above 1 km of perimeter |
+| `broad` | over 22 500 km² | trunk network only, rivers and canals, woods and lakes above 3 km, no trams or pistes |
+
+Two levers, both server-side, because what matters is what is never sent: fewer
+tag values, and `(if:length() > n)` to drop small polygons and stubs by
+perimeter — 43 048 forest ways over Styria become 342 at a 10 km perimeter, and
+the ones that survive are the forests you would draw. Relations are never
+length-filtered; they are the few hundred large multipolygons that the coarse
+tiers exist to keep. The tier is shown in the panel and can be overridden to
+`full` in one click, because a user who wanted every footpath and got the trunk
+roads needs to know which happened.
+
+Above 2 500 km² the fetch also **counts before it downloads**: `out count;` runs
+the same search and answers with a number instead of a gigabyte, so an extent
+that cannot be draped is refused in seconds rather than after four minutes of
+downloading. Only when the answer is no does a second, per-category count run —
+it costs the server one search per category, and it buys a refusal that names the
+offender. Which is rarely the one a user would guess: over Styria the heaviest
+category is not Buildings (already off by default) but Landuse & natural, at
+317 758 elements.
+
 Each attempt also carries its own **deadline**, covering headers and body, set
 above the server's own `[timeout:180]`. One budget rather than a short connect
 timeout and a long transfer one, because Overpass withholds response headers
@@ -638,6 +675,7 @@ framing, and the STL base plate.
 | `src/utils/stlExport.js` | Ribbon solids for layers that ask for one |
 | `tests/projection.spec.js` | CRS classification, projection maths, round-trips, coverage, load path |
 | `tests/vector.spec.js` | Fetch → layers, hide/remove, fills, uploads, SVG export |
+| `tests/osm-detail.spec.js` | Detail tiers by extent, and the pre-flight count that refuses a province by name |
 
 ### A note on geotiff.js
 

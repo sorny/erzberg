@@ -9,7 +9,7 @@ import ErosionWorker from '../utils/erosion.worker?worker'
 import { HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
 import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, metresPerWorldUnit, wgs84ExtentKm } from '../utils/geoCoords'
-import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES } from '../utils/osmCategories'
+import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES, OSM_DETAIL_LABEL, detailTierFor } from '../utils/osmCategories'
 import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
 import { featureLabel, toggleHidden } from '../utils/vectorLayers'
 import { CANCELLED } from '../utils/pacing'
@@ -844,6 +844,23 @@ function VectorLayersPanel({
   const canQuery = !!wgs
   const hasOsm = sources?.some((s) => s.kind === 'osm')
 
+  /*
+   * HOW MUCH OF OPENSTREETMAP TO ASK FOR.
+   *
+   * The extent decides, because it is the thing that makes the answer
+   * unmanageable: a province asked for at full detail is over a million
+   * elements and a gigabyte of geometry, and no timeout is long enough for
+   * that. The same extent asked for at its own tier arrives in under a minute
+   * and draws a better sheet — see `OSM_DETAIL_TIERS`.
+   *
+   * The tier is shown rather than applied silently, because a user who wanted
+   * every footpath and got the trunk roads needs to know which happened, and
+   * the override is one click away when the extent really is worth the wait.
+   */
+  const autoTier = detailTierFor(size ? size.w * size.h : 0)
+  const [fullDetail, setFullDetail] = useState(false)
+  const detail = fullDetail ? 'full' : autoTier
+
   const toggleCat = (id) =>
     setPicked((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
 
@@ -856,6 +873,7 @@ function VectorLayersPanel({
     onError(null)
     try {
       const { source, cached } = await fetchOsm(wgs, picked, {
+        detail,
         signal: ctrl.signal,
         onProgress: (_f, label) => label && setStatus(label),
         shouldCancel: () => ctrl.signal.aborted,
@@ -910,7 +928,7 @@ function VectorLayersPanel({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
           {size && (
-            <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>
+            <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }} data-testid="osm-extent">
               {size.w.toFixed(1)} × {size.h.toFixed(1)} km
             </span>
           )}
@@ -935,6 +953,14 @@ function VectorLayersPanel({
             )
           })}
         </div>
+
+        {autoTier !== 'full' && (
+          <div style={{ marginBottom: 8 }} data-testid="osm-detail">
+            <Tog label={`Detail: ${OSM_DETAIL_LABEL[detail]}`} small checked={fullDetail}
+                 onChange={setFullDetail}
+                 help={`An extent this size holds more than a browser can hold, so it is asked for at a coarser detail: fewer road and water classes, and only the larger woods and lakes. Switch this on to ask for everything anyway — on a province that is upwards of a million features, and the fetch will say so before it tries.`} />
+          </div>
+        )}
 
         <button onClick={fetching ? () => abortRef.current?.abort() : runFetch}
           disabled={!canQuery || !picked.length}

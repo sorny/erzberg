@@ -29,7 +29,8 @@
  */
 
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
-import { bucketLabel, bucketStyle, osmCategory } from './osmCategories'
+import { bucketLabel, bucketStyle, osmCategory, selectorsFor } from './osmCategories'
+import { wgs84ExtentKm } from './geoCoords'
 import { makeSource, packFeatures } from './vectorLayers'
 
 export const OSM_ATTRIBUTION = '© OpenStreetMap contributors'
@@ -70,6 +71,24 @@ const ATTEMPT_TIMEOUT_MS = (QUERY_TIMEOUT_S + 45) * 1000
 // memory and drape, and it is reported rather than silently applied.
 export const MAX_ELEMENTS = 400_000
 
+/**
+ * Above this, ask what the extent holds before downloading it.
+ *
+ * Overpass answers `out count;` by running the same search and sending back a
+ * number instead of a gigabyte, which turns "four minutes, then an error" into
+ * "two seconds, then a sentence naming what to untick". It is not free — the
+ * server does the search twice — so it is spent only where the answer could
+ * plausibly be no. Below 2 500 km² a fetch has never been too large to drape,
+ * and the extra round trip would be a tax on every ordinary fetch of a valley.
+ */
+const COUNT_ABOVE_KM2 = 2_500
+
+/** Square kilometres of a WGS84 envelope, or 0 when there is nothing to measure. */
+function extentKm2(bboxWgs84) {
+  const km = wgs84ExtentKm(bboxWgs84)
+  return km ? Math.max(0, km.w) * Math.max(0, km.h) : 0
+}
+
 // Identical queries are answered from memory. Ticking one more category and
 // re-fetching is a normal thing to do, and it should not cost the endpoint a
 // second full download of what was already sent.
@@ -81,19 +100,46 @@ const responseCache = new Map()
  * The bbox is stated once in the settings line, so every selector inherits it
  * and the query text stays short enough to read in a bug report.
  */
-export function buildOverpassQuery(bboxWgs84, categoryIds) {
-  const [minLon, minLat, maxLon, maxLat] = bboxWgs84
-  const bbox = [minLat, minLon, maxLat, maxLon].map((v) => v.toFixed(6)).join(',')
-
+export function buildOverpassQuery(bboxWgs84, categoryIds, detail = 'full') {
   const parts = []
   for (const id of categoryIds) {
     const cat = osmCategory(id)
     if (!cat) continue
-    for (const sel of cat.selectors) parts.push(`  ${sel};`)
+    for (const sel of selectorsFor(cat, detail)) parts.push(`  ${sel};`)
   }
   if (!parts.length) return null
 
-  return `[out:json][timeout:${QUERY_TIMEOUT_S}][bbox:${bbox}];\n(\n${parts.join('\n')}\n);\nout geom;`
+  return `${settings(bboxWgs84)};\n(\n${parts.join('\n')}\n);\nout geom;`
+}
+
+/** The settings line every query shares — output, budget, and the envelope. */
+function settings(bboxWgs84) {
+  const [minLon, minLat, maxLon, maxLat] = bboxWgs84
+  const bbox = [minLat, minLon, maxLat, maxLon].map((v) => v.toFixed(6)).join(',')
+  return `[out:json][timeout:${QUERY_TIMEOUT_S}][bbox:${bbox}]`
+}
+
+/**
+ * The same search, answered with a number instead of the data.
+ *
+ * `perCategory` puts each category in its own statement with its own `out
+ * count;`, so the reply is a list in catalogue order and the panel can say
+ * *which* tick box is the expensive one. That costs the server one search per
+ * category, so it is asked only when the combined count has already said no and
+ * the fetch is being refused anyway.
+ */
+export function buildCountQuery(bboxWgs84, categoryIds, detail = 'full', perCategory = false) {
+  const cats = categoryIds.map(osmCategory).filter(Boolean)
+  if (!cats.length) return null
+  const head = settings(bboxWgs84)
+
+  if (!perCategory) {
+    const parts = cats.flatMap((c) => selectorsFor(c, detail).map((sel) => `  ${sel};`))
+    return `${head};\n(\n${parts.join('\n')}\n);\nout count;`
+  }
+  const blocks = cats.map((c) =>
+    `(${selectorsFor(c, detail).map((sel) => `${sel};`).join('')});out count;`)
+  return `${head};\n${blocks.join('\n')}`
 }
 
 /**
@@ -315,6 +361,71 @@ async function fetchOverpassText(query, signal) {
   throw lastError ?? new Error('Could not reach OpenStreetMap.')
 }
 
+// Counts are cached like responses: ticking a category on and off while
+// deciding what to fetch must not cost the endpoint a search each time.
+const countCache = new Map()
+
+/** POST a count query and return its totals, in statement order. */
+async function runCount(query, signal, cacheKey) {
+  const cached = countCache.get(cacheKey)
+  if (cached) return cached
+  const text = await fetchOverpassText(query, signal)
+  let doc
+  try {
+    doc = JSON.parse(text)
+  } catch (err) {
+    throw new Error('OpenStreetMap sent a count this could not read.', { cause: err })
+  }
+  if (doc.remark) throw new Error(`OpenStreetMap: ${doc.remark}`)
+  const totals = (doc.elements ?? []).map((el) => Number(el?.tags?.total ?? 0))
+  countCache.set(cacheKey, totals)
+  return totals
+}
+
+/**
+ * How many elements this extent would return, without returning them.
+ *
+ * Exported because it is worth having on its own: the panel can say what a
+ * fetch is about to cost before anyone waits for it.
+ */
+export async function countOsm(bboxWgs84, categoryIds, { detail = 'full', signal, perCategory = false } = {}) {
+  const query = buildCountQuery(bboxWgs84, categoryIds, detail, perCategory)
+  if (!query) throw new Error('Nothing selected to count.')
+  const key = `${cacheKey(bboxWgs84, categoryIds, detail)}|${perCategory ? 'each' : 'all'}`
+  const totals = await runCount(query, signal, key)
+  if (!perCategory) return { total: totals[0] ?? 0, byCategory: null }
+
+  const cats = categoryIds.map(osmCategory).filter(Boolean)
+  const byCategory = cats.map((c, i) => ({ id: c.id, label: c.label, count: totals[i] ?? 0 }))
+  return { total: byCategory.reduce((n, c) => n + c.count, 0), byCategory }
+}
+
+/** One key for the bbox + tick boxes + detail tier, shared by both caches. */
+function cacheKey(bboxWgs84, categoryIds, detail) {
+  return `${bboxWgs84.map((v) => v.toFixed(5)).join(',')}|${[...categoryIds].sort().join(',')}|${detail}`
+}
+
+/**
+ * What to say when the extent holds more than this can draw.
+ *
+ * Naming the two heaviest categories with their own numbers, because "untick a
+ * category" is not advice without saying which one — and on a province it is
+ * rarely the one a user would guess. Buildings is the obvious suspect and is
+ * already off by default; the actual answer over Styria is Landuse & natural.
+ */
+function tooBigMessage(total, byCategory, detail) {
+  const worst = [...(byCategory ?? [])].sort((a, b) => b.count - a.count)
+    .filter((c) => c.count > 0).slice(0, 2)
+  const named = worst.length
+    ? ` — ${worst.map((c) => `${c.label} is ${c.count.toLocaleString()} of them`).join(', and ')}`
+    : ''
+  const lever = detail === 'full'
+    ? 'Untick a category, turn Full detail off, or crop the raster in Edit Mode.'
+    : 'Untick a category, or crop the raster in Edit Mode.'
+  return `That extent holds ${total.toLocaleString()} features, past the ` +
+         `${MAX_ELEMENTS.toLocaleString()} this can drape${named}. ${lever}`
+}
+
 /**
  * Fetch and bucket everything in `categoryIds` over `bboxWgs84`.
  *
@@ -322,21 +433,43 @@ async function fetchOverpassText(query, signal) {
  *          (from the pacer) or a DOMException named 'AbortError' (from fetch);
  *          the caller treats both as "nothing happened".
  */
-export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, shouldCancel } = {}) {
-  const query = buildOverpassQuery(bboxWgs84, categoryIds)
+export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, shouldCancel, detail = 'full' } = {}) {
+  const query = buildOverpassQuery(bboxWgs84, categoryIds, detail)
   if (!query) throw new Error('Nothing selected to fetch.')
 
   const pacer = makePacer(shouldCancel ?? (() => false))
   const report = makeReporter(onProgress)
 
-  const key = `${bboxWgs84.map((v) => v.toFixed(5)).join(',')}|${[...categoryIds].sort().join(',')}`
+  const key = cacheKey(bboxWgs84, categoryIds, detail)
   const hit = responseCache.get(key)
 
   let elements
   if (hit) {
     elements = hit
   } else {
-    report(0, 'Querying OpenStreetMap…')
+    /*
+     * On a large extent, ask what it holds before asking for it.
+     *
+     * The alternative is what this replaces: four minutes of downloading a
+     * province, and then the element cap below rejecting it — the whole cost
+     * paid, and the user told nothing except that it did not work. A count
+     * costs one search and answers in seconds.
+     */
+    if (extentKm2(bboxWgs84) > COUNT_ABOVE_KM2) {
+      report(0, 'Measuring the extent…')
+      const { total } = await countOsm(bboxWgs84, categoryIds, { detail, signal })
+      if (total > MAX_ELEMENTS) {
+        // Only now is the per-category breakdown worth a search of its own: the
+        // fetch is being refused either way, and this is what makes the refusal
+        // actionable.
+        const { byCategory } = await countOsm(bboxWgs84, categoryIds,
+          { detail, signal, perCategory: true }).catch(() => ({ byCategory: null }))
+        throw new Error(tooBigMessage(total, byCategory, detail))
+      }
+      report(0, `${total.toLocaleString()} features — querying OpenStreetMap…`)
+    } else {
+      report(0, 'Querying OpenStreetMap…')
+    }
     // Text rather than `res.json()`: the download is the long part, and parsing
     // it separately is what lets the progress bar move between the two.
     const text = await fetchOverpassText(query, signal)
@@ -354,18 +487,14 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
     responseCache.set(key, elements)
   }
 
-  if (elements.length > MAX_ELEMENTS) {
-    throw new Error(
-      `That extent holds ${elements.length.toLocaleString()} features, past the ` +
-      `${MAX_ELEMENTS.toLocaleString()} this can drape. Untick a category — Buildings ` +
-      `is usually the one — or crop the raster in Edit Mode first.`
-    )
-  }
+  // The backstop, for the extents small enough that no count was run — and for a
+  // count that was right about the search but not about what came back.
+  if (elements.length > MAX_ELEMENTS) throw new Error(tooBigMessage(elements.length, null, detail))
 
   const source = await bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
     (f, label) => report(0.5 + 0.5 * f, label))
   return { source, cached: !!hit }
 }
 
-export function clearOsmCache() { responseCache.clear() }
+export function clearOsmCache() { responseCache.clear(); countCache.clear() }
 export { CANCELLED }
