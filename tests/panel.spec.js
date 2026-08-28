@@ -118,4 +118,65 @@ test.describe('panel', () => {
     expect(written).toBe('Heightmap-alpha.png')
     expect(toast, 'the message exists to name the file').toContain(written)
   })
+  test('a formatted slider announces what the panel prints', async ({ page }) => {
+    // aria-label gave a screen reader the name and the raw number, so a control
+    // reading "315°" was announced as "315" and one reading "100%" as "1" — the
+    // value heard and the value beside it disagreed.
+    await openApp(page)
+    await page.click('[data-testid="section-hillshade"]')
+    await page.waitForTimeout(300)
+    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.waitForTimeout(1200)
+
+    const slider = page.locator('input.hmr[aria-label="Azimuth"]')
+    await expect(slider).toHaveValue('315')
+    await expect(slider).toHaveAttribute('aria-valuetext', '315°')
+
+    // And it tracks the value rather than being a one-off at mount.
+    await page.locator('input.hmval[aria-label="Azimuth value"]').fill('90')
+    await page.keyboard.press('Enter')
+    await page.waitForTimeout(400)
+    await expect(slider).toHaveAttribute('aria-valuetext', '90°')
+  })
+
+  test('clicking a control’s label focuses the control', async ({ page }) => {
+    // Every row used to build a <span> for its label and hand the input an
+    // aria-label, so a screen reader was served but the pointer was not:
+    // clicking the visible word did nothing, on 10px text.
+    await openApp(page)
+    await page.click('[data-testid="section-hillshade"]')
+    await page.waitForTimeout(300)
+    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.waitForTimeout(1200)
+
+    const slider = page.locator('input.hmr[aria-label="Azimuth"]')
+    const id = await slider.getAttribute('id')
+    expect(id, 'the slider must carry an id to be pointed at').toBeTruthy()
+
+    const label = page.locator(`label[for="${id}"]`)
+    await expect(label).toHaveText('Azimuth')
+    await label.click()
+    await expect(slider).toBeFocused()
+  })
+
+  test('the help button does not toggle the control it explains', async ({ page }) => {
+    // The `?` sits inside the same row as the label. Wrapping the whole row in a
+    // <label> would have made every click on it flip the switch beside it, so
+    // the association deliberately covers the text and nothing else.
+    await openApp(page)
+    await page.click('[data-testid="section-hillshade"]')
+    await page.waitForTimeout(300)
+    const enabled = page.locator('input[type=checkbox][aria-label="Enabled"]').first()
+    await enabled.click()
+    await page.waitForTimeout(1200)
+    await expect(enabled).toBeChecked()
+
+    // Cast shadows carries both a switch and a help button.
+    const help = page.locator('button.hmi[aria-label="What Cast Shadows does"]')
+    const shadows = page.locator('input[type=checkbox][aria-label="Cast Shadows"]')
+    const before = await shadows.isChecked()
+    await help.click()
+    await page.waitForTimeout(300)
+    expect(await shadows.isChecked(), 'asking what it does must not do it').toBe(before)
+  })
 })

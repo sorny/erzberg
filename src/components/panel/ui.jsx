@@ -7,7 +7,7 @@
  * on the first tweak. Nothing here knows about terrain — it is the panel's
  * design system and nothing else.
  */
-import { useContext, useEffect, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { SectionFilter, sectionMatches } from './filter'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -265,19 +265,27 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
 
 export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2, testId }) {
   const [showHelp, setShowHelp] = useState(false)
+  const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ marginBottom: 8, ...(col2 && { gridColumn: '1/-1' }) }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 3 }}>
         <span style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center' }}>
-          {label}
+          {/* The label wraps the text and NOT the help button: a `?` inside a
+              `<label>` would toggle the control it explains on every click. */}
+          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         {hint && <span style={{ fontSize: 10, color: MUTED }}>{hint}</span>}
       </div>
       {showHelp && help && <HelpBox text={help} />}
       <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
-        <input type="range" className="hmr" data-testid={testId} aria-label={label}
+        {/* aria-valuetext: what the panel prints, not the raw number. A slider
+            reading "50.0°" or "100%" was announced as "50" or "1" — the value a
+            screen reader heard and the one beside it disagreed, and `fmt` was
+            already in scope. */}
+        <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
+          aria-valuetext={fmt ? String(fmt(value)) : undefined}
           min={min} max={max} step={step} value={value}
           onChange={e => onChange(parsed(e.target.value))} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
@@ -289,26 +297,28 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
 
 export function Tog({ label, hint, help, checked, onChange, small }) {
   const [showHelp, setShowHelp] = useState(false)
+  const id = useId()
   const fs = small ? 11 : 12
   const tc = small ? MUTED : DIM
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: fs, color: tc, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
+          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
+          {hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <Switch label={label} checked={checked} onChange={onChange} />
+        <Switch id={id} label={label} checked={checked} onChange={onChange} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
 
-export function Switch({ label, checked, onChange }) {
+export function Switch({ id, label, checked, onChange }) {
   return (
     <label style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
-      <input type="checkbox" checked={checked} aria-label={label}
+      <input type="checkbox" id={id} checked={checked} aria-label={label}
         onChange={e => onChange(e.target.checked)}
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer' }} />
       <span style={{ position:'absolute', inset:0, background: checked ? ACCENT : BORDER, borderRadius:9, transition:'background .15s', pointerEvents:'none' }}>
@@ -323,14 +333,15 @@ export function Switch({ label, checked, onChange }) {
 
 export function ColorRow({ label, help, value, onChange, testId }) {
   const [showHelp, setShowHelp] = useState(false)
+  const id = useId()
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
         <span style={{ fontSize: 12, color: DIM, display:'flex', alignItems:'center' }}>
-          {label}
+          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <input type="color" className="hmc" data-testid={testId} aria-label={label}
+        <input type="color" className="hmc" id={id} data-testid={testId} aria-label={label}
           value={value} onChange={e => onChange(e.target.value)} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
@@ -360,15 +371,22 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
 
 export function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId }) {
   const [showHelp, setShowHelp] = useState(false)
+  const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display: 'flex', alignItems: 'center' }}>
-          {label}{hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
+          {hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <input type="range" className="hmr" data-testid={testId} aria-label={label}
+        {/* aria-valuetext: what the panel prints, not the raw number. A slider
+            reading "50.0°" or "100%" was announced as "50" or "1" — the value a
+            screen reader heard and the one beside it disagreed, and `fmt` was
+            already in scope. */}
+        <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
+          aria-valuetext={fmt ? String(fmt(value)) : undefined}
           min={min} max={max} step={step} value={value}
           onChange={e => onChange(parsed(e.target.value))} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
@@ -408,11 +426,11 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
           <div style={{ position:'absolute', top:5, height:3, borderRadius:2, background: ACCENT,
                         left:`${pct(lo)}%`, width:`${Math.max(0, pct(hi) - pct(lo))}%` }} />
           <input type="range" className="hmrr" data-testid={testId && `${testId}-lo`}
-            aria-label={`${label} lower bound`}
+            aria-label={`${label} lower bound`} aria-valuetext={String(f(lo))}
             min={min} max={max} step={step} value={lo}
             onChange={(e) => onChange(Math.min(parseFloat(e.target.value), hi - GAP), hi)} />
           <input type="range" className="hmrr" data-testid={testId && `${testId}-hi`}
-            aria-label={`${label} upper bound`}
+            aria-label={`${label} upper bound`} aria-valuetext={String(f(hi))}
             min={min} max={max} step={step} value={hi}
             onChange={(e) => onChange(lo, Math.max(parseFloat(e.target.value), lo + GAP))} />
         </div>
