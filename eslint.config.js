@@ -31,6 +31,51 @@ const unusedVars = ['error', {
   caughtErrorsIgnorePattern: '^_',
 }]
 
+/**
+ * Two props of the same name on one JSX element.
+ *
+ * JSX keeps the last one and drops the rest silently — no error, no warning,
+ * nothing in the output to look at. `Section` in panel/ui.jsx carried `style`
+ * twice for exactly as long as it took someone to read the file: a
+ * filtering-only `{ cursor: 'default' }` written above the real style object,
+ * discarded on every render, so the header advertised a pointer over a control
+ * the filter had already made inert.
+ *
+ * This is `eslint-plugin-react`'s `jsx-no-duplicate-props`, written out rather
+ * than installed: that plugin's peer range stops at eslint ^9.7 and this project
+ * is on 10, so adding it would mean --legacy-peer-deps and a broken `npm ci`.
+ * Twenty lines against the AST is the cheaper answer, and it is the only rule
+ * from that plugin this config wants — pure correctness, nothing stylistic,
+ * which is the bar the rest of this file sets.
+ */
+const noDuplicateProps = {
+  meta: {
+    type: 'problem',
+    docs: { description: 'Disallow duplicate props on a JSX element' },
+    schema: [],
+    messages: { duplicate: "'{{name}}' is set twice on this element; JSX keeps only the last." },
+  },
+  create(context) {
+    return {
+      JSXOpeningElement(node) {
+        const seen = new Set()
+        for (const attr of node.attributes) {
+          // A spread may legitimately sit between two of the same name — the
+          // second is then an intentional override of whatever the spread
+          // carried — so seeing one clears the slate.
+          if (attr.type === 'JSXSpreadAttribute') { seen.clear(); continue }
+          const n = attr.name
+          const name = n.type === 'JSXNamespacedName'
+            ? `${n.namespace.name}:${n.name.name}`
+            : n.name
+          if (seen.has(name)) context.report({ node: attr, messageId: 'duplicate', data: { name } })
+          seen.add(name)
+        }
+      },
+    }
+  },
+}
+
 export default [
   { ignores: ['dist/**', 'test-results/**'] },
 
@@ -44,7 +89,11 @@ export default [
   {
     files: ['src/**/*.{js,jsx}'],
     ignores: ['src/utils/*.worker.js'],
-    plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },
+    plugins: {
+      'react-hooks': reactHooks,
+      'react-refresh': reactRefresh,
+      local: { rules: { 'jsx-no-duplicate-props': noDuplicateProps } },
+    },
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',
@@ -58,6 +107,7 @@ export default [
       // panel/ui.jsx exports BG, SURF, ACCENT, W beside its components; those are
       // constants and do not break Fast Refresh.
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      'local/jsx-no-duplicate-props': 'error',
     },
   },
 

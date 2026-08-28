@@ -502,10 +502,15 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
           silently collapsed reappeared that way once the field was cleared. */}
       <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
         aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
-        style={q ? { cursor: 'default' } : undefined}
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
           display:'flex', justifyContent:'space-between', alignItems:'center',
-          padding:'10px 14px', cursor:'pointer', userSelect:'none', width:'100%',
+          padding:'10px 14px', userSelect:'none', width:'100%',
+          // One `style`, not two. This element used to carry the prop twice —
+          // a filtering-only `{ cursor: 'default' }` and then this object — and
+          // JSX keeps the last one, so the override above it never applied and
+          // the header went on showing a pointer over a control the filter had
+          // already made inert.
+          cursor: q ? 'default' : 'pointer',
         }}>
         <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
           {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
