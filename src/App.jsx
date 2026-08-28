@@ -34,6 +34,7 @@ import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
+import { clearOsmCache } from './utils/osmFetch'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
@@ -313,6 +314,11 @@ export default function App() {
     clearVectorSources()
     setVectorLayers([])
     setVectorError(null)
+    // Including the Overpass responses those layers came from. They are keyed on
+    // the old raster's extent, so they can never be hit again from here — and an
+    // entry is the raw JSON of a whole valley, which is not something to hold on
+    // to for a place that is no longer open.
+    clearOsmCache()
   }, [clearVectorSources])
 
   /**

@@ -92,7 +92,37 @@ function extentKm2(bboxWgs84) {
 // Identical queries are answered from memory. Ticking one more category and
 // re-fetching is a normal thing to do, and it should not cost the endpoint a
 // second full download of what was already sent.
+//
+// Bounded, because an entry here is the largest thing this app caches: up to
+// MAX_ELEMENTS Overpass elements, which is the raw JSON of a whole valley. An
+// unbounded Map kept every distinct query of a session resident for as long as
+// the tab lived. Three is sized to the workflow it exists for — tick a category,
+// re-fetch, untick it, go back — and not to a browsing history.
+const RESPONSE_CACHE_MAX = 3
 const responseCache = new Map()
+
+// Counts are a handful of integers each, so this one is capped for tidiness
+// rather than for memory.
+const COUNT_CACHE_MAX = 32
+
+/**
+ * Least-recently-used reads and writes over a plain Map.
+ *
+ * A Map iterates in insertion order, so "delete then set" moves an entry to the
+ * end and the oldest key is always `keys().next()`. That is the whole mechanism
+ * — no second structure, and nothing to keep in step with the Map itself.
+ */
+function lruGet(map, key) {
+  if (!map.has(key)) return undefined
+  const value = map.get(key)
+  map.delete(key); map.set(key, value)
+  return value
+}
+
+function lruSet(map, key, value, cap) {
+  map.delete(key); map.set(key, value)
+  while (map.size > cap) map.delete(map.keys().next().value)
+}
 
 /**
  * Overpass QL for a set of category ids over a WGS84 envelope.
@@ -367,7 +397,7 @@ const countCache = new Map()
 
 /** POST a count query and return its totals, in statement order. */
 async function runCount(query, signal, cacheKey) {
-  const cached = countCache.get(cacheKey)
+  const cached = lruGet(countCache, cacheKey)
   if (cached) return cached
   const text = await fetchOverpassText(query, signal)
   let doc
@@ -378,7 +408,7 @@ async function runCount(query, signal, cacheKey) {
   }
   if (doc.remark) throw new Error(`OpenStreetMap: ${doc.remark}`)
   const totals = (doc.elements ?? []).map((el) => Number(el?.tags?.total ?? 0))
-  countCache.set(cacheKey, totals)
+  lruSet(countCache, cacheKey, totals, COUNT_CACHE_MAX)
   return totals
 }
 
@@ -441,7 +471,7 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
   const report = makeReporter(onProgress)
 
   const key = cacheKey(bboxWgs84, categoryIds, detail)
-  const hit = responseCache.get(key)
+  const hit = lruGet(responseCache, key)
 
   let elements
   if (hit) {
@@ -484,7 +514,7 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
     }
     if (doc.remark) throw new Error(`OpenStreetMap: ${doc.remark}`)
     elements = doc.elements ?? []
-    responseCache.set(key, elements)
+    lruSet(responseCache, key, elements, RESPONSE_CACHE_MAX)
   }
 
   // The backstop, for the extents small enough that no count was run — and for a
