@@ -834,10 +834,26 @@ export default function App() {
     }
     if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
     const data = JSON.stringify(payload, null, 2) + '\n'
-    Object.assign(document.createElement('a'), {
-      download: 'heightmap_preset.json',
-      href: 'data:application/json,' + encodeURIComponent(data),
-    }).click()
+    /*
+     * A Blob URL, not a data: URI.
+     *
+     * `heightmapDataURL` is already a base64 PNG of the whole raster, and the
+     * previous line ran `encodeURIComponent` over the JSON holding it — percent-
+     * encoding a payload that was expanded by a third by base64 already, as one
+     * JS string, with the browser then parsing that string as a URL. On a
+     * carry-the-heightmap preset from a large raster that is a real allocation
+     * spike for nothing, and data: URI length limits vary between browsers.
+     *
+     * A Blob is handed to the download as bytes. Same three lines, and it is
+     * what svgExport's own `download()` has always done.
+     */
+    const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }))
+    const a = Object.assign(document.createElement('a'),
+      { href: url, download: 'heightmap_preset.json' })
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }, [terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers,
       heightmapPixels, heightmapWidth, heightmapHeight, heightmapFilename])
 
