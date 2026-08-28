@@ -576,14 +576,31 @@ export default function App() {
         const baseUrl = import.meta.env.BASE_URL || '/'
         const res = await fetch(`${baseUrl}presets/manifest.json`)
         const manifest = await res.json()
-        const loaded = {}
-        for (const file of manifest) {
-          const presRes = await fetch(`${baseUrl}presets/${file}`)
-          const presData = await presRes.json()
-          const name = file.replace('.json', '')
-          loaded[name] = presData
-        }
-        setExternalPresets(loaded)
+        /*
+         * In parallel, and tolerant of one bad file.
+         *
+         * These were fetched one after another: 56 sequential round trips,
+         * which on a dev server is nothing and on a deployed build is seconds.
+         * That window is not merely slow — it is the window in which the panel
+         * is already usable and the opening preset has not arrived, which is
+         * what let a Reset all be overwritten by Alpine Survey a moment later.
+         * The flag in Sidebar makes that harmless; this makes it rare.
+         *
+         * The browser caps its own concurrency per host, so what this removes
+         * is the serialisation rather than the politeness. One unreadable
+         * preset now costs its own tile instead of the other fifty-five.
+         */
+        const entries = await Promise.all(manifest.map(async (file) => {
+          try {
+            const presRes = await fetch(`${baseUrl}presets/${file}`)
+            if (!presRes.ok) throw new Error(`HTTP ${presRes.status}`)
+            return [file.replace('.json', ''), await presRes.json()]
+          } catch (err) {
+            console.warn('[App] Skipped preset', file, err)
+            return null
+          }
+        }))
+        setExternalPresets(Object.fromEntries(entries.filter(Boolean)))
       } catch (e) {
         console.warn('[App] Could not load external presets:', e)
       }

@@ -1434,15 +1434,27 @@ export function Sidebar({
     [projection.id, snd.spec]
   )
 
+  /**
+   * Whether the opening preset may still land.
+   *
+   * It waits on 56 preset files, so on a slow connection — a deployed build
+   * rather than a dev server on localhost — it can arrive a second or more after
+   * the panel is already usable. Anything that deliberately establishes a look
+   * inside that window has to win, or the opening quietly lands on top of it.
+   *
+   * This was one flag short of that. Moving a slider set it, but the three paths
+   * that set a *whole* look did not: Reset all cleared the preset tiles and left
+   * this alone, so a reset inside that first second gave bare defaults and then
+   * Alpine Survey a moment later; Surprise me and loading a preset file had the
+   * same hole. One flag now, spent by every path that establishes a look —
+   * including the opening itself, which is what makes it run once.
+   */
+  const openingSpent = useRef(false)
+  const spendOpening = () => { openingSpent.current = true }
   // Every style or particle change that did not come from applyPreset means the
   // user has left the preset behind. applyPreset writes through setStyle/setPoints
   // directly, so it does not trip this.
-  // Has the user changed anything yet? The opening preset waits on 56 preset
-  // files, so it can arrive a second or more after the panel is usable — and
-  // applying it then would overwrite whatever had already been touched. Set by
-  // every parameter setter below, and read by the effect that would apply it.
-  const userTouched = useRef(false)
-  const leftPreset = () => { userTouched.current = true; if (lastPreset) setPresetEdited(true) }
+  const leftPreset = () => { spendOpening(); if (lastPreset) setPresetEdited(true) }
   // applyPreset writes both gradients, so changing one by hand is as much a
   // departure from the preset as moving a slider. These wrap the setters for
   // the panel; applyPreset keeps using the raw props, which is what stops it
@@ -1457,6 +1469,9 @@ export function Sidebar({
   // The panel's own share of a reset: the preset tiles have to stop pointing at
   // a look the settings no longer hold.
   const handleResetAll = () => {
+    // Bare defaults are a look the user asked for, so the opening must not
+    // arrive after it and overwrite it.
+    spendOpening()
     setLastPreset(null)
     setPresetEdited(false)
     setRollSeed(null)
@@ -1533,6 +1548,9 @@ export function Sidebar({
   }
 
   const applyPreset = (preset, name = null) => {
+    // Rolling a look or picking a tile is establishing one, so it spends the
+    // opening too — otherwise a roll in the first second is overwritten by it.
+    spendOpening()
     setStyle(prev => ({ ...prev, ...preset.style }))
     // Particle params live in the points state, not style — without this a
     // preset can never drive the hologram field. All presets carry a points
@@ -1575,13 +1593,11 @@ export function Sidebar({
    * randomiser's starting point. This is an opening state, not a new baseline.
    * A restored session wins, because that is somebody's actual work.
    */
-  const openingApplied = useRef(false)
   useEffect(() => {
-    if (openingApplied.current || sessionRestored) return
-    if (userTouched.current) { openingApplied.current = true; return }   // too late to be an opening
+    if (openingSpent.current || sessionRestored) return
     const preset = externalPresets?.[OPENING_PRESET]
     if (!preset) return                       // manifest still in flight
-    openingApplied.current = true
+    spendOpening()
     applyPreset(preset, OPENING_PRESET)
     // Not the user's doing, so it must not be stored as their session.
     onPristine?.()
@@ -2858,7 +2874,11 @@ export function Sidebar({
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
               <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
-              <ExpBtn label="Preset ⬆" hint="load" onClick={onLoadPreset} />
+              {/* Spends the opening on the *click*, not on the file landing: the
+                  picker is a dialog the user sits in front of, and the opening
+                  arriving behind it would be overwritten by the load anyway —
+                  or worse, land after it. */}
+              <ExpBtn label="Preset ⬆" hint="load" onClick={() => { spendOpening(); onLoadPreset?.() }} />
             </div>
             <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
           </Section>
