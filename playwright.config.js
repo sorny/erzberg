@@ -2,6 +2,15 @@ import { defineConfig } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
+  /*
+   * `.spec.js` only, so `tests/unit/*.test.js` stays with Vitest.
+   *
+   * Playwright's default testMatch takes both extensions, and handing it a file
+   * that imports `vitest` fails in a way that reads as a broken spec rather than
+   * as the wrong runner. The two suites are separated by extension as well as by
+   * directory so neither can pick up the other's files by accident.
+   */
+  testMatch: /.*\.spec\.js$/,
   timeout: 60_000,
   /**
    * One worker, deliberately — and it is not a tax.

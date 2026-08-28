@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "playwright test",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "test:ui": "playwright test --ui",
     "update-presets": "node scripts/update-presets.js",
     "font": "node scripts/build-font.js",
@@ -41,7 +43,8 @@
     "opentype.js": "^2.0.0",
     "postcss": "^8.4.41",
     "tailwindcss": "^4.2.4",
-    "vite": "^8.0.9"
+    "vite": "^8.0.9",
+    "vitest": "^4.1.11"
   },
   "allowScripts": {
     "fsevents@2.3.2": true,

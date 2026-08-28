@@ -421,7 +421,7 @@ The app is built to idle quietly and stay responsive under load.
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
 | Audio | Web Audio `decodeAudioData` + in-house radix-2 FFT (no dependency) |
-| Tests | Playwright, against a live dev server in real Chrome |
+| Tests | Vitest for the pure maths; Playwright against a live dev server in real Chrome |
 
 ---
 
@@ -445,6 +445,7 @@ npm install
 npm run dev              # dev server at http://localhost:5173
 npm run build            # production build
 npm run lint             # ESLint — correctness rules only, no formatting
+npm run test:unit        # Vitest — the pure maths, ~0.3s
 npm run test             # Playwright end-to-end suite
 npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
@@ -465,7 +466,16 @@ records why the React Compiler rules that ship with `eslint-plugin-react-hooks`
 v7 are declined: driving three.js *is* mutating material uniforms in an effect,
 so three of them flag working code in every r3f app.
 
-Tests run against a live dev server in non-headless Chrome with WebGL enabled,
+Two suites, and they do not overlap. `test:unit` is Vitest over the modules that
+are just arithmetic — the box blur, area resampling, the bilinear tap,
+Douglas–Peucker, the projections, and the parameter registry that decides when a
+rebuild happens. They run in Node in about a third of a second and assert the
+maths directly, which is what a deviation bound or a projection wants instead of
+being inferred from a pixel eleven seconds into a spec. They live in
+`tests/unit/*.test.js`; Playwright is pinned to `*.spec.js` so neither runner
+picks up the other's files.
+
+Everything else is end-to-end, and that is not a gap. Tests run against a live dev server in non-headless Chrome with WebGL enabled,
 because the things worth asserting — what the geometry worker produced, what the
 SVG exporter drew, whether the drawing buffer was clamped — only exist in a real
 renderer. Some specs depend on fixtures that are gitignored for size; those skip
