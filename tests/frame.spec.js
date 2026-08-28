@@ -1,8 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
 
+// The switch itself, by the name it carries. This used to walk
+// `//span[text()="X"]/following-sibling::label` because the text was a bare
+// node in a span and clicking it did nothing — which is the accessibility gap
+// that has since been fixed, so the text is now a real <label> and the span has
+// no direct text node to match. Naming the checkbox is both shorter and immune
+// to the row's layout: TogColor nests its switch a level deeper and this finds
+// it just the same.
 const toggleFor = (page, label) =>
-  page.locator(`xpath=//span[text()="${label}"]/following-sibling::label`)
+  page.locator(`input[type=checkbox][aria-label="${label}"]`)
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')

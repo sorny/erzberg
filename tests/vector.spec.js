@@ -221,7 +221,7 @@ test.describe('vector layers', () => {
     // Polled rather than slept on: the count arrives from a worker round trip,
     // and a fixed wait is a race that only shows up under the GPU contention of
     // a full suite run.
-    const fillToggle = page.locator(`[data-testid="vector-fill-${id}"] label`)
+    const fillToggle = page.locator(`[data-testid="vector-fill-${id}"] input[type=checkbox]`)
     await fillToggle.click()
     await expect.poll(() => triangles(page), { timeout: 20000 }).toBeLessThan(filled)
 
@@ -578,7 +578,7 @@ test.describe('vector layers', () => {
     await page.waitForSelector('text=Peaks')
     await page.waitForTimeout(2000)
 
-    await page.locator('text=Identify on hover').locator('..').locator('label').click()
+    await page.locator('input[type=checkbox][aria-label="Identify on hover"]').click()
     await page.waitForTimeout(500)
 
     const box = await page.locator('canvas[data-engine]').boundingBox()
@@ -664,8 +664,7 @@ test.describe('vector layers', () => {
     expect(outlined).toContain('font-family="Space Mono')
     expect(outlined).toMatch(/<text transform="matrix\([^"]+\)" font-size="1"/)
 
-    await page.locator('text=Use single-line font').locator('..')
-      .locator('input[type=checkbox]').click()
+    await page.locator('input[type=checkbox][aria-label="Use single-line font"]').click()
     await page.waitForTimeout(2500)
     const stroked = await exportSvg()
     expect(stroked.match(/<text[^>]*>/g), 'a stroke face exports strokes, not text').toBeNull()
@@ -706,8 +705,7 @@ test.describe('vector layers', () => {
     await expect(page.locator(`[data-testid="label-fill-${id}"]`)).toHaveCount(1)
     await expect(page.locator(`[data-testid="label-font-${id}"]`)).toHaveCount(0)
 
-    await page.locator('text=Use single-line font').locator('..')
-      .locator('input[type=checkbox]').click()
+    await page.locator('input[type=checkbox][aria-label="Use single-line font"]').click()
     await page.waitForTimeout(2500)
 
     // …and withdrawn for a stroke one, which has no interior to fill.
@@ -1012,7 +1010,7 @@ test.describe('vector layers', () => {
     expect(group[1]).not.toContain('<polygon')
 
     // Switching Fill off leaves the outline, which is what a plotter draws.
-    await page.locator(`[data-testid="icon-fill-${id}"] label`).click()
+    await page.locator(`[data-testid="icon-fill-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => triangles(page), { timeout: 20000 }).toBe(bare)
   })
 
@@ -1042,18 +1040,18 @@ test.describe('vector layers', () => {
     })
     expect(cost.names).toBeGreaterThan(0)
 
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => segments(page), { timeout: 20000 }).toBe(dots + cost.names)
 
-    await page.locator(`[data-testid="label-height-${id}"] label`).click()
+    await page.locator(`[data-testid="label-height-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => segments(page), { timeout: 20000 }).toBe(dots + cost.names + cost.heights)
 
     // The height stands on its own — a plot of spot elevations is a real thing.
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => segments(page), { timeout: 20000 }).toBe(dots + cost.heights)
 
     // And off is off, with no residue.
-    await page.locator(`[data-testid="label-height-${id}"] label`).click()
+    await page.locator(`[data-testid="label-height-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => segments(page), { timeout: 20000 }).toBe(dots)
   })
 
@@ -1066,7 +1064,7 @@ test.describe('vector layers', () => {
 
     const id = await openIconPicker(page, 'Peaks')
     await page.click(`[data-testid="icon-${id}-triangle"]`)
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.locator(`[data-testid="label-weight-${id}"]`).fill('5')
     await page.waitForTimeout(2000)
 
@@ -1113,7 +1111,7 @@ test.describe('vector layers', () => {
 
     const id = await openIconPicker(page, 'Peaks')
     await page.click(`[data-testid="icon-${id}-triangle"]`)
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(2000)
 
     /** What one pen layer draws with: its stroke colour and its opacity. */
@@ -1168,7 +1166,7 @@ test.describe('vector layers', () => {
 
     const id = await openIconPicker(page, 'Peaks')
     await page.click(`[data-testid="icon-${id}-triangle"]`)
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(2000)
 
     const val = (what) => page.locator(`[data-testid="${what}-${id}"]`).inputValue()
@@ -1221,7 +1219,7 @@ test.describe('vector layers', () => {
     expect(await val('label-fill-opacity')).toBe('0.75')
 
     // Each mark's fill can be switched off without touching the other's.
-    await page.locator(`[data-testid="icon-fill-${id}"] label`).click()
+    await page.locator(`[data-testid="icon-fill-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(500)
     expect(await val('label-fill-color')).toBe('#0000ff')
 
@@ -1361,7 +1359,7 @@ test.describe('vector layers', () => {
 
     const id = await openIconPicker(page, 'Peaks')
     await page.click(`[data-testid="icon-${id}-triangle"]`)
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(2500)
 
     const marks = await page.evaluate(() => {
@@ -1426,7 +1424,7 @@ test.describe('vector layers', () => {
     expect(cost.bold).not.toBe(cost.regular)
     expect(cost.italic).not.toBe(cost.regular)
 
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await expect.poll(() => segments(page), { timeout: 20000 }).toBe(dots + cost.regular)
 
     await page.click(`[data-testid="label-bold-${id}"]`)
@@ -1455,7 +1453,7 @@ test.describe('vector layers', () => {
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(2000)
 
     await page.evaluate(() => document.activeElement?.blur())
@@ -1505,7 +1503,7 @@ test.describe('vector layers', () => {
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
-    await page.locator(`[data-testid="label-name-${id}"] label`).click()
+    await page.locator(`[data-testid="label-name-${id}"] input[type=checkbox]`).click()
     await page.waitForTimeout(2000)
 
     await page.evaluate(() => document.activeElement?.blur())
@@ -1661,7 +1659,7 @@ test.describe('vector layers', () => {
 
     // Off, and aimed flat at the ground: the glyphs foreshorten, so the drawing
     // must change.
-    await page.locator('text=Face camera').locator('..').locator('label').click()
+    await page.locator('input[type=checkbox][aria-label="Face camera"]').click()
     await page.locator(`[data-testid="icon-tilt-${id}"]`).fill('0')
     await page.waitForTimeout(2000)
     expect(await drawn(), 'tilt must change what is drawn').not.toBe(facing)
@@ -2110,7 +2108,7 @@ test.describe('vector layers', () => {
     const paintFill = async (id, hex) => {
       await page.click(`[data-testid="vector-name-${id}"]`)
       const fill = page.locator(`[data-testid="vector-fill-${id}"]`)
-      if (!(await fill.locator('input[type="color"]').count())) await fill.locator('label').click()
+      if (!(await fill.locator('input[type="color"]').count())) await fill.locator('input[type=checkbox]').click()
       await fill.locator('input[type="color"]').fill(hex)
       await fill.locator('input[type="range"]').fill('0.95')
       await page.click(`[data-testid="vector-name-${id}"]`)

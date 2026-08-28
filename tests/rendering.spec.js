@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
 
-// Switch inputs are display:none inside a label that is a *sibling* of the text
-// span, so clicking the label text does nothing — walk from the span instead.
+// The switch itself, by the name it carries. This used to walk
+// `//span[text()="X"]/following-sibling::label` because the text was a bare
+// node in a span and clicking it did nothing — which is the accessibility gap
+// that has since been fixed, so the text is now a real <label> and the span has
+// no direct text node to match. Naming the checkbox is both shorter and immune
+// to the row's layout: TogColor nests its switch a level deeper and this finds
+// it just the same.
 const toggleFor = (page, label) =>
-  page.locator(`xpath=//span[text()="${label}"]/following-sibling::label`)
+  page.locator(`input[type=checkbox][aria-label="${label}"]`)
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -58,7 +63,7 @@ test('raw terrain view shows the heightmap as a flat greyscale plane', async ({ 
 
   const tog = toggleFor(page, 'Raw terrain view')
   await tog.click({ force: true })
-  await expect(tog.locator('input')).toBeChecked()
+  await expect(tog).toBeChecked()
   await page.waitForTimeout(2500)
 
   const raw = await rawSample(page)
@@ -78,11 +83,11 @@ test('raw terrain view shows the heightmap as a flat greyscale plane', async ({ 
   // visible, since most of them are dark against a dark plane anyway.
   const lines = page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ }).first()
     .locator('label').first()
-  const wasOn = await lines.locator('input').isChecked()
+  const wasOn = await lines.isChecked()
   await lines.click({ force: true })
   // Without this the pixel-equality check below would also pass if the click
   // simply missed its target.
-  await expect(lines.locator('input')).toBeChecked({ checked: !wasOn })
+  await expect(lines).toBeChecked({ checked: !wasOn })
   await page.waitForTimeout(2000)
   const after = await rawSample(page)
   expect(after.sig, 'toggling a draw mode must not change raw view').toBe(raw.sig)

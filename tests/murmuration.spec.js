@@ -7,14 +7,20 @@ import { resetToDefaults } from './helpers.js'
 // with 1.5 kHz bursts once a second — so it has bass, air and onsets.
 const MP3 = path.join(path.dirname(fileURLToPath(import.meta.url)), 'testdata', 'sweep.mp3')
 
-// Switch inputs are display:none inside a label that is a *sibling* of the text
-// span, so clicking the label text does nothing — walk from the span instead.
+// The switch itself, by the name it carries. This used to walk
+// `//span[text()="X"]/following-sibling::label` because the text was a bare
+// node in a span and clicking it did nothing — which is the accessibility gap
+// that has since been fixed, so the text is now a real <label> and the span has
+// no direct text node to match. Naming the checkbox is both shorter and immune
+// to the row's layout: TogColor nests its switch a level deeper and this finds
+// it just the same.
 const toggleFor = (page, label) =>
-  page.locator(`xpath=//span[text()="${label}"]/following-sibling::label`)
+  page.locator(`input[type=checkbox][aria-label="${label}"]`)
 
-// TogColor puts its switch one level deeper, alongside the colour swatch.
+// TogColor puts its switch one level deeper, alongside the colour swatch —
+// which the selector above does not care about.
 const togColorFor = (page, label) =>
-  page.locator(`xpath=//span[text()="${label}"]/following-sibling::div//label`)
+  page.locator(`input[type=checkbox][aria-label="${label}"]`)
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -153,7 +159,7 @@ test('murmuration mode animates on screen, and freezes when told to', async ({ p
   await page.locator('[data-testid="section-particles"]').click()
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
-  await expect(on.locator('input')).toBeChecked()
+  await expect(on).toBeChecked()
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1500)
 
@@ -743,7 +749,7 @@ test('the particle field paints over the draw modes, not under them', async ({ p
   await page.locator('[data-testid="section-particles"]').click()
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
-  await expect(on.locator('input')).toBeChecked()
+  await expect(on).toBeChecked()
   await page.locator('[data-testid="particle-size"]').fill('9')
   await page.locator('[data-testid="particle-spacing"]').fill('4')
   await toggleFor(page, 'Animate').click({ force: true })
