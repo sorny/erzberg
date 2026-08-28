@@ -155,6 +155,19 @@ const MARKS = {
       </g>
     </g>
   ),
+  // Quantised tiers: a hard lattice staircase, dithered between the steps.
+  bitplane: (
+    <g stroke="currentColor" fill="currentColor" strokeLinejoin="miter" vectorEffect="non-scaling-stroke">
+      <g fill="none" strokeWidth="1.1">
+        <path d="M1 11.5 L5 11.5 L5 8.5 L9 8.5 L9 5.5 L13 5.5 L13 2.5 L17 2.5 L17 5.5 L21 5.5" />
+      </g>
+      <g stroke="none">
+        {[[2.5,9.5],[6.5,6.5],[10.5,3.5],[18.5,3.5],[4,10.5],[8,7.5],[12,4.5],[20,4.5]].map(([x, y], i) => (
+          <rect key={i} x={x} y={y} width={i % 2 ? 0.9 : 1.3} height={i % 2 ? 0.9 : 1.3} />
+        ))}
+      </g>
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

@@ -77,6 +77,10 @@ export const DRAW_MODES = [
     id: 'Swiss', label: 'Rock & scree', cost: 3.5,
     pick: { spacing: [1, 6], threshold: [0.25, 0.7], length: [0.5, 2], scree: [0, 1] },
   },
+  {
+    id: 'Bitplane', label: 'Bitplane', cost: 1.5,
+    pick: { tiers: [5, 18], dither: [0.4, 1], spacing: [1.5, 5] },
+  },
 ]
 
 /** Draw-mode ids in pipeline order. */

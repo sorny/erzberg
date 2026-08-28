@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using fifteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using sixteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -273,6 +273,28 @@ That is right for a coastline and wrong here: there is no illumination where
 there is no ground, and an isophote drawn around the edge of a selection would be
 describing the selection rather than the terrain. Cells with any masked corner
 are skipped.
+
+## 16. Bitplane
+
+The terrain as a tilemap: flat plateaus, hard lattice staircases between them, and an ordered dither screening one band into the next.
+
+**The quantiser.** Normalised elevation is cut into $N$ tiers and every vertex is snapped to its tier's floor,
+
+$$t(r,c) = \left\lfloor \hat{H}(r,c) \cdot N \right\rfloor, \qquad y = \min + t \cdot \frac{\max - \min}{N}$$
+
+where $\hat{H}$ is `normElev` against the terrain's own bounds rather than raw brightness. That anchoring is the same argument the contour ladder makes: the steps are terrain-relative, so the exaggeration slider scales them without reshuffling which cell sits on which plateau. Reading brightness directly would also invert incorrectly at negative `elevScale`, where `minElev`/`maxElev` are deliberately ordered and brightness is not.
+
+**The staircase is marching squares with the interpolation removed.** Where two neighbouring cells land on different tiers, the shared cell *edge* is emitted whole — axis-aligned, at the higher tier's height. Contours interpolate that crossing to get a smooth isoline; refusing to is the entire difference between the two modes, and it is what turns a curve into a pixel staircase. Only the east and south neighbours are tested, since every interior edge is shared by exactly two cells and two directions visit each edge once. No chaining is needed: the segments already meet exactly at lattice corners, which is what keeps the steps crisp rather than stitched.
+
+With **Risers** on, each step is closed by the two verticals down to the lower plateau, so the mode reads as a stack of blocks under an orthographic camera — the isometric reading. Off, it is a flat staircase seen from above.
+
+**The screen** is a $4 \times 4$ Bayer matrix $B$ over the residual $f = \hat{H} \cdot N - t$, which is how far up its own band a cell sits:
+
+$$\text{ink}(r,c) \iff f \cdot \text{dither} > \frac{B[r \bmod 4][c \bmod 4] + \tfrac12}{16}$$
+
+Ordered dither is the wrong screen for a photograph and the right one here — it lays down a visible, regular pattern, which is exactly what a 16-colour ramp looks like when it shades a sky. (Flashbulb wants blue noise for the opposite reason.)
+
+The two ship as separate layers, `Bitplane-Step` and `Bitplane-Screen`, because they want two pens and because one of them is `isPoints` and the other is not — the same split Rock & Scree makes between its cliff hachures and its debris. Hypsometric tinting reads the *tier* rather than the vertex elevation, so the ramp bands with the plateaus instead of cutting across them.
 
 ---
 

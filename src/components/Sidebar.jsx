@@ -86,6 +86,7 @@ const SECTION_TERMS = {
   'Mode: Engraving':  'copperplate illumination cross-hatch shadows stacked directions',
   'Mode: Curvature':  'streamlines principal direction field wrap shape',
   'Mode: Rock & Scree': 'swisstopo cliff hachures debris dots talus seed',
+  'Mode: Bitplane':   'tilemap quantise plateaus tiers steps staircase dither bayer screen pixel voxel isometric arcade 16-bit retro',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1355,6 +1356,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
+    modeBitplane: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1544,6 +1546,7 @@ export function Sidebar({
       modeEngrave:  !!newStyle.enabledEngrave,
       modeCurv:     !!newStyle.enabledCurv,
       modeSwiss:    !!newStyle.enabledSwiss,
+      modeBitplane: !!newStyle.enabledBitplane,
     }))
   }
 
@@ -2418,6 +2421,22 @@ export function Sidebar({
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical stroke wobble and scree pattern." min={1} max={999} step={1} value={style.seedSwiss ?? 42} onChange={v => ss({ seedSwiss: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Swiss" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Bitplane" icon={<ModeMark kind="bitplane" />} open={sec.modeBitplane} onToggle={() => tog('modeBitplane')} enabled={style.enabledBitplane}>
+            <Tog label="Enabled" checked={style.enabledBitplane} onChange={v => ss({ enabledBitplane: v })} />
+            {style.enabledBitplane && (
+              <>
+                <Sub>
+                  <InlineSl label="Tiers" help="How many flat plateaus the elevation range is cut into. Anchored to the terrain, so the steps stay put when Elevation Scale moves." min={2} max={40} step={1} value={style.tiersBitplane} onChange={v => ss({ tiersBitplane: v })} />
+                  <Tog label="Risers" small help="Close each step with the verticals down to the plateau below — blocks rather than a flat staircase." checked={style.risersBitplane} onChange={v => ss({ risersBitplane: v })} />
+                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen shading each band into the next. 0 leaves the plateaus bare." min={0} max={1} step={0.05} value={style.ditherBitplane} onChange={v => ss({ ditherBitplane: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Dot pitch" help="Grid spacing of the dither dots." min={0.5} max={20} step={0.5} value={style.spacingBitplane} onChange={v => ss({ spacingBitplane: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Bitplane" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

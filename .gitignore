@@ -12,3 +12,4 @@ CLAUDE.md
 .claude
 tests/testdata/benchmark.tif
 tests/testdata/geotiff.tif
+tests/_visual.spec.js

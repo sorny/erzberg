@@ -105,6 +105,14 @@ export const STYLE_DEF = {
   colorSwiss: '#000000', weightSwiss: 1, opacitySwiss: 1, dashSwiss: 'solid',
   hypsoSwiss: false, hypsoModeSwiss: 'elevation', hypsoBandedSwiss: false, hypsoIntervalSwiss: 10,
 
+  // Bitplane — the terrain quantised to flat tiers, with a Bayer screen between
+  // them. `screenWeight` is the dither dot's radius, separate from the
+  // staircase's stroke, the same way Swiss parts its scree from its hachures.
+  enabledBitplane: false, tiersBitplane: 10, ditherBitplane: 1, spacingBitplane: 2, risersBitplane: true,
+  colorBitplane: '#000000', weightBitplane: 1, opacityBitplane: 1, dashBitplane: 'solid',
+  screenWeightBitplane: 3,
+  hypsoBitplane: false, hypsoModeBitplane: 'elevation', hypsoBandedBitplane: false, hypsoIntervalBitplane: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.
