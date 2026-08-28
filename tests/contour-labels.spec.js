@@ -22,9 +22,12 @@ async function contoursOnly(page) {
   await resetToDefaults(page)
   const setMode = async (title, on) => {
     const row = page.locator('#hm-panel-body > div').filter({ hasText: new RegExp(`^${title}`) }).first()
-    const tog = row.locator('label').first()
+    // The section's own enable switch. Named as the checkbox rather than as
+    // "the first label in the row": the first label is now the toggle's text,
+    // which no longer wraps the input.
+    const tog = row.locator('input[type=checkbox]').first()
     await tog.scrollIntoViewIfNeeded()
-    if ((await tog.locator('input').isChecked()) !== on) await tog.click({ force: true })
+    if ((await tog.isChecked()) !== on) await tog.click({ force: true })
   }
   await setMode('Mode: Lines', false)
   await page.getByText('Mode: Contours', { exact: true }).click()

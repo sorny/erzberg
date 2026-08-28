@@ -199,10 +199,11 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
       await page.waitForTimeout(500)
     }
     const tog = page.locator('#hm-panel-body > div')
-      .filter({ hasText: new RegExp(`^${title}`) }).first().locator('label').first()
+      .filter({ hasText: new RegExp(`^${title}`) }).first()
+      .locator('input[type=checkbox]').first()
     await tog.scrollIntoViewIfNeeded()
     await tog.click({ force: true })
-    await expect(tog.locator('input')).toBeChecked({ checked: on })
+    await expect(tog).toBeChecked({ checked: on })
   }
 
   // Stipple only. Mode: Lines is the one draw-mode section open by default.
