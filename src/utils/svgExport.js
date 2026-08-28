@@ -6,6 +6,35 @@
  * Occlusion: a software depth buffer (view-space Z, world-unit precision) is
  * rasterised from the terrain surface mesh in JavaScript so that peaks hide lines
  * behind them, matching the depth-buffer behaviour of the live viewport.
+ *
+ * ── WHY THIS IS NOT IN A WORKER ──────────────────────────────────────────────
+ * It looks like it should be. `buildZBuffer` and the occlusion walk are pure
+ * Float32Array arithmetic plus four THREE matrix operations, with no DOM
+ * anywhere, which is the usual argument for moving work off the main thread. It
+ * was considered and measured, and the numbers say no:
+ *
+ *   default plate     365 ms      X-Ray       767 ms
+ *   Static            546 ms      Alpine Survey  1 023 ms   (a 15 MB SVG)
+ *
+ * — end to end, with the page responsive throughout, because the pacer in
+ * utils/pacing.js already hands the main thread back every 24 ms and the
+ * measured longest unbroken stretch is 39 ms. There is no freeze left to fix.
+ *
+ * And a worker would have to be *paid for* rather than merely added. The
+ * occluders are the surface mesh and the per-layer curtains, which the renderer
+ * owns and is still drawing: transferring them detaches the buffers out from
+ * under three.js, so they would have to be copied first — tens to hundreds of
+ * megabytes, on the main thread, before any work could start. That buys back a
+ * fraction of a second that is already yielding, at the cost of a copy, a
+ * serialization contract and a second cancellation path.
+ *
+ * A large share of the remaining time is assembling the SVG string itself (52 MB
+ * for Static), which a worker cannot help with either — the string has to come
+ * back across the boundary.
+ *
+ * If this is ever revisited, the thing to re-measure first is whether the export
+ * still yields: the case for a worker is a page that stops painting, and this one
+ * does not.
  */
 import * as THREE from 'three'
 import { DASH_SEGMENT_SIZES } from './stylePresets'
