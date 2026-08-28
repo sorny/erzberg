@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] — 2026-08-28
+
+### Fixed
+- **Reset all is no longer overwritten by the preset the app opens on.** Reported
+  against the deployed build: a reset gave bare defaults and then Alpine Survey
+  a moment later. The opening preset is applied by an effect that waits for the
+  preset files to arrive, guarded so it cannot land on input that got there
+  first — but the guard was only set by *parameter* changes. The three paths
+  that establish a whole look set neither of the two flags involved: Reset all
+  cleared the preset tiles and left them alone, and Surprise me and loading a
+  preset file both went through `applyPreset`, which deliberately does not mark
+  its own work as an edit. The two flags were one question asked twice, which is
+  how three call sites came to miss both; they are now one, spent by every path
+  that establishes a look.
+
+  It only showed once deployed because the 56 preset files were fetched in a
+  sequential loop — one round trip each, imperceptible on a dev server and
+  several seconds on Pages, all of it with a fully usable panel and the opening
+  still in flight. That is the window being clicked through. They now load in
+  parallel, which collapses it to roughly one round trip, and one unreadable
+  preset costs its own tile instead of the other fifty-five.
+
 ## [1.5.0] — 2026-08-28
 
 ### Added
