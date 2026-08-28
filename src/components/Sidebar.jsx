@@ -1447,6 +1447,34 @@ export function Sidebar({
     })
   }
 
+  /**
+   * Abandon a run in progress.
+   *
+   * Terminating is safe here in a way it is not for the geometry worker: the
+   * droplet simulation posts progress and then one final result, and `setPixels`
+   * is only ever called with that result — so a run killed part-way has written
+   * nothing, and the raster is exactly as it was. There is no partial state to
+   * roll back and no cached raster to lose.
+   *
+   * Erosion is the third operation long enough to need a progress bar (50 000
+   * droplets by default) and was the only one of the three with no way out. SVG
+   * and STL have shared an overlay, a progress channel and a Cancel all along.
+   */
+  const handleCancelErosion = () => {
+    if (!erosionWorkerRef.current) return
+    erosionWorkerRef.current.terminate()
+    erosionWorkerRef.current = null
+    setIsEroding(false)
+    setErosionProgress(0)
+    // No error line: abandoning a run is the user's own decision, and the
+    // "Erosion failed" box would be reporting their click back to them.
+    setErosionError(null)
+    // The pre-run snapshot is dropped too. Undo means "put back what erosion
+    // changed", and nothing changed — leaving it armed would offer to restore a
+    // raster identical to the one on screen.
+    setLastPixels(null)
+  }
+
   const handleUndoErosion = () => {
     if (!lastPixels) return
     setPixels(lastPixels)
@@ -2941,7 +2969,14 @@ export function Sidebar({
             </Sub>
             <div style={{ display:'flex', gap:4 }}>
               <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
-              <button onClick={handleUndoErosion} disabled={!lastPixels || isEroding} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: (lastPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (lastPixels && !isEroding) ? 1 : 0.5 }}>Undo</button>
+              {/* Cancel takes Undo's place while a run is live — the two are
+                  never useful at the same moment, and the row keeps its shape. */}
+              {isEroding ? (
+                <button onClick={handleCancelErosion} data-testid="erosion-cancel"
+                  style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}>Cancel</button>
+              ) : (
+                <button onClick={handleUndoErosion} disabled={!lastPixels} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: lastPixels ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: lastPixels ? 1 : 0.5 }}>Undo</button>
+              )}
             </div>
             {erosionError && (
               <div data-testid="erosion-error" role="status" style={{
