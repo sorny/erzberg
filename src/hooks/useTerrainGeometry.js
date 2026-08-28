@@ -4,6 +4,7 @@
 import { useState, useEffect, useMemo, useRef, startTransition } from 'react'
 import { useStore } from '../store/useStore'
 import { vectorBuildSignature } from '../utils/vectorLayers'
+import { geometryKey } from '../params'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
 export function useTerrainGeometry(p) {
@@ -84,6 +85,11 @@ export function useTerrainGeometry(p) {
   // The stack, as one string, for the merge memo below. Ids only: what this has
   // to notice is a layer moving, and a layer moving changes nothing else.
   const vectorOrderKey = (p.vectorLayers ?? []).map((l) => l.id).join(',')
+
+  // Every geometry-affecting parameter, as one string — the rebuild effect's
+  // whole dependency on `p`. Built from the registry in src/params.js, so it
+  // covers a new draw mode's params the moment they exist in defaults.js.
+  const rebuildKey = geometryKey(p)
 
   const ensureWorker = () => {
     if (workerRef.current) return
@@ -231,112 +237,34 @@ export function useTerrainGeometry(p) {
     }
 
     send(req)
-    // This list IS the rebuild contract: a worker rebuild is expensive, so it names
-    // every param that changes the geometry and nothing else. Depending on `p`
-    // wholesale would rebuild the terrain on every colour pick and slider tick.
-    // `send` is held in sendRef and is stable by construction.
+    // The rebuild contract, derived rather than transcribed.
     //
-    // Audited against the worker's actual reads: the only params it touches that are
-    // absent here are the weight/opacity/dash families (resolved render-side by
-    // layerStyle — see the NOTE below) and the fill switches, which reach this effect
-    // through the precomputed p.needsSurfaceShading. No knob is silently inert.
+    // `rebuildKey` is built in src/params.js from every geometry-affecting
+    // parameter in defaults.js — see RENDER_SIDE there for the exception list and
+    // why each entry is on it. What used to stand here was ~180 keys written out
+    // by hand behind this same eslint-disable, which no tool could check against
+    // the worker: it reads half of them through computed keys (`p[`hypso${id}`]`),
+    // so a draw mode added without touching the list got a knob that moved and
+    // changed nothing. The derived key was verified to reproduce that list
+    // exactly — 172 params either way, no drift — so this is a change of
+    // mechanism and not of behaviour.
+    //
+    // The four that cannot come from the key:
+    //  • gradientStops is an array (see GEOMETRY_NON_SCALAR) and is depended on
+    //    by identity, as it was before.
+    //  • needsSurfaceShading is computed onto `p` by App, not a stored param.
+    //  • geoTiffBbox / geoTiffCRS come from the store, not from defaults.
+    // `send` is held in sendRef and is stable by construction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
-    // Terrain Globals
-    p.resolution, p.blurRadius, p.gridOffsetX, p.gridOffsetY,
-    p.blackPoint, p.whitePoint, p.elevScale, p.elevMinCut, p.elevMaxCut, p.jitterAmt,
-    
-    // Creative / Mirroring
-    p.showMirrorPlusX, p.showMirrorMinusX,
-    p.showMirrorPlusY, p.showMirrorMinusY,
-    p.showMirrorPlusZ, p.showMirrorMinusZ,
-
-    // NOTE: weight / opacity / dash are render-side (resolved via layerStyle(id, p)
-    // in HeightmapLines + svgExport) and deliberately excluded here so dragging
-    // those sliders updates the material live without a full geometry rebuild.
-
-    // Mode: Lines
-    p.enabledLines, p.spacingLines, p.shiftLines, p.angleLines, p.colorLines,
-    p.hypsoLines, p.hypsoModeLines, p.hypsoBandedLines, p.hypsoIntervalLines,
-    // Mode: Cross
-    p.enabledCross, p.spacingCross, p.angleCross, p.colorCross,
-    p.hypsoCross, p.hypsoModeCross, p.hypsoBandedCross, p.hypsoIntervalCross,
-    // Mode: Pillars
-    p.enabledPillars, p.spacingPillars, p.colorPillars,
-    p.hypsoPillars, p.hypsoModePillars, p.hypsoBandedPillars, p.hypsoIntervalPillars,
-    p.pillarGap, p.pillarDepth, p.pillarStyle, p.pillarSize, p.pillarSegments, p.pillarLidColor,
-    // Mode: Contours
-    p.enabledContours, p.intervalContours, p.colorContours,
-    p.hypsoContours, p.hypsoModeContours, p.hypsoBandedContours, p.hypsoIntervalContours,
-    p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours,
-    p.tanakaContours, p.tanakaSunAzimuth,
-    // Labels move the contour geometry itself — the line is broken where a
-    // number goes — so every one of these is a rebuild, not a re-render.
-    p.labelContours, p.labelSizeContours, p.labelSpacingContours, p.labelMajorOnlyContours,
-    p.labelPadContours,
-    // Mode: Hachure
-    p.enabledHachure, p.spacingHachure, p.lengthHachure, p.colorHachure,
-    p.hypsoHachure, p.hypsoModeHachure, p.hypsoBandedHachure, p.hypsoIntervalHachure,
-    // Mode: Flow
-    p.enabledFlow, p.spacingFlow, p.stepFlow, p.maxLenFlow, p.colorFlow,
-    p.hypsoFlow, p.hypsoModeFlow, p.hypsoBandedFlow, p.hypsoIntervalFlow,
-    // Mode: Network
-    p.enabledDag, p.thresholdDag, p.colorDag,
-    p.hypsoDag, p.hypsoModeDag, p.hypsoBandedDag, p.hypsoIntervalDag,
-    // Mode: Pencil
-    p.enabledPencil, p.spacingPencil, p.thresholdPencil, p.colorPencil,
-    p.hypsoPencil, p.hypsoModePencil, p.hypsoBandedPencil, p.hypsoIntervalPencil,
-    // Mode: Ridge
-    p.enabledRidge, p.spacingRidge, p.radiusRidge, p.thresholdRidge, p.colorRidge,
-    p.hypsoRidge, p.hypsoModeRidge, p.hypsoBandedRidge, p.hypsoIntervalRidge,
-    // Mode: Valley
-    p.enabledValley, p.spacingValley, p.radiusValley, p.thresholdValley, p.colorValley,
-    p.hypsoValley, p.hypsoModeValley, p.hypsoBandedValley, p.hypsoIntervalValley,
-    // Mode: Stipple
-    p.enabledStipple, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter,
-    p.seedStipple, p.colorStipple,
-    p.hypsoStipple, p.hypsoModeStipple, p.hypsoBandedStipple, p.hypsoIntervalStipple,
-    // Mode: Engraving
-    p.enabledIso, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso,
-    p.colorIso,
-    p.hypsoIso, p.hypsoModeIso, p.hypsoBandedIso, p.hypsoIntervalIso,
-    p.enabledEngrave, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave,
-    p.colorEngrave,
-    p.hypsoEngrave, p.hypsoModeEngrave, p.hypsoBandedEngrave, p.hypsoIntervalEngrave,
-    // Mode: Curvature engraving
-    p.enabledCurv, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv,
-    p.dirModeCurv, p.stepCurv, p.colorCurv,
-    p.hypsoCurv, p.hypsoModeCurv, p.hypsoBandedCurv, p.hypsoIntervalCurv,
-    // Mode: Swiss rock & scree
-    p.enabledSwiss, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss,
-    p.seedSwiss, p.colorSwiss,
-    p.hypsoSwiss, p.hypsoModeSwiss, p.hypsoBandedSwiss, p.hypsoIntervalSwiss,
-
-    // Whether the surface mesh needs shading attributes (normals/UVs) at all.
-    // This is the one fill-related value that must rebuild geometry: with no
-    // fill layer on, the worker skips building them entirely, so switching one
-    // on has to regenerate them. Individual fill *styling* params below stay
-    // render-side.
-    p.needsSurfaceShading,
-
-    // Same shape of trade: occlusion curtains are geometry, and building them
-    // for a scene that will not draw them costs ~18 MB and a per-segment loop on
-    // every rebuild. One rebuild when the switch moves is much cheaper.
-    p.depthOcclusion,
-
-    // NOTE: the fill params (showFill, fillColor, fillBanded, fillHypso*) are
-    // render-side only — fill styling is pure GPU uniforms in SurfaceMesh.
-    // They are deliberately excluded so toggling/dragging them never spawns a
-    // worker rebuild. gradientStops stays: it is baked into line vertex colors.
-    p.gradientStops,
-
+    rebuildKey,
+    p.gradientStops, p.needsSurfaceShading, p.geoTiffBbox, p.geoTiffCRS,
     // Vector layers. `vectorBuildKey` is a string rather than p.vectorLayers
     // itself, and that is the whole point: the layer array is replaced on every
-    // colour-picker tick, so depending on its identity would rebuild all
-    // fourteen draw modes to recolour one road. The key covers only what moves
-    // the geometry — see layerBuildKey in utils/vectorLayers.js.
-    vectorSources, vectorBuildKey, p.geoTiffBbox, p.geoTiffCRS,
+    // colour-picker tick, so depending on its identity would rebuild all fifteen
+    // draw modes to recolour one road. See layerBuildKey in utils/vectorLayers.js.
+    vectorSources, vectorBuildKey,
   ])
 
   useEffect(() => () => workerRef.current?.terminate(), [])

@@ -35,6 +35,7 @@ import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache } from './utils/osmFetch'
+import { GROUP_OF } from './params'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
@@ -869,81 +870,31 @@ export default function App() {
     () => ({ ...terrain, ...style, ...points, ...view }),
     [terrain, style, points, view]
   )
+  /**
+   * Write parameters back into whichever group owns them.
+   *
+   * Routed by ownership, from the registry in src/params.js — not, as before, by
+   * a `startsWith` filter over sixteen name prefixes plus forty explicit
+   * branches. That heuristic misrouted nothing, but 73 of the 262 style keys
+   * matched no prefix and no branch and were simply undeliverable through here:
+   * angleLines, angleCross, every hillshade*, every label*Contours, the seeds,
+   * and all six surface-overlay switches. Nothing writes those today, which is
+   * the only reason it never showed.
+   *
+   * One updater per group, so a call carrying keys from three groups is three
+   * state updates rather than one per key.
+   */
   const setParams = useCallback((vals) => {
-    const t = {}, s = {}, v = {}
-    if (vals.resolution   != null) t.resolution    = vals.resolution
-    if (vals.gridOffsetX  != null) t.gridOffsetX   = vals.gridOffsetX
-    if (vals.gridOffsetY  != null) t.gridOffsetY   = vals.gridOffsetY
-    if (vals.blackPoint   != null) t.blackPoint    = vals.blackPoint
-    if (vals.whitePoint   != null) t.whitePoint    = vals.whitePoint
-    
-    // Line globals
-    if (vals.depthOcclusion != null) s.depthOcclusion = vals.depthOcclusion
-    if (vals.occlusionBias  != null) s.occlusionBias  = vals.occlusionBias
-    if (vals.occlusionColor != null) s.occlusionColor = vals.occlusionColor
-    if (vals.occlusionOpacity != null) s.occlusionOpacity = vals.occlusionOpacity
-    
-    // Support massive sync of all per-mode params
-    Object.keys(vals).forEach(k => {
-      if (k.startsWith('enabled') || k.startsWith('spacing') || k.startsWith('shift') || 
-          k.startsWith('color') || k.startsWith('weight') || k.startsWith('opacity') || 
-          k.startsWith('dash') || k.startsWith('hypso') || k.startsWith('interval') ||
-          k.startsWith('threshold') || k.startsWith('length') || k.startsWith('maxLen') || 
-          k.startsWith('step') || k.startsWith('pillar') || k.startsWith('major') || k.startsWith('closeRings')) {
-        s[k] = vals[k]
-      }
-    })
-
-    // Fill & Mesh
-    if (vals.showFill     != null) s.showFill      = vals.showFill
-    if (vals.showMesh     != null) s.showMesh      = vals.showMesh
-    if (vals.showTexture       != null) s.showTexture       = vals.showTexture
-    if (vals.textureScale      != null) s.textureScale      = vals.textureScale
-    if (vals.textureShiftX     != null) s.textureShiftX     = vals.textureShiftX
-    if (vals.textureShiftY     != null) s.textureShiftY     = vals.textureShiftY
-    if (vals.textureBlendMode  != null) s.textureBlendMode  = vals.textureBlendMode
-    if (vals.textureOpacity    != null) s.textureOpacity    = vals.textureOpacity
-    
-    // Creative
-    if (vals.showMirrorPlusX  != null) s.showMirrorPlusX  = vals.showMirrorPlusX
-    if (vals.showMirrorMinusX != null) s.showMirrorMinusX = vals.showMirrorMinusX
-    if (vals.showMirrorPlusY  != null) s.showMirrorPlusY  = vals.showMirrorPlusY
-    if (vals.showMirrorMinusY != null) s.showMirrorMinusY = vals.showMirrorMinusY
-    if (vals.showMirrorPlusZ  != null) s.showMirrorPlusZ  = vals.showMirrorPlusZ
-    if (vals.showMirrorMinusZ != null) s.showMirrorMinusZ = vals.showMirrorMinusZ
-
-    if (vals.tilt         != null) v.tilt          = vals.tilt
-    if (vals.rotation     != null) v.rotation      = vals.rotation
-    if (vals.zoom         != null) v.zoom          = vals.zoom
-    // panX/panY must round-trip: the orbit controls sync them after a pan, and
-    // dropping them here leaves state permanently behind the camera (which both
-    // re-fires the sync on every orbit event and snaps the pan back on the next
-    // tilt/rotation/zoom change).
-    if (vals.panX         != null) v.panX          = vals.panX
-    if (vals.panY         != null) v.panY          = vals.panY
-    if (vals.panZ         != null) v.panZ          = vals.panZ
-    if (vals.autoRotate     != null) v.autoRotate     = vals.autoRotate
-    if (vals.autoRotateAxis != null) v.autoRotateAxis = vals.autoRotateAxis
-    if (vals.autoRotateDir  != null) v.autoRotateDir  = vals.autoRotateDir
-    if (vals.showGuides   != null) v.showGuides    = vals.showGuides
-    // Framing round-trips like the rest of the view state; without these a
-    // preset would load its look but lose the page it was composed for.
-    if (vals.showFrame      != null) v.showFrame      = vals.showFrame
-    if (vals.framePaper     != null) v.framePaper     = vals.framePaper
-    if (vals.frameCustomRatio != null) v.frameCustomRatio = vals.frameCustomRatio
-    if (vals.frameLandscape != null) v.frameLandscape = vals.frameLandscape
-    if (vals.frameScale     != null) v.frameScale     = vals.frameScale
-    if (vals.frameOffsetX   != null) v.frameOffsetX   = vals.frameOffsetX
-    if (vals.frameOffsetY   != null) v.frameOffsetY   = vals.frameOffsetY
-    if (vals.frameMargin    != null) v.frameMargin    = vals.frameMargin
-    
-    // Particle params live in their own group; without this branch the pause
-    // hotkey has nowhere to write and silently does nothing.
-    if (vals.animateParticles != null) setPoints(prev => ({ ...prev, animateParticles: vals.animateParticles }))
-
-    if (Object.keys(t).length) setTerrain(prev => ({ ...prev, ...t }))
-    if (Object.keys(s).length) setStyle(prev   => ({ ...prev, ...s }))
-    if (Object.keys(v).length) setView(prev    => ({ ...prev, ...v }))
+    const patches = {}
+    for (const [k, value] of Object.entries(vals)) {
+      const group = GROUP_OF.get(k)
+      if (!group) { console.warn('[setParams] no group owns', k); continue }
+      ;(patches[group] ??= {})[k] = value
+    }
+    const setters = { terrain: setTerrain, style: setStyle, points: setPoints, view: setView }
+    for (const [group, patch] of Object.entries(patches)) {
+      setters[group]((prev) => ({ ...prev, ...patch }))
+    }
   }, [setTerrain, setStyle, setView, setPoints])
 
   // ── Auto-zoom to fit terrain on load ─────────────────────────────────────
