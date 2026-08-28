@@ -144,6 +144,34 @@ export const STYLE_DEF = {
   colorHalation: '#111111', weightHalation: 3, opacityHalation: 1, dashHalation: 'solid',
   hypsoHalation: false, hypsoModeHalation: 'elevation', hypsoBandedHalation: false, hypsoIntervalHalation: 10,
 
+  // Descent with mass — one tracer, four readings of it. `carve` runs the yaw
+  // limit backwards for the panel: 0 is welded to the fall line (and converges
+  // on Flow mode), 1 is a big-mountain arc. Gravity is normalised by the
+  // terrain's own steepness, so one setting behaves the same on a quarry and an
+  // alp.
+  enabledFallLine: false, spacingFallLine: 20, gravityFallLine: 1, dragFallLine: 0.1,
+  dragQuadFallLine: 0.015, smoothingFallLine: 2, carveFallLine: 0.45, maxLenFallLine: 300,
+  colorFallLine: '#000000', weightFallLine: 1.5, opacityFallLine: 1, dashFallLine: 'solid',
+  hypsoFallLine: false, hypsoModeFallLine: 'slope', hypsoBandedFallLine: false, hypsoIntervalFallLine: 10,
+
+  enabledBerm: false, spacingBerm: 16, gravityBerm: 1, dragBerm: 0.1,
+  dragQuadBerm: 0.015, smoothingBerm: 2, carveBerm: 0.6, maxLenBerm: 300, lengthBerm: 2,
+  colorBerm: '#000000', weightBerm: 1, opacityBerm: 1, dashBerm: 'solid',
+  hypsoBerm: false, hypsoModeBerm: 'slope', hypsoBandedBerm: false, hypsoIntervalBerm: 10,
+
+  enabledAir: false, spacingAir: 14, gravityAir: 1, dragAir: 0.07,
+  dragQuadAir: 0.01, smoothingAir: 3, carveAir: 0.35, maxLenAir: 300, runInAir: 10,
+  airGravityAir: 0.3, lipAir: 0.12, minAirAir: 4,
+  colorAir: '#000000', weightAir: 3, opacityAir: 1, dashAir: 'solid', runInWeightAir: 1,
+  hypsoAir: false, hypsoModeAir: 'slope', hypsoBandedAir: false, hypsoIntervalAir: 10,
+
+  enabledRaceLine: false, spacingRaceLine: 40, gravityRaceLine: 1, dragRaceLine: 0.1,
+  dragQuadRaceLine: 0.015, smoothingRaceLine: 2, carveRaceLine: 0.6, maxLenRaceLine: 300,
+  fanRaceLine: 11, spreadRaceLine: 120, dropsRaceLine: 4, dropSpeedRaceLine: 0.9,
+  colorRaceLine: '#000000', weightRaceLine: 1, opacityRaceLine: 1, dashRaceLine: 'solid',
+  bestWeightRaceLine: 3,
+  hypsoRaceLine: false, hypsoModeRaceLine: 'slope', hypsoBandedRaceLine: false, hypsoIntervalRaceLine: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

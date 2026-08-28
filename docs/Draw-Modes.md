@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using eighteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twenty-two independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -341,6 +341,45 @@ The blur is the same `boxBlur` the Blur slider runs, taken over the *exposure la
 The two read the blue-noise tile at a half-tile offset from one another. Sharing an index would correlate them exactly — every halo dot would land on a cell the grain had already claimed, and the halo would vanish into it instead of reading as a second pass.
 
 The optics themselves (`flashExposure`, `flashShadowed`, `flashTone`) are shared with Flashbulb rather than reimplemented; with the glow turned off the two modes agree cell for cell, which is what the spec pins.
+
+## 19–22. Descent with mass — Fall Line, Berms, Air, Race Line
+
+Four readings of one tracer. Flow (mode 6) steps $\mathbf{p} \leftarrow \mathbf{p} - \alpha \nabla H$: a *massless* particle that points exactly downhill at every step. It cannot overshoot, cannot bank, and stops the instant the gradient does — correct for drainage, and why Flow reads as a river network. This family integrates a **state** instead:
+
+$$\mathbf{a} = \frac{-g\,\nabla H}{1 + k|\nabla H|^2} - (\mu + \kappa|\mathbf{v}|)\,\mathbf{v}, \qquad \mathbf{v} \leftarrow \mathbf{v} + \Delta t\,\mathbf{a}, \quad \mathbf{p} \leftarrow \mathbf{p} + \Delta t\,\mathbf{v}$$
+
+Semi-implicit, because explicit Euler gains energy on every bowl traverse. `src/utils/erosion.js` integrates droplets with inertia over the same grid and is the nearest existing relative.
+
+**The carve constraint.** The heading may not turn faster than a maximum yaw rate, so a fast rider physically cannot take a tight line and gets carried up the outside of a gully:
+
+$$\Delta\theta \le \omega_\text{max}\Delta t, \qquad \omega_\text{max} = \frac{a_\text{lat}}{|\mathbf{v}|} \quad\Longrightarrow\quad r = \frac{|\mathbf{v}|^2}{a_\text{lat}}$$
+
+The clamp binds when the *perpendicular* acceleration exceeds $a_\text{lat}$ — a comparison with no speed in it — so $a_\text{lat}$ only means something stated against the other acceleration in the system. Two scalings got this wrong before it worked: against $g_\text{acc}$ (which differs from the peak pull by a factor of $1/\bar{s}$, several hundred on ordinary ground) and then linearly across a range sitting entirely above the binding threshold. Both left the slider inert. The mapping is now geometric, $0.12 \cdot a_\text{peak} \cdot 0.03^{\,\text{carve}}$, which is the band that actually bites end to end.
+
+**Gravity is normalised by the terrain's *typical* slope, not its steepest.** `maxSlope` is a maximum over the whole grid, so one cliff cell sets it and every ordinary slope then reads as almost flat; measured on the sample plate that left drag stopping every run within a few dozen steps, and the mode drew a field of short dashes. The mean over valid cells is stable against that and still scales with the terrain, which is what lets one Gravity setting behave the same on a quarry and an alp.
+
+**The surface is pre-smoothed**, and not cosmetically: a rider has length, and does not launch off — or steer around — a one-cell bump. Same argument Ridge and Curvature make one derivative further down. A run must also *travel*: anything that has not covered its own seed spacing is dropped, or a plate comes out speckled with marks a few pixels long.
+
+### Fall Line
+
+The track itself. `computeVertexColor` takes a 0–1 value in its second slot that every other mode fills with normalised slope; filling it with $|\mathbf{v}|/v_\text{max}$ turns the hypsometric ramp into a **speed** ramp for nothing, and the gradient picker becomes a telemetry palette. The one thing the mode wants and cannot have is stroke weight following speed — `weight` is resolved per layer by `layerStyle`, so a layer has one width.
+
+### Berms
+
+Only the lateral load: a tick on the outside of every turn, nothing on the straights. Length follows $|\mathbf{v}|\,|\Delta\theta| / a_\text{lat}$ — the fraction of the rider's grip in use, reading 1 exactly where the yaw clamp binds. Normalising against a *speed* instead is dimensionally wrong and put every tick below the visibility floor. A perfectly even plane draws nothing at all, which is the spec's assertion.
+
+### Air
+
+The jumps, found rather than drawn. The rider leaves the ground when the ballistic path clears the surface — a convex break taken faster than gravity can pull it back down — and each flight is drawn on its true parabola, lifted off the ground because it *is* off the ground. Two sub-layers: the flight, and the run-in leading into it.
+
+Two things had to be right for this to mean anything:
+
+- **The descent is carried as a rate per cell, not per step.** Per step is the natural thing to write and it is wrong: a rider accelerating down an even ramp covers more ground each step, so each drop exceeds the last and a prediction carried forward sits above the ground every time. On a constant-gradient plane that flagged 1 664 segments airborne — launching off nothing but its own acceleration.
+- **The thresholds were swept, not derived.** Over a plane, a single 4× break, and a rough field read raw and smoothed, `airGravity` 0.3 with `lip` 0.12 is the lowest pair at which a plane yields exactly zero flights while a real break still fires. Below it float noise on nominally flat ground starts launching riders; above it a single change of gradient stops registering. Flights shorter than `minAir` steps are discarded — a scattering of one-step hops reads as broken line work rather than as air.
+
+### Race Line
+
+Every line a single drop-in could have taken: one seed, the initial heading fanned across ±θ, and no occupancy mask, because the overlap *is* the picture. The run reaching the lowest ground soonest is promoted to its own sub-layer and inked heavier, which turns a braid into an argument about which way down is best.
 
 ---
 

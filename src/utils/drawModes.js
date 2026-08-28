@@ -87,6 +87,22 @@ export const DRAW_MODES = [
             falloff: [1, 2.2], exposure: [1.4, 2.6], contrast: [1, 1.7], spacing: [1.5, 4] },
   },
   {
+    id: 'FallLine', label: 'Fall line', cost: 3,
+    pick: { spacing: [6, 20], carve: [0.2, 0.85], drag: [0.06, 0.2], maxLen: [120, 400] },
+  },
+  {
+    id: 'Berm', label: 'Berms', cost: 3,
+    pick: { spacing: [5, 16], carve: [0.4, 0.9], length: [1, 4] },
+  },
+  {
+    id: 'Air', label: 'Air', cost: 3,
+    pick: { spacing: [5, 14], carve: [0.15, 0.6], drag: [0.04, 0.12], runIn: [4, 18] },
+  },
+  {
+    id: 'RaceLine', label: 'Race line', cost: 3.5,
+    pick: { spacing: [25, 70], carve: [0.4, 0.9], fan: [7, 17], spread: [60, 180], drops: [2, 6] },
+  },
+  {
     id: 'Halation', label: 'Halation', cost: 5,
     pick: { azimuth: [0, 360], height: [1.2, 2.8], falloff: [1, 2.2],
             exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],

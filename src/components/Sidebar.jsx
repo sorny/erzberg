@@ -89,6 +89,10 @@ const SECTION_TERMS = {
   'Mode: Bitplane':   'tilemap quantise plateaus tiers steps staircase dither bayer screen pixel voxel isometric arcade 16-bit retro',
   'Mode: Flashbulb':  'point light bulb flash inverse square falloff cast shadow ray march blue noise grain film emulsion photograph solarise sabattier contrast exposure',
   'Mode: Halation':   'bloom glow halo bleed highlight edge blown emulsion film red orange flare light spill',
+  'Mode: Fall Line':  'snowboard ski descent momentum mass inertia carve yaw gravity friction runout track downhill bike',
+  'Mode: Berms':      'banking lateral load cornering g-force turn ticks camber',
+  'Mode: Air':        'jump kicker launch ballistic parabola flight convex lip gap send',
+  'Mode: Race Line':  'braid fan drop-in fastest descent variants spread choices',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1359,6 +1363,7 @@ export function Sidebar({
     modeRidge: false, modeValley: false, modeStipple: false,
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
+    modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1551,6 +1556,10 @@ export function Sidebar({
       modeBitplane: !!newStyle.enabledBitplane,
       modeFlashbulb: !!newStyle.enabledFlashbulb,
       modeHalation: !!newStyle.enabledHalation,
+      modeFallLine: !!newStyle.enabledFallLine,
+      modeBerm:     !!newStyle.enabledBerm,
+      modeAir:      !!newStyle.enabledAir,
+      modeRaceLine: !!newStyle.enabledRaceLine,
     }))
   }
 
@@ -2503,6 +2512,90 @@ export function Sidebar({
                   <Tog label="Cast shadows" small checked={style.shadowHalation} onChange={v => ss({ shadowHalation: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Halation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="GRAIN STYLE" showDash={false} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Fall Line" icon={<ModeMark kind="fallline" />} open={sec.modeFallLine} onToggle={() => tog('modeFallLine')} enabled={style.enabledFallLine}>
+            <Tog label="Enabled" checked={style.enabledFallLine} onChange={v => ss({ enabledFallLine: v })} />
+            {style.enabledFallLine && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" help="Seed pitch. Tracks claim the ground they cross, so this is how far apart the runs end up." min={2} max={60} step={1} value={style.spacingFallLine} onChange={v => ss({ spacingFallLine: v })} />
+                </Sub>
+                <Sub label="PHYSICS">
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveFallLine} onChange={v => ss({ carveFallLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityFallLine} onChange={v => ss({ gravityFallLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragFallLine} onChange={v => ss({ dragFallLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadFallLine} onChange={v => ss({ dragQuadFallLine: v })} fmt={v => v.toFixed(3)} />
+                  <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenFallLine} onChange={v => ss({ maxLenFallLine: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="FallLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Berms" icon={<ModeMark kind="berm" />} open={sec.modeBerm} onToggle={() => tog('modeBerm')} enabled={style.enabledBerm}>
+            <Tog label="Enabled" checked={style.enabledBerm} onChange={v => ss({ enabledBerm: v })} />
+            {style.enabledBerm && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={2} max={60} step={1} value={style.spacingBerm} onChange={v => ss({ spacingBerm: v })} />
+                  <InlineSl label="Tick length" help="Ticks scale with the lateral load the rider is holding, so the straights draw nothing." min={0.2} max={10} step={0.1} value={style.lengthBerm} onChange={v => ss({ lengthBerm: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="PHYSICS">
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveBerm} onChange={v => ss({ carveBerm: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityBerm} onChange={v => ss({ gravityBerm: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragBerm} onChange={v => ss({ dragBerm: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadBerm} onChange={v => ss({ dragQuadBerm: v })} fmt={v => v.toFixed(3)} />
+                  <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenBerm} onChange={v => ss({ maxLenBerm: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Berm" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Air" icon={<ModeMark kind="air" />} open={sec.modeAir} onToggle={() => tog('modeAir')} enabled={style.enabledAir}>
+            <Tog label="Enabled" checked={style.enabledAir} onChange={v => ss({ enabledAir: v })} />
+            {style.enabledAir && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" min={2} max={60} step={1} value={style.spacingAir} onChange={v => ss({ spacingAir: v })} />
+                  <InlineSl label="Run-in" help="How many steps of approach to draw leading into each flight, so a launch can be read back to where it started." min={0} max={60} step={1} value={style.runInAir} onChange={v => ss({ runInAir: v })} />
+                  <InlineSl label="Run-in weight" min={0.5} max={6} step={0.5} value={style.runInWeightAir} onChange={v => ss({ runInWeightAir: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="PHYSICS">
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveAir} onChange={v => ss({ carveAir: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityAir} onChange={v => ss({ gravityAir: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragAir} onChange={v => ss({ dragAir: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadAir} onChange={v => ss({ dragQuadAir: v })} fmt={v => v.toFixed(3)} />
+                  <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenAir} onChange={v => ss({ maxLenAir: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Air" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Race Line" icon={<ModeMark kind="raceline" />} open={sec.modeRaceLine} onToggle={() => tog('modeRaceLine')} enabled={style.enabledRaceLine}>
+            <Tog label="Enabled" checked={style.enabledRaceLine} onChange={v => ss({ enabledRaceLine: v })} />
+            {style.enabledRaceLine && (
+              <>
+                <Sub>
+                  <InlineSl label="Drop-ins" help="How many summits get a braid." min={1} max={20} step={1} value={style.dropsRaceLine} onChange={v => ss({ dropsRaceLine: v })} />
+                  <InlineSl label="Spacing" help="How far apart the drop-ins must be." min={5} max={150} step={5} value={style.spacingRaceLine} onChange={v => ss({ spacingRaceLine: v })} />
+                  <InlineSl label="Lines" help="Runs per drop-in." min={2} max={41} step={1} value={style.fanRaceLine} onChange={v => ss({ fanRaceLine: v })} />
+                  <InlineSl label="Fan" help="Total spread of the initial headings." min={10} max={350} step={5} value={style.spreadRaceLine} onChange={v => ss({ spreadRaceLine: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Entry speed" min={0} max={4} step={0.05} value={style.dropSpeedRaceLine} onChange={v => ss({ dropSpeedRaceLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Best weight" help="The run reaching lowest ground soonest, inked heavier in its own layer." min={0.5} max={10} step={0.5} value={style.bestWeightRaceLine} onChange={v => ss({ bestWeightRaceLine: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="PHYSICS">
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveRaceLine} onChange={v => ss({ carveRaceLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityRaceLine} onChange={v => ss({ gravityRaceLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragRaceLine} onChange={v => ss({ dragRaceLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadRaceLine} onChange={v => ss({ dragQuadRaceLine: v })} fmt={v => v.toFixed(3)} />
+                  <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenRaceLine} onChange={v => ss({ maxLenRaceLine: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="RaceLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

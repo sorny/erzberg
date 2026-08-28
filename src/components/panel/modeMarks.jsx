@@ -197,6 +197,41 @@ const MARKS = {
       </g>
     </g>
   ),
+  // A carved arc that overshoots rather than a dendritic drainage line.
+  fallline: (
+    <g {...BASE}>
+      <path d="M3 1.5 C3 5, 8 4.5, 9 7.5 C10 10.5, 15 10, 16 7 C17 4, 20 4.5, 21 7.5" strokeWidth="1.4" />
+      <path d="M1.5 4 C2 7, 5 7, 6 9.5 C7 11.5, 9.5 12, 11 11" opacity="0.45" />
+    </g>
+  ),
+  // Lateral load: ticks on the outside of the turns, nothing on the straights.
+  berm: (
+    <g {...BASE}>
+      <path d="M2 2 C2 6, 7 5, 8.5 8 C10 11, 15 10.5, 16 7 C17 3.5, 20 4, 21 6" strokeWidth="1.1" />
+      <path d="M2.6 4 L0.9 4.4 M3.6 6 L2 6.8 M5.6 7.2 L4.6 8.9 M9.4 9.6 L9 11.4
+               M12 10.6 L12.2 12.4 M15.3 9.6 L16.6 10.9 M16.6 6 L18.3 6.2" strokeWidth="0.85" opacity="0.85" />
+    </g>
+  ),
+  // The flight, dashed, off the ground; the run-in dotted behind it.
+  air: (
+    <g {...BASE}>
+      <path d="M1 10.5 L4 9.5 L6.5 6.5" strokeDasharray="1 1.6" opacity="0.6" />
+      <path d="M6.5 6.5 C9 1.5, 13 1, 16 6.5" strokeDasharray="2.4 1.8" strokeWidth="1.3" />
+      <path d="M16 6.5 L18 9.5 L21 10.5" opacity="0.6" />
+      <path d="M6.5 6.5 L6.5 8" strokeWidth="0.7" opacity="0.4" />
+    </g>
+  ),
+  // A braid from one drop-in, with the fastest line picked out.
+  raceline: (
+    <g {...BASE}>
+      <circle cx="4" cy="2" r="1.2" fill="currentColor" stroke="none" />
+      <path d="M4 3.2 C4 6, 2 8, 1.5 11.5" opacity="0.4" />
+      <path d="M4 3.2 C5 6, 4 8.5, 4.5 11.5" opacity="0.4" />
+      <path d="M4 3.2 C7 6, 9 8, 13 11.5" opacity="0.4" />
+      <path d="M4 3.2 C8 5.5, 12 7, 20.5 11.5" opacity="0.4" />
+      <path d="M4 3.2 C6 6.5, 6.5 9, 8.5 11.5" strokeWidth="1.9" />
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {
