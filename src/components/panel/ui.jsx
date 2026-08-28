@@ -602,9 +602,22 @@ export function Btn({
   )
 }
 
-export function Sub({ children }) {
+/**
+ * An indented group of controls under a section.
+ *
+ * `label` is optional and older call sites pass none, which renders exactly what
+ * they rendered before. It earns its place on the modes carrying a dozen
+ * parameters — Flashbulb's bulb, tone, grain and shadow are four different
+ * questions, and an unbroken run of thirteen sliders reads as one.
+ */
+export function Sub({ label, children }) {
   return (
     <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
+      {label && (
+        <div style={{ fontSize: 9, color: MUTED, fontWeight: 700, letterSpacing: 1, marginBottom: 5 }}>
+          {label}
+        </div>
+      )}
       {children}
     </div>
   )

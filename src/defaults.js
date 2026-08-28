@@ -113,6 +113,24 @@ export const STYLE_DEF = {
   screenWeightBitplane: 3,
   hypsoBitplane: false, hypsoModeBitplane: 'elevation', hypsoBandedBitplane: false, hypsoIntervalBitplane: 10,
 
+  // Flashbulb — one bare bulb inside the scene, with 1/r² falloff and a marched
+  // cast shadow. Distance and height are fractions of the terrain's own
+  // half-diagonal and elevation range, so one setting frames a quarry and a
+  // mountain alike. `fold` is the Sabattier reversal: it costs one line and
+  // turns the mode inside out, so it is a switch here rather than its own mode.
+  enabledFlashbulb: false,
+  // Measured rather than picked: on a reference massif these put ink on ~40% of
+  // the plate, which reads as a photograph. The first guess (height 1.2, falloff
+  // 1, exposure 1.15) covered 59% and came out a black slab — most of a terrain
+  // faces away from a low bulb, and the shadow march then takes a third of what
+  // is left.
+  azimuthFlashbulb: 315, distanceFlashbulb: 0.9, heightFlashbulb: 2, falloffFlashbulb: 1.6,
+  exposureFlashbulb: 2, gammaFlashbulb: 1, contrastFlashbulb: 1.2, grainFlashbulb: 1,
+  spacingFlashbulb: 1.5, seedFlashbulb: 42, foldFlashbulb: false,
+  shadowFlashbulb: true, shadowStepsFlashbulb: 24,
+  colorFlashbulb: '#111111', weightFlashbulb: 3, opacityFlashbulb: 1, dashFlashbulb: 'solid',
+  hypsoFlashbulb: false, hypsoModeFlashbulb: 'elevation', hypsoBandedFlashbulb: false, hypsoIntervalFlashbulb: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

@@ -81,6 +81,11 @@ export const DRAW_MODES = [
     id: 'Bitplane', label: 'Bitplane', cost: 1.5,
     pick: { tiers: [5, 18], dither: [0.4, 1], spacing: [1.5, 5] },
   },
+  {
+    id: 'Flashbulb', label: 'Flashbulb', cost: 4.5,
+    pick: { azimuth: [0, 360], distance: [0.5, 1.6], height: [1.2, 2.8],
+            falloff: [1, 2.2], exposure: [1.4, 2.6], contrast: [1, 1.7], spacing: [1.5, 4] },
+  },
 ]
 
 /** Draw-mode ids in pipeline order. */

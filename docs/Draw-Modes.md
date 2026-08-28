@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using sixteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using seventeen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -295,6 +295,31 @@ $$\text{ink}(r,c) \iff f \cdot \text{dither} > \frac{B[r \bmod 4][c \bmod 4] + \
 Ordered dither is the wrong screen for a photograph and the right one here — it lays down a visible, regular pattern, which is exactly what a 16-colour ramp looks like when it shades a sky. (Flashbulb wants blue noise for the opposite reason.)
 
 The two ship as separate layers, `Bitplane-Step` and `Bitplane-Screen`, because they want two pens and because one of them is `isPoints` and the other is not — the same split Rock & Scree makes between its cliff hachures and its debris. Hypsometric tinting reads the *tier* rather than the vertex elevation, so the ramp bands with the plateaus instead of cutting across them.
+
+## 17. Flashbulb
+
+One bare bulb inside the scene, and the terrain as a police flash photograph: the near flank blown to bare paper, the far side crushed to solid, and a narrow band of tone between them carried entirely by grain.
+
+**Why nothing else in the tool can light it this way.** Engraving, Isophotes and the hillshade shader share one convention — azimuth around, altitude pinned at 45°, *parallel* rays. Parallel rays have no falloff, and falloff is the entire subject. The light goes at a world position inside the scene instead:
+
+$$E = \frac{\max(0,\; \hat{n} \cdot \hat{d})}{1 + (r/r_0)^2}, \qquad d = L - P,\; r = |d|$$
+
+The $1+$ keeps the light finite as the bulb approaches the ground. $r_0$ decides which band of terrain survives at all; everything after it is a tone curve.
+
+The bulb is exposed as **azimuth, distance and height** rather than as a raw XYZ triple — three unlabelled world coordinates are not something anyone can aim, and azimuth is already the vocabulary the Hillshade section teaches. Distance and height are *fractions*, of the terrain's half-diagonal and of its elevation range, so one setting frames a 40 m quarry and a 3 000 m mountain alike.
+
+**Referenced to a percentile, not to the brightest cell.** One sample a few units from the bulb otherwise sets the scale for the whole plate and everything else crushes to solid — measured, that put 84% of the terrain at full ink. The reference is the 68th percentile of exposure over the sampled cells, taken from a 512-bin histogram rather than a sort, so it costs one pass. The defaults were then measured against ~40% ink coverage on a reference massif; the first guess covered 59% and came out a black slab.
+
+**Shadows are marched, not inferred.** This is the CPU twin of `hillshadeCastShadows` in the surface shader and takes the same step count, so the two agree when both are on. The march runs in *grid* coordinates, so its inner loop is an array index and a compare. It is the expensive part of the mode, so it is skipped wherever it cannot change the answer: a cell facing away from the bulb is already dark, and a cell whose unshadowed tone is already solid cannot get darker.
+
+**The grain is blue noise.** Ordered dither lays down a visible screen — which is exactly right at Bitplane and the one thing that would kill a photograph. Blue noise carries a tone without printing a pattern, because its energy sits at high spatial frequencies. The tile is 64×64, built once by void-and-cluster (Ulichney 1993) and held at module scope; it is toroidal, so it wraps across the grid without a seam. Measured against a random threshold at the same density, it holds its points about 1.6× further apart at sparse tones.
+
+Two constraints are worth stating because they shaped the mode:
+
+- **The tile is walked per *sample*, not per cell.** Indexing it by grid position while sampling at a coarser pitch would decimate the pattern and take the blue out of it.
+- **Dot size cannot vary.** `weight` is resolved per layer by `layerStyle`, so every dot in the layer has the same radius — the variation has to come from density and position jitter alone. That is a property of the line contract, not a choice.
+
+**Solarise** folds the tone curve, $T \rightarrow |2T - 1|$, so highlights reverse and a bright rim appears exactly at mid-tone — the Sabattier effect. It is one line on top of everything above, which is why it is a switch here rather than a mode of its own.
 
 ---
 

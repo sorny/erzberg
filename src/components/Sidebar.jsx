@@ -87,6 +87,7 @@ const SECTION_TERMS = {
   'Mode: Curvature':  'streamlines principal direction field wrap shape',
   'Mode: Rock & Scree': 'swisstopo cliff hachures debris dots talus seed',
   'Mode: Bitplane':   'tilemap quantise plateaus tiers steps staircase dither bayer screen pixel voxel isometric arcade 16-bit retro',
+  'Mode: Flashbulb':  'point light bulb flash inverse square falloff cast shadow ray march blue noise grain film emulsion photograph solarise sabattier contrast exposure',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1356,7 +1357,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
-    modeBitplane: false,
+    modeBitplane: false, modeFlashbulb: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1547,6 +1548,7 @@ export function Sidebar({
       modeCurv:     !!newStyle.enabledCurv,
       modeSwiss:    !!newStyle.enabledSwiss,
       modeBitplane: !!newStyle.enabledBitplane,
+      modeFlashbulb: !!newStyle.enabledFlashbulb,
     }))
   }
 
@@ -2437,6 +2439,36 @@ export function Sidebar({
                   <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Bitplane" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Flashbulb" icon={<ModeMark kind="flashbulb" />} open={sec.modeFlashbulb} onToggle={() => tog('modeFlashbulb')} enabled={style.enabledFlashbulb}>
+            <Tog label="Enabled" checked={style.enabledFlashbulb} onChange={v => ss({ enabledFlashbulb: v })} />
+            {style.enabledFlashbulb && (
+              <>
+                <Sub label="BULB">
+                  <InlineSl label="Azimuth" help="Bearing of the bulb, same convention as the hillshade sun. 315° is NW." min={0} max={360} step={5} value={style.azimuthFlashbulb} onChange={v => ss({ azimuthFlashbulb: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Distance" help="How far out the bulb sits, as a fraction of the terrain's half-diagonal — so one setting frames a quarry and a mountain alike." min={0.1} max={3} step={0.05} value={style.distanceFlashbulb} onChange={v => ss({ distanceFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Height" help="Bulb height above the terrain floor, as a fraction of the elevation range. Below 1 puts it under the summits." min={0} max={4} step={0.05} value={style.heightFlashbulb} onChange={v => ss({ heightFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Falloff" help="r₀ in the 1/(1+(r/r₀)²) falloff, as a fraction of the half-diagonal. Small values leave only the near flank lit." min={0.1} max={3} step={0.05} value={style.falloffFlashbulb} onChange={v => ss({ falloffFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <Sub label="TONE">
+                  <InlineSl label="Exposure" min={0.2} max={4} step={0.05} value={style.exposureFlashbulb} onChange={v => ss({ exposureFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gamma" min={0.2} max={3} step={0.05} value={style.gammaFlashbulb} onChange={v => ss({ gammaFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Contrast" help="Slope of the S-curve about mid-tone. High values clip to bare paper and solid black, which is the flash look." min={0.2} max={5} step={0.05} value={style.contrastFlashbulb} onChange={v => ss({ contrastFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Solarise" small help="Sabattier: folds the tone curve, T → |2T − 1|, so the highlights reverse and a bright rim appears at mid-tone." checked={style.foldFlashbulb} onChange={v => ss({ foldFlashbulb: v })} />
+                </Sub>
+                <Sub label="GRAIN">
+                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainFlashbulb} onChange={v => ss({ grainFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Pitch" help="Grid spacing of the grain samples. The blue-noise tile is walked per sample, so this thins the grain without patterning it." min={0.5} max={12} step={0.5} value={style.spacingFlashbulb} onChange={v => ss({ spacingFlashbulb: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Seed" help="The same seed always reproduces the identical grain." min={1} max={999} step={1} value={style.seedFlashbulb ?? 42} onChange={v => ss({ seedFlashbulb: v })} />
+                </Sub>
+                <Sub label="SHADOW">
+                  <Tog label="Cast shadows" small help="Marches a ray from each sample toward the bulb. The expensive part of the mode — skipped wherever it cannot change the answer." checked={style.shadowFlashbulb} onChange={v => ss({ shadowFlashbulb: v })} />
+                  {style.shadowFlashbulb && <InlineSl label="Steps" min={4} max={64} step={4} value={style.shadowStepsFlashbulb} onChange={v => ss({ shadowStepsFlashbulb: v })} />}
+                </Sub>
+                <ModeStyleOverride prefix="Flashbulb" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
               </>
             )}
           </Section>

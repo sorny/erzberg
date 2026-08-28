@@ -168,6 +168,16 @@ const MARKS = {
       </g>
     </g>
   ),
+  // One hard light: blown to paper at the near edge, crushed to solid at the far.
+  flashbulb: (
+    <g stroke="none" fill="currentColor">
+      {[[19,2,1.5],[20.5,4.5,1.5],[17.5,4.5,1.5],[19,7,1.4],[21,9,1.3],[16,7,1.2],
+        [17.5,9.5,1.2],[14,9,1],[19.5,11.5,1.1],[15,11.5,0.9],[11,11,0.75],[12,8,0.6],
+        [8,11.5,0.5],[9,9,0.4],[5,11,0.32],[6,8.5,0.26]].map(([x, y, r], i) => (
+        <circle key={i} cx={x} cy={y} r={r} />
+      ))}
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

@@ -336,6 +336,12 @@ export function buildLineGeometry(terrain, p) {
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Flashbulb',builder: (t, ctx) => buildFlashbulb(t, ctx, {
+        azimuth: p.azimuthFlashbulb, distance: p.distanceFlashbulb, height: p.heightFlashbulb,
+        falloff: p.falloffFlashbulb, exposure: p.exposureFlashbulb, gamma: p.gammaFlashbulb,
+        contrast: p.contrastFlashbulb, grain: p.grainFlashbulb, spacing: p.spacingFlashbulb,
+        shadow: p.shadowFlashbulb, shadowSteps: p.shadowStepsFlashbulb,
+        fold: p.foldFlashbulb, seed: p.seedFlashbulb }) },
   ]
 
   const finalLayers = []
@@ -2583,6 +2589,268 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
     }
   }
 
+  return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+// ─── Flashbulb (point light, cast shadow, blue-noise grain) ──────────────────
+
+/**
+ * A 64×64 void-and-cluster blue-noise tile, values in (0,1), built lazily once.
+ *
+ * Ordered dither lays down a visible screen — which is the whole point at
+ * Bitplane and the one thing that would kill a photograph. Blue noise carries a
+ * tone without printing a pattern: its energy sits at high spatial frequencies,
+ * so the eye reads it as grain rather than as a grid.
+ *
+ * Void-and-cluster (Ulichney 1993) is the standard construction and it is worth
+ * the ~60 ms it costs, once, the first time the mode is switched on. A plain
+ * `Math.random()` threshold is the cheap substitute and it reads as sand: white
+ * noise clumps *and* leaves holes at every scale, so a smooth mid-tone comes out
+ * blotchy. The pattern is toroidal — every neighbourhood lookup wraps — which is
+ * what lets it tile across the grid without a seam.
+ *
+ * Held at module scope beside `_chainScratch` and for the same reason: it depends
+ * on nothing, and rebuilding it per rebuild would dominate the mode.
+ */
+let _blueNoise = null
+export function blueNoiseTile() {
+  if (_blueNoise) return _blueNoise
+  const S = 64, n = S * S
+  const energy = new Float32Array(n)
+  const bin = new Uint8Array(n)
+
+  // Wrapped Gaussian, σ = 1.5 — Ulichney's value. Radius 6 is where the weight
+  // has fallen below 1/2000 and the tail stops being worth 169 more multiplies.
+  const SIG = 1.5, RAD = 6
+  const kdx = [], kdy = [], kw = []
+  for (let dy = -RAD; dy <= RAD; dy++) {
+    for (let dx = -RAD; dx <= RAD; dx++) {
+      kdx.push(dx); kdy.push(dy)
+      kw.push(Math.exp(-(dx * dx + dy * dy) / (2 * SIG * SIG)))
+    }
+  }
+  const splat = (i, sign) => {
+    const y = (i / S) | 0, x = i % S
+    for (let k = 0; k < kw.length; k++) {
+      const yy = (y + kdy[k] + S) % S, xx = (x + kdx[k] + S) % S
+      energy[yy * S + xx] += sign * kw[k]
+    }
+  }
+  const tightestCluster = () => {
+    let bi = -1, bv = -Infinity
+    for (let i = 0; i < n; i++) if (bin[i] && energy[i] > bv) { bv = energy[i]; bi = i }
+    return bi
+  }
+  const largestVoid = () => {
+    let bi = -1, bv = Infinity
+    for (let i = 0; i < n; i++) if (!bin[i] && energy[i] < bv) { bv = energy[i]; bi = i }
+    return bi
+  }
+
+  // Seed with a tenth of the cells, then relax: repeatedly move the point from
+  // the tightest cluster into the largest void until doing so is a no-op. That
+  // fixed point is the "initial binary pattern" the ranking phases start from.
+  const rng = mulberry32(0x5eed)
+  const order = new Int32Array(n)
+  for (let i = 0; i < n; i++) order[i] = i
+  const seeded = Math.max(1, Math.round(n / 10))
+  for (let k = 0; k < seeded; k++) {
+    const j = k + Math.floor(rng() * (n - k))
+    const t = order[k]; order[k] = order[j]; order[j] = t
+    bin[order[k]] = 1; splat(order[k], 1)
+  }
+  for (let guard = 0; guard < n * 4; guard++) {
+    const c = tightestCluster()
+    bin[c] = 0; splat(c, -1)
+    const v = largestVoid()
+    if (v === c) { bin[c] = 1; splat(c, 1); break }
+    bin[v] = 1; splat(v, 1)
+  }
+
+  const rank = new Int32Array(n).fill(-1)
+  const binKeep = bin.slice(), energyKeep = energy.slice()
+
+  // Phase 1 — strip the relaxed pattern back to nothing, ranking downward. The
+  // last point standing is the one the sparsest tone keeps.
+  for (let r = seeded - 1; r >= 0; r--) {
+    const c = tightestCluster()
+    bin[c] = 0; splat(c, -1); rank[c] = r
+  }
+  // Phase 2 — refill from the relaxed pattern, ranking upward.
+  bin.set(binKeep); energy.set(energyKeep)
+  for (let r = seeded; r < n; r++) {
+    const v = largestVoid()
+    if (v < 0) break
+    bin[v] = 1; splat(v, 1); rank[v] = r
+  }
+
+  const out = new Float32Array(n)
+  for (let i = 0; i < n; i++) out[i] = (rank[i] + 0.5) / n
+  _blueNoise = { S, tile: out }
+  return _blueNoise
+}
+
+/**
+ * Where the bulb is, in world coordinates.
+ *
+ * Exposed as azimuth / distance / height rather than as a raw XYZ triple: three
+ * unlabelled world coordinates are not a thing anyone can aim, and azimuth is
+ * already the vocabulary the Hillshade section teaches. Distance and height are
+ * *fractions* — of the terrain's half-diagonal and of its elevation range — so a
+ * setting that frames a 40 m quarry also frames a 3 000 m mountain, which a
+ * world-unit control could not do.
+ */
+function flashLightPos(terrain, azimuthDeg, distFrac, heightFrac) {
+  const { spanHalfW, spanHalfH, minElev, maxElev } = terrain
+  const reach = Math.hypot(spanHalfW, spanHalfH) || 1
+  const az = ((azimuthDeg ?? 315) * Math.PI) / 180
+  const d = reach * (distFrac ?? 0.9)
+  return [
+    Math.cos(az) * d,
+    minElev + (maxElev - minElev) * (heightFrac ?? 1.2),
+    Math.sin(az) * d,
+  ]
+}
+
+/**
+ * Silver on paper, under one bare bulb.
+ *
+ * Every lit mode in the tool — Engraving, Isophotes, the hillshade shader —
+ * shares one convention: azimuth around, altitude pinned at 45°, *parallel* rays.
+ * Parallel rays have no falloff, and falloff is the entire subject here. The
+ * light goes inside the scene instead:
+ *
+ *     E = max(0, n̂·d̂) / (1 + (r/r₀)²)
+ *
+ * The `1 +` keeps the light finite as the bulb approaches the ground; r₀ decides
+ * which band of terrain survives at all, and everything after it is a tone curve.
+ *
+ * **Referenced to a percentile, not to the brightest cell.** One sample a few
+ * units from the bulb otherwise sets the scale for the whole plate and everything
+ * else crushes to solid — measured, that put 84% of the terrain at full ink. The
+ * reference is the 68th percentile of the exposure over the sampled cells, taken
+ * from a histogram rather than a sort so it costs one pass.
+ *
+ * **Shadows are marched, not inferred.** This is the CPU twin of
+ * `hillshadeCastShadows` in the surface shader, and takes the same step count so
+ * the two agree when both are on. It is also the expensive part, so it is skipped
+ * wherever it cannot change the answer: a cell facing away from the bulb is
+ * already dark, and a cell whose unshadowed tone is already solid cannot get
+ * darker.
+ *
+ * **The grain cannot vary its dot size.** `weight` is resolved per layer by
+ * `layerStyle`, so every dot in the layer is the same radius — the variation has
+ * to come from density and from position jitter alone. That is a real constraint
+ * of the line contract rather than a choice, and it is why the jitter is worth
+ * having rather than being a nicety.
+ */
+function buildFlashbulb(terrain, p, opt) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+
+  const step  = Math.max(1, Math.round((opt.spacing ?? 1.5) / scl))
+  const reach = Math.hypot(terrain.spanHalfW, terrain.spanHalfH) || 1
+  const r0    = Math.max(1e-3, reach * (opt.falloff ?? 1))
+  const [lx, ly, lz] = flashLightPos(terrain, opt.azimuth, opt.distance, opt.height)
+  const gamma    = Math.max(0.05, opt.gamma ?? 1)
+  const expo     = Math.max(0.01, opt.exposure ?? 1.15)
+  const contrast = Math.max(0, opt.contrast ?? 1.35)
+  const grain    = Math.max(0, Math.min(1, opt.grain ?? 1))
+  const K        = Math.max(0, Math.round(opt.shadowSteps ?? 24))
+  const doShadow = !!opt.shadow && K > 0
+
+  const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
+  const { S, tile } = blueNoiseTile()
+
+  // Candidate cells, and their exposure. Two passes over the same set: the tone
+  // curve needs the distribution before it can place any single cell in it.
+  const nR = Math.ceil(rows / step), nC = Math.ceil(cols / step)
+  const expos = new Float32Array(nR * nC)
+  const BINS = 512
+  const hist = new Uint32Array(BINS)
+  let maxE = 0, nValid = 0
+
+  for (let ri = 0, r = 0; r < rows; r += step, ri++) {
+    for (let ci = 0, c = 0; c < cols; c += step, ci++) {
+      const i = r * cols + c
+      if (!gridMask[i]) { expos[ri * nC + ci] = -1; continue }
+      const b = grid[i]
+      const elev = (b - 0.5) * 100 * elevScale
+      const bL = (c > 0        && gridMask[i - 1])    ? grid[i - 1]    : b
+      const bR = (c < cols - 1 && gridMask[i + 1])    ? grid[i + 1]    : b
+      const bU = (r > 0        && gridMask[i - cols]) ? grid[i - cols] : b
+      const bD = (r < rows - 1 && gridMask[i + cols]) ? grid[i + cols] : b
+      const gx = (bR - bL) * dScale, gz = (bD - bU) * dScale
+      const nl = Math.sqrt(gx * gx + gz * gz + 1)
+
+      const dx = lx - (c * scl - halfW), dy = ly - elev, dz = lz - (r * scl - halfH)
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1e-6
+      const lam = Math.max(0, (-gx * dx + dy - gz * dz) / (dist * nl))
+      const rr = dist / r0
+      const e = lam / (1 + rr * rr)
+      expos[ri * nC + ci] = e
+      if (e > maxE) maxE = e
+      nValid++
+    }
+  }
+  if (!nValid) return { positions: EMPTY_F32, colors: EMPTY_F32, isPoints: true }
+
+  for (let k = 0; k < expos.length; k++) {
+    const e = expos[k]
+    if (e < 0) continue
+    hist[Math.min(BINS - 1, (e / (maxE || 1)) * (BINS - 1) | 0)]++
+  }
+  const target = nValid * 0.68
+  let acc = 0, refBin = BINS - 1
+  for (let k = 0; k < BINS; k++) { acc += hist[k]; if (acc >= target) { refBin = k; break } }
+  const ref = Math.max(1e-6, ((refBin + 0.5) / BINS) * (maxE || 1))
+
+  const positions = new F32List(), colors = new F32List()
+  const eps = Math.max(0.001, scl * 0.003)
+  const rng = mulberry32(((opt.seed ?? 42) * 2654435761) >>> 0)
+
+  for (let ri = 0, r = 0; r < rows; r += step, ri++) {
+    for (let ci = 0, c = 0; c < cols; c += step, ci++) {
+      const e = expos[ri * nC + ci]
+      if (e < 0) continue
+      const i = r * cols + c
+      const elev = (grid[i] - 0.5) * 100 * elevScale
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+
+      let dark = 1 - Math.min(1, Math.pow(Math.min(1, e / ref) * expo, gamma))
+      // A cell already at full ink cannot be darkened by finding a shadow, and a
+      // cell the bulb never reached is in one. Both skip the march.
+      if (doShadow && e > 0 && dark < 1) {
+        // The march runs in grid coordinates, so its inner loop is an array
+        // index and a compare rather than a world-space transform per step.
+        const gcL = (lx + halfW) / scl, grL = (lz + halfH) / scl
+        for (let k = 1; k <= K; k++) {
+          const t = k / K
+          const qc = c + (gcL - c) * t, qr = r + (grL - r) * t
+          if (qc < 0 || qc > cols - 1 || qr < 0 || qr > rows - 1) break
+          const qy = elev + (ly - elev) * t
+          const b = sampleBilinear(grid, sMask, rows, cols, qr, qc)
+          if (b !== b) break
+          if ((b - 0.5) * 100 * elevScale > qy + eps) { dark = 1; break }
+        }
+      }
+      dark = Math.max(0, Math.min(1, (dark - 0.5) * contrast + 0.5))
+      if (opt.fold) dark = Math.abs(2 * dark - 1)
+      dark *= grain
+      if (dark <= 0) continue
+
+      // The tile is walked per *sample*, not per cell — stepping through it at
+      // the dot pitch would decimate the pattern and take the blue out of it.
+      if (dark <= tile[(ri % S) * S + (ci % S)]) continue
+
+      const jr = (rng() - 0.5) * step, jc = (rng() - 0.5) * step
+      const wx = (c + jc) * scl - halfW, wz = (r + jr) * scl - halfH
+      positions.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+      colors.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev),
+                                         gridSlopes[i] / (maxSlope || 1), 0, p))
+    }
+  }
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 
