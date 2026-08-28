@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-08-28
+
+### Added
+- **Erosion can be cancelled.** Hydraulic erosion is the third operation long
+  enough to need a progress bar — 50 000 droplets by default, two million at the
+  top of the slider — and it was the only one of the three with no way out. SVG
+  and STL have shared an overlay, a progress channel and a Cancel all along.
+  Cancel takes Undo's place while a run is live, since the two are never useful
+  at the same moment. Abandoning is not reported as a failure and it disarms
+  Undo: nothing was written, and offering to restore an identical raster is a
+  promise about nothing.
+
+- **A unit-test layer.** 87 tests over the modules that are just arithmetic — the
+  box blur, area resampling, the bilinear tap, Douglas–Peucker, the projections,
+  the layer-style cascade and the parameter registry — running in Node in about a
+  third of a second. The end-to-end suite is right about what it covers, but it
+  meant a deviation bound or a projection was only ever checked through a GPU, a
+  dev server and a headed Chrome, eleven seconds into a spec. `npm run test:unit`;
+  Playwright keeps `*.spec.js` and these are `*.test.js`, so neither runner can
+  pick up the other's files.
+
+### Changed
+- **Clicking a control's label now works it.** Every row built a `<span>` for its
+  label and handed the input an `aria-label`, so a screen reader was served but a
+  pointer was not: clicking the visible word did nothing, on 10 px text. The
+  label is a real `<label>` now. It deliberately wraps the text and not the help
+  button beside it — wrapping the whole row would have made "what does this do?"
+  also do it. Sliders also carry `aria-valuetext`, so a control the panel prints
+  as `315°` is announced as `315°` rather than as `315`.
+
+- **The rebuild contract is derived rather than transcribed.** Which parameters
+  cost a worker rebuild was a ~180-entry array written out by hand, while the
+  worker reads half of them through computed keys — so nothing could reconcile
+  the two, and a draw mode added without touching the array got a knob that moved
+  and changed nothing. It is now derived from the same registry that routes a
+  parameter to its state object and asserts the four groups share no key. The
+  derived set was verified identical to the array it replaces, 172 keys either
+  way, before it was wired in.
+
+- **The OpenStreetMap response cache is bounded.** It was a module-level Map with
+  no cap holding raw Overpass elements — up to 400 000 each, the JSON of a whole
+  valley — and every distinct query in a session stayed resident for as long as
+  the tab lived. Responses now cap at three and counts at thirty-two, and both
+  are dropped when a new raster makes them unreachable anyway.
+
+- **GeoTIFF ingest reads one band and walks rows.** `readRasters()` decoded and
+  allocated every band in the file when only the first is ever read — free on a
+  single-band DEM, three times the peak on an RGB-packed one. The normalisation
+  pass also computed a modulo and a division per pixel, before the branch that
+  was their only consumer: 128 M integer divisions on an 8k raster, to maintain a
+  bounding box.
+
+### Fixed
+- **A failed worker says so.** None of the four workers installed an `onerror`
+  handler, so one that threw out rather than posting an error never reached
+  `onmessage`. In the geometry hook that left the busy flag set for ever: the
+  "Computing geometry…" overlay latched on, and only an unrelated parameter
+  change tripping the cancel budget could clear it. Erosion sat on
+  "Eroding… 0%" with no way back but a reload. The quieter half is that a failed
+  rebuild leaves the *previous* picture on screen, which is exactly what a
+  successful-but-subtle one looks like — so the two were indistinguishable.
+
+- **A float DEM using −3.4e38 for voids no longer flattens the terrain.** The
+  sentinel list held the positive float maximum but not the negative, and the
+  other tests are `!isFinite` and equality with the file's declared
+  `GDAL_NODATA`. A raster marking voids with the negative one and carrying no
+  such tag read them as real ground 3.4e38 metres down; that single cell then set
+  the normalisation range and flattened everything to a plateau. Magnitude is now
+  the test, which covers both signs and every writer's variant at once.
+
+- **A panel section header set `style` twice.** JSX keeps the last one and drops
+  the rest silently, so a filtering-only cursor override never applied and the
+  header went on offering a pointer over a control the filter had already made
+  inert. The rule that catches this — `jsx-no-duplicate-props` — is now in the
+  lint config, written out rather than installed, since the plugin that owns it
+  stops at ESLint 9 and this project is on 10.
+
 ## [1.4.0] — 2026-08-25
 
 ### Added
