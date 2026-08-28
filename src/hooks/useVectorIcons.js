@@ -299,6 +299,20 @@ export function useVectorIcons(lineGeo, vectorLayers, viewTilt, viewSpin) {
                 `${l.iconTilt}|${l.iconSpin}|${l.iconFill ? 1 : 0}|` +
                 `${l.iconCustom?.name ?? ''}#${l.iconCustom?.geo?.segments ?? 0}`)
     .join(';')
+  /*
+   * With `iconFaceCamera` on, this changes at the orbit sync rate — roughly
+   * seven times a second during a drag — and each change re-emits the layer's
+   * geometry on the main thread. That looks like the one piece of per-gesture
+   * geometry work left outside the worker, so it was measured rather than
+   * assumed: at MAX_ICON_SEGMENTS, the ceiling above which the hook gives up and
+   * draws dots instead, one rebuild writes 1.4 MB of typed array in 0.26 ms —
+   * 0.2% of the 150 ms sync interval, and bounded by the budget rather than by
+   * how much data was fetched.
+   *
+   * So there is nothing here to move off the main thread. The empty string when
+   * no layer faces the camera is the part that matters: it keeps the memo from
+   * re-running at all for the ordinary case.
+   */
   const camKey = anyFaceCamera ? `${viewTilt}|${viewSpin}` : ''
 
   return useMemo(() => {
