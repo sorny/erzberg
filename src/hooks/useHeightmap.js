@@ -206,7 +206,22 @@ async function loadImagePixels(source) {
 
 // ── GeoTIFF loader ───────────────────────────────────────────────────────────
 
-const NODATA_SENTINELS = new Set([-9999, -9999.0, -32767, -32768, 3.4028234663852886e+38])
+const NODATA_SENTINELS = new Set([-9999, -32767, -32768])
+
+/**
+ * Magnitude at which a float value is a void marker rather than a height.
+ *
+ * Enumerating the float sentinels was the wrong shape. GDAL writes voids as
+ * ±3.4028235e38, writers disagree in the last digits, and only the *positive*
+ * one was listed — so a raster using the negative marker with no GDAL_NODATA tag
+ * read it as real ground 3.4e38 metres down. That one cell then sets the
+ * normalisation range and flattens the entire terrain to a plateau, which looks
+ * like a broken file rather than a missed sentinel.
+ *
+ * No elevation in any unit comes within twenty-six orders of magnitude of this,
+ * so testing the magnitude covers both signs and every writer's variant at once.
+ */
+const FLOAT_VOID = 1e30
 
 // GeoTIFF's "this key is set, but to a value not in the EPSG registry" marker.
 // Treating it as a code would produce a CRS string nothing can classify.
@@ -275,7 +290,10 @@ async function loadGeoTiffPixels(file) {
   const image  = await tiff.getImage()
   let width  = image.getWidth()
   let height = image.getHeight()
-  const rasters = await image.readRasters()
+  // Band 0 only. Without `samples`, geotiff decodes and allocates every band in
+  // the file — free on the single-band DEMs this is aimed at, and three times the
+  // peak allocation on an RGB-packed raster, none of which is ever read.
+  const rasters = await image.readRasters({ samples: [0] })
   let band      = rasters[0]
   // The file's declared NoData value, which the sentinel list cannot stand in
   // for: GDAL writes float DEMs with -3.4028235e+38, and only the *positive*
@@ -286,7 +304,8 @@ async function loadGeoTiffPixels(file) {
   const parsed     = rawNodata != null ? parseFloat(rawNodata) : NaN   // trailing NUL and all
   const nodataValue = Number.isFinite(parsed) ? parsed : null
 
-  const isNodata = (v) => !isFinite(v) || (nodataValue !== null && v === nodataValue) || NODATA_SENTINELS.has(v)
+  const isNodata = (v) => !isFinite(v) || Math.abs(v) >= FLOAT_VOID
+    || (nodataValue !== null && v === nodataValue) || NODATA_SENTINELS.has(v)
 
   // Extent and CRS, read before anything measures the raster: what shape the
   // pixels are is a question about the projection, and the answer decides the
@@ -344,21 +363,30 @@ async function loadGeoTiffPixels(file) {
   let minX = width, minY = height, maxX = 0, maxY = 0
   let hasValid = false
 
-  for (let i = 0; i < band.length; i++) {
-    const v = band[i]
-    const x = i % width
-    const y = Math.floor(i / width)
-
-    if (isNodata(v)) {
-      pixels[i] = 0; nodataMask[i] = 0
-    } else {
-      pixels[i] = (v - min) / range; nodataMask[i] = 1
-      if (x < minX) minX = x
-      if (x > maxX) maxX = x
-      if (y < minY) minY = y
-      if (y > maxY) maxY = y
-      hasValid = true
+  // Walked as rows and columns rather than one flat index, so x and y are
+  // induction variables instead of a modulo and a division per pixel. They were
+  // computed *before* the NoData branch that is their only consumer, which on an
+  // 8k raster is 128 M integer divisions to maintain a bounding box — and every
+  // one of them on a cell that may be a void. Same output, one pass.
+  const invRange = 1 / range
+  for (let y = 0, i = 0; y < height; y++) {
+    let rowMinX = width, rowMaxX = -1
+    for (let x = 0; x < width; x++, i++) {
+      const v = band[i]
+      if (isNodata(v)) { pixels[i] = 0; nodataMask[i] = 0; continue }
+      pixels[i] = (v - min) * invRange
+      nodataMask[i] = 1
+      if (x < rowMinX) rowMinX = x
+      rowMaxX = x
     }
+    // A row holding nothing valid moves no bound — including the y bounds, which
+    // is what keeps minY/maxY on rows that actually carry data.
+    if (rowMaxX < 0) continue
+    hasValid = true
+    if (rowMinX < minX) minX = rowMinX
+    if (rowMaxX > maxX) maxX = rowMaxX
+    if (y < minY) minY = y
+    maxY = y
   }
 
   // Suggest a vertical exaggeration from the real-world pixel size. Classify by
