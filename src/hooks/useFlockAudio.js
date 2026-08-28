@@ -144,6 +144,20 @@ export function useFlockAudio(fallbackLiveRef) {
         worker.terminate()
         if (workerRef.current === worker) workerRef.current = null
       }
+      // Same guard as useSoundscape: a worker that throws out never posts, and
+      // `specRef` was cleared above — so without this the flock would sit on no
+      // analysis at all while the panel showed the bar still filling.
+      const die = (msg) => {
+        console.error('[SpectrogramWorker]', msg)
+        setError(msg)
+        setIsAnalyzing(false)
+        setProgress(0)
+        worker.terminate()
+        if (workerRef.current === worker) workerRef.current = null
+      }
+      worker.onerror = (ev) => die(ev.message || 'The audio analysis stopped.')
+      worker.onmessageerror = () => die('The audio analysis result could not be read.')
+
       worker.postMessage({ pcm, sampleRate: audioBuf.sampleRate, fftSize: FFT_SIZE, bins: BINS, logFreq: LOG_FREQ })
       return true
     } catch (err) {

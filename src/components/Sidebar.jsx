@@ -1372,6 +1372,10 @@ export function Sidebar({
   const [isEroding,       setIsEroding]       = useState(false)
   const [erosionProgress, setErosionProgress] = useState(0)
   const [lastPixels,      setLastPixels]      = useState(null)
+  // Erosion's own failure line. A run that dies used to clear its progress bar
+  // and say nothing, which is indistinguishable from a run that did nothing —
+  // and erosion is subtle enough that "nothing happened" is a plausible result.
+  const [erosionError,    setErosionError]    = useState(null)
   const erosionWorkerRef = useRef(null)
 
   // --- Discovery State ---
@@ -1394,6 +1398,7 @@ export function Sidebar({
     setLastPixels(new Float32Array(heightmapPixels))
     setIsEroding(true)
     setErosionProgress(0)
+    setErosionError(null)
 
     const worker = new ErosionWorker()
     erosionWorkerRef.current = worker
@@ -1402,12 +1407,29 @@ export function Sidebar({
       const { progress, result, error } = e.data
       if (progress !== undefined) { setErosionProgress(progress); return }
       if (result) setPixels(result)
-      if (error) console.error('[ErosionWorker]', error)
+      if (error) {
+        console.error('[ErosionWorker]', error)
+        setErosionError(error)
+      }
       setIsEroding(false)
       setErosionProgress(0)
       worker.terminate()
       erosionWorkerRef.current = null
     }
+
+    // A droplet simulation that throws out — an allocation the raster is too
+    // large for, most likely — never reaches onmessage, so without this the
+    // button stayed stuck on "Eroding… 0%" with no way back but a reload.
+    const die = (msg) => {
+      console.error('[ErosionWorker]', msg)
+      setErosionError(msg)
+      setIsEroding(false)
+      setErosionProgress(0)
+      worker.terminate()
+      if (erosionWorkerRef.current === worker) erosionWorkerRef.current = null
+    }
+    worker.onerror = (ev) => die(ev.message || 'the worker stopped.')
+    worker.onmessageerror = () => die('the result could not be read.')
 
     worker.postMessage({
       pixels: heightmapPixels,
@@ -2921,6 +2943,13 @@ export function Sidebar({
               <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
               <button onClick={handleUndoErosion} disabled={!lastPixels || isEroding} style={{ flex:1, padding:'8px 0', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor: (lastPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (lastPixels && !isEroding) ? 1 : 0.5 }}>Undo</button>
             </div>
+            {erosionError && (
+              <div data-testid="erosion-error" role="status" style={{
+                marginTop: 6, fontSize: 10, lineHeight: 1.45, color: '#fca5a5',
+                background: 'rgba(153,27,27,0.18)', border: '1px solid #7f1d1d',
+                borderRadius: 4, padding: '5px 7px',
+              }}>Erosion failed — {erosionError}</div>
+            )}
           </Section>
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>

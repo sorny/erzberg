@@ -139,6 +139,19 @@ export function useSoundscape() {
       if (workerRef.current === worker) workerRef.current = null
     }
 
+    // An FFT that throws out never posts, so `isAnalyzing` would stay true and
+    // the panel would report an analysis still running on a worker that is gone.
+    const die = (msg) => {
+      console.error('[SpectrogramWorker]', msg)
+      setError(msg)
+      setIsAnalyzing(false)
+      setProgress(0)
+      worker.terminate()
+      if (workerRef.current === worker) workerRef.current = null
+    }
+    worker.onerror = (ev) => die(ev.message || 'The audio analysis stopped.')
+    worker.onmessageerror = () => die('The audio analysis result could not be read.')
+
     worker.postMessage({
       pcm, sampleRate,
       fftSize: o.fftSize, bins: o.bins, logFreq: o.logFreq,

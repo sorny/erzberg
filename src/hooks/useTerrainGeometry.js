@@ -25,6 +25,17 @@ export function useTerrainGeometry(p) {
   // running but frames are still arriving" (streaming) from "a build is running
   // and nothing has come back" (a genuine stall worth an overlay).
   const [resultCount, setResultCount] = useState(0)
+  /**
+   * The last rebuild failure, for the caller to say out loud.
+   *
+   * A failed rebuild leaves the *previous* picture on screen, which is exactly
+   * what a successful-but-subtle one looks like — so without this the two are
+   * indistinguishable from the user's side. Carries a `seq` because the same
+   * message twice running is two events, and the toast keys on it.
+   */
+  const [error, setError] = useState(null)
+  const errorSeq = useRef(0)
+  const fail = (msg) => setError({ msg, seq: ++errorSeq.current })
 
   const workerRef = useRef(null)
   const startTimeRef = useRef(0)
@@ -85,8 +96,10 @@ export function useTerrainGeometry(p) {
       busyRef.current = false
       lastDurationRef.current = performance.now() - buildStartRef.current
       if (_gen === genRef.current) {
-        if (error) console.error('[GeometryWorker] Error:', error)
-        else {
+        if (error) {
+          console.error('[GeometryWorker] Error:', error)
+          fail(`Geometry rebuild failed: ${error}`)
+        } else {
           startTransition(() => {
             setTerrain(terrain); setLineGeo(lineGeo); setSurfaceGeo(surfaceGeo)
             // Absent, not null, means the worker's vector cache was still valid
@@ -106,6 +119,36 @@ export function useTerrainGeometry(p) {
       pendingRef.current = null
       if (next) sendRef.current(next)
       else setIsComputing(false)
+    }
+
+    /**
+     * A worker that throws *out* never reaches onmessage.
+     *
+     * That is the failure this hook had no answer for: `busyRef` stayed true
+     * for ever, so the "Computing geometry…" overlay latched on and the only
+     * thing that could clear it was an unrelated parameter change happening to
+     * trip the cancel budget. The worker is dropped rather than reused — its
+     * cached raster and vector sources are in an unknown state after an
+     * uncaught throw, and `ensureWorker` re-sends both on the next build.
+     */
+    const die = (msg) => {
+      busyRef.current = false
+      pendingRef.current = null
+      setIsComputing(false)
+      workerRef.current?.terminate()
+      workerRef.current = null
+      workerPixelsRef.current = null
+      workerVectorRef.current = null
+      fail(msg)
+    }
+    workerRef.current.onerror = (ev) => {
+      console.error('[GeometryWorker] Uncaught:', ev.message || ev)
+      die(`Geometry rebuild failed: ${ev.message || 'the worker stopped.'}`)
+    }
+    // A result that cannot be structured-cloned fails here, not in onerror.
+    workerRef.current.onmessageerror = () => {
+      console.error('[GeometryWorker] Result could not be deserialised.')
+      die('Geometry rebuild failed: the result could not be read.')
     }
   }
 
@@ -324,5 +367,5 @@ export function useTerrainGeometry(p) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lineGeo, vectorGeo, vectorOrderKey])
 
-  return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount }
+  return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount, error }
 }

@@ -1123,7 +1123,15 @@ export default function App() {
   profileClickRef.current = handleProfileClick
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
-  const { terrain: terrainData, lineGeo: workerGeo, surfaceGeo, isComputing, resultCount } = useTerrainGeometry(p)
+  const { terrain: terrainData, lineGeo: workerGeo, surfaceGeo, isComputing, resultCount,
+          error: geometryError } = useTerrainGeometry(p)
+
+  // A failed rebuild leaves the previous picture on screen, which is exactly what
+  // a successful-but-subtle one looks like. Eight other failure paths already say
+  // something here; this was the one that went to the console alone.
+  useEffect(() => {
+    if (geometryError) notify(geometryError.msg)
+  }, [geometryError, notify])
 
   // Point layers that asked for an icon get one here, in place of their dots.
   // Downstream of the worker on purpose: flattening an SVG needs the DOM, and
