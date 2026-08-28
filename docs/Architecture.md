@@ -60,8 +60,9 @@ the one used for it. Three tiers, from most to least expensive:
 **1. Geometry rebuild (worker round-trip).** Anything that changes where a
 vertex is: resolution, blur, levels, elevation scale and cuts, jitter, mirroring,
 every draw mode's spacing/angle/threshold, and the gradient stops (baked into
-line vertex colours). The dependency list in `useTerrainGeometry` is the
-authoritative statement of this set.
+line vertex colours). `GEOMETRY_KEYS` in `src/params.js` is the authoritative
+statement of this set — derived from `defaults.js` rather than written out, so it
+cannot fall behind the parameter space it describes.
 
 Vector layers sit here only for what moves their geometry — layer visibility,
 area fill, and which individual features are hidden — via `layerBuildKey`. Their
@@ -75,9 +76,9 @@ vector layer's colour and its area fill colour/opacity, the feature highlight,
 terrain fill colour, hillshade, slope shading, water, aspect, AO, raw terrain view. These are
 resolved per layer at render time by `layerStyle(id, p)` and in the surface
 shader, so dragging them never enters the worker. Two exceptions are deliberate
-and documented at the dependency list: `needsSurfaceShading` (normals and UVs are
-not built when no fill layer would use them) and `depthOcclusion` (occlusion
-curtains are geometry).
+and argued at `RENDER_SIDE` in `src/params.js`: `needsSurfaceShading` (normals and
+UVs are not built when no fill layer would use them) and `depthOcclusion`
+(occlusion curtains are geometry).
 
 **3. Nothing at all.** Rendering is `frameloop="demand"` — a frame is drawn only
 when something invalidates it. Camera interaction moves the camera directly and
@@ -239,14 +240,34 @@ into one picture.
 ## Adding things
 
 - **A draw mode**: write a builder in `geometryBuilders.js` returning
-  `{ id, positions, colors? }`, register it in `buildLineGeometry`, add its
-  params to `STYLE_DEF` in `src/defaults.js`, an entry in
-  `src/utils/drawModes.js` (which is what teaches the randomiser it exists), a
-  `<Section>` in `Sidebar.jsx`, and its params to the dependency list in
-  `useTerrainGeometry`. Forgetting the last step is the classic bug: the
-  control moves and nothing happens. Two smaller ones go with the section: a
-  mark in `panel/modeMarks.jsx`, drawn at 22×13 as the mode's defining gesture
-  rather than a picture of terrain, and a line in `SECTION_TERMS` (below).
+  `{ positions, colors }` — or an object of *sub-layers*, which is how Contours
+  ships its major and minor lines under separate pens — register it in
+  `MODES_CONFIG` inside `buildLineGeometry`, add a `layerStyle` case for each
+  sub-layer, add its params to `STYLE_DEF` in `src/defaults.js`, an entry in
+  `src/utils/drawModes.js` (which is what teaches the randomiser it exists), and
+  a `<Section>` in `Sidebar.jsx`. Two smaller ones go with the section: a mark
+  in `panel/modeMarks.jsx`, drawn at 22×13 as the mode's defining gesture rather
+  than a picture of terrain, and a line in `SECTION_TERMS` (below).
+
+  **The rebuild dependency list is no longer a step.** It used to be, and
+  forgetting it was the classic bug — the control moved and nothing happened.
+  `src/params.js` now derives the rebuild key from `defaults.js`, so a new
+  mode's params are covered the moment they exist. What replaced that one step
+  is two quieter traps, and both are now guarded at module load rather than left
+  to be discovered:
+
+  - The key is built by *excluding* render-side params by regex, and several of
+    those patterns are unanchored prefixes (`fill`, `point`, `pan`, `rotation`,
+    `frame`, `texture`). A geometry param named `fillTruss` or `rotationBitplane`
+    would be silently classified render-side and never enter the key. `params.js`
+    now cross-checks every mode-suffixed key against the registry in
+    `drawModes.js` and throws at import naming the offender.
+  - `geometryKey` builds a *string*, so a non-scalar default (an array of band
+    gains, a list of light positions) stringifies to `[object Object]` and the
+    key goes blind to every edit inside it. That is why `gradientStops` is in
+    `GEOMETRY_NON_SCALAR` and depended on by identity instead. A non-scalar
+    default that is not declared there now throws at import too. Flat-name the
+    array (`gain0Bandsplit` … `gain5Bandsplit`) or declare it.
 - **A button**: use `Btn` from `panel/ui.jsx` — `variant` carries the look
   (`quiet`, `ghost`, `primary`, `toggle`) and `style` carries the geometry, which
   is genuinely per-row. Do not re-specify background, colour and border by hand;
@@ -268,8 +289,9 @@ into one picture.
   the mode is on — a section that cannot be found while it is switched off is
   unfindable exactly when someone is looking for it.
 - **A surface overlay**: it is a branch in the `SurfaceMesh` shader plus a
-  uniform. Do not add it to the worker dependency list — that would make a
-  colour change rebuild geometry.
+  uniform. Name it in `RENDER_SIDE` in `src/params.js` — the rebuild key is
+  built by exclusion now, so an overlay left out of that list rebuilds all the
+  geometry every time its colour moves.
 - **A CRS**: one entry in the table in `geoCoords.js` reaches the renderer, the
   STL exporter and the sidebar together, because all three ask the same
   classifier. See [Georeferencing](Georeferencing.md).

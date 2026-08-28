@@ -11,7 +11,8 @@
  * These are the assertions that used to be a 180-line array nobody could audit.
  */
 import { describe, expect, it } from 'vitest'
-import { GEOMETRY_KEYS, GEOMETRY_NON_SCALAR, GROUP_OF, geometryKey } from '../../src/params'
+import { GEOMETRY_KEYS, GEOMETRY_NON_SCALAR, GROUP_OF, auditParamSpace, geometryKey } from '../../src/params'
+import { DRAW_MODE_IDS } from '../../src/utils/drawModes'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from '../../src/defaults'
 
 /** The merged param bus, as App builds it. */
@@ -123,5 +124,44 @@ describe('geometryKey', () => {
     // offset slider has not moved.
     const p = allParams()
     expect(geometryKey({ ...p, elevScale: 1 })).not.toBe(geometryKey({ ...p, elevScale: 2 }))
+  })
+})
+
+describe('auditParamSpace', () => {
+  const ok = { style: { spacingLines: 4, weightLines: 1, colorLines: '#000' } }
+
+  it('passes the real parameter space', () => {
+    expect(() => auditParamSpace({ terrain: TERRAIN_DEF, style: STYLE_DEF, points: POINTS_DEF, view: VIEW_DEF }, DRAW_MODE_IDS)).not.toThrow()
+  })
+
+  it('catches a geometry param swallowed by an unanchored RENDER_SIDE prefix', () => {
+    // `fill` is unanchored so it covers fillColor/fillBanded/fillHypso*, and it
+    // would swallow a mode's own fill switch too. Uses registered mode ids, so
+    // the assertion keeps meaning something as modes are added.
+    expect(() => auditParamSpace({ style: { ...ok.style, fillLines: true } }, DRAW_MODE_IDS))
+      .toThrow(/fillLines/)
+    expect(() => auditParamSpace({ style: { ...ok.style, rotationLines: 0 } }, DRAW_MODE_IDS))
+      .toThrow(/rotationLines/)
+    expect(() => auditParamSpace({ style: { ...ok.style, pointSizeStipple: 2 } }, DRAW_MODE_IDS))
+      .toThrow(/pointSizeStipple/)
+  })
+
+  it('allows the render-side params a mode is genuinely entitled to', () => {
+    expect(() => auditParamSpace({
+      style: { weightLines: 1, opacityLines: 1, dashLines: 'solid',
+               majorWeightContours: 2, labelColorContours: null,
+               screeWeightSwiss: 2.5, labelFontContours: 'HersheySans1' },
+    }, DRAW_MODE_IDS)).not.toThrow()
+  })
+
+  it('catches a non-scalar geometry default', () => {
+    expect(() => auditParamSpace({ style: { gainsBandsplit: [1, 1, 1] } }, DRAW_MODE_IDS))
+      .toThrow(/gainsBandsplit/)
+    expect(() => auditParamSpace({ style: { lightFlashbulb: { x: 0 } } }, DRAW_MODE_IDS))
+      .toThrow(/lightFlashbulb/)
+  })
+
+  it('lets a null default through — null is a scalar for the key', () => {
+    expect(() => auditParamSpace({ style: { anchorLines: null } }, DRAW_MODE_IDS)).not.toThrow()
   })
 })
