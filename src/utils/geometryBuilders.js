@@ -133,10 +133,40 @@ export function layerStyle(id, p) {
  * Growable typed-array writers. The builders emit millions of floats per rebuild;
  * accumulating them in plain JS arrays (boxed doubles + push/spread) and converting
  * at the end dominated worker time and GC. These append straight into typed
- * storage with doubling growth. toArray() returns a subarray view (no copy) — the
- * backing buffer is at most 2× the payload, which is cheaper than a final copy
- * for both the worker transfer and peak memory.
+ * storage with doubling growth.
+ *
+ * ── What toArray() returns, and why it depends ───────────────────────────────
+ * A subarray view costs nothing but keeps the *whole* backing buffer alive, and
+ * the worker transfers `arr.buffer` — so a layer that finished just past a
+ * doubling boundary ships nearly twice the bytes it needs and holds them for as
+ * long as it is on screen. Measured on a 1024² raster at resolution 1:
+ *
+ *   Stipple    16.8 MB used   32.0 MB allocated   1.91×   15.2 MB wasted
+ *   Swiss      12.9           16.9                1.31     4.0
+ *   Contours   65.0           75.0                1.15    10.0
+ *   Lines      59.9           68.0                1.13     8.0
+ *
+ * Stipple is the case the doubling is worst for, and it is not a rounding error.
+ * But copying unconditionally is not free either: `slice` holds the old buffer
+ * and the new one at the same time, so it trades a lower steady state for a
+ * higher peak — which is the wrong way round for the small layers, where the
+ * slack is a few hundred kilobytes and the copy buys nothing.
+ *
+ * So the copy is spent only where it pays: a large buffer that is also mostly
+ * slack. Everything else keeps the free view it always had.
  */
+
+// Trim when the waste is worth a copy — both tests have to pass. The ratio alone
+// would copy a 64 KB buffer to save 32 KB; the size alone would copy a 60 MB
+// buffer to save 8 MB, which is the 1.13× case above and not worth the peak.
+const TRIM_MIN_WASTE_BYTES = 2 * 1024 * 1024
+const TRIM_MIN_RATIO = 1.5
+
+/** Whether a writer's slack is worth one copy to reclaim. See above. */
+function worthTrimming(used, capacity, bytesPerElement) {
+  return (capacity - used) * bytesPerElement >= TRIM_MIN_WASTE_BYTES
+      && capacity >= used * TRIM_MIN_RATIO
+}
 export class F32List {
   constructor(cap = 4096) { this.a = new Float32Array(cap); this.n = 0 }
   _grow(need) {
@@ -164,7 +194,10 @@ export class F32List {
   /** Append the same [r,g,b] triple twice (both vertices of a segment). */
   pushRgb2(c) { this.push6(c[0], c[1], c[2], c[0], c[1], c[2]) }
   get length() { return this.n }
-  toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
+  toArray() {
+    if (this.n === this.a.length) return this.a
+    return worthTrimming(this.n, this.a.length, 4) ? this.a.slice(0, this.n) : this.a.subarray(0, this.n)
+  }
 }
 
 /** Float64 variant, used for contour chain coordinates. Double precision keeps
@@ -222,7 +255,10 @@ export class U32List {
     this.n = n + 3
   }
   get length() { return this.n }
-  toArray() { return this.n === this.a.length ? this.a : this.a.subarray(0, this.n) }
+  toArray() {
+    if (this.n === this.a.length) return this.a
+    return worthTrimming(this.n, this.a.length, 4) ? this.a.slice(0, this.n) : this.a.subarray(0, this.n)
+  }
 }
 
 // Shared zero-length buffers for "nothing to emit" returns. Immutable in

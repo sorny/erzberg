@@ -8,7 +8,7 @@
  * these two files are two halves of the same statement.
  */
 import { describe, expect, it } from 'vitest'
-import { simplifyFlat, layerStyle, hasFillLayer, needsSurfaceShading } from '../../src/utils/geometryBuilders'
+import { F32List, U32List, simplifyFlat, layerStyle, hasFillLayer, needsSurfaceShading } from '../../src/utils/geometryBuilders'
 import { STYLE_DEF } from '../../src/defaults'
 
 /** Flat [x,y,…] from pairs. */
@@ -134,5 +134,54 @@ describe('needsSurfaceShading', () => {
   it('agrees with hasFillLayer about a plain fill', () => {
     expect(hasFillLayer({ ...STYLE_DEF, showFill: true })).toBe(true)
     expect(hasFillLayer({ ...STYLE_DEF })).toBe(false)
+  })
+})
+
+describe('growable writers', () => {
+  it('keeps every value it was given, in order', () => {
+    const l = new F32List(4)
+    for (let i = 0; i < 300; i++) l.push3(i, i + 0.5, i + 0.25)
+    const out = l.toArray()
+    expect(out.length).toBe(900)
+    expect(out[0]).toBeCloseTo(0, 5)
+    expect(out[898]).toBeCloseTo(299.5, 4)
+  })
+
+  it('returns the buffer itself when it happens to be exactly full', () => {
+    const l = new F32List(6)
+    l.push3(1, 2, 3); l.push3(4, 5, 6)
+    expect(l.toArray().length).toBe(6)
+    expect(l.toArray().byteOffset).toBe(0)
+  })
+
+  it('leaves a small buffer as a free view rather than copying it', () => {
+    // A few hundred KB of slack is not worth a copy, and copying raises the
+    // peak — the old buffer and the new one are alive at the same moment.
+    const l = new F32List(4)
+    for (let i = 0; i < 10; i++) l.push3(i, i, i)
+    const out = l.toArray()
+    expect(out.buffer.byteLength).toBeGreaterThan(out.byteLength)   // still a view
+  })
+
+  it('trims a large buffer that is mostly slack', () => {
+    // Just over a doubling boundary is the worst case: measured at 1.91x on a
+    // real Stipple layer, 15.2 MB of waste on a 16.8 MB payload.
+    const cap = 4 * 1024 * 1024            // 4M floats = 16 MB
+    const l = new F32List(cap)
+    for (let i = 0; i < 1000; i++) l.push3(i, i, i)   // ~12 KB used of 16 MB
+    const out = l.toArray()
+    expect(out.length).toBe(3000)
+    // Right-sized: the backing buffer is the payload and nothing more.
+    expect(out.buffer.byteLength).toBe(out.byteLength)
+  })
+
+  it('applies the same rule to the index writer', () => {
+    const cap = 4 * 1024 * 1024
+    const u = new U32List(cap)
+    for (let i = 0; i < 900; i++) u.push3(i, i + 1, i + 2)
+    const out = u.toArray()
+    expect(out.length).toBe(2700)
+    expect(out.buffer.byteLength).toBe(out.byteLength)
+    expect(out[2699]).toBe(901)
   })
 })
