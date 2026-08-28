@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using seventeen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using eighteen independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -320,6 +320,27 @@ Two constraints are worth stating because they shaped the mode:
 - **Dot size cannot vary.** `weight` is resolved per layer by `layerStyle`, so every dot in the layer has the same radius — the variation has to come from density and position jitter alone. That is a property of the line contract, not a choice.
 
 **Solarise** folds the tone curve, $T \rightarrow |2T - 1|$, so highlights reverse and a bright rim appears exactly at mid-tone — the Sabattier effect. It is one line on top of everything above, which is why it is a switch here rather than a mode of its own.
+
+## 18. Halation
+
+Flashbulb's optics, plus the glow a blown highlight throws into the shadow beside it. The lit crest of a ridge bleeds outward; the grain next to it is eaten away; a warm halo pools in what is left.
+
+**What actually scatters.** Halation in a real emulsion is light that got *through* the silver, bounced off the film base and came back — so the thing that spreads is the light the highlight could not hold, and the field to blur is the **overexposure**:
+
+$$\text{over} = \max\!\left(0,\; \frac{E}{E_\text{ref}} \cdot \text{exposure} - 1\right), \qquad \text{bloom} = \text{boxBlur}(\text{over},\, \text{radius})$$
+
+Blurring the exposure *gradient* instead is the obvious first idea, and it is wrong in a way that only shows on real terrain: every ridge and gully is an edge, so a busy massif blooms uniformly and the halo covers the picture rather than pooling beside the bright parts of it. Only genuinely blown highlights scatter, and `over` is exactly them — which is also what makes the mode do nothing at all on an under-exposed plate, as it should.
+
+The blur is the same `boxBlur` the Blur slider runs, taken over the *exposure lattice* rather than the raster — so its radius is in sample pitches, and it inherits the mask-aware path, which stops a clipped edge from ringing the selection with a halo of its own.
+
+**Two populations, two inks.**
+
+- **`Halation-Grain`** is Flashbulb's grain with the bloom subtracted from the darkness, $\text{inked} = \max(0,\, T - \text{bloom} \cdot \text{bleed})$. That subtraction *is* the halation; with `bleed` at 0 the glow would sit on top of the picture instead of consuming it, and the mode would just be Flashbulb with confetti.
+- **`Halation-Bloom`** is the halo, drawn where the bloom is strong *and* the ground is dark, $\text{halo} = \text{bloom} \cdot \text{glow} \cdot T$. A glow over an already-blown highlight is invisible, and drawing it there only wastes ink.
+
+The two read the blue-noise tile at a half-tile offset from one another. Sharing an index would correlate them exactly — every halo dot would land on a cell the grain had already claimed, and the halo would vanish into it instead of reading as a second pass.
+
+The optics themselves (`flashExposure`, `flashShadowed`, `flashTone`) are shared with Flashbulb rather than reimplemented; with the glow turned off the two modes agree cell for cell, which is what the spec pins.
 
 ---
 

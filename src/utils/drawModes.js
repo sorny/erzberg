@@ -86,6 +86,12 @@ export const DRAW_MODES = [
     pick: { azimuth: [0, 360], distance: [0.5, 1.6], height: [1.2, 2.8],
             falloff: [1, 2.2], exposure: [1.4, 2.6], contrast: [1, 1.7], spacing: [1.5, 4] },
   },
+  {
+    id: 'Halation', label: 'Halation', cost: 5,
+    pick: { azimuth: [0, 360], height: [1.2, 2.8], falloff: [1, 2.2],
+            exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],
+            spacing: [1.5, 4] },
+  },
 ]
 
 /** Draw-mode ids in pipeline order. */

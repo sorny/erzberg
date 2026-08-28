@@ -91,7 +91,7 @@ const RENDER_SIDE = [
   // and stay out of this.
   // Unanchored too — these are prefixes of suffixed names
   // (tanakaWeightBright, labelColorContours, screeWeightSwiss).
-  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight)/,
+  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity)/,
   /^label(SingleLine|Font)Contours$/,
   // Texture overlay — sampled in the surface shader.
   /^(texture|showTexture)/,
@@ -140,7 +140,7 @@ const isGeometry = (k) =>
  */
 const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
-  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight)[A-Z]/,
+  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,
 ]
 

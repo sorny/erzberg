@@ -131,6 +131,19 @@ export const STYLE_DEF = {
   colorFlashbulb: '#111111', weightFlashbulb: 3, opacityFlashbulb: 1, dashFlashbulb: 'solid',
   hypsoFlashbulb: false, hypsoModeFlashbulb: 'elevation', hypsoBandedFlashbulb: false, hypsoIntervalFlashbulb: 10,
 
+  // Halation — Flashbulb's optics, plus the glow that a blown highlight throws
+  // into the shadow beside it. `glowOpacity`/`glowWeight` are the halo's own
+  // ink; `glowColor` is baked per vertex like every other mode's colour.
+  enabledHalation: false,
+  azimuthHalation: 315, distanceHalation: 0.9, heightHalation: 2, falloffHalation: 1.6,
+  exposureHalation: 2, gammaHalation: 1, contrastHalation: 1.2, grainHalation: 1,
+  spacingHalation: 1.5, seedHalation: 42,
+  shadowHalation: true, shadowStepsHalation: 24,
+  bloomHalation: 8, bleedHalation: 0.6, glowHalation: 0.6, glowColorHalation: '#c8481e',
+  glowWeightHalation: 4, glowOpacityHalation: 0.45,
+  colorHalation: '#111111', weightHalation: 3, opacityHalation: 1, dashHalation: 'solid',
+  hypsoHalation: false, hypsoModeHalation: 'elevation', hypsoBandedHalation: false, hypsoIntervalHalation: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

@@ -178,6 +178,25 @@ const MARKS = {
       ))}
     </g>
   ),
+  // A lit edge bleeding into the dark beside it.
+  halation: (
+    <g stroke="none" fill="currentColor">
+      <g opacity="0.28">
+        {[[7,2.5,1.7],[6,5,1.9],[7,7.5,1.8],[8.5,10,1.6],[9.5,4,1.5],[10,8,1.4]].map(([x,y,r],i) => (
+          <circle key={'g'+i} cx={x} cy={y} r={r} />
+        ))}
+      </g>
+      {[[13,2,1.1],[15,4,1],[14,6.5,0.95],[16.5,8,0.85],[15.5,11,0.8],[18,5.5,0.75],
+        [19,9,0.65],[20.5,3,0.6],[20,12,0.55],[11,11.5,0.5]].map(([x,y,r],i) => (
+        <circle key={'d'+i} cx={x} cy={y} r={r} />
+      ))}
+      <g opacity="0.9">
+        {[[2,3,0.5],[3,6,0.42],[2.5,9,0.36],[4,11.5,0.3]].map(([x,y,r],i) => (
+          <circle key={'p'+i} cx={x} cy={y} r={r} />
+        ))}
+      </g>
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

@@ -88,6 +88,7 @@ const SECTION_TERMS = {
   'Mode: Rock & Scree': 'swisstopo cliff hachures debris dots talus seed',
   'Mode: Bitplane':   'tilemap quantise plateaus tiers steps staircase dither bayer screen pixel voxel isometric arcade 16-bit retro',
   'Mode: Flashbulb':  'point light bulb flash inverse square falloff cast shadow ray march blue noise grain film emulsion photograph solarise sabattier contrast exposure',
+  'Mode: Halation':   'bloom glow halo bleed highlight edge blown emulsion film red orange flare light spill',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1357,7 +1358,7 @@ export function Sidebar({
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
-    modeBitplane: false, modeFlashbulb: false,
+    modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1549,6 +1550,7 @@ export function Sidebar({
       modeSwiss:    !!newStyle.enabledSwiss,
       modeBitplane: !!newStyle.enabledBitplane,
       modeFlashbulb: !!newStyle.enabledFlashbulb,
+      modeHalation: !!newStyle.enabledHalation,
     }))
   }
 
@@ -2469,6 +2471,38 @@ export function Sidebar({
                   {style.shadowFlashbulb && <InlineSl label="Steps" min={4} max={64} step={4} value={style.shadowStepsFlashbulb} onChange={v => ss({ shadowStepsFlashbulb: v })} />}
                 </Sub>
                 <ModeStyleOverride prefix="Flashbulb" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Halation" icon={<ModeMark kind="halation" />} open={sec.modeHalation} onToggle={() => tog('modeHalation')} enabled={style.enabledHalation}>
+            <Tog label="Enabled" checked={style.enabledHalation} onChange={v => ss({ enabledHalation: v })} />
+            {style.enabledHalation && (
+              <>
+                <Sub label="BLOOM">
+                  <InlineSl label="Radius" help="How far the glow spreads from a lit edge, in world units." min={1} max={40} step={0.5} value={style.bloomHalation} onChange={v => ss({ bloomHalation: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Bleed" help="How much the glow eats into the shadow beside it. This is the halation itself — at 0 the halo sits on top of the picture instead of consuming it." min={0} max={2} step={0.05} value={style.bleedHalation} onChange={v => ss({ bleedHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Glow" help="Density of the halo's own dots. They are drawn only where the bloom is strong and the ground is dark." min={0} max={2} step={0.05} value={style.glowHalation} onChange={v => ss({ glowHalation: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <Sub label="HALO INK">
+                  <ColorRow label="Colour" value={style.glowColorHalation} onChange={v => ss({ glowColorHalation: v })} />
+                  <InlineSl label="Dot size" min={0.5} max={14} step={0.5} value={style.glowWeightHalation} onChange={v => ss({ glowWeightHalation: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Opacity" min={0} max={1} step={0.05} value={style.glowOpacityHalation} onChange={v => ss({ glowOpacityHalation: v })} fmt={v => Math.round(v * 100) + '%'} />
+                </Sub>
+                <Sub label="BULB">
+                  <InlineSl label="Azimuth" min={0} max={360} step={5} value={style.azimuthHalation} onChange={v => ss({ azimuthHalation: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Distance" min={0.1} max={3} step={0.05} value={style.distanceHalation} onChange={v => ss({ distanceHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Height" min={0} max={4} step={0.05} value={style.heightHalation} onChange={v => ss({ heightHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Falloff" min={0.1} max={3} step={0.05} value={style.falloffHalation} onChange={v => ss({ falloffHalation: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <Sub label="TONE">
+                  <InlineSl label="Exposure" min={0.2} max={4} step={0.05} value={style.exposureHalation} onChange={v => ss({ exposureHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Contrast" min={0.2} max={5} step={0.05} value={style.contrastHalation} onChange={v => ss({ contrastHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainHalation} onChange={v => ss({ grainHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Pitch" min={0.5} max={12} step={0.5} value={style.spacingHalation} onChange={v => ss({ spacingHalation: v })} fmt={v => v.toFixed(1)} />
+                  <Tog label="Cast shadows" small checked={style.shadowHalation} onChange={v => ss({ shadowHalation: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Halation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="GRAIN STYLE" showDash={false} />
               </>
             )}
           </Section>

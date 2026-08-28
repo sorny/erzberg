@@ -130,6 +130,12 @@ export function layerStyle(id, p) {
     // stroke width, and it is never dashed — a dashed point is a point.
     case 'Bitplane-Screen':
       return { weight: p.screenWeightBitplane ?? 3, opacity: p.opacityBitplane, dash: 'solid' }
+    case 'Halation-Grain':
+      return { weight: p.weightHalation, opacity: p.opacityHalation, dash: 'solid' }
+    // The halo is a second ink on the same plate, so it carries its own radius
+    // and its own opacity — a glow at the grain's weight is just more grain.
+    case 'Halation-Bloom':
+      return { weight: p.glowWeightHalation ?? 5, opacity: p.glowOpacityHalation ?? 0.55, dash: 'solid' }
     default:
       return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
   }
@@ -336,6 +342,13 @@ export function buildLineGeometry(terrain, p) {
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Halation',builder: (t, ctx) => buildHalation(t, ctx, {
+        azimuth: p.azimuthHalation, distance: p.distanceHalation, height: p.heightHalation,
+        falloff: p.falloffHalation, exposure: p.exposureHalation, gamma: p.gammaHalation,
+        contrast: p.contrastHalation, grain: p.grainHalation, spacing: p.spacingHalation,
+        shadow: p.shadowHalation, shadowSteps: p.shadowStepsHalation,
+        bloom: p.bloomHalation, bleed: p.bleedHalation, glow: p.glowHalation,
+        glowColor: p.glowColorHalation, seed: p.seedHalation }) },
     { id:'Flashbulb',builder: (t, ctx) => buildFlashbulb(t, ctx, {
         azimuth: p.azimuthFlashbulb, distance: p.distanceFlashbulb, height: p.heightFlashbulb,
         falloff: p.falloffFlashbulb, exposure: p.exposureFlashbulb, gamma: p.gammaFlashbulb,
@@ -2744,31 +2757,33 @@ function flashLightPos(terrain, azimuthDeg, distFrac, heightFrac) {
  * of the line contract rather than a choice, and it is why the jitter is worth
  * having rather than being a nicety.
  */
-function buildFlashbulb(terrain, p, opt) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
-  const sMask = terrain.hasNoData ? gridMask : null
-
+/**
+ * The exposure field, sampled on the emission lattice.
+ *
+ * Shared by Flashbulb and Halation, which want the same optics and differ only
+ * in what they do with the answer. It is computed at the *dot pitch* rather than
+ * per cell for two reasons: nothing below that pitch is ever drawn, and the
+ * shadow march downstream is the mode's whole cost, so sampling it at full
+ * resolution would be paying four times over for a field nothing reads.
+ *
+ * `ref` is the 68th percentile, from a histogram rather than a sort. Referencing
+ * to the *brightest* cell instead lets one sample a few units from the bulb set
+ * the scale for the whole plate — measured, that put 84% of the terrain at full
+ * ink. -1 marks a cell with no data.
+ */
+function flashExposure(terrain, p, opt) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
+  const { elevScale } = p
   const step  = Math.max(1, Math.round((opt.spacing ?? 1.5) / scl))
   const reach = Math.hypot(terrain.spanHalfW, terrain.spanHalfH) || 1
   const r0    = Math.max(1e-3, reach * (opt.falloff ?? 1))
-  const [lx, ly, lz] = flashLightPos(terrain, opt.azimuth, opt.distance, opt.height)
-  const gamma    = Math.max(0.05, opt.gamma ?? 1)
-  const expo     = Math.max(0.01, opt.exposure ?? 1.15)
-  const contrast = Math.max(0, opt.contrast ?? 1.35)
-  const grain    = Math.max(0, Math.min(1, opt.grain ?? 1))
-  const K        = Math.max(0, Math.round(opt.shadowSteps ?? 24))
-  const doShadow = !!opt.shadow && K > 0
-
+  const light = flashLightPos(terrain, opt.azimuth, opt.distance, opt.height)
+  const [lx, ly, lz] = light
   const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
-  const { S, tile } = blueNoiseTile()
 
-  // Candidate cells, and their exposure. Two passes over the same set: the tone
-  // curve needs the distribution before it can place any single cell in it.
   const nR = Math.ceil(rows / step), nC = Math.ceil(cols / step)
   const expos = new Float32Array(nR * nC)
-  const BINS = 512
-  const hist = new Uint32Array(BINS)
+  const BINS = 512, hist = new Uint32Array(BINS)
   let maxE = 0, nValid = 0
 
   for (let ri = 0, r = 0; r < rows; r += step, ri++) {
@@ -2794,7 +2809,7 @@ function buildFlashbulb(terrain, p, opt) {
       nValid++
     }
   }
-  if (!nValid) return { positions: EMPTY_F32, colors: EMPTY_F32, isPoints: true }
+  if (!nValid) return null
 
   for (let k = 0; k < expos.length; k++) {
     const e = expos[k]
@@ -2804,7 +2819,92 @@ function buildFlashbulb(terrain, p, opt) {
   const target = nValid * 0.68
   let acc = 0, refBin = BINS - 1
   for (let k = 0; k < BINS; k++) { acc += hist[k]; if (acc >= target) { refBin = k; break } }
-  const ref = Math.max(1e-6, ((refBin + 0.5) / BINS) * (maxE || 1))
+
+  return { expos, nR, nC, step, light,
+           ref: Math.max(1e-6, ((refBin + 0.5) / BINS) * (maxE || 1)) }
+}
+
+/**
+ * Is the bulb hidden from this cell?
+ *
+ * The CPU twin of `hillshadeCastShadows` in the surface shader, taking the same
+ * step count so the two agree when both are on. The march runs in *grid*
+ * coordinates, so the inner loop is a bilinear tap and a compare rather than a
+ * world-space transform per step.
+ *
+ * Callers skip it wherever it cannot change the answer — a cell facing away from
+ * the bulb is already dark, and a cell already at full ink cannot get darker.
+ * That guard is what makes the mode's cost bearable at fine pitches.
+ */
+function flashShadowed(terrain, p, r, c, elev, light, K, eps) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const [lx, ly, lz] = light
+  const gcL = (lx + halfW) / scl, grL = (lz + halfH) / scl
+  for (let k = 1; k <= K; k++) {
+    const t = k / K
+    const qc = c + (gcL - c) * t, qr = r + (grL - r) * t
+    if (qc < 0 || qc > cols - 1 || qr < 0 || qr > rows - 1) return false
+    const b = sampleBilinear(grid, sMask, rows, cols, qr, qc)
+    if (b !== b) return false
+    if ((b - 0.5) * 100 * p.elevScale > elev + (ly - elev) * t + eps) return true
+  }
+  return false
+}
+
+/** Does the exposure lattice actually exclude anything? Same guard as
+ *  `maskHasHoles`, over the sample grid rather than the raster — the masked blur
+ *  path costs two extra passes and buys nothing on a solid plate. */
+function maskHasHolesU8(m) {
+  for (let i = 0; i < m.length; i++) if (!m[i]) return true
+  return false
+}
+
+/** Exposure → ink, through the hard S-curve that makes the mode clip. */
+function flashTone(e, ref, opt) {
+  const gamma = Math.max(0.05, opt.gamma ?? 1)
+  const expo  = Math.max(0.01, opt.exposure ?? 1.15)
+  let d = 1 - Math.min(1, Math.pow(Math.min(1, e / ref) * expo, gamma))
+  return d
+}
+function flashCurve(d, opt) {
+  const contrast = Math.max(0, opt.contrast ?? 1.35)
+  let v = Math.max(0, Math.min(1, (d - 0.5) * contrast + 0.5))
+  if (opt.fold) v = Math.abs(2 * v - 1)
+  return v
+}
+
+/**
+ * Silver on paper, under one bare bulb.
+ *
+ * Every lit mode in the tool — Engraving, Isophotes, the hillshade shader —
+ * shares one convention: azimuth around, altitude pinned at 45°, *parallel* rays.
+ * Parallel rays have no falloff, and falloff is the entire subject here. The
+ * light goes inside the scene instead:
+ *
+ *     E = max(0, n̂·d̂) / (1 + (r/r₀)²)
+ *
+ * The `1 +` keeps the light finite as the bulb approaches the ground; r₀ decides
+ * which band of terrain survives at all, and everything after it is a tone curve.
+ *
+ * **The grain cannot vary its dot size.** `weight` is resolved per layer by
+ * `layerStyle`, so every dot in the layer is the same radius — the variation has
+ * to come from density and from position jitter alone. That is a real constraint
+ * of the line contract rather than a choice, and it is why the jitter is worth
+ * having rather than being a nicety.
+ */
+function buildFlashbulb(terrain, p, opt) {
+  const { grid, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+
+  const field = flashExposure(terrain, p, opt)
+  if (!field) return { positions: EMPTY_F32, colors: EMPTY_F32, isPoints: true }
+  const { expos, nC, step, ref, light } = field
+
+  const grain = Math.max(0, Math.min(1, opt.grain ?? 1))
+  const K = Math.max(0, Math.round(opt.shadowSteps ?? 24))
+  const doShadow = !!opt.shadow && K > 0
+  const { S, tile } = blueNoiseTile()
 
   const positions = new F32List(), colors = new F32List()
   const eps = Math.max(0.001, scl * 0.003)
@@ -2818,30 +2918,15 @@ function buildFlashbulb(terrain, p, opt) {
       const elev = (grid[i] - 0.5) * 100 * elevScale
       if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
 
-      let dark = 1 - Math.min(1, Math.pow(Math.min(1, e / ref) * expo, gamma))
-      // A cell already at full ink cannot be darkened by finding a shadow, and a
-      // cell the bulb never reached is in one. Both skip the march.
-      if (doShadow && e > 0 && dark < 1) {
-        // The march runs in grid coordinates, so its inner loop is an array
-        // index and a compare rather than a world-space transform per step.
-        const gcL = (lx + halfW) / scl, grL = (lz + halfH) / scl
-        for (let k = 1; k <= K; k++) {
-          const t = k / K
-          const qc = c + (gcL - c) * t, qr = r + (grL - r) * t
-          if (qc < 0 || qc > cols - 1 || qr < 0 || qr > rows - 1) break
-          const qy = elev + (ly - elev) * t
-          const b = sampleBilinear(grid, sMask, rows, cols, qr, qc)
-          if (b !== b) break
-          if ((b - 0.5) * 100 * elevScale > qy + eps) { dark = 1; break }
-        }
-      }
-      dark = Math.max(0, Math.min(1, (dark - 0.5) * contrast + 0.5))
-      if (opt.fold) dark = Math.abs(2 * dark - 1)
-      dark *= grain
+      let dark = flashTone(e, ref, opt)
+      if (doShadow && e > 0 && dark < 1 &&
+          flashShadowed(terrain, p, r, c, elev, light, K, eps)) dark = 1
+      dark = flashCurve(dark, opt) * grain
       if (dark <= 0) continue
 
-      // The tile is walked per *sample*, not per cell — stepping through it at
-      // the dot pitch would decimate the pattern and take the blue out of it.
+      // The tile is walked per *sample*, not per cell — indexing it by grid
+      // position while sampling at a coarser pitch would decimate the pattern
+      // and take the blue out of it.
       if (dark <= tile[(ri % S) * S + (ci % S)]) continue
 
       const jr = (rng() - 0.5) * step, jc = (rng() - 0.5) * step
@@ -2852,6 +2937,124 @@ function buildFlashbulb(terrain, p, opt) {
     }
   }
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+/**
+ * Blown highlights bleeding into the shadow beside them.
+ *
+ * Halation in a real emulsion is light that got *through* the silver, bounced off
+ * the film base and came back — so the thing that scatters is the light the
+ * highlight could not hold, and the field to spread is the **overexposure**:
+ *
+ *     over  = max(0, E/ref · exposure − 1)     the part above full white
+ *     bloom = boxBlur(over, radius)            normalised convolution, mask-aware
+ *
+ * Blurring the exposure *gradient* instead is the obvious first idea and it is
+ * wrong in a way that only shows on real terrain: every ridge and gully is an
+ * edge, so a busy massif blooms uniformly and the halo covers the picture
+ * rather than pooling beside the bright parts of it. Only genuinely blown
+ * highlights scatter, and `over` is exactly them.
+ *
+ * `boxBlur` is the same O(W·H) pass the Blur slider runs, taken over the
+ * exposure lattice rather than the raster. It is given the validity mask, so a
+ * clipped edge does not average real exposure against the zeros in NoData and
+ * ring the selection with a halo of its own — the same argument
+ * `boxBlurMasked` already makes for the terrain.
+ *
+ * Two populations come out, and they ship as two sub-layers because they are two
+ * inks on a printed plate:
+ *
+ * - **Grain** is Flashbulb's, with the bloom *subtracted* from the darkness, so
+ *   the highlight eats into the shadow next to it. That subtraction is the
+ *   halation; without it the glow would sit on top of the picture instead of
+ *   consuming it.
+ * - **Bloom** is the halo itself, drawn only where the bloom is strong *and* the
+ *   ground is dark — a glow over an already-blown highlight is invisible, and
+ *   drawing it there just wastes ink.
+ *
+ * The two populations read the blue-noise tile at a half-tile offset from one
+ * another. Sharing an index would correlate them exactly: every halo dot would
+ * land on a cell the grain had already claimed, and the halo would disappear
+ * into it rather than reading as a second pass.
+ */
+function buildHalation(terrain, p, opt) {
+  const { grid, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+
+  const field = flashExposure(terrain, p, opt)
+  if (!field) return null
+  const { expos, nR, nC, step, ref, light } = field
+
+  // The overexposure — the light the highlight could not hold — on the sample
+  // lattice. Zero everywhere the plate is merely lit; positive only where it is
+  // blown.
+  const over = new Float32Array(nR * nC)
+  const emask = new Uint8Array(nR * nC)
+  const expoGain = Math.max(0.01, opt.exposure ?? 1.15)
+  for (let k = 0; k < over.length; k++) {
+    const e = expos[k]
+    if (e < 0) continue
+    emask[k] = 1
+    over[k] = Math.max(0, (e / ref) * expoGain - 1)
+  }
+  const rad = Math.max(1, Math.round((opt.bloom ?? 6) / (scl * step)))
+  const holes = maskHasHolesU8(emask)
+  const bloom = boxBlur(over, nC, nR, rad, holes ? emask : null)
+  let bMax = 0
+  for (let k = 0; k < bloom.length; k++) if (emask[k] && bloom[k] > bMax) bMax = bloom[k]
+  const bInv = 1 / (bMax || 1)
+
+  const bleed = Math.max(0, Math.min(2, opt.bleed ?? 1))
+  const glow  = Math.max(0, Math.min(2, opt.glow ?? 0.8))
+  const grain = Math.max(0, Math.min(1, opt.grain ?? 1))
+  const K = Math.max(0, Math.round(opt.shadowSteps ?? 24))
+  const doShadow = !!opt.shadow && K > 0
+  const { S, tile } = blueNoiseTile()
+  const HALF = S >> 1
+
+  const gP = new F32List(), gC = new F32List()
+  const bP = new F32List(), bC = new F32List()
+  const glowRgb = hexToRgb(opt.glowColor || '#c8481e')
+  const eps = Math.max(0.001, scl * 0.003)
+  const rng = mulberry32(((opt.seed ?? 42) * 2654435761) >>> 0)
+
+  for (let ri = 0, r = 0; r < rows; r += step, ri++) {
+    for (let ci = 0, c = 0; c < cols; c += step, ci++) {
+      const k = ri * nC + ci
+      const e = expos[k]
+      if (e < 0) continue
+      const i = r * cols + c
+      const elev = (grid[i] - 0.5) * 100 * elevScale
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+
+      let dark = flashTone(e, ref, opt)
+      if (doShadow && e > 0 && dark < 1 &&
+          flashShadowed(terrain, p, r, c, elev, light, K, eps)) dark = 1
+      dark = flashCurve(dark, opt)
+
+      const b = Math.min(1, bloom[k] * bInv)
+      const inked = Math.max(0, Math.min(1, dark - b * bleed)) * grain
+      const halo  = Math.max(0, Math.min(1, b * glow * dark))
+
+      const jr = (rng() - 0.5) * step, jc = (rng() - 0.5) * step
+      const wx = (c + jc) * scl - halfW, wz = (r + jr) * scl - halfH
+
+      if (inked > tile[(ri % S) * S + (ci % S)]) {
+        gP.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+        gC.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev),
+                                       gridSlopes[i] / (maxSlope || 1), 0, p))
+      }
+      if (halo > tile[((ri + HALF) % S) * S + ((ci + HALF) % S)]) {
+        bP.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+        bC.pushRgb2(glowRgb)
+      }
+    }
+  }
+
+  return {
+    'Halation-Grain': { positions: gP.toArray(), colors: gC.toArray(), isPoints: true },
+    'Halation-Bloom': { positions: bP.toArray(), colors: bC.toArray(), isPoints: true },
+  }
 }
 
 // ─── Bitplane (quantised tiers + ordered dither) ─────────────────────────────
