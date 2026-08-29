@@ -237,7 +237,7 @@ is what keeps recolouring one a frame rather than a worker rebuild. There is no
 hypsometric tint: a feature has no elevation of its own — OSM carries none and a
 GPX `<ele>` would disagree with the raster it is drawn on — so the tint could
 only read the ground underneath, which is a different thing from what the
-fifteen draw modes mean by it.
+the draw modes mean by it.
 
 ### Individual features
 

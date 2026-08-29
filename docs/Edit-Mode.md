@@ -26,7 +26,7 @@ The store holds the raster twice.
                                                     └──> useTerrainGeometry ──> worker
 ```
 
-Everything downstream — the geometry worker, all fifteen draw modes, hillshade,
+Everything downstream — the geometry worker, every draw mode, hillshade,
 erosion, the exporters, the elevation profile — reads only the derived names and
 knows nothing about clipping. With no clip the derived fields *are* the source
 arrays, so the feature costs nothing until a selection exists.

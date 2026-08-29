@@ -30,6 +30,7 @@ import {
   RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
 import { SectionFilter, sectionMatches } from './panel/filter'
+import { SECTION_TERMS } from './panel/sectionTerms'
 import { ModeMark } from './panel/modeMarks'
 
 /**
@@ -60,60 +61,6 @@ const birdSlider = (n) =>
  * find "azimuth" while Hillshade is off — which is exactly when someone is
  * looking for it. Keep a section's own words here when you add controls to it.
  */
-const SECTION_TERMS = {
-  'Terrain':          'resolution elevation scale blur jitter min max cut hypsometric integral raw greyscale heightmap',
-  'Levels':           'shadows highlights histogram black white point contrast',
-  'View':             'tilt zoom rotation supersampling auto-rotate spin guides paper frame page sheet margin aspect portrait landscape a4 letter',
-  'Camera':           'orthographic perspective focal length lens pan dolly',
-  'Terrain Style':    'fill mesh occlusion ghost x-ray background gradient sky paper colour color',
-  'Hillshade':        'sun azimuth altitude shadows relief lambert penumbra softness multidirectional light',
-  'Slope Shading':    'steepness gradient two-colour incline',
-  'Water Fill':       'flood level sea lake opacity',
-  'Aspect Map':       'slope direction hue wheel compass facing',
-  'Presets':          'styles looks surprise me random roll seed thumbnails',
-  'Mode: Lines':      'ridgelines parallel spacing shift angle bearing unknown pleasures dash weight opacity',
-  'Mode: Crosshatch': 'hatch two directions perpendicular angle spacing',
-  'Mode: Pillars':    'extrusion cuboid cylinder columns pins bars',
-  'Mode: Contours':   'isolines marching squares interval chaikin smoothing form lines closing metres labels heights elevation numbers annotate',
-  'Mode: Hachure':    'slope strokes ticks direction swiss',
-  'Mode: Flow':       'drainage euler streamlines water paths',
-  'Mode: Network':    'strahler stream order flow accumulation rivers',
-  'Mode: Pencil':     'laplacian curvature shading sketch graphite',
-  'Mode: Ridge':      'hessian crest eigenvalue peaks arete',
-  'Mode: Valley':     'topographic position index tpi troughs gully',
-  'Mode: Stipple Dots': 'dots density stochastic seed slope elevation pointillism',
-  'Mode: Isophotes':  'illumination contours constant light reflection lines sun isophote',
-  'Mode: Engraving':  'copperplate illumination cross-hatch shadows stacked directions',
-  'Mode: Curvature':  'streamlines principal direction field wrap shape',
-  'Mode: Rock & Scree': 'swisstopo cliff hachures debris dots talus seed',
-  'Mode: Bitplane':   'tilemap quantise plateaus tiers steps staircase dither bayer screen pixel voxel isometric arcade 16-bit retro',
-  'Mode: Flashbulb':  'point light bulb flash inverse square falloff cast shadow ray march blue noise grain film emulsion photograph solarise sabattier contrast exposure',
-  'Mode: Halation':   'bloom glow halo bleed highlight edge blown emulsion film red orange flare light spill',
-  'Mode: Fall Line':  'snowboard ski descent momentum mass inertia carve yaw gravity friction runout track downhill bike',
-  'Mode: Berms':      'banking lateral load cornering g-force turn ticks camber',
-  'Mode: Air':        'jump kicker launch ballistic parabola flight convex lip gap send',
-  'Mode: Race Line':  'braid fan drop-in fastest descent variants spread choices',
-  'Mode: Truss':      'space frame lattice bracing diagonal hessian twist gusset joint chord post datum steel structural general arrangement drafting',
-  'Mode: Exploded Frame': 'assembly diagram displaced members leaders apart layers exploded view',
-  'Mode: Section':    'cutting plane cut face hatch 45 drafting convention material below beyond slice',
-  'Mode: Weldment':   'parts drawing callout leader gusset plate annotation joints degree',
-  'Mode: Bandsplit':  'octave bands laplacian pyramid frequency spectrum analyser equaliser gains filter fft scanline signal',
-  'Mode: Envelope':   'attack decay follower waveform daw clip audio region detrend roughness',
-  'Mode: Lissajous':  'oscilloscope xy figure scope trace signal phase',
-  'Mode: Zero Crossings': 'sign change pitch crossings detrend roughness scree dots',
-  'Mode: Sprite Blocks': 'isometric voxel blocks cubes tiles arcade quantise tiers minecraft populous risers',
-  'Mode: Scanline':   'crt interlace roll sync comb banding tube retro raster television',
-  'Mode: Palette Cycle': 'colour cycling waterfall phase ramp arcade animation tiers gradient',
-  'Mode: Reticulation': 'worley voronoi cellular crazing emulsion cracks gelatin film network cells',
-  'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
-  'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
-  'Texture':          'image overlay blend mode scale offset',
-  'Mirror':           'symmetry kaleidoscope reflect octants axis',
-  'Soundscapes':      'audio mp3 wav spectrogram fft playback freeze disc similarity weave strata noise gate music',
-  'Hydraulic Erosion':'droplets rain simulation inertia capacity deposition evaporation weathering',
-  'Export':           'svg png stl webm plotter print heightmap preset save load download video recording',
-  'Analysis':         'elevation profile cross-section transect chart a b pins',
-}
 
 /**
  * The preset the app opens on for a visitor with no stored session.
@@ -828,7 +775,7 @@ function FeatureList({ layer, bucket, onPatch }) {
  * The Vector Layers panel — sources at the top, one editable row per layer below.
  *
  * Deliberately additive: it replaces the old GPX Track section in place and
- * leaves the fourteen draw-mode sections exactly as they are. The rows here are
+ * leaves the draw-mode sections exactly as they are. The rows here are
  * a list of *data* layers, which is a different thing from the draw modes and is
  * why it does not try to be a unified layer stack.
  */
@@ -1077,7 +1024,7 @@ function VectorLayersPanel({
 
             {isOpen && (
               <Sub>
-                {/* The very same control block the fourteen draw modes use. A
+                {/* The very same control block every draw mode uses. A
                     layer record's field names are the mode params minus their
                     suffix, so an empty prefix addresses them unchanged. */}
                 <ModeStyleOverride prefix="" style={l} ss={(patch) => onPatch(l.id, patch)} showHypso={false} />
@@ -3062,7 +3009,7 @@ export function Sidebar({
                         something you reach for constantly — to look at a shape, or to
                         export the frame you are looking at — and it deserves to be
                         the most obvious control in the block rather than one switch
-                        among fifteen. Same `animateParticles` param either way. */}
+                        among many. Same `animateParticles` param either way. */}
                     <div style={{ display: 'flex', marginBottom: 8 }}>
                       <ExpBtn
                         label={points.animateParticles ? '❚❚  Pause' : '▶  Resume'}

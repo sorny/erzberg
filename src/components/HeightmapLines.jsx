@@ -24,7 +24,7 @@ import { VectorHighlight } from './VectorHighlight'
  *
  * Fractions rather than a multiplier because the budget is not free. The
  * particle field sits at 99–101 to paint over every line layer, and a scene can
- * carry fourteen draw modes plus forty vector layers — spacing slots ten apart
+ * carry thirty-four draw modes plus forty vector layers — spacing slots ten apart
  * would put the deepest of them on the wrong side of the flock.
  *
  * Occlusion curtains are deliberately absent: they write depth for *every*

@@ -262,7 +262,7 @@ export function useTerrainGeometry(p) {
     p.gradientStops, p.needsSurfaceShading, p.geoTiffBbox, p.geoTiffCRS,
     // Vector layers. `vectorBuildKey` is a string rather than p.vectorLayers
     // itself, and that is the whole point: the layer array is replaced on every
-    // colour-picker tick, so depending on its identity would rebuild all fifteen
+    // colour-picker tick, so depending on its identity would rebuild every
     // draw modes to recolour one road. See layerBuildKey in utils/vectorLayers.js.
     vectorSources, vectorBuildKey,
   ])

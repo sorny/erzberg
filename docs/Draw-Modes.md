@@ -496,7 +496,7 @@ Edit Mode. `buildTerrain` records them in `gridMask` and stores $H = 0$ there.
 That zero is a trap, because 0 is not "absent": it is the darkest possible
 ground, and $(H - 0.5)\cdot 100 \cdot \text{elevScale}$ puts it at the very
 bottom of the scene. Reading it as terrain produces the artifact in three
-different shapes, and all fifteen modes now guard against it.
+different shapes, and every mode now guards against it.
 
 **Sampling — normalized bilinear.** Modes that drape themselves on *fractional*
 grid coordinates (Lines and Crosshatch at an oblique bearing, Engraving at every
@@ -538,7 +538,7 @@ data as shorelines rather than stopping short of it.
 
 ## Ghost Occlusion
 
-All fifteen modes share the same depth-ordering system.
+Every mode shares the same depth-ordering system.
 
 For each line segment, a thin triangulated curtain mesh is generated immediately beneath it, extending vertically to the base of the scene. Curtains are rendered to the depth buffer only (invisible, no colour output). In the subsequent colour pass, line segments that fall behind an existing curtain are occluded — they either disappear or are rendered with a separate ghost colour and opacity, depending on the configured occlusion settings.
 

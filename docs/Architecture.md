@@ -19,7 +19,7 @@ allowed to cost anything.
                         ▼
   ┌──────────── geometry.worker ─────────────┐
   │  buildTerrain()       grid, slopes, bounds│
-  │  buildLineGeometry()  15 draw modes       │
+  │  buildLineGeometry()  every draw mode     │
   │  buildVectorGeometry() draped features    │
   │  buildSurfaceGeometry() fill / depth mesh │
   └───────────────────────────────────────────┘
@@ -68,8 +68,7 @@ Vector layers sit here only for what moves their geometry — layer visibility,
 area fill, and which individual features are hidden — via `layerBuildKey`. Their
 colour, weight, opacity and dash are tier 2, which is the whole reason the layer
 panel feels live: a list of twenty OSM layers is something you recolour
-constantly, and each recolour must not cost a rebuild of all fifteen draw
-modes.
+constantly, and each recolour must not cost a rebuild of every draw mode.
 
 **2. Re-render only (GPU uniforms).** Line weight, opacity, dash pattern, a
 vector layer's colour and its area fill colour/opacity, the feature highlight,
@@ -284,7 +283,9 @@ into one picture.
   `HEX` if the consumer is a 2D canvas or needs to append an alpha suffix —
   a custom property cannot serve either.
 - **A panel section**: add its title and the words it should answer to in
-  `SECTION_TERMS` in `Sidebar.jsx`. The filter's index is stated rather than
+  `SECTION_TERMS` in `panel/sectionTerms.js`. `panel.spec.js` counts the rendered
+  sections against that index, so an entry with no section — or a section with no
+  entry — fails there rather than going unnoticed. The filter's index is stated rather than
   scraped from the rendered tree, because a mode's parameters only mount once
   the mode is on — a section that cannot be found while it is switched off is
   unfindable exactly when someone is looking for it.

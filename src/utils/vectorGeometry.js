@@ -2,7 +2,7 @@
  * Draping vector features onto the terrain — the worker-side half of the vector
  * layer feature.
  *
- * Every layer comes out shaped exactly like the fourteen draw modes
+ * Every layer comes out shaped exactly like the draw modes
  * (`{ id, positions, colors, curtains, lids, isPoints }`), which is what buys it
  * the live renderer, depth occlusion, hidden-line removal and SVG export without
  * any of those knowing that OpenStreetMap exists. This generalises the single

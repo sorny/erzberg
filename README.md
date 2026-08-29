@@ -19,7 +19,7 @@
 
 Load a greyscale heightmap (8- or 16-bit PNG), a GeoTIFF, or an audio file, and
 render it as 3D line art, structural relief or an architectural sketch through
-fifteen independent draw modes, with contours that letter their own heights — the
+thirty-four independent draw modes, with contours that letter their own heights — the
 number set into a break in the line, at the line's own angle, in its own ink. Export to SVG for a pen plotter, STL for a
 printer, or 4K PNG for the wall.
 
@@ -214,7 +214,7 @@ carry a seed — the same seed always reproduces the identical pattern, so a pie
 can be regenerated exactly.
 
 Every mode carries a small sample of its own marks in its panel header, so the
-list reads as fifteen ways of drawing rather than fifteen cartographic nouns.
+list reads as ways of drawing rather than as a column of cartographic nouns.
 
 **56 style presets** ship with the app, each a complete look: draw modes,
 colours, gradients and particle settings — shown as thumbnails rather than a

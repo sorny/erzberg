@@ -618,7 +618,7 @@ async function runExport({
         }
 
         // The one funnel every segment passes through, visible and ghost alike,
-        // for all fourteen draw modes and the GPX track — so the paper crop
+        // for every draw mode and the GPX track — so the paper crop
         // belongs here rather than in each of them.
         //
         // The chain bookkeeping advances with the *original* segment even when

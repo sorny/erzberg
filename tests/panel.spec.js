@@ -1,5 +1,9 @@
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
+import { SECTION_TERMS } from '../src/components/panel/sectionTerms.js'
+
+/** Every section the filter index knows about should be on the panel. */
+const SECTION_COUNT = Object.keys(SECTION_TERMS).length
 
 /**
  * The control panel itself — the filter, the typed values, the shortcut.
@@ -31,7 +35,7 @@ test.describe('panel', () => {
 
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(33)
+    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(SECTION_COUNT)
   })
 
   test('a filtered-out section is hidden, not unmounted', async ({ page }) => {
@@ -44,7 +48,7 @@ test.describe('panel', () => {
     await page.waitForTimeout(400)
     const inDom = await page.locator('[data-testid^="section-"]').count()
     const onScreen = await page.locator('[data-testid^="section-"]:visible').count()
-    expect(inDom).toBe(33)
+    expect(inDom).toBe(SECTION_COUNT)
     expect(onScreen).toBe(1)
   })
 

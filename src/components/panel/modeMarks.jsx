@@ -2,7 +2,7 @@
  * A sample of what each draw mode puts on paper, small enough to sit in a
  * section header.
  *
- * Fifteen rows reading MODE: ⟨cartographic noun⟩ are interchangeable to anyone
+ * Thirty-four rows reading MODE: ⟨noun⟩ are interchangeable to anyone
  * who does not already know what a Strahler-order stream network looks like —
  * which is most people, and exactly the people browsing. Seeing the mark is the
  * whole point of the section, so the mark goes in the row rather than three
