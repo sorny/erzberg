@@ -223,6 +223,31 @@ export const STYLE_DEF = {
   colorZeroCross: '#1a1a1a', weightZeroCross: 3, opacityZeroCross: 0.9, dashZeroCross: 'solid',
   hypsoZeroCross: false, hypsoModeZeroCross: 'slope', hypsoBandedZeroCross: false, hypsoIntervalZeroCross: 10,
 
+  // Sprite — Bitplane's quantiser drawn as blocks rather than as boundaries.
+  enabledSprite: false, tiersSprite: 8, spacingSprite: 10, sizeSprite: 1,
+  facesSprite: true, faceColorSprite: '#ffffff',
+  colorSprite: '#000000', weightSprite: 1, opacitySprite: 1, dashSprite: 'solid',
+  hypsoSprite: false, hypsoModeSprite: 'elevation', hypsoBandedSprite: false, hypsoIntervalSprite: 10,
+
+  // Scanline — the Lines marcher with a CRT's three artefacts on top.
+  enabledScanline: false, spacingScanline: 3, angleScanline: 0, interlaceScanline: 2,
+  rollScanline: 3, rollLengthScanline: 40, phaseScanline: 0,
+  combScanline: 0.5, combLengthScanline: 60,
+  colorScanline: '#000000', weightScanline: 1, opacityScanline: 1, dashScanline: 'solid',
+  hypsoScanline: false, hypsoModeScanline: 'elevation', hypsoBandedScanline: false, hypsoIntervalScanline: 10,
+
+  // Palette Cycle — the phase is a slider rather than a clock: vertex colours are
+  // baked in the worker, so advancing it is a full rebuild.
+  enabledPalette: false, tiersPalette: 10, phasePalette: 0, risersPalette: true,
+  colorPalette: '#000000', weightPalette: 1.5, opacityPalette: 1, dashPalette: 'solid',
+  hypsoPalette: true, hypsoModePalette: 'elevation', hypsoBandedPalette: false, hypsoIntervalPalette: 10,
+
+  // Reticulation — Worley cell walls, thinned by tone.
+  enabledRetic: false, cellRetic: 12, spacingRetic: 1.5, widthRetic: 0.5,
+  gammaRetic: 1, densityModeRetic: 'invElev', seedRetic: 42,
+  colorRetic: '#1a1a1a', weightRetic: 2.5, opacityRetic: 0.9, dashRetic: 'solid',
+  hypsoRetic: false, hypsoModeRetic: 'elevation', hypsoBandedRetic: false, hypsoIntervalRetic: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

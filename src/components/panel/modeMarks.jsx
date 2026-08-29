@@ -306,6 +306,52 @@ const MARKS = {
       ))}
     </g>
   ),
+  // Isometric blocks stepping up a slope.
+  sprite: (
+    <g stroke="currentColor" strokeLinejoin="miter" vectorEffect="non-scaling-stroke" strokeWidth="1">
+      <g fill="none">
+        <path d="M2 9 L5.5 7.5 L9 9 L5.5 10.5 Z M2 9 L2 11 L5.5 12.5 L9 11 L9 9 M5.5 10.5 L5.5 12.5" />
+        <path d="M8 5.5 L11.5 4 L15 5.5 L11.5 7 Z M8 5.5 L8 7.5 L11.5 9 L15 7.5 L15 5.5 M11.5 7 L11.5 9" />
+        <path d="M14 2 L17.5 0.5 L21 2 L17.5 3.5 Z M14 2 L14 4 L17.5 5.5 L21 4 L21 2 M17.5 3.5 L17.5 5.5" />
+      </g>
+    </g>
+  ),
+  // Interlaced traces, sheared, with a brightness comb across them.
+  scanline: (
+    <g {...BASE}>
+      <path d="M1 1.5 L21 1.5" opacity="0.25" />
+      <path d="M2 3.5 L22 3.5" opacity="0.6" />
+      <path d="M0.5 5.5 L20.5 5.5" opacity="1" />
+      <path d="M1.5 7.5 L21.5 7.5" opacity="0.75" />
+      <path d="M2.5 9.5 L22.5 9.5" opacity="0.35" />
+      <path d="M0.5 11.5 L20.5 11.5" opacity="0.7" />
+    </g>
+  ),
+  // The same tiers, colours walked round the ramp.
+  palette: (
+    <g stroke="currentColor" fill="none" strokeLinejoin="miter" vectorEffect="non-scaling-stroke">
+      <path d="M1 11.5 L5 11.5 L5 8.5 L9 8.5 L9 5.5 L13 5.5 L13 2.5 L17 2.5 L17 5.5 L21 5.5"
+            strokeWidth="1.1" />
+      <path d="M1 11.5 L5 11.5" strokeWidth="2.4" opacity="0.25" />
+      <path d="M5 8.5 L9 8.5" strokeWidth="2.4" opacity="0.5" />
+      <path d="M9 5.5 L13 5.5" strokeWidth="2.4" opacity="0.75" />
+      <path d="M13 2.5 L17 2.5" strokeWidth="2.4" opacity="1" />
+      <path d="M17 5.5 L21 5.5" strokeWidth="2.4" opacity="0.4" />
+    </g>
+  ),
+  // Cell walls, not cells: a crazed network.
+  retic: (
+    <g stroke="none" fill="currentColor">
+      {[[2,2],[3.4,3.2],[5,4],[6.8,4.4],[8.6,4],[10,3],[11,1.8],
+        [5.2,5.8],[5.6,7.6],[6.4,9.4],[7.6,11],
+        [10.6,4.6],[12.2,5.8],[13.4,7.4],[14,9.2],[14.2,11],
+        [12.4,4.4],[14,3.4],[15.8,3],[17.6,3.4],[19.2,4.4],[20.4,5.8],
+        [16.6,5.2],[17.2,7],[18.2,8.6],[19.6,9.8],
+        [2.6,5.6],[2,7.4],[1.6,9.2],[2.2,11]].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r={0.75} />
+      ))}
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

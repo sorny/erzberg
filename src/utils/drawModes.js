@@ -103,6 +103,23 @@ export const DRAW_MODES = [
     pick: { spacing: [25, 70], carve: [0.4, 0.9], fan: [7, 17], spread: [60, 180], drops: [2, 6] },
   },
   {
+    id: 'Sprite', label: 'Sprite blocks', cost: 2,
+    pick: { tiers: [4, 14], spacing: [3, 12], size: [0.6, 1] },
+  },
+  {
+    id: 'Scanline', label: 'Scanline', cost: 1,
+    pick: { spacing: [1.5, 8], angle: [0, 180], interlace: [1, 4],
+            roll: [0, 8], comb: [0, 1] },
+  },
+  {
+    id: 'Palette', label: 'Palette cycle', cost: 1.5,
+    pick: { tiers: [6, 20], phase: [0, 1] },
+  },
+  {
+    id: 'Retic', label: 'Reticulation', cost: 4,
+    pick: { cell: [5, 26], spacing: [1, 4], width: [0.2, 1], gamma: [0.6, 2] },
+  },
+  {
     id: 'Bandsplit', label: 'Bandsplit', cost: 2.5,
     pick: { bands: [3, 6], spacing: [12, 45], angle: [0, 180], spread: [0.06, 0.22], amp: [0.04, 0.16] },
   },

@@ -101,6 +101,10 @@ const SECTION_TERMS = {
   'Mode: Envelope':   'attack decay follower waveform daw clip audio region detrend roughness',
   'Mode: Lissajous':  'oscilloscope xy figure scope trace signal phase',
   'Mode: Zero Crossings': 'sign change pitch crossings detrend roughness scree dots',
+  'Mode: Sprite Blocks': 'isometric voxel blocks cubes tiles arcade quantise tiers minecraft populous risers',
+  'Mode: Scanline':   'crt interlace roll sync comb banding tube retro raster television',
+  'Mode: Palette Cycle': 'colour cycling waterfall phase ramp arcade animation tiers gradient',
+  'Mode: Reticulation': 'worley voronoi cellular crazing emulsion cracks gelatin film network cells',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1374,6 +1378,7 @@ export function Sidebar({
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeTruss: false, modeExploded: false, modeSection: false, modeWeldment: false,
     modeBandsplit: false, modeEnvelope: false, modeLissajous: false, modeZeroCross: false,
+    modeSprite: false, modeScanline: false, modePalette: false, modeRetic: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1578,6 +1583,10 @@ export function Sidebar({
       modeEnvelope:  !!newStyle.enabledEnvelope,
       modeLissajous: !!newStyle.enabledLissajous,
       modeZeroCross: !!newStyle.enabledZeroCross,
+      modeSprite:   !!newStyle.enabledSprite,
+      modeScanline: !!newStyle.enabledScanline,
+      modePalette:  !!newStyle.enabledPalette,
+      modeRetic:    !!newStyle.enabledRetic,
     }))
   }
 
@@ -2793,6 +2802,82 @@ export function Sidebar({
                   </div>
                 </Sub>
                 <ModeStyleOverride prefix="ZeroCross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Sprite Blocks" icon={<ModeMark kind="sprite" />} open={sec.modeSprite} onToggle={() => tog('modeSprite')} enabled={style.enabledSprite}>
+            <Tog label="Enabled" checked={style.enabledSprite} onChange={v => ss({ enabledSprite: v })} />
+            {style.enabledSprite && (
+              <>
+                <Sub>
+                  <InlineSl label="Tiers" min={2} max={40} step={1} value={style.tiersSprite} onChange={v => ss({ tiersSprite: v })} />
+                  <InlineSl label="Block pitch" min={1} max={40} step={1} value={style.spacingSprite} onChange={v => ss({ spacingSprite: v })} />
+                  <InlineSl label="Block size" help="Fraction of the pitch each block fills. Below 1 leaves mortar between them." min={0.1} max={1} step={0.05} value={style.sizeSprite} onChange={v => ss({ sizeSprite: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Top faces" small help="Fills each block's top so the stack self-occludes instead of reading as a wireframe." checked={style.facesSprite} onChange={v => ss({ facesSprite: v })} />
+                  {style.facesSprite && <ColorRow label="Face fill" value={style.faceColorSprite} onChange={v => ss({ faceColorSprite: v })} />}
+                </Sub>
+                <ModeStyleOverride prefix="Sprite" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Scanline" icon={<ModeMark kind="scanline" />} open={sec.modeScanline} onToggle={() => tog('modeScanline')} enabled={style.enabledScanline}>
+            <Tog label="Enabled" checked={style.enabledScanline} onChange={v => ss({ enabledScanline: v })} />
+            {style.enabledScanline && (
+              <>
+                <Sub>
+                  <InlineSl label="Line pitch" min={0.5} max={40} step={0.5} value={style.spacingScanline} onChange={v => ss({ spacingScanline: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Bearing" min={0} max={180} step={1} value={style.angleScanline} onChange={v => ss({ angleScanline: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Interlace" help="Draws every Nth line. The gaps are the scan lines." min={1} max={8} step={1} value={style.interlaceScanline} onChange={v => ss({ interlaceScanline: v })} />
+                </Sub>
+                <Sub label="ROLL">
+                  <InlineSl label="Amount" help="Shear along each line — a picture failing to hold horizontal sync." min={0} max={30} step={0.5} value={style.rollScanline} onChange={v => ss({ rollScanline: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Wavelength" min={4} max={300} step={2} value={style.rollLengthScanline} onChange={v => ss({ rollLengthScanline: v })} />
+                  <InlineSl label="Phase" min={0} max={360} step={5} value={style.phaseScanline} onChange={v => ss({ phaseScanline: v })} fmt={v => v + '°'} />
+                </Sub>
+                <Sub label="COMB">
+                  <InlineSl label="Depth" help="Brightness banding, lerped toward the background — a washed band on a tube is less signal, not more shadow." min={0} max={1} step={0.05} value={style.combScanline} onChange={v => ss({ combScanline: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Wavelength" min={4} max={400} step={2} value={style.combLengthScanline} onChange={v => ss({ combLengthScanline: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Scanline" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Palette Cycle" icon={<ModeMark kind="palette" />} open={sec.modePalette} onToggle={() => tog('modePalette')} enabled={style.enabledPalette}>
+            <Tog label="Enabled" checked={style.enabledPalette} onChange={v => ss({ enabledPalette: v })} />
+            {style.enabledPalette && (
+              <>
+                <Sub>
+                  <InlineSl label="Tiers" min={2} max={40} step={1} value={style.tiersPalette} onChange={v => ss({ tiersPalette: v })} />
+                  <InlineSl label="Phase" help="Walks each tier's colour around the gradient. Drag it and the waterfall runs — it is a slider rather than a clock because vertex colours are baked in the worker, so advancing it is a full rebuild." min={0} max={1} step={0.01} value={style.phasePalette} onChange={v => ss({ phasePalette: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Risers" small checked={style.risersPalette} onChange={v => ss({ risersPalette: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Palette" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Reticulation" icon={<ModeMark kind="retic" />} open={sec.modeRetic} onToggle={() => tog('modeRetic')} enabled={style.enabledRetic}>
+            <Tog label="Enabled" checked={style.enabledRetic} onChange={v => ss({ enabledRetic: v })} />
+            {style.enabledRetic && (
+              <>
+                <Sub>
+                  <InlineSl label="Cell size" help="Spacing of the feature points. The crazing is the boundary between their cells, not the cells themselves." min={2} max={80} step={1} value={style.cellRetic} onChange={v => ss({ cellRetic: v })} />
+                  <InlineSl label="Crack width" min={0.05} max={2} step={0.05} value={style.widthRetic} onChange={v => ss({ widthRetic: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Dot pitch" min={0.5} max={12} step={0.5} value={style.spacingRetic} onChange={v => ss({ spacingRetic: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Gamma" min={0.2} max={3} step={0.05} value={style.gammaRetic} onChange={v => ss({ gammaRetic: v })} fmt={v => v.toFixed(2)} />
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['invElev','LOW'],['elevation','HIGH'],['slope','STEEP'],['invSlope','FLAT']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.densityModeRetic === m}
+                        onClick={() => ss({ densityModeRetic: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRetic} onChange={v => ss({ seedRetic: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Retic" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
               </>
             )}
           </Section>

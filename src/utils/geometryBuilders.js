@@ -370,6 +370,18 @@ export function buildLineGeometry(terrain, p) {
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Sprite',  builder: (t, ctx) => buildSprite(t, ctx, {
+        tiers: p.tiersSprite, spacing: p.spacingSprite, size: p.sizeSprite,
+        faces: p.facesSprite, faceColor: p.faceColorSprite }) },
+    { id:'Scanline',builder: (t, ctx) => buildScanline(t, ctx, {
+        spacing: p.spacingScanline, angle: p.angleScanline, interlace: p.interlaceScanline,
+        roll: p.rollScanline, rollLength: p.rollLengthScanline, phase: p.phaseScanline,
+        comb: p.combScanline, combLength: p.combLengthScanline, bg: p.bgColor }) },
+    { id:'Palette', builder: (t, ctx) => buildPaletteCycle(t, ctx, {
+        tiers: p.tiersPalette, phase: p.phasePalette, risers: p.risersPalette }) },
+    { id:'Retic',   builder: (t, ctx) => buildReticulation(t, ctx, {
+        cell: p.cellRetic, spacing: p.spacingRetic, width: p.widthRetic,
+        gamma: p.gammaRetic, densityMode: p.densityModeRetic, seed: p.seedRetic }) },
     { id:'Bandsplit',builder: (t, ctx) => buildBandsplit(t, ctx, {
         bands: p.bandsBandsplit, radius: p.radiusBandsplit, spacing: p.spacingBandsplit,
         angle: p.angleBandsplit, spread: p.spreadBandsplit, amp: p.ampBandsplit,
@@ -2676,6 +2688,348 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
     }
   }
 
+  return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+// ─── Sprite / Scanline / Palette Cycle / Reticulation ────────────────────────
+
+/**
+ * Tier index and snapped elevation per cell — Bitplane's quantiser, shared.
+ *
+ * Anchored to `normElev` against the terrain's own bounds rather than to raw
+ * brightness, which is what keeps the plateaus still when the exaggeration
+ * slider moves and what keeps them correctly ordered at negative `elevScale`.
+ */
+function quantiseTiers(terrain, p, tiers) {
+  const { grid, gridMask, rows, cols, minElev, maxElev } = terrain
+  const { elevScale, jitterAmt } = p
+  const nT = Math.max(2, Math.min(64, Math.round(tiers ?? 8)))
+  const bandH = (maxElev - minElev) / nT
+  const n = rows * cols
+  const tier = new Int16Array(n)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) { tier[i] = -1; continue }
+      const ne = normElev(cellElev(grid, r, c, cols, elevScale, jitterAmt), minElev, maxElev)
+      tier[i] = Math.min(nT - 1, Math.max(0, Math.floor(ne * nT)))
+    }
+  }
+  return { tier, nT, bandH, yOf: (t) => minElev + t * bandH }
+}
+
+/**
+ * Each quantised tier drawn as an isometric block.
+ *
+ * Bitplane draws the *boundaries* between plateaus; this draws the plateaus
+ * themselves, one cuboid per lattice cell — a top face at the snapped tier
+ * height, and side faces dropped only where the neighbour is lower. Under an
+ * orthographic camera at 30° that is an arcade tile map.
+ *
+ * The side walls go only to the *neighbour's* tier rather than to a common
+ * floor. Dropping every block to the base plate would bury the entire stack in
+ * one solid mass of vertical lines: what makes a voxel landscape legible is that
+ * you see exactly one riser per step, and its height is the step.
+ *
+ * The top faces ship as a `lids` mesh, so a block reads as a solid plate rather
+ * than a wireframe square and the stack self-occludes without any depth work of
+ * its own — the same mechanism `buildPillars` uses for its cuboid caps.
+ */
+function buildSprite(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevMinCut, elevMaxCut } = p
+  const { tier, nT, yOf } = quantiseTiers(terrain, p, o.tiers)
+  const step = Math.max(1, Math.round((o.spacing ?? 6) / scl))
+  const half = step * scl * 0.5 * Math.max(0.1, Math.min(1, o.size ?? 1))
+
+  const positions = new F32List(), colors = new F32List()
+  const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
+  let lidV = 0
+
+  const tierAt = (r, c) => {
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return -1
+    return tier[r * cols + c]
+  }
+
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 0; c < cols; c += step) {
+      const i = r * cols + c
+      const t = tier[i]
+      if (t < 0) continue
+      const y = yOf(t)
+      if (!inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+      const wx = c * scl - halfW, wz = r * scl - halfH
+      const col = computeVertexColor(t / Math.max(1, nT - 1),
+                                     gridSlopes[i] / (maxSlope || 1), 0, p)
+
+      // Top face outline.
+      positions.push6(wx - half, y, wz - half, wx + half, y, wz - half)
+      positions.push6(wx + half, y, wz - half, wx + half, y, wz + half)
+      positions.push6(wx + half, y, wz + half, wx - half, y, wz + half)
+      positions.push6(wx - half, y, wz + half, wx - half, y, wz - half)
+      for (let e = 0; e < 4; e++) colors.pushRgb2(col)
+
+      // Risers, only where the neighbour actually sits lower.
+      for (const [dr, dc] of [[0, step], [step, 0], [0, -step], [-step, 0]]) {
+        const tn = tierAt(r + dr, c + dc)
+        if (tn < 0 || tn >= t) continue
+        const yLo = yOf(tn)
+        const ex = dc > 0 ? wx + half : dc < 0 ? wx - half : 0
+        const ez = dr > 0 ? wz + half : dr < 0 ? wz - half : 0
+        if (dc !== 0) {
+          positions.push6(ex, y, wz - half, ex, yLo, wz - half)
+          positions.push6(ex, y, wz + half, ex, yLo, wz + half)
+        } else {
+          positions.push6(wx - half, y, ez, wx - half, yLo, ez)
+          positions.push6(wx + half, y, ez, wx + half, yLo, ez)
+        }
+        colors.pushRgb2(col); colors.pushRgb2(col)
+      }
+
+      if (o.faces !== false) {
+        const lidCol = o.faceColor ? hexToRgb(o.faceColor) : col
+        lidP.push6(wx - half, y, wz - half, wx + half, y, wz - half)
+        lidP.push6(wx + half, y, wz + half, wx - half, y, wz + half)
+        for (let v = 0; v < 4; v++) lidC.pushRgb(lidCol)
+        lidI.push3(lidV, lidV + 1, lidV + 2); lidI.push3(lidV, lidV + 2, lidV + 3)
+        lidV += 4
+      }
+    }
+  }
+  void grid; void gridMask
+  const lids = lidI.length > 0
+    ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
+    : null
+  return { positions: positions.toArray(), colors: colors.toArray(), lids }
+}
+
+/**
+ * A CRT reading the terrain: interlaced traces, a rolling shear, and a
+ * brightness comb.
+ *
+ * Underneath it is the Lines marcher — the same rotated ray walk — with three
+ * artefacts of a scanned display added, because those artefacts *are* the look:
+ *
+ * - **Interlace.** Every `interlace`-th line is dropped, so the field is drawn
+ *   at half its apparent resolution and the gaps read as scan lines.
+ * - **Roll.** Each line is sheared along its own direction by
+ *   `A·sin(2πr/λ + φ)`, which is a picture failing to hold horizontal sync.
+ * - **Comb.** Line brightness is modulated on a second period, so the field
+ *   bands the way a mistuned tube does. It rides the *colour* buffer rather
+ *   than opacity, since opacity is per layer and could not vary line to line.
+ */
+function buildScanline(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const pitch = Math.max(0.5, (o.spacing ?? 3) / scl)
+  const skip = Math.max(1, Math.round(o.interlace ?? 2))
+  const rollAmp = (o.roll ?? 3) / scl
+  const rollLen = Math.max(1, o.rollLength ?? 40)
+  const phase = ((o.phase ?? 0) * Math.PI) / 180
+  const combLen = Math.max(1, o.combLength ?? 60)
+  const combAmt = Math.max(0, Math.min(1, o.comb ?? 0.5))
+  const bg = hexToRgb(o.bg || '#ffffff')
+
+  const theta = ((o.angle ?? 0) * Math.PI) / 180
+  const dx = Math.cos(theta), dz = Math.sin(theta)
+  const nx = -dz, nz = dx
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
+  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
+
+  const positions = new F32List(), colors = new F32List()
+  let lineIdx = 0
+  for (let off = -halfDiag; off <= halfDiag; off += pitch, lineIdx++) {
+    if (skip > 1 && lineIdx % skip !== 0) continue
+    const shear = rollAmp * Math.sin((2 * Math.PI * off) / rollLen + phase)
+    // 0 = fully washed toward the background, 1 = full ink.
+    const comb = 1 - combAmt * 0.5 * (1 + Math.sin((2 * Math.PI * off) / combLen + phase))
+    const ox = cc + nx * off + dx * shear, oz = rc + nz * off + dz * shear
+
+    let px = 0, py = 0, pz = 0, run = false
+    for (let t = -halfDiag; t <= halfDiag; t += 1) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+      let x = 0, y = 0, z = 0
+      if (ok) {
+        const ri = Math.round(fr), ci = Math.round(fc)
+        ok = gridMask[ri * cols + ci] === 1
+        if (ok) {
+          const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+          if (b !== b) ok = false
+          else {
+            y = (b - 0.5) * 100 * elevScale
+            if (jitterAmt > 0) y += jitterNoise(fc, fr) * jitterAmt
+            ok = inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)
+            x = fc * scl - halfW; z = fr * scl - halfH
+          }
+        }
+      }
+      if (ok && run) {
+        const ri = Math.round(fr), ci = Math.round(fc)
+        const base = computeVertexColor(normElev(y, minElev, maxElev),
+                                        gridSlopes[ri * cols + ci] / (maxSlope || 1), theta, p)
+        // Lerp toward the paper rather than dimming to black: a washed-out band
+        // on a tube is less signal, not more shadow.
+        positions.push6(px, py, pz, x, y, z)
+        for (let v = 0; v < 2; v++) {
+          colors.push3(bg[0] + (base[0] - bg[0]) * comb,
+                       bg[1] + (base[1] - bg[1]) * comb,
+                       bg[2] + (base[2] - bg[2]) * comb)
+        }
+      }
+      run = ok; px = x; py = y; pz = z
+    }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * Bitplane's quantiser, with the palette walking instead of sitting still.
+ *
+ * A tier's colour is `ramp((t/N + phase) mod 1)` rather than `ramp(t/N)`, so the
+ * bands cycle through the gradient as the phase advances — the arcade waterfall,
+ * and the reason a 16-colour machine could animate a river without touching a
+ * pixel of the frame buffer.
+ *
+ * **The phase is a slider, not a clock, and that is deliberate.** Vertex colours
+ * are baked in the worker, so advancing the phase is a full geometry rebuild;
+ * driving it from `frameClock` would put a rebuild on every frame for as long as
+ * the mode was switched on. Soundscapes does stream at that rate, so it is
+ * possible — but it is a cost this mode has no way to justify while it is merely
+ * *visible*, which is exactly the failure mode the hologram clock and the
+ * murmuration are gated against. Drag the slider and the waterfall runs.
+ */
+function buildPaletteCycle(terrain, p, o) {
+  const { gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevMinCut, elevMaxCut } = p
+  const { tier, nT, yOf } = quantiseTiers(terrain, p, o.tiers)
+  const phase = o.phase ?? 0
+  const risers = o.risers !== false
+  const half = scl * 0.5
+
+  const positions = new F32List(), colors = new F32List()
+  const wrap = (v) => ((v % 1) + 1) % 1
+  const colOf = (t) => computeVertexColor(wrap(t / nT + phase), wrap(t / nT + phase), 0, p)
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      const t = tier[i]
+      if (t < 0) continue
+      const y = yOf(t)
+      if (!inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+      const wx = c * scl - halfW, wz = r * scl - halfH
+      const col = colOf(t)
+
+      for (let dir = 0; dir < 2; dir++) {
+        const j = dir === 0 ? (c < cols - 1 ? i + 1 : -1) : (r < rows - 1 ? i + cols : -1)
+        if (j < 0) continue
+        const tn = tier[j]
+        if (tn < 0 || tn === t) continue
+        const hi = Math.max(t, tn), lo = Math.min(t, tn)
+        const yHi = yOf(hi), yLo = yOf(lo)
+        if (!inElevCut(yHi, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+        const cHi = colOf(hi)
+        const ax = dir === 0 ? wx + half : wx - half
+        const az = dir === 0 ? wz - half : wz + half
+        const bx = wx + half, bz = wz + half
+        positions.push6(ax, yHi, az, bx, yHi, bz); colors.pushRgb2(cHi)
+        if (risers) {
+          positions.push6(ax, yHi, az, ax, yLo, az)
+          positions.push6(bx, yHi, bz, bx, yLo, bz)
+          colors.pushRgb2(cHi); colors.pushRgb2(cHi)
+        }
+      }
+      void col
+    }
+  }
+  void gridMask
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * Crazed emulsion: the walls of a Worley cellular pattern, thinned by tone.
+ *
+ * Reticulation in a real emulsion is the gelatin cracking into a network of
+ * islands, so the mark is the *boundary* between cells and not the cells
+ * themselves. That boundary is where the two nearest feature points are
+ * equidistant — F₂ − F₁ ≈ 0 — which is the Voronoi diagram of the feature set,
+ * obtained here without ever building one:
+ *
+ *     F₁, F₂ = the two smallest distances to jittered feature points
+ *     wall  ⟺  F₂ − F₁ < width
+ *
+ * A Fortune sweep would give exact edges and cost a real data structure; this
+ * costs nine bucket lookups per sample and gives an edge with thickness, which
+ * is what a crack has. The feature points sit one per cell of a coarse grid,
+ * jittered from `mulberry32` so a seed reproduces the pattern exactly.
+ *
+ * The tone gate is what stops it being wallpaper: walls are drawn only where the
+ * plate is dark enough to have cracked, on the same density modes Stipple
+ * offers, so the crazing pools in the shadows and leaves the highlights clean.
+ */
+function buildReticulation(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const cell = Math.max(2, Math.round((o.cell ?? 12) / scl))
+  const step = Math.max(1, Math.round((o.spacing ?? 1.5) / scl))
+  const width = Math.max(0.05, o.width ?? 0.5) * cell * 0.25
+  const gam = o.gamma ?? 1
+  const dm = o.densityMode ?? 'invElev'
+  const rng = mulberry32(((o.seed ?? 42) * 2654435761) >>> 0)
+
+  // One jittered feature point per coarse cell, laid out once.
+  const fR = Math.ceil(rows / cell) + 2, fC = Math.ceil(cols / cell) + 2
+  const fx = new Float32Array(fR * fC), fy = new Float32Array(fR * fC)
+  for (let i = 0; i < fR; i++) {
+    for (let j = 0; j < fC; j++) {
+      const k = i * fC + j
+      fy[k] = (i - 1 + rng()) * cell
+      fx[k] = (j - 1 + rng()) * cell
+    }
+  }
+
+  const positions = new F32List(), colors = new F32List()
+  const eps = Math.max(0.001, scl * 0.003)
+
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 0; c < cols; c += step) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+
+      const normE = normElev(elev, minElev, maxElev)
+      const slope = gridSlopes[i] / (maxSlope || 1)
+      let density
+      if      (dm === 'elevation') density = normE
+      else if (dm === 'slope')     density = slope
+      else if (dm === 'invSlope')  density = 1 - slope
+      else                         density = 1 - normE
+      density = Math.pow(Math.max(0, Math.min(1, density)), gam)
+      if (density <= 0.001) continue
+
+      // The two nearest feature points, over the 3×3 buckets that can hold them.
+      const bi = Math.floor(r / cell) + 1, bj = Math.floor(c / cell) + 1
+      let f1 = Infinity, f2 = Infinity
+      for (let di = -1; di <= 1; di++) {
+        for (let dj = -1; dj <= 1; dj++) {
+          const ii = bi + di, jj = bj + dj
+          if (ii < 0 || ii >= fR || jj < 0 || jj >= fC) continue
+          const k = ii * fC + jj
+          const dr = fy[k] - r, dc = fx[k] - c
+          const d = Math.sqrt(dr * dr + dc * dc)
+          if (d < f1) { f2 = f1; f1 = d } else if (d < f2) f2 = d
+        }
+      }
+      if (!(f2 - f1 < width * density)) continue
+
+      const wx = c * scl - halfW, wz = r * scl - halfH
+      positions.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+      colors.pushRgb2(computeVertexColor(normE, slope, 0, p))
+    }
+  }
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 

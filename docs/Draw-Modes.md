@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using thirty independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using thirty-four independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -450,6 +450,40 @@ Two orthogonal scanlines plotted against each other as an XY oscilloscope figure
 ### Zero Crossings
 
 Every sign change of the scanline after its own running mean is taken out. The density of the marks is the terrain's local **pitch** — how often the ground crosses its own average — which is a different measurement from either slope or curvature: dense on scree and broken rock, empty on a glacier, regardless of how steep either is. Detrending is what makes it a pitch rather than a horizon; without it a scanline crosses its mean twice on a whole mountain and the mode draws two dots.
+
+## 31–34. Sprite Blocks, Scanline, Palette Cycle, Reticulation
+
+### Sprite Blocks
+
+Bitplane draws the *boundaries* between plateaus; this draws the plateaus themselves, one cuboid per lattice cell — a top face at the snapped tier height, and side faces dropped only where the neighbour sits lower. Under an orthographic camera at 30° it is an arcade tile map.
+
+The risers go to the **neighbour's** tier rather than to a common floor. Dropping every block to the base plate buries the stack in one solid mass of vertical lines; what makes a voxel landscape legible is seeing exactly one riser per step, its height *being* the step. Top faces ship as a `lids` mesh so a block reads as a solid plate and the stack self-occludes — the mechanism Pillars already uses for its cuboid caps.
+
+### Scanline
+
+The Lines marcher with three artefacts of a scanned display on top, because those artefacts *are* the look:
+
+- **Interlace** drops every Nth line, so the gaps read as scan lines.
+- **Roll** shears each line along its own direction by $A\sin(2\pi r/\lambda + \varphi)$ — a picture failing to hold horizontal sync.
+- **Comb** modulates line brightness on a second period. It rides the *colour* buffer, not opacity, because opacity is resolved per layer and could not vary line to line; and it lerps toward the **background** rather than toward black, since a washed-out band on a tube is less signal, not more shadow.
+
+The spec pins the division: roll moves vertices, comb does not.
+
+### Palette Cycle
+
+Bitplane's quantiser with the palette walking instead of sitting still — a tier's colour is $\text{ramp}\big((t/N + \varphi) \bmod 1\big)$, so the bands cycle through the gradient as the phase advances. It is the reason a 16-colour machine could animate a waterfall without touching a pixel of the frame buffer, and the spec asserts exactly that property: **identical geometry at every phase**, different colours. If advancing the phase moved a vertex, the mode would be mis-named.
+
+**The phase is a slider, not a clock, and that is deliberate.** Vertex colours are baked in the worker, so advancing the phase is a full geometry rebuild. Driving it from `frameClock` would put a rebuild on every frame for as long as the mode was merely *visible* — the exact failure the hologram clock and the murmuration are gated against. Soundscapes streams at that rate, so it is possible; it is just a cost this mode cannot justify. Drag the slider and the waterfall runs.
+
+### Reticulation
+
+Crazed emulsion. Reticulation in a real film is the gelatin cracking into a network of islands, so the mark is the **boundary** between cells, not the cells. That boundary is where the two nearest feature points are equidistant, which is the Voronoi diagram of the feature set — obtained here without ever building one:
+
+$$F_1, F_2 = \text{the two smallest distances to jittered feature points}, \qquad \text{wall} \iff F_2 - F_1 < w$$
+
+A Fortune sweep would give exact edges and cost a real data structure. This costs nine bucket lookups per sample and gives an edge with *thickness*, which is what a crack has. Feature points sit one per cell of a coarse grid, jittered from `mulberry32`, so a seed reproduces the pattern exactly.
+
+Crack width is proportional to cell size, which keeps total coverage roughly constant as the cells open up — fewer boundaries, each wider — so the crazing looks like crazing at any scale instead of fading out. Coverage is therefore `width`'s job, not the cell's. The **tone gate** is what stops the whole thing being wallpaper: walls are drawn only where the plate is dark enough to have cracked, on the same density modes Stipple offers, so the crazing pools in the shadows and leaves the highlights clean.
 
 ---
 
