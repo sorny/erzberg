@@ -103,6 +103,22 @@ export const DRAW_MODES = [
     pick: { spacing: [25, 70], carve: [0.4, 0.9], fan: [7, 17], spread: [60, 180], drops: [2, 6] },
   },
   {
+    id: 'Bandsplit', label: 'Bandsplit', cost: 2.5,
+    pick: { bands: [3, 6], spacing: [12, 45], angle: [0, 180], spread: [0.06, 0.22], amp: [0.04, 0.16] },
+  },
+  {
+    id: 'Envelope', label: 'Envelope', cost: 1.5,
+    pick: { detrend: [5, 25], decay: [0.75, 0.97], amp: [0.15, 0.6], spacing: [4, 20] },
+  },
+  {
+    id: 'Lissajous', label: 'Lissajous', cost: 1,
+    pick: { figures: [1, 9], size: [0.12, 0.4], level: [0.2, 0.8] },
+  },
+  {
+    id: 'ZeroCross', label: 'Zero crossings', cost: 1.5,
+    pick: { detrend: [2, 16], spacing: [1, 6] },
+  },
+  {
     id: 'Truss', label: 'Truss', cost: 2.5,
     pick: { spacing: [25, 80], radius: [1, 4], braced: [0.2, 0.7], gusset: [0, 0.6] },
   },

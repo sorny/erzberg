@@ -200,6 +200,29 @@ export const STYLE_DEF = {
   braceWeightWeldment: 1, postWeightWeldment: 1, leaderWeightWeldment: 1,
   hypsoWeldment: false, hypsoModeWeldment: 'elevation', hypsoBandedWeldment: false, hypsoIntervalWeldment: 10,
 
+  // The scanline as a signal. Bandsplit's gains are flat-named rather than an
+  // array on purpose: geometryKey builds a *string*, so an array stringifies to
+  // [object Object] however it is edited and the rebuild would never fire.
+  enabledBandsplit: false, bandsBandsplit: 5, radiusBandsplit: 1, spacingBandsplit: 24,
+  angleBandsplit: 0, spreadBandsplit: 0.12, ampBandsplit: 0.09, modeBandsplit: 'stacked',
+  gain0Bandsplit: 1, gain1Bandsplit: 1, gain2Bandsplit: 1,
+  gain3Bandsplit: 1, gain4Bandsplit: 1, gain5Bandsplit: 1, gain6Bandsplit: 1,
+  colorBandsplit: '#000000', weightBandsplit: 1, opacityBandsplit: 1, dashBandsplit: 'solid',
+  hypsoBandsplit: false, hypsoModeBandsplit: 'elevation', hypsoBandedBandsplit: false, hypsoIntervalBandsplit: 10,
+
+  enabledEnvelope: false, detrendEnvelope: 12, decayEnvelope: 0.9, ampEnvelope: 0.35,
+  spacingEnvelope: 8, rungsEnvelope: 4,
+  colorEnvelope: '#000000', weightEnvelope: 1, opacityEnvelope: 1, dashEnvelope: 'solid',
+  hypsoEnvelope: false, hypsoModeEnvelope: 'elevation', hypsoBandedEnvelope: false, hypsoIntervalEnvelope: 10,
+
+  enabledLissajous: false, figuresLissajous: 4, sizeLissajous: 0.16, levelLissajous: 0.5,
+  colorLissajous: '#000000', weightLissajous: 1, opacityLissajous: 1, dashLissajous: 'solid',
+  hypsoLissajous: false, hypsoModeLissajous: 'elevation', hypsoBandedLissajous: false, hypsoIntervalLissajous: 10,
+
+  enabledZeroCross: false, detrendZeroCross: 6, spacingZeroCross: 2, axesZeroCross: 'both',
+  colorZeroCross: '#1a1a1a', weightZeroCross: 3, opacityZeroCross: 0.9, dashZeroCross: 'solid',
+  hypsoZeroCross: false, hypsoModeZeroCross: 'slope', hypsoBandedZeroCross: false, hypsoIntervalZeroCross: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

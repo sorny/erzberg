@@ -97,6 +97,10 @@ const SECTION_TERMS = {
   'Mode: Exploded Frame': 'assembly diagram displaced members leaders apart layers exploded view',
   'Mode: Section':    'cutting plane cut face hatch 45 drafting convention material below beyond slice',
   'Mode: Weldment':   'parts drawing callout leader gusset plate annotation joints degree',
+  'Mode: Bandsplit':  'octave bands laplacian pyramid frequency spectrum analyser equaliser gains filter fft scanline signal',
+  'Mode: Envelope':   'attack decay follower waveform daw clip audio region detrend roughness',
+  'Mode: Lissajous':  'oscilloscope xy figure scope trace signal phase',
+  'Mode: Zero Crossings': 'sign change pitch crossings detrend roughness scree dots',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1369,6 +1373,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeTruss: false, modeExploded: false, modeSection: false, modeWeldment: false,
+    modeBandsplit: false, modeEnvelope: false, modeLissajous: false, modeZeroCross: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1569,6 +1574,10 @@ export function Sidebar({
       modeExploded: !!newStyle.enabledExploded,
       modeSection:  !!newStyle.enabledSection,
       modeWeldment: !!newStyle.enabledWeldment,
+      modeBandsplit: !!newStyle.enabledBandsplit,
+      modeEnvelope:  !!newStyle.enabledEnvelope,
+      modeLissajous: !!newStyle.enabledLissajous,
+      modeZeroCross: !!newStyle.enabledZeroCross,
     }))
   }
 
@@ -2699,6 +2708,91 @@ export function Sidebar({
                   <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightWeldment} onChange={v => ss({ postWeightWeldment: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Weldment" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Bandsplit" icon={<ModeMark kind="bandsplit" />} open={sec.modeBandsplit} onToggle={() => tog('modeBandsplit')} enabled={style.enabledBandsplit}>
+            <Tog label="Enabled" checked={style.enabledBandsplit} onChange={v => ss({ enabledBandsplit: v })} />
+            {style.enabledBandsplit && (
+              <>
+                <Sub>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {['stacked', 'draped'].map(m => (
+                      <Btn key={m} block variant="toggle" on={style.modeBandsplit === m}
+                        onClick={() => ss({ modeBandsplit: m })}
+                        style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>{m}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Bands" help="Octave bands. Each is a difference of two box blurs an octave apart; the last is the residual massif." min={1} max={6} step={1} value={style.bandsBandsplit} onChange={v => ss({ bandsBandsplit: v })} />
+                  <InlineSl label="Finest" help="Radius of the first blur, in cells — where the octave ladder starts." min={0.5} max={8} step={0.5} value={style.radiusBandsplit} onChange={v => ss({ radiusBandsplit: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Line pitch" min={2} max={100} step={1} value={style.spacingBandsplit} onChange={v => ss({ spacingBandsplit: v })} />
+                  <InlineSl label="Bearing" min={0} max={180} step={1} value={style.angleBandsplit} onChange={v => ss({ angleBandsplit: v })} fmt={v => v + '°'} />
+                  {style.modeBandsplit !== 'draped' && <>
+                    <InlineSl label="Spread" help="Vertical gap between the stacked traces, as a fraction of the elevation range." min={0} max={0.5} step={0.01} value={style.spreadBandsplit} onChange={v => ss({ spreadBandsplit: v })} fmt={v => v.toFixed(2)} />
+                    <InlineSl label="Amplitude" min={0.01} max={0.4} step={0.01} value={style.ampBandsplit} onChange={v => ss({ ampBandsplit: v })} fmt={v => v.toFixed(2)} />
+                  </>}
+                </Sub>
+                <Sub label={style.modeBandsplit === 'draped' ? 'EQUALISER — ALL AT 1 IS THE TERRAIN' : 'BAND GAINS'}>
+                  <InlineSl label="Band 0" min={0} max={3} step={0.05} value={style.gain0Bandsplit} onChange={v => ss({ gain0Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 1" min={0} max={3} step={0.05} value={style.gain1Bandsplit} onChange={v => ss({ gain1Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 2" min={0} max={3} step={0.05} value={style.gain2Bandsplit} onChange={v => ss({ gain2Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 3" min={0} max={3} step={0.05} value={style.gain3Bandsplit} onChange={v => ss({ gain3Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 4" min={0} max={3} step={0.05} value={style.gain4Bandsplit} onChange={v => ss({ gain4Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 5" min={0} max={3} step={0.05} value={style.gain5Bandsplit} onChange={v => ss({ gain5Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Band 6" min={0} max={3} step={0.05} value={style.gain6Bandsplit} onChange={v => ss({ gain6Bandsplit: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="Bandsplit" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Envelope" icon={<ModeMark kind="envelope" />} open={sec.modeEnvelope} onToggle={() => tog('modeEnvelope')} enabled={style.enabledEnvelope}>
+            <Tog label="Enabled" checked={style.enabledEnvelope} onChange={v => ss({ enabledEnvelope: v })} />
+            {style.enabledEnvelope && (
+              <>
+                <Sub>
+                  <InlineSl label="Detrend" help="Blur radius removed before the envelope is taken. The envelope is of the roughness, not of the elevation — without this it is just the massif." min={1} max={60} step={1} value={style.detrendEnvelope} onChange={v => ss({ detrendEnvelope: v })} />
+                  <InlineSl label="Decay" help="Release of the follower. High values hold a peak across the whole line." min={0} max={0.99} step={0.01} value={style.decayEnvelope} onChange={v => ss({ decayEnvelope: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Amplitude" min={0.02} max={1} step={0.01} value={style.ampEnvelope} onChange={v => ss({ ampEnvelope: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Line pitch" min={1} max={60} step={1} value={style.spacingEnvelope} onChange={v => ss({ spacingEnvelope: v })} />
+                  <InlineSl label="Rungs" help="Vertical ties between the two curves every N cells — what turns a pair of lines into a filled block on a plotter, which has no fill. 0 draws none." min={0} max={40} step={1} value={style.rungsEnvelope} onChange={v => ss({ rungsEnvelope: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Envelope" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Lissajous" icon={<ModeMark kind="lissajous" />} open={sec.modeLissajous} onToggle={() => tog('modeLissajous')} enabled={style.enabledLissajous}>
+            <Tog label="Enabled" checked={style.enabledLissajous} onChange={v => ss({ enabledLissajous: v })} />
+            {style.enabledLissajous && (
+              <>
+                <Sub>
+                  <InlineSl label="Figures" help="Each plots one row against one column as an XY oscilloscope trace." min={1} max={16} step={1} value={style.figuresLissajous} onChange={v => ss({ figuresLissajous: v })} />
+                  <InlineSl label="Size" min={0.05} max={0.6} step={0.01} value={style.sizeLissajous} onChange={v => ss({ sizeLissajous: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Height" help="Where the figures float, as a fraction of the elevation range. They are flat by design — draping would put the trace at the elevation of a third place, unrelated to either axis." min={0} max={1} step={0.01} value={style.levelLissajous} onChange={v => ss({ levelLissajous: v })} fmt={v => Math.round(v * 100) + '%'} />
+                </Sub>
+                <ModeStyleOverride prefix="Lissajous" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Zero Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
+            <Tog label="Enabled" checked={style.enabledZeroCross} onChange={v => ss({ enabledZeroCross: v })} />
+            {style.enabledZeroCross && (
+              <>
+                <Sub>
+                  <InlineSl label="Detrend" help="Blur radius subtracted first. Without it a scanline crosses its own mean twice on a whole mountain and the mode draws two dots." min={1} max={40} step={1} value={style.detrendZeroCross} onChange={v => ss({ detrendZeroCross: v })} />
+                  <InlineSl label="Line pitch" min={0.5} max={30} step={0.5} value={style.spacingZeroCross} onChange={v => ss({ spacingZeroCross: v })} fmt={v => v.toFixed(1)} />
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {['rows', 'both'].map(m => (
+                      <Btn key={m} block variant="toggle" on={style.axesZeroCross === m}
+                        onClick={() => ss({ axesZeroCross: m })}
+                        style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>{m}</Btn>
+                    ))}
+                  </div>
+                </Sub>
+                <ModeStyleOverride prefix="ZeroCross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
               </>
             )}
           </Section>

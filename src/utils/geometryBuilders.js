@@ -370,6 +370,19 @@ export function buildLineGeometry(terrain, p) {
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Bandsplit',builder: (t, ctx) => buildBandsplit(t, ctx, {
+        bands: p.bandsBandsplit, radius: p.radiusBandsplit, spacing: p.spacingBandsplit,
+        angle: p.angleBandsplit, spread: p.spreadBandsplit, amp: p.ampBandsplit,
+        mode: p.modeBandsplit,
+        gains: [p.gain0Bandsplit, p.gain1Bandsplit, p.gain2Bandsplit,
+                p.gain3Bandsplit, p.gain4Bandsplit, p.gain5Bandsplit, p.gain6Bandsplit] }) },
+    { id:'Envelope',builder: (t, ctx) => buildEnvelope(t, ctx, {
+        detrend: p.detrendEnvelope, decay: p.decayEnvelope, amp: p.ampEnvelope,
+        spacing: p.spacingEnvelope, rungs: p.rungsEnvelope }) },
+    { id:'Lissajous',builder: (t, ctx) => buildLissajous(t, ctx, {
+        figures: p.figuresLissajous, size: p.sizeLissajous, level: p.levelLissajous }) },
+    { id:'ZeroCross',builder: (t, ctx) => buildZeroCross(t, ctx, {
+        detrend: p.detrendZeroCross, spacing: p.spacingZeroCross, axes: p.axesZeroCross }) },
     { id:'Truss',   builder: (t, ctx) => buildTruss(t, ctx, {
         spacing: p.spacingTruss, radius: p.radiusTruss, braced: p.bracedTruss,
         depth: p.depthTruss, gusset: p.gussetTruss, gussetSides: p.gussetSidesTruss,
@@ -2663,6 +2676,343 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
     }
   }
 
+  return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+// ─── The scanline as a signal (Bandsplit, Envelope, Lissajous, Zero Crossing) ─
+
+/**
+ * An octave-band decomposition of the raster — a Laplacian pyramid.
+ *
+ * Splitting a signal into frequency bands is an FFT's job, and `src/utils/fft.js`
+ * is right there. It is the wrong tool here for three reasons: it needs
+ * power-of-two padding per scanline, it rings either side of every cliff
+ * (Gibbs), and it would cost a transform per row per rebuild. A pyramid of
+ * differences of box blurs is the same decomposition, O(W·H) per level, with no
+ * padding and no ringing:
+ *
+ *     G_b = boxBlur(H, r_b),   r_b = r₀·σᵇ      (σ = 2 — this is what makes them octaves)
+ *     L_b = G_b − G_(b+1)                        band b
+ *     L_B = G_B                                  the residual: the massif itself
+ *
+ * ΣL_b = H exactly, so a gain vector reconstructs a filtered terrain and the
+ * mode becomes a graphic equaliser for landform. `boxBlur` is the same pass the
+ * Blur slider already runs, and it is given the mask, so a clipped edge does not
+ * average real ground against the zeros in NoData.
+ *
+ * Each band also carries its own peak amplitude, because the bands differ by
+ * orders of magnitude — the residual is the whole massif and the top band is
+ * scree. Drawn at a shared scale the detail bands are invisible; normalised, the
+ * stack reads as an analyser.
+ */
+function bandPyramid(terrain, bands, baseRadius) {
+  const { grid, gridMask, rows, cols } = terrain
+  const B = Math.max(1, Math.min(6, Math.round(bands ?? 5)))
+  const mask = terrain.hasNoData ? gridMask : null
+  const r0 = Math.max(0.5, baseRadius ?? 1)
+
+  let prev = grid
+  const out = []
+  for (let b = 0; b < B; b++) {
+    const next = boxBlur(grid, cols, rows, r0 * Math.pow(2, b), mask)
+    const L = new Float32Array(rows * cols)
+    for (let i = 0; i < L.length; i++) L[i] = prev[i] - next[i]
+    out.push(L)
+    prev = next
+  }
+  out.push(prev)                    // the residual, at the coarsest blur
+
+  const peaks = out.map((L) => {
+    let m = 0
+    for (let i = 0; i < L.length; i++) {
+      if (!gridMask[i]) continue
+      const v = Math.abs(L[i] - (L === prev ? 0.5 : 0))
+      if (v > m) m = v
+    }
+    return m || 1
+  })
+  return { bands: out, peaks, B }
+}
+
+/** Bilinear tap into one band, NoData-aware in the same way as the terrain's. */
+function sampleBand(L, gridMask, rows, cols, fr, fc) {
+  return sampleBilinear(L, gridMask, rows, cols, fr, fc)
+}
+
+/**
+ * The terrain as a spectrum analyser: one scanline, drawn once per octave band.
+ *
+ * **This is not Unknown Pleasures.** Lines mode stacks whole scanlines and every
+ * trace in it is a different *place*. Here every trace is the same place at a
+ * different *scale* — the bottom one a single slow swell with everything else
+ * removed, the top one pure detail oscillating around nothing.
+ *
+ * Two presentations off one switch:
+ *
+ * - **Stacked** puts each band at a fixed height above the terrain floor, flat,
+ *   and it is a diagram.
+ * - **Draped** adds the bands back onto the surface at their own gains, so the
+ *   terrain itself is re-synthesised and the mode is a *filter*: cut the lows
+ *   and the range collapses to a rough plain, cut the highs and it becomes a
+ *   smooth swell with the same skyline. With every gain at 1 the reconstruction
+ *   is exact and the output is the terrain, which is the property that says the
+ *   decomposition is sound.
+ *
+ * The gains are flat-named `gain0…gain5` rather than an array, and that is not
+ * cosmetic: `geometryKey` builds a *string*, so an array param stringifies to
+ * `[object Object]` however it is edited and the rebuild would never fire. See
+ * GEOMETRY_NON_SCALAR in `src/params.js`.
+ *
+ * Colour comes from the band index rather than the elevation — feeding b/B into
+ * `computeVertexColor`'s normalised-elevation slot makes the gradient picker the
+ * band palette, for nothing.
+ */
+function buildBandsplit(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const { bands: L, peaks, B } = bandPyramid(terrain, o.bands, o.radius)
+  const gains = o.gains ?? []
+  const draped = (o.mode ?? 'stacked') === 'draped'
+  const range = maxElev - minElev
+  const spread = (o.spread ?? 0.12) * range
+  const amp = (o.amp ?? 0.09) * range
+  const sMask = terrain.hasNoData ? gridMask : null
+
+  const positions = new F32List(), colors = new F32List()
+  const pitch = Math.max(1, (o.spacing ?? 24) / scl)
+  const theta = ((o.angle ?? 0) * Math.PI) / 180
+  const dx = Math.cos(theta), dz = Math.sin(theta)
+  const nx = -dz, nz = dx
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
+  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
+
+  for (let off = -halfDiag; off <= halfDiag; off += pitch) {
+    const ox = cc + nx * off, oz = rc + nz * off
+    for (let b = 0; b <= B; b++) {
+      const g = gains[b] ?? 1
+      const col = computeVertexColor(B > 0 ? b / B : 0, 1 - (B > 0 ? b / B : 0), theta, p)
+      let px = 0, py = 0, pz = 0, run = false
+      for (let t = -halfDiag; t <= halfDiag; t += 1) {
+        const fc = ox + dx * t, fr = oz + dz * t
+        let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+        let x = 0, y = 0, z = 0
+        if (ok) {
+          const ri = Math.round(fr), ci = Math.round(fc)
+          ok = gridMask[ri * cols + ci] === 1
+          if (ok) {
+            if (draped) {
+              // Reconstruct brightness from the gained bands, then convert once.
+              let bri = 0
+              for (let k = 0; k <= B; k++) {
+                const v = sampleBand(L[k], sMask, rows, cols, fr, fc)
+                if (v !== v) { ok = false; break }
+                bri += v * (gains[k] ?? 1)
+              }
+              y = (bri - 0.5) * 100 * elevScale
+              ok = ok && inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)
+            } else {
+              const v = sampleBand(L[b], sMask, rows, cols, fr, fc)
+              if (v !== v) ok = false
+              else {
+                // The residual is a brightness, the detail bands are signed
+                // differences about zero — so only the residual is re-centred.
+                const centred = b === B ? v - 0.5 : v
+                y = minElev + b * spread + (centred / peaks[b]) * amp * g
+              }
+            }
+            x = fc * scl - halfW; z = fr * scl - halfH
+          }
+        }
+        if (ok && run) {
+          positions.push6(px, py, pz, x, y, z)
+          colors.pushRgb2(col)
+        }
+        run = ok; px = x; py = y; pz = z
+      }
+      if (draped) break            // one trace per line, not one per band
+    }
+  }
+  void grid
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * The DAW clip: an attack/decay envelope over the detrended scanline, drawn as
+ * ±e about the ground.
+ *
+ * The follower runs both ways —
+ *
+ *     forward:  e ← max(|x|, e·decay)
+ *     backward: e ← max(e, max(|x|, e·decay))
+ *
+ * — because a one-directional follower is lopsided by construction: it rises
+ * instantly at a transient and decays only afterwards, so every peak gets a tail
+ * on one side and a cliff on the other. Running it back over its own output
+ * symmetrises the envelope, which is what makes the shape read as a waveform
+ * block rather than as a row of sawteeth.
+ *
+ * Detrending is `boxBlur` again: the envelope is of the *roughness*, not of the
+ * elevation, so the massif has to come out first or the envelope is just the
+ * massif.
+ */
+function buildEnvelope(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const mask = terrain.hasNoData ? gridMask : null
+  const base = boxBlur(grid, cols, rows, Math.max(1, o.detrend ?? 12), mask)
+  const decay = Math.max(0, Math.min(0.999, o.decay ?? 0.9))
+  const amp = (o.amp ?? 0.35) * (maxElev - minElev)
+  const step = Math.max(1, Math.round((o.spacing ?? 8) / scl))
+  const rungEvery = Math.max(0, Math.round(o.rungs ?? 4))
+
+  const positions = new F32List(), colors = new F32List()
+  const env = new Float32Array(cols)
+  const sig = new Float32Array(cols)
+  const valid = new Uint8Array(cols)
+
+  for (let r = 0; r < rows; r += step) {
+    let peak = 0
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      valid[c] = gridMask[i]
+      sig[c] = gridMask[i] ? grid[i] - base[i] : 0
+      const a = Math.abs(sig[c])
+      if (valid[c] && a > peak) peak = a
+    }
+    if (peak <= 0) continue
+    let e = 0
+    for (let c = 0; c < cols; c++) { e = Math.max(Math.abs(sig[c]), e * decay); env[c] = e }
+    e = 0
+    for (let c = cols - 1; c >= 0; c--) { e = Math.max(Math.abs(sig[c]), e * decay); env[c] = Math.max(env[c], e) }
+
+    let px = 0, pUp = 0, pDn = 0, pz = 0, run = false
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      const ok = valid[c] === 1
+      let x = 0, up = 0, dn = 0, z = 0
+      if (ok) {
+        const mid = (base[i] - 0.5) * 100 * elevScale
+        if (!inElevCut(mid, minElev, maxElev, elevMinCut, elevMaxCut)) { run = false; continue }
+        const h = (env[c] / peak) * amp
+        x = c * scl - halfW; z = r * scl - halfH
+        up = mid + h; dn = mid - h
+      }
+      if (ok && run) {
+        const col = computeVertexColor(normElev(up, minElev, maxElev),
+                                       Math.min(1, env[c] / peak), 0, p)
+        positions.push6(px, pUp, pz, x, up, z); colors.pushRgb2(col)
+        positions.push6(px, pDn, pz, x, dn, z); colors.pushRgb2(col)
+        // The rungs are what turn two curves into a filled block on a plotter,
+        // which has no fill.
+        if (rungEvery > 0 && c % rungEvery === 0) {
+          positions.push6(x, dn, z, x, up, z); colors.pushRgb2(col)
+        }
+      }
+      run = ok; px = x; pUp = up; pDn = dn; pz = z
+    }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * Two orthogonal scanlines plotted against each other — the XY oscilloscope
+ * figure.
+ *
+ * It reads as pure signal and barely as terrain, which is the point: it is the
+ * one mode here that describes the raster without describing its shape. Best
+ * over something legible, which is why it draws several figures rather than one
+ * and places them on a grid across the plate.
+ *
+ * The figure is drawn flat at a chosen elevation rather than draped. Draping it
+ * would put the trace at the elevation of a *third* place, unrelated to either
+ * axis, which is exactly the kind of accidental meaning a diagram should not
+ * acquire.
+ */
+function buildLissajous(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const n = Math.max(1, Math.round(o.figures ?? 3))
+  const size = (o.size ?? 0.28) * Math.min(cols, rows) * scl
+  const y = minElev + (maxElev - minElev) * (o.level ?? 0.5)
+  const positions = new F32List(), colors = new F32List()
+
+  for (let k = 0; k < n; k++) {
+    // Rows and columns spread evenly, skipping the border where a scanline is
+    // mostly NoData on a clipped raster.
+    const f = (k + 1) / (n + 1)
+    const r0 = Math.round(rows * (0.15 + 0.7 * f))
+    const c0 = Math.round(cols * (0.15 + 0.7 * ((k * 0.618) % 1)))
+    const cx = ((k % Math.ceil(Math.sqrt(n))) + 0.5) / Math.ceil(Math.sqrt(n))
+    const cz = (Math.floor(k / Math.ceil(Math.sqrt(n))) + 0.5) / Math.ceil(Math.sqrt(n))
+    const ox = (cx - 0.5) * cols * scl, oz = (cz - 0.5) * rows * scl
+    const col = computeVertexColor(f, 1 - f, 0, p)
+
+    let px = 0, pz = 0, run = false
+    const len = Math.min(rows, cols)
+    for (let t = 0; t < len; t++) {
+      const a = sampleBilinear(grid, sMask, rows, cols, r0, t)
+      const b = sampleBilinear(grid, sMask, rows, cols, t, c0)
+      const ok = a === a && b === b
+      const x = ox + (a - 0.5) * 2 * size
+      const z = oz + (b - 0.5) * 2 * size
+      if (ok && run) { positions.push6(px, y, pz, x, y, z); colors.pushRgb2(col) }
+      run = ok; px = x; pz = z
+    }
+  }
+  void halfW; void halfH
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * Every sign change of the scanline, after its own running mean is taken out.
+ *
+ * The density of the marks is the terrain's local *pitch* — how often the ground
+ * crosses its own average — which is a different measurement from either slope
+ * or curvature: dense on scree and broken rock, empty on a glacier or a screefree
+ * face, regardless of how steep either is.
+ *
+ * Detrending is what makes it a pitch rather than a horizon: without subtracting
+ * the blur, a scanline crosses its mean twice on a whole mountain and the mode
+ * draws two dots.
+ */
+function buildZeroCross(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const mask = terrain.hasNoData ? gridMask : null
+  const base = boxBlur(grid, cols, rows, Math.max(1, o.detrend ?? 6), mask)
+  const step = Math.max(1, Math.round((o.spacing ?? 2) / scl))
+  const eps = Math.max(0.001, scl * 0.003)
+  const both = o.axes !== 'rows'
+
+  const positions = new F32List(), colors = new F32List()
+  const emit = (r, c, i) => {
+    const elev = cellElev(grid, r, c, cols, elevScale, p.jitterAmt)
+    if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) return
+    const wx = c * scl - halfW, wz = r * scl - halfH
+    positions.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+    colors.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev),
+                                       gridSlopes[i] / (maxSlope || 1), 0, p))
+  }
+  for (let r = 0; r < rows; r += step) {
+    for (let c = 1; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i] || !gridMask[i - 1]) continue
+      const a = grid[i - 1] - base[i - 1], b = grid[i] - base[i]
+      if (a === 0 || (a > 0) === (b > 0)) continue
+      emit(r, c, i)
+    }
+  }
+  if (both) {
+    for (let c = 0; c < cols; c += step) {
+      for (let r = 1; r < rows; r++) {
+        const i = r * cols + c
+        if (!gridMask[i] || !gridMask[i - cols]) continue
+        const a = grid[i - cols] - base[i - cols], b = grid[i] - base[i]
+        if (a === 0 || (a > 0) === (b > 0)) continue
+        emit(r, c, i)
+      }
+    }
+  }
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 

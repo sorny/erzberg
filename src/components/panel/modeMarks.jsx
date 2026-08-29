@@ -272,6 +272,40 @@ const MARKS = {
       <polygon points="6,4 7.7,5 7.7,7 6,8 4.3,7 4.3,5" fill="currentColor" stroke="none" />
     </g>
   ),
+  // The same signal three times over, an octave apart each time.
+  bandsplit: (
+    <g {...BASE}>
+      <path d="M1 2.5 C4 1, 7 4, 10 2 C13 0.5, 16 3.5, 21 2" strokeWidth="1.3" />
+      <path d="M1 6.5 C2.5 5, 4 8, 6 6.5 C8 5, 9.5 8, 11.5 6.5 C13.5 5, 15 8, 17 6.5 C19 5.5, 20 7.5, 21 6.5" />
+      <path d="M1 11 L2 9.8 L3 11.4 L4 10 L5 11.6 L6 9.9 L7 11.3 L8 10.1 L9 11.5 L10 9.8 L11 11.4 L12 10 L13 11.6 L14 9.9 L15 11.3 L16 10.2 L17 11.5 L18 9.8 L19 11.4 L20 10.1 L21 11.2" strokeWidth="0.7" />
+    </g>
+  ),
+  // An audio clip: a symmetric envelope about a baseline, tied with rungs.
+  envelope: (
+    <g {...BASE}>
+      <path d="M1 6.5 L21 6.5" strokeWidth="0.5" opacity="0.5" />
+      <path d="M1 6 C3 2.5, 5 1.5, 8 3 C11 4.5, 13 1, 16 2.5 C18.5 3.8, 20 5.5, 21 5.5" strokeWidth="1.1" />
+      <path d="M1 7 C3 10.5, 5 11.5, 8 10 C11 8.5, 13 12, 16 10.5 C18.5 9.2, 20 7.5, 21 7.5" strokeWidth="1.1" />
+      <path d="M4 3.6 L4 9.4 M8 3 L8 10 M12 2.6 L12 10.4 M16 2.5 L16 10.5 M19.5 4.6 L19.5 8.4" strokeWidth="0.5" opacity="0.7" />
+    </g>
+  ),
+  // An XY scope figure.
+  lissajous: (
+    <g {...BASE}>
+      <path d="M11 1.5 C16 1.5, 19 4, 19 6.5 C19 9, 16 11.5, 11 11.5 C6 11.5, 3 9, 3 6.5 C3 4, 6 1.5, 11 1.5" strokeWidth="0.9" />
+      <path d="M11 3 C15 4.5, 16.5 8, 13.5 10.5 C10.5 8, 11.5 4.5, 15.5 3" strokeWidth="0.7" opacity="0.7" />
+      <path d="M11 3 C7 4.5, 5.5 8, 8.5 10.5 C11.5 8, 10.5 4.5, 6.5 3" strokeWidth="0.7" opacity="0.7" />
+    </g>
+  ),
+  // Dots at every sign change: dense where the ground is busy.
+  zerocross: (
+    <g stroke="none" fill="currentColor">
+      <path d="M1 6.5 L21 6.5" stroke="currentColor" strokeWidth="0.4" fill="none" opacity="0.45" />
+      {[1.5,2.6,3.4,4.7,5.3,6.6,8.4,10.8,13.6,14.4,15.6,17.4,18.2,19.6,20.5].map((x, i) => (
+        <circle key={i} cx={x} cy={i % 3 === 0 ? 4 : i % 3 === 1 ? 6.5 : 9} r={0.8} />
+      ))}
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {
