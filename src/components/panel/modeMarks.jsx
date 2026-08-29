@@ -232,6 +232,46 @@ const MARKS = {
       <path d="M4 3.2 C6 6.5, 6.5 9, 8.5 11.5" strokeWidth="1.9" />
     </g>
   ),
+  // A braced panel with node plates — the most literal mark in the set.
+  truss: (
+    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+      <path d="M3 3 L11 2 L19 4 M3 3 L4 10 M11 2 L11.5 9 M19 4 L19 11" strokeWidth="1.6" />
+      <path d="M4 10 L11.5 9 L19 11" strokeWidth="1.6" />
+      <path d="M3 3 L11.5 9 M11 2 L19 11" strokeWidth="0.7" />
+      <g fill="currentColor" stroke="none">
+        {[[3,3],[11,2],[19,4],[4,10],[11.5,9],[19,11]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r={1.1} />
+        ))}
+      </g>
+    </g>
+  ),
+  // The same frame pulled apart along Y, with leaders back to place.
+  exploded: (
+    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+      <path d="M2 2.5 L11 1.5 L20 3" strokeWidth="1.6" />
+      <path d="M2 6.5 L11.5 6 M11.5 6 L20 7" strokeWidth="0.8" />
+      <path d="M2 11 L11 10.5 L20 11.5" strokeWidth="1.2" strokeDasharray="2 1.5" />
+      <path d="M6 2.2 L6 11 M15.5 2.3 L15.5 11.2" strokeWidth="0.5" strokeDasharray="1 1.4" />
+    </g>
+  ),
+  // A cutting plane: hatched below, outline beyond.
+  section: (
+    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+      <path d="M1 3 L6 1.5 L10 3.5 L14 1 L18 3 L21 2" strokeWidth="0.7" opacity="0.5" />
+      <path d="M1 6.5 L21 6.5" strokeWidth="1.8" />
+      <path d="M2 12 L7.5 6.5 M5.5 12 L11 6.5 M9 12 L14.5 6.5 M12.5 12 L18 6.5 M16 12 L21 7"
+            strokeWidth="0.7" />
+    </g>
+  ),
+  // A called-out joint: gusset plate, leader, shelf.
+  weldment: (
+    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+      <path d="M1 10 L6 6 L11 9 M6 6 L6 12" strokeWidth="1.4" />
+      <path d="M6 6 L11.5 2.5 L20.5 2.5" strokeWidth="0.8" />
+      <path d="M13 5 L20.5 5 M13 5 L13 2.5" strokeWidth="0.5" opacity="0.55" />
+      <polygon points="6,4 7.7,5 7.7,7 6,8 4.3,7 4.3,5" fill="currentColor" stroke="none" />
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

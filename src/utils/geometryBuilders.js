@@ -146,6 +146,24 @@ export function layerStyle(id, p) {
       return { weight: p.weightRaceLine, opacity: (p.opacityRaceLine ?? 1) * 0.45, dash: p.dashRaceLine }
     case 'RaceLine-Best':
       return { weight: p.bestWeightRaceLine ?? 3, opacity: p.opacityRaceLine, dash: 'solid' }
+    // A General Arrangement drawing has three pens, and this is where they part:
+    // chords heavy, bracing hairline, posts dashed to the datum.
+    case 'Truss-Chord':    return { weight: p.weightTruss, opacity: p.opacityTruss, dash: p.dashTruss }
+    case 'Truss-Brace':    return { weight: p.braceWeightTruss ?? 1, opacity: p.opacityTruss, dash: 'solid' }
+    case 'Truss-Post':     return { weight: p.postWeightTruss ?? 1, opacity: (p.opacityTruss ?? 1) * 0.6, dash: 'dashed' }
+    case 'Exploded-Chord': return { weight: p.weightExploded, opacity: p.opacityExploded, dash: p.dashExploded }
+    case 'Exploded-Brace': return { weight: p.braceWeightExploded ?? 1, opacity: p.opacityExploded, dash: 'solid' }
+    case 'Exploded-Post':  return { weight: p.postWeightExploded ?? 1, opacity: (p.opacityExploded ?? 1) * 0.5, dash: 'dashed' }
+    case 'Exploded-Leader':return { weight: p.leaderWeightExploded ?? 0.5, opacity: (p.opacityExploded ?? 1) * 0.4, dash: 'dotted' }
+    case 'Weldment-Chord': return { weight: p.weightWeldment, opacity: p.opacityWeldment, dash: p.dashWeldment }
+    case 'Weldment-Brace': return { weight: p.braceWeightWeldment ?? 1, opacity: p.opacityWeldment, dash: 'solid' }
+    case 'Weldment-Post':  return { weight: p.postWeightWeldment ?? 1, opacity: (p.opacityWeldment ?? 1) * 0.5, dash: 'dashed' }
+    case 'Weldment-Leader':return { weight: p.leaderWeightWeldment ?? 1, opacity: p.opacityWeldment, dash: 'solid' }
+    // A section's three parts: the cut face heaviest, the hatch fine, the ground
+    // beyond it faint enough to stay behind the drawing.
+    case 'Section-Face':   return { weight: p.weightSection, opacity: p.opacitySection, dash: 'solid' }
+    case 'Section-Hatch':  return { weight: p.hatchWeightSection ?? 1, opacity: (p.opacitySection ?? 1) * 0.9, dash: 'solid' }
+    case 'Section-Beyond': return { weight: p.beyondWeightSection ?? 1, opacity: (p.opacitySection ?? 1) * 0.35, dash: p.dashSection }
     default:
       return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
   }
@@ -352,6 +370,22 @@ export function buildLineGeometry(terrain, p) {
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Truss',   builder: (t, ctx) => buildTruss(t, ctx, {
+        spacing: p.spacingTruss, radius: p.radiusTruss, braced: p.bracedTruss,
+        depth: p.depthTruss, gusset: p.gussetTruss, gussetSides: p.gussetSidesTruss,
+        gussetColor: p.gussetColorTruss, posts: p.postsTruss }) },
+    { id:'Exploded',builder: (t, ctx) => buildExploded(t, ctx, {
+        spacing: p.spacingExploded, radius: p.radiusExploded, braced: p.bracedExploded,
+        depth: p.depthExploded, gusset: p.gussetExploded, gussetSides: p.gussetSidesExploded,
+        explode: p.explodeExploded }) },
+    { id:'Section', builder: (t, ctx) => buildSection(t, ctx, {
+        cut: p.cutSection, hatch: p.hatchSection, hatchAngle: p.hatchAngleSection,
+        beyond: p.beyondSection }) },
+    { id:'Weldment',builder: (t, ctx) => buildWeldment(t, ctx, {
+        spacing: p.spacingWeldment, radius: p.radiusWeldment, braced: p.bracedWeldment,
+        depth: p.depthWeldment, gusset: p.gussetWeldment, gussetSides: p.gussetSidesWeldment,
+        gussetColor: p.gussetColorWeldment, posts: p.postsWeldment,
+        leader: p.leaderWeldment, leaderRise: p.leaderRiseWeldment }) },
     { id:'FallLine',builder: (t, ctx) => buildFallLine(t, ctx, {
         spacing: p.spacingFallLine, gravity: p.gravityFallLine, drag: p.dragFallLine,
         dragQuad: p.dragQuadFallLine, carve: p.carveFallLine, smoothing: p.smoothingFallLine, maxLen: p.maxLenFallLine }) },
@@ -2630,6 +2664,348 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
   }
 
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+// ─── Space frame (Truss, Exploded, Section, Weldment) ────────────────────────
+
+/**
+ * The lattice the frame hangs on.
+ *
+ * Nodes sit on a regular grid of pitch `spacing`, each snapped to the highest
+ * cell inside its own lattice square — so the frame hangs off real summits
+ * instead of sampling between them, which is what stops a coarse frame from
+ * missing every peak it is supposed to describe.
+ *
+ * Each node also carries the terrain's **twist** at that point: the mixed second
+ * derivative, which is the off-diagonal of the Hessian `buildRidgeLines` and
+ * `buildCurvature` already assemble from this same stencil, measured at the
+ * *panel's* scale rather than the cell's.
+ *
+ *     h_xy = ( H(r+p,c+p) − H(r+p,c−p) − H(r−p,c+p) + H(r−p,c−p) ) / 4
+ *
+ * The grid is pre-smoothed first, for the reason those two modes give: second
+ * derivatives amplify noise, and on a raw DEM every pixel of sensor grain would
+ * ask for its own brace.
+ *
+ * The bracing threshold is a **percentile of the twist actually present**, not
+ * an absolute. A frame is a drawing before it is an analysis: an absolute cutoff
+ * either braces everything or nothing depending on how rough the raster happens
+ * to be, while "the busiest 45% of the panels" is a composition that survives
+ * changing the terrain under it.
+ */
+function trussLattice(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const { elevScale } = p
+  const pitch = Math.max(2, Math.round((o.spacing ?? 14) / scl))
+  const sm = Math.max(0, o.radius ?? 2)
+  const HB = sm > 0
+    ? boxBlur(grid, cols, rows, sm, terrain.hasNoData ? gridMask : null)
+    : grid
+  const tap = (r, c) => HB[Math.max(0, Math.min(rows - 1, r)) * cols
+                         + Math.max(0, Math.min(cols - 1, c))]
+
+  const nR = Math.floor((rows - 1) / pitch), nC = Math.floor((cols - 1) / pitch)
+  const nodes = new Array((nR + 1) * (nC + 1)).fill(null)
+  const half = Math.max(1, pitch >> 1)
+
+  for (let i = 0; i <= nR; i++) {
+    for (let j = 0; j <= nC; j++) {
+      const r0 = Math.min(rows - 1, i * pitch), c0 = Math.min(cols - 1, j * pitch)
+      let br = -1, bc = -1, bv = -Infinity
+      for (let r = r0 - half; r <= r0 + half; r++) {
+        for (let c = c0 - half; c <= c0 + half; c++) {
+          if (r < 0 || r >= rows || c < 0 || c >= cols) continue
+          const k = r * cols + c
+          if (!gridMask[k] || grid[k] <= bv) continue
+          bv = grid[k]; br = r; bc = c
+        }
+      }
+      if (br < 0) continue
+      const hxy = (tap(r0 + half, c0 + half) - tap(r0 + half, c0 - half)
+                 - tap(r0 - half, c0 + half) + tap(r0 - half, c0 - half)) / 4
+      nodes[i * (nC + 1) + j] = {
+        i, j, r: br, c: bc, hxy,
+        elev: cellElev(grid, br, bc, cols, elevScale, p.jitterAmt),
+      }
+    }
+  }
+
+  const mags = nodes.filter(Boolean).map((n) => Math.abs(n.hxy)).sort((a, b) => a - b)
+  const q = Math.max(0, Math.min(1, 1 - (o.braced ?? 0.45)))
+  const thr = mags.length ? mags[Math.min(mags.length - 1, Math.floor(mags.length * q))] : Infinity
+  return { nodes, nR, nC, at: (i, j) => nodes[i * (nC + 1) + j], thr }
+}
+
+/**
+ * The mountain drawn as a structure someone has to build.
+ *
+ * **The bracing rule is the idea.** A rectangular panel with pin joints is a
+ * mechanism: it needs one diagonal, and *which* diagonal depends on which way it
+ * is being racked. The terrain's rack is its twist, so
+ *
+ *   |h_xy| below threshold → the panel is a plane. Brace nothing.
+ *         h_xy > 0         → brace NW–SE.
+ *         h_xy < 0         → brace NE–SW.
+ *
+ * The diagonal drawn lies along the compression direction of the warp, so the
+ * bracing pattern *reads* the saddle rather than decorating it. The one-sided
+ * threshold is the same discipline `buildPencilShading` uses to leave flats and
+ * uniform slopes clean.
+ *
+ * **Three sub-layers, because a drawing has three pens.** Chords heavy, bracing
+ * hairline, posts dashed to a datum. This is the mode that most wants the SVG
+ * exporter and it gets it for nothing — three named layers arrive in Inkscape as
+ * three pens, ready to plot in three weights. Gussets ship as a `lids` mesh on
+ * the chord layer, so joints read as filled plates rather than as rings.
+ */
+function buildTruss(terrain, p, o) {
+  const { scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes, cols } = terrain
+  const { elevMinCut, elevMaxCut } = p
+  const L = trussLattice(terrain, p, o)
+  const datum = minElev - (o.depth ?? 0)
+  const explode = (o.explode ?? 0) * (maxElev - minElev)
+
+  const cP = new F32List(), cC = new F32List()
+  const bP = new F32List(), bC = new F32List()
+  const pP = new F32List(), pC = new F32List()
+  const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
+  let lidV = 0
+
+  const wx = (n) => n.c * scl - halfW
+  const wz = (n) => n.r * scl - halfH
+  const colOf = (n) => computeVertexColor(normElev(n.elev, minElev, maxElev),
+                                          gridSlopes[n.r * cols + n.c] / (maxSlope || 1), 0, p)
+  const ok = (n) => n && inElevCut(n.elev, minElev, maxElev, elevMinCut, elevMaxCut)
+
+  // Chords: the lattice edges themselves.
+  for (let i = 0; i <= L.nR; i++) {
+    for (let j = 0; j <= L.nC; j++) {
+      const a = L.at(i, j)
+      if (!ok(a)) continue
+      const ay = a.elev + explode * 2
+      for (const b of [L.at(i, j + 1), L.at(i + 1, j)]) {
+        if (!ok(b)) continue
+        cP.push6(wx(a), ay, wz(a), wx(b), b.elev + explode * 2, wz(b))
+        cC.pushRgb(colOf(a)); cC.pushRgb(colOf(b))
+      }
+    }
+  }
+
+  // Bracing: one diagonal per twisted panel, oriented by the sign of the twist.
+  for (let i = 0; i < L.nR; i++) {
+    for (let j = 0; j < L.nC; j++) {
+      const a = L.at(i, j), b = L.at(i, j + 1), c = L.at(i + 1, j), d = L.at(i + 1, j + 1)
+      if (!ok(a) || !ok(b) || !ok(c) || !ok(d)) continue
+      if (Math.abs(a.hxy) < L.thr) continue
+      const [u, v] = a.hxy > 0 ? [a, d] : [b, c]
+      bP.push6(wx(u), u.elev + explode, wz(u), wx(v), v.elev + explode, wz(v))
+      bC.pushRgb(colOf(u)); bC.pushRgb(colOf(v))
+    }
+  }
+
+  // Posts, and the gusset plate at each joint.
+  const segs = Math.max(3, Math.round(o.gussetSides ?? 6))
+  const rad = (o.gusset ?? 0.35) * (o.spacing ?? 14) * 0.5
+  for (const n of L.nodes) {
+    if (!ok(n)) continue
+    const top = n.elev + explode * 2
+    if (o.posts !== false && top > datum) {
+      pP.push6(wx(n), top, wz(n), wx(n), datum, wz(n))
+      pC.pushRgb(colOf(n)); pC.pushRgb(colOf(n))
+    }
+    if (rad <= 0) continue
+    // A gusset's shape says something: a braced joint carries more members, so
+    // it gets more sides. Free, since the twist is already on the node.
+    const sides = Math.abs(n.hxy) >= L.thr ? segs : Math.max(3, segs - 2)
+    const lidCol = o.gussetColor ? hexToRgb(o.gussetColor) : colOf(n)
+    lidP.push3(wx(n), top, wz(n)); lidC.pushRgb(lidCol)
+    for (let k = 0; k < sides; k++) {
+      const a = (k / sides) * Math.PI * 2 + 0.4
+      lidP.push3(wx(n) + Math.cos(a) * rad, top, wz(n) + Math.sin(a) * rad)
+      lidC.pushRgb(lidCol)
+    }
+    for (let k = 0; k < sides; k++) lidI.push3(lidV, lidV + k + 1, lidV + ((k + 1) % sides) + 1)
+    lidV += sides + 1
+  }
+
+  const lids = lidI.length > 0
+    ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
+    : null
+  const pre = o.idPrefix ?? 'Truss'
+  return {
+    [`${pre}-Chord`]: { positions: cP.toArray(), colors: cC.toArray(), lids },
+    [`${pre}-Brace`]: { positions: bP.toArray(), colors: bC.toArray() },
+    [`${pre}-Post`]:  { positions: pP.toArray(), colors: pC.toArray() },
+  }
+}
+
+/**
+ * The frame pulled apart along Y, with leaders back to where each member
+ * belongs — the assembly diagram.
+ *
+ * Nothing new is computed: the sub-layer split already exists and this only
+ * moves it, then adds one hairline per node joining the displaced chord to the
+ * ground it came off. Which is the whole argument for having split the layers.
+ */
+function buildExploded(terrain, p, o) {
+  const { scl, halfW, halfH, minElev, maxElev } = terrain
+  const gap = (o.explode ?? 0.12)
+  const base = buildTruss(terrain, p, { ...o, explode: gap, idPrefix: 'Exploded' })
+  const L = trussLattice(terrain, p, o)
+  const lead = new F32List(), leadC = new F32List()
+  const range = maxElev - minElev
+  for (const n of L.nodes) {
+    if (!n) continue
+    const x = n.c * scl - halfW, z = n.r * scl - halfH
+    const col = computeVertexColor(normElev(n.elev, minElev, maxElev), 0, 0, p)
+    lead.push6(x, n.elev, z, x, n.elev + gap * range * 2, z)
+    leadC.pushRgb(col); leadC.pushRgb(col)
+  }
+  return { ...base, 'Exploded-Leader': { positions: lead.toArray(), colors: leadC.toArray() } }
+}
+
+/**
+ * A cutting plane, drawn the way a drawing draws one.
+ *
+ * The tool already *culls* by elevation — `elevMinCut`/`elevMaxCut` are the
+ * terrain-level version of this idea. This is the same cut rendered as a
+ * section: the cut **face** as a heavy line at the plane, the solid **below** it
+ * hatched at 45° in the drafting convention, and the ground **beyond** it drawn
+ * in outline so the section reads as sitting in a landscape rather than floating.
+ *
+ * The hatch is a set of parallel rays marched across the grid at 45°, broken
+ * wherever the surface rises above the plane — the same run-based marcher
+ * `buildEngraving` uses, thresholded on height instead of on light.
+ */
+function buildSection(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const cutN = Math.max(0, Math.min(1, o.cut ?? 0.45))
+  const cutE = minElev + (maxElev - minElev) * cutN
+  const cutB = 0.5 + cutE / (100 * (elevScale || 1))    // the level, in brightness
+
+  const hP = new F32List(), hC = new F32List()
+  const fP = new F32List(), fC = new F32List()
+  const bP = new F32List(), bC = new F32List()
+
+  // ── the hatch: 45° rays clipped to the material below the plane ──
+  const pitch = Math.max(1, (o.hatch ?? 4) / scl)
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
+  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
+  const theta = ((o.hatchAngle ?? 45) * Math.PI) / 180
+  const dx = Math.cos(theta), dz = Math.sin(theta)
+  const nx = -dz, nz = dx
+  const hatchCol = computeVertexColor(cutN, 0, theta, p)
+  for (let off = -halfDiag; off <= halfDiag; off += pitch) {
+    const ox = cc + nx * off, oz = rc + nz * off
+    let pc = 0, pr = 0, run = false
+    for (let t = -halfDiag; t <= halfDiag; t += 1) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let inside = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+      if (inside) {
+        const ri = Math.round(fr), ci = Math.round(fc)
+        const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+        inside = gridMask[ri * cols + ci] === 1 && b === b && b < cutB
+      }
+      if (inside && run) {
+        hP.push6(pc * scl - halfW, cutE, pr * scl - halfH, fc * scl - halfW, cutE, fr * scl - halfH)
+        hC.pushRgb2(hatchCol)
+      }
+      run = inside; pc = fc; pr = fr
+    }
+  }
+
+  // ── the cut face: marching squares at the plane, as a heavy outline ──
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      const i = r * cols + c
+      if (!gridMask[i] || !gridMask[i + 1] || !gridMask[i + cols]) continue
+      const a = grid[i], bR = grid[i + 1], bD = grid[i + cols]
+      if ((a > cutB) !== (bR > cutB)) {
+        const t = (cutB - a) / (bR - a)
+        fP.push6((c + t) * scl - halfW, cutE, (r - 0.5) * scl - halfH,
+                 (c + t) * scl - halfW, cutE, (r + 0.5) * scl - halfH)
+        fC.pushRgb2(hatchCol)
+      }
+      if ((a > cutB) !== (bD > cutB)) {
+        const t = (cutB - a) / (bD - a)
+        fP.push6((c - 0.5) * scl - halfW, cutE, (r + t) * scl - halfH,
+                 (c + 0.5) * scl - halfW, cutE, (r + t) * scl - halfH)
+        fC.pushRgb2(hatchCol)
+      }
+    }
+  }
+
+  // ── beyond the plane: the landscape the section stands in, in outline ──
+  const bStep = Math.max(1, Math.round((o.beyond ?? 8) / scl))
+  for (let r = 0; r < rows; r += bStep) {
+    let run = null
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      const on = gridMask[i] === 1 && grid[i] >= cutB
+      if (on) {
+        const e = cellElev(grid, r, c, cols, elevScale, p.jitterAmt)
+        if (!inElevCut(e, minElev, maxElev, elevMinCut, elevMaxCut)) { run = null; continue }
+        const x = c * scl - halfW, z = r * scl - halfH
+        if (run) {
+          bP.push6(run[0], run[1], run[2], x, e, z)
+          bC.pushRgb2(computeVertexColor(normElev(e, minElev, maxElev), 0, 0, p))
+        }
+        run = [x, e, z]
+      } else run = null
+    }
+  }
+
+  return {
+    'Section-Hatch':  { positions: hP.toArray(), colors: hC.toArray() },
+    'Section-Face':   { positions: fP.toArray(), colors: fC.toArray() },
+    'Section-Beyond': { positions: bP.toArray(), colors: bC.toArray() },
+  }
+}
+
+/**
+ * The frame as a parts drawing: every joint a gusset plate, every *braced* joint
+ * called out with a leader running to clear ground.
+ *
+ * Which joints get called out is a real reading rather than a decoration — they
+ * are the ones the bracing rule picked, so the annotation points at the panels
+ * that are actually doing work. Leaders run in +x at a fixed bearing, the same
+ * convention the contour labels use, since the scene orbits and a camera-relative
+ * one would swing.
+ *
+ * The number that would sit at the end of each leader is deliberately not drawn
+ * here: lettering needs a font, and a font is on the main thread. The split
+ * `useContourLabels` already makes — the worker decides *where*, the main thread
+ * decides *what it says* — is where that would go, and this emits the anchors
+ * for it rather than inventing a second lettering path.
+ */
+function buildWeldment(terrain, p, o) {
+  const { scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevMinCut, elevMaxCut } = p
+  const base = buildTruss(terrain, p, { ...o, idPrefix: 'Weldment', posts: o.posts !== false })
+  const L = trussLattice(terrain, p, o)
+  const lead = new F32List(), leadC = new F32List()
+  const anchors = []
+  const armX = (o.leader ?? 18), armY = (o.leaderRise ?? 0.06) * (maxElev - minElev)
+  const tick = armX * 0.5
+
+  for (const n of L.nodes) {
+    if (!n || Math.abs(n.hxy) < L.thr) continue
+    if (!inElevCut(n.elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+    const x = n.c * scl - halfW, z = n.r * scl - halfH
+    const col = computeVertexColor(normElev(n.elev, minElev, maxElev), 0, 0, p)
+    const ex = x + armX, ey = n.elev + armY
+    lead.push6(x, n.elev, z, ex, ey, z)          // the leader
+    lead.push6(ex, ey, z, ex + tick, ey, z)      // the shelf it lands on
+    leadC.pushRgb(col); leadC.pushRgb(col); leadC.pushRgb(col); leadC.pushRgb(col)
+    anchors.push({ x: ex + tick * 0.25, y: ey, z, elev: n.elev })
+  }
+  return {
+    ...base,
+    'Weldment-Leader': { positions: lead.toArray(), colors: leadC.toArray(),
+                         labelAnchors: anchors.length ? anchors : null },
+  }
 }
 
 // ─── Descent with mass (Fall Line, Berm, Air, Race Line) ─────────────────────

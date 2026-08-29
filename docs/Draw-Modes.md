@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twenty-two independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twenty-six independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -380,6 +380,38 @@ Two things had to be right for this to mean anything:
 ### Race Line
 
 Every line a single drop-in could have taken: one seed, the initial heading fanned across ±θ, and no occupancy mask, because the overlap *is* the picture. The run reaching the lowest ground soonest is promoted to its own sub-layer and inked heavier, which turns a braid into an argument about which way down is best.
+
+## 23–26. Space frame — Truss, Exploded Frame, Section, Weldment
+
+One lattice, four drawings of it. Nodes sit on a regular grid of pitch `spacing`, each snapped to the highest cell inside its own square — so the frame hangs off real summits instead of sampling between them, which is what stops a coarse frame from missing every peak it is meant to describe.
+
+**The bracing rule is the idea.** A rectangular panel with pin joints is a mechanism: it needs one diagonal, and *which* diagonal depends on which way it is being racked. The terrain's rack is its **twist**, the mixed second derivative — the off-diagonal of the Hessian that Ridge and Curvature already assemble from this same stencil, measured here at the panel's scale rather than the cell's:
+
+$$h_{xy} = \tfrac14\big(H_{r+p,\,c+p} - H_{r+p,\,c-p} - H_{r-p,\,c+p} + H_{r-p,\,c-p}\big)$$
+
+$$|h_{xy}| < \text{threshold} \;\Rightarrow\; \text{brace nothing}, \qquad h_{xy} > 0 \;\Rightarrow\; \text{NW–SE}, \qquad h_{xy} < 0 \;\Rightarrow\; \text{NE–SW}$$
+
+The diagonal drawn lies along the compression direction of the warp, so the pattern *reads* the saddle rather than decorating it. The spec proves this rather than assuming it: over the field $H \propto (c-c_0)(r-r_0)$ — the saddle whose $h_{xy}$ is a nonzero constant of known sign everywhere — every brace in the frame commits to one diagonal, and flipping the field's sign flips all of them. (The obvious saddle, $x^2 - y^2$, has $h_{xy} = 0$ and would brace nothing at all.)
+
+The grid is pre-smoothed first, for the reason those two modes give: second derivatives amplify noise, and on a raw DEM every pixel of sensor grain asks for its own brace.
+
+**The threshold is a percentile, not an absolute.** A frame is a drawing before it is an analysis. An absolute cutoff braces everything or nothing depending on how rough the raster happens to be, while *"the busiest 45% of the panels"* is a composition that survives changing the terrain under it.
+
+**Three pens.** `Truss-Chord` heavy, `Truss-Brace` hairline, `Truss-Post` dashed to a datum — the mode that most wants the SVG exporter, and it gets it for nothing: three named layers arrive in Inkscape as three pens. Gussets ship as a `lids` mesh on the chord layer so joints read as filled plates rather than rings, and a braced joint gets more sides than a free one, which is free because the twist is already on the node.
+
+### Exploded Frame
+
+The member classes pulled apart along Y, with one hairline per node joining the displaced chord back to the ground it came off. Nothing new is computed — the sub-layer split already exists and this only moves it, which is the whole argument for having split them.
+
+### Section
+
+The tool already *culls* by elevation; `elevMinCut`/`elevMaxCut` are the terrain-level version of this idea. This is the same cut rendered as a drawing: the cut **face** as a heavy line at the plane, the solid **below** it hatched at 45° in the drafting convention, and the ground **beyond** it in outline so the section reads as standing in a landscape rather than floating. The hatch is a set of parallel rays marched across the grid and broken wherever the surface rises above the plane — the same run-based marcher Engraving uses, thresholded on height instead of on light. Face and hatch both lie exactly *in* the plane, at one elevation and no other.
+
+### Weldment
+
+The frame as a parts drawing: every joint a gusset plate, every *braced* joint called out with a leader running to clear ground and a shelf for the number to sit on. Which joints get called out is a real reading rather than a decoration — they are the ones the bracing rule picked, so the annotation points at the panels doing work. Leaders run at a fixed bearing in $+x$, the same convention the contour labels use, since the scene orbits and a camera-relative one would swing.
+
+The number itself is deliberately not drawn in the worker: lettering needs a font and a font is on the main thread. The mode emits `labelAnchors` in world coordinates instead — the same division `buildContours` and `useContourLabels` already make, where the worker decides *where* and the main thread decides *what it says* — rather than inventing a second lettering path.
 
 ---
 

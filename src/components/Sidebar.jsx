@@ -93,6 +93,10 @@ const SECTION_TERMS = {
   'Mode: Berms':      'banking lateral load cornering g-force turn ticks camber',
   'Mode: Air':        'jump kicker launch ballistic parabola flight convex lip gap send',
   'Mode: Race Line':  'braid fan drop-in fastest descent variants spread choices',
+  'Mode: Truss':      'space frame lattice bracing diagonal hessian twist gusset joint chord post datum steel structural general arrangement drafting',
+  'Mode: Exploded Frame': 'assembly diagram displaced members leaders apart layers exploded view',
+  'Mode: Section':    'cutting plane cut face hatch 45 drafting convention material below beyond slice',
+  'Mode: Weldment':   'parts drawing callout leader gusset plate annotation joints degree',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',
@@ -1364,6 +1368,7 @@ export function Sidebar({
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
+    modeTruss: false, modeExploded: false, modeSection: false, modeWeldment: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1560,6 +1565,10 @@ export function Sidebar({
       modeBerm:     !!newStyle.enabledBerm,
       modeAir:      !!newStyle.enabledAir,
       modeRaceLine: !!newStyle.enabledRaceLine,
+      modeTruss:    !!newStyle.enabledTruss,
+      modeExploded: !!newStyle.enabledExploded,
+      modeSection:  !!newStyle.enabledSection,
+      modeWeldment: !!newStyle.enabledWeldment,
     }))
   }
 
@@ -2596,6 +2605,100 @@ export function Sidebar({
                   <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenRaceLine} onChange={v => ss({ maxLenRaceLine: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="RaceLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Truss" icon={<ModeMark kind="truss" />} open={sec.modeTruss} onToggle={() => tog('modeTruss')} enabled={style.enabledTruss}>
+            <Tog label="Enabled" checked={style.enabledTruss} onChange={v => ss({ enabledTruss: v })} />
+            {style.enabledTruss && (
+              <>
+                <Sub label="LATTICE">
+                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingTruss} onChange={v => ss({ spacingTruss: v })} />
+                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusTruss} onChange={v => ss({ radiusTruss: v })} />
+                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedTruss} onChange={v => ss({ bracedTruss: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightTruss} onChange={v => ss({ braceWeightTruss: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="JOINTS &amp; POSTS">
+                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetTruss} onChange={v => ss({ gussetTruss: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesTruss} onChange={v => ss({ gussetSidesTruss: v })} />
+                  <ColorRow label="Gusset fill" value={style.gussetColorTruss} onChange={v => ss({ gussetColorTruss: v })} />
+                  <Tog label="Posts" small checked={style.postsTruss} onChange={v => ss({ postsTruss: v })} />
+                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthTruss} onChange={v => ss({ depthTruss: v })} />
+                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightTruss} onChange={v => ss({ postWeightTruss: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Truss" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Exploded Frame" icon={<ModeMark kind="exploded" />} open={sec.modeExploded} onToggle={() => tog('modeExploded')} enabled={style.enabledExploded}>
+            <Tog label="Enabled" checked={style.enabledExploded} onChange={v => ss({ enabledExploded: v })} />
+            {style.enabledExploded && (
+              <>
+                <Sub label="LATTICE">
+                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingExploded} onChange={v => ss({ spacingExploded: v })} />
+                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusExploded} onChange={v => ss({ radiusExploded: v })} />
+                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedExploded} onChange={v => ss({ bracedExploded: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightExploded} onChange={v => ss({ braceWeightExploded: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="JOINTS &amp; POSTS">
+                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetExploded} onChange={v => ss({ gussetExploded: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesExploded} onChange={v => ss({ gussetSidesExploded: v })} />
+                  <InlineSl label="Explode" help="How far the member classes are pulled apart along Y, as a fraction of the elevation range." min={0} max={0.6} step={0.01} value={style.explodeExploded} onChange={v => ss({ explodeExploded: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Leader weight" min={0.5} max={6} step={0.5} value={style.leaderWeightExploded} onChange={v => ss({ leaderWeightExploded: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthExploded} onChange={v => ss({ depthExploded: v })} />
+                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightExploded} onChange={v => ss({ postWeightExploded: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Exploded" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Section" icon={<ModeMark kind="section" />} open={sec.modeSection} onToggle={() => tog('modeSection')} enabled={style.enabledSection}>
+            <Tog label="Enabled" checked={style.enabledSection} onChange={v => ss({ enabledSection: v })} />
+            {style.enabledSection && (
+              <>
+                <Sub label="CUT">
+                  <InlineSl label="Level" help="Where the cutting plane sits, as a fraction of the elevation range." min={0} max={1} step={0.01} value={style.cutSection} onChange={v => ss({ cutSection: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Face weight" min={0.5} max={10} step={0.5} value={style.weightSection} onChange={v => ss({ weightSection: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="HATCH">
+                  <InlineSl label="Pitch" min={1} max={30} step={0.5} value={style.hatchSection} onChange={v => ss({ hatchSection: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" min={0} max={180} step={5} value={style.hatchAngleSection} onChange={v => ss({ hatchAngleSection: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.hatchWeightSection} onChange={v => ss({ hatchWeightSection: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="BEYOND">
+                  <InlineSl label="Line pitch" help="The ground above the plane, drawn in outline so the section reads as standing in a landscape." min={1} max={40} step={1} value={style.beyondSection} onChange={v => ss({ beyondSection: v })} />
+                  <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.beyondWeightSection} onChange={v => ss({ beyondWeightSection: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Section" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="INK" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Weldment" icon={<ModeMark kind="weldment" />} open={sec.modeWeldment} onToggle={() => tog('modeWeldment')} enabled={style.enabledWeldment}>
+            <Tog label="Enabled" checked={style.enabledWeldment} onChange={v => ss({ enabledWeldment: v })} />
+            {style.enabledWeldment && (
+              <>
+                <Sub label="LATTICE">
+                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingWeldment} onChange={v => ss({ spacingWeldment: v })} />
+                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusWeldment} onChange={v => ss({ radiusWeldment: v })} />
+                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedWeldment} onChange={v => ss({ bracedWeldment: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightWeldment} onChange={v => ss({ braceWeightWeldment: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <Sub label="JOINTS &amp; POSTS">
+                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetWeldment} onChange={v => ss({ gussetWeldment: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesWeldment} onChange={v => ss({ gussetSidesWeldment: v })} />
+                  <ColorRow label="Gusset fill" value={style.gussetColorWeldment} onChange={v => ss({ gussetColorWeldment: v })} />
+                  <Tog label="Posts" small checked={style.postsWeldment} onChange={v => ss({ postsWeldment: v })} />
+                  <InlineSl label="Leader" help="How far out the callout arm runs from a braced joint, in world units." min={0} max={80} step={2} value={style.leaderWeldment} onChange={v => ss({ leaderWeldment: v })} />
+                  <InlineSl label="Leader rise" min={0} max={0.4} step={0.01} value={style.leaderRiseWeldment} onChange={v => ss({ leaderRiseWeldment: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Leader weight" min={0.5} max={6} step={0.5} value={style.leaderWeightWeldment} onChange={v => ss({ leaderWeightWeldment: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthWeldment} onChange={v => ss({ depthWeldment: v })} />
+                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightWeldment} onChange={v => ss({ postWeightWeldment: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Weldment" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
               </>
             )}
           </Section>

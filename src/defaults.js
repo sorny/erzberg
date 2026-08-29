@@ -172,6 +172,34 @@ export const STYLE_DEF = {
   bestWeightRaceLine: 3,
   hypsoRaceLine: false, hypsoModeRaceLine: 'slope', hypsoBandedRaceLine: false, hypsoIntervalRaceLine: 10,
 
+  // Space frame — one lattice, four drawings of it. `braced` is the *fraction*
+  // of panels that get a diagonal, taken as a percentile of the twist actually
+  // present: a frame is a drawing before it is an analysis, and an absolute
+  // cutoff braces everything or nothing depending on how rough the raster is.
+  enabledTruss: false, spacingTruss: 45, radiusTruss: 2, bracedTruss: 0.45,
+  depthTruss: 0, gussetTruss: 0.35, gussetSidesTruss: 6, gussetColorTruss: '#ffffff', postsTruss: true,
+  colorTruss: '#000000', weightTruss: 2.5, opacityTruss: 1, dashTruss: 'solid',
+  braceWeightTruss: 1, postWeightTruss: 1,
+  hypsoTruss: false, hypsoModeTruss: 'elevation', hypsoBandedTruss: false, hypsoIntervalTruss: 10,
+
+  enabledExploded: false, spacingExploded: 50, radiusExploded: 2, bracedExploded: 0.45,
+  depthExploded: 0, gussetExploded: 0.3, gussetSidesExploded: 6, explodeExploded: 0.12,
+  colorExploded: '#000000', weightExploded: 2.5, opacityExploded: 1, dashExploded: 'solid',
+  braceWeightExploded: 1, postWeightExploded: 1, leaderWeightExploded: 0.5,
+  hypsoExploded: false, hypsoModeExploded: 'elevation', hypsoBandedExploded: false, hypsoIntervalExploded: 10,
+
+  enabledSection: false, cutSection: 0.45, hatchSection: 4, hatchAngleSection: 45, beyondSection: 8,
+  colorSection: '#000000', weightSection: 3, opacitySection: 1, dashSection: 'solid',
+  hatchWeightSection: 1, beyondWeightSection: 1,
+  hypsoSection: false, hypsoModeSection: 'elevation', hypsoBandedSection: false, hypsoIntervalSection: 10,
+
+  enabledWeldment: false, spacingWeldment: 60, radiusWeldment: 2, bracedWeldment: 0.3,
+  depthWeldment: 0, gussetWeldment: 0.5, gussetSidesWeldment: 6, gussetColorWeldment: '#ffffff',
+  postsWeldment: true, leaderWeldment: 18, leaderRiseWeldment: 0.06,
+  colorWeldment: '#000000', weightWeldment: 2.5, opacityWeldment: 1, dashWeldment: 'solid',
+  braceWeightWeldment: 1, postWeightWeldment: 1, leaderWeightWeldment: 1,
+  hypsoWeldment: false, hypsoModeWeldment: 'elevation', hypsoBandedWeldment: false, hypsoIntervalWeldment: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

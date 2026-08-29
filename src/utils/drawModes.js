@@ -103,6 +103,22 @@ export const DRAW_MODES = [
     pick: { spacing: [25, 70], carve: [0.4, 0.9], fan: [7, 17], spread: [60, 180], drops: [2, 6] },
   },
   {
+    id: 'Truss', label: 'Truss', cost: 2.5,
+    pick: { spacing: [25, 80], radius: [1, 4], braced: [0.2, 0.7], gusset: [0, 0.6] },
+  },
+  {
+    id: 'Exploded', label: 'Exploded frame', cost: 2.5,
+    pick: { spacing: [30, 90], braced: [0.2, 0.7], explode: [0.05, 0.3] },
+  },
+  {
+    id: 'Section', label: 'Section', cost: 2,
+    pick: { cut: [0.2, 0.7], hatch: [2, 9], hatchAngle: [0, 180], beyond: [4, 16] },
+  },
+  {
+    id: 'Weldment', label: 'Weldment', cost: 3,
+    pick: { spacing: [40, 110], braced: [0.1, 0.4], gusset: [0.3, 0.8], leader: [10, 30] },
+  },
+  {
     id: 'Halation', label: 'Halation', cost: 5,
     pick: { azimuth: [0, 360], height: [1.2, 2.8], falloff: [1, 2.2],
             exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],
