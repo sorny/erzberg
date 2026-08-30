@@ -4,6 +4,12 @@ import { resetToDefaults } from './helpers.js'
 /**
  * The space frame, and the one claim it makes that is more than decoration.
  *
+ * Truss and Weldment were cut; the lattice they shared survives as Exploded
+ * Frame's machinery, so the assertions that were pinned against `Truss-*` are
+ * pinned against `Exploded-*` now. They are the same frame — Exploded only
+ * displaces it along Y, which leaves every claim below untouched, since all of
+ * them are about the plan.
+ *
  * A rectangular panel with pin joints is a mechanism: it needs one diagonal, and
  * *which* diagonal depends on which way it is being racked. The mode reads that
  * from the terrain's twist — the Hessian's off-diagonal — so the assertion is
@@ -63,21 +69,19 @@ const run = (page, over, field = 'cone') => page.evaluate(async ([over, field]) 
       .map((v) => Math.round(v * 100) / 100))]
   }
   return { ids: layers.map((l) => l.id),
-           chord: n('Truss-Chord'), brace: n('Truss-Brace'), post: n('Truss-Post'),
-           signs: braceSigns('Truss-Brace'),
-           hasLids: !!of('Truss-Chord')?.lids,
+           chord: n('Exploded-Chord'), brace: n('Exploded-Brace'), post: n('Exploded-Post'),
+           signs: braceSigns('Exploded-Brace'),
+           hasLids: !!of('Exploded-Chord')?.lids,
            hatch: n('Section-Hatch'), face: n('Section-Face'), beyond: n('Section-Beyond'),
            faceLevels: levels('Section-Face'), hatchLevels: levels('Section-Hatch'),
            minElev: t.minElev, maxElev: t.maxElev,
-           expChord: n('Exploded-Chord'), expLeader: n('Exploded-Leader'),
-           weldLeader: n('Weldment-Leader'),
-           weldAnchors: of('Weldment-Leader')?.labelAnchors?.length ?? 0 }
+           expChord: n('Exploded-Chord'), expLeader: n('Exploded-Leader') }
 }, [over, field])
 
 test('the frame ships three pens plus gusset plates', async ({ page }) => {
   await ready(page)
-  const r = await run(page, { enabledTruss: true, spacingTruss: 20, depthTruss: 20 })
-  expect(r.ids).toEqual(expect.arrayContaining(['Truss-Chord', 'Truss-Brace', 'Truss-Post']))
+  const r = await run(page, { enabledExploded: true, spacingExploded: 20, depthExploded: 20 })
+  expect(r.ids).toEqual(expect.arrayContaining(['Exploded-Chord', 'Exploded-Brace', 'Exploded-Post']))
   expect(r.chord).toBeGreaterThan(50)
   expect(r.brace).toBeGreaterThan(10)
   expect(r.post).toBeGreaterThan(10)
@@ -86,7 +90,10 @@ test('the frame ships three pens plus gusset plates', async ({ page }) => {
 
 test('the bracing follows the sign of the twist', async ({ page }) => {
   await ready(page)
-  const opts = { enabledTruss: true, spacingTruss: 20, bracedTruss: 1, radiusTruss: 1 }
+  // Explode 0 so the frame sits on the ground; the bracing claim is about the
+  // plan either way, since displacing along Y cannot change Δx·Δz.
+  const opts = { enabledExploded: true, spacingExploded: 20, bracedExploded: 1,
+                 radiusExploded: 1, explodeExploded: 0 }
   const pos = await run(page, opts, 'twist')
   const neg = await run(page, opts, 'antitwist')
 
@@ -102,9 +109,9 @@ test('the bracing follows the sign of the twist', async ({ page }) => {
 
 test('a plane is a plane — braced 0 leaves it bare, braced 1 fills it', async ({ page }) => {
   await ready(page)
-  const none = await run(page, { enabledTruss: true, spacingTruss: 18, bracedTruss: 0 })
-  const half = await run(page, { enabledTruss: true, spacingTruss: 18, bracedTruss: 0.5 })
-  const all  = await run(page, { enabledTruss: true, spacingTruss: 18, bracedTruss: 1 })
+  const none = await run(page, { enabledExploded: true, spacingExploded: 18, bracedExploded: 0 })
+  const half = await run(page, { enabledExploded: true, spacingExploded: 18, bracedExploded: 0.5 })
+  const all  = await run(page, { enabledExploded: true, spacingExploded: 18, bracedExploded: 1 })
   expect(none.brace).toBe(0)
   expect(half.brace).toBeGreaterThan(0)
   expect(all.brace).toBeGreaterThan(half.brace)
@@ -148,14 +155,4 @@ test('exploded adds leaders without touching the frame', async ({ page }) => {
   const out  = await run(page, { enabledExploded: true, spacingExploded: 20, explodeExploded: 0.2 })
   expect(out.expChord).toBe(flat.expChord)
   expect(out.expLeader).toBeGreaterThan(10)
-})
-
-test('weldment calls out the braced joints and nothing else', async ({ page }) => {
-  await ready(page)
-  const few  = await run(page, { enabledWeldment: true, spacingWeldment: 20, bracedWeldment: 0.1 })
-  const many = await run(page, { enabledWeldment: true, spacingWeldment: 20, bracedWeldment: 0.6 })
-  expect(few.weldAnchors).toBeGreaterThan(0)
-  expect(many.weldAnchors).toBeGreaterThan(few.weldAnchors)
-  // Two segments per callout — the leader and the shelf it lands on.
-  expect(many.weldLeader).toBe(many.weldAnchors * 2)
 })

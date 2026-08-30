@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using thirty-four independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$ and extracts topographic features from it using twenty-seven independent algorithms. Each mode produces its own `LineSegmentsGeometry` and can be styled, dashed, and hypsometrically tinted separately.
 
 ---
 
@@ -381,9 +381,9 @@ Two things had to be right for this to mean anything:
 
 Every line a single drop-in could have taken: one seed, the initial heading fanned across ±θ, and no occupancy mask, because the overlap *is* the picture. The run reaching the lowest ground soonest is promoted to its own sub-layer and inked heavier, which turns a braid into an argument about which way down is best.
 
-## 23–26. Space frame — Truss, Exploded Frame, Section, Weldment
+## 23–24. Space frame — Exploded Frame, Section
 
-One lattice, four drawings of it. Nodes sit on a regular grid of pitch `spacing`, each snapped to the highest cell inside its own square — so the frame hangs off real summits instead of sampling between them, which is what stops a coarse frame from missing every peak it is meant to describe.
+One lattice, two drawings of it — Truss and Weldment were cut, and the lattice survives as the machinery behind these two. Nodes sit on a regular grid of pitch `spacing`, each snapped to the highest cell inside its own square — so the frame hangs off real summits instead of sampling between them, which is what stops a coarse frame from missing every peak it is meant to describe.
 
 **The bracing rule is the idea.** A rectangular panel with pin joints is a mechanism: it needs one diagonal, and *which* diagonal depends on which way it is being racked. The terrain's rack is its **twist**, the mixed second derivative — the off-diagonal of the Hessian that Ridge and Curvature already assemble from this same stencil, measured here at the panel's scale rather than the cell's:
 
@@ -397,7 +397,7 @@ The grid is pre-smoothed first, for the reason those two modes give: second deri
 
 **The threshold is a percentile, not an absolute.** A frame is a drawing before it is an analysis. An absolute cutoff braces everything or nothing depending on how rough the raster happens to be, while *"the busiest 45% of the panels"* is a composition that survives changing the terrain under it.
 
-**Three pens.** `Truss-Chord` heavy, `Truss-Brace` hairline, `Truss-Post` dashed to a datum — the mode that most wants the SVG exporter, and it gets it for nothing: three named layers arrive in Inkscape as three pens. Gussets ship as a `lids` mesh on the chord layer so joints read as filled plates rather than rings, and a braced joint gets more sides than a free one, which is free because the twist is already on the node.
+**Three pens.** `Exploded-Chord` heavy, `Exploded-Brace` hairline, `Exploded-Post` dashed to a datum — what most wants the SVG exporter, and it gets it for nothing: three named layers arrive in Inkscape as three pens. Gussets ship as a `lids` mesh on the chord layer so joints read as filled plates rather than rings, and a braced joint gets more sides than a free one, which is free because the twist is already on the node.
 
 ### Exploded Frame
 
@@ -407,73 +407,17 @@ The member classes pulled apart along Y, with one hairline per node joining the 
 
 The tool already *culls* by elevation; `elevMinCut`/`elevMaxCut` are the terrain-level version of this idea. This is the same cut rendered as a drawing: the cut **face** as a heavy line at the plane, the solid **below** it hatched at 45° in the drafting convention, and the ground **beyond** it in outline so the section reads as standing in a landscape rather than floating. The hatch is a set of parallel rays marched across the grid and broken wherever the surface rises above the plane — the same run-based marcher Engraving uses, thresholded on height instead of on light. Face and hatch both lie exactly *in* the plane, at one elevation and no other.
 
-### Weldment
-
-The frame as a parts drawing: every joint a gusset plate, every *braced* joint called out with a leader running to clear ground and a shelf for the number to sit on. Which joints get called out is a real reading rather than a decoration — they are the ones the bracing rule picked, so the annotation points at the panels doing work. Leaders run at a fixed bearing in $+x$, the same convention the contour labels use, since the scene orbits and a camera-relative one would swing.
-
-The number itself is deliberately not drawn in the worker: lettering needs a font and a font is on the main thread. The mode emits `labelAnchors` in world coordinates instead — the same division `buildContours` and `useContourLabels` already make, where the worker decides *where* and the main thread decides *what it says* — rather than inventing a second lettering path.
-
-## 27–30. The scanline as a signal — Bandsplit, Envelope, Lissajous, Zero Crossings
-
-### Bandsplit
-
-The terrain as a spectrum analyser: one scanline, drawn once per octave band. **This is not Unknown Pleasures** — Lines stacks whole scanlines and every trace in it is a different *place*; here every trace is the same place at a different *scale*.
-
-Splitting a signal into frequency bands is an FFT's job, and `src/utils/fft.js` is already in the tree. It is the wrong tool here for three reasons: it needs power-of-two padding per scanline, it rings either side of every cliff, and it costs a transform per row per rebuild. A **Laplacian pyramid** is the same decomposition, O(W·H) per level, with none of that:
-
-$$G_b = \text{boxBlur}(H, r_b),\quad r_b = r_0 \sigma^b \qquad L_b = G_b - G_{b+1} \qquad L_B = G_B$$
-
-with σ = 2, which is what makes the bands octaves. `boxBlur` is the same pass the Blur slider runs and inherits its mask-aware path.
-
-$\sum_b L_b = H$ **exactly**, so a gain vector reconstructs a filtered terrain and the mode becomes a graphic equaliser for landform. That identity is the mode's only real claim, and the spec tests it directly: draped at unit gain, every drawn vertex lands on the ground it came from to within 0.1% of the elevation range — compared against the *bilinear* sample at its own fractional position, since a nearest-cell comparison folds half a cell of relief into the error and measures the sampler instead.
-
-Two presentations off one switch. **Stacked** puts each band at a fixed height above the floor and is a diagram; **draped** adds them back onto the surface at their own gains and is a filter — cut the lows and the range collapses to a rough plain, cut the highs and it stays a smooth swell with the same skyline.
-
-The bands differ by orders of magnitude — the residual is the whole massif, the top band is scree — so each is normalised by its own peak before drawing. At a shared scale the detail bands are invisible. The residual is a brightness and the detail bands are signed differences about zero, so only the residual is re-centred.
-
-The gains are flat-named `gain0…gain6` rather than an array, and that is not cosmetic: `geometryKey` builds a *string*, so an array stringifies to `[object Object]` however it is edited and the rebuild would never fire. See `GEOMETRY_NON_SCALAR`. Colour comes from the band index rather than the elevation, which makes the gradient picker the band palette for nothing.
-
-### Envelope
-
-The DAW clip. An attack/decay follower over the detrended scanline, drawn as ±e about the ground:
-
-$$e \leftarrow \max\big(|x|,\; e \cdot \text{decay}\big) \quad\text{forward, then again backward}$$
-
-The second pass is not an optimisation. A one-directional follower is lopsided by construction — it rises instantly at a transient and decays only afterwards, so every peak gets a tail on one side and a cliff on the other. Running it back over its own output symmetrises the envelope, which is what makes the shape read as a waveform block rather than a row of sawteeth; the spec asserts that symmetry about the baseline.
-
-Detrending first matters for the same kind of reason: the envelope is of the *roughness*, not of the elevation, so the massif has to come out or the envelope is just the massif. **Rungs** tie the two curves together every N cells — what turns a pair of lines into a filled block on a plotter, which has no fill.
-
-### Lissajous
-
-Two orthogonal scanlines plotted against each other as an XY oscilloscope figure. It reads as pure signal and barely as terrain, which is the point: the one mode here that describes the raster without describing its shape. Drawn flat at a chosen elevation rather than draped — draping would put the trace at the elevation of a *third* place, unrelated to either axis, which is exactly the accidental meaning a diagram should not acquire.
-
-### Zero Crossings
+## 25. Zero Crossings
 
 Every sign change of the scanline after its own running mean is taken out. The density of the marks is the terrain's local **pitch** — how often the ground crosses its own average — which is a different measurement from either slope or curvature: dense on scree and broken rock, empty on a glacier, regardless of how steep either is. Detrending is what makes it a pitch rather than a horizon; without it a scanline crosses its mean twice on a whole mountain and the mode draws two dots.
 
-## 31–34. Sprite Blocks, Scanline, Palette Cycle, Reticulation
+## 26–27. Sprite Blocks, Reticulation
 
 ### Sprite Blocks
 
 Bitplane draws the *boundaries* between plateaus; this draws the plateaus themselves, one cuboid per lattice cell — a top face at the snapped tier height, and side faces dropped only where the neighbour sits lower. Under an orthographic camera at 30° it is an arcade tile map.
 
 The risers go to the **neighbour's** tier rather than to a common floor. Dropping every block to the base plate buries the stack in one solid mass of vertical lines; what makes a voxel landscape legible is seeing exactly one riser per step, its height *being* the step. Top faces ship as a `lids` mesh so a block reads as a solid plate and the stack self-occludes — the mechanism Pillars already uses for its cuboid caps.
-
-### Scanline
-
-The Lines marcher with three artefacts of a scanned display on top, because those artefacts *are* the look:
-
-- **Interlace** drops every Nth line, so the gaps read as scan lines.
-- **Roll** shears each line along its own direction by $A\sin(2\pi r/\lambda + \varphi)$ — a picture failing to hold horizontal sync.
-- **Comb** modulates line brightness on a second period. It rides the *colour* buffer, not opacity, because opacity is resolved per layer and could not vary line to line; and it lerps toward the **background** rather than toward black, since a washed-out band on a tube is less signal, not more shadow.
-
-The spec pins the division: roll moves vertices, comb does not.
-
-### Palette Cycle
-
-Bitplane's quantiser with the palette walking instead of sitting still — a tier's colour is $\text{ramp}\big((t/N + \varphi) \bmod 1\big)$, so the bands cycle through the gradient as the phase advances. It is the reason a 16-colour machine could animate a waterfall without touching a pixel of the frame buffer, and the spec asserts exactly that property: **identical geometry at every phase**, different colours. If advancing the phase moved a vertex, the mode would be mis-named.
-
-**The phase is a slider, not a clock, and that is deliberate.** Vertex colours are baked in the worker, so advancing the phase is a full geometry rebuild. Driving it from `frameClock` would put a rebuild on every frame for as long as the mode was merely *visible* — the exact failure the hologram clock and the murmuration are gated against. Soundscapes streams at that rate, so it is possible; it is just a cost this mode cannot justify. Drag the slider and the waterfall runs.
 
 ### Reticulation
 

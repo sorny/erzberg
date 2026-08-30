@@ -146,19 +146,10 @@ export function layerStyle(id, p) {
       return { weight: p.weightRaceLine, opacity: (p.opacityRaceLine ?? 1) * 0.45, dash: p.dashRaceLine }
     case 'RaceLine-Best':
       return { weight: p.bestWeightRaceLine ?? 3, opacity: p.opacityRaceLine, dash: 'solid' }
-    // A General Arrangement drawing has three pens, and this is where they part:
-    // chords heavy, bracing hairline, posts dashed to the datum.
-    case 'Truss-Chord':    return { weight: p.weightTruss, opacity: p.opacityTruss, dash: p.dashTruss }
-    case 'Truss-Brace':    return { weight: p.braceWeightTruss ?? 1, opacity: p.opacityTruss, dash: 'solid' }
-    case 'Truss-Post':     return { weight: p.postWeightTruss ?? 1, opacity: (p.opacityTruss ?? 1) * 0.6, dash: 'dashed' }
     case 'Exploded-Chord': return { weight: p.weightExploded, opacity: p.opacityExploded, dash: p.dashExploded }
     case 'Exploded-Brace': return { weight: p.braceWeightExploded ?? 1, opacity: p.opacityExploded, dash: 'solid' }
     case 'Exploded-Post':  return { weight: p.postWeightExploded ?? 1, opacity: (p.opacityExploded ?? 1) * 0.5, dash: 'dashed' }
     case 'Exploded-Leader':return { weight: p.leaderWeightExploded ?? 0.5, opacity: (p.opacityExploded ?? 1) * 0.4, dash: 'dotted' }
-    case 'Weldment-Chord': return { weight: p.weightWeldment, opacity: p.opacityWeldment, dash: p.dashWeldment }
-    case 'Weldment-Brace': return { weight: p.braceWeightWeldment ?? 1, opacity: p.opacityWeldment, dash: 'solid' }
-    case 'Weldment-Post':  return { weight: p.postWeightWeldment ?? 1, opacity: (p.opacityWeldment ?? 1) * 0.5, dash: 'dashed' }
-    case 'Weldment-Leader':return { weight: p.leaderWeightWeldment ?? 1, opacity: p.opacityWeldment, dash: 'solid' }
     // A section's three parts: the cut face heaviest, the hatch fine, the ground
     // beyond it faint enough to stay behind the drawing.
     case 'Section-Face':   return { weight: p.weightSection, opacity: p.opacitySection, dash: 'solid' }
@@ -373,32 +364,11 @@ export function buildLineGeometry(terrain, p) {
     { id:'Sprite',  builder: (t, ctx) => buildSprite(t, ctx, {
         tiers: p.tiersSprite, spacing: p.spacingSprite, size: p.sizeSprite,
         faces: p.facesSprite, faceColor: p.faceColorSprite }) },
-    { id:'Scanline',builder: (t, ctx) => buildScanline(t, ctx, {
-        spacing: p.spacingScanline, angle: p.angleScanline, interlace: p.interlaceScanline,
-        roll: p.rollScanline, rollLength: p.rollLengthScanline, phase: p.phaseScanline,
-        comb: p.combScanline, combLength: p.combLengthScanline, bg: p.bgColor }) },
-    { id:'Palette', builder: (t, ctx) => buildPaletteCycle(t, ctx, {
-        tiers: p.tiersPalette, phase: p.phasePalette, risers: p.risersPalette }) },
     { id:'Retic',   builder: (t, ctx) => buildReticulation(t, ctx, {
         cell: p.cellRetic, spacing: p.spacingRetic, width: p.widthRetic,
         gamma: p.gammaRetic, densityMode: p.densityModeRetic, seed: p.seedRetic }) },
-    { id:'Bandsplit',builder: (t, ctx) => buildBandsplit(t, ctx, {
-        bands: p.bandsBandsplit, radius: p.radiusBandsplit, spacing: p.spacingBandsplit,
-        angle: p.angleBandsplit, spread: p.spreadBandsplit, amp: p.ampBandsplit,
-        mode: p.modeBandsplit,
-        gains: [p.gain0Bandsplit, p.gain1Bandsplit, p.gain2Bandsplit,
-                p.gain3Bandsplit, p.gain4Bandsplit, p.gain5Bandsplit, p.gain6Bandsplit] }) },
-    { id:'Envelope',builder: (t, ctx) => buildEnvelope(t, ctx, {
-        detrend: p.detrendEnvelope, decay: p.decayEnvelope, amp: p.ampEnvelope,
-        spacing: p.spacingEnvelope, rungs: p.rungsEnvelope }) },
-    { id:'Lissajous',builder: (t, ctx) => buildLissajous(t, ctx, {
-        figures: p.figuresLissajous, size: p.sizeLissajous, level: p.levelLissajous }) },
     { id:'ZeroCross',builder: (t, ctx) => buildZeroCross(t, ctx, {
         detrend: p.detrendZeroCross, spacing: p.spacingZeroCross, axes: p.axesZeroCross }) },
-    { id:'Truss',   builder: (t, ctx) => buildTruss(t, ctx, {
-        spacing: p.spacingTruss, radius: p.radiusTruss, braced: p.bracedTruss,
-        depth: p.depthTruss, gusset: p.gussetTruss, gussetSides: p.gussetSidesTruss,
-        gussetColor: p.gussetColorTruss, posts: p.postsTruss }) },
     { id:'Exploded',builder: (t, ctx) => buildExploded(t, ctx, {
         spacing: p.spacingExploded, radius: p.radiusExploded, braced: p.bracedExploded,
         depth: p.depthExploded, gusset: p.gussetExploded, gussetSides: p.gussetSidesExploded,
@@ -406,11 +376,6 @@ export function buildLineGeometry(terrain, p) {
     { id:'Section', builder: (t, ctx) => buildSection(t, ctx, {
         cut: p.cutSection, hatch: p.hatchSection, hatchAngle: p.hatchAngleSection,
         beyond: p.beyondSection }) },
-    { id:'Weldment',builder: (t, ctx) => buildWeldment(t, ctx, {
-        spacing: p.spacingWeldment, radius: p.radiusWeldment, braced: p.bracedWeldment,
-        depth: p.depthWeldment, gusset: p.gussetWeldment, gussetSides: p.gussetSidesWeldment,
-        gussetColor: p.gussetColorWeldment, posts: p.postsWeldment,
-        leader: p.leaderWeldment, leaderRise: p.leaderRiseWeldment }) },
     { id:'FallLine',builder: (t, ctx) => buildFallLine(t, ctx, {
         spacing: p.spacingFallLine, gravity: p.gravityFallLine, drag: p.dragFallLine,
         dragQuad: p.dragQuadFallLine, carve: p.carveFallLine, smoothing: p.smoothingFallLine, maxLen: p.maxLenFallLine }) },
@@ -2691,7 +2656,7 @@ function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 
-// ─── Sprite / Scanline / Palette Cycle / Reticulation ────────────────────────
+// ─── Sprite blocks / Reticulation ────────────────────────────────────────────
 
 /**
  * Tier index and snapped elevation per cell — Bitplane's quantiser, shared.
@@ -2804,151 +2769,6 @@ function buildSprite(terrain, p, o) {
 }
 
 /**
- * A CRT reading the terrain: interlaced traces, a rolling shear, and a
- * brightness comb.
- *
- * Underneath it is the Lines marcher — the same rotated ray walk — with three
- * artefacts of a scanned display added, because those artefacts *are* the look:
- *
- * - **Interlace.** Every `interlace`-th line is dropped, so the field is drawn
- *   at half its apparent resolution and the gaps read as scan lines.
- * - **Roll.** Each line is sheared along its own direction by
- *   `A·sin(2πr/λ + φ)`, which is a picture failing to hold horizontal sync.
- * - **Comb.** Line brightness is modulated on a second period, so the field
- *   bands the way a mistuned tube does. It rides the *colour* buffer rather
- *   than opacity, since opacity is per layer and could not vary line to line.
- */
-function buildScanline(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
-  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
-  const sMask = terrain.hasNoData ? gridMask : null
-  const pitch = Math.max(0.5, (o.spacing ?? 3) / scl)
-  const skip = Math.max(1, Math.round(o.interlace ?? 2))
-  const rollAmp = (o.roll ?? 3) / scl
-  const rollLen = Math.max(1, o.rollLength ?? 40)
-  const phase = ((o.phase ?? 0) * Math.PI) / 180
-  const combLen = Math.max(1, o.combLength ?? 60)
-  const combAmt = Math.max(0, Math.min(1, o.comb ?? 0.5))
-  const bg = hexToRgb(o.bg || '#ffffff')
-
-  const theta = ((o.angle ?? 0) * Math.PI) / 180
-  const dx = Math.cos(theta), dz = Math.sin(theta)
-  const nx = -dz, nz = dx
-  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
-  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
-
-  const positions = new F32List(), colors = new F32List()
-  let lineIdx = 0
-  for (let off = -halfDiag; off <= halfDiag; off += pitch, lineIdx++) {
-    if (skip > 1 && lineIdx % skip !== 0) continue
-    const shear = rollAmp * Math.sin((2 * Math.PI * off) / rollLen + phase)
-    // 0 = fully washed toward the background, 1 = full ink.
-    const comb = 1 - combAmt * 0.5 * (1 + Math.sin((2 * Math.PI * off) / combLen + phase))
-    const ox = cc + nx * off + dx * shear, oz = rc + nz * off + dz * shear
-
-    let px = 0, py = 0, pz = 0, run = false
-    for (let t = -halfDiag; t <= halfDiag; t += 1) {
-      const fc = ox + dx * t, fr = oz + dz * t
-      let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
-      let x = 0, y = 0, z = 0
-      if (ok) {
-        const ri = Math.round(fr), ci = Math.round(fc)
-        ok = gridMask[ri * cols + ci] === 1
-        if (ok) {
-          const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
-          if (b !== b) ok = false
-          else {
-            y = (b - 0.5) * 100 * elevScale
-            if (jitterAmt > 0) y += jitterNoise(fc, fr) * jitterAmt
-            ok = inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)
-            x = fc * scl - halfW; z = fr * scl - halfH
-          }
-        }
-      }
-      if (ok && run) {
-        const ri = Math.round(fr), ci = Math.round(fc)
-        const base = computeVertexColor(normElev(y, minElev, maxElev),
-                                        gridSlopes[ri * cols + ci] / (maxSlope || 1), theta, p)
-        // Lerp toward the paper rather than dimming to black: a washed-out band
-        // on a tube is less signal, not more shadow.
-        positions.push6(px, py, pz, x, y, z)
-        for (let v = 0; v < 2; v++) {
-          colors.push3(bg[0] + (base[0] - bg[0]) * comb,
-                       bg[1] + (base[1] - bg[1]) * comb,
-                       bg[2] + (base[2] - bg[2]) * comb)
-        }
-      }
-      run = ok; px = x; py = y; pz = z
-    }
-  }
-  return { positions: positions.toArray(), colors: colors.toArray() }
-}
-
-/**
- * Bitplane's quantiser, with the palette walking instead of sitting still.
- *
- * A tier's colour is `ramp((t/N + phase) mod 1)` rather than `ramp(t/N)`, so the
- * bands cycle through the gradient as the phase advances — the arcade waterfall,
- * and the reason a 16-colour machine could animate a river without touching a
- * pixel of the frame buffer.
- *
- * **The phase is a slider, not a clock, and that is deliberate.** Vertex colours
- * are baked in the worker, so advancing the phase is a full geometry rebuild;
- * driving it from `frameClock` would put a rebuild on every frame for as long as
- * the mode was switched on. Soundscapes does stream at that rate, so it is
- * possible — but it is a cost this mode has no way to justify while it is merely
- * *visible*, which is exactly the failure mode the hologram clock and the
- * murmuration are gated against. Drag the slider and the waterfall runs.
- */
-function buildPaletteCycle(terrain, p, o) {
-  const { gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
-  const { elevMinCut, elevMaxCut } = p
-  const { tier, nT, yOf } = quantiseTiers(terrain, p, o.tiers)
-  const phase = o.phase ?? 0
-  const risers = o.risers !== false
-  const half = scl * 0.5
-
-  const positions = new F32List(), colors = new F32List()
-  const wrap = (v) => ((v % 1) + 1) % 1
-  const colOf = (t) => computeVertexColor(wrap(t / nT + phase), wrap(t / nT + phase), 0, p)
-
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      const t = tier[i]
-      if (t < 0) continue
-      const y = yOf(t)
-      if (!inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)) continue
-      const wx = c * scl - halfW, wz = r * scl - halfH
-      const col = colOf(t)
-
-      for (let dir = 0; dir < 2; dir++) {
-        const j = dir === 0 ? (c < cols - 1 ? i + 1 : -1) : (r < rows - 1 ? i + cols : -1)
-        if (j < 0) continue
-        const tn = tier[j]
-        if (tn < 0 || tn === t) continue
-        const hi = Math.max(t, tn), lo = Math.min(t, tn)
-        const yHi = yOf(hi), yLo = yOf(lo)
-        if (!inElevCut(yHi, minElev, maxElev, elevMinCut, elevMaxCut)) continue
-        const cHi = colOf(hi)
-        const ax = dir === 0 ? wx + half : wx - half
-        const az = dir === 0 ? wz - half : wz + half
-        const bx = wx + half, bz = wz + half
-        positions.push6(ax, yHi, az, bx, yHi, bz); colors.pushRgb2(cHi)
-        if (risers) {
-          positions.push6(ax, yHi, az, ax, yLo, az)
-          positions.push6(bx, yHi, bz, bx, yLo, bz)
-          colors.pushRgb2(cHi); colors.pushRgb2(cHi)
-        }
-      }
-      void col
-    }
-  }
-  void gridMask
-  return { positions: positions.toArray(), colors: colors.toArray() }
-}
-
-/**
  * Crazed emulsion: the walls of a Worley cellular pattern, thinned by tone.
  *
  * Reticulation in a real emulsion is the gelatin cracking into a network of
@@ -3033,290 +2853,6 @@ function buildReticulation(terrain, p, o) {
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 
-// ─── The scanline as a signal (Bandsplit, Envelope, Lissajous, Zero Crossing) ─
-
-/**
- * An octave-band decomposition of the raster — a Laplacian pyramid.
- *
- * Splitting a signal into frequency bands is an FFT's job, and `src/utils/fft.js`
- * is right there. It is the wrong tool here for three reasons: it needs
- * power-of-two padding per scanline, it rings either side of every cliff
- * (Gibbs), and it would cost a transform per row per rebuild. A pyramid of
- * differences of box blurs is the same decomposition, O(W·H) per level, with no
- * padding and no ringing:
- *
- *     G_b = boxBlur(H, r_b),   r_b = r₀·σᵇ      (σ = 2 — this is what makes them octaves)
- *     L_b = G_b − G_(b+1)                        band b
- *     L_B = G_B                                  the residual: the massif itself
- *
- * ΣL_b = H exactly, so a gain vector reconstructs a filtered terrain and the
- * mode becomes a graphic equaliser for landform. `boxBlur` is the same pass the
- * Blur slider already runs, and it is given the mask, so a clipped edge does not
- * average real ground against the zeros in NoData.
- *
- * Each band also carries its own peak amplitude, because the bands differ by
- * orders of magnitude — the residual is the whole massif and the top band is
- * scree. Drawn at a shared scale the detail bands are invisible; normalised, the
- * stack reads as an analyser.
- */
-function bandPyramid(terrain, bands, baseRadius) {
-  const { grid, gridMask, rows, cols } = terrain
-  const B = Math.max(1, Math.min(6, Math.round(bands ?? 5)))
-  const mask = terrain.hasNoData ? gridMask : null
-  const r0 = Math.max(0.5, baseRadius ?? 1)
-
-  let prev = grid
-  const out = []
-  for (let b = 0; b < B; b++) {
-    const next = boxBlur(grid, cols, rows, r0 * Math.pow(2, b), mask)
-    const L = new Float32Array(rows * cols)
-    for (let i = 0; i < L.length; i++) L[i] = prev[i] - next[i]
-    out.push(L)
-    prev = next
-  }
-  out.push(prev)                    // the residual, at the coarsest blur
-
-  const peaks = out.map((L) => {
-    let m = 0
-    for (let i = 0; i < L.length; i++) {
-      if (!gridMask[i]) continue
-      const v = Math.abs(L[i] - (L === prev ? 0.5 : 0))
-      if (v > m) m = v
-    }
-    return m || 1
-  })
-  return { bands: out, peaks, B }
-}
-
-/** Bilinear tap into one band, NoData-aware in the same way as the terrain's. */
-function sampleBand(L, gridMask, rows, cols, fr, fc) {
-  return sampleBilinear(L, gridMask, rows, cols, fr, fc)
-}
-
-/**
- * The terrain as a spectrum analyser: one scanline, drawn once per octave band.
- *
- * **This is not Unknown Pleasures.** Lines mode stacks whole scanlines and every
- * trace in it is a different *place*. Here every trace is the same place at a
- * different *scale* — the bottom one a single slow swell with everything else
- * removed, the top one pure detail oscillating around nothing.
- *
- * Two presentations off one switch:
- *
- * - **Stacked** puts each band at a fixed height above the terrain floor, flat,
- *   and it is a diagram.
- * - **Draped** adds the bands back onto the surface at their own gains, so the
- *   terrain itself is re-synthesised and the mode is a *filter*: cut the lows
- *   and the range collapses to a rough plain, cut the highs and it becomes a
- *   smooth swell with the same skyline. With every gain at 1 the reconstruction
- *   is exact and the output is the terrain, which is the property that says the
- *   decomposition is sound.
- *
- * The gains are flat-named `gain0…gain5` rather than an array, and that is not
- * cosmetic: `geometryKey` builds a *string*, so an array param stringifies to
- * `[object Object]` however it is edited and the rebuild would never fire. See
- * GEOMETRY_NON_SCALAR in `src/params.js`.
- *
- * Colour comes from the band index rather than the elevation — feeding b/B into
- * `computeVertexColor`'s normalised-elevation slot makes the gradient picker the
- * band palette, for nothing.
- */
-function buildBandsplit(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
-  const { bands: L, peaks, B } = bandPyramid(terrain, o.bands, o.radius)
-  const gains = o.gains ?? []
-  const draped = (o.mode ?? 'stacked') === 'draped'
-  const range = maxElev - minElev
-  const spread = (o.spread ?? 0.12) * range
-  const amp = (o.amp ?? 0.09) * range
-  const sMask = terrain.hasNoData ? gridMask : null
-
-  const positions = new F32List(), colors = new F32List()
-  const pitch = Math.max(1, (o.spacing ?? 24) / scl)
-  const theta = ((o.angle ?? 0) * Math.PI) / 180
-  const dx = Math.cos(theta), dz = Math.sin(theta)
-  const nx = -dz, nz = dx
-  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
-  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
-
-  for (let off = -halfDiag; off <= halfDiag; off += pitch) {
-    const ox = cc + nx * off, oz = rc + nz * off
-    for (let b = 0; b <= B; b++) {
-      const g = gains[b] ?? 1
-      const col = computeVertexColor(B > 0 ? b / B : 0, 1 - (B > 0 ? b / B : 0), theta, p)
-      let px = 0, py = 0, pz = 0, run = false
-      for (let t = -halfDiag; t <= halfDiag; t += 1) {
-        const fc = ox + dx * t, fr = oz + dz * t
-        let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
-        let x = 0, y = 0, z = 0
-        if (ok) {
-          const ri = Math.round(fr), ci = Math.round(fc)
-          ok = gridMask[ri * cols + ci] === 1
-          if (ok) {
-            if (draped) {
-              // Reconstruct brightness from the gained bands, then convert once.
-              let bri = 0
-              for (let k = 0; k <= B; k++) {
-                const v = sampleBand(L[k], sMask, rows, cols, fr, fc)
-                if (v !== v) { ok = false; break }
-                bri += v * (gains[k] ?? 1)
-              }
-              y = (bri - 0.5) * 100 * elevScale
-              ok = ok && inElevCut(y, minElev, maxElev, elevMinCut, elevMaxCut)
-            } else {
-              const v = sampleBand(L[b], sMask, rows, cols, fr, fc)
-              if (v !== v) ok = false
-              else {
-                // The residual is a brightness, the detail bands are signed
-                // differences about zero — so only the residual is re-centred.
-                const centred = b === B ? v - 0.5 : v
-                y = minElev + b * spread + (centred / peaks[b]) * amp * g
-              }
-            }
-            x = fc * scl - halfW; z = fr * scl - halfH
-          }
-        }
-        if (ok && run) {
-          positions.push6(px, py, pz, x, y, z)
-          colors.pushRgb2(col)
-        }
-        run = ok; px = x; py = y; pz = z
-      }
-      if (draped) break            // one trace per line, not one per band
-    }
-  }
-  void grid
-  return { positions: positions.toArray(), colors: colors.toArray() }
-}
-
-/**
- * The DAW clip: an attack/decay envelope over the detrended scanline, drawn as
- * ±e about the ground.
- *
- * The follower runs both ways —
- *
- *     forward:  e ← max(|x|, e·decay)
- *     backward: e ← max(e, max(|x|, e·decay))
- *
- * — because a one-directional follower is lopsided by construction: it rises
- * instantly at a transient and decays only afterwards, so every peak gets a tail
- * on one side and a cliff on the other. Running it back over its own output
- * symmetrises the envelope, which is what makes the shape read as a waveform
- * block rather than as a row of sawteeth.
- *
- * Detrending is `boxBlur` again: the envelope is of the *roughness*, not of the
- * elevation, so the massif has to come out first or the envelope is just the
- * massif.
- */
-function buildEnvelope(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
-  const mask = terrain.hasNoData ? gridMask : null
-  const base = boxBlur(grid, cols, rows, Math.max(1, o.detrend ?? 12), mask)
-  const decay = Math.max(0, Math.min(0.999, o.decay ?? 0.9))
-  const amp = (o.amp ?? 0.35) * (maxElev - minElev)
-  const step = Math.max(1, Math.round((o.spacing ?? 8) / scl))
-  const rungEvery = Math.max(0, Math.round(o.rungs ?? 4))
-
-  const positions = new F32List(), colors = new F32List()
-  const env = new Float32Array(cols)
-  const sig = new Float32Array(cols)
-  const valid = new Uint8Array(cols)
-
-  for (let r = 0; r < rows; r += step) {
-    let peak = 0
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      valid[c] = gridMask[i]
-      sig[c] = gridMask[i] ? grid[i] - base[i] : 0
-      const a = Math.abs(sig[c])
-      if (valid[c] && a > peak) peak = a
-    }
-    if (peak <= 0) continue
-    let e = 0
-    for (let c = 0; c < cols; c++) { e = Math.max(Math.abs(sig[c]), e * decay); env[c] = e }
-    e = 0
-    for (let c = cols - 1; c >= 0; c--) { e = Math.max(Math.abs(sig[c]), e * decay); env[c] = Math.max(env[c], e) }
-
-    let px = 0, pUp = 0, pDn = 0, pz = 0, run = false
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      const ok = valid[c] === 1
-      let x = 0, up = 0, dn = 0, z = 0
-      if (ok) {
-        const mid = (base[i] - 0.5) * 100 * elevScale
-        if (!inElevCut(mid, minElev, maxElev, elevMinCut, elevMaxCut)) { run = false; continue }
-        const h = (env[c] / peak) * amp
-        x = c * scl - halfW; z = r * scl - halfH
-        up = mid + h; dn = mid - h
-      }
-      if (ok && run) {
-        const col = computeVertexColor(normElev(up, minElev, maxElev),
-                                       Math.min(1, env[c] / peak), 0, p)
-        positions.push6(px, pUp, pz, x, up, z); colors.pushRgb2(col)
-        positions.push6(px, pDn, pz, x, dn, z); colors.pushRgb2(col)
-        // The rungs are what turn two curves into a filled block on a plotter,
-        // which has no fill.
-        if (rungEvery > 0 && c % rungEvery === 0) {
-          positions.push6(x, dn, z, x, up, z); colors.pushRgb2(col)
-        }
-      }
-      run = ok; px = x; pUp = up; pDn = dn; pz = z
-    }
-  }
-  return { positions: positions.toArray(), colors: colors.toArray() }
-}
-
-/**
- * Two orthogonal scanlines plotted against each other — the XY oscilloscope
- * figure.
- *
- * It reads as pure signal and barely as terrain, which is the point: it is the
- * one mode here that describes the raster without describing its shape. Best
- * over something legible, which is why it draws several figures rather than one
- * and places them on a grid across the plate.
- *
- * The figure is drawn flat at a chosen elevation rather than draped. Draping it
- * would put the trace at the elevation of a *third* place, unrelated to either
- * axis, which is exactly the kind of accidental meaning a diagram should not
- * acquire.
- */
-function buildLissajous(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
-  const sMask = terrain.hasNoData ? gridMask : null
-  const n = Math.max(1, Math.round(o.figures ?? 3))
-  const size = (o.size ?? 0.28) * Math.min(cols, rows) * scl
-  const y = minElev + (maxElev - minElev) * (o.level ?? 0.5)
-  const positions = new F32List(), colors = new F32List()
-
-  for (let k = 0; k < n; k++) {
-    // Rows and columns spread evenly, skipping the border where a scanline is
-    // mostly NoData on a clipped raster.
-    const f = (k + 1) / (n + 1)
-    const r0 = Math.round(rows * (0.15 + 0.7 * f))
-    const c0 = Math.round(cols * (0.15 + 0.7 * ((k * 0.618) % 1)))
-    const cx = ((k % Math.ceil(Math.sqrt(n))) + 0.5) / Math.ceil(Math.sqrt(n))
-    const cz = (Math.floor(k / Math.ceil(Math.sqrt(n))) + 0.5) / Math.ceil(Math.sqrt(n))
-    const ox = (cx - 0.5) * cols * scl, oz = (cz - 0.5) * rows * scl
-    const col = computeVertexColor(f, 1 - f, 0, p)
-
-    let px = 0, pz = 0, run = false
-    const len = Math.min(rows, cols)
-    for (let t = 0; t < len; t++) {
-      const a = sampleBilinear(grid, sMask, rows, cols, r0, t)
-      const b = sampleBilinear(grid, sMask, rows, cols, t, c0)
-      const ok = a === a && b === b
-      const x = ox + (a - 0.5) * 2 * size
-      const z = oz + (b - 0.5) * 2 * size
-      if (ok && run) { positions.push6(px, y, pz, x, y, z); colors.pushRgb2(col) }
-      run = ok; px = x; pz = z
-    }
-  }
-  void halfW; void halfH
-  return { positions: positions.toArray(), colors: colors.toArray() }
-}
-
 /**
  * Every sign change of the scanline, after its own running mean is taken out.
  *
@@ -3370,10 +2906,10 @@ function buildZeroCross(terrain, p, o) {
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
 }
 
-// ─── Space frame (Truss, Exploded, Section, Weldment) ────────────────────────
+// ─── Space frame (Exploded Frame, Section) ───────────────────────────────────
 
 /**
- * The lattice the frame hangs on.
+ * The lattice the frame hangs on. Private to Exploded Frame and Section.
  *
  * Nodes sit on a regular grid of pitch `spacing`, each snapped to the highest
  * cell inside its own lattice square — so the frame hangs off real summits
@@ -3397,7 +2933,7 @@ function buildZeroCross(terrain, p, o) {
  * to be, while "the busiest 45% of the panels" is a composition that survives
  * changing the terrain under it.
  */
-function trussLattice(terrain, p, o) {
+function frameLattice(terrain, p, o) {
   const { grid, gridMask, rows, cols, scl } = terrain
   const { elevScale } = p
   const pitch = Math.max(2, Math.round((o.spacing ?? 14) / scl))
@@ -3441,7 +2977,12 @@ function trussLattice(terrain, p, o) {
 }
 
 /**
- * The mountain drawn as a structure someone has to build.
+ * A frame over the terrain, in three pens.
+ *
+ * Not a mode of its own any more — Truss and Weldment were cut, and this is now
+ * reached only through Exploded Frame, which passes its own `idPrefix`. The
+ * bracing rule below is the reason the machinery was worth keeping rather than
+ * inlining: it is a genuine reading of the ground, not a texture over it.
  *
  * **The bracing rule is the idea.** A rectangular panel with pin joints is a
  * mechanism: it needs one diagonal, and *which* diagonal depends on which way it
@@ -3457,15 +2998,15 @@ function trussLattice(terrain, p, o) {
  * uniform slopes clean.
  *
  * **Three sub-layers, because a drawing has three pens.** Chords heavy, bracing
- * hairline, posts dashed to a datum. This is the mode that most wants the SVG
- * exporter and it gets it for nothing — three named layers arrive in Inkscape as
+ * hairline, posts dashed to a datum. This is what most wants the SVG exporter
+ * and it gets it for nothing — three named layers arrive in Inkscape as
  * three pens, ready to plot in three weights. Gussets ship as a `lids` mesh on
  * the chord layer, so joints read as filled plates rather than as rings.
  */
-function buildTruss(terrain, p, o) {
+function buildFrame(terrain, p, o) {
   const { scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes, cols } = terrain
   const { elevMinCut, elevMaxCut } = p
-  const L = trussLattice(terrain, p, o)
+  const L = frameLattice(terrain, p, o)
   const datum = minElev - (o.depth ?? 0)
   const explode = (o.explode ?? 0) * (maxElev - minElev)
 
@@ -3535,7 +3076,7 @@ function buildTruss(terrain, p, o) {
   const lids = lidI.length > 0
     ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
     : null
-  const pre = o.idPrefix ?? 'Truss'
+  const pre = o.idPrefix
   return {
     [`${pre}-Chord`]: { positions: cP.toArray(), colors: cC.toArray(), lids },
     [`${pre}-Brace`]: { positions: bP.toArray(), colors: bC.toArray() },
@@ -3554,8 +3095,8 @@ function buildTruss(terrain, p, o) {
 function buildExploded(terrain, p, o) {
   const { scl, halfW, halfH, minElev, maxElev } = terrain
   const gap = (o.explode ?? 0.12)
-  const base = buildTruss(terrain, p, { ...o, explode: gap, idPrefix: 'Exploded' })
-  const L = trussLattice(terrain, p, o)
+  const base = buildFrame(terrain, p, { ...o, explode: gap, idPrefix: 'Exploded' })
+  const L = frameLattice(terrain, p, o)
   const lead = new F32List(), leadC = new F32List()
   const range = maxElev - minElev
   for (const n of L.nodes) {
@@ -3665,50 +3206,6 @@ function buildSection(terrain, p, o) {
     'Section-Hatch':  { positions: hP.toArray(), colors: hC.toArray() },
     'Section-Face':   { positions: fP.toArray(), colors: fC.toArray() },
     'Section-Beyond': { positions: bP.toArray(), colors: bC.toArray() },
-  }
-}
-
-/**
- * The frame as a parts drawing: every joint a gusset plate, every *braced* joint
- * called out with a leader running to clear ground.
- *
- * Which joints get called out is a real reading rather than a decoration — they
- * are the ones the bracing rule picked, so the annotation points at the panels
- * that are actually doing work. Leaders run in +x at a fixed bearing, the same
- * convention the contour labels use, since the scene orbits and a camera-relative
- * one would swing.
- *
- * The number that would sit at the end of each leader is deliberately not drawn
- * here: lettering needs a font, and a font is on the main thread. The split
- * `useContourLabels` already makes — the worker decides *where*, the main thread
- * decides *what it says* — is where that would go, and this emits the anchors
- * for it rather than inventing a second lettering path.
- */
-function buildWeldment(terrain, p, o) {
-  const { scl, halfW, halfH, minElev, maxElev } = terrain
-  const { elevMinCut, elevMaxCut } = p
-  const base = buildTruss(terrain, p, { ...o, idPrefix: 'Weldment', posts: o.posts !== false })
-  const L = trussLattice(terrain, p, o)
-  const lead = new F32List(), leadC = new F32List()
-  const anchors = []
-  const armX = (o.leader ?? 18), armY = (o.leaderRise ?? 0.06) * (maxElev - minElev)
-  const tick = armX * 0.5
-
-  for (const n of L.nodes) {
-    if (!n || Math.abs(n.hxy) < L.thr) continue
-    if (!inElevCut(n.elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
-    const x = n.c * scl - halfW, z = n.r * scl - halfH
-    const col = computeVertexColor(normElev(n.elev, minElev, maxElev), 0, 0, p)
-    const ex = x + armX, ey = n.elev + armY
-    lead.push6(x, n.elev, z, ex, ey, z)          // the leader
-    lead.push6(ex, ey, z, ex + tick, ey, z)      // the shelf it lands on
-    leadC.pushRgb(col); leadC.pushRgb(col); leadC.pushRgb(col); leadC.pushRgb(col)
-    anchors.push({ x: ex + tick * 0.25, y: ey, z, elev: n.elev })
-  }
-  return {
-    ...base,
-    'Weldment-Leader': { positions: lead.toArray(), colors: leadC.toArray(),
-                         labelAnchors: anchors.length ? anchors : null },
   }
 }
 

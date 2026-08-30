@@ -172,16 +172,10 @@ export const STYLE_DEF = {
   bestWeightRaceLine: 3,
   hypsoRaceLine: false, hypsoModeRaceLine: 'slope', hypsoBandedRaceLine: false, hypsoIntervalRaceLine: 10,
 
-  // Space frame — one lattice, four drawings of it. `braced` is the *fraction*
+  // Space frame — the lattice Exploded Frame hangs on. `braced` is the *fraction*
   // of panels that get a diagonal, taken as a percentile of the twist actually
   // present: a frame is a drawing before it is an analysis, and an absolute
   // cutoff braces everything or nothing depending on how rough the raster is.
-  enabledTruss: false, spacingTruss: 45, radiusTruss: 2, bracedTruss: 0.45,
-  depthTruss: 0, gussetTruss: 0.35, gussetSidesTruss: 6, gussetColorTruss: '#ffffff', postsTruss: true,
-  colorTruss: '#000000', weightTruss: 2.5, opacityTruss: 1, dashTruss: 'solid',
-  braceWeightTruss: 1, postWeightTruss: 1,
-  hypsoTruss: false, hypsoModeTruss: 'elevation', hypsoBandedTruss: false, hypsoIntervalTruss: 10,
-
   enabledExploded: false, spacingExploded: 50, radiusExploded: 2, bracedExploded: 0.45,
   depthExploded: 0, gussetExploded: 0.3, gussetSidesExploded: 6, explodeExploded: 0.12,
   colorExploded: '#000000', weightExploded: 2.5, opacityExploded: 1, dashExploded: 'solid',
@@ -193,32 +187,8 @@ export const STYLE_DEF = {
   hatchWeightSection: 1, beyondWeightSection: 1,
   hypsoSection: false, hypsoModeSection: 'elevation', hypsoBandedSection: false, hypsoIntervalSection: 10,
 
-  enabledWeldment: false, spacingWeldment: 60, radiusWeldment: 2, bracedWeldment: 0.3,
-  depthWeldment: 0, gussetWeldment: 0.5, gussetSidesWeldment: 6, gussetColorWeldment: '#ffffff',
-  postsWeldment: true, leaderWeldment: 18, leaderRiseWeldment: 0.06,
-  colorWeldment: '#000000', weightWeldment: 2.5, opacityWeldment: 1, dashWeldment: 'solid',
-  braceWeightWeldment: 1, postWeightWeldment: 1, leaderWeightWeldment: 1,
-  hypsoWeldment: false, hypsoModeWeldment: 'elevation', hypsoBandedWeldment: false, hypsoIntervalWeldment: 10,
-
-  // The scanline as a signal. Bandsplit's gains are flat-named rather than an
-  // array on purpose: geometryKey builds a *string*, so an array stringifies to
-  // [object Object] however it is edited and the rebuild would never fire.
-  enabledBandsplit: false, bandsBandsplit: 5, radiusBandsplit: 1, spacingBandsplit: 24,
-  angleBandsplit: 0, spreadBandsplit: 0.12, ampBandsplit: 0.09, modeBandsplit: 'stacked',
-  gain0Bandsplit: 1, gain1Bandsplit: 1, gain2Bandsplit: 1,
-  gain3Bandsplit: 1, gain4Bandsplit: 1, gain5Bandsplit: 1, gain6Bandsplit: 1,
-  colorBandsplit: '#000000', weightBandsplit: 1, opacityBandsplit: 1, dashBandsplit: 'solid',
-  hypsoBandsplit: false, hypsoModeBandsplit: 'elevation', hypsoBandedBandsplit: false, hypsoIntervalBandsplit: 10,
-
-  enabledEnvelope: false, detrendEnvelope: 12, decayEnvelope: 0.9, ampEnvelope: 0.35,
-  spacingEnvelope: 8, rungsEnvelope: 4,
-  colorEnvelope: '#000000', weightEnvelope: 1, opacityEnvelope: 1, dashEnvelope: 'solid',
-  hypsoEnvelope: false, hypsoModeEnvelope: 'elevation', hypsoBandedEnvelope: false, hypsoIntervalEnvelope: 10,
-
-  enabledLissajous: false, figuresLissajous: 4, sizeLissajous: 0.16, levelLissajous: 0.5,
-  colorLissajous: '#000000', weightLissajous: 1, opacityLissajous: 1, dashLissajous: 'solid',
-  hypsoLissajous: false, hypsoModeLissajous: 'elevation', hypsoBandedLissajous: false, hypsoIntervalLissajous: 10,
-
+  // The scanline as a signal: every sign change of its own detrended profile,
+  // which measures the terrain's local pitch rather than its slope.
   enabledZeroCross: false, detrendZeroCross: 6, spacingZeroCross: 2, axesZeroCross: 'both',
   colorZeroCross: '#1a1a1a', weightZeroCross: 3, opacityZeroCross: 0.9, dashZeroCross: 'solid',
   hypsoZeroCross: false, hypsoModeZeroCross: 'slope', hypsoBandedZeroCross: false, hypsoIntervalZeroCross: 10,
@@ -228,19 +198,6 @@ export const STYLE_DEF = {
   facesSprite: true, faceColorSprite: '#ffffff',
   colorSprite: '#000000', weightSprite: 1, opacitySprite: 1, dashSprite: 'solid',
   hypsoSprite: false, hypsoModeSprite: 'elevation', hypsoBandedSprite: false, hypsoIntervalSprite: 10,
-
-  // Scanline — the Lines marcher with a CRT's three artefacts on top.
-  enabledScanline: false, spacingScanline: 3, angleScanline: 0, interlaceScanline: 2,
-  rollScanline: 3, rollLengthScanline: 40, phaseScanline: 0,
-  combScanline: 0.5, combLengthScanline: 60,
-  colorScanline: '#000000', weightScanline: 1, opacityScanline: 1, dashScanline: 'solid',
-  hypsoScanline: false, hypsoModeScanline: 'elevation', hypsoBandedScanline: false, hypsoIntervalScanline: 10,
-
-  // Palette Cycle — the phase is a slider rather than a clock: vertex colours are
-  // baked in the worker, so advancing it is a full rebuild.
-  enabledPalette: false, tiersPalette: 10, phasePalette: 0, risersPalette: true,
-  colorPalette: '#000000', weightPalette: 1.5, opacityPalette: 1, dashPalette: 'solid',
-  hypsoPalette: true, hypsoModePalette: 'elevation', hypsoBandedPalette: false, hypsoIntervalPalette: 10,
 
   // Reticulation — Worley cell walls, thinned by tone.
   enabledRetic: false, cellRetic: 12, spacingRetic: 1.5, widthRetic: 0.5,

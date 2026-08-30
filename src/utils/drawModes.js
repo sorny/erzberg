@@ -107,37 +107,12 @@ export const DRAW_MODES = [
     pick: { tiers: [4, 14], spacing: [3, 12], size: [0.6, 1] },
   },
   {
-    id: 'Scanline', label: 'Scanline', cost: 1,
-    pick: { spacing: [1.5, 8], angle: [0, 180], interlace: [1, 4],
-            roll: [0, 8], comb: [0, 1] },
-  },
-  {
-    id: 'Palette', label: 'Palette cycle', cost: 1.5,
-    pick: { tiers: [6, 20], phase: [0, 1] },
-  },
-  {
     id: 'Retic', label: 'Reticulation', cost: 4,
     pick: { cell: [5, 26], spacing: [1, 4], width: [0.2, 1], gamma: [0.6, 2] },
   },
   {
-    id: 'Bandsplit', label: 'Bandsplit', cost: 2.5,
-    pick: { bands: [3, 6], spacing: [12, 45], angle: [0, 180], spread: [0.06, 0.22], amp: [0.04, 0.16] },
-  },
-  {
-    id: 'Envelope', label: 'Envelope', cost: 1.5,
-    pick: { detrend: [5, 25], decay: [0.75, 0.97], amp: [0.15, 0.6], spacing: [4, 20] },
-  },
-  {
-    id: 'Lissajous', label: 'Lissajous', cost: 1,
-    pick: { figures: [1, 9], size: [0.12, 0.4], level: [0.2, 0.8] },
-  },
-  {
     id: 'ZeroCross', label: 'Zero crossings', cost: 1.5,
     pick: { detrend: [2, 16], spacing: [1, 6] },
-  },
-  {
-    id: 'Truss', label: 'Truss', cost: 2.5,
-    pick: { spacing: [25, 80], radius: [1, 4], braced: [0.2, 0.7], gusset: [0, 0.6] },
   },
   {
     id: 'Exploded', label: 'Exploded frame', cost: 2.5,
@@ -146,10 +121,6 @@ export const DRAW_MODES = [
   {
     id: 'Section', label: 'Section', cost: 2,
     pick: { cut: [0.2, 0.7], hatch: [2, 9], hatchAngle: [0, 180], beyond: [4, 16] },
-  },
-  {
-    id: 'Weldment', label: 'Weldment', cost: 3,
-    pick: { spacing: [40, 110], braced: [0.1, 0.4], gusset: [0.3, 0.8], leader: [10, 30] },
   },
   {
     id: 'Halation', label: 'Halation', cost: 5,

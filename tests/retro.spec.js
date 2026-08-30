@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
 
 /**
- * The four that read the raster as a display rather than as ground.
+ * The two that read the raster as a surface to be tiled or cracked.
  *
- * The sharpest assertion here is Palette Cycle's: a palette cycle is, by
- * definition, a change of colour and *nothing else* — the whole trick on a
- * 16-colour machine was animating a waterfall without touching a pixel of the
- * frame buffer. If advancing the phase moves a single vertex, the mode is
- * mis-named.
+ * Scanline and Palette Cycle were cut from this family. What is left is Sprite,
+ * which quantises the ground into blocks, and Reticulation, which lays a
+ * cellular network over it — and in both the interesting assertion is about what
+ * the mode *refuses* to draw: a riser only where a neighbour actually sits
+ * lower, a wall only where the plate is dark enough to have cracked.
  */
 const PAGE = 'http://localhost:5173'
 
@@ -47,15 +47,8 @@ const run = (page, over) => page.evaluate(async (over) => {
     return { n: l.positions.length / 6, pos: sig(l.positions), col: sig(l.colors),
              lids: l.lids ? l.lids.indices.length / 3 : 0, isPoints: !!l.isPoints }
   }
-  return { sprite: pick('Sprite'), scan: pick('Scanline'),
-           pal: pick('Palette'), ret: pick('Retic') }
+  return { sprite: pick('Sprite'), ret: pick('Retic') }
 }, over)
-
-const GRAD = {
-  hypsoPalette: true, hypsoModePalette: 'elevation',
-  gradientStops: [{ pos: 0, color: '#0000ff' }, { pos: 0.5, color: '#ffff00' },
-                  { pos: 1, color: '#ff0000' }],
-}
 
 test('sprite draws blocks with filled tops', async ({ page }) => {
   await ready(page)
@@ -74,50 +67,6 @@ test('more tiers means more risers', async ({ page }) => {
   // The top-face outlines are fixed by the lattice; only the risers can grow,
   // and they only exist where a neighbour actually sits lower.
   expect(many.sprite.n).toBeGreaterThan(few.sprite.n)
-})
-
-test('interlace drops lines, roll moves them, comb only recolours', async ({ page }) => {
-  await ready(page)
-  // interlace 1 draws every line — the default is 2, which is the look but the
-  // wrong baseline for measuring what dropping lines does.
-  const base = { enabledScanline: true, spacingScanline: 3, rollScanline: 0,
-                 combScanline: 0, interlaceScanline: 1 }
-  const solid = await run(page, base)
-  const every2 = await run(page, { ...base, interlaceScanline: 2 })
-  expect(every2.scan.n).toBeLessThan(solid.scan.n * 0.6)
-
-  const rolled = await run(page, { ...base, rollScanline: 6 })
-  expect(rolled.scan.pos).not.toBe(solid.scan.pos)
-
-  // The comb rides the colour buffer, because opacity is per layer and could
-  // not vary line to line. So it must leave every vertex exactly where it was.
-  const combed = await run(page, { ...base, combScanline: 0.9 })
-  expect(combed.scan.pos).toBe(solid.scan.pos)
-  expect(combed.scan.col).not.toBe(solid.scan.col)
-})
-
-test('a palette cycle moves colour and nothing else', async ({ page }) => {
-  await ready(page)
-  const base = { enabledPalette: true, tiersPalette: 12, ...GRAD }
-  const a = await run(page, { ...base, phasePalette: 0 })
-  const b = await run(page, { ...base, phasePalette: 0.37 })
-  const c = await run(page, { ...base, phasePalette: 0.74 })
-  expect(a.pal.n).toBeGreaterThan(100)
-  // Identical geometry at every phase — that is what makes it a *palette* cycle.
-  expect(b.pal.pos).toBe(a.pal.pos)
-  expect(c.pal.pos).toBe(a.pal.pos)
-  // And a different palette at each.
-  expect(b.pal.col).not.toBe(a.pal.col)
-  expect(c.pal.col).not.toBe(a.pal.col)
-  expect(c.pal.col).not.toBe(b.pal.col)
-})
-
-test('the phase wraps rather than running off the end of the ramp', async ({ page }) => {
-  await ready(page)
-  const base = { enabledPalette: true, tiersPalette: 12, ...GRAD }
-  const zero = await run(page, { ...base, phasePalette: 0 })
-  const one  = await run(page, { ...base, phasePalette: 1 })
-  expect(one.pal.col).toBe(zero.pal.col)
 })
 
 test('reticulation draws cell walls, seeded and tone-gated', async ({ page }) => {

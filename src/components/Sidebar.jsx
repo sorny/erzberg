@@ -1323,9 +1323,8 @@ export function Sidebar({
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
-    modeTruss: false, modeExploded: false, modeSection: false, modeWeldment: false,
-    modeBandsplit: false, modeEnvelope: false, modeLissajous: false, modeZeroCross: false,
-    modeSprite: false, modeScanline: false, modePalette: false, modeRetic: false,
+    modeExploded: false, modeSection: false, modeZeroCross: false,
+    modeSprite: false, modeRetic: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1522,17 +1521,10 @@ export function Sidebar({
       modeBerm:     !!newStyle.enabledBerm,
       modeAir:      !!newStyle.enabledAir,
       modeRaceLine: !!newStyle.enabledRaceLine,
-      modeTruss:    !!newStyle.enabledTruss,
       modeExploded: !!newStyle.enabledExploded,
       modeSection:  !!newStyle.enabledSection,
-      modeWeldment: !!newStyle.enabledWeldment,
-      modeBandsplit: !!newStyle.enabledBandsplit,
-      modeEnvelope:  !!newStyle.enabledEnvelope,
-      modeLissajous: !!newStyle.enabledLissajous,
       modeZeroCross: !!newStyle.enabledZeroCross,
       modeSprite:   !!newStyle.enabledSprite,
-      modeScanline: !!newStyle.enabledScanline,
-      modePalette:  !!newStyle.enabledPalette,
       modeRetic:    !!newStyle.enabledRetic,
     }))
   }
@@ -2574,29 +2566,6 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Truss" icon={<ModeMark kind="truss" />} open={sec.modeTruss} onToggle={() => tog('modeTruss')} enabled={style.enabledTruss}>
-            <Tog label="Enabled" checked={style.enabledTruss} onChange={v => ss({ enabledTruss: v })} />
-            {style.enabledTruss && (
-              <>
-                <Sub label="LATTICE">
-                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingTruss} onChange={v => ss({ spacingTruss: v })} />
-                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusTruss} onChange={v => ss({ radiusTruss: v })} />
-                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedTruss} onChange={v => ss({ bracedTruss: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightTruss} onChange={v => ss({ braceWeightTruss: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <Sub label="JOINTS &amp; POSTS">
-                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetTruss} onChange={v => ss({ gussetTruss: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesTruss} onChange={v => ss({ gussetSidesTruss: v })} />
-                  <ColorRow label="Gusset fill" value={style.gussetColorTruss} onChange={v => ss({ gussetColorTruss: v })} />
-                  <Tog label="Posts" small checked={style.postsTruss} onChange={v => ss({ postsTruss: v })} />
-                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthTruss} onChange={v => ss({ depthTruss: v })} />
-                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightTruss} onChange={v => ss({ postWeightTruss: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <ModeStyleOverride prefix="Truss" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
-              </>
-            )}
-          </Section>
-
           <Section title="Mode: Exploded Frame" icon={<ModeMark kind="exploded" />} open={sec.modeExploded} onToggle={() => tog('modeExploded')} enabled={style.enabledExploded}>
             <Tog label="Enabled" checked={style.enabledExploded} onChange={v => ss({ enabledExploded: v })} />
             {style.enabledExploded && (
@@ -2642,97 +2611,6 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Weldment" icon={<ModeMark kind="weldment" />} open={sec.modeWeldment} onToggle={() => tog('modeWeldment')} enabled={style.enabledWeldment}>
-            <Tog label="Enabled" checked={style.enabledWeldment} onChange={v => ss({ enabledWeldment: v })} />
-            {style.enabledWeldment && (
-              <>
-                <Sub label="LATTICE">
-                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingWeldment} onChange={v => ss({ spacingWeldment: v })} />
-                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusWeldment} onChange={v => ss({ radiusWeldment: v })} />
-                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedWeldment} onChange={v => ss({ bracedWeldment: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightWeldment} onChange={v => ss({ braceWeightWeldment: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <Sub label="JOINTS &amp; POSTS">
-                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetWeldment} onChange={v => ss({ gussetWeldment: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesWeldment} onChange={v => ss({ gussetSidesWeldment: v })} />
-                  <ColorRow label="Gusset fill" value={style.gussetColorWeldment} onChange={v => ss({ gussetColorWeldment: v })} />
-                  <Tog label="Posts" small checked={style.postsWeldment} onChange={v => ss({ postsWeldment: v })} />
-                  <InlineSl label="Leader" help="How far out the callout arm runs from a braced joint, in world units." min={0} max={80} step={2} value={style.leaderWeldment} onChange={v => ss({ leaderWeldment: v })} />
-                  <InlineSl label="Leader rise" min={0} max={0.4} step={0.01} value={style.leaderRiseWeldment} onChange={v => ss({ leaderRiseWeldment: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Leader weight" min={0.5} max={6} step={0.5} value={style.leaderWeightWeldment} onChange={v => ss({ leaderWeightWeldment: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthWeldment} onChange={v => ss({ depthWeldment: v })} />
-                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightWeldment} onChange={v => ss({ postWeightWeldment: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <ModeStyleOverride prefix="Weldment" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Bandsplit" icon={<ModeMark kind="bandsplit" />} open={sec.modeBandsplit} onToggle={() => tog('modeBandsplit')} enabled={style.enabledBandsplit}>
-            <Tog label="Enabled" checked={style.enabledBandsplit} onChange={v => ss({ enabledBandsplit: v })} />
-            {style.enabledBandsplit && (
-              <>
-                <Sub>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {['stacked', 'draped'].map(m => (
-                      <Btn key={m} block variant="toggle" on={style.modeBandsplit === m}
-                        onClick={() => ss({ modeBandsplit: m })}
-                        style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>{m}</Btn>
-                    ))}
-                  </div>
-                  <InlineSl label="Bands" help="Octave bands. Each is a difference of two box blurs an octave apart; the last is the residual massif." min={1} max={6} step={1} value={style.bandsBandsplit} onChange={v => ss({ bandsBandsplit: v })} />
-                  <InlineSl label="Finest" help="Radius of the first blur, in cells — where the octave ladder starts." min={0.5} max={8} step={0.5} value={style.radiusBandsplit} onChange={v => ss({ radiusBandsplit: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Line pitch" min={2} max={100} step={1} value={style.spacingBandsplit} onChange={v => ss({ spacingBandsplit: v })} />
-                  <InlineSl label="Bearing" min={0} max={180} step={1} value={style.angleBandsplit} onChange={v => ss({ angleBandsplit: v })} fmt={v => v + '°'} />
-                  {style.modeBandsplit !== 'draped' && <>
-                    <InlineSl label="Spread" help="Vertical gap between the stacked traces, as a fraction of the elevation range." min={0} max={0.5} step={0.01} value={style.spreadBandsplit} onChange={v => ss({ spreadBandsplit: v })} fmt={v => v.toFixed(2)} />
-                    <InlineSl label="Amplitude" min={0.01} max={0.4} step={0.01} value={style.ampBandsplit} onChange={v => ss({ ampBandsplit: v })} fmt={v => v.toFixed(2)} />
-                  </>}
-                </Sub>
-                <Sub label={style.modeBandsplit === 'draped' ? 'EQUALISER — ALL AT 1 IS THE TERRAIN' : 'BAND GAINS'}>
-                  <InlineSl label="Band 0" min={0} max={3} step={0.05} value={style.gain0Bandsplit} onChange={v => ss({ gain0Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 1" min={0} max={3} step={0.05} value={style.gain1Bandsplit} onChange={v => ss({ gain1Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 2" min={0} max={3} step={0.05} value={style.gain2Bandsplit} onChange={v => ss({ gain2Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 3" min={0} max={3} step={0.05} value={style.gain3Bandsplit} onChange={v => ss({ gain3Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 4" min={0} max={3} step={0.05} value={style.gain4Bandsplit} onChange={v => ss({ gain4Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 5" min={0} max={3} step={0.05} value={style.gain5Bandsplit} onChange={v => ss({ gain5Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Band 6" min={0} max={3} step={0.05} value={style.gain6Bandsplit} onChange={v => ss({ gain6Bandsplit: v })} fmt={v => v.toFixed(2)} />
-                </Sub>
-                <ModeStyleOverride prefix="Bandsplit" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Envelope" icon={<ModeMark kind="envelope" />} open={sec.modeEnvelope} onToggle={() => tog('modeEnvelope')} enabled={style.enabledEnvelope}>
-            <Tog label="Enabled" checked={style.enabledEnvelope} onChange={v => ss({ enabledEnvelope: v })} />
-            {style.enabledEnvelope && (
-              <>
-                <Sub>
-                  <InlineSl label="Detrend" help="Blur radius removed before the envelope is taken. The envelope is of the roughness, not of the elevation — without this it is just the massif." min={1} max={60} step={1} value={style.detrendEnvelope} onChange={v => ss({ detrendEnvelope: v })} />
-                  <InlineSl label="Decay" help="Release of the follower. High values hold a peak across the whole line." min={0} max={0.99} step={0.01} value={style.decayEnvelope} onChange={v => ss({ decayEnvelope: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Amplitude" min={0.02} max={1} step={0.01} value={style.ampEnvelope} onChange={v => ss({ ampEnvelope: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Line pitch" min={1} max={60} step={1} value={style.spacingEnvelope} onChange={v => ss({ spacingEnvelope: v })} />
-                  <InlineSl label="Rungs" help="Vertical ties between the two curves every N cells — what turns a pair of lines into a filled block on a plotter, which has no fill. 0 draws none." min={0} max={40} step={1} value={style.rungsEnvelope} onChange={v => ss({ rungsEnvelope: v })} />
-                </Sub>
-                <ModeStyleOverride prefix="Envelope" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Lissajous" icon={<ModeMark kind="lissajous" />} open={sec.modeLissajous} onToggle={() => tog('modeLissajous')} enabled={style.enabledLissajous}>
-            <Tog label="Enabled" checked={style.enabledLissajous} onChange={v => ss({ enabledLissajous: v })} />
-            {style.enabledLissajous && (
-              <>
-                <Sub>
-                  <InlineSl label="Figures" help="Each plots one row against one column as an XY oscilloscope trace." min={1} max={16} step={1} value={style.figuresLissajous} onChange={v => ss({ figuresLissajous: v })} />
-                  <InlineSl label="Size" min={0.05} max={0.6} step={0.01} value={style.sizeLissajous} onChange={v => ss({ sizeLissajous: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Height" help="Where the figures float, as a fraction of the elevation range. They are flat by design — draping would put the trace at the elevation of a third place, unrelated to either axis." min={0} max={1} step={0.01} value={style.levelLissajous} onChange={v => ss({ levelLissajous: v })} fmt={v => Math.round(v * 100) + '%'} />
-                </Sub>
-                <ModeStyleOverride prefix="Lissajous" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
           <Section title="Mode: Zero Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
             <Tog label="Enabled" checked={style.enabledZeroCross} onChange={v => ss({ enabledZeroCross: v })} />
             {style.enabledZeroCross && (
@@ -2765,43 +2643,6 @@ export function Sidebar({
                   {style.facesSprite && <ColorRow label="Face fill" value={style.faceColorSprite} onChange={v => ss({ faceColorSprite: v })} />}
                 </Sub>
                 <ModeStyleOverride prefix="Sprite" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Scanline" icon={<ModeMark kind="scanline" />} open={sec.modeScanline} onToggle={() => tog('modeScanline')} enabled={style.enabledScanline}>
-            <Tog label="Enabled" checked={style.enabledScanline} onChange={v => ss({ enabledScanline: v })} />
-            {style.enabledScanline && (
-              <>
-                <Sub>
-                  <InlineSl label="Line pitch" min={0.5} max={40} step={0.5} value={style.spacingScanline} onChange={v => ss({ spacingScanline: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Bearing" min={0} max={180} step={1} value={style.angleScanline} onChange={v => ss({ angleScanline: v })} fmt={v => v + '°'} />
-                  <InlineSl label="Interlace" help="Draws every Nth line. The gaps are the scan lines." min={1} max={8} step={1} value={style.interlaceScanline} onChange={v => ss({ interlaceScanline: v })} />
-                </Sub>
-                <Sub label="ROLL">
-                  <InlineSl label="Amount" help="Shear along each line — a picture failing to hold horizontal sync." min={0} max={30} step={0.5} value={style.rollScanline} onChange={v => ss({ rollScanline: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Wavelength" min={4} max={300} step={2} value={style.rollLengthScanline} onChange={v => ss({ rollLengthScanline: v })} />
-                  <InlineSl label="Phase" min={0} max={360} step={5} value={style.phaseScanline} onChange={v => ss({ phaseScanline: v })} fmt={v => v + '°'} />
-                </Sub>
-                <Sub label="COMB">
-                  <InlineSl label="Depth" help="Brightness banding, lerped toward the background — a washed band on a tube is less signal, not more shadow." min={0} max={1} step={0.05} value={style.combScanline} onChange={v => ss({ combScanline: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Wavelength" min={4} max={400} step={2} value={style.combLengthScanline} onChange={v => ss({ combLengthScanline: v })} />
-                </Sub>
-                <ModeStyleOverride prefix="Scanline" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Palette Cycle" icon={<ModeMark kind="palette" />} open={sec.modePalette} onToggle={() => tog('modePalette')} enabled={style.enabledPalette}>
-            <Tog label="Enabled" checked={style.enabledPalette} onChange={v => ss({ enabledPalette: v })} />
-            {style.enabledPalette && (
-              <>
-                <Sub>
-                  <InlineSl label="Tiers" min={2} max={40} step={1} value={style.tiersPalette} onChange={v => ss({ tiersPalette: v })} />
-                  <InlineSl label="Phase" help="Walks each tier's colour around the gradient. Drag it and the waterfall runs — it is a slider rather than a clock because vertex colours are baked in the worker, so advancing it is a full rebuild." min={0} max={1} step={0.01} value={style.phasePalette} onChange={v => ss({ phasePalette: v })} fmt={v => v.toFixed(2)} />
-                  <Tog label="Risers" small checked={style.risersPalette} onChange={v => ss({ risersPalette: v })} />
-                </Sub>
-                <ModeStyleOverride prefix="Palette" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

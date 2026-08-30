@@ -2,7 +2,7 @@
  * A sample of what each draw mode puts on paper, small enough to sit in a
  * section header.
  *
- * Thirty-four rows reading MODE: ⟨noun⟩ are interchangeable to anyone
+ * Twenty-seven rows reading MODE: ⟨noun⟩ are interchangeable to anyone
  * who does not already know what a Strahler-order stream network looks like —
  * which is most people, and exactly the people browsing. Seeing the mark is the
  * whole point of the section, so the mark goes in the row rather than three
@@ -232,19 +232,6 @@ const MARKS = {
       <path d="M4 3.2 C6 6.5, 6.5 9, 8.5 11.5" strokeWidth="1.9" />
     </g>
   ),
-  // A braced panel with node plates — the most literal mark in the set.
-  truss: (
-    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-      <path d="M3 3 L11 2 L19 4 M3 3 L4 10 M11 2 L11.5 9 M19 4 L19 11" strokeWidth="1.6" />
-      <path d="M4 10 L11.5 9 L19 11" strokeWidth="1.6" />
-      <path d="M3 3 L11.5 9 M11 2 L19 11" strokeWidth="0.7" />
-      <g fill="currentColor" stroke="none">
-        {[[3,3],[11,2],[19,4],[4,10],[11.5,9],[19,11]].map(([x, y], i) => (
-          <circle key={i} cx={x} cy={y} r={1.1} />
-        ))}
-      </g>
-    </g>
-  ),
   // The same frame pulled apart along Y, with leaders back to place.
   exploded: (
     <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
@@ -261,40 +248,6 @@ const MARKS = {
       <path d="M1 6.5 L21 6.5" strokeWidth="1.8" />
       <path d="M2 12 L7.5 6.5 M5.5 12 L11 6.5 M9 12 L14.5 6.5 M12.5 12 L18 6.5 M16 12 L21 7"
             strokeWidth="0.7" />
-    </g>
-  ),
-  // A called-out joint: gusset plate, leader, shelf.
-  weldment: (
-    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-      <path d="M1 10 L6 6 L11 9 M6 6 L6 12" strokeWidth="1.4" />
-      <path d="M6 6 L11.5 2.5 L20.5 2.5" strokeWidth="0.8" />
-      <path d="M13 5 L20.5 5 M13 5 L13 2.5" strokeWidth="0.5" opacity="0.55" />
-      <polygon points="6,4 7.7,5 7.7,7 6,8 4.3,7 4.3,5" fill="currentColor" stroke="none" />
-    </g>
-  ),
-  // The same signal three times over, an octave apart each time.
-  bandsplit: (
-    <g {...BASE}>
-      <path d="M1 2.5 C4 1, 7 4, 10 2 C13 0.5, 16 3.5, 21 2" strokeWidth="1.3" />
-      <path d="M1 6.5 C2.5 5, 4 8, 6 6.5 C8 5, 9.5 8, 11.5 6.5 C13.5 5, 15 8, 17 6.5 C19 5.5, 20 7.5, 21 6.5" />
-      <path d="M1 11 L2 9.8 L3 11.4 L4 10 L5 11.6 L6 9.9 L7 11.3 L8 10.1 L9 11.5 L10 9.8 L11 11.4 L12 10 L13 11.6 L14 9.9 L15 11.3 L16 10.2 L17 11.5 L18 9.8 L19 11.4 L20 10.1 L21 11.2" strokeWidth="0.7" />
-    </g>
-  ),
-  // An audio clip: a symmetric envelope about a baseline, tied with rungs.
-  envelope: (
-    <g {...BASE}>
-      <path d="M1 6.5 L21 6.5" strokeWidth="0.5" opacity="0.5" />
-      <path d="M1 6 C3 2.5, 5 1.5, 8 3 C11 4.5, 13 1, 16 2.5 C18.5 3.8, 20 5.5, 21 5.5" strokeWidth="1.1" />
-      <path d="M1 7 C3 10.5, 5 11.5, 8 10 C11 8.5, 13 12, 16 10.5 C18.5 9.2, 20 7.5, 21 7.5" strokeWidth="1.1" />
-      <path d="M4 3.6 L4 9.4 M8 3 L8 10 M12 2.6 L12 10.4 M16 2.5 L16 10.5 M19.5 4.6 L19.5 8.4" strokeWidth="0.5" opacity="0.7" />
-    </g>
-  ),
-  // An XY scope figure.
-  lissajous: (
-    <g {...BASE}>
-      <path d="M11 1.5 C16 1.5, 19 4, 19 6.5 C19 9, 16 11.5, 11 11.5 C6 11.5, 3 9, 3 6.5 C3 4, 6 1.5, 11 1.5" strokeWidth="0.9" />
-      <path d="M11 3 C15 4.5, 16.5 8, 13.5 10.5 C10.5 8, 11.5 4.5, 15.5 3" strokeWidth="0.7" opacity="0.7" />
-      <path d="M11 3 C7 4.5, 5.5 8, 8.5 10.5 C11.5 8, 10.5 4.5, 6.5 3" strokeWidth="0.7" opacity="0.7" />
     </g>
   ),
   // Dots at every sign change: dense where the ground is busy.
@@ -314,29 +267,6 @@ const MARKS = {
         <path d="M8 5.5 L11.5 4 L15 5.5 L11.5 7 Z M8 5.5 L8 7.5 L11.5 9 L15 7.5 L15 5.5 M11.5 7 L11.5 9" />
         <path d="M14 2 L17.5 0.5 L21 2 L17.5 3.5 Z M14 2 L14 4 L17.5 5.5 L21 4 L21 2 M17.5 3.5 L17.5 5.5" />
       </g>
-    </g>
-  ),
-  // Interlaced traces, sheared, with a brightness comb across them.
-  scanline: (
-    <g {...BASE}>
-      <path d="M1 1.5 L21 1.5" opacity="0.25" />
-      <path d="M2 3.5 L22 3.5" opacity="0.6" />
-      <path d="M0.5 5.5 L20.5 5.5" opacity="1" />
-      <path d="M1.5 7.5 L21.5 7.5" opacity="0.75" />
-      <path d="M2.5 9.5 L22.5 9.5" opacity="0.35" />
-      <path d="M0.5 11.5 L20.5 11.5" opacity="0.7" />
-    </g>
-  ),
-  // The same tiers, colours walked round the ramp.
-  palette: (
-    <g stroke="currentColor" fill="none" strokeLinejoin="miter" vectorEffect="non-scaling-stroke">
-      <path d="M1 11.5 L5 11.5 L5 8.5 L9 8.5 L9 5.5 L13 5.5 L13 2.5 L17 2.5 L17 5.5 L21 5.5"
-            strokeWidth="1.1" />
-      <path d="M1 11.5 L5 11.5" strokeWidth="2.4" opacity="0.25" />
-      <path d="M5 8.5 L9 8.5" strokeWidth="2.4" opacity="0.5" />
-      <path d="M9 5.5 L13 5.5" strokeWidth="2.4" opacity="0.75" />
-      <path d="M13 2.5 L17 2.5" strokeWidth="2.4" opacity="1" />
-      <path d="M17 5.5 L21 5.5" strokeWidth="2.4" opacity="0.4" />
     </g>
   ),
   // Cell walls, not cells: a crazed network.
