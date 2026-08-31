@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   version shipped. A rewrite of a released entry changes the record rather than
   the documentation.
 
+### Fixed
+
+- **`package-lock.json` recorded version 1.4.0.** Each version bump from 1.5.0 to
+  1.6.2 changed `package.json` alone. The lock file thus went four releases out of
+  date about the version that it locks.
+
+  `npm install --package-lock-only` corrects the two fields, and it changes no
+  dependency. That the diff is two lines is the evidence: the tree itself was
+  already in sync, and only the version had drifted.
+
 ## [1.6.2] — 2026-08-31
 
 ### Fixed
