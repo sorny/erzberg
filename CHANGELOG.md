@@ -7,6 +7,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] — 2026-08-31
+
+A licence-compliance pass over what the project ships and what it exports.
+Nothing here is a feature; every item corrects something that was already
+wrong.
+
+### Fixed
+
+- **The OFL text did not ship with the fonts it covers.**
+  `public/fonts/single-line/LICENSE.txt` carried the copyright notices for the
+  EMS, Relief SingleLine, Relief Pendot and DearPlotter faces and then pointed
+  at somebody else's repository for the licence itself. OFL 1.1 condition 2
+  requires each copy of the Font Software to contain "the above copyright notice
+  **and this license**", and a pointer is neither. Space Mono's own copy was
+  already correct and is unchanged — and, checked while in there: its copyright
+  line reserves no font name, so the derived `space-mono-*.json` are free to keep
+  the name.
+
+- **No third-party notice survived into the bundle.** `dist/` is published to
+  Pages, so it is a distribution of React, three.js, zustand, geotiff, lerc,
+  pako and eighty others — every one of which asks that its notice travel with a
+  copy. MIT says "included in all copies", BSD and ISC say it in their own
+  words, Apache-2.0 §4 wants a copy of the licence. Minification strips all of
+  them; measured, exactly one incidental match survived across every chunk.
+  `dist/THIRD-PARTY-NOTICES.txt` collects them, and `build` generates it, so a
+  `dist` without notices cannot be produced by accident.
+
+  Six packages declare a licence and ship no copy of it, and for one that is not
+  merely untidy: `lerc` is Apache-2.0 and does reach the bundle, and §4(a)
+  requires giving recipients a copy of the licence — an SPDX identifier is a
+  reference, not a copy. The text is taken from a sibling declaring the same
+  identifier, which keeps the generator self-maintaining rather than carrying
+  licence blobs that drift out of date.
+
+- **Only the SVG credited OpenStreetMap.** OSM data is ODbL, and §4.3 attaches
+  its notice to the *Produced Work* rather than to the application — so a plate
+  posted as a PNG carried no indication of where its roads came from. Every
+  export that can carry the credit now does: a `tEXt` chunk after `IHDR` in the
+  PNG, the 80-byte header of the binary STL, a Matroska `Tags` element in the
+  WebM. Nothing is drawn into the picture; a credit burned into the pixels is a
+  change to the artwork, which is not something a licence obligation gets to
+  make on the user's behalf.
+
+  Two are narrower than the rest, deliberately. The STL **plate** is the terrain
+  surface and never contains OSM data, so only the ribbons file is credited, and
+  only when a layer that actually contributed a ribbon came from OpenStreetMap —
+  which is not the same as an OSM layer being visible, since ribbons default to
+  GPX. And the WebM says it out loud as well as writing it down: a container tag
+  is read by `ffprobe` and by very little a viewer would open.
+
+  The WebM's placement had to be measured, and the obvious answer was wrong.
+  Chrome writes the Segment with an unknown size, so nothing records a length an
+  insertion would invalidate — but that also means a demuxer has no length to
+  seek against and no SeekHead to consult, and parses header elements only until
+  the first Cluster. A `Tags` element appended to the end of the file is
+  well-formed Matroska that **nothing reads**: ffprobe reported no tag at all
+  until the element moved ahead of the first Cluster. A notice nothing reads is
+  worse than no notice, because it looks like the obligation was met.
+
+- **The app fetched a webfont from Google on every load.** Space Mono sets two
+  words in the panel — the wordmark and Edit Mode's label — and came from
+  fonts.googleapis.com. Licence-wise that was fine; it sat badly beside the
+  promise that everything runs locally. The claim is about the user's *files* and
+  stayed true, but "no server, no upload, no account" reads more broadly, and a
+  request to Google reveals a visitor's IP whatever it is fetching. Self-hosted
+  now, 9.6 kB, and a spec asserts the property rather than the implementation:
+  loading the app issues no request to any host but its own.
+
+### Added
+
+- `npm run licenses`, which `build` runs. Scope is the production dependency
+  closure; the dev tooling is not distributed and is not listed.
+- `public/PROVENANCE.md`. `Heightmap.png` was the one asset with no stated
+  origin — added in the first commit with no note, and its own metadata says
+  only that Photoshop created it. A 1024×1024 16-bit greyscale plate is exactly
+  what a real DEM export looks like, so an auditor cannot tell an original from
+  something traced off Copernicus or swisstopo, both of which require
+  attribution. It is original work. Recorded now, because the answer was only
+  available by asking.
+
 ## [1.6.0] — 2026-08-31
 
 ### Added
