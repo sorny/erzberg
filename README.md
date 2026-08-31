@@ -26,7 +26,8 @@ number set into a break in the line, at the line's own angle, in its own ink.
 Export to SVG for a pen plotter, STL for a printer, or 4K PNG for the wall.
 
 **Everything runs locally in your browser.** Your files never leave your
-machine — no server, no upload, no account.
+machine — no server, no upload, no account, and no third-party request on load:
+the one webfont is served from the app's own origin rather than from a CDN.
 
 <table>
   <tr>
@@ -430,7 +431,7 @@ The app is built to idle quietly and stay responsive under load.
 | State | Zustand (raster data) + React state (all UI params), persisted to `localStorage` between visits |
 | GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
 | Icons | Maki (CC0), flattened to polylines through the browser's own SVG geometry API |
-| Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way |
+| Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way. The panel's own wordmark uses the same face as a self-hosted woff2 — 9.6 kB, so the app contacts nobody on load |
 | Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces; flattened by `npm run fonts:single-line` |
 | Map data | OpenStreetMap via Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |

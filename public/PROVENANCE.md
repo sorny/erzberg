@@ -38,6 +38,12 @@ single-line faces under the OFL, the Hershey licence, the public domain, the
 WTFPL and MIT depending on the face (`fonts/single-line/LICENSE.txt`, which
 carries the full OFL text as the OFL requires).
 
+`fonts/space-mono-700-latin.woff2` is the Latin subset as Google Fonts serves
+it, downloaded once and served from this origin. It sets two words in the panel
+— the wordmark and Edit Mode's label — and used to be fetched from
+fonts.googleapis.com on every load, which handed each visitor's IP to a third
+party. The OFL expressly permits bundling, and the licence ships beside it.
+
 Fonts keep their own licences whatever this repository is licensed under, and
 the OFL explicitly exempts documents made *with* a font from the font's terms —
 so an SVG erzberg exports with lettering in it is unencumbered.

@@ -70,6 +70,32 @@ export const W      = 272   // panel width px
 export function PanelStyles() {
   return (
     <style>{`
+      /*
+       * Space Mono Bold, self-hosted.
+       *
+       * It sets two words — the erzberg wordmark and Edit Mode's "edit" — and it
+       * used to cost a request to fonts.googleapis.com on every load, which
+       * revealed each visitor's IP to a third party. That sat badly beside the
+       * promise at the top of the README that everything runs locally: the claim
+       * is about the user's *files* and stayed true, but "no server" reads more
+       * broadly than that, and 9.6 kB of woff2 is a cheap way to mean it.
+       *
+       * The Latin subset, as Google Fonts serves it — the full weight rather
+       * than the eight glyphs actually set, so adding a word to the header
+       * cannot silently produce tofu. SIL OFL 1.1, which expressly permits
+       * bundling; the licence ships beside it at public/fonts/OFL.txt.
+       *
+       * BASE_URL rather than a rooted path: this deploys to a project page under
+       * /erzberg/, where /fonts/… would be a 404.
+       */
+      @font-face {
+        font-family: 'Space Mono';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('${import.meta.env.BASE_URL}fonts/space-mono-700-latin.woff2') format('woff2');
+      }
+
       :root {
         --hm-bg: ${RAW.bg};
         --hm-surf: ${RAW.surf};
