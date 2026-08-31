@@ -1,544 +1,611 @@
 # Murmurations
 
-The second thing the Particles section can draw. Where the hologram field pins a
-particle to every terrain cell and shimmers it in place, **Murmuration** flies a
-flock of boids over the relief — steered by the terrain, not merely placed above
-it.
+This is the second thing that the Particles section can draw. The hologram field
+pins one particle to every terrain cell and shimmers it in place. A
+**Murmuration** instead flies a flock of boids over the relief. The terrain
+steers the flock. It does not merely place the flock above the ground.
 
-Implementation: `src/utils/murmuration.js` (the simulation, pure) and the
-murmuration branch of `src/components/ParticleSystem.jsx` (the geometry, the
-materials and the per-frame step).
+Two files hold the work. `src/utils/murmuration.js` holds the simulation, which
+is pure. The murmuration branch of `src/components/ParticleSystem.jsx` holds the
+geometry, the materials and the per-frame step.
 
 ---
 
 ## The rules
 
-The three classic ones, from Reynolds' *Flocks, Herds, and Schools* (1987):
+These are the three classic rules, from Reynolds:
 
 > Reynolds, C. W., *Flocks, Herds, and Schools: A Distributed Behavioral Model*,
 > SIGGRAPH '87. [Full text](https://www.red3d.com/cwr/papers/1987/boids.html)
 
-**Separation** — steer away from neighbours inside the separation radius,
-weighted by $1/d$ so an imminent collision outranks mere proximity. This is what
-keeps the flock's internal spacing even rather than clumped.
+**Separation.** A bird steers away from the neighbours inside the separation
+radius. The weight is $1/d$, so a collision that is about to happen outranks
+mere nearness. This rule keeps the spacing inside the flock even, and not
+clumped.
 
-**Alignment** — steer the heading toward the mean velocity of the neighbourhood.
+**Alignment.** A bird steers its heading toward the mean velocity of its
+neighbourhood.
 
-**Cohesion** — steer toward the neighbourhood's centre of mass.
+**Cohesion.** A bird steers toward the centre of mass of its neighbourhood.
 
-Each is a *steering force* in Reynolds' sense: the difference between the
-velocity the bird wants and the one it has.
+Each rule gives a *steering force* in the sense of Reynolds. That force is the
+difference between the velocity that the bird wants and the velocity that it
+has:
 
 $$\mathbf{F} = \hat{\mathbf{d}} \cdot v_{\text{cruise}} - \mathbf{v}$$
 
 Reynolds also clamps each such force to a maximum, as a turn-rate limit. That
-clamp is not here, because it provably never fires — see
-[the dead clamp](#the-arithmetic-and-one-dead-clamp) below. `maxForce` still
-exists and still matters: every force that is *not* a steering term — ground
-avoidance, the flight envelope, turbulence, the predator — is expressed as a
-multiple of it.
+clamp is not here, because we can prove that it never fires. See
+[the dead clamp](#the-arithmetic-and-one-dead-clamp), further down.
 
-Speed is then clamped to $[0.65, 1.35] \cdot v_{\text{cruise}}$. The floor is not
-decoration: birds do not hover, and a flock allowed to slow to a stop settles
-into a stationary cloud — the failure mode that looks least like a bug.
+`maxForce` still exists and still matters. Every force that is *not* a steering
+term is a multiple of it. Ground avoidance, the flight envelope, the turbulence
+and the predator are those forces.
+
+The app then clamps the speed to
+$[0.65, 1.35] \cdot v_{\text{cruise}}$. The floor is not decoration. Birds do
+not hover. A flock that can slow to a stop settles into a stationary cloud,
+which is the failure mode that looks least like a bug.
 
 ### Topological, not metric
 
-A bird flies with its **eight nearest neighbours**, not with everything inside
-the perception radius. The radius is only a search bound; the count is the rule.
+A bird flies with its **eight nearest neighbours**. It does not fly with
+everything inside the perception radius. The radius is only a search bound. The
+count is the rule.
 
-That is what real starlings do:
+Real starlings do this:
 
 > Ballerini, M. et al., *Interaction ruling animal collective behavior depends on
 > topological rather than metric distance*, PNAS 105(4), 2008.
 > [Full text](https://www.pnas.org/doi/10.1073/pnas.0711437105)
 
-They found each bird tracks six or seven neighbours regardless of how tightly
-the flock is packed — and that this is precisely what keeps a murmuration
-cohesive as it compresses and expands, and what lets a predator's strike
-propagate as a travelling wave rather than a local dent. A metric rule loses the
-flock's edges the moment it spreads out.
+They found that each bird tracks six or seven neighbours at every density of
+the flock. This is what keeps a murmuration whole as it compresses
+and expands. It is also what lets the strike of a predator travel as a wave
+through the flock, instead of making a local dent. A metric rule loses the edges
+of the flock the moment that the flock spreads out.
 
-One honest caveat: the eight are *approximately* the nearest, not exactly. The
-search takes the first eight it accepts while scanning outward from the bird's
-own hash cell, which is a near-neighbour set rather than a sorted k-nearest one.
-Sorting candidates by distance would cost more than the whole rest of the step
-and change nothing anyone can see.
+One honest caveat: the eight are *approximately* the nearest and not exactly the
+nearest. The search takes the first eight that it accepts, and it scans outward
+from the hash cell of the bird itself. That gives a near-neighbour set and not a
+sorted k-nearest set. A sort of the candidates by distance costs more than the
+whole rest of the step, and it changes nothing that anyone can see.
 
-This is also, conveniently, what makes the cost linear in population: see below.
+This is also what makes the cost linear in the population. See
+[Cost](#cost), further down.
 
 ## What the terrain contributes
 
-Four more forces, and these are the reason this feature belongs in a topographic
-tool rather than being a boids demo with a mountain behind it. All four read data
-`buildTerrain` already returns.
+Four more forces. These four are the reason this feature belongs in a
+topographic tool. Without them it is a boids demo with a mountain behind it. All
+four read data that `buildTerrain` already returns.
 
-**Ground avoidance.** Height under the bird comes from `sampleBilinear`
-(`src/utils/terrain.js`) — the NoData-safe tap. Below the clearance band, an
-upward force ramps in that dominates every other term, so the flock drapes over a
-ridge instead of shearing through it. The integrator also holds a hard floor: the
-steering force alone can be outrun on a cliff face, and a bird drawn underground
-is the one artefact a viewer notices immediately.
+**Ground avoidance.** The height under the bird comes from `sampleBilinear` in
+`src/utils/terrain.js`, which is the NoData-safe tap. Below the clearance band
+an upward force ramps in. That force dominates every other term, so the flock
+drapes over a ridge and does not shear through it.
 
-A plain bilinear tap would not do. The grid stores `0` for NoData, and `0` is not
-"absent" but the darkest possible ground, which
-$(b - 0.5) \cdot 100 \cdot \text{elevScale}$ puts at the very bottom of the
-scene — so a tap straddling a lasso crop reports a floor that is not there, and
-the flock would dive into it all along the cut. Where the footprint holds no data
-at all the sampler returns `NaN`, and the bird heads for the roost rather than
-treating the void as ground.
+The integrator also holds a hard floor. A bird can outrun the steering force
+alone on a cliff face. A bird drawn underground is the one artefact that a
+viewer notices at once.
 
-**Roost.** An attractor above the highest ground, found by a strided scan capped
-at ~64k samples (a roost a couple of cells off the true summit is a roost on the
-summit). The pull is zero inside a free radius and ramps to full beyond it — a
-constant pull collapses the flock onto the peak, while the ramp makes it *orbit*,
-which is the shape people mean by "murmuration".
+A plain bilinear tap cannot do this. The grid stores `0` for NoData, and `0` is
+not "absent". It is the darkest possible ground, and
+$(b - 0.5) \cdot 100 \cdot \text{elevScale}$ puts it at the very bottom of the
+scene. Thus a tap across a lasso crop reports a floor that is not there, and the
+flock dives into it all along the cut. Where the footprint holds no data at all
+the sampler returns `NaN`. The bird then heads for the roost and does not treat
+the void as ground.
 
-**Ridge lift.** Updraft over steep ground and sink over the flats, read from
-`gridSlopes`, decaying with height above the terrain. The flock finds the
+**Roost.** An attractor above the highest ground. A strided scan finds it, with
+a cap of about 64 000 samples. A roost a few cells off the true summit is still
+a roost on the summit.
+
+The pull is zero inside a free radius and ramps to full beyond it. A constant
+pull collapses the flock onto the peak. The ramp makes the flock *orbit*, and
+that is the shape that people mean by "murmuration".
+
+**Ridge lift.** An updraft over steep ground and a sink over the flats, read
+from `gridSlopes`. It decays with height above the terrain. The flock finds the
 ridgelines on its own and traces them.
 
-Steepness is normalised as $s / (s + \bar{s})$ — exactly $0.5$ at the terrain's
-own mean slope — rather than against `maxSlope`. Normalising against the maximum
-makes the reading a function of one outlier cell: on a uniform cone every sample
-reads near 1 and the lift is a constant updraft; on a landscape with a single
-cliff in it every sample reads near 0 and the lift is a constant downdraft.
-Either way the flock drifts to one end of its envelope and parks there.
+The app normalises the steepness as $s / (s + \bar{s})$, which is exactly $0.5$
+at the mean slope of the terrain. It does not normalise against `maxSlope`.
+Against the maximum, one outlier cell decides the reading. On a uniform cone
+every sample then reads near 1 and the lift is a constant updraft. On a
+landscape with a single cliff in it every sample reads near 0 and the lift is a
+constant downdraft. Either way the flock drifts to one end of its envelope and
+parks there.
 
-**Flight envelope.** A slab of air around the roost height, pushed back into from
-*both* sides. A bare ceiling is not enough for the same reason: ridge lift has no
-obligation to average to zero over a given landscape.
+**Flight envelope.** A slab of air around the roost height. The app pushes the
+flock back into that slab from *both* sides. A bare ceiling is not enough, for
+the same reason: ridge lift has no obligation to average to zero over a given
+landscape.
 
 ## Shadows
 
-Each bird drops a soft dark disc onto the terrain. Not a shadow map — this scene
-has no lights at all, and the terrain's own shading is faked in the surface
-shader — so the shadow is faked the same way: solved analytically by walking from
-the bird along the sun ray until it meets the ground.
+Each bird drops a soft dark disc onto the terrain. This is not a shadow map.
+The scene has no lights at all, and the surface shader fakes the shading of the
+terrain. Thus the app fakes the shadow the same way. It solves the shadow
+analytically. It walks from the bird along the sun ray until the ray meets the
+ground.
 
-The direction is the **hillshade sun**, the same
-$(\cos\alpha\cos h,\ \sin h,\ \sin\alpha\cos h)$ vector `SurfaceMesh` lights the
-terrain with. A flock lit from a different angle than the ground it flies over
-looks wrong instantly, and sharing the parameter means the two cannot drift
-apart: move the azimuth and the shadows swing with the hillshading. Because the
-Hillshade section hides those sliders when hillshading is switched off — and the
-flock's shadows do not require it — the same two values are surfaced again in the
-Particles section. One parameter, two places to reach it.
+The direction is the **hillshade sun**. It is the same vector
+$(\cos\alpha\cos h,\ \sin h,\ \sin\alpha\cos h)$ that `SurfaceMesh` lights the
+terrain with. A flock lit from a different angle than the ground under it looks
+wrong at once. A shared parameter also means the two cannot drift apart. Move
+the azimuth and the shadows swing with the hillshading.
 
-Given a bird at height $h$ above the ground and a sun altitude $\theta$, the
-shadow lands $h \cot\theta$ away, opposite the azimuth. Finding the true
-intersection would mean marching the ray; instead there are exactly **two**
-terrain taps — one for the drop under the bird, one for the ground the shadow
-lands on. A third pass refining the position again moved shadows by well under
-their own width and cost half the feature's whole surcharge. The altitude is
-clamped to 5° and the throw capped at 0.6·span, because a sun on the horizon
-casts to infinity.
+The Hillshade section hides those two sliders when hillshading is off, and the
+shadows of the flock do not need hillshading. Thus the Particles section
+surfaces the same two values again. One parameter, two places to reach it.
 
-A shadow is only drawn where there is ground to receive it. That needs a
-*stricter* sampler than the flock's own: `sampleBilinear` clamps its row and
-column into range, which is right for a bird — one that strays past the edge
-should still see ground beneath it rather than fall off the world — but for a
-shadow it hands back the height of the nearest edge cell, so a shadow thrown past
-the boundary hung in mid-air beside the terrain, and one landing in a lasso'd-out
-hole lay on ground that is not there. `groundAt` returns `NaN` outside the grid
-as well as inside its holes, and a shadow with no ground under it is marked
-`aLift < 0` and skipped — thrown outside clip space by the vertex shader, and
-passed over by the exporter. With a 10° sun over a holed raster that culls about
-a quarter of them. Note "ground" here means what it means everywhere else in the
-app since 0.9.7 — a 2×2 footprint with at least one valid corner — so a shadow on
-the *rim* of a cut is kept, because that ground genuinely is there.
+Take a bird at height $h$ above the ground and a sun altitude $\theta$. The
+shadow lands $h \cot\theta$ away, opposite the azimuth. To find the true
+intersection the app must march the ray. Instead it takes exactly **two**
+terrain taps: one for the drop under the bird, one for the ground that the
+shadow lands on. A third pass to refine the position moved a shadow by well
+under its own width. It also cost half of the whole surcharge of the feature.
+The app clamps the altitude to 5° and caps the throw at 0.6 of the span, because
+a sun on the horizon casts to infinity.
 
-The sprite grows and fades with the bird's height above ground, which is the
-entire depth cue — without it the flock reads as pasted onto the terrain rather
-than flying over it. `Sh. spread` is that growth; at 0 every shadow is the same
-size whatever the altitude.
+The app draws a shadow only where there is ground to receive it. That needs a
+*stricter* sampler than the flock itself uses. `sampleBilinear` clamps its row
+and column into range. That is right for a bird: one that strays past the edge
+must still see ground beneath it and not fall off the world. For a shadow it is
+wrong. It hands back the height of the nearest edge cell. Thus a shadow thrown
+past the boundary hung in mid-air beside the terrain. A shadow that landed in a
+lasso hole lay on ground that is not there.
 
-Shadows cost roughly **a third on top of the simulation**, since they add a
-terrain tap per bird. Free at the default 2 000; the reason the 100 000 ceiling
-is a 60 fps flock without them and an 18 fps one with.
+`groundAt` returns `NaN` outside the grid and inside its holes. The app marks a
+shadow with no ground under it as `aLift < 0` and skips it. The vertex shader
+throws it outside clip space, and the exporter passes over it. With a sun at 10°
+over a raster with holes, that culls about a quarter of the shadows.
+
+"Ground" here means what it means everywhere else in the app since 0.9.7: a 2×2
+footprint with at least one valid corner. Thus the app keeps a shadow on the
+*rim* of a cut, because that ground genuinely is there.
+
+The sprite grows and fades with the height of the bird above the ground. That is
+the whole depth cue. Without it the flock reads as pasted onto the terrain and
+not as flying over it. `Sh. spread` sets that growth. At 0, every shadow is the
+same size at every altitude.
+
+Shadows cost about **a third on top of the simulation**, because they add one
+terrain tap per bird. At the default of 2 000 birds that is free. It is also the
+reason the ceiling of 100 000 is a 60 fps flock without shadows and an 18 fps
+flock with them.
 
 ## Listening to a track
 
-Load a track in the Particles panel and the flock flies to it. **The terrain is
-not touched.** That distinction is the whole design: `useSoundscape` exists to
-*become* the landscape — every frame it analyses is pushed into the heightmap
-store — and wanting birds that react to music is not wanting your raster
-replaced by a spectrogram. So the flock has its own audio (`useFlockAudio`),
-which decodes, analyses and plays while touching no store at all.
+Load a track in the Particles panel and the flock flies to it. **The app does
+not touch the terrain.** That distinction is the whole design.
 
-If a Soundscape *is* loaded, it is used as a fallback, so the same file never has
-to be uploaded twice. Own track first, Soundscape second, and the panel says
-which one it is listening to.
+`useSoundscape` exists to *become* the landscape. It pushes every frame that it
+analyses into the heightmap store. A wish for birds that react to music is not a
+wish for a spectrogram in place of your raster. Thus the flock has its own audio
+in `useFlockAudio`. That module decodes, analyses and plays, and it touches no
+store at all.
 
-Either way the features come from a *precomputed spectrogram read at the
-playhead*, not from an `AnalyserNode` on the output. Three things follow:
+If a Soundscape *is* loaded, the flock uses it as a fallback. Thus you never
+have to upload the same file twice. The own track comes first and the Soundscape
+comes second. The panel says which one the flock listens to.
 
-- **scrubbing works** — the features are a function of time, not of a running
-  stream, so dragging the playhead makes the flock react to where it lands;
-- it is deterministic: the same track at the same second gives the same reading;
-- it costs a few hundred array reads per frame instead of an FFT.
+Either way, the features come from a *precomputed spectrogram, read at the
+playhead*. They do not come from an `AnalyserNode` on the output. Three things
+follow from that:
 
-The trade is that this is what the *file contains*, not what the speakers emit:
-volume, muting and the browser's output chain are invisible to it.
+- **Scrubbing works.** The features are a function of time and not of a running
+  stream. Thus a drag of the playhead makes the flock react to where it lands.
+- **The result is deterministic.** The same track at the same second gives the
+  same reading.
+- **It is cheap.** It costs a few hundred array reads per frame and not an FFT.
 
-The flock's own analysis is deliberately coarser than the Soundscapes one — 128
-bins rather than 512. Nothing here becomes a heightmap, and three bands plus a
-flux figure cannot use the resolution a terrain needs.
+The trade is that this is what the *file contains*. It is not what the speakers
+emit. The volume, the mute switch and the output chain of the browser are all
+invisible to it.
+
+The analysis of the flock is coarser than the Soundscapes analysis, on purpose:
+128 bins and not 512. Nothing here becomes a heightmap. Three bands and one flux
+figure cannot use the resolution that a terrain needs.
 
 ### What it hears
 
-Three bands, because a kick, a voice and a cymbal pull the flock in visibly
-different directions while five bands mostly yield sliders nobody can hear:
-**bass** (20–160 Hz), **mid** (160 Hz–2 kHz), **high** (2–16 kHz). Each is
-peak-held over its bins, then run through an envelope with a fast attack and a
-slow release — percussion arrives instantly and decays, and equal rates give a
-flock that lags the beat and twitches after it.
+Three bands. A kick, a voice and a cymbal pull the flock in directions that you
+can see. Five bands mostly give sliders that nobody can hear. The three are
+**bass** (20–160 Hz), **mid** (160 Hz–2 kHz) and **high** (2–16 kHz).
 
-Loudness is **auto-gained** against a running peak that halves every four
-seconds. The stored values are absolute dB and music is not, so without it a
-quiet track never moves the flock and a loud one pins every slider.
+The app peak-holds each band over its bins. It then runs the band through an
+envelope with a fast attack and a slow release. Percussion arrives at once and
+then decays. Equal rates give a flock that lags the beat and twitches after it.
 
-Onsets come from **spectral flux** — the summed *rise* between consecutive
-analysis frames, falls ignored, which is what finds attacks rather than
-amplitude. It is measured against the last frame actually read, not the last
-render: the analysis runs at ~86 frames a second and the renderer at 60, so on
-some frames the playhead has not reached a new column, and re-measuring against
-the same row would report zero and chop every onset into a flicker.
+The app **auto-gains** the loudness against a running peak that halves every
+four seconds. The stored values are absolute dB, and music is not. Without the
+auto-gain a quiet track never moves the flock, and a loud one pins every slider.
+
+Onsets come from **spectral flux**. This is the summed *rise* between
+consecutive analysis frames, with the falls ignored. A rise finds attacks. An
+amplitude does not.
+
+The app measures the flux against the last frame that it actually read, and not
+against the last render. The analysis runs at about 86 frames a second and the
+renderer at 60. Thus on some frames the playhead has not reached a new column. A
+measurement against the same row reports zero and chops every onset into a
+flicker.
 
 ### What it drives
 
-Audio is a **parameter transform on the way into the simulation**, not a new set
-of forces. `stepFlock` resolves its scales from params on every call, so the
-whole feature lives outside the physics and `murmuration.js` never learns audio
-exists. It also means every mapping is something you could have dialled by hand,
-which keeps the result legible rather than magic.
+Audio is a **parameter transform on the way into the simulation**. It is not a
+new set of forces. `stepFlock` resolves its scales from params on every call.
+Thus the whole feature lives outside the physics, and `murmuration.js` never
+learns that audio exists. It also means that you can dial every mapping by hand,
+which keeps the result legible and not magic.
 
 | Control | Feature | Acts through | Effect |
 |---|---|---|---|
-| **Size** | bass, level | uniform | Sprites swell on the kick and streaks lengthen with energy |
+| **Size** | bass, level | uniform | Sprites swell on the kick. Streaks lengthen with the energy |
 | **Burst** | onsets | velocity | Throws the flock outward from its own centre |
-| Pace | overall level | speed clamp | Flight speed, centred so an average passage flies at the dialled speed and quiet ones genuinely slow down |
-| Pulse | bass | force | Separation opens while cohesion eases — the flock *breathes*. Pulling both the same way only makes it vibrate |
+| Pace | overall level | speed clamp | Flight speed, centred so an average passage flies at the dialled speed and a quiet one slows down |
+| Pulse | bass | force | Separation opens while cohesion eases, so the flock *breathes*. Both the same way only makes it vibrate |
 | Shimmer | high | force | Turbulence, on top of whatever is dialled in |
-| Startle | onsets | force | Widens the predator's fear radius, so an accented beat tears the same hole a strike does. Needs the predator on; **Burst** does not |
+| Startle | onsets | force | Widens the fear radius of the predator, so an accented beat tears the same hole a strike does. Needs the predator on. **Burst** does not |
 
 ### Why the top two exist
 
-The first version of this drove only the force channels, and the result was both
-faint and late. That is not a tuning problem, it is the integrator: a steering
-force changes velocity at `acc·dt` bounded by the turn-rate limit, and only then
-changes position, so a beat arrives on screen as a vague swell a few hundred
-milliseconds afterwards. Modulating parameters is inherently low-pass.
+The first version drove only the force channels. The result was faint and late.
+That is not a tuning problem. It is the integrator. A steering force changes the
+velocity at `acc·dt`, bounded by the turn-rate limit, and only then changes the
+position. Thus a beat arrives on screen as a vague swell a few hundred
+milliseconds afterwards. A modulation of parameters is low-pass by its nature.
 
-So the two most percussive channels bypass it. **Size** is a shader uniform —
-it changes on the frame it is set, with no lag at all. **Burst** writes velocity
-directly rather than applying a force, so an onset lands immediately; the speed
-clamp renormalises on the next substep, which turns the impulse into the flock
-snapping *outward*, and it re-forms on its own because no flocking rule was
-touched.
+Thus the two most percussive channels bypass the integrator. **Size** is a
+shader uniform. It changes on the frame that sets it, with no lag at all.
+**Burst** writes the velocity directly and applies no force. Thus an onset lands
+at once. The speed clamp renormalises on the next substep, which turns the
+impulse into the flock that snaps *outward*. The flock re-forms on its own,
+because nothing touched a flocking rule.
 
-It was also worth noticing that Startle — the most percussive control in the
-panel — routed through the predator's fear radius, and the predator is off by
-default. The punchiest mapping did nothing at all out of the box.
+Startle is the most percussive control in the panel. It routed through the fear
+radius of the predator, and the predator is off by default. Thus the punchiest mapping did nothing at all out of the box.
 
-Measured against the test fixture, which bursts once a second: the flock's
-on-screen footprint carries a 1 Hz component of amplitude 358 against a
-neighbouring-frequency floor of 41, where a silent flock manages 61 against 34.
-The beat is a line in the flock's motion, not a wobble.
+Measured against the test fixture, which bursts once a second: the on-screen
+footprint of the flock carries a 1 Hz component of amplitude 358, against a
+floor of 41 at the neighbouring frequencies. A silent flock manages 61 against
+34. The beat is a line in the motion of the flock and not a wobble.
 
 ### Ranges
 
-Each channel has an input **range** under its amount: the slice of that signal's
-0…1 which gets stretched across the whole response.
+Each channel has an input **range** under its amount. The range is the slice of
+that signal's 0…1 which the app stretches across the whole response.
 
-This is the control a dense track needs, and an amount slider cannot substitute
-for it. The band envelopes are auto-gained against the track's own recent peak,
-so on something loud from end to end — drum and bass, the back half of most
-choruses — they sit near the top and barely move. Scaling a signal that is not
-varying only scales a constant. Measured on a synthetic envelope oscillating
-between 0.86 and 0.94: **unwindowed it swings 0.08 of its available range;
-windowed to exactly that slice it swings the full 1.0.** Same input, same
-amount, a reaction you can see.
+A dense track needs this control, and an amount slider cannot take its place.
+The app auto-gains the band envelopes against the recent peak of the track
+itself. Thus on something loud from end to end the envelopes sit near the top
+and barely move. Drum and bass does this. So does the back half of most
+choruses. A scale applied to a signal that does not vary only scales a constant.
 
-Each channel windows separately because each is looking for something different
-in the same track. Burst wants only the sharpest attacks and starts windowed at
-0.15–0.90, since raw onset values sit low and dense music produces a wall of
-small ones that would disperse the flock. Pace wants the broad shape of the
-whole thing. Pulse and Size both read bass but are usually wanted at different
-thresholds — a swell you can see before the flock has moved at all, against a
-kick you can feel.
+Measured on a synthetic envelope that oscillates between 0.86 and 0.94: without
+a window it swings 0.08 of its available range. Windowed to exactly that slice,
+it swings the full 1.0. Same input, same amount, and a reaction that you can
+see.
 
-The meter draws each window as a bracket behind its band's envelope cap, so
-setting one is a matter of watching where the track actually sits and putting the
-window around it rather than guessing.
+Each channel windows on its own, because each one looks for something different
+in the same track. Burst wants only the sharpest attacks, so it starts windowed
+at 0.15–0.90. Raw onset values sit low, and dense music gives a wall of small
+ones that disperses the flock. Pace wants the broad shape of the whole track.
+Pulse and Size both read the bass, and you usually want them at different
+thresholds: a swell that you see before the flock has moved at all, against a
+kick that you feel.
+
+The meter draws each window as a bracket behind the envelope cap of its band.
+Thus you set a window by watching where the track actually sits and putting the
+window around it. You do not guess.
 
 ### Transport
 
-Play, restart, ±5 s, a scrub bar and a loop toggle. Skipping *wraps* rather than
-clamping, so stepping back from the first second of a looping track lands near
-its end instead of pinning at zero.
+The transport has play, restart, ±5 s, a scrub bar and a loop switch. A skip
+*wraps* and does not clamp. Thus a step back from the first second of a looping
+track lands near the end of the track and does not pin at zero.
 
-Seeking needs no resynchronisation of anything downstream, which is the same
-property that makes this design work at all: everything the flock reads is a
-function of *time*, taken from the precomputed spectrogram at `currentTime`
-rather than from a running stream. Drop the playhead anywhere and the next frame
-simply reads a different column. Scrubbing is wired to `input` rather than to
-release for that reason — the flock reacts as you drag, which is how you find
-the bar you were looking for.
+A seek needs no resynchronisation of anything downstream. That property is what
+makes this design work at all. Everything the flock reads is a function of
+*time*, taken from the precomputed spectrogram at `currentTime` and not from a
+running stream. Drop the playhead anywhere, and the next frame reads a different
+column.
 
-The playhead is read in an animation frame and written straight to the DOM: the
-range input's value and one text node. A scrubber backed by React state would
-re-render the entire sidebar several times a second, which for a panel this size
-is the most expensive thing on the page and exactly what the rest of the audio
-path is built to avoid.
+The scrubber is wired to `input` and not to release, for that reason. The flock
+reacts while you drag, and that is how you find the bar that you want.
+
+The app reads the playhead in an animation frame and writes it straight to the
+DOM. It writes the value of the range input and one text node. A scrubber backed
+by React state re-renders the whole sidebar several times a second. For a panel
+this size that is the most expensive thing on the page. It is also exactly what
+the rest of the audio path avoids.
 
 ### The meter
 
-Above the sliders is a live readout of what the flock is hearing and what that
-is doing to it — because "is the reaction visible enough" turned out to be a
-question I could not answer by eye, and neither can anyone else.
+Above the sliders is a live readout of what the flock hears and of what that
+does to it. The question "is the reaction visible enough" is one that nobody can
+answer by eye.
 
-The top row is the spectrum at the playhead, with the three bands tinted behind
-it and each band's *envelope* drawn as a cap. That distinction is the useful
-part: the envelope is smoothed and auto-gained, so it sits nowhere near the raw
-spectrum's height, and seeing both is how you tell a kick landing squarely in the
-bass band from one smearing into the mid.
+The top row is the spectrum at the playhead. The three bands are tinted behind
+it, and the *envelope* of each band is drawn as a cap. That distinction is the
+useful part. The envelope is smoothed and auto-gained, so it sits nowhere near
+the height of the raw spectrum. To see both is how you tell a kick that lands
+squarely in the bass band from one that smears into the mid.
 
-The bottom row is one bar per channel, showing its contribution right now. That
-is what makes the sliders tunable by eye: raise Pulse and watch its bar grow on
-every kick, instead of raising it and squinting at the flock.
+The bottom row is one bar per channel. Each bar shows the contribution of that
+channel right now. This is what makes the sliders tunable by eye. Raise Pulse
+and watch its bar grow on every kick. You need not raise it and then squint at
+the flock.
 
-Those bars are derived by running the real `applyAudio` and `audioVisuals` over
-neutral parameters and reading what comes back, rather than by restating their
-formulas in the drawing code — a meter that drifts from the thing it is metering
-is worse than no meter.
+The app derives those bars by a run of the real `applyAudio` and `audioVisuals`
+over neutral parameters, and it reads back what comes out. It does not restate
+their formulas in the drawing code. A meter that drifts from the thing it
+measures is worse than no meter.
 
-It samples the spectrogram independently rather than reading the simulation's
-state. Both are deterministic functions of the same playhead with the same
-constants, so they agree, and sampling independently means the meter keeps
-working while the flock is paused — which is exactly when you are setting it up.
+The meter samples the spectrogram on its own. It does not read the state of the
+simulation. Both are deterministic functions of the same playhead with the same
+constants, so they agree. A separate sample also keeps the meter working while
+the flock is paused, which is exactly when you set it up.
+
 An `IntersectionObserver` stops the loop when the panel is collapsed or scrolled
-away: a collapsed `Section` still renders its children, so without it the meter
-would sample and repaint sixty times a second for something nobody can see.
+away. A collapsed `Section` still renders its children. Without the observer the
+meter samples and repaints sixty times a second for something that nobody can
+see.
 
 ### Sync
 
-`Sync` reads the spectrogram slightly *ahead* of the playhead, 40 ms by default.
-The force channels still carry the integrator's lag, and a little lookahead
-cancels it. Reading the future is possible only because the whole track is
-analysed before it plays — an `AnalyserNode` on the output could not do this at
-any price. Raise it if the flock still feels behind the music, lower it if it
-anticipates.
+`Sync` reads the spectrogram a little *ahead* of the playhead, 40 ms by default.
+The force channels still carry the lag of the integrator, and a little lookahead
+cancels it. A read of the future is possible only because the app analyses the
+whole track before it plays. An `AnalyserNode` on the output cannot do this at
+any price. If the flock still feels behind the music, raise the value. If the
+flock anticipates the music, lower it.
 
-Past a Drive of about 1.5 the bursts arrive faster than the flock can re-form
-and it disperses into fragments. Measurably so: the 1 Hz prominence peaks at
-Drive 1 and *falls* by Drive 2, because saturated envelopes have less room left
-to modulate.
+Above a Drive of about 1.5 the bursts arrive faster than the flock can re-form,
+and the flock disperses into fragments. This is measurable. The 1 Hz prominence
+peaks at Drive 1 and *falls* by Drive 2, because a saturated envelope has less
+room left to modulate.
 
-Pausing releases the envelopes toward silence on the slow constant rather than
-cutting them, so the flock returns to its own behaviour instead of being yanked.
+A pause releases the envelopes toward silence on the slow constant. It does not
+cut them. Thus the flock returns to its own behaviour and is not yanked.
 
 ## The predator
 
-Optional, one agent, `O(n)` to evaluate. It pursues a point circling the flock's
-centroid — a pursuer that converges exactly sits in the middle of the flock and
-the wave never re-forms — and every bird inside the fear radius gets a repulsion
-an order of magnitude stronger than any flocking term.
+The predator is optional. It is one agent and costs `O(n)` to evaluate. It
+pursues a point that circles the centroid of the flock. A pursuer that converges
+exactly sits in the middle of the flock, and the wave never re-forms. Every bird
+inside the fear radius gets a repulsion an order of magnitude stronger than any
+flocking term.
 
-That imbalance is deliberate. The waves and holes that tear through real
-murmurations are birds abandoning every other rule at once, and without a
-predator a boids flock is a smooth blob that never surprises anyone.
+That imbalance is deliberate. The waves and holes that tear through a real
+murmuration are birds that abandon every other rule at once. Without a predator
+a boids flock is a smooth blob that never surprises anyone.
 
 ## Turbulence
 
-Low-amplitude wander sampled from `jitterNoise` — the same deterministic value
-noise the elevation jitter is built on. Reused rather than added to, so the
-codebase has one noise function and a seeded flock stays reproducible.
+A low-amplitude wander, sampled from `jitterNoise`. That is the same
+deterministic value noise that the elevation jitter uses. The app reuses it and
+does not add a second one. Thus the codebase has one noise function, and a
+seeded flock stays reproducible.
 
 ---
 
 ## Scaling: two yardsticks
 
 Every slider is a unitless multiplier. What they scale are fractions of the
-terrain's own dimensions, so a setting that reads well on one heightmap reads
-well on the next instead of needing re-tuning per raster.
+dimensions of the terrain itself. Thus a setting that reads well on one
+heightmap reads well on the next. It needs no re-tuning per raster.
 
-There are **two** yardsticks, not one:
+There are **two** yardsticks and not one:
 
 | | Symbol | Scales |
 |---|---|---|
-| Horizontal | `span` = larger footprint | perception radius, cruise speed, roost radii, fear radius, trail length |
-| Vertical | `vspan` = relief, floored at `0.05·span` | ground clearance, roost height, envelope half-height, lift decay |
+| Horizontal | `span` = the larger footprint | Perception radius, cruise speed, roost radii, fear radius, trail length |
+| Vertical | `vspan` = the relief, floored at `0.05·span` | Ground clearance, roost height, envelope half-height, lift decay |
 
-Keying altitude off the footprint looked right on a test cone and absurd on a
-real heightmap, where a 1024-cell raster is ten times wider than its mountains
-are tall: the flock cruised so far above the terrain that ground avoidance and
-ridge lift never engaged at all. The floor under `vspan` keeps a heightmap
-flattened to nothing (`elevScale` 0, or a blank raster) from collapsing the flock
-onto the plane.
+A key of the altitude off the footprint looked right on a test cone and absurd
+on a real heightmap. A raster of 1024 cells is ten times wider than its
+mountains are tall. The flock then cruised so far above the terrain that ground
+avoidance and ridge lift never engaged at all.
 
-`span` comes from `buildTerrain`'s `spanHalfW`/`spanHalfH`, the half-extents of
-the valid-cell box — *not* from `halfW`/`halfH`, which are the centring offsets
-that place that box's midpoint at the origin. The two are the same number on a
-full grid and diverge the moment a crop is off-centre, which is how this was
-originally wrong: on a lasso of columns 800–1000 of 1024, the offset is 900·scl
-against a terrain 200·scl wide, so every horizontal radius above and the
-`BOUND_SOFT` containment wall were an order of magnitude larger than the ground
-underneath them, and the flock simply left. Measured on a 20×20-cell crop: 32% of
-birds over data before the fix, 96% after. See
-[Edit-Mode.md § Centring is free](Edit-Mode.md).
+The floor under `vspan` protects a heightmap that is flat. An `elevScale` of 0
+gives such a heightmap, and so does a blank raster. Without the floor the flock
+collapses onto the plane.
+
+`span` comes from `spanHalfW` and `spanHalfH` in `buildTerrain`. Those are the
+half-extents of the valid-cell box. `span` does *not* come from `halfW` and
+`halfH`, which are the centring offsets that put the midpoint of that box at the
+origin.
+
+The two are the same number on a full grid. They diverge the moment that a crop
+is off-centre, and that is how this was wrong at first. On a lasso of columns
+800–1000 of 1024, the offset is 900·scl against a terrain 200·scl wide. Thus
+every horizontal radius above, and the `BOUND_SOFT` containment wall, were an
+order of magnitude larger than the ground under them. The flock left.
+Measured on a crop of 20×20 cells: 32% of the birds were over data before the
+fix, and 96% after it. See
+[Edit-Mode.md § The centring comes for free](Edit-Mode.md).
 
 ---
 
 ## Fixed timestep
 
-`stepFlock` consumes time in fixed $1/60\,\mathrm{s}$ substeps out of an
-accumulator, at most three per call, carrying the remainder forward. Two reasons:
+`stepFlock` consumes time in fixed substeps of $1/60\,\mathrm{s}$, out of an
+accumulator. It takes at most three substeps per call and carries the remainder
+forward. There are two reasons:
 
 1. **Reproducibility.** A variable timestep makes the flock a function of the
-   frame rate — the same seed diverges between a fast machine and a slow one, and
-   between a test run and the viewport. The seed is a user-facing control and
-   has to mean something.
-2. **Stability.** Boids under a large step overshoot into each other and explode.
+   frame rate. The same seed then diverges between a fast machine and a slow
+   one, and between a test run and the viewport. The seed is a control that the
+   user sees, and it has to mean something.
+2. **Stability.** Boids under a large step overshoot into each other and
+   explode.
 
-The caller's `Math.min(delta, 0.05)` clamp and the three-substep cap together
-prevent the spiral of death after a tab switch.
+The caller clamps with `Math.min(delta, 0.05)`. That clamp and the cap of three
+substeps together prevent the spiral of death after a tab switch.
 
 ---
 
 ## Cost
 
-Neighbour search is a uniform spatial hash: cell size equals the perception
-radius, so every neighbour lies in one of the 27 cells around a bird. Buckets are
-a power of two at least twice the population, addressed by
+The neighbour search uses a uniform spatial hash. The cell size equals the
+perception radius. Thus every neighbour lies in one of the 27 cells around a
+bird. The bucket count is a power of two, and at least twice the population. The
+address is:
 
 $$h = \left(i_x \cdot 73856093 \oplus i_y \cdot 19349663 \oplus i_z \cdot 83492791\right) \wedge \text{mask}$$
 
-Hash collisions only add candidates that the radius test then rejects, so
-correctness never depends on the table size. Three details earn their keep:
+A hash collision only adds candidates, and the radius test then rejects them.
+Thus the correctness never depends on the size of the table.
 
-**Cells are scanned nearest-first** — own cell, then the 6 faces, the 12 edges,
-the 8 corners. This is the difference between linear and quadratic scaling, and
-it is not obvious why. A flock occupies roughly the same *volume* however many
-birds are in it, so doubling the population doubles the birds per cell. Scanning
-in naive $-1 \ldots +1$ order meant a bird walked twenty low-yield corner and
-edge cells — where almost nothing falls inside the perception sphere — before
-reaching its own. At 50 000 birds that was some 2 000 rejected candidates before
-the neighbour cap could fire:
+Three details earn their keep.
 
-| Birds | occupied cells | birds/cell | candidates walked, naive order |
+**The app scans the cells nearest-first.** It takes the own cell, then the 6
+faces, then the 12 edges, then the 8 corners. This is the difference between
+linear and quadratic scaling, and the reason is not obvious.
+
+A flock occupies about the same *volume* whatever the number of birds in it.
+Thus a doubled population doubles the birds per cell. In a naive order of
+$-1 \ldots +1$, a bird walked twenty low-yield corner and edge cells before it
+reached its own. Almost nothing in those cells falls inside the perception
+sphere. At 50 000 birds that was some 2 000 rejected candidates before the
+neighbour cap fired:
+
+| Birds | Occupied cells | Birds per cell | Candidates walked, naive order |
 |---|---|---|---|
 | 2 000 | 283 | 7 | 144 |
 | 12 000 | 394 | 31 | 867 |
 | 50 000 | 468 | 107 | 3 552 |
 
-Nearest-first, the cap fires inside the bird's own cell and the walk is bounded
-by construction.
+Nearest-first, the cap fires inside the own cell of the bird. The walk is then
+bounded by construction.
 
-**Two budgets, not one.** Eight neighbours accepted (the topological rule above),
-and 96 candidates examined. The second is the hard guarantee: a *sparse* flock
-can walk a long way without accepting anything at all, so the neighbour cap alone
-does not bound the search.
+**There are two budgets and not one.** The app accepts eight neighbours, which
+is the topological rule above. It also examines 96 candidates at most. The
+second budget is the hard guarantee. A *sparse* flock can walk a long way and
+accept nothing at all, so the neighbour cap alone does not bound the search.
 
-**Cells are built by counting sort**, not the usual head/next linked list. The
-list is shorter to write but scatters its reads across the whole position buffer,
-and at this scale the search is entirely memory-bound; sorting lets a cell be
-walked as a contiguous slice. Birds are then processed in cell order, reading
-from the sorted snapshot and writing back to the real buffers — which as a
-side-effect makes the update *simultaneous*, so no bird sees some of its
-neighbours already moved this substep. Every buffer is permanent: a substep
-allocates nothing.
+**The app builds the cells by counting sort.** It does not use the usual
+head-and-next linked list. The list is shorter to write, but it scatters its
+reads across the whole position buffer. At this scale the search is entirely
+memory-bound, and a sort lets the app walk a cell as one contiguous slice.
+
+The app then processes the birds in cell order. It reads from the sorted
+snapshot and writes back to the real buffers. As a side effect the update is
+*simultaneous*: no bird sees a neighbour that already moved in this substep.
+Every buffer is permanent, so a substep allocates nothing.
 
 ### The arithmetic, and one dead clamp
 
-Getting from 50 000 birds to 100 000 was not an algorithmic change — the search
+The step from 50 000 birds to 100 000 was not an algorithmic change. The search
 was already linear. It was two things in the inner arithmetic, worth 2.2×
-together:
+together.
 
-**`Math.hypot` is not `Math.sqrt`.** It guards against intermediate overflow and
-underflow that cannot arise for three coordinates of a bird, and it costs several
-times as much. There were about ten per bird per substep — in the steering
-helper, its clamp, the speed limit, the streak buffer — and between them they
-were **27% of the entire step**. All are now `Math.sqrt` of the dot product.
+**`Math.hypot` is not `Math.sqrt`.** It guards against an intermediate overflow
+and underflow that cannot arise for three coordinates of a bird, and it costs
+several times as much. There were about ten calls per bird per substep. They
+were in the steering helper, in its clamp, in the speed limit and in the streak
+buffer. Between them they were **27% of the entire step**. All are now
+`Math.sqrt` of the dot product.
 
-**Reynolds' per-force clamp never fired.** Each steering force is limited to
-`maxForce`, which sounds necessary and is provably dead here:
-$|\hat{\mathbf{d}} \cdot v_{\text{cruise}}|$ is exactly $v_{\text{cruise}}$ and
-$|\mathbf{v}|$ never exceeds $1.35\,v_{\text{cruise}}$, so their difference
-cannot exceed $2.35\,v_{\text{cruise}}$ — and `maxForce` is
-$2.5\,v_{\text{cruise}}$. Removing it is bit-for-bit identical output (the flock
-invariant test's min and max altitudes did not move by a float) for another 12%.
-The forces that *do* need to overpower everything — ground avoidance at 6×,
-the predator at 12× — are applied afterwards and were never clamped anyway.
+**The per-force clamp of Reynolds never fired.** The app limits each steering
+force to `maxForce`, which sounds necessary. Here we can prove that it is dead.
+$|\hat{\mathbf{d}} \cdot v_{\text{cruise}}|$ is exactly $v_{\text{cruise}}$, and
+$|\mathbf{v}|$ never exceeds $1.35\,v_{\text{cruise}}$. Thus their difference
+cannot exceed $2.35\,v_{\text{cruise}}$, and `maxForce` is
+$2.5\,v_{\text{cruise}}$.
 
-The steering itself is now inlined at each of its four sites rather than called
-through a shared scratch array. That is deliberate duplication in the one loop in
-this codebase that runs a hundred thousand times per frame; scalars stay in
-registers.
+Removal of the clamp gives bit-for-bit identical output. The minimum and maximum
+altitudes in the flock invariant test did not move by one float. That was
+another 12%.
+
+The forces that *do* need to overpower everything are applied afterwards, and
+nothing ever clamped them. Ground avoidance at 6× is one. The predator at 12× is
+the other.
+
+The steering itself is now inlined at each of its four sites. It is no longer
+called through a shared scratch array. That is deliberate duplication, in the
+one loop in this codebase that runs a hundred thousand times per frame. The
+scalars stay in registers.
 
 ### Numbers
 
-Measured single-threaded in Node on an M-series laptop, 1024² terrain,
-predator on:
+Measured single-threaded in Node, on an M-series laptop, over a terrain of
+1024², with the predator on:
 
-| Birds | ms/substep | |
+| Birds | ms per substep | |
 |---|---|---|
 | 2 000 | 0.96 | the default |
 | 6 000 | 1.16 | |
 | 12 000 | 1.90 | |
 | 25 000 | 3.88 | |
 | 50 000 | 7.57 | |
-| 100 000 | 14.91 | the slider's ceiling |
+| 100 000 | 14.91 | the ceiling of the slider |
 
-With shadows on, add about a third: 10.2 ms at 50 000, 20.3 ms at 100 000.
+With shadows on, add about a third: 10.2 ms at 50 000, and 20.3 ms at 100 000.
 
-Linear above a few thousand at **0.15 ms per 1000 birds**, as the topological cap
-promises. In the browser, with rendering and the panel on the same thread, the
-full 100 000 holds 60 fps with shadows off (median frame 16.6 ms, p95 17.5 ms) —
-but that is the whole budget, so a slower machine will drop frames at the top of
-the range, and turning shadows on there takes it to about 18 fps. Both at once
-are comfortable to around 50 000. When
-it does the flock does not spiral: the accumulator simply releases fewer substeps
-than real time asks for and it moves in slow motion.
+Above a few thousand birds the cost is linear, at **0.15 ms per 1000 birds**.
+That is what the topological cap promises.
+
+In the browser the rendering and the panel share the thread. The full 100 000
+holds 60 fps with shadows off. The median frame is 16.6 ms and the p95 is
+17.5 ms. That is the whole budget, so a slower machine drops frames at the top
+of the range. Shadows on at that population give about 18 fps. Both at once are
+comfortable to about 50 000.
+
+When the machine does drop frames, the flock does not spiral. The accumulator
+releases fewer substeps than real time asks for, and the flock moves in slow
+motion.
 
 For comparison, the *hologram* field in its default configuration builds one
-particle per terrain cell — about a million on a 1024² raster — so even a
-100 000-bird flock is the lighter of the two, and it explicitly skips the
-hologram's home-buffer scan.
+particle per terrain cell. On a raster of 1024² that is about a million
+particles. Thus even a flock of 100 000 birds is the lighter of the two, and it
+skips the home-buffer scan of the hologram.
 
 ---
 
 ## Export
 
-The trade against the hologram field runs the other way here, and in the useful
+The trade against the hologram field runs the other way here, in the useful
 direction.
 
-The hologram's motion lives entirely in the vertex shader; the CPU never learns
-where a particle went, so an SVG export of it is a snapshot of the field *at
-rest*. The flock's positions **are** the buffer the renderer draws from, so
-`getPositions()` returns the live flock and the exported SVG is the frame on
-screen. Turn *Animate* off to freeze it, then export.
+The motion of the hologram lives entirely in the vertex shader. The CPU never
+learns where a particle went. Thus an SVG export of the hologram is a snapshot
+of the field *at rest*.
 
-Shadows export too, as their own `layer-flock-shadow` layer, and they are the
-one part of the field the depth test genuinely culls in the exporter: a shadow on
-the far slope is hidden by the ridge in front of it, with no ghost pass, since a
-shadow showing faintly through a mountain reads as a smudge on the rock.
+The positions of the flock **are** the buffer that the renderer draws from.
+`getPositions()` returns the live flock, so the exported SVG is the frame on
+screen. To freeze the flock, turn *Animate* off. Then export.
 
-**Sprites are clamped to what the GPU will draw.** `gl_PointSize` is silently
-limited to `ALIASED_POINT_SIZE_RANGE` — 511 on one machine here, as little as 63
-on others. The exporter computes the same `size · 300 / −z` as the vertex
-shader, so the two agree right up until that product passes the ceiling, and
-then they diverge by however far past it the maths went. At a close zoom with a
-large Size the viewport showed a sprite pinned at the ceiling while the SVG drew
-one many times bigger: measured at 579 px against a 511 px ceiling here, and
-proportionally far worse on hardware that stops at 63. The export inherits the
-limit, because the export is meant to be what the viewport shows.
+Shadows export too, in their own `layer-flock-shadow` layer. They are also the
+one part of the field that the depth test genuinely culls in the exporter. The
+ridge in front of a shadow hides it, with no ghost pass. A shadow that shows
+faintly through a mountain reads as a smudge on the rock.
 
-Birds land in the SVG as `<circle>` elements alongside the hologram's, projected
-and depth-tested against the same software Z-buffer the line layers use. Streaks
-get their own Inkscape layer, `layer-flock`, because a plotter run is sorted by
-layer and the streaks are the pen-drawn half of the flock. PNG and WebM need no
-special handling: PNG re-renders the scene offscreen, and WebM recording already
-forces the on-demand render loop to run.
+**The app clamps a sprite to what the GPU will draw.** WebGL limits
+`gl_PointSize` to `ALIASED_POINT_SIZE_RANGE` and reports nothing. That limit is
+511 on one machine here, and as little as 63 on others.
 
-STL does not include the flock — it does not include particles of any kind.
+The exporter computes the same `size · 300 / −z` that the vertex shader
+computes. Thus the two agree until that product passes the ceiling. Past the
+ceiling they diverge by the amount that the maths went over it.
+
+At a close zoom with a large Size, the viewport showed a sprite pinned at the
+ceiling while the SVG drew one many times bigger. Measured here: 579 px against
+a ceiling of 511 px, and far worse in proportion on hardware that stops at 63.
+The export now inherits the limit, because the export must be what the viewport
+shows.
+
+Birds land in the SVG as `<circle>` elements, beside the ones from the hologram.
+The exporter projects them and depth-tests them against the same software
+Z-buffer that the line layers use.
+
+Streaks get their own Inkscape layer, `layer-flock`. A plotter run is sorted by
+layer, and the streaks are the pen-drawn half of the flock.
+
+PNG and WebM need no special handling. PNG re-renders the scene offscreen. A
+WebM recording already forces the on-demand render loop to run.
+
+STL does not include the flock. It includes no particles of any kind.

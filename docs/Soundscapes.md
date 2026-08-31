@@ -1,10 +1,10 @@
 # Soundscapes
 
-Soundscapes turns an audio file into terrain. The track is analysed once into a
-spectrogram, and playback then *streams* a window of that spectrogram into the
-heightmap store — the same slot a PNG or GeoTIFF occupies. Every existing tool
-therefore applies unchanged: every draw mode, hillshade, erosion, and
-the SVG / PNG / STL exporters.
+Soundscapes turns an audio file into terrain. The app analyses the track once
+into a spectrogram. During playback it then *streams* a window of that
+spectrogram into the heightmap store. This is the same slot that a PNG or a
+GeoTIFF uses. Thus every existing tool works without a change: every draw mode,
+hillshade, erosion, and the SVG, PNG and STL exporters.
 
 ---
 
@@ -21,87 +21,91 @@ the SVG / PNG / STL exporters.
                                         └──> setHeightmap() ──> terrain
 ```
 
-Analysis happens **once**, on upload. Seeking, restyling and every tone-mapping
-control re-slice the stored result rather than re-running the FFT.
+The app analyses the track **once**, at upload. When you seek, restyle, or move
+a tone-mapping control, the app re-slices the stored result. It does not run the
+FFT again.
 
 ---
 
 ## Short-Time Fourier Transform
 
-The decoded track is mixed to mono and cut into overlapping frames of
-`fftSize` samples, advancing by a hop of `fftSize / 4` (75 % overlap). Each
-frame is multiplied by a periodic Hann window
+The app mixes the decoded track to mono. It then cuts the track into frames of
+`fftSize` samples that overlap. The hop between frames is `fftSize / 4`, which
+gives an overlap of 75 %. It multiplies each frame by a periodic Hann window:
 
 $$w[n] = \tfrac{1}{2}\left(1 - \cos\frac{2\pi n}{N}\right)$$
 
-and transformed with a radix-2 Cooley–Tukey FFT (`src/utils/fft.js`).
-Magnitudes are taken over the half-spectrum (DC … Nyquist) and scaled by the
-window's coherent gain, $2 / \sum_n w[n]$, so a full-scale sinusoid lands at
-0 dBFS.
+It then transforms the frame with a radix-2 Cooley–Tukey FFT
+(`src/utils/fft.js`). It takes the magnitudes over the half-spectrum, from DC to
+Nyquist. It scales them by the coherent gain of the window, $2 / \sum_n w[n]$.
+Thus a full-scale sinusoid lands at 0 dBFS.
 
-Frames are capped at `MAX_FRAMES = 24000`. Past that the hop is stretched, so a
-long track loses time resolution instead of exhausting memory — a 12-minute
-file at 44.1 kHz would otherwise allocate ~52k frames.
+The frame count has a limit of `MAX_FRAMES = 24000`. Above that limit the app
+stretches the hop. Thus a long track loses time resolution and does not exhaust
+the memory. Without the limit, a file of 12 minutes at 44.1 kHz allocates about
+52 000 frames.
 
 ### Frequency binning
 
-The half-spectrum is reduced to `bins` rows. Two spacings are available:
+The app reduces the half-spectrum to `bins` rows. There are two spacings:
 
 | Mode | Bin edges |
 |---|---|
 | Linear | $f_i = \dfrac{i}{B}\, f_\text{Nyquist}$ |
 | Logarithmic (default) | $f_i = f_\text{min}\left(\dfrac{f_\text{Nyquist}}{f_\text{min}}\right)^{i/B}$, $f_\text{min} = 30\ \text{Hz}$ |
 
-Log spacing is the musically meaningful one — an octave is a constant distance,
-so bass detail is not crushed into the bottom few rows. Within a band the
-**peak** magnitude is kept rather than the mean: averaging washes out narrow
-partials, which are exactly the ridges that read as terrain.
+Log spacing is the one with a musical meaning. An octave is a constant distance
+on that axis, so the bottom rows do not crush the bass detail.
 
-Edges are forced strictly increasing, so when many output bins map into the
-sparse low end the mapping degrades to 1:1 rather than producing empty rows.
+Inside a band the app keeps the **peak** magnitude and not the mean. A mean
+washes out narrow partials, and those partials are the ridges that read as
+terrain.
+
+The app forces the edges to increase strictly. Thus when many output bins map
+into the sparse low end, the mapping degrades to 1:1 and gives no empty rows.
 
 ### Storage
 
-Values are stored as dB normalised over a **fixed** range, $[-110, 0]$ dB:
+The app stores values in dB, normalised over a **fixed** range of $[-110, 0]$ dB:
 
 $$v = \operatorname{clamp}\left(\frac{20\log_{10}(|X_k| \cdot g) - \text{DB}_\text{MIN}}{-\text{DB}_\text{MIN}},\ 0,\ 1\right)$$
 
-Keeping the storage range fixed — rather than baking in the user's floor and
-contrast — is what lets **dB Floor** and **Contrast** apply per frame at
-streaming time instead of forcing a re-analysis on every slider tick.
+The storage range stays fixed. It does not bake in the floor and the contrast of
+the user. Thus **dB Floor** and **Contrast** apply per frame at stream time. A
+move of either slider costs no new analysis.
 
 ---
 
 ## Streaming
 
-On each tick the frame index for the current playback position is
+On each tick the app gets the frame index for the current playback position:
 
 $$f = \left\lfloor \frac{t \cdot f_s}{\text{hop}} \right\rceil$$
 
-and `sliceWindow()` copies columns $[f - W + 1,\ f]$ into a
-`windowFrames × bins` heightmap: time on X, frequency on Y, low frequencies at
-the bottom. Columns before the start of the track stay silent, so a track
-scrolls in from the right rather than starting mid-stream.
+`sliceWindow()` then copies the columns $[f - W + 1,\ f]$ into a heightmap of
+`windowFrames × bins`. Time runs along X and frequency along Y. The low
+frequencies are at the bottom. Columns before the start of the track stay
+silent. Thus a track scrolls in from the right and does not start in the middle.
 
-Tone mapping is applied here:
+The app applies the tone map here:
 
 $$v' = \left(\operatorname{clamp}\frac{v - \text{floor}}{1 - \text{floor}}\right)^{\gamma}$$
 
 ### Pacing
 
-Each push replaces the heightmap and therefore costs a full geometry rebuild,
-so the tick is throttled to the **Rate** setting rather than running at rAF
-speed.
+Each push replaces the heightmap, so each push costs a full geometry rebuild.
+Thus the tick runs at the **Rate** setting and not at rAF speed.
 
-Pacing is deadline-based, not "has `interval` elapsed since the last push".
-Ticks only arrive on rAF boundaries (~16.7 ms), so an elapsed test can only
-produce rates of 60/n — asking for 45/s would silently give 30/s, because the
-frame at 16.7 ms is always short of a 22.2 ms interval. Advancing a deadline by
-exactly `interval` instead lets the gap alternate between one and two frames so
-the *average* matches the request. The deadline resyncs when it falls more than
-an interval behind, so a stall is absorbed rather than repaid as a burst.
+The pacing uses a deadline. It does not measure the time from the last push
+against `interval`. Ticks arrive only on rAF boundaries, about every 16.7 ms. An
+elapsed test can thus give only the rates 60/n. A request for 45/s gives 30/s in
+silence, because the frame at 16.7 ms is always short of an interval of 22.2 ms.
+The app advances a deadline by exactly `interval` instead. The gap then
+alternates between one frame and two frames, so the *average* matches the
+request. The deadline resyncs when it falls more than one interval behind. Thus
+the app absorbs a stall and does not repay it as a burst.
 
-Measured effective rates at the 512 × 512 default:
+These are the measured rates at the default grid of 512 × 512:
 
 | Requested | Achieved |
 |---|---|
@@ -110,128 +114,137 @@ Measured effective rates at the 512 × 512 default:
 | 45/s | 44.6/s |
 | 60/s | 55.4/s |
 
-60/s falls slightly short because the 16.7 ms build just exceeds the 16.67 ms
-frame budget at that grid size; smaller grids reach a full 60.
+60/s comes out a little short. The build takes 16.7 ms at that grid size, which
+is a little more than the frame budget of 16.67 ms. A smaller grid reaches a full
+60/s.
 
 ---
 
 ## Freeze Whole Track
 
-Streaming terrain is a moving target, which erosion, STL and SVG cannot work
-with. **Freeze Whole Track** pauses playback and writes the entire track as one
+Streamed terrain moves. Erosion, STL and SVG cannot work with a moving target.
+**Freeze Whole Track** pauses the playback and writes the whole track as one
 static heightmap.
 
-*Which shape* the track takes is chosen by the **projection** selector above the
-button. Every projection is a pure function of the spectrogram returning the
-same pixels/width/height the store takes, so none of them needs anything
-downstream to know which one ran.
+The **projection** selector above the button decides *which shape* the track
+takes. Every projection is a pure function of the spectrogram. Each one returns
+the same pixels, width and height that the store takes. Thus nothing downstream
+needs to know which projection ran.
 
 ---
 
 ## Whole-track projections
 
-A four-minute STFT squeezed into 1024 columns is the literal answer and a poor
-portrait: mostly noise with a loud middle. The other projections fold the track
-so its *structure* becomes relief.
+A four-minute STFT in 1024 columns is the literal answer. It is also a poor
+portrait: mostly noise, with a loud middle. The other projections fold the track
+so that its *structure* becomes relief.
 
-Each one lands in the heightmap slot as a plain raster, so **Terrain → Raw
-terrain view** shows exactly what a projection produced — flat, greyscale, with
-the draw modes out of the way. That is usually the quickest way to judge whether
-a setting did what you wanted before styling anything on top of it.
+Each projection lands in the heightmap slot as a plain raster. Thus **Terrain →
+Raw terrain view** shows exactly what the projection produced: flat, greyscale,
+with the draw modes out of the way. This is usually the quickest way to judge a
+setting before you style anything on top of it.
 
 ### Spectrogram
 
-Time across, frequency up, peak-held down to at most 1024 columns. The original
-freeze view, unchanged.
+Time across, frequency up, peak-held down to 1024 columns at most. This is the
+original freeze view, unchanged.
 
 ### Disc
 
-The track wound into a record: time runs around the circle, frequency from the
-label out to the rim.
+The track wound into a record. Time runs around the circle. Frequency runs from
+the label out to the rim.
 
-**Turns** is where it gets interesting. At 1 the track makes a single lap. Above
-1 it becomes an Archimedean groove — and setting the turn count to the track's
-bar or phrase count makes every repeat land at the same angle, so verse/chorus
-structure resolves into visible sectors.
+**Turns** sets how many laps the track makes. At 1 the track makes a single lap.
+Above 1 the track becomes an Archimedean groove. Set the turn count to the bar
+count or the phrase count of the track. Every repeat then lands at the same
+angle, so the verse and chorus structure resolves into sectors you can see.
 
-The spiral is parameterised by nearest groove, not by ring index: for the groove
-centred at radius $u = t$ and angle $2\pi t \cdot \text{turns}$, a pixel's turn
-is $k = \operatorname{round}(u \cdot \text{turns} - \theta)$ and its position
-along the groove is $t = (k + \theta) / \text{turns}$. Deriving the turn from
-radius alone would tear the image along the seam where $\theta$ wraps — exactly
-where the groove is supposed to run on into its next lap.
+The spiral takes its parameter from the nearest groove and not from a ring
+index. The groove has its centre at radius $u = t$ and angle
+$2\pi t \cdot \text{turns}$. The turn of a pixel is
+$k = \operatorname{round}(u \cdot \text{turns} - \theta)$. Its position along
+the groove is $t = (k + \theta) / \text{turns}$. A turn derived from the radius
+alone tears the image at the seam where $\theta$ wraps. That seam is exactly
+where the groove must run on into its next lap.
 
-**Groove** below 100 % leaves a gap between laps so they read as separate ridges
-rather than one smear.
+**Groove** below 100 % leaves a gap between the laps. The laps then read as
+separate ridges and not as one smear.
 
 ### Similarity
 
-Every moment of the track compared against every other. A repeated chorus is a
-stripe parallel to the main diagonal; a section that holds still is a block.
-This is the projection that makes song *form* visible rather than sound.
+Every moment of the track, compared against every other moment. A repeated
+chorus gives a stripe parallel to the main diagonal. A section that holds still
+gives a block. This projection makes the *form* of a song visible, and not its
+sound.
 
-Moments are reduced to feature vectors — 24 log-spaced band energies
-(**Timbre**) or 12 pitch classes (**Harmony**, which folds octaves together so
-it tracks chords rather than production) — then L2-normalised, so similarity is
-a plain dot product and a loud passage cannot look more similar to everything
-than a quiet one.
+The app reduces each moment to a feature vector. **Timbre** gives 24 log-spaced
+band energies. **Harmony** gives 12 pitch classes, which folds the octaves
+together, so it tracks the chords and not the production. The app then
+L2-normalises each vector. Thus the similarity is a plain dot product, and a
+loud passage cannot look more similar to everything than a quiet one.
 
-Two settings carry most of the visual weight:
+Two controls carry most of the visual weight:
 
-- **Enhance** averages along the diagonal direction. A single frame-to-frame
-  comparison is noisy; a genuine repeat is precisely the case where *consecutive*
-  moments match consecutive moments, so this is what turns a dotted repeat into a
+- **Enhance** averages along the direction of the diagonal. One frame-to-frame
+  comparison is noisy. A genuine repeat is the case where *consecutive* moments
+  match consecutive moments. Thus this control turns a dotted repeat into a
   continuous ridge.
-- **Layout → Lag** re-plots cell $(i, j)$ at $(i,\ j - i)$, straightening repeat
-  diagonals into horizontal ledges. Section boundaries become anti-diagonals.
-  The empty upper corner is the honest consequence of long lags having fewer
-  moments to compare.
+- **Layout → Lag** re-plots the cell $(i, j)$ at $(i,\ j - i)$. Repeat diagonals
+  become horizontal ledges. Section boundaries become anti-diagonals. The upper
+  corner is empty because a long lag has fewer moments to compare.
 
-**Sparsity** drops the weakest share of the matrix to flat ground, using a
-256-bucket histogram for the cut point rather than sorting ~590k cells.
+**Sparsity** drops the weakest share of the matrix to flat ground. It finds the
+cut point with a histogram of 256 buckets. It does not sort about 590 000 cells.
 
-Cosine similarity between non-negative spectra clusters in the top of its range,
-so the matrix is renormalised to its observed min/max before output — without
-that it is a plateau with faint marks on it rather than terrain.
+Cosine similarity between non-negative spectra clusters in the top of its range.
+Thus the app renormalises the matrix to its measured minimum and maximum before
+output. Without that step the result is a plateau with faint marks on it, and
+not terrain.
 
 ### Weave
 
 The track folded onto its own bar grid. Time runs across one bar and then wraps
-to the next row, so anything the drummer repeats stacks into a vertical ridge
-and the places where the pattern breaks — a fill, a dropped beat, a section
-change — appear as interruptions in an otherwise woven surface.
+to the next row. Thus anything the drummer repeats stacks into a vertical ridge.
+The places where the pattern breaks appear as interruptions in a woven surface.
+A fill, a dropped beat or a section change makes such a break.
 
-Tempo comes from autocorrelating the onset envelope (half-wave-rectified
-spectral flux — only *rising* energy counts, since summing the signed difference
-would cancel attacks against decays) over the lag range for 60–200 BPM. The
-result is folded into 70–160 BPM, because raw autocorrelation locks onto half or
-double the tempo just as happily. Set **BPM** manually to override it, and
-**Phase** to move the downbeat until the ridges stand upright.
+The tempo comes from an autocorrelation of the onset envelope over the lag range
+for 60–200 BPM. The envelope is the half-wave-rectified spectral flux, so only
+*rising* energy counts. A sum of the signed difference cancels the attacks
+against the decays.
 
-Short tracks make thin weaves: one row per bar means a 6-second clip is three
-rows. Past 512 rows the laps are peak-folded together, so a long track loses
-resolution rather than being truncated.
+The app folds the result into 70–160 BPM, because raw autocorrelation locks onto
+half the tempo or double the tempo as readily. To override the result, set
+**BPM** by hand. To move the downbeat until the ridges stand upright, set
+**Phase**.
+
+A short track makes a thin weave. One row per bar means that a clip of
+6 seconds gives three rows. Above 512 rows the app peak-folds the laps together.
+Thus a long track loses resolution and is not cut short.
 
 ### Strata
 
-Measured qualities of the track — loudness, brightness, onset density, spectral
-spread, rolloff, noisiness, low/mid/high energy, and a 12-row chromagram — each
-given its own horizontal band over one shared timeline.
+Measured qualities of the track, each in its own horizontal band over one shared
+timeline. These are the qualities: loudness, brightness, onset density, spectral
+spread, rolloff, noisiness, low, mid and high energy, and a chromagram of 12
+rows.
 
-**Profile** fills each band up to its curve, giving a silhouette; **Terrace**
-fills the whole band at the curve's value. Each curve is normalised to its own
-range over the track: spectral flatness lives in a very different numeric range
-from loudness, and a shared scale would flatten most of the strata into straight
-lines. What matters is how each quality moves across *this* track.
+**Profile** fills each band up to its curve, which gives a silhouette.
+**Terrace** fills the whole band at the value of the curve.
 
-Frequency-derived features are measured on a log axis — the perceptual distance
-from 200 Hz to 400 Hz is the same as 2 kHz to 4 kHz, and a linear centroid would
-spend its whole range in the top octave.
+The app normalises each curve to its own range over the track. Spectral flatness
+lives in a very different numeric range from loudness. A shared scale flattens
+most of the strata into straight lines. What matters is how each quality moves
+across *this* track.
+
+The app measures the frequency-derived features on a log axis. The perceptual
+distance from 200 Hz to 400 Hz is the same as the distance from 2 kHz to 4 kHz.
+A linear centroid spends its whole range in the top octave.
 
 ### Cost
 
-All projections run synchronously on the main thread; freezing is a one-shot
-action that already pauses playback.
+All projections run on the main thread and block it. A freeze is a one-shot
+action that already pauses the playback.
 
 | Projection | Default output | Time |
 |---|---|---|
@@ -242,10 +255,10 @@ action that already pauses playback.
 | Weave | 256 × bars | ~2 ms |
 | Strata | 512 × 304 | ~10 ms |
 
-Cell count, not the longest side, drives the render cost downstream, so
-`fitSoundscape` picks the terrain resolution from `width × height` against a
-budget set just above the frozen spectrogram — which has always rendered
-undecimated. Only the genuinely larger projections step up to resolution 2.
+The cell count drives the render cost downstream, and the longest side does not.
+Thus `fitSoundscape` picks the terrain resolution from `width × height` against
+a budget. That budget sits a little above the frozen spectrogram, which has always
+rendered without decimation. Only the larger projections step up to resolution 2.
 
 ---
 
@@ -254,20 +267,20 @@ undecimated. Only the genuinely larger projections step up to resolution 2.
 | Control | Re-analyses? | Notes |
 |---|---|---|
 | FFT Size (1024 / 2048 / 4096) | yes | Larger = finer frequency, coarser time |
-| Log / Linear frequency | yes | See binning above |
-| Bins | yes | Frequency rows; also the heightmap height |
-| Window | no | Time columns; also the heightmap width |
+| Log / Linear frequency | yes | See the binning section above |
+| Bins | yes | Frequency rows, and also the heightmap height |
+| Window | no | Time columns, and also the heightmap width |
 | Rate | no | Heightmap pushes per second |
-| dB Floor | no | Noise gate — drops quiet detail to flat ground |
-| Contrast | no | Gamma after the gate; >1 sharpens peaks into ridges |
-| Projection + its settings | no | Only affects freezing; re-renders in place while frozen |
+| dB Floor | no | Noise gate. Drops quiet detail to flat ground |
+| Contrast | no | Gamma after the gate. Above 1 it sharpens peaks into ridges |
+| Projection and its controls | no | Affects only the freeze. Re-renders in place while frozen |
 
-dB Floor and Contrast feed every projection too, so the two sliders behave the
-same whether the terrain is a streamed window or a frozen disc.
+dB Floor and Contrast feed every projection as well. Thus the two sliders behave
+the same way for a streamed window and for a frozen disc.
 
 The sidebar canvas renders the whole analysed track once into an offscreen
-buffer and blits it per frame, overlaying the playhead and the slice currently
-feeding the terrain. Click or drag it to seek.
+buffer. It then blits that buffer per frame and draws the playhead and the
+current slice over it. To seek, click the canvas or drag on it.
 
 ---
 
@@ -275,18 +288,24 @@ feeding the terrain. Click or drag it to seek.
 
 | File | Role |
 |---|---|
-| `src/utils/fft.js` | Radix-2 FFT + Hann window |
+| `src/utils/fft.js` | Radix-2 FFT and Hann window |
 | `src/utils/spectrogram.js` | STFT, binning, `sliceWindow`, `resampleTime`, tone map |
 | `src/utils/spectrogram.worker.js` | Runs the STFT off the main thread |
-| `src/utils/trackProjections.js` | Whole-track projections + their param schemas |
+| `src/utils/trackProjections.js` | Whole-track projections and their param schemas |
 | `src/hooks/useSoundscape.js` | Decode, transport, streaming tick, freeze |
-| `src/components/SpectrogramView.jsx` | Sidebar canvas + playhead |
+| `src/components/SpectrogramView.jsx` | Sidebar canvas and playhead |
 
 ### Adding a projection
 
-One entry in `TRACK_PROJECTIONS` (`src/utils/trackProjections.js`): an `id`, a
-`label`, a one-line `blurb`, a `build(spec, params, tone)` returning
-`{ pixels, width, height }`, and a `params` schema. The sidebar renders the
-schema itself — a bare descriptor is a slider, `type: 'seg'` a segmented row,
-`type: 'tog'` a switch, and a shared `group` collapses several toggles into a
-chip grid. Nothing else needs touching.
+Add one entry to `TRACK_PROJECTIONS` in `src/utils/trackProjections.js`. The
+entry needs these fields:
+
+- An `id`.
+- A `label`.
+- A `blurb` of one line.
+- A `build(spec, params, tone)` that returns `{ pixels, width, height }`.
+- A `params` schema.
+
+The sidebar renders the schema itself. A bare descriptor gives a slider.
+`type: 'seg'` gives a segmented row. `type: 'tog'` gives a switch. A shared
+`group` collapses several switches into a chip grid. Nothing else needs a change.

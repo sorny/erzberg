@@ -17,17 +17,22 @@
 
 ---
 
-Load a greyscale heightmap (8- or 16-bit PNG), a GeoTIFF, or an audio file, and
-render it as 3D line art, structural relief or an architectural sketch through
-twenty-seven independent draw modes — from surveyor's marks like hachures and
-form lines to a quantised tilemap, a flashbulb with a cast shadow, and tracks
-laid down a face by something with mass. Contours letter their own heights: the
-number set into a break in the line, at the line's own angle, in its own ink.
-Export to SVG for a pen plotter, STL for a printer, or 4K PNG for the wall.
+Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
+The app renders it as 3D line art, structural relief or an architectural sketch.
+Twenty-seven independent draw modes do the work. They range from surveyor's
+marks such as hachures and form lines to a quantised tilemap. Others are a
+flashbulb with a cast shadow, and tracks that something with mass laid down a
+face.
+
+Contours letter their own heights. The app sets the number into a break in the
+line, at the angle of the line, in the ink of the line.
+
+Export to SVG for a pen plotter, to STL for a printer, or to 4K PNG for the wall.
 
 **Everything runs locally in your browser.** Your files never leave your
-machine — no server, no upload, no account, and no third-party request on load:
-the one webfont is served from the app's own origin rather than from a CDN.
+machine. There is no server, no upload and no account. The app makes no
+third-party request on load, because it serves the one webfont from its own
+origin.
 
 <table>
   <tr>
@@ -52,8 +57,8 @@ the one webfont is served from the app's own origin rather than from a CDN.
   </tr>
 </table>
 
-<sub>Six of the 56 bundled presets, all rendered from the same sample heightmap
-through the app's own PNG exporter.</sub>
+<sub>Six of the 56 bundled presets. The app rendered all six from the same sample
+heightmap through its own PNG exporter.</sub>
 
 ---
 
@@ -66,23 +71,24 @@ npm install
 npm run dev              # http://localhost:5173
 ```
 
-The app opens on a bundled sample heightmap under a style preset, so there is
-something worth looking at before you load anything — the picture is the landing
-page. Pick a different style from the grid, then tune. *Reset all* returns to
-bare defaults, which is a different thing from the look it opens on.
+The app opens on a bundled sample heightmap under a style preset. Thus there is
+something worth a look before you load a file. The picture is the landing page.
+Pick a different style from the grid. Then tune it. *Reset all* returns the app
+to bare defaults, which are not the same as the look that it opens on.
 
-**The panel remembers.** Terrain, style, particles, view and both gradients are
-written to the browser as you work and restored on the next visit, so a reload
-does not cost you the look you were building. The raster is deliberately not
-stored — the app opens on its sample plate and puts your settings back onto it.
-*Reset all* returns everything to defaults and offers an Undo for the eight
-seconds after.
+**The panel remembers.** The app writes terrain, style, particles, view and both
+gradients to the browser as you work, and restores them on your next visit. A
+reload thus does not cost you the look that you built. The app does not store
+the raster. It opens on its sample plate and puts your parameters back onto it.
+*Reset all* returns everything to defaults and offers an Undo for the next eight
+seconds.
 
-**Find a control.** Thirty-odd sections is a lot to remember the shape of, so the
-field at the top of the panel narrows it: type `azimuth` and only Hillshade is
-left, open, with the sun controls in it. Sections answer to their own vocabulary
-rather than only their titles, so it finds things that are switched off. Clearing
-the field puts the panel back exactly as it was.
+**Find a control.** The panel has more than thirty sections, which is a lot to
+remember the shape of. The field at the top of the panel narrows them. Type
+`azimuth`. Only Hillshade then remains, open, with the sun controls in it.
+Sections answer to their own vocabulary as well as to their titles, so the field
+also finds sections that are switched off. Clear the field. The panel then
+returns to exactly its previous state.
 
 ---
 
@@ -90,58 +96,77 @@ the field puts the panel back exactly as it was.
 
 | Source | Notes |
 |---|---|
-| **PNG** | 8-bit, or 16-bit decoded natively — the canvas path would silently truncate it to 8. Alpha is read as NoData. |
-| **GeoTIFF** | Real elevation, with the file's coordinate system reported rather than assumed, its declared NoData honoured, and vertical exaggeration suggested from the real ground size of a pixel. |
-| **Audio** | MP3 / WAV / OGG / M4A, analysed into a spectrogram that drives the terrain. |
-| **GPX** | Draped over a georeferenced raster as a track line. |
+| **PNG** | 8-bit, or 16-bit. The app decodes 16-bit natively, because the canvas path truncates it to 8-bit without a word. The app reads alpha as NoData. |
+| **GeoTIFF** | Real elevation. The app reports the coordinate system of the file instead of an assumption, honours the declared NoData value, and suggests a vertical exaggeration from the real ground size of a pixel. |
+| **Audio** | MP3, WAV, OGG or M4A. The app analyses the file into a spectrogram that drives the terrain. |
+| **GPX** | The app drapes the track line over a georeferenced raster. |
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
-| **OpenStreetMap** | Queried live for the raster's own extent — roads, water, rail, landuse, buildings, lifts, peaks. |
+| **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. |
 
-**Vector layers.** The section is always in the panel, and says what it needs
-when it has nothing to work with. With a georeferenced raster loaded, tick what
-you want from OpenStreetMap and it arrives as named layers — *Roads · Motorway*,
-*Water · Stream*, *Landuse · Forest* — one per tag class, and only for the classes that
-are actually there. Each layer has its own colour, weight, opacity and dash, can
-be hidden or removed, and areas can carry a fill that follows the slope rather
-than hanging over it as a flat lid. The list is a stack — top row is the front of
-the scene — and dragging a row by its grip changes what covers what, on screen and
-in the plot. Inside a layer, features are listed
-individually and checkable — keep five peaks out of twenty-nine — and resting the
-pointer on one names it and lights it up, so a dot on the terrain becomes
-*Polster · 1910 m*. Point features can carry their **name and height as labels**, set in the same
-Space Mono the logo uses — regular, bold or italic — and drawn as real geometry,
-so they plot as strokes in their own pen layer, and exported as real `<text>` you
-can retype in Inkscape rather than paths you can only redraw. Or set them in a **single-line
-font**: 49 stroke faces — the Hershey originals, Evil Mad Scientist's EMS
-conversions, the Relief SingleLine family, ISO 3098 (the lettering standard for
-technical drawings), and three fonts that were born on a plotter — where a letter
-is the centre line of each stem rather than its outline. An outlined 'A' plots as two closed contours and the pen goes round it
-twice; the Hershey 'A' is three strokes. Measured on the same pair of labels,
-the SVG's label layer is a quarter of the size. The icon and the lettering each
-carry their own ink: colour, stroke width, opacity, a fill with its own colour and
-opacity, and whether the stroke sits outside the shape or centred on its edge —
-independent of each other and of the layer's. A
-summit with no name in the data is left unlabelled rather than numbered. They can also drop the dot for an **SVG icon** — one of
-sixteen map-and-terrain marks drawn solid, or your own file — lifted off the ground on a leader line and
-turned in 3D to match the view. GeoJSON and GPX uploads join the same list. Everything is
-draped: simplified to what the DEM can express, then cut down to the grid step,
-so a motorway follows the ground over a ridge instead of tunnelling through it. Recolouring and restacking are a frame, not a rebuild.
-Layers carry into the SVG (one Inkscape layer each, so a plot is separable by
-pen), PNG and video exports.
+**Vector layers.** The section is always in the panel. If the section has
+nothing to work with, it says what it needs. With a georeferenced raster loaded,
+tick what you want from OpenStreetMap. The data arrives as named layers —
+*Roads · Motorway*, *Water · Stream*, *Landuse · Forest* — one layer per tag
+class. The app makes a layer only for the classes that are in the data.
+
+Each layer has its own colour, weight, opacity and dash. You can hide a layer or
+remove it. An area can carry a fill that follows the slope instead of a flat lid
+over it. The list is a stack, and the top row is the front of the scene. Drag a
+row by its grip to change what covers what, on screen and in the plot.
+
+Inside a layer, the panel lists the features individually with a checkbox. You
+can keep five peaks out of twenty-nine. Rest the pointer on a feature. The panel
+then names it and lights it up, so a dot on the terrain becomes
+*Polster · 1910 m*.
+
+A point feature can carry its **name and height as labels**. The labels use the
+same Space Mono as the logo, in regular, bold or italic. The app draws them as
+real geometry, so they plot as strokes in their own pen layer. The SVG export
+writes real `<text>` that you can retype in Inkscape, not paths that you can
+only redraw.
+
+You can also set the labels in a **single-line font**. There are 49 stroke
+faces. They are the Hershey originals, the EMS conversions from Evil Mad
+Scientist, and the Relief SingleLine family. The set also holds ISO 3098 (the
+lettering standard for technical drawings) and three fonts that were born on a
+plotter. In a stroke face, a
+letter is the centre line of each stem rather than its outline. An outlined 'A'
+plots as two closed contours, and the pen goes round it twice. The Hershey 'A'
+is three strokes. Measured on the same pair of labels, the label layer of the
+SVG is a quarter of the size.
+
+The icon and the lettering each carry their own ink: colour, stroke width,
+opacity, and a fill with its own colour and opacity. The stroke sits outside the
+shape or centred on its edge. These parameters are independent of each other and
+of the layer. If a summit has no name in the data, the app leaves it unlabelled
+rather than numbered.
+
+A point feature can also drop the dot for an **SVG icon**. Pick one of sixteen
+map-and-terrain marks drawn solid, or upload your own file. The app lifts the
+icon off the ground on a leader line and turns it in 3D to match the view.
+GeoJSON and GPX uploads join the same list.
+
+The app drapes every layer. It simplifies each feature to what the DEM can
+express, then cuts it down to the grid step. A motorway thus follows the ground
+over a ridge instead of a tunnel through it. A recolour or a restack costs a
+frame, not a rebuild. Layers carry into the SVG, PNG and video exports. Each
+layer becomes one Inkscape layer in the SVG, so you can separate a plot by pen.
 → [Georeferencing](docs/Georeferencing.md)
 
 **Georeferenced input, stated rather than assumed.** A GeoTIFF reports its
-coordinate system in the sidebar — `WGS 84 / UTM zone 33N (EPSG:32633)` — and
-says when a reading rests on an assumption instead of implying a precision it
-lacks. Features are projected from WGS84 into the raster's own grid: geographic
-CRS, Web Mercator, and the WGS84/ETRS89/NAD83/NAD27 UTM zone blocks. National
-grids needing Lambert or Gauss-Krüger maths plus a datum shift are named and
-declined rather than approximated — an overlay quietly 400 m out is worse than
-one that tells you to run `gdalwarp` first. When features do not appear, the
-panel distinguishes the reasons that otherwise look identical: not projectable,
-not georeferenced, projected fine and lying somewhere else, or — for the OSM
-query alone, which needs the *inverse* projection — a raster that can be drawn
-on but not queried for.
+coordinate system in the sidebar — `WGS 84 / UTM zone 33N (EPSG:32633)`. If a
+reading rests on an assumption, the panel says so. It does not imply a precision
+that it lacks. The app projects features from WGS84 into the grid of the raster.
+It supports a geographic CRS, Web Mercator, and the WGS84, ETRS89, NAD83 and
+NAD27 UTM zone blocks. The app names and declines the national grids that need
+Lambert or Gauss-Krüger maths plus a datum shift, rather than an
+approximation of them. An overlay 400 m out in silence is worse than one that
+tells you to run `gdalwarp` first.
+
+If features do not appear, the panel gives the reason. Four cases otherwise look
+the same: not projectable, not georeferenced, projected but somewhere else, and
+drawable but not queryable. The last case applies to the OSM query alone,
+because that query needs the *inverse* projection.
 
 ---
 
@@ -149,20 +174,23 @@ on but not queried for.
 
 <img src="docs/images/edit-mode.png" alt="Edit Mode: a lasso selection with editable points and a feathered edge over the heightmap">
 
-Press `E` and the viewport becomes a flat picture of the raster. Crop it with a
-handled rectangle (aspect locks, numeric fields), draw an ellipse — Shift for a
-perfect circle — or cut out an arbitrary region with a lasso or polygon. A lasso
-or polygon stays editable once closed: drag a point to move it, drag an edge to
-add one, right-click to remove. The cursor names whichever handle it is over
-before you press, so the small ones are findable. The result is centred
-automatically, and Feather ramps the clipped edge down to the terrain's own base
-level instead of ending it in a cliff.
+Press `E`. The viewport then becomes a flat picture of the raster. Crop it with
+a handled rectangle, which has aspect locks and numeric fields. Or draw an
+ellipse, and hold Shift for a perfect circle. Or cut out an arbitrary region
+with a lasso or a polygon.
 
-The clip is non-destructive: the original raster is kept, so Edit Mode can be
-re-entered to adjust it or cleared to get the whole heightmap back. It works the
-same on a PNG, a GeoTIFF and a Soundscape, and a GeoTIFF's bounding box is
-re-derived over the crop so vector layers stay where they belong. Every draw mode
-stops cleanly at the cut rather than reading the empty ground beyond it — see
+A lasso or a polygon stays editable after you close it. Drag a point to move it.
+Drag an edge to add a point. Right-click a point to remove it. Before you press,
+the cursor names the handle that it is over, so you can find the small ones. The
+app centres the result automatically. Feather ramps the clipped edge down to the
+base level of the terrain instead of an end in a cliff.
+
+The clip is non-destructive. The app keeps the original raster. You can enter Edit Mode
+again to adjust the clip, or clear the clip to get the whole heightmap back.
+Edit Mode works the same way on a PNG, a GeoTIFF and a Soundscape. The app
+re-derives the bounding box of a GeoTIFF over the crop, so vector layers stay
+where they belong. Every draw mode stops cleanly at the cut and does not read
+the empty ground beyond it. Read
 [NoData and clipped edges](docs/Draw-Modes.md#nodata-and-clipped-edges).
 → [Edit Mode](docs/Edit-Mode.md)
 
@@ -170,13 +198,13 @@ stops cleanly at the cut rather than reading the empty ground beyond it — see
 
 ## Draw modes
 
-Every mode runs independently, with its own colour, weight, dash pattern and
-hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
+Every mode runs independently. Each one has its own colour, weight, dash pattern
+and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 
 | Mode | Technique |
 |---|---|
 | Lines | Parallel terrain ridgelines at any bearing angle |
-| Crosshatch | Two perpendicular line sets at a configurable angle |
+| Crosshatch | Two perpendicular line sets at an angle that you set |
 | Pillars | Vertical extrusion per cell (line, cuboid or cylinder) |
 | Contours | Marching Squares isolines, GIS-unit-aware, with optional ring closing and Chaikin smoothing for soft "form lines" |
 | Hachure | Slope-directed short strokes |
@@ -186,79 +214,80 @@ hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Ridge Detection | Hessian eigenvalue crest extraction |
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot density driven by slope or elevation |
-| Isophotes | Lines of constant illumination — light drawn instead of hatched by |
+| Isophotes | Lines of constant illumination — light drawn, not hatched by |
 | Engraving | Copperplate illumination cross-hatch — shadows accumulate over up to 4 stacked stroke directions |
 | Curvature | Evenly spaced streamlines through the principal-curvature direction field — strokes wrap the shape rather than the light |
 | Rock & Scree | Swisstopo-style cliff hachures plus slope-graded debris dots |
 | Bitplane | Marching squares with the interpolation removed: flat plateaus, hard lattice staircases, a Bayer screen between them |
 | Sprite Blocks | The same quantiser drawn as blocks — one riser per step, top faces filled |
 | Flashbulb | A point light *inside* the scene with 1/r² falloff and a marched cast shadow, grained with a void-and-cluster blue-noise tile |
-| Halation | Blown highlights bleeding into the shadow beside them — the overexposure blurred, then subtracted from the grain |
-| Reticulation | Worley cell walls thinned by tone: crazed emulsion, found without building a Voronoi |
+| Halation | Blown highlights bleed into the shadow beside them — the overexposure blurred, then subtracted from the grain |
+| Reticulation | Worley cell walls thinned by tone: crazed emulsion, found without a Voronoi |
 | Fall Line | Descent with mass. A velocity, not a position — it overshoots, banks, and runs out onto the flat where Flow stops |
 | Berms | The same tracks drawn as lateral load: a tick on the outside of every turn, nothing on the straights |
 | Air | The jumps, found rather than drawn — spans where the ballistic path clears the surface, on their true parabola |
-| Race Line | Every line one drop-in could have taken, with the one that reaches lowest ground soonest inked heavier |
-| Exploded Frame | A braced space frame pulled apart along Y — the diagonal placed and oriented by the terrain's own twist |
+| Race Line | Every line that one drop-in could take, with the one that reaches lowest ground soonest inked heavier |
+| Exploded Frame | A braced space frame pulled apart along Y — the diagonal placed and oriented by the twist of the terrain |
 | Section | A cutting plane drawn as a drawing: heavy cut face, 45° hatch over the material below, outline beyond |
-| Zero Crossings | Sign changes of the detrended scanline — the terrain's local pitch, which is neither slope nor curvature |
+| Zero Crossings | Sign changes of the detrended scanline — the local pitch of the terrain, which is neither slope nor curvature |
 
-**Layered ghost occlusion.** Each line segment generates an invisible 3D curtain
-mesh acting as a depth buffer, so lines occlude other lines instead of being
-swallowed by the terrain surface. Hidden segments can be drawn in their own
-colour and opacity for an X-ray effect.
+**Layered ghost occlusion.** Each line segment makes an invisible 3D curtain
+mesh that acts as a depth buffer. Lines then occlude other lines, and the
+terrain surface does not swallow them. Hidden segments can take their own colour
+and opacity for an X-ray effect.
 
-**Paper framing.** Turn on a frame and the viewport shows where a sheet falls
-over the scene — ISO A, US Letter/Legal/Tabloid, square, 4:3, 3:2, golden, 16:9
-or a ratio of your own, portrait or landscape, with an optional inner margin. SVG export then emits only what lands inside it, *cut at the
-boundary* rather than hidden behind a clip path: lines are split at the page
-edge and dots outside are dropped, so the file contains nothing to delete
-afterwards. The page becomes the shape you chose instead of whatever bounding
-box the geometry happened to occupy.
+**Paper frame.** Turn on a frame. The viewport then shows where a sheet falls
+over the scene. The choices are ISO A, US Letter, US Legal, US Tabloid, square,
+4:3, 3:2, golden, 16:9, or a ratio of your own. A frame can be portrait or
+landscape, and it can have an inner margin. The SVG export then emits only what
+lands inside the frame, *cut at the boundary* rather than hidden behind a clip
+path. The app splits lines at the page edge and drops the dots outside it, so
+the file holds nothing for you to delete afterwards. The page becomes the shape
+that you chose, not the bounding box that the geometry happened to occupy.
 
-**Sections you can see.** Click two points and the elevation profile draws the
-cut it sampled: a pin at each end and a line draped over the surface between
-them, so the chart on screen is anchored to somewhere on the terrain rather than
-being a curve with no address. The section exports as its own SVG — ink on
-paper, with its axis, its elevation range and both ends labelled — to sit beside
-a plotted plate or in a document. Both are viewport aids: they are drawn over
-the scene but flagged out of the PNG capture and hidden while recording, so
-nothing composed for the screen lands in a print.
+**Sections that you can see.** Click two points. The elevation profile then
+draws the cut that it sampled: a pin at each end, and a line draped over the
+surface between them. The chart on screen is thus anchored to a place on the
+terrain, not a curve with no address. The section exports as its own SVG — ink
+on paper, with its axis, its elevation range and both ends labelled. It can sit
+beside a plotted plate or in a document. Both are viewport aids. The app draws
+them over the scene, but flags them out of the PNG capture and hides them during
+a recording. Nothing that you composed for the screen thus lands in a print.
 
-**Reproducible randomness.** The stochastic modes — Stipple, Rock & Scree,
-Flashbulb, Halation and Reticulation — each carry a seed, so the same seed
-always reproduces the identical pattern and a piece can be regenerated exactly.
+**Reproducible randomness.** The stochastic modes are Stipple, Rock & Scree,
+Flashbulb, Halation and Reticulation. Each one carries a seed. The same seed
+always reproduces the identical pattern, so you can regenerate a piece exactly.
 
-Every mode carries a small sample of its own marks in its panel header, so the
-list reads as ways of drawing rather than as a column of cartographic nouns.
+Every mode carries a small sample of its own marks in its panel header. The list
+thus reads as ways to draw, not as a column of cartographic nouns.
 
-**56 style presets** ship with the app, each a complete look: draw modes,
-colours, gradients and particle settings — shown as thumbnails rather than a
-wall of identical buttons. The tile you started from stays marked, and says
-*edited* once you have tuned away from it.
+**56 style presets** ship with the app. Each preset is a complete look: draw
+modes, colours, gradients and particle parameters. The app shows them as
+thumbnails, not as a wall of identical buttons. The tile that you started from
+stays marked, and says *edited* after you tune away from it.
 
-**Surprise me.** A seeded randomiser that rolls a look rather than shuffling
-250 sliders: it picks paper or ink, one to three draw modes against a cost
-budget, a palette, and at most one surface overlay, then checks the ink against
-the background so nothing comes back invisible. The seed is shown and the arrow
-steps back through recent rolls — the seed *is* the look, so it can always be
-returned to.
+**Surprise me.** A seeded randomiser rolls a look. It does not shuffle 250
+sliders. It picks paper or ink, one to three draw modes against a cost budget, a
+palette, and at most one surface overlay. Then it compares the ink against the
+background, so nothing comes back invisible. The panel shows the seed, and the
+arrow steps back through recent rolls. The seed *is* the look, so you can always
+return to it.
 
 ---
 
 ## Surface overlays
 
-- **Hillshade** with physically-based ray-marched cast shadows: ridgelines
+- **Hillshade** with physically-based ray-marched cast shadows. Ridgelines
   occlude sunlight through a horizon-angle comparison along a progressive-step
-  heightmap ray, with configurable darkness, softness (penumbra) and quality.
+  heightmap ray. Darkness, softness (penumbra) and quality are parameters.
   Azimuth and altitude drive both the Lambert shading and the shadows, and an
   amber sun indicator marks the light in the scene. Multi-directional mode
   blends several azimuths.
 - **Slope shading** — a two-colour steepness gradient blended over the fill.
 - **Aspect map** — slope direction as a hue wheel.
 - **Sky View Factor** ambient occlusion, ray-marched over the sky hemisphere.
-- **Water fill** at a chosen level, and **Tanaka illumination** that splits
-  contours into thick-bright and thin-dark halves.
+- **Water fill** at a level that you choose, and **Tanaka illumination** that
+  splits contours into thick-bright and thin-dark halves.
 - **Hypsometric tinting** per layer, driven by a shared editable gradient.
 - **Texture overlay** with blend modes, scale and offset.
 
@@ -266,63 +295,67 @@ returned to.
 
 ## Terrain tools
 
-- **Raw terrain view** — a one-toggle look at the data behind the art: the
-  heightmap as a flat greyscale plane, lowest point black and highest white,
-  stretched so a raster occupying only part of the range still reads at full
-  contrast. It reflects resolution, blur, Levels and the elevation cuts, so it
-  doubles as a live preview while tuning them. Flattening happens in the shader,
-  so the toggle costs no rebuild and every exporter still sees the real terrain.
-- **Levels** — black/white points over a live histogram, plus elevation cuts.
-- **Hydraulic erosion** — droplet simulation following
-  [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf),
-  off the main thread. → [Hydraulic erosion](docs/Hydraulic-Erosion.md)
+- **Raw terrain view** — one toggle shows the data behind the art. The heightmap
+  becomes a flat greyscale plane, with the lowest point black and the highest
+  white. The app stretches the range, so a raster that occupies only part of it
+  still reads at full contrast. The view reflects resolution, blur, Levels and
+  the elevation cuts, so it also works as a live preview while you tune them.
+  The shader does the flattening, so the toggle costs no rebuild. Every exporter
+  still sees the real terrain.
+- **Levels** — black and white points over a live histogram, plus elevation
+  cuts.
+- **Hydraulic erosion** — a droplet simulation off the main thread. It follows
+  [Hans Beyer's method](https://ardordeosis.github.io/implementation-of-a-method-for-hydraulic-erosion/thesis-beyer.pdf).
+  → [Hydraulic erosion](docs/Hydraulic-Erosion.md)
 - **Mirror** — reflect the raster on X or Y for kaleidoscopic terrain, and
   render octants selectively.
-- **Analysis** — click two points for an elevation cross-section, marked on the
-  terrain by a green pin at A, a red pin at B and a draped line between them.
-  The chart exports as a standalone SVG; the hypsometric integral is reported
-  continuously.
+- **Analysis** — click two points for an elevation cross-section. The app marks
+  the cut on the terrain with a green pin at A, a red pin at B and a draped line
+  between them. The chart exports as a standalone SVG. The app reports the
+  hypsometric integral continuously.
 - **Hologram particles** — an optional GPU-animated point cloud. A single time
-  uniform drives per-particle float and two-octave fractal-noise displacement
-  gated by a moving scan mask; all animation lives in the vertex shader, so
-  nothing is looped or re-uploaded per frame, and the glowing sprites are faked
-  in the fragment shader with no post-processing pass.
-- **Murmurations** — the same field, flying. Up to 100 000 boids steered by the
-  landscape they are over: they keep their distance from the ground, orbit a
-  roost on the highest peak, ride the updraft on steep slopes, and scatter into
-  waves when the optional predator gives chase. Each bird flies with its eight
-  nearest neighbours rather than everything within a radius — the topological
-  rule real starlings follow — which is what keeps the flock cohesive at any
-  density and the cost linear in population. Drawn as birds with velocity
-  streaks, each casting a shadow onto the terrain that grows and fades with how
-  high it is flying, lit by the same sun as the hillshading. Pause with `Space`
-  — and unlike the hologram, the positions live on the CPU, so exporting a
+  uniform drives per-particle float and two-octave fractal-noise displacement,
+  gated by a moving scan mask. All animation lives in the vertex shader, so the
+  app loops nothing and re-uploads nothing per frame. The fragment shader fakes
+  the glowing sprites with no post-processing pass.
+- **Murmurations** — the same field, in flight. The landscape steers up to
+  100 000 boids. They keep their distance from the ground, orbit a roost on the
+  highest peak, and ride the updraft on steep slopes. When the optional predator
+  gives chase, they scatter into waves. Each bird flies with its eight nearest
+  neighbours rather than with everything within a radius. That is the
+  topological rule that real starlings obey, and it keeps the flock cohesive at
+  any density and the cost linear in population. The app draws the birds with
+  velocity streaks. Each bird casts a shadow onto the terrain that grows and
+  fades with its height, lit by the same sun as the hillshade. Press `Space` to
+  pause. Unlike the hologram, the positions live on the CPU, so an export of a
   frozen flock gives an SVG of exactly what is on screen. Drop an MP3 on the
-  Particles panel and the flock flies to it — bass opens it out, highs make it
-  restless, onsets scatter it — while the terrain stays exactly the landscape you
-  loaded. → [Murmurations](docs/Murmurations.md)
+  Particles panel and the flock flies to it: bass opens it out, highs make it
+  restless, and onsets scatter it. The terrain stays exactly the landscape that
+  you loaded. → [Murmurations](docs/Murmurations.md)
 
 ---
 
 ## Soundscapes
 
-Upload a track and it becomes terrain. The audio is decoded and analysed once,
-off-thread, into a full spectrogram — radix-2 FFT, Hann-windowed STFT at 75%
-overlap, log or linear frequency binning — and playback then *streams* a
-scrolling window of that spectrogram into the same slot a raster would occupy,
-so every draw mode, overlay and exporter works on it unchanged. The spectrogram
-is drawn in the sidebar with a playhead and a highlight marking the slice
-currently feeding the terrain; click or drag to seek. Because the analysis is
-stored as dB over a fixed range, the noise gate and contrast controls re-slice
-the stored result instead of re-running the FFT.
+Upload a track. It becomes terrain. The app decodes and analyses the audio once,
+off-thread, into a full spectrogram. It uses a radix-2 FFT and a Hann-windowed
+STFT at 75% overlap, with log or linear frequency bins. Playback then *streams* a
+scrolling window of that spectrogram into the same slot that a raster occupies.
+Every draw mode, overlay and exporter thus works on it unchanged.
 
-*Freeze Whole Track* writes the entire track as one static heightmap for the
-tools that need a terrain that holds still — and it can take five shapes: a
-stretched spectrogram, a **Disc** wound like a record (match the turn count to
-the bar count and repeats line up radially), a **Similarity** matrix where
-repeated choruses become diagonal stripes, a **Weave** folded onto the detected
-bar grid so the groove stacks into ridges, or **Strata** stacking loudness,
-brightness, onset density and harmony as layers over one timeline.
+The sidebar draws the spectrogram with a playhead and a highlight. The highlight
+marks the slice that currently feeds the terrain. Click or drag to seek. The app
+stores the analysis as dB over a fixed range. The noise gate and contrast
+controls thus re-slice the stored result instead of a new FFT run.
+
+*Freeze Whole Track* writes the entire track as one static heightmap, for the
+tools that need a terrain that holds still. It can take five shapes. The first
+is a stretched spectrogram. The second is a **Disc**, wound like a record: match
+the turn count to the bar count, and repeats line up radially. The third is a
+**Similarity** matrix, where repeated choruses become diagonal stripes. The
+fourth is a **Weave**, folded onto the detected bar grid, so the groove stacks
+into ridges. The fifth is **Strata**, which stacks loudness, brightness, onset
+density and harmony as layers over one timeline.
 → [Soundscapes](docs/Soundscapes.md)
 
 ---
@@ -331,20 +364,19 @@ brightness, onset density and harmony as layers over one timeline.
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer projection with fill-based terrain occlusion, one named Inkscape/Illustrator layer per draw mode and per vector layer, dash patterns faithfully reproduced. Shows progress and can be cancelled — a dense plate takes real time, and the page stays responsive throughout |
+| **SVG** | Software Z-buffer projection with fill-based terrain occlusion. One named Inkscape or Illustrator layer per draw mode and per vector layer. Dash patterns are faithful. The export shows progress and you can cancel it. A dense plate takes real time, and the page stays responsive throughout |
 | **PNG** | 4K with MSAA, trimmed to content |
 | **PNG α** | Transparent background |
-| **STL** | Watertight mesh for 3D printing. Shows progress and can be cancelled, like the SVG export. Vector layers with **STL ribbon** on get a second solid for multicolour printing — default on for GPX, off for OSM |
+| **STL** | Watertight mesh for 3D printing. The export shows progress and you can cancel it, like the SVG export. A vector layer with **STL ribbon** on gets a second solid for multicolour printing. The default is on for GPX and off for OSM |
 | **Heightmap PNG** | The processed greyscale raster |
 | **WebM** | Screen recording of the live canvas |
 | **Profile SVG** | The elevation cross-section as a standalone chart, ink on paper |
 
-Exports are named after the source file: uploading `graz.tif` produces
-`graz.svg`, `graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png`,
-`graz-profile.svg`, `graz-vectors.stl` and `graz.webm` — and each one says which
-name it wrote when it finishes, rather than leaving the download shelf as the
-only evidence. Presets save and load as JSON, optionally carrying the heightmap
-with them.
+The app names exports after the source file. `graz.tif` produces `graz.svg`,
+`graz.png`, `graz-alpha.png`, `graz.stl`, `graz-heightmap.png`,
+`graz-profile.svg`, `graz-vectors.stl` and `graz.webm`. Each export says which
+name it wrote when it finishes, so the download shelf is not the only evidence.
+Presets save and load as JSON, and they can carry the heightmap with them.
 
 ---
 
@@ -353,10 +385,10 @@ with them.
 | Key | Action |
 |---|---|
 | `E` | Enter Edit Mode |
-| `Esc` | Cancel the shape being drawn, leave Edit Mode, or cancel elevation-profile picking |
-| `Enter` | Close the shape being drawn, or apply the clip |
+| `Esc` | Cancel the current shape, leave Edit Mode, or cancel an elevation-profile pick |
+| `Enter` | Close the current shape, or apply the clip |
 | `Backspace` | Remove the last polygon vertex |
-| `Shift` | While drawing or resizing an ellipse, constrain it to a circle |
+| `Shift` | While you draw or resize an ellipse, constrain it to a circle |
 | Right-click | Remove a point from a committed lasso or polygon |
 | `Q` | Toggle auto-rotate |
 | `\` | Show or hide the control panel |
@@ -369,57 +401,58 @@ browser or the OS and passes through untouched.
 
 ## Reach
 
-The panel runs on four type roles, three radii and one palette published as CSS
-custom properties, so a retune is a token edit rather than four hundred inline
-ones. Every control that fills with the accent under white text uses the deeper
-`#2f6fe0`, which reads 4.7:1 — the lighter accent is fine behind a 34 px toggle
-and not behind a 10 px uppercase label.
+The panel runs on four type roles, three radii and one palette, published as CSS
+custom properties. A retune is thus a token edit, not four hundred inline ones.
+Every control that fills with the accent under white text uses the deeper
+`#2f6fe0`, which reads 4.7:1. The lighter accent works behind a 34 px toggle,
+but not behind a 10 px uppercase label.
 
-Nothing here is a 3D terrain tool anyone will use without sight, and pretending
-otherwise would be worse than saying so. What the controls owe is the part that
-plenty of sighted people depend on: every slider, toggle, colour well and
-segmented choice carries its own name, so voice control has something to say and
-a screen reader has something to read. Section headers are buttons with
-`aria-expanded`, which is what lets the keyboard open one — everything inside a
-collapsed section was unreachable before. A focused slider shows a ring, and its
-arrow keys were always the only way to set an exact value from the keyboard.
-Panel text is at or above 4.5:1 at the size it is set, and the smallest control
-sits in a 20 px hit box.
+Nobody will use a 3D terrain tool without sight, and a claim to the contrary is
+worse than the plain statement. The controls owe the part that plenty of sighted
+people depend on. Every slider, toggle, colour well and segmented choice carries
+its own name. Voice control thus has something to say, and a screen reader has
+something to read.
+
+Section headers are buttons with `aria-expanded`. That is what lets the keyboard
+open one, and everything inside a collapsed section was unreachable before. A
+focused slider shows a ring. Its arrow keys were always the only way to set an
+exact value from the keyboard. Panel text is at or above 4.5:1 at the size that
+it is set, and the smallest control sits in a 20 px hit box.
 
 ---
 
 ## Performance
 
-The app is built to idle quietly and stay responsive under load.
+The app idles quietly and stays responsive under load.
 
-- **On-demand rendering.** The canvas draws a frame only when something changes,
-  so a static scene leaves the GPU near-idle. Continuous animations keep the loop
-  alive only while they run.
-- **60 fps camera.** Orbit, pan and zoom move the camera on the fast path while
-  React state follows on a throttled tick, so the sidebar never re-renders
-  per frame.
+- **On-demand rendering.** The canvas draws a frame only when something changes.
+  A static scene thus leaves the GPU near-idle. Continuous animations keep the
+  loop alive only while they run.
+- **60 fps camera.** Orbit, pan and zoom move the camera on the fast path. React
+  state follows on a throttled tick, so the sidebar never re-renders per frame.
 - **Off-thread geometry.** Rebuilds run in a long-lived worker over growable
-  typed-array writers and come back zero-copy, including surface normals.
-  Single-pass marching-squares contours are ~18× faster than per-level scanning.
-  The worker caches the source raster, so moving a slider sends parameters
-  instead of re-copying a 256 MB raster.
-- **Coalesced rebuilds.** Requests arriving faster than builds complete are
-  queued newest-wins rather than cancelled — cancelling each one meant nothing
-  ever finished under a continuous stream. A build is killed only when it is a
-  genuine outlier against the current cadence.
-- **Don't compute what nothing will look at.** Purely visual controls never
-  trigger a rebuild; surface normals and UVs are skipped when no fill layer
-  draws them; the particle field, occlusion curtains and the 268 MB ray-marching
-  texture are built only when something needs them; the full-resolution blur is
-  cached against the raster and radius. Smoothed contours are decimated with
-  Douglas–Peucker between Chaikin passes, keeping 40× the geometry off the GPU
-  for a deviation well under a pixel. SVG export scales occlusion sampling to
-  each segment's screen length rather than taking a flat 64 samples
-  (1042 ms → 265 ms).
+  typed-array writers. The results come back zero-copy, and they include surface
+  normals. Single-pass marching-squares contours are about 18 times faster than
+  per-level scanning. The worker caches the source raster. A slider move thus
+  sends parameters instead of a copy of a 256 MB raster.
+- **Coalesced rebuilds.** Requests that arrive faster than builds complete go
+  into a queue on a newest-wins rule. The app does not cancel each one, because
+  cancellation meant that nothing ever finished under a continuous stream. The
+  app kills a build only when it is a genuine outlier against the current
+  cadence.
+- **The app computes only what something will look at.** Purely visual controls
+  never trigger a rebuild. The app skips surface normals and UVs when no fill
+  layer draws them. It builds the particle field, the occlusion curtains and the
+  268 MB ray-marching texture only when something needs them. It caches the
+  full-resolution blur against the raster and the radius. Douglas–Peucker
+  decimates smoothed contours between Chaikin passes, which keeps 40 times the
+  geometry off the GPU for a deviation well under a pixel. SVG export scales
+  occlusion sampling to the screen length of each segment instead of a flat 64
+  samples (1042 ms → 265 ms).
 - **Supersampling.** Hairline art is finer than the pixel grid and can shimmer
-  in motion. An optional slider renders internally at up to 2× the device pixel
-  ratio — measured ~93% fewer hard pixel flips during a slow rotate — trading
-  fill rate for a calm, print-like image.
+  in motion. An optional slider renders internally at up to 2 times the device
+  pixel ratio. Measured: about 93% fewer hard pixel flips during a slow rotate.
+  The slider trades fill rate for a calm, print-like image.
 
 ---
 
@@ -428,16 +461,16 @@ The app is built to idle quietly and stay responsive under load.
 | Layer | Library |
 |---|---|
 | 3D engine | React Three Fiber + Three.js |
-| State | Zustand (raster data) + React state (all UI params), persisted to `localStorage` between visits |
-| GIS parsing | GeoTIFF.js; in-house GeoJSON, GPX and Overpass readers (no dependency) |
-| Icons | Maki (CC0), flattened to polylines through the browser's own SVG geometry API |
-| Labels | Space Mono (SIL OFL 1.1) in four faces, converted to glyph outlines by `npm run font` and flattened the same way. The panel's own wordmark uses the same face as a self-hosted woff2 — 9.6 kB, so the app contacts nobody on load |
-| Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces; flattened by `npm run fonts:single-line` |
-| Map data | OpenStreetMap via Overpass API — ODbL, attributed in the panel and in every SVG |
+| State | Zustand (raster data) + React state (all UI parameters), persisted to `localStorage` between visits |
+| GIS parsing | GeoTIFF.js, plus in-house GeoJSON, GPX and Overpass readers with no dependency |
+| Icons | Maki (CC0), flattened to polylines through the SVG geometry API of the browser |
+| Labels | Space Mono (SIL OFL 1.1) in four faces. `npm run font` converts them to glyph outlines, flattened the same way. The wordmark of the panel uses the same face as a self-hosted woff2 of 9.6 kB, so the app contacts nobody on load |
+| Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces. `npm run fonts:single-line` flattens them |
+| Map data | OpenStreetMap through the Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
-| Audio | Web Audio `decodeAudioData` + in-house radix-2 FFT (no dependency) |
-| Tests | Vitest for the pure maths; Playwright against a live dev server in real Chrome |
+| Audio | Web Audio `decodeAudioData` + an in-house radix-2 FFT with no dependency |
+| Tests | Vitest for the pure maths. Playwright against a live dev server in real Chrome |
 
 ---
 
@@ -472,59 +505,62 @@ npm run licenses         # regenerate dist/THIRD-PARTY-NOTICES.txt
 npm run logo             # flatten any <text> in the brand SVGs to outlines
 ```
 
-`logo` exists because an SVG used as an `<img>` — which is how the README
-embeds the logo — cannot load anything external, fonts included. Measured: as a
-document `logo.svg` made two requests to Google and rendered in Space Mono;
-inside an `<img>` it made none and fell back to Courier New, so the wordmark had
-never once rendered in its own typeface where it is actually used. Outlines have
-nothing to fetch and nothing to fall back to. They come from the same
-`space-mono-*.json` the 3D labels use, and they are *more* faithful than the
-text was: the browser hinted the `b` ascender down to 0.639 em where the font
-draws it at 0.700.
+`logo` exists because an SVG used as an `<img>` cannot load anything external,
+fonts included. The README embeds the logo that way. Measured: as a document,
+`logo.svg` made two requests to Google and rendered in Space Mono. Inside an
+`<img>` it made none and fell back to Courier New. The wordmark thus never
+rendered in its own typeface where it is actually in use. Outlines have nothing
+to fetch and nothing to fall back to. They come from the same
+`space-mono-*.json` files that the 3D labels use, and they are *more* faithful
+than the text was: the browser hinted the `b` ascender down to 0.639 em, where
+the font draws it at 0.700.
 
-`licenses` runs as part of `build`, so a `dist/` without its notices cannot be
-produced by accident. Every permissive licence in the tree asks the same small
-thing — MIT wants its notice "included in all copies", BSD and ISC say it in
-their own words, Apache-2.0 §4 wants a copy of the licence — and minification
-strips all of them out of the bundle. Collecting them beside it is the standard
-remedy: the notice still travels with the distribution, it is just not inside
-the JavaScript. Scope is the production dependency closure; the dev tooling is
+`licenses` runs as part of `build`, so nobody can produce a `dist/` without its
+notices by accident. Every permissive licence in the tree asks for the same
+small thing. MIT wants its notice "included in all copies". BSD and ISC say it
+in their own words. Apache-2.0 §4 wants a copy of the licence. Minification
+strips all of them out of the bundle. To collect them beside it is the standard
+remedy: the notice still travels with the distribution, but it is not inside the
+JavaScript. The scope is the production dependency closure. The dev tooling is
 not distributed and is not listed.
 
-`update-presets` and `thumbs` both drive the running dev server with Playwright,
-so start `npm run dev` first. `thumbs` renders each preset through the app's own
-PNG exporter and scales it down in-browser, so it needs no image tooling on the
-host.
+`update-presets` and `thumbs` both drive the running dev server with Playwright.
+Start `npm run dev` first. `thumbs` renders each preset through the PNG exporter
+of the app and scales it down in the browser. It thus needs no image tooling on
+the host.
 
-`lint` carries correctness rules only — no stylistic ones, and none are planned.
-The house style is settled, and a formatter would produce a diff across the whole
-tree that buried the findings a linter exists to surface. `eslint.config.js`
-records why the React Compiler rules that ship with `eslint-plugin-react-hooks`
-v7 are declined: driving three.js *is* mutating material uniforms in an effect,
-so three of them flag working code in every r3f app.
+`lint` carries correctness rules only. There are no stylistic rules, and none
+are planned. The house style is settled. A formatter produces a diff across the
+whole tree that buries the findings that a linter exists to surface.
+`eslint.config.js` records why the project declines the React Compiler rules
+that ship with `eslint-plugin-react-hooks` v7. To drive three.js *is* to mutate
+material uniforms in an effect, so three of those rules flag working code in
+every r3f app.
 
-Two suites, and they do not overlap. `test:unit` is Vitest over the modules that
-are just arithmetic — the box blur, area resampling, the bilinear tap,
-Douglas–Peucker, the projections, and the parameter registry that decides when a
-rebuild happens. They run in Node in about a third of a second and assert the
-maths directly, which is what a deviation bound or a projection wants instead of
-being inferred from a pixel eleven seconds into a spec. They live in
-`tests/unit/*.test.js`; Playwright is pinned to `*.spec.js` so neither runner
-picks up the other's files.
+There are two suites, and they do not overlap. `test:unit` is Vitest over the
+modules that are pure arithmetic: the box blur, area resampling, the bilinear
+tap, Douglas–Peucker and the projections. It also covers the parameter registry
+that decides when a rebuild happens. The unit tests run in Node in about a third
+of a second, and they assert the maths directly. A deviation bound or a
+projection wants that, not an inference from a pixel eleven seconds into a spec.
+They live in `tests/unit/*.test.js`. Playwright is pinned to `*.spec.js`, so
+neither runner picks up the files of the other.
 
-Everything else is end-to-end, and that is not a gap. Tests run against a live dev server in non-headless Chrome with WebGL enabled,
-because the things worth asserting — what the geometry worker produced, what the
-SVG exporter drew, whether the drawing buffer was clamped — only exist in a real
-renderer. Some specs depend on fixtures that are gitignored for size; those skip
-with a message rather than failing. See
+Everything else is end-to-end, and that is not a gap. Tests run against a live
+dev server in non-headless Chrome with WebGL enabled. The things worth an
+assertion exist only in a real renderer: what the geometry worker produced, what
+the SVG exporter drew, and whether the drawing buffer was clamped. Some specs
+depend on fixtures that are gitignored for size. Those specs skip with a message
+rather than a failure. Read
 [tests/testdata/README.md](tests/testdata/README.md).
 
-They also run **one at a time**, and that is not a compromise for a slow machine.
-Headed Chrome only foregrounds one window, and an occluded one has its
-`requestAnimationFrame` throttled and may stop compositing — so a parallel run of a
-suite that mostly reads rendered pixels reports starvation as feature failure. The
-cost is about six seconds: 14 workers on one GPU spent their time queueing rather
-than adding throughput. `playwright.config.js` carries the measurements.
+They also run **one at a time**, and that is not a compromise for a slow
+machine. Headed Chrome foregrounds one window only. An occluded window has its
+`requestAnimationFrame` throttled and can stop the composite. A parallel run of
+a suite that mostly reads rendered pixels thus reports starvation as feature
+failure. The cost is about six seconds: 14 workers on one GPU spent their time
+in a queue rather than added throughput. `playwright.config.js` carries the
+measurements.
 
 ---
 
@@ -532,19 +568,20 @@ than adding throughput. `playwright.config.js` carries the measurements.
 
 MIT — Copyright (c) 2026 sorny.
 
-The code is MIT. The things it ships alongside are not, and each keeps its own:
+The code is MIT. The things that it ships alongside are not, and each one keeps
+its own:
 
 | | |
 |---|---|
-| Sample plate, logo, presets | Original work, MIT with the rest — see [`public/PROVENANCE.md`](public/PROVENANCE.md) |
-| Bundled npm packages | MIT, Apache-2.0, ISC and BSD. Collected verbatim into `dist/THIRD-PARTY-NOTICES.txt` at build time, since minification strips them from the bundle |
-| Maki icons | [Maki](https://labs.mapbox.com/maki-icons) 8.2.0, unmodified — CC0 1.0, public domain, no attribution required. [`public/icons/LICENSE`](public/icons/LICENSE) records provenance anyway |
+| Sample plate, logo, presets | Original work, MIT with the rest — read [`public/PROVENANCE.md`](public/PROVENANCE.md) |
+| Bundled npm packages | MIT, Apache-2.0, ISC and BSD. The build collects them verbatim into `dist/THIRD-PARTY-NOTICES.txt`, because minification strips them from the bundle |
+| Maki icons | [Maki](https://labs.mapbox.com/maki-icons) 8.2.0, unmodified — CC0 1.0, public domain, no attribution required. [`public/icons/LICENSE`](public/icons/LICENSE) records the provenance anyway |
 | Space Mono | SIL OFL 1.1 — `public/fonts/OFL.txt` |
 | Single-line faces | SIL OFL 1.1, the Hershey licence, public domain, WTFPL and MIT, per face — `public/fonts/single-line/LICENSE.txt`, which carries the full OFL text as the OFL requires |
-| OpenStreetMap data | ODbL 1.0 — a data licence, independent of this one. Credited in the panel whenever OSM data is loaded, and written into every export that can carry it: an XML comment in the SVG, a `tEXt` chunk in the PNG, the header of the STL, a Matroska tag in the WebM |
+| OpenStreetMap data | ODbL 1.0 — a data licence, independent of this one. The app credits OSM in the panel whenever OSM data is loaded, and writes the credit into every export that can carry it: an XML comment in the SVG, a `tEXt` chunk in the PNG, the header of the STL, and a Matroska tag in the WebM |
 
-Neither MIT nor any other software licence reaches what you *make* with erzberg.
-A plate you plot is derived from your raster and your composition, not from this
-program — erzberg copies no part of itself into its output, and the OFL
-explicitly exempts documents made with a font from the font's own terms. The
-work is yours. If you plot something you like, I would still love to see it.
+No software licence reaches what you *make* with erzberg. A plate that you plot
+is derived from your raster and your composition, not from this program.
+erzberg copies no part of itself into its output. The OFL explicitly exempts a
+document made with a font from the terms of the font. The work is yours. If you
+plot something that you like, I want to see it.
