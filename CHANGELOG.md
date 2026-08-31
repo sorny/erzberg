@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] — 2026-08-31
+
+### Changed
+
+- **The documentation is rewritten in Simplified Technical English.** Eleven
+  Markdown files now follow ASD-STE100: `README.md`, the seven files in `docs/`,
+  `docs/images/README.md`, `public/PROVENANCE.md` and `tests/testdata/README.md`.
+
+  The rules are structural, not cosmetic. A descriptive sentence takes at most 25
+  words, and an instruction at most 20. Every sentence is active voice in a
+  simple tense. There is no `should`, `would`, `may`, `might` or `could` — only
+  `can`, `must`, or the action stated directly. A condition comes before its
+  command, and one instruction goes in one sentence.
+
+  The vocabulary is fixed across all eleven files, and one word carries one
+  meaning. **parameter**, never `config` or `settings` or `options`. **make sure
+  that**, never `check` or `verify` or `ensure` or `confirm`. **show** for the
+  interface, and **render** only for 3D geometry. **but** for `however`, **thus**
+  for `therefore`, **because** for `since`.
+
+  The facts are unchanged: the rewrite moves style, not content. Every measured
+  number, file name and stated reason is the one that was there before. Code
+  blocks, math blocks, tables and every internal anchor are unchanged too.
+
+  Two things are deliberately out of scope. The licence files keep their exact
+  text, because their own terms require it. British spelling stays. Rule 1.14
+  asks for American spelling, but spelling affects nothing that the other rules
+  exist to fix.
+
+  This file is untouched. It records what shipped, written at the time that each
+  version shipped. A rewrite of a released entry changes the record rather than
+  the documentation.
+
 ## [1.6.2] — 2026-08-31
 
 ### Fixed
