@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **The logo never rendered in its own typeface.** `logo.svg` asked a browser to
+  fetch Space Mono from Google, and the README embeds it as
+  `<img src="public/logo.svg">` — a context in which browsers refuse every
+  external load, fonts included. Measured: opened as a document the file made two
+  requests to Google and rendered correctly; inside an `<img>` it made none and
+  fell back to `'Courier New'`. The wordmark has been a slab serif everywhere it
+  is actually used.
+
+  `npm run logo` flattens the text to outlines, from the same
+  `space-mono-*.json` the 3D labels are lettered with. Nothing to fetch, nothing
+  to fall back to, identical in a README, a browser tab and an editor — and
+  *more* faithful than the text was: the browser hinted the `b` ascender to
+  0.639 em where the font draws it at 0.700, which is where the outlines put it,
+  to within a twentieth of a pixel. Run widths are unchanged.
+
+  `og-image.svg` had the same dead import and gets the same treatment. The social
+  card itself is `og-image.png`, a separate composition with the wordmark already
+  rasterised into it, and is untouched.
+
 ## [1.6.1] — 2026-08-31
 
 A licence-compliance pass over what the project ships and what it exports.

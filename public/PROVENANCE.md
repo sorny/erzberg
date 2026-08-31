@@ -21,6 +21,14 @@ left to ask.
 
 Drawn for this project. MIT with the rest.
 
+The wordmark in `logo.svg` and `og-image.svg` is Space Mono, flattened to
+outlines by `npm run logo` so the files carry no font dependency. They asked a
+browser to fetch the face from Google before that, which cannot work in the one
+context that matters — an SVG used as an `<img>` loads nothing external — so the
+wordmark rendered in a fallback everywhere it was actually used. The outlines
+are the face's own curves, and the OFL exempts a document made with a font from
+the font's terms, so nothing here is encumbered by it.
+
 ## `presets/` — original
 
 Each preset is a set of this application's own parameter values, saved from the

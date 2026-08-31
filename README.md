@@ -469,7 +469,18 @@ npm run update-presets   # round-trip all presets through the live app
 npm run thumbs           # regenerate the preset thumbnails
 npm run fonts:single-line # refetch and reflatten the 49 stroke faces
 npm run licenses         # regenerate dist/THIRD-PARTY-NOTICES.txt
+npm run logo             # flatten any <text> in the brand SVGs to outlines
 ```
+
+`logo` exists because an SVG used as an `<img>` — which is how the README
+embeds the logo — cannot load anything external, fonts included. Measured: as a
+document `logo.svg` made two requests to Google and rendered in Space Mono;
+inside an `<img>` it made none and fell back to Courier New, so the wordmark had
+never once rendered in its own typeface where it is actually used. Outlines have
+nothing to fetch and nothing to fall back to. They come from the same
+`space-mono-*.json` the 3D labels use, and they are *more* faithful than the
+text was: the browser hinted the `b` ascender down to 0.639 em where the font
+draws it at 0.700.
 
 `licenses` runs as part of `build`, so a `dist/` without its notices cannot be
 produced by accident. Every permissive licence in the tree asks the same small
