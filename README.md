@@ -19,9 +19,11 @@
 
 Load a greyscale heightmap (8- or 16-bit PNG), a GeoTIFF, or an audio file, and
 render it as 3D line art, structural relief or an architectural sketch through
-twenty-seven independent draw modes, with contours that letter their own heights — the
-number set into a break in the line, at the line's own angle, in its own ink. Export to SVG for a pen plotter, STL for a
-printer, or 4K PNG for the wall.
+twenty-seven independent draw modes — from surveyor's marks like hachures and
+form lines to a quantised tilemap, a flashbulb with a cast shadow, and tracks
+laid down a face by something with mass. Contours letter their own heights: the
+number set into a break in the line, at the line's own angle, in its own ink.
+Export to SVG for a pen plotter, STL for a printer, or 4K PNG for the wall.
 
 **Everything runs locally in your browser.** Your files never leave your
 machine — no server, no upload, no account.
@@ -183,9 +185,22 @@ hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Ridge Detection | Hessian eigenvalue crest extraction |
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot density driven by slope or elevation |
+| Isophotes | Lines of constant illumination — light drawn instead of hatched by |
 | Engraving | Copperplate illumination cross-hatch — shadows accumulate over up to 4 stacked stroke directions |
 | Curvature | Evenly spaced streamlines through the principal-curvature direction field — strokes wrap the shape rather than the light |
 | Rock & Scree | Swisstopo-style cliff hachures plus slope-graded debris dots |
+| Bitplane | Marching squares with the interpolation removed: flat plateaus, hard lattice staircases, a Bayer screen between them |
+| Sprite Blocks | The same quantiser drawn as blocks — one riser per step, top faces filled |
+| Flashbulb | A point light *inside* the scene with 1/r² falloff and a marched cast shadow, grained with a void-and-cluster blue-noise tile |
+| Halation | Blown highlights bleeding into the shadow beside them — the overexposure blurred, then subtracted from the grain |
+| Reticulation | Worley cell walls thinned by tone: crazed emulsion, found without building a Voronoi |
+| Fall Line | Descent with mass. A velocity, not a position — it overshoots, banks, and runs out onto the flat where Flow stops |
+| Berms | The same tracks drawn as lateral load: a tick on the outside of every turn, nothing on the straights |
+| Air | The jumps, found rather than drawn — spans where the ballistic path clears the surface, on their true parabola |
+| Race Line | Every line one drop-in could have taken, with the one that reaches lowest ground soonest inked heavier |
+| Exploded Frame | A braced space frame pulled apart along Y — the diagonal placed and oriented by the terrain's own twist |
+| Section | A cutting plane drawn as a drawing: heavy cut face, 45° hatch over the material below, outline beyond |
+| Zero Crossings | Sign changes of the detrended scanline — the terrain's local pitch, which is neither slope nor curvature |
 
 **Layered ghost occlusion.** Each line segment generates an invisible 3D curtain
 mesh acting as a depth buffer, so lines occlude other lines instead of being
@@ -209,9 +224,9 @@ a plotted plate or in a document. Both are viewport aids: they are drawn over
 the scene but flagged out of the PNG capture and hidden while recording, so
 nothing composed for the screen lands in a print.
 
-**Reproducible randomness.** The stochastic modes (Stipple, Rock & Scree) each
-carry a seed — the same seed always reproduces the identical pattern, so a piece
-can be regenerated exactly.
+**Reproducible randomness.** The stochastic modes — Stipple, Rock & Scree,
+Flashbulb, Halation and Reticulation — each carry a seed, so the same seed
+always reproduces the identical pattern and a piece can be regenerated exactly.
 
 Every mode carries a small sample of its own marks in its panel header, so the
 list reads as ways of drawing rather than as a column of cartographic nouns.
