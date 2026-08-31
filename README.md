@@ -524,6 +524,7 @@ The code is MIT. The things it ships alongside are not, and each keeps its own:
 
 | | |
 |---|---|
+| Sample plate, logo, presets | Original work, MIT with the rest — see [`public/PROVENANCE.md`](public/PROVENANCE.md) |
 | Bundled npm packages | MIT, Apache-2.0, ISC and BSD. Collected verbatim into `dist/THIRD-PARTY-NOTICES.txt` at build time, since minification strips them from the bundle |
 | Maki icons | [Maki](https://labs.mapbox.com/maki-icons) 8.2.0, unmodified — CC0 1.0, public domain, no attribution required. [`public/icons/LICENSE`](public/icons/LICENSE) records provenance anyway |
 | Space Mono | SIL OFL 1.1 — `public/fonts/OFL.txt` |
