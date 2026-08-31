@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] — 2026-08-31
+
 ### Fixed
 
 - **The logo never rendered in its own typeface.** `logo.svg` asked a browser to
