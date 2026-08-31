@@ -7,6 +7,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-08-31
+
+### Added
+
+- **Twelve new draw modes, from fifteen to twenty-seven.** The fifteen that
+  existed were all a cartographer's marks — hachures, isophotes, Swiss rock,
+  form lines. These read the same scalar field as something else: an arcade
+  tilemap, a bare flashbulb, a snowboard, a braced steel frame.
+
+  Twenty were built; seven were cut after being looked at in the app, and the
+  pattern in what went is worth recording. Nothing was cut for being slow or for
+  failing a test — every one of them worked. They were cut for describing
+  something other than the ground: a signal, a display, a structure standing
+  where the terrain is. The twelve that stayed all draw the mountain.
+
+  - **Bitplane** — marching squares with the interpolation taken out. Where two
+    cells land on different elevation tiers the shared cell *edge* is emitted
+    whole and axis-aligned at the higher tier's height, so a curve becomes a
+    pixel staircase; that refusal to interpolate is the entire difference from
+    Contours. Between the plateaus, a 4×4 Bayer screen over the residual.
+    Ordered dither is the wrong screen for a photograph and the right one here:
+    a visible regular pattern is what a 16-colour ramp looks like shading a sky.
+
+  - **Sprite Blocks** — the same quantiser drawn as blocks rather than as
+    boundaries. Risers go to the *neighbour's* tier, not to a common floor:
+    dropping every block to the base plate buries the stack in one mass of
+    vertical lines, and what makes a voxel landscape legible is seeing exactly
+    one riser per step, its height being the step.
+
+  - **Flashbulb** — the first light in the tool that is not at infinity. Every
+    other lit mode shares one convention (azimuth around, altitude pinned at
+    45°, parallel rays), and parallel rays have no falloff. This puts a point
+    light inside the scene, marches its shadows on the CPU at the same step
+    count the surface shader uses, and grains the result with a 64×64
+    void-and-cluster blue-noise tile — which carries a tone without printing a
+    screen, the one thing that would kill a photograph. **Solarise** folds the
+    tone curve for the Sabattier reversal.
+
+  - **Halation** — blown highlights bleeding into the shadow beside them. What
+    scatters is the *overexposure*, not the exposure gradient: on real terrain
+    every ridge and gully is an edge, so a gradient-sourced bloom covers the
+    picture instead of pooling beside the bright parts of it. Two inks — the
+    grain with the bloom subtracted from it, and the halo itself — reading the
+    blue-noise tile at a half-tile offset so they do not land on the same cells.
+
+  - **Reticulation** — crazed emulsion. Worley cell *walls*, since the mark is
+    the boundary between islands and not the islands: F₂ − F₁ < w over jittered
+    feature points is nine bucket lookups per sample and yields an edge with
+    thickness, which is what a crack has. A tone gate keeps it out of the
+    highlights, which is what stops it being wallpaper.
+
+  - **Fall Line, Berms, Air, Race Line** — descent with mass. Flow steps
+    `p ← p − α∇H`: a massless particle that points exactly downhill, so it
+    cannot overshoot, cannot bank, and stops when the gradient does. These
+    integrate a *velocity*, under a yaw limit that means a fast rider physically
+    cannot take a tight line. Fall Line draws the track and puts speed in the
+    ink; Berms draw only the lateral load, so the straights vanish; Air draws
+    the spans where the ballistic path clears the surface, on their true
+    parabola; Race Line fans one drop-in into a braid and inks the fastest line
+    heavier.
+
+  - **Exploded Frame** — a braced space frame, pulled apart along Y with leaders
+    back to place. A pin-jointed rectangular panel is a mechanism: it needs one
+    diagonal, and *which* one depends on how it is being racked. The terrain's
+    rack is its twist, so the bracing is placed by |h_xy| and oriented by its
+    sign — a genuine reading of the ground rather than a texture over it. Three
+    pens (chords, bracing, posts), so the SVG export separates by weight for
+    free.
+
+  - **Section** — the cut `elevMinCut`/`elevMaxCut` already performs, rendered
+    as a drawing: heavy cut face in the plane, 45° hatch over the material
+    below, faint outline for the ground beyond.
+
+  - **Zero Crossings** — sign changes of the scanline after its own running mean
+    is taken out. The density is the terrain's local *pitch*, which is neither
+    slope nor curvature: dense on scree, empty on a glacier, however steep
+    either is.
+
+- **Seven new specs, thirty-one tests**, and the fields they run on were most of
+  the work. A cone is the obvious test terrain and the wrong one for half of
+  these — it is radially symmetric, so every descent runs straight down a fall
+  line and Berms, Air and the carve slider all correctly do nothing on it.
+  Ramp-then-flat isolates momentum; a rough field gives turns; a sharp step
+  gives one lip and a plane gives none. The saddle that proves the frame's
+  bracing had to be *H* ∝ (c−c₀)(r−r₀), because the saddle everyone reaches for
+  first, x² − y², has h_xy = 0 and braces nothing at all.
+
+### Changed
+
+- **`SECTION_TERMS` moved out of `Sidebar.jsx`** into `panel/sectionTerms.js`, a
+  leaf module with no imports, and `panel.spec.js` derives its expected section
+  count from it instead of hard-coding one. The number was 33; adding modes made
+  it 45, and a magic number was the weaker assertion anyway — it only ever
+  caught a section that failed to render, never an index entry pointing at a
+  section that does not exist. The leaf has to be import-free for the spec to
+  use it at all, or importing the index would drag React and three.js into a
+  Node-side test file.
+
+- **`Sub` takes an optional label.** Flashbulb's bulb, tone, grain and shadow
+  are four different questions, and thirteen unbroken sliders read as one.
+  Existing call sites pass none and render exactly as before.
+
+### Fixed
+
+- **The architecture doc described a dependency list that no longer exists.**
+  "Adding things" still named `useTerrainGeometry`'s hand-written array as step
+  six and called forgetting it "the classic bug"; `src/params.js` had already
+  replaced it with a key derived from `defaults.js`. Three places pointed at
+  that array and now point at `GEOMETRY_KEYS`.
+
+- **Both traps that replaced it are now guarded at import.** The rebuild key is
+  built by *excluding* render-side params by regex, and several of those
+  patterns are unanchored prefixes (`fill`, `point`, `pan`, `rotation`, `frame`,
+  `texture`) because they must cover a whole family. A draw mode named
+  afterwards can collide with one — `fillLines`, `rotationLines` and
+  `pointSizeStipple` all match, all get classified render-side, and all give a
+  control that moves while nothing happens. Separately, `geometryKey`
+  concatenates into a string, so a non-scalar default stringifies to
+  `[object Object]` however it is edited; that is why `gradientStops` is in
+  `GEOMETRY_NON_SCALAR`, and nothing stopped a second one being added without
+  it. `auditParamSpace` catches both at module load and is exported rather than
+  inlined, so the specs can hand it a synthetic parameter space and prove it
+  fires — a guard nothing ever proves catches anything is indistinguishable from
+  no guard. It earned its place immediately: the render-side prefix list needed
+  widening seven times as these modes arrived.
+
 ## [1.5.1] — 2026-08-28
 
 ### Fixed
