@@ -529,7 +529,7 @@ The code is MIT. The things it ships alongside are not, and each keeps its own:
 | Maki icons | [Maki](https://labs.mapbox.com/maki-icons) 8.2.0, unmodified — CC0 1.0, public domain, no attribution required. [`public/icons/LICENSE`](public/icons/LICENSE) records provenance anyway |
 | Space Mono | SIL OFL 1.1 — `public/fonts/OFL.txt` |
 | Single-line faces | SIL OFL 1.1, the Hershey licence, public domain, WTFPL and MIT, per face — `public/fonts/single-line/LICENSE.txt`, which carries the full OFL text as the OFL requires |
-| OpenStreetMap data | ODbL 1.0 — a data licence, independent of this one. Credited in the panel whenever OSM data is loaded, and written into every SVG export |
+| OpenStreetMap data | ODbL 1.0 — a data licence, independent of this one. Credited in the panel whenever OSM data is loaded, and written into every export that can carry it: an XML comment in the SVG, a `tEXt` chunk in the PNG, the header of the STL, a Matroska tag in the WebM |
 
 Neither MIT nor any other software licence reaches what you *make* with erzberg.
 A plate you plot is derived from your raster and your composition, not from this

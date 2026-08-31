@@ -30,16 +30,40 @@
 
 import { NODATA_SENTINEL_Y } from './terrain'
 import { drapedRuns } from './vectorGeometry'
+import { OSM_ATTRIBUTION } from './osmFetch'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 
 // ── STL writer ────────────────────────────────────────────────────────────────
 
-async function writeBinarySTL(tris, filename, pacer = null, onPhase = null) {
+/**
+ * The 80-byte header a binary STL opens with, sanitised to fit it.
+ *
+ * ASCII only, and deliberately: the field is a fixed byte run with no declared
+ * encoding, and readers decode it as whatever they please. `©` is a legal
+ * Latin-1 byte and would survive here, but `(c)` survives *everywhere*, and a
+ * credit that renders as a replacement character in somebody's slicer is not a
+ * credit. Truncation is at 80 by the writer below; this keeps that from cutting
+ * a word in half by refusing to build a longer one in the first place.
+ *
+ * Must not begin with `solid`: some readers take that as the marker of an ASCII
+ * STL and try to parse the binary triangles as text.
+ *
+ * Exported for the unit suite — it is a pure string function, and the three
+ * things that matter about it (fits 80 bytes, stays ASCII, is not mistaken for
+ * an ASCII STL) are cheaper to assert here than to read off a downloaded file.
+ */
+export function stlHeader(attribution) {
+  const base = 'Heightmap Lines STL Export'
+  const credit = attribution ? ' (c) OpenStreetMap contributors' : ''
+  return (base + credit).replace(/[^\x20-\x7E]/g, '?').slice(0, 80)
+}
+
+async function writeBinarySTL(tris, filename, pacer = null, onPhase = null, attribution = null) {
   const triCount = tris.length / 9
   const buf = new ArrayBuffer(84 + triCount * 50)
   const dv  = new DataView(buf)
 
-  const hdr = 'Heightmap Lines STL Export'
+  const hdr = stlHeader(attribution)
   for (let i = 0; i < Math.min(hdr.length, 80); i++) dv.setUint8(i, hdr.charCodeAt(i))
   dv.setUint32(80, triCount, true)
 
@@ -297,7 +321,20 @@ async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }
     const runs = drapedRuns(terrain, p, vectorSources, layer, p.imageWidth, p.imageHeight)
     for (const run of runs) buildRibbon(run, ribbonTris)
   }
-  if (ribbonTris.length) await writeBinarySTL(ribbonTris, `${base}-vectors.stl`)
+  /*
+   * ODbL, and narrower than the other exporters need to be.
+   *
+   * The plate is the terrain surface and never contains OSM data, so it is not
+   * credited — a notice on a file that owes none is noise, and noise is how a
+   * notice stops being read. The ribbons file is credited only when a layer
+   * that actually contributed one came from OpenStreetMap. That is not the same
+   * as "an OSM layer is visible": ribbons default to GPX only, and reach an OSM
+   * layer solely when somebody turns the switch on for it.
+   */
+  const ribbonAttribution = wanted.some((l) => l.sourceKind === 'osm') ? OSM_ATTRIBUTION : null
+  if (ribbonTris.length) {
+    await writeBinarySTL(ribbonTris, `${base}-vectors.stl`, null, null, ribbonAttribution)
+  }
 
   return 'done'
 }

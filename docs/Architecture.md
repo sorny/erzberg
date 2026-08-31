@@ -196,11 +196,42 @@ Two things are generated from that set rather than written by hand:
 | PNG / PNG α | The scene | Rendered offscreen into a 4× render target, trimmed to content via the alpha channel |
 | STL | `surfaceGeo` | Computes its own facet normals; must skip vertices parked at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
 | Heightmap PNG | `terrain.grid` | The processed raster, after resolution and levels |
-| WebM | The live canvas | `MediaRecorder` on the canvas stream |
+| WebM | The live canvas | `MediaRecorder` on the canvas stream, with the ODbL credit spliced into the Matroska container |
 | Profile SVG | `profileData` | Written from the same `chartGeometry()` the popup draws, at export size and in an ink-on-paper palette |
 
 Because every exporter reads the *derived* terrain, features upstream of it —
 Edit Mode clips, erosion, mirroring, soundscapes — need no exporter support.
+
+### The ODbL credit goes wherever the data does
+
+OpenStreetMap data is ODbL, and §4.3 attaches its notice to the *Produced Work*
+rather than to the application — so the question is not "is OSM loaded" but "is
+OSM data in this file". `osmAttribution()` in `osmFetch.js` answers it once, for
+every exporter, because four exporters asking it four ways is how three of them
+came to be answering it differently.
+
+Each format takes the credit where it provides for one: an XML comment in the
+SVG, a `tEXt` chunk after `IHDR` in the PNG, the 80-byte header of the binary
+STL, a Matroska `Tags` element in the WebM. Nothing is drawn into the picture —
+a credit burned into the pixels is a change to the artwork, which is not
+something a licence obligation gets to make on the user's behalf.
+
+Two of them are narrower than the rest, and deliberately. The STL **plate** is
+the terrain surface and never contains OSM data, so only the ribbons file is
+credited, and only when a layer that actually contributed a ribbon came from
+OpenStreetMap — which is not the same as an OSM layer being visible, since
+ribbons default to GPX and reach an OSM layer only if somebody switches one on.
+And the WebM carries a spoken notice as well as a written one: a Matroska tag is
+read by `ffprobe` and by very little a viewer would open.
+
+The WebM's is the one that needed measuring. Chrome writes the Segment with an
+unknown size, as live recording requires, so nothing records a length an
+insertion would invalidate — but it also means a demuxer has no length to seek
+against and no SeekHead to consult, and parses header elements only until the
+first Cluster. A `Tags` element appended to the end of the file is well-formed
+Matroska that **nothing reads**; ffprobe reported no tag at all until the
+element moved ahead of the first Cluster. A notice nothing reads is worse than
+no notice, because it looks like the obligation was met.
 
 ### The SVG and STL exporters pace themselves
 

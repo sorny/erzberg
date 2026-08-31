@@ -35,6 +35,24 @@ import { makeSource, packFeatures } from './vectorLayers'
 
 export const OSM_ATTRIBUTION = '© OpenStreetMap contributors'
 
+/**
+ * The credit an export must carry, or null when nothing owes one.
+ *
+ * ODbL 4.3 attaches to the *Produced Work* — a plate, a print, a model — rather
+ * than to the app, so the test is what is actually in the file: a visible layer
+ * whose features came from OpenStreetMap. A hidden layer is not in the picture
+ * and a GeoJSON or GPX upload was never OSM's to begin with.
+ *
+ * Lives here beside the string rather than at each export site, because four
+ * exporters asking the same question four ways is how three of them came to be
+ * answering it differently — the SVG credited, and PNG, STL and WebM did not.
+ */
+export function osmAttribution(vectorLayers) {
+  return vectorLayers?.some((l) => l.visible && l.sourceKind === 'osm')
+    ? OSM_ATTRIBUTION
+    : null
+}
+
 // Tried in order. Three rather than two because two is not redundancy: both of
 // the first pair were serving 504 "server is probably too busy" on the day this
 // was written, on a query a third instance answered in seconds, and a feature

@@ -12,7 +12,7 @@ import { frameDelta } from '../utils/frameClock'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
-import { OSM_ATTRIBUTION } from '../utils/osmFetch'
+import { osmAttribution } from '../utils/osmFetch'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { VectorPicker } from './VectorPicker'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
@@ -321,7 +321,8 @@ export function Scene({
       imgData.data.set(flipped)
       offCtx.putImageData(imgData, 0, 0)
 
-      captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha, exportBaseName)
+      captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha,
+        exportBaseName, osmAttribution(p.vectorLayers))
     } finally {
       // Restore materials and camera
       lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
@@ -340,8 +341,7 @@ export function Scene({
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     // weight/opacity/dash live in params (not the worker geometry) — resolve per layer id.
     // ODbL: if OpenStreetMap data is on screen, the credit goes into the file.
-    const attribution = p.vectorLayers?.some(l => l.visible && l.sourceKind === 'osm')
-      ? OSM_ATTRIBUTION : null
+    const attribution = osmAttribution(p.vectorLayers)
     const lineStyles = Array.isArray(lineGeo)
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}

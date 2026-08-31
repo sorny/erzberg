@@ -34,7 +34,7 @@ import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
-import { clearOsmCache } from './utils/osmFetch'
+import { clearOsmCache, osmAttribution } from './utils/osmFetch'
 import { GROUP_OF } from './params'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
@@ -1041,6 +1041,16 @@ export default function App() {
    * around the *manual* stop meant the ordinary case, letting it run out, wrote
    * a file and said nothing at all.
    */
+  /**
+   * The ODbL credit this session owes, or null.
+   *
+   * Hoisted rather than computed inside the toggle so the recorder and the
+   * notice cannot disagree about whether one is owed — they are the same
+   * answer to the same question, and asking twice is how the SVG came to be
+   * the only exporter that credited anything.
+   */
+  const osmCredit = osmAttribution(style.vectorLayers)
+
   const handleWebmState = useCallback((active) => {
     setWebmActive(active)
     if (!active) notify(`Wrote ${exportBaseName}.webm`)
@@ -1051,12 +1061,18 @@ export default function App() {
     if (!canvas) return
     if (isRecording()) {
       stopWebM(handleWebmState)
-    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName)) {
-      notify(`Recording — ${webmDuration}s, or press 5 to stop.`)
+    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName, osmCredit)) {
+      // Said out loud as well as written into the file. A Matroska tag is read
+      // by ffprobe and by nothing a viewer is likely to open, so for video —
+      // unlike an SVG or a PNG somebody edits — the metadata alone is a weak
+      // way to make anyone aware of where the data came from.
+      notify(osmCredit
+        ? `Recording — ${webmDuration}s, or press 5 to stop. Contains OpenStreetMap data: credit ${osmCredit} when you publish it.`
+        : `Recording — ${webmDuration}s, or press 5 to stop.`)
     } else {
       notify('Could not start recording — this browser refused the canvas stream.')
     }
-  }, [webmDuration, exportBaseName, notify, handleWebmState])
+  }, [webmDuration, exportBaseName, notify, handleWebmState, osmCredit])
 
   // ── Canvas pixel ratio ────────────────────────────────────────────────────
   // The canvas fills the window, so its CSS size is the window size. Supersampling
