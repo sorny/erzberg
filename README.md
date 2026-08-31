@@ -467,7 +467,17 @@ npx playwright test tests/lines.spec.js   # a single spec
 npm run update-presets   # round-trip all presets through the live app
 npm run thumbs           # regenerate the preset thumbnails
 npm run fonts:single-line # refetch and reflatten the 49 stroke faces
+npm run licenses         # regenerate dist/THIRD-PARTY-NOTICES.txt
 ```
+
+`licenses` runs as part of `build`, so a `dist/` without its notices cannot be
+produced by accident. Every permissive licence in the tree asks the same small
+thing — MIT wants its notice "included in all copies", BSD and ISC say it in
+their own words, Apache-2.0 §4 wants a copy of the licence — and minification
+strips all of them out of the bundle. Collecting them beside it is the standard
+remedy: the notice still travels with the distribution, it is just not inside
+the JavaScript. Scope is the production dependency closure; the dev tooling is
+not distributed and is not listed.
 
 `update-presets` and `thumbs` both drive the running dev server with Playwright,
 so start `npm run dev` first. `thumbs` renders each preset through the app's own
@@ -510,6 +520,18 @@ than adding throughput. `playwright.config.js` carries the measurements.
 
 MIT — Copyright (c) 2026 sorny.
 
-The bundled icons in `public/icons/` are [Maki](https://labs.mapbox.com/maki-icons)
-(CC0 1.0, public domain — no attribution required), unmodified, and recorded in
-[`public/icons/LICENSE`](public/icons/LICENSE) anyway.
+The code is MIT. The things it ships alongside are not, and each keeps its own:
+
+| | |
+|---|---|
+| Bundled npm packages | MIT, Apache-2.0, ISC and BSD. Collected verbatim into `dist/THIRD-PARTY-NOTICES.txt` at build time, since minification strips them from the bundle |
+| Maki icons | [Maki](https://labs.mapbox.com/maki-icons) 8.2.0, unmodified — CC0 1.0, public domain, no attribution required. [`public/icons/LICENSE`](public/icons/LICENSE) records provenance anyway |
+| Space Mono | SIL OFL 1.1 — `public/fonts/OFL.txt` |
+| Single-line faces | SIL OFL 1.1, the Hershey licence, public domain, WTFPL and MIT, per face — `public/fonts/single-line/LICENSE.txt`, which carries the full OFL text as the OFL requires |
+| OpenStreetMap data | ODbL 1.0 — a data licence, independent of this one. Credited in the panel whenever OSM data is loaded, and written into every SVG export |
+
+Neither MIT nor any other software licence reaches what you *make* with erzberg.
+A plate you plot is derived from your raster and your composition, not from this
+program — erzberg copies no part of itself into its output, and the OFL
+explicitly exempts documents made with a font from the font's own terms. The
+work is yours. If you plot something you like, I would still love to see it.

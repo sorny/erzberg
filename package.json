@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/licenses.js",
     "preview": "vite preview",
     "lint": "eslint .",
     "test": "playwright test",
@@ -16,7 +16,8 @@
     "update-presets": "node scripts/update-presets.js",
     "font": "node scripts/build-font.js",
     "thumbs": "node scripts/generate-thumbs.js",
-    "fonts:single-line": "node scripts/build-single-line-fonts.js"
+    "fonts:single-line": "node scripts/build-single-line-fonts.js",
+    "licenses": "node scripts/licenses.js"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
