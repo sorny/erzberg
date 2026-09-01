@@ -7,6 +7,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-09-01
+
+Colour. Every draw mode until now took its colour the same way: one scalar, into
+one shared gradient, sampled once per vertex. These five break that in five
+different places.
+
+### Added
+
+- **Five colour modes.**
+
+  **Indexed** makes colour a lookup rather than a sample. Two terrain quantities
+  index one small palette: elevation tier by slope class. A snowfield and the
+  cliff beside it thus get different inks. A one-dimensional ramp cannot do that,
+  because both of them are high. Between two adjacent entries there is no blend but a
+  4×4 Bayer screen, and the checkerboard reads as a colour the palette does not
+  contain. It is the dual of Bitplane: that mode quantises geometry and leaves
+  colour continuous, this quantises colour and leaves geometry continuous.
+
+  **Outrun** is the first thing in the tool that adds light instead of ink. A
+  wide dim halo composites additively under a near-white filament, so where
+  contours crowd the halos sum and the ground between them lifts. The two halves
+  must be two layers: `layerStyle` resolves one width per layer, so a fat halo
+  under a thin core is impossible in one. The halo needs a dark background,
+  because additive light cannot darken anything. The filament composites
+  normally, so the mode is still legible on paper.
+
+  **Riso** is three spot inks, each carrying a different reading of the terrain,
+  each screened at its own angle and multiplied together. Every colour past the
+  first three is one the machine never held. Two controls decide which machine
+  you are printing on. **Registration** above zero is a duplicator and at zero is
+  a press. **Coverage cap** drops the weakest ink per cell once the three of
+  them want more than it allows. That is why an overloaded press goes flat in
+  the shadows.
+
+  **Mineral** classifies the ground into five materials by slope and curvature,
+  and gives each one a flat colour and its own grain. Colour means a rock type
+  rather than a height, the way a geological sheet reads.
+
+  **Watershed** labels every cell with the sink that it drains to, and gives each
+  catchment one flat ink. The divides are ridgelines, which is why they look
+  drawn rather than imposed. Stream Network already walks this graph to
+  accumulate flow. This reads the same walk for identity instead of for volume.
+
+- **Speed, as a hypsometric axis.** The descent family carries a velocity that
+  nothing outside it can reach. It is a fourth choice beside Elevation, Slope
+  and Aspect. Every other mode passes no speed. There the axis falls back to
+  slope, rather than a draw of the whole layer at one end of the ramp.
+
+- **Blending on line layers.** `AdditiveBlending` appeared exactly once in the
+  whole codebase before this, on the sun indicator. Line layers now take a
+  blending mode, which is what Outrun and Riso are built on.
+
+### Fixed
+
+- **The descent family drew a speed ramp and called it Slope.** Fall Line, Berms,
+  Air and Race Line filled the second slot of `computeVertexColor` with velocity.
+  The button marked Slope thus inked those four modes by speed, and only those
+  four.
+  Speed has its own name and its own slot now, and Slope in those modes is slope.
+  A preset that uses one of the four with a hypsometric Slope tint looks
+  different after this change.
+
+- **A layer with fills and no strokes was dropped in silence.** The sub-layer
+  dispatch skipped anything with an empty `positions` array, which was correct
+  while every layer had strokes. The renderer dropped it a second time. Three of
+  the new modes are area and no line, and produced nothing at all.
+
+- **Area-fill cells fought the terrain surface in the depth buffer.** A cell is
+  flat at its own elevation while the surface between cells is interpolated, so
+  its corners are inside the hill. The lid material carried a positive depth
+  bias. That is right for a pillar cap above the ground and wrong for a cell in
+  it. Turning Occ. Dist up appeared to fix it because that control
+  pushes the *terrain* back, not the cells forward. Surface-hugging fills take
+  the bias an area fill takes, so they are correct at any Occ. Dist.
+
+- **Occ. Dist reaches 50.** It was capped at 25.
+
+- **The area modes exported an empty SVG.** The exporter reads strokes and never
+  looks at fills. Each cell edge where the ink changes is now a real stroke. The
+  plot is thus the outline of each region rather than of each square, and each
+  stroke carries the base ink of its region. Measured on the sample plate: Indexed
+  plots 6 inks, Mineral 5 and Watershed 10.
+
+- **Surprise me moved under the cursor.** A roll is a preset, and applying one
+  opens and shuts every mode section to match. That changes the height of the
+  panel, and near the end of the scroll the browser clamps `scrollTop` and the
+  whole column slides. Measured before the fix: 60 px of drift on half the rolls,
+  which is a whole button. A scroll anchor holds the button still, and the
+  sections still track the look.
+
 ## [1.6.3] — 2026-08-31
 
 ### Changed
