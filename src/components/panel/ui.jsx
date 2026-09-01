@@ -70,6 +70,11 @@ export const W      = 272   // panel width px
 export function PanelStyles() {
   return (
     <style>{`
+      /* The indeterminate fetch bar. A query Overpass has not answered yet has
+         nothing to measure, so the stripe travels rather than fills. */
+      @keyframes hm-indet { from { transform: translateX(-40%) } to { transform: translateX(240%) } }
+      .hm-indet { animation: hm-indet 1.15s ease-in-out infinite; }
+      @media (prefers-reduced-motion: reduce) { .hm-indet { animation: none; opacity: 0.5; } }
       /*
        * Space Mono Bold, self-hosted.
        *

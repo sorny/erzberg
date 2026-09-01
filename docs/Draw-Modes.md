@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Thirty-two independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Thirty-one independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
 
 ---
 
@@ -390,37 +390,21 @@ Two things had to be right for this to mean anything:
 
 Every line that one drop-in can take: one seed, the initial heading fanned across ±θ, and no occupancy mask, because the overlap *is* the picture. The builder promotes the run that reaches the lowest ground soonest to its own sub-layer and inks it heavier. That turns a braid into an argument about which way down is best.
 
-## 23–24. Space frame — Exploded Frame, Section
+## 23. Section
 
-One lattice, two drawings of it. Truss and Weldment were cut, and the lattice survives as the machinery behind these two. Nodes sit on a regular grid of pitch `spacing`. The builder snaps each node to the highest cell inside its own square, so the frame hangs off real summits instead of samples between them. That is what stops a coarse frame from a miss of every peak that it is meant to describe.
+A cutting plane drawn the way a drawing draws one.
 
-**The bracing rule is the idea.** A rectangular panel with pin joints is a mechanism. It needs one diagonal, and *which* diagonal depends on which way the load racks it. The rack of the terrain is its **twist**, the mixed second derivative. Ridge and Curvature already assemble that off-diagonal of the Hessian from this same stencil. Here the builder measures it at the scale of the panel rather than of the cell:
+The tool already *culls* by elevation, and `elevMinCut` and `elevMaxCut` are the terrain-level version of this idea. This is the same cut rendered as a drawing. The cut **face** is a heavy line at the plane. The solid **below** it is hatched at 45° in the drafting convention. The ground **beyond** it is in outline, so the section reads as a stand in a landscape rather than a float.
 
-$$h_{xy} = \tfrac14\big(H_{r+p,\,c+p} - H_{r+p,\,c-p} - H_{r-p,\,c+p} + H_{r-p,\,c-p}\big)$$
+The hatch is a set of parallel rays marched across the grid and broken wherever the surface rises above the plane. That is the same run-based marcher that Engraving (§12) uses, thresholded on height instead of on light. Face and hatch both lie exactly *in* the plane, at one elevation and no other.
 
-$$|h_{xy}| < \text{threshold} \;\Rightarrow\; \text{brace nothing}, \qquad h_{xy} > 0 \;\Rightarrow\; \text{NW–SE}, \qquad h_{xy} < 0 \;\Rightarrow\; \text{NE–SW}$$
+The hatch is the material *below* the plane rather than the disc that the plane cuts, and the two move in opposite directions. On a cone the disc shrinks as the plane rises while the ground under it grows to nearly the whole raster. Beyond is the complement and shrinks to nothing. The spec asserts both directions, because getting them the wrong way round still produces a picture.
 
-The diagonal that the builder draws lies along the compression direction of the warp. The pattern thus *reads* the saddle rather than a decoration of it. The spec proves this rather than an assumption of it. Consider the field $H \propto (c-c_0)(r-r_0)$. That is the saddle whose $h_{xy}$ is a nonzero constant of known sign everywhere. Over it, every brace in the frame commits to one diagonal, and a flip of the sign of the field flips all of them. (The obvious saddle, $x^2 - y^2$, has $h_{xy} = 0$ and braces nothing at all.)
-
-The builder pre-smooths the grid first, for the reason that those two modes give. Second derivatives amplify noise, and on a raw DEM every pixel of sensor grain asks for its own brace.
-
-**The threshold is a percentile, not an absolute.** A frame is a drawing before it is an analysis. An absolute cutoff braces everything or nothing. The result depends on how rough the raster happens to be. *"The busiest 45% of the panels"* is a composition that survives a change of the terrain under it.
-
-**Three pens.** `Exploded-Chord` is heavy, `Exploded-Brace` is a hairline, and `Exploded-Post` is dashed to a datum. This is what most wants the SVG exporter, and it gets it for nothing: three named layers arrive in Inkscape as three pens. Gussets ship as a `lids` mesh on the chord layer, so joints read as filled plates rather than rings. A braced joint gets more sides than a free one, which is free because the twist already sits on the node.
-
-### Exploded Frame
-
-The member classes pulled apart along Y, with one hairline per node that joins the displaced chord back to the ground that it came off. The builder computes nothing new. The sub-layer split already exists and this only moves it, which is the whole argument for the split.
-
-### Section
-
-The tool already *culls* by elevation, and `elevMinCut` and `elevMaxCut` are the terrain-level version of this idea. This is the same cut rendered as a drawing. The cut **face** is a heavy line at the plane. The solid **below** it is hatched at 45° in the drafting convention. The ground **beyond** it is in outline, so the section reads as a stand in a landscape rather than a float. The hatch is a set of parallel rays marched across the grid and broken wherever the surface rises above the plane. That is the same run-based marcher that Engraving uses, thresholded on height instead of on light. Face and hatch both lie exactly *in* the plane, at one elevation and no other.
-
-## 25. Zero Crossings
+## 24. Zero Crossings
 
 Every sign change of the scanline after the app takes out its own running mean. The density of the marks is the local **pitch** of the terrain: how often the ground crosses its own average. That is a different measurement from either slope or curvature. It is dense on scree and broken rock, and empty on a glacier, regardless of how steep either one is. The detrend is what makes it a pitch rather than a horizon. Without the detrend, a scanline crosses its mean twice on a whole mountain and the mode draws two dots.
 
-## 26–27. Sprite Blocks, Reticulation
+## 25–26. Sprite Blocks, Reticulation
 
 ### Sprite Blocks
 
@@ -439,7 +423,7 @@ A Fortune sweep gives exact edges and costs a real data structure. This costs ni
 Crack width is proportional to cell size. Total coverage thus stays roughly constant as the cells open up: fewer boundaries, each one wider. The crazing looks like crazing at any scale instead of a fade. Coverage is thus the job of `width`, not of the cell. The **tone gate** is what stops the whole thing from being wallpaper. The builder draws walls only where the plate is dark enough for a crack, on the same density modes that Stipple offers. The crazing thus pools in the shadows and leaves the highlights clean.
 
 
-## 28–32. Colour modes — Indexed, Outrun, Riso, Mineral, Watershed
+## 27–31. Colour modes — Indexed, Outrun, Riso, Mineral, Watershed
 
 Every mode above takes its colour the same way. One scalar goes into one shared
 gradient, and `computeVertexColor` samples it once per vertex. That single

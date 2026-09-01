@@ -115,10 +115,6 @@ export const DRAW_MODES = [
     pick: { detrend: [2, 16], spacing: [1, 6] },
   },
   {
-    id: 'Exploded', label: 'Exploded frame', cost: 2.5,
-    pick: { spacing: [30, 90], braced: [0.2, 0.7], explode: [0.05, 0.3] },
-  },
-  {
     id: 'Section', label: 'Section', cost: 2,
     pick: { cut: [0.2, 0.7], hatch: [2, 9], hatchAngle: [0, 180], beyond: [4, 16] },
   },

@@ -91,8 +91,27 @@ export function makePacer(shouldCancel, budget = 24) {
  */
 export function makeReporter(onProgress) {
   let lastPct = -1
+  let lastLabel = null
   return (frac, label) => {
     if (!onProgress) return
+    /*
+     * A step with no percentage to report.
+     *
+     * A fetch waiting on a server that has not sent a byte is exactly that:
+     * Overpass withholds response headers until the query has finished running,
+     * so there is nothing to measure and no honest fraction to invent. Its label
+     * is the only thing that changes, so the dedupe runs on that instead — which
+     * is what lets an elapsed count tick without the bar pretending to know how
+     * far along it is.
+     */
+    if (frac == null) {
+      if (label === lastLabel) return
+      lastLabel = label
+      lastPct = -1
+      onProgress(null, label)
+      return
+    }
+    lastLabel = label
     const f = frac < 0 ? 0 : frac > 1 ? 1 : frac
     const pct = Math.round(f * 100)
     if (pct === lastPct) return

@@ -19,7 +19,7 @@
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
 The app renders it as 3D line art, structural relief or an architectural sketch.
-Thirty-two independent draw modes do the work. They range from surveyor's
+Thirty-one independent draw modes do the work. They range from surveyor's
 marks such as hachures and form lines to a quantised tilemap. Others are a
 flashbulb with a cast shadow, and tracks that something with mass laid down a
 face. Five of them are about colour rather than about mark-making.
@@ -101,7 +101,7 @@ returns to exactly its previous state.
 | **Audio** | MP3, WAV, OGG or M4A. The app analyses the file into a spectrogram that drives the terrain. |
 | **GPX** | The app drapes the track line over a georeferenced raster. |
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
-| **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. |
+| **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 
 **Vector layers.** The section is always in the panel. If the section has
 nothing to work with, it says what it needs. With a georeferenced raster loaded,
@@ -227,7 +227,6 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Berms | The same tracks drawn as lateral load: a tick on the outside of every turn, nothing on the straights |
 | Air | The jumps, found rather than drawn — spans where the ballistic path clears the surface, on their true parabola |
 | Race Line | Every line that one drop-in could take, with the one that reaches lowest ground soonest inked heavier |
-| Exploded Frame | A braced space frame pulled apart along Y — the diagonal placed and oriented by the twist of the terrain |
 | Section | A cutting plane drawn as a drawing: heavy cut face, 45° hatch over the material below, outline beyond |
 | Zero Crossings | Sign changes of the detrended scanline — the local pitch of the terrain, which is neither slope nor curvature |
 | Indexed | Colour as a lookup, not a sample: elevation tier by slope class, Bayer-dithered between adjacent palette entries |
@@ -293,7 +292,10 @@ stays marked, and says *edited* after you tune away from it.
 **Surprise me.** A seeded randomiser rolls a look. It does not shuffle 250
 sliders. It picks paper or ink, one to three draw modes against a cost budget, a
 palette, and at most one surface overlay. Then it compares the ink against the
-background, so nothing comes back invisible. The panel shows the seed, and the
+background, so nothing comes back invisible. It sometimes adds the hologram
+point cloud and never a murmuration: a flock is a decision about the scene
+rather than about the drawing, and it is one to ask for rather than to be
+handed. The panel shows the seed, and the
 arrow steps back through recent rolls. The seed *is* the look, so you can always
 return to it.
 

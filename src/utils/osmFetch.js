@@ -363,7 +363,59 @@ export async function bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
  * status, so the loop never advanced and the panel waited for ever. The mirrors
  * were unreachable precisely when they were most needed.
  */
-async function fetchOverpassText(query, signal) {
+/**
+ * Roughly how many bytes one Overpass element costs, inlined geometry included.
+ *
+ * Only ever a denominator for a progress bar, never a limit. Measured over the
+ * cases the docs already record: Styria at `broad` is 56 000 elements and 72 MB,
+ * and at `full` about 1.2 million and a gigabyte — 1.29 kB and 0.9 kB an element.
+ * Anything in that band is close enough for a bar, and the bar is clamped below
+ * 100% anyway, so an underestimate stalls near the end rather than finishing
+ * early and then continuing to move.
+ */
+const BYTES_PER_ELEMENT = 1_100
+
+/*
+ * How the one bar is shared out.
+ *
+ * The download is given most of it because on anything worth a progress bar it
+ * *is* most of it. The parse sits between the two bands as a single step, which
+ * is what it is.
+ */
+const DOWNLOAD_FROM = 0.05
+const DOWNLOAD_TO   = 0.75
+const BUCKET_FROM   = 0.80
+
+/**
+ * The response body, streamed, with the bytes reported as they land.
+ *
+ * `res.text()` was one shot, so the bar had nothing to say between "querying"
+ * and "reading" — which on a province is minutes. Overpass sends chunked, so
+ * there is usually no `Content-Length` to divide by; the count pre-flight is
+ * what supplies the denominator instead, and a mirror that does send a length is
+ * preferred over the estimate.
+ */
+async function readBody(res, onBytes) {
+  const declared = Number(res.headers.get('content-length')) || 0
+  if (!onBytes || !res.body?.getReader) return await res.text()
+
+  const reader = res.body.getReader()
+  const chunks = []
+  let received = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.length
+    onBytes(received, declared)
+  }
+  const buf = new Uint8Array(received)
+  let at = 0
+  for (const c of chunks) { buf.set(c, at); at += c.length }
+  return new TextDecoder().decode(buf)
+}
+
+async function fetchOverpassText(query, signal, onBytes) {
   let lastError = null
   for (const url of ENDPOINTS) {
     const deadline = AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
@@ -374,7 +426,7 @@ async function fetchOverpassText(query, signal) {
         body: new URLSearchParams({ data: query }),
         signal: attempt,
       })
-      if (res.ok) return await res.text()
+      if (res.ok) return await readBody(res, onBytes)
 
       // 429 is rate limiting and 504 is the query outrunning the server's own
       // budget; both are worth asking a different mirror. Anything else is about
@@ -503,9 +555,11 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
      * paid, and the user told nothing except that it did not work. A count
      * costs one search and answers in seconds.
      */
+    let expected = 0
     if (extentKm2(bboxWgs84) > COUNT_ABOVE_KM2) {
-      report(0, 'Measuring the extent…')
+      report(null, 'Measuring the extent…')
       const { total } = await countOsm(bboxWgs84, categoryIds, { detail, signal })
+      expected = total
       if (total > MAX_ELEMENTS) {
         // Only now is the per-category breakdown worth a search of its own: the
         // fetch is being refused either way, and this is what makes the refusal
@@ -514,14 +568,50 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
           { detail, signal, perCategory: true }).catch(() => ({ byCategory: null }))
         throw new Error(tooBigMessage(total, byCategory, detail))
       }
-      report(0, `${total.toLocaleString()} features — querying OpenStreetMap…`)
+      report(null, `${total.toLocaleString()} features — querying OpenStreetMap…`)
     } else {
-      report(0, 'Querying OpenStreetMap…')
+      report(null, 'Querying OpenStreetMap…')
     }
-    // Text rather than `res.json()`: the download is the long part, and parsing
-    // it separately is what lets the progress bar move between the two.
-    const text = await fetchOverpassText(query, signal)
-    report(0.5, 'Reading response…')
+
+    /*
+     * The three phases of a fetch, and why only two of them have a percentage.
+     *
+     * Overpass withholds response headers until the query has finished running,
+     * so between the POST and the first byte there is nothing to measure — no
+     * length, no bytes, not even a status. That stretch is reported as
+     * indeterminate with the elapsed time against the server's own budget,
+     * because a bar sitting at 0% for ninety seconds and then racing to the end
+     * is worse than a line of text that says what is happening.
+     *
+     * Once bytes start arriving they are real progress, against a length the
+     * mirror declared or the count pre-flight estimated. `JSON.parse` after that
+     * is one unsplittable blocking call, so its label is set *before* it rather
+     * than animated through it — a bar that keeps moving while the tab is frozen
+     * is a lie about which part is slow.
+     */
+    const t0 = Date.now()
+    const elapsed = () => Math.round((Date.now() - t0) / 1000)
+    const waiting = setInterval(() => {
+      report(null, `Overpass is running the query — ${elapsed()} s of ${QUERY_TIMEOUT_S} s`)
+    }, 1000)
+
+    let text
+    try {
+      text = await fetchOverpassText(query, signal, (received, declared) => {
+        const total = declared || (expected ? expected * BYTES_PER_ELEMENT : 0)
+        const mb = (received / 1e6).toFixed(1)
+        if (!total) { report(null, `Downloading — ${mb} MB`); return }
+        // Clamped below the end of its own band: an estimated denominator that
+        // runs short must stall rather than finish and then keep going.
+        const f = Math.min(0.98, received / total)
+        report(DOWNLOAD_FROM + (DOWNLOAD_TO - DOWNLOAD_FROM) * f,
+               `Downloading — ${mb} of about ${(total / 1e6).toFixed(0)} MB`)
+      })
+    } finally {
+      clearInterval(waiting)
+    }
+
+    report(DOWNLOAD_TO, `Reading ${(text.length / 1e6).toFixed(0)} MB…`)
     await pacer.yield()
 
     let doc
@@ -540,7 +630,7 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
   if (elements.length > MAX_ELEMENTS) throw new Error(tooBigMessage(elements.length, null, detail))
 
   const source = await bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
-    (f, label) => report(0.5 + 0.5 * f, label))
+    (f, label) => report(BUCKET_FROM + (1 - BUCKET_FROM) * f, label))
   return { source, cached: !!hit }
 }
 

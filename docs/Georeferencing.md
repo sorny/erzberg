@@ -216,6 +216,30 @@ legitimate slow queries and catches a dead socket no sooner. Without the
 deadline, a stalled endpoint parked the panel indefinitely *and* defeated the
 mirror fallback. The loop advanced only on a rejection or a bad status.
 
+#### How far along a fetch is
+
+The wait has three phases and only two of them can be measured.
+
+Between the POST and the first byte there is nothing at all: no length, no bytes,
+not even a status, because Overpass withholds response headers until the query
+has finished running. On a province that stretch is most of the wait. The panel
+reports it as indeterminate, with the elapsed time against the budget of the
+server. A bar that sits at 0% for ninety seconds and then races to the end says
+the wrong thing about which part is slow.
+
+Once bytes arrive they are real progress. The body is read through a stream
+reader rather than in one call. The denominator is either a length that the
+mirror declared, or the count pre-flight above. Overpass sends chunked, so a
+declared length is rare and the estimate is what usually applies: about 1.1 kB an
+element, from the measurements above. The bar is clamped below the end of its own
+band. An estimate that runs short thus stalls near the end, rather than finishing
+early and then continuing to move.
+
+`JSON.parse` on the result is one blocking call that cannot be subdivided. Its
+label is set *before* it runs rather than animated through it: a bar that keeps
+moving while the tab is frozen is a lie about where the time went. The draping
+after it reports normally, because the element count is known.
+
 OSM data is ODbL. `© OpenStreetMap contributors` appears in the panel whenever
 OSM layers are loaded, and as a comment in every SVG export that carries them.
 

@@ -732,6 +732,8 @@ function VectorLayersPanel({
   const [picked, setPicked] = useState(DEFAULT_OSM_CATEGORIES)
   const [fetching, setFetching] = useState(false)
   const [status, setStatus] = useState(null)
+  // `null` while a phase has no percentage to report — see makeReporter.
+  const [progress, setProgress] = useState(null)
   const abortRef = useRef(null)
 
   const wgs = useMemo(() => bboxToWgs84(bbox, crs), [bbox, crs])
@@ -764,13 +766,14 @@ function VectorLayersPanel({
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setFetching(true)
+    setProgress(null)
     setStatus('Querying OpenStreetMap…')
     onError(null)
     try {
       const { source, cached } = await fetchOsm(wgs, picked, {
         detail,
         signal: ctrl.signal,
-        onProgress: (_f, label) => label && setStatus(label),
+        onProgress: (f, label) => { setProgress(f); if (label) setStatus(label) },
         shouldCancel: () => ctrl.signal.aborted,
       })
       if (ctrl.signal.aborted) return
@@ -789,6 +792,7 @@ function VectorLayersPanel({
     } finally {
       abortRef.current = null
       setFetching(false)
+      setProgress(null)
       if (!fetching) setStatus(null)
     }
   }
@@ -868,8 +872,34 @@ function VectorLayersPanel({
           {fetching ? '✕ Cancel' : 'Fetch from OpenStreetMap'}
         </button>
 
-        {fetching && status && (
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{status}</div>
+        {fetching && (
+          <>
+            {/* Determinate only where there is something to be determinate
+                about. Overpass sends no headers until the query has finished
+                running, so the stripe travels during that wait rather than
+                filling — a bar stuck at 0% for ninety seconds and then racing to
+                the end says the wrong thing about which part is slow. */}
+            <div data-testid="osm-progress" data-pct={progress == null ? '' : Math.round(progress * 100)}
+              style={{
+                height: 3, marginTop: 6, borderRadius: 2, background: SURF,
+                overflow: 'hidden', position: 'relative',
+              }}>
+              {progress == null ? (
+                <div className="hm-indet" style={{
+                  position: 'absolute', inset: 0, width: '40%',
+                  background: ACCENT, borderRadius: 2,
+                }} />
+              ) : (
+                <div style={{
+                  height: '100%', width: `${Math.round(progress * 100)}%`,
+                  background: ACCENT, borderRadius: 2, transition: 'width 120ms linear',
+                }} />
+              )}
+            </div>
+            {status && (
+              <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{status}</div>
+            )}
+          </>
         )}
         {hasOsm && (
           <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
@@ -1258,7 +1288,7 @@ export function Sidebar({
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
-    modeExploded: false, modeSection: false, modeZeroCross: false,
+    modeSection: false, modeZeroCross: false,
     modeSprite: false, modeRetic: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
@@ -1458,7 +1488,6 @@ export function Sidebar({
       modeBerm:     !!newStyle.enabledBerm,
       modeAir:      !!newStyle.enabledAir,
       modeRaceLine: !!newStyle.enabledRaceLine,
-      modeExploded: !!newStyle.enabledExploded,
       modeSection:  !!newStyle.enabledSection,
       modeZeroCross: !!newStyle.enabledZeroCross,
       modeSprite:   !!newStyle.enabledSprite,
@@ -2629,7 +2658,7 @@ export function Sidebar({
             {style.enabledRaceLine && (
               <>
                 <Sub>
-                  <InlineSl label="Drop-ins" help="How many summits get a braid." min={1} max={20} step={1} value={style.dropsRaceLine} onChange={v => ss({ dropsRaceLine: v })} />
+                  <InlineSl label="Drop-ins" help="How many summits get a braid. Each one blanks a radius of Spacing around itself so the braids do not all start on one summit, so a high count needs a low Spacing to have anywhere to put them — ask for more than the terrain has room for and you get what fits." min={1} max={250} step={1} value={style.dropsRaceLine} onChange={v => ss({ dropsRaceLine: v })} />
                   <InlineSl label="Spacing" help="How far apart the drop-ins must be." min={5} max={150} step={5} value={style.spacingRaceLine} onChange={v => ss({ spacingRaceLine: v })} />
                   <InlineSl label="Lines" help="Runs per drop-in." min={2} max={41} step={1} value={style.fanRaceLine} onChange={v => ss({ fanRaceLine: v })} />
                   <InlineSl label="Fan" help="Total spread of the initial headings." min={10} max={350} step={5} value={style.spreadRaceLine} onChange={v => ss({ spreadRaceLine: v })} fmt={v => v + '°'} />
@@ -2644,29 +2673,6 @@ export function Sidebar({
                   <InlineSl label="Max steps" min={20} max={800} step={10} value={style.maxLenRaceLine} onChange={v => ss({ maxLenRaceLine: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="RaceLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Mode: Exploded Frame" icon={<ModeMark kind="exploded" />} open={sec.modeExploded} onToggle={() => tog('modeExploded')} enabled={style.enabledExploded}>
-            <Tog label="Enabled" checked={style.enabledExploded} onChange={v => ss({ enabledExploded: v })} />
-            {style.enabledExploded && (
-              <>
-                <Sub label="LATTICE">
-                  <InlineSl label="Spacing" help="Node pitch. Each node snaps to the highest cell in its own square, so the frame hangs off real summits." min={4} max={60} step={1} value={style.spacingExploded} onChange={v => ss({ spacingExploded: v })} />
-                  <InlineSl label="Smoothing" help="Pre-smooths the grid before the twist is measured. Second derivatives amplify noise — on a raw DEM every pixel of grain asks for its own brace." min={0} max={10} step={1} value={style.radiusExploded} onChange={v => ss({ radiusExploded: v })} />
-                  <InlineSl label="Braced" help="Fraction of panels that get a diagonal, as a percentile of the twist actually present — so the composition survives changing the terrain under it." min={0} max={1} step={0.05} value={style.bracedExploded} onChange={v => ss({ bracedExploded: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Brace weight" min={0.5} max={8} step={0.5} value={style.braceWeightExploded} onChange={v => ss({ braceWeightExploded: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <Sub label="JOINTS &amp; POSTS">
-                  <InlineSl label="Gusset" help="Plate radius at each joint, as a fraction of the node pitch. A braced joint gets more sides than a free one." min={0} max={1} step={0.05} value={style.gussetExploded} onChange={v => ss({ gussetExploded: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Gusset sides" min={3} max={12} step={1} value={style.gussetSidesExploded} onChange={v => ss({ gussetSidesExploded: v })} />
-                  <InlineSl label="Explode" help="How far the member classes are pulled apart along Y, as a fraction of the elevation range." min={0} max={0.6} step={0.01} value={style.explodeExploded} onChange={v => ss({ explodeExploded: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Leader weight" min={0.5} max={6} step={0.5} value={style.leaderWeightExploded} onChange={v => ss({ leaderWeightExploded: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Datum depth" help="How far below the terrain floor the posts run." min={0} max={200} step={5} value={style.depthExploded} onChange={v => ss({ depthExploded: v })} />
-                  <InlineSl label="Post weight" min={0.5} max={8} step={0.5} value={style.postWeightExploded} onChange={v => ss({ postWeightExploded: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <ModeStyleOverride prefix="Exploded" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="CHORD STYLE" />
               </>
             )}
           </Section>

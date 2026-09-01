@@ -172,16 +172,6 @@ export const STYLE_DEF = {
   bestWeightRaceLine: 3,
   hypsoRaceLine: false, hypsoModeRaceLine: 'slope', hypsoBandedRaceLine: false, hypsoIntervalRaceLine: 10,
 
-  // Space frame — the lattice Exploded Frame hangs on. `braced` is the *fraction*
-  // of panels that get a diagonal, taken as a percentile of the twist actually
-  // present: a frame is a drawing before it is an analysis, and an absolute
-  // cutoff braces everything or nothing depending on how rough the raster is.
-  enabledExploded: false, spacingExploded: 50, radiusExploded: 2, bracedExploded: 0.45,
-  depthExploded: 0, gussetExploded: 0.3, gussetSidesExploded: 6, explodeExploded: 0.12,
-  colorExploded: '#000000', weightExploded: 2.5, opacityExploded: 1, dashExploded: 'solid',
-  braceWeightExploded: 1, postWeightExploded: 1, leaderWeightExploded: 0.5,
-  hypsoExploded: false, hypsoModeExploded: 'elevation', hypsoBandedExploded: false, hypsoIntervalExploded: 10,
-
   enabledSection: false, cutSection: 0.45, hatchSection: 4, hatchAngleSection: 45, beyondSection: 8,
   colorSection: '#000000', weightSection: 3, opacitySection: 1, dashSection: 'solid',
   hatchWeightSection: 1, beyondWeightSection: 1,

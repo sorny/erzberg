@@ -232,15 +232,6 @@ const MARKS = {
       <path d="M4 3.2 C6 6.5, 6.5 9, 8.5 11.5" strokeWidth="1.9" />
     </g>
   ),
-  // The same frame pulled apart along Y, with leaders back to place.
-  exploded: (
-    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-      <path d="M2 2.5 L11 1.5 L20 3" strokeWidth="1.6" />
-      <path d="M2 6.5 L11.5 6 M11.5 6 L20 7" strokeWidth="0.8" />
-      <path d="M2 11 L11 10.5 L20 11.5" strokeWidth="1.2" strokeDasharray="2 1.5" />
-      <path d="M6 2.2 L6 11 M15.5 2.3 L15.5 11.2" strokeWidth="0.5" strokeDasharray="1 1.4" />
-    </g>
-  ),
   // A cutting plane: hatched below, outline beyond.
   section: (
     <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">

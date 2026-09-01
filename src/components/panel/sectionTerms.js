@@ -50,7 +50,6 @@ export const SECTION_TERMS = {
   'Mode: Berms':      'banking lateral load cornering g-force turn ticks camber',
   'Mode: Air':        'jump kicker launch ballistic parabola flight convex lip gap send',
   'Mode: Race Line':  'braid fan drop-in fastest descent variants spread choices',
-  'Mode: Exploded Frame': 'assembly diagram displaced members leaders apart layers exploded view',
   'Mode: Section':    'cutting plane cut face hatch 45 drafting convention material below beyond slice',
   'Mode: Zero Crossings': 'sign change pitch crossings detrend roughness scree dots',
   'Mode: Sprite Blocks': 'isometric voxel blocks cubes tiles arcade quantise tiers minecraft populous risers',
