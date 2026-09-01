@@ -71,8 +71,9 @@ export function sampleGradient(stops, t) {
  * @param {number} normSlope 0–1 normalised slope magnitude
  * @param {number} aspect    Aspect angle in radians
  * @param {object} params    All visual params
+ * @param {number} [speed]   0–1 normalised speed, for the descent family only
  */
-export function computeVertexColor(normElev, normSlope, aspect, params) {
+export function computeVertexColor(normElev, normSlope, aspect, params, speed = 0) {
   const { 
     lineColor, lineHypsometric, lineBanded, 
     lineHypsoMode, lineHypsoInterval, gradientStops 
@@ -85,6 +86,10 @@ export function computeVertexColor(normElev, normSlope, aspect, params) {
   let val = normElev
   if (lineHypsoMode === 'slope') val = normSlope
   else if (lineHypsoMode === 'aspect') val = aspect / (Math.PI * 2) + 0.5
+  // Speed is meaningful only where a tracer integrated one. Every other mode
+  // passes 0, which would ink the whole layer at the bottom of the ramp — so
+  // the mode falls back to slope rather than drawing a lie.
+  else if (lineHypsoMode === 'speed') val = speed > 0 ? speed : normSlope
 
   if (lineBanded) {
     const steps = 100 / (lineHypsoInterval || 10)

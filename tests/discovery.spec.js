@@ -96,6 +96,45 @@ test('Surprise me rolls a look, and the arrow walks back', async ({ page }) => {
   expect(errors).toEqual([])
 })
 
+test('Surprise me does not move under the cursor', async ({ page }) => {
+  /*
+   * The button exists to be pressed over and over until something looks right,
+   * so it has to stay where it was pressed.
+   *
+   * A roll is a preset, and applying one syncs every mode section open or shut
+   * to match. That changes the panel's height, and near the end of the scroll
+   * the browser clamps `scrollTop` to the new maximum — the column slides and
+   * the dice land somewhere else. Measured before the scroll anchor went in:
+   * 60px of drift on half the rolls, which is a whole button.
+   */
+  await boot(page)
+  await openPresets(page)
+  const btn = page.locator('[data-testid="surprise-me"]')
+
+  // Park the panel near its end, which is where the clamp bites.
+  await page.evaluate(() => {
+    const body = document.getElementById('hm-panel-body')
+    body.scrollTop = body.scrollHeight
+  })
+  await page.waitForTimeout(300)
+  await btn.scrollIntoViewIfNeeded()
+  await page.waitForTimeout(300)
+
+  for (let i = 0; i < 6; i++) {
+    const before = (await btn.boundingBox()).y
+    await btn.click()
+    await page.waitForTimeout(700)
+    const after = (await btn.boundingBox()).y
+    expect(Math.abs(after - before), `roll ${i + 1} moved the button`).toBeLessThanOrEqual(1)
+  }
+
+  // Stepping back through rolls is the same gesture and holds the same anchor.
+  const before = (await btn.boundingBox()).y
+  await page.locator('[data-testid="surprise-back"]').click()
+  await page.waitForTimeout(700)
+  expect(Math.abs((await btn.boundingBox()).y - before)).toBeLessThanOrEqual(1)
+})
+
 test('a roll describes the whole look, not just the parts it changed', async ({ page }) => {
   await boot(page)
   const r = await page.evaluate(async () => {

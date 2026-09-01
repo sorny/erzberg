@@ -205,6 +205,52 @@ export const STYLE_DEF = {
   colorRetic: '#1a1a1a', weightRetic: 2.5, opacityRetic: 0.9, dashRetic: 'solid',
   hypsoRetic: false, hypsoModeRetic: 'elevation', hypsoBandedRetic: false, hypsoIntervalRetic: 10,
 
+  // ── Colour modes ──────────────────────────────────────────────────────────
+  // Every mode above takes its colour as one scalar into the shared gradient.
+  // These nine break that: a lookup, an area, a separation, a classification.
+  // None of them carries its own palette *array* — `geometryKey` stringifies,
+  // so an array here would be invisible to the rebuild. They quantise
+  // `gradientStops` instead, which already lives in GEOMETRY_NON_SCALAR.
+
+  // Indexed — colour as a 2D lookup: elevation tier by slope class, Bayer
+  // dithered between adjacent entries.
+  enabledIndexed: false, tiersIndexed: 6, slopeBandsIndexed: 2,
+  steepShiftIndexed: 0.35, ditherIndexed: 1, spacingIndexed: 2,
+  colorIndexed: '#000000', weightIndexed: 1, opacityIndexed: 1, dashIndexed: 'solid',
+  hypsoIndexed: false, hypsoModeIndexed: 'elevation', hypsoBandedIndexed: false, hypsoIntervalIndexed: 10,
+
+  // Outrun — additive glow under a near-white filament.
+  enabledOutrun: false, levelsOutrun: 16, whitenOutrun: 0.35,
+  colorOutrun: '#ff2d95', weightOutrun: 1.2, opacityOutrun: 0.95, dashOutrun: 'solid',
+  glowWeightOutrun: 8, glowOpacityOutrun: 0.14,
+  hypsoOutrun: true, hypsoModeOutrun: 'elevation', hypsoBandedOutrun: false, hypsoIntervalOutrun: 10,
+
+  // Riso — three spot inks, screened at 15/45/75°, deliberately out of register.
+  // `limitRiso` at 3 is off: three inks cannot sum past 3.0, so the cap
+  // cannot bind. Lower it and the shadows go flat, the way an overloaded
+  // press does. `offsetRiso` at 0 is a press in perfect register.
+  enabledRiso: false, pitchRiso: 2, offsetRiso: 1.4, limitRiso: 3, azimuthRiso: 315,
+  colorARiso: '#ff48b0', colorBRiso: '#5ec8e5', colorCRiso: '#ffe800',
+  gammaARiso: 2.6, gammaBRiso: 2, gammaCRiso: 2.2, seedRiso: 42,
+  // No `colorRiso`: the three separations each carry their own ink, and
+  // nothing reads a base colour for this mode.
+  weightRiso: 3, opacityRiso: 1, dashRiso: 'solid',
+  hypsoRiso: false, hypsoModeRiso: 'elevation', hypsoBandedRiso: false, hypsoIntervalRiso: 10,
+
+  // Mineral — five materials classified by slope and curvature, each grained.
+  enabledMineral: false, spacingMineral: 2, radiusMineral: 2,
+  steepMineral: 0.62, brokenMineral: 0.45, grainMineral: 0.28,
+  colorAMineral: '#3e2a1f', colorBMineral: '#8c4a2f', colorCMineral: '#c97b3c',
+  colorDMineral: '#5e6e54', colorEMineral: '#d8cbb0',
+  colorMineral: '#3e2a1f', weightMineral: 1, opacityMineral: 1, dashMineral: 'solid',
+  hypsoMineral: false, hypsoModeMineral: 'elevation', hypsoBandedMineral: false, hypsoIntervalMineral: 10,
+
+  // Watershed — D8 catchments, one flat ink each.
+  enabledShed: false, spacingShed: 2, inksShed: 10, minBasinShed: 0.4, radiusShed: 3,
+  shadeShed: 0.32, azimuthShed: 315, seedShed: 11,
+  colorShed: '#ff3d6e', weightShed: 1, opacityShed: 1, dashShed: 'solid',
+  hypsoShed: false, hypsoModeShed: 'elevation', hypsoBandedShed: false, hypsoIntervalShed: 10,
+
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.

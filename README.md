@@ -19,10 +19,10 @@
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
 The app renders it as 3D line art, structural relief or an architectural sketch.
-Twenty-seven independent draw modes do the work. They range from surveyor's
+Thirty-two independent draw modes do the work. They range from surveyor's
 marks such as hachures and form lines to a quantised tilemap. Others are a
 flashbulb with a cast shadow, and tracks that something with mass laid down a
-face.
+face. Five of them are about colour rather than about mark-making.
 
 Contours letter their own heights. The app sets the number into a break in the
 line, at the angle of the line, in the ink of the line.
@@ -230,6 +230,11 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Exploded Frame | A braced space frame pulled apart along Y — the diagonal placed and oriented by the twist of the terrain |
 | Section | A cutting plane drawn as a drawing: heavy cut face, 45° hatch over the material below, outline beyond |
 | Zero Crossings | Sign changes of the detrended scanline — the local pitch of the terrain, which is neither slope nor curvature |
+| Indexed | Colour as a lookup, not a sample: elevation tier by slope class, Bayer-dithered between adjacent palette entries |
+| Outrun | An additive halo under a near-white filament — where contours crowd, the halos sum and the ground lifts |
+| Riso | Three spot inks screened at 15°, 45° and 75°, multiplied together. Registration and a coverage cap decide which press you are on |
+| Mineral | Five materials classified by slope and curvature, each with a flat colour and its own grain |
+| Watershed | Every cell labelled with the sink it drains to, one flat ink per catchment. The divides are ridgelines |
 
 **Layered ghost occlusion.** Each line segment makes an invisible 3D curtain
 mesh that acts as a depth buffer. Lines then occlude other lines, and the
@@ -253,6 +258,12 @@ on paper, with its axis, its elevation range and both ends labelled. It can sit
 beside a plotted plate or in a document. Both are viewport aids. The app draws
 them over the scene, but flags them out of the PNG capture and hides them during
 a recording. Nothing that you composed for the screen thus lands in a print.
+
+**Colour as the subject.** Five modes treat colour as the thing drawn rather
+than as a property of a mark. They are the only layers in the tool that do not
+composite normally. Outrun adds light, which is why it wants a dark ground. Riso
+multiplies ink, which is why it wants paper. Three of them draw area rather than
+line, and export the boundary between regions so a plotter still gets a map.
 
 **Reproducible randomness.** The stochastic modes are Stipple, Rock & Scree,
 Flashbulb, Halation and Reticulation. Each one carries a seed. The same seed

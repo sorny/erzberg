@@ -1,6 +1,6 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Twenty-seven independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Thirty-two independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
 
 ---
 
@@ -437,6 +437,152 @@ $$F_1, F_2 = \text{the two smallest distances to jittered feature points}, \qqua
 A Fortune sweep gives exact edges and costs a real data structure. This costs nine bucket lookups per sample and gives an edge with *thickness*, which is what a crack has. Feature points sit one per cell of a coarse grid, jittered from `mulberry32`, so a seed reproduces the pattern exactly.
 
 Crack width is proportional to cell size. Total coverage thus stays roughly constant as the cells open up: fewer boundaries, each one wider. The crazing looks like crazing at any scale instead of a fade. Coverage is thus the job of `width`, not of the cell. The **tone gate** is what stops the whole thing from being wallpaper. The builder draws walls only where the plate is dark enough for a crack, on the same density modes that Stipple offers. The crazing thus pools in the shadows and leaves the highlights clean.
+
+
+## 28–32. Colour modes — Indexed, Outrun, Riso, Mineral, Watershed
+
+Every mode above takes its colour the same way. One scalar goes into one shared
+gradient, and `computeVertexColor` samples it once per vertex. That single
+function is where all colour in the tool comes from, and it is also the ceiling:
+one input, one dimension, one ramp. These five break it in five different places.
+
+Three of them draw **area** rather than line, through the `lids` mesh that
+Pillars and Sprite Blocks already use for their caps. Two of them are about the
+**blend** rather than the colour. They are the first line layers in the tool that
+do not composite normally.
+
+### Indexed
+
+Colour as a lookup rather than a sample. Two terrain quantities index one small
+palette:
+
+$$e = \left\lfloor \hat{H} \cdot N_e \right\rfloor, \qquad
+  s = \left\lfloor \hat{S}^{0.6} \cdot N_s \right\rfloor$$
+
+The second axis is the point. A one-dimensional ramp cannot say *high and flat*
+against *high and steep*, so a snowfield and the cliff beside it get the same
+ink. A two-dimensional table separates them, and that separation is what makes
+the picture read as terrain rather than as a heat map.
+
+Between two adjacent entries there is no blend but a 4×4 Bayer screen, on how far
+up its own band a cell sits. The checkerboard of two inks reads as a third that
+the palette does not contain. That artefact is the aesthetic. It is what a
+sixteen-colour machine did when it was asked for a sky.
+
+The palette is the shared gradient, quantised. A per-mode array of stops is not
+possible: `geometryKey` stringifies, so the rebuild cannot see an edit inside
+one. `gradientStops` already solved that by living in
+`GEOMETRY_NON_SCALAR`, so the colour modes borrow it rather than adding a second
+exception.
+
+This is the dual of Bitplane (§16), deliberately. That mode quantises *geometry*
+and leaves colour continuous. This quantises *colour* and leaves geometry
+continuous. They stack.
+
+### Outrun
+
+The first thing in the tool that adds light instead of ink. A wide dim halo
+composites additively under a thin near-white filament. Where contours crowd, the
+halos sum and the ground between them lifts to a glowing plane. Out on an open
+face a single line hangs alone in the dark. Density becomes luminance for free,
+because that is what the addition of light does.
+
+The two halves must be two layers, and not for tidiness. `layerStyle` resolves
+one `weight` for a whole layer, so a fat halo under a thin core is structurally
+impossible in one. That constraint is the design.
+
+Only the halo is additive. Additive light cannot darken anything. An all-additive
+mode thus draws nothing at all on a white ground, and reads as broken the moment
+it is switched on. The filament is ink and composites normally, which is
+also the honest description of what the two pens are.
+
+### Riso
+
+Three spot inks, each carrying a different reading of the terrain, each screened
+at its own angle and multiplied together. They are not composed, they are
+*overprinted*. Every colour past the first three is one that the machine never
+held: pink over aqua is a bruised violet, aqua over yellow a sharp green.
+
+A traditional halftone is *amplitude*-modulated, with one grid and bigger dots
+for more ink. This engine cannot do that, because `layerStyle` resolves one
+`weight` for a whole layer and every dot in a pen is the same size. The screens
+are *frequency*-modulated instead: a fixed dot at a varying density, which is
+what modern presses use anyway. The rotated angles of 15°, 45° and 75° are still
+what keeps three of them from moiré against each other.
+
+Each separation is stretched to its own percentile range first. Raw, the three
+fields occupy narrow and *different* bands on real terrain, so one ink covers the
+sheet while the other two barely print.
+
+Two controls decide which machine you are printing on, and they are the whole
+range of the mode:
+
+- **Registration.** Above zero the plates sit a hair apart, which is the tell of
+  a real duplicator. At zero they are in perfect register, like a press.
+- **Coverage cap.** A real press has a total-area-coverage ceiling. Past it the
+  sheet cannot dry, so the shadows are pulled back. They go flat and slightly
+  wrong-coloured, because the ink removed is whichever was contributing least. At the top of its range three inks cannot exceed 3.0, so the cap cannot
+  bind and the mode prints everything.
+
+The cap limits the three inks that this mode lays down. A limit across every enabled layer in the scene has no home in
+the architecture. Nothing between the builders and the renderer sees all the
+layers at once while their coverage is still known.
+
+### Mineral
+
+Colour that means a rock type rather than a height. Slope and curvature pick one
+of five materials. Each material carries a flat colour and its own noise tooth,
+so the surfaces differ in texture as well as in hue. That is how a geological
+survey sheet distinguishes them.
+
+Both cuts are **percentiles** of the distribution of this terrain, not fractions
+of its maximum. Against `maxSlope` a single cliff cell sets the scale and every
+other cell falls into one class. Measured on the sample plate, five materials
+came out as one. That is the same failure that the Fall Line gravity had (§19).
+
+Curvature is taken on a blurred grid, for the reason that Ridge (§9) and
+Curvature (§14) give. A second difference on a raw DEM turns every pixel of
+sensor grain into its own rock type.
+
+### Watershed
+
+Big flat areas of unmixed colour, with hard edges along the divides. The picture
+is a map of where water goes rather than of how high anything is. The
+boundaries are ridgelines, which is why they look drawn rather than imposed.
+
+The machinery already existed. Stream Network (§7) walks this graph to accumulate
+flow. Here every cell walks steepest descent to a sink and inherits the label of that
+sink. It is the same D8 traversal, read for identity instead of for volume.
+
+Two things were needed to make it a map rather than confetti:
+
+- **The walk runs on a blurred grid.** D8 on a raw DEM finds a pit at every
+  dimple. Measured on the sample plate that gave thousands of one-cell basins.
+  A divide is a ridge, and a ridge is a second derivative in disguise.
+- **Small basins fold into their largest neighbour, with path compression.** A
+  small basin can fold into a neighbour that is itself small, so the chain has to
+  be followed. A naive walk is O(basins²) and hung the worker outright. A
+  fold-in is accepted only when it strictly increases the size of the target,
+  which makes the graph a forest and makes the compression terminate.
+
+### What the area modes plot
+
+Indexed, Mineral and Watershed draw fills, and a fill is not a stroke. The SVG
+exporter reads the per-vertex colour buffer and never looks at `lids`, so these
+three exported an empty plate.
+
+Each cell edge where the ink changes is now a real stroke. The plot is the
+outline of each *region* rather than of each square: on Watershed those edges are
+the divides, on Mineral the material boundaries, on Indexed the band steps. Every
+cell edge is a wall of grid lines, and a plotter has no use for that.
+
+What counts as the same area is the **region**, not the pixel colour. Mineral
+grains every cell and Indexed dithers between two entries on purpose, so a
+comparison of colours made every single cell edge a boundary. Each stroke also
+carries the *base* ink of its region, without the grain or the relief shading
+that the fill carries. Those modulate every cell separately, and using the fill
+colour put 703 near-identical greens into a Mineral plot. Measured on the sample
+plate, the modes now plot 6, 5 and 10 inks.
 
 ---
 

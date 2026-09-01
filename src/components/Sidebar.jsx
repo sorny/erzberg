@@ -1,7 +1,7 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
@@ -27,7 +27,7 @@ import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
-  RangeSl, Sl, Sub, Tog, TogColor, Btn,
+  Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
 import { SectionFilter, sectionMatches } from './panel/filter'
 import { SECTION_TERMS } from './panel/sectionTerms'
@@ -1186,15 +1186,20 @@ function ProjectionParams({ params, values, onChange }) {
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
-function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, gradientStops, setGradientStops }) {
+function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
       <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>{label}</div>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-        <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
-        <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
-      </div>
+      {/* A mode that inks every mark from its own table has no base colour to
+          show: Riso's three separations each carry their own, and a swatch here
+          would be a control that changes nothing. */}
+      {showColor && (
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
+          <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
+          <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
+        </div>
+      )}
       <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
 
@@ -1217,7 +1222,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
         {isHypso && (
           <Sub>
             <div style={{ display:'flex', gap:2, marginBottom:4 }}>
-              {['Elevation', 'Slope', 'Aspect'].map(m => (
+              {['Elevation', 'Slope', 'Aspect', 'Speed'].map(m => (
                 <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
                   style={{ 
                     flex:1, fontSize:10, padding:'2px 0', borderRadius:2, 
@@ -1325,6 +1330,8 @@ export function Sidebar({
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeExploded: false, modeSection: false, modeZeroCross: false,
     modeSprite: false, modeRetic: false,
+    modeIndexed: false, modeOutrun: false, modeRiso: false,
+    modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
@@ -1526,6 +1533,11 @@ export function Sidebar({
       modeZeroCross: !!newStyle.enabledZeroCross,
       modeSprite:   !!newStyle.enabledSprite,
       modeRetic:    !!newStyle.enabledRetic,
+      modeIndexed:  !!newStyle.enabledIndexed,
+      modeOutrun:   !!newStyle.enabledOutrun,
+      modeRiso:     !!newStyle.enabledRiso,
+      modeMineral:  !!newStyle.enabledMineral,
+      modeShed:     !!newStyle.enabledShed,
     }))
   }
 
@@ -1591,6 +1603,42 @@ export function Sidebar({
   // ── Discovery: rolling a look ─────────────────────────────────────────────
   const presetNames = Object.keys(externalPresets || {})
 
+  /*
+   * Rolling a look must not move the button that rolled it.
+   *
+   * A roll is a preset, and applying one syncs every mode section open or shut
+   * to match. That changes the panel's total height, and where the panel was
+   * scrolled near its end the browser clamps `scrollTop` to the new maximum —
+   * so the whole column slides and the dice land somewhere else. Which is fatal
+   * for the one thing this button is for: pressing it over and over until
+   * something looks right. You end up chasing it down the panel.
+   *
+   * The fix is a scroll anchor rather than a restriction on what a roll may
+   * change: note where the button is before, and after the commit put the
+   * scroller back by however far it drifted. The sections still track the look —
+   * which is what makes the panel worth reading after a roll — and the cursor
+   * stays over the dice.
+   */
+  const surpriseRef = useRef(null)
+  const anchorTopRef = useRef(null)
+
+  const anchorSurprise = () => {
+    anchorTopRef.current = surpriseRef.current?.getBoundingClientRect().top ?? null
+  }
+
+  useLayoutEffect(() => {
+    const want = anchorTopRef.current
+    if (want == null) return
+    anchorTopRef.current = null
+    const btn = surpriseRef.current
+    const body = document.getElementById('hm-panel-body')
+    if (!btn || !body) return
+    // Layout, not paint: this runs before the browser draws, so the correction
+    // is never visible as a jump.
+    const drift = btn.getBoundingClientRect().top - want
+    if (drift) body.scrollTop += drift
+  })
+
   const roll = (seed) => {
     const preset = randomPreset(seed)
     applyPreset(preset, null)
@@ -1599,6 +1647,7 @@ export function Sidebar({
 
   const handleSurprise = () => {
     const seed = Math.floor(Math.random() * 0xffffffff)
+    anchorSurprise()
     if (rollSeed != null) setRollHistory(h => [...h.slice(-9), rollSeed])
     setRollSeed(seed)
     roll(seed)
@@ -1611,6 +1660,7 @@ export function Sidebar({
   // side effect, and React is free to call a state updater more than once.
   const handleUnroll = () => {
     if (!rollHistory.length) return
+    anchorSurprise()
     const prev = rollHistory[rollHistory.length - 1]
     setRollHistory(h => h.slice(0, -1))
     setRollSeed(prev)
@@ -1930,7 +1980,7 @@ export function Sidebar({
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
             {style.depthOcclusion && (
               <Sub>
-                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface." min={0} max={25} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={50} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
                 <InlineSl label="Ghost Opac" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -2016,7 +2066,7 @@ export function Sidebar({
             {/* Roll a look. The seed is shown because it *is* the look — note it
                 down and the same roll comes back. */}
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <button data-testid="surprise-me" onClick={handleSurprise} style={{
+              <button data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise} style={{
                 flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
                 borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
               }}>🎲 Surprise me</button>
@@ -2416,6 +2466,108 @@ export function Sidebar({
                   <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Bitplane" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+
+          <Section title="Mode: Indexed" icon={<ModeMark kind="indexed" />} open={sec.modeIndexed} onToggle={() => tog('modeIndexed')} enabled={style.enabledIndexed}>
+            <Tog label="Enabled" checked={style.enabledIndexed} onChange={v => ss({ enabledIndexed: v })} />
+            {style.enabledIndexed && (
+              <>
+                <Sub label="PALETTE">
+                  <InlineSl label="Entries" help="How many inks the shared gradient is cut into. This is the palette — 16 is what a 16-colour machine had." min={2} max={16} step={1} value={style.tiersIndexed} onChange={v => ss({ tiersIndexed: v })} />
+                  <InlineSl label="Slope bands" help="The second axis of the lookup. A 1D ramp cannot tell a snowfield from the cliff beside it, because both are high." min={1} max={4} step={1} value={style.slopeBandsIndexed} onChange={v => ss({ slopeBandsIndexed: v })} />
+                  <InlineSl label="Steep shift" help="How far a steep cell moves along the palette against a flat one at the same height." min={0} max={1} step={0.05} value={style.steepShiftIndexed} onChange={v => ss({ steepShiftIndexed: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <Sub label="SCREEN">
+                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen between two adjacent entries. The checkerboard reads as a colour the palette does not contain — that artefact is the point." min={0} max={1} step={0.05} value={style.ditherIndexed} onChange={v => ss({ ditherIndexed: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Cell size" help="Lattice pitch of the filled cells. Smaller is finer and much heavier." min={1} max={12} step={0.5} value={style.spacingIndexed} onChange={v => ss({ spacingIndexed: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Indexed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Outrun" icon={<ModeMark kind="outrun" />} open={sec.modeOutrun} onToggle={() => tog('modeOutrun')} enabled={style.enabledOutrun}>
+            <Tog label="Enabled" checked={style.enabledOutrun} onChange={v => ss({ enabledOutrun: v })} />
+            {style.enabledOutrun && (
+              <>
+                <Sub>
+                  <InlineSl label="Levels" help="How many contour rings are drawn. Where they crowd, the halos sum and the ground between them lifts." min={4} max={40} step={1} value={style.levelsOutrun} onChange={v => ss({ levelsOutrun: v })} />
+                  <InlineSl label="Filament" help="How far the core is pushed toward white. The hue stays in the halo." min={0} max={1} step={0.05} value={style.whitenOutrun} onChange={v => ss({ whitenOutrun: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <Sub label="GLOW">
+                  <InlineSl label="Halo width" help="The halo is a second pen over the same path — a fat halo under a thin core is impossible in one layer, because a layer has one width." min={1} max={30} step={0.5} value={style.glowWeightOutrun} onChange={v => ss({ glowWeightOutrun: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Halo opacity" help="Additive: the halo can only add light, never darken what it lies over. Low values stack better." min={0} max={1} step={0.01} value={style.glowOpacityOutrun} onChange={v => ss({ glowOpacityOutrun: v })} fmt={v => Math.round(v*100)+'%'} />
+                </Sub>
+                <Note>Additive blending. Wants a dark background — on paper it does nothing.</Note>
+                <ModeStyleOverride prefix="Outrun" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Riso" icon={<ModeMark kind="riso" />} open={sec.modeRiso} onToggle={() => tog('modeRiso')} enabled={style.enabledRiso}>
+            <Tog label="Enabled" checked={style.enabledRiso} onChange={v => ss({ enabledRiso: v })} />
+            {style.enabledRiso && (
+              <>
+                <Sub label="INKS">
+                  <ColorRow label="Ink A · elevation" value={style.colorARiso} onChange={v => ss({ colorARiso: v })} />
+                  <ColorRow label="Ink B · slope" value={style.colorBRiso} onChange={v => ss({ colorBRiso: v })} />
+                  <ColorRow label="Ink C · light" value={style.colorCRiso} onChange={v => ss({ colorCRiso: v })} />
+                </Sub>
+                <Sub label="SCREENS">
+                  <InlineSl label="Pitch" help="Dot spacing. Each ink is screened at its own angle — 15°, 45°, 75° — which is what keeps three of them from moiréing." min={1} max={8} step={0.25} value={style.pitchRiso} onChange={v => ss({ pitchRiso: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Registration" help="How far the plates sit out of register. Above zero is a duplicator; at zero they line up, like a press." min={0} max={6} step={0.1} value={style.offsetRiso} onChange={v => ss({ offsetRiso: v })} fmt={v => v === 0 ? 'exact' : '±' + v.toFixed(1)} />
+                  <InlineSl label="Coverage cap" help="Total area coverage. Where all three inks want the same cell and the sum passes this, the weakest is dropped — which is why an overloaded press goes flat and slightly wrong-coloured in the shadows. At 3.00 it cannot bind." min={0.3} max={3} step={0.05} value={style.limitRiso} onChange={v => ss({ limitRiso: v })} fmt={v => v >= 3 ? 'off' : v.toFixed(2)} />
+                  <InlineSl label="Ink A curve" min={0.4} max={5} step={0.1} value={style.gammaARiso} onChange={v => ss({ gammaARiso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Ink B curve" min={0.4} max={5} step={0.1} value={style.gammaBRiso} onChange={v => ss({ gammaBRiso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Ink C curve" min={0.4} max={5} step={0.1} value={style.gammaCRiso} onChange={v => ss({ gammaCRiso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRiso} onChange={v => ss({ seedRiso: v })} />
+                </Sub>
+                <Note>Multiply blending, so it wants paper. On a dark background three light inks go to mud.</Note>
+                <ModeStyleOverride prefix="Riso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} showColor={false} label="DOT SIZE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Mineral" icon={<ModeMark kind="mineral" />} open={sec.modeMineral} onToggle={() => tog('modeMineral')} enabled={style.enabledMineral}>
+            <Tog label="Enabled" checked={style.enabledMineral} onChange={v => ss({ enabledMineral: v })} />
+            {style.enabledMineral && (
+              <>
+                <Sub label="MATERIALS">
+                  <ColorRow label="Rock face" value={style.colorAMineral} onChange={v => ss({ colorAMineral: v })} />
+                  <ColorRow label="Massive rock" value={style.colorBMineral} onChange={v => ss({ colorBMineral: v })} />
+                  <ColorRow label="Scree" value={style.colorCMineral} onChange={v => ss({ colorCMineral: v })} />
+                  <ColorRow label="Bench" value={style.colorDMineral} onChange={v => ss({ colorDMineral: v })} />
+                  <ColorRow label="Summit" value={style.colorEMineral} onChange={v => ss({ colorEMineral: v })} />
+                </Sub>
+                <Sub label="CLASSIFIER">
+                  <InlineSl label="Steep at" help="Slope above which a cell is rock rather than ground." min={0.05} max={0.95} step={0.01} value={style.steepMineral} onChange={v => ss({ steepMineral: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Broken at" help="Curvature above which rock is a face rather than massive." min={0.05} max={0.95} step={0.01} value={style.brokenMineral} onChange={v => ss({ brokenMineral: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Smoothing" help="Curvature is a second derivative, so it is taken on a blurred grid. On a raw DEM every pixel of sensor grain becomes its own rock type." min={0} max={8} step={1} value={style.radiusMineral} onChange={v => ss({ radiusMineral: v })} />
+                  <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Watershed" icon={<ModeMark kind="shed" />} open={sec.modeShed} onToggle={() => tog('modeShed')} enabled={style.enabledShed}>
+            <Tog label="Enabled" checked={style.enabledShed} onChange={v => ss({ enabledShed: v })} />
+            {style.enabledShed && (
+              <>
+                <Sub>
+                  <InlineSl label="Inks" help="How many colours the gradient is cut into before basins are dealt from it." min={2} max={24} step={1} value={style.inksShed} onChange={v => ss({ inksShed: v })} />
+                  <InlineSl label="Min basin" help="Percentage of the raster below which a catchment is folded into its largest neighbour. A thousand one-cell basins is noise, not a map." min={0} max={5} step={0.1} value={style.minBasinShed} onChange={v => ss({ minBasinShed: v })} fmt={v => v.toFixed(1) + '%'} />
+                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingShed} onChange={v => ss({ spacingShed: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Relief" min={0} max={1} step={0.05} value={style.shadeShed} onChange={v => ss({ shadeShed: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Sun azimuth" min={0} max={360} step={5} value={style.azimuthShed} onChange={v => ss({ azimuthShed: v })} fmt={v => v + '°'} />
+                  <InlineSl label="Seed" help="Which ink each basin is dealt." min={1} max={999} step={1} value={style.seedShed} onChange={v => ss({ seedShed: v })} />
+                </Sub>
+                <Note>The divides are ridgelines, which is why they look drawn rather than imposed.</Note>
+                <ModeStyleOverride prefix="Shed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
               </>
             )}
           </Section>

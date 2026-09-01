@@ -282,6 +282,72 @@ const MARKS = {
       ))}
     </g>
   ),
+  // A palette read as a lookup: flat blocks, dithered along one seam.
+  indexed: (
+    <g stroke="none" fill="currentColor">
+      <rect x="1" y="1.5" width="6" height="4.5" opacity="0.35" />
+      <rect x="7.5" y="1.5" width="6" height="4.5" opacity="0.65" />
+      <rect x="14" y="1.5" width="7" height="4.5" opacity="1" />
+      <rect x="1" y="7" width="6" height="4.5" opacity="0.8" />
+      <rect x="7.5" y="7" width="6" height="4.5" opacity="0.25" />
+      {[[14,7],[16,7],[18,7],[20,7],[15,8.5],[17,8.5],[19,8.5],
+        [14,10],[16,10],[18,10],[20,10]].map(([x, y], i) => (
+        <rect key={i} x={x} y={y} width="1.1" height="1.1" opacity="0.7" />
+      ))}
+    </g>
+  ),
+  // A stroke with a halo: the same path twice, wide and dim under thin and hot.
+  outrun: (
+    <g fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
+      <path d={RIDGE} stroke="currentColor" strokeWidth="5" opacity="0.16" />
+      <path d={RIDGE} stroke="currentColor" strokeWidth="2.4" opacity="0.3" />
+      <path d={RIDGE} stroke="currentColor" strokeWidth="0.9" opacity="1" />
+    </g>
+  ),
+  // Three screens at three angles, overprinted.
+  riso: (
+    <g stroke="none" fill="currentColor">
+      {[[2,3],[5,2],[8,3.4],[11,2.4],[14,3.6],[17,2.6],[20,3.8]].map(([x, y], i) => (
+        <circle key={'a'+i} cx={x} cy={y} r="1.1" opacity="0.85" />
+      ))}
+      {[[3,6.6],[6,7.4],[9,6.4],[12,7.2],[15,6.2],[18,7]].map(([x, y], i) => (
+        <circle key={'b'+i} cx={x} cy={y} r="1.1" opacity="0.5" />
+      ))}
+      {[[2,10.4],[5.5,10],[9,10.8],[12.5,10.2],[16,10.9],[19.5,10.3]].map(([x, y], i) => (
+        <circle key={'c'+i} cx={x} cy={y} r="1.1" opacity="0.3" />
+      ))}
+    </g>
+  ),
+  // Patches of material, each with its own tooth.
+  mineral: (
+    <g>
+      <g stroke="none" fill="currentColor">
+        <path d="M1 1.5 L9 1.5 L11 5 L4 7 L1 5 Z" opacity="0.85" />
+        <path d="M9 1.5 L21 1.5 L21 6 L11 5 Z" opacity="0.4" />
+        <path d="M1 5 L4 7 L3 11.5 L1 11.5 Z" opacity="0.6" />
+        <path d="M4 7 L11 5 L21 6 L21 11.5 L3 11.5 Z" opacity="0.2" />
+      </g>
+      <g stroke="none" fill="currentColor" opacity="0.55">
+        {[[6,9],[9,10.5],[13,9],[16,10.6],[19,9.2],[7.5,11],[11,8.4],[17,8.2]].map(([x, y], i) => (
+          <circle key={i} cx={x} cy={y} r="0.5" />
+        ))}
+      </g>
+    </g>
+  ),
+  // Catchments: flat areas of colour, divided along the ridges.
+  shed: (
+    <g>
+      <g stroke="none" fill="currentColor">
+        <path d="M1 1.5 L8 1.5 L6 6.5 L1 8 Z" opacity="0.85" />
+        <path d="M8 1.5 L15 1.5 L14 7 L6 6.5 Z" opacity="0.35" />
+        <path d="M15 1.5 L21 1.5 L21 7.5 L14 7 Z" opacity="0.62" />
+        <path d="M1 8 L6 6.5 L14 7 L21 7.5 L21 11.5 L1 11.5 Z" opacity="0.15" />
+      </g>
+      <g fill="none" stroke="currentColor" strokeWidth="0.8" vectorEffect="non-scaling-stroke">
+        <path d="M8 1.5 L6 6.5 M15 1.5 L14 7 M1 8 L6 6.5 L14 7 L21 7.5" />
+      </g>
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

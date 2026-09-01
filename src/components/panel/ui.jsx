@@ -215,6 +215,26 @@ export function HelpBox({ text }) {
   )
 }
 
+/**
+ * A standing caveat about a mode, always visible.
+ *
+ * `HelpBox` is the body of a help toggle: it appears when someone asks a
+ * question. This is the answer to a question they have not asked yet — that
+ * Outrun does nothing on white paper, that Riso does nothing on a black one.
+ * A control whose result depends on a setting in a different section has to say
+ * so where it is, or the first thing it does is look broken.
+ */
+export function Note({ children }) {
+  return (
+    <div style={{
+      fontSize: 9.5, color: MUTED, lineHeight: 1.5, marginTop: -4, marginBottom: 10,
+      paddingLeft: 6, borderLeft: `2px solid ${BORDER}`,
+    }}>
+      {children}
+    </div>
+  )
+}
+
 export function HelpBtn({ label, active, onClick }) {
   return (
     <button type="button" className={`hmi${active ? ' on' : ''}`} onClick={onClick}

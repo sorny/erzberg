@@ -128,6 +128,29 @@ export const DRAW_MODES = [
             exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],
             spacing: [1.5, 4] },
   },
+  {
+    id: 'Indexed', label: 'Indexed', cost: 2,
+    pick: { tiers: [4, 12], slopeBands: [1, 3], steepShift: [0.15, 0.6],
+            dither: [0.4, 1], spacing: [1.5, 5] },
+  },
+  {
+    id: 'Outrun', label: 'Outrun', cost: 2,
+    pick: { levels: [8, 26], whiten: [0.5, 0.9] },
+  },
+  {
+    id: 'Riso', label: 'Riso', cost: 4,
+    pick: { pitch: [1.5, 4], offset: [0, 2.4], limit: [0.7, 3], gammaA: [1.2, 3.2],
+            gammaB: [1, 2.6], gammaC: [1.2, 3] },
+  },
+  {
+    id: 'Mineral', label: 'Mineral', cost: 3,
+    pick: { spacing: [1.5, 5], radius: [1, 4], steep: [0.45, 0.8],
+            broken: [0.25, 0.65], grain: [0.1, 0.5] },
+  },
+  {
+    id: 'Shed', label: 'Watershed', cost: 3,
+    pick: { spacing: [1.5, 5], inks: [5, 16], minBasin: [0.1, 1.5], shade: [0.1, 0.55] },
+  },
 ]
 
 /** Draw-mode ids in pipeline order. */

@@ -58,7 +58,45 @@ const SUB_FILL_OVER = 0.9
  */
 const MARK_OFFSET = 64
 
-function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
+/**
+ * How far a `lids` mesh is biased against the terrain surface.
+ *
+ * Two kinds of layer ship lids and they want opposite things. A pillar cap or a
+ * sprite block sits *above* the ground on its own column, and a positive offset
+ * — away from the camera — is what lets the stack self-occlude correctly.
+ *
+ * The area-fill colour modes are the other kind: one flat quad per cell, at that
+ * cell's own elevation, while the surface between cells is interpolated. The
+ * corners are therefore genuinely inside the hill, and against a surface that
+ * carries `occlusionBias` as its own positive offset the two tie and z-fight.
+ * That is why turning Occ. Dist up to 25 appeared to fix Mineral: it was pushing
+ * the *terrain* back until the cells won, rather than putting the cells in
+ * front. These take the same negative bias an area fill takes, so they win at
+ * any Occ. Dist and the control goes back to meaning what it says.
+ */
+const LID_OFFSET = { cap: 1, hug: -1 }
+
+/**
+ * How a layer composites, for the layers that do not composite normally.
+ *
+ * Every line in this tool blended normally until the colour modes arrived, and
+ * two of them are *about* the blend rather than about the colour. Neon is not a
+ * hue, it is a summation: a wide dim halo in additive composite sums with itself
+ * where strokes crowd, which is what makes density read as luminance. An
+ * overprint is the opposite — three light inks multiplying toward a colour none
+ * of them holds.
+ *
+ * Additive ignores the destination, so a glow can never darken what it lies
+ * over; multiply can only darken, which is why it wants paper and turns to mud
+ * on a dark ground. Both are a material flag, not a pass.
+ */
+const BLEND_MODES = {
+  additive: THREE.AdditiveBlending,
+  multiply: THREE.MultiplyBlending,
+  normal:   THREE.NormalBlending,
+}
+
+function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
   const { positions, colors } = layer
   const base = (layerIndex ?? 0) + 1
   // A layer either carries per-vertex colour (every draw mode) or takes a flat
@@ -238,7 +276,10 @@ function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity
     // opacity is a uniform and depthTest is render state — no recompile needed.
     lidMat.opacity   = opacity ?? 1
     lidMat.depthTest = !!depthOcclusion
-  }, [lidMat, opacity, depthOcclusion])
+    const bias = layer.lids?.hugsSurface ? LID_OFFSET.hug : LID_OFFSET.cap
+    lidMat.polygonOffsetFactor = bias
+    lidMat.polygonOffsetUnits  = bias
+  }, [lidMat, opacity, depthOcclusion, layer.lids])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
   // Built once; weight/opacity/depthOcclusion/resolution here are seed values only
@@ -254,6 +295,11 @@ function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity
     depthTest: !!depthOcclusion,
     depthFunc: THREE.LessEqualDepth,
     opacity: opacity ?? 1,
+    blending: BLEND_MODES[blending] ?? THREE.NormalBlending,
+    // three.js requires this for MultiplyBlending and warns on every frame
+    // without it. Harmless for the other two: these materials only ever carry a
+    // flat or per-vertex colour at full alpha, so there is nothing to premultiply.
+    premultipliedAlpha: true,
     polygonOffset: isMark,
     polygonOffsetFactor: -MARK_OFFSET,
     polygonOffsetUnits: -MARK_OFFSET,
@@ -318,6 +364,14 @@ function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity
     // itself, and only when the define actually flips.
     material.alphaToCoverage = (opacity ?? 1) >= 0.99
 
+    // An additive layer must never take alpha-to-coverage: the coverage mask
+    // would dither the halo into a stipple, and a halo is the one thing in the
+    // scene whose whole job is to be smooth. It is also always translucent in
+    // practice, so this only bites if someone drives the opacity to 1.
+    const blend = BLEND_MODES[blending] ?? THREE.NormalBlending
+    if (material.blending !== blend) { material.blending = blend; material.needsUpdate = true }
+    if (blend === THREE.AdditiveBlending) material.alphaToCoverage = false
+
     // Flat layers take their one colour from the live params, which is what
     // makes recolouring a vector layer a frame rather than a worker rebuild.
     if (flat) material.color.set(color || '#000000')
@@ -351,7 +405,7 @@ function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity
       ghostMaterial.gapSize = d.gapSize
       ghostLines.renderOrder = base + SUB_GHOST
     }
-  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base])
 
   useEffect(() => () => {
     material?.dispose()
@@ -360,7 +414,9 @@ function LineLayer({ layer, weight, opacity, dash, color, fillColor, fillOpacity
 
   // A fill with no surviving outline is possible — every stroke can fall over
   // NoData while the interior does not — so this is not gated on `lines`.
-  if (!lines && !fillGeo) return null
+  // `lidGeo` is the same argument for the colour modes that are pure area:
+  // Indexed, Mineral and Watershed draw no strokes at all.
+  if (!lines && !fillGeo && !lidGeo) return null
 
   return (
     <group>
@@ -408,7 +464,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
       {!p.showRawTerrain && <VectorHighlight lineGeo={lineGeo} resolution={resolution} />}
 
       {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
-        const { weight, opacity, dash, color, fillColor, fillOpacity, strokeOutside } = layerStyle(layer.id, p)
+        const { weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside } = layerStyle(layer.id, p)
         return (
         <LineLayer
           key={layer.id}
@@ -417,6 +473,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           opacity={opacity}
           dash={dash}
           color={color}
+          blending={blending}
           fillColor={fillColor}
           fillOpacity={fillOpacity}
           strokeOutside={strokeOutside}
