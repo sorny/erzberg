@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.2] — 2026-09-01
+
+### Fixed
+
+- **Reset all now resets everything.** It meant six state objects: terrain,
+  style, particles, view and the two gradients. The vector layers and the free
+  text were not among them. A reset thus left a fetched province of roads, an
+  uploaded track and a typed title on top of bare defaults. That is the
+  one state the label of the button says it does not produce.
+
+  The Undo puts all of it back, and for the vectors that means both halves: the
+  style records *and* the coordinates that they point at. One without the other
+  is a layer list that draws nothing.
+
+  The Overpass response cache is deliberately kept. That is where this differs
+  from the clear that runs when a new raster is loaded: there the cached
+  responses are keyed to an extent that can never be asked for again, while here
+  the raster has not moved. Keeping them makes fetching the same layers back
+  instant.
+
 ## [1.9.1] — 2026-09-01
 
 ### Fixed
