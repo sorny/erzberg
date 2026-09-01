@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.1] — 2026-09-01
+
+### Fixed
+
+- **A high-severity `browserslist` advisory.** 4.28.2 to 4.28.8, with the five
+  data packages that come with it. Nothing user-facing changed: the declared
+  ranges in `package.json` are untouched, so this is a lock-file move inside them.
+
+  The advisory never reached anybody. `browserslist` arrives only through
+  `autoprefixer` and `eslint-plugin-react-hooks`, both of which are build-time,
+  and it appears in no file in `dist/`. Both reports also need input that a local
+  build does not have: a hostile `browserslist-stats.json`, or an unbounded
+  stream of distinct queries.
+
+  It is fixed anyway. A known advisory in the tree is a thing to answer, rather
+  than to explain every time somebody runs an audit. `caniuse-lite` feeds
+  autoprefixer, so the emitted CSS was the one thing at risk of moving. Every
+  one of the 19 built files is byte for byte what it was before.
+
 ## [1.9.0] — 2026-09-01
 
 ### Added
