@@ -1,6 +1,12 @@
 /**
  * Point features labelled with their name and their height.
  *
+ * One of three lettering passes, all of which run on the main thread and share
+ * `textGeometry`: this one letters what a feature *is*, `useContourLabels`
+ * letters what a contour *is at*, and `useTextLayers` letters whatever you type.
+ * The first two are derived and the third is not, which is the only real
+ * difference between them.
+ *
  * An OSM fetch already knows both — a peak arrives with its `name` and, from its
  * `ele` tag, a note reading "1910m", and the panel has been showing them in the
  * feature list all along. This puts them on the terrain, as geometry rather than

@@ -60,6 +60,7 @@ export const SECTION_TERMS = {
   'Mode: Riso':       'risograph spot colour overprint separation screens halftone angles misregistration registration fluorescent pink aqua duplicator print zine multiply total area coverage tac ink limit cap press cmyk',
   'Mode: Mineral':    'geology rock type field map material classification survey sheet ochre lichen scree grain texture',
   'Mode: Watershed':  'catchment basin drainage divide d8 flood label flat colour blocking pop art ridgelines',
+  'Text':             'annotation title caption note signature words type lettering free text label place sign headline credit inscription typography',
   'Vector Layers':    'openstreetmap osm overpass roads water rail landuse buildings lifts peaks gpx geojson track labels icons names heights stacking order dash ribbon',
   'Particles':        'hologram point cloud murmurations boids flock birds predator roost scan noise audio',
   'Texture':          'image overlay blend mode scale offset',

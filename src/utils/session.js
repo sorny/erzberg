@@ -17,7 +17,12 @@
 const KEY = 'erzberg.session.v1'
 
 /** Field names, so a shape change in one place cannot drift from the other. */
-const FIELDS = ['terrain', 'style', 'points', 'view', 'gradientStops', 'bgGradientStops']
+// `textLayers` is content rather than a look — the words someone typed onto a
+// plate. It restores with the session for the same reason the panel state does:
+// losing a title to a reload is the kind of small betrayal a tool should not
+// commit. It is deliberately absent from a *preset*, which is a look and travels
+// to other people's rasters.
+const FIELDS = ['terrain', 'style', 'points', 'view', 'gradientStops', 'bgGradientStops', 'textLayers']
 
 /**
  * View keys that describe the *raster*, not the look, and so must not come back.

@@ -55,8 +55,9 @@ export function fontStyleKey({ bold, italic } = {}) {
  * Single-line faces live in the same key space, behind a prefix.
  *
  * One string identifies a face wherever a face is asked for — the fetch, the
- * cache, the "which faces does this scene need" set in useVectorLabels — and a
- * prefix keeps that true across two collections that share no naming at all.
+ * cache, and the "which faces does this scene need" set that each lettering
+ * pass keeps (`useVectorLabels`, `useContourLabels`, `useTextLayers`). A prefix
+ * keeps that true across two collections that share no naming at all.
  */
 const SL = 'sl:'
 export const singleLineKey = (id) => `${SL}${id}`

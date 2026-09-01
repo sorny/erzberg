@@ -656,6 +656,24 @@ export function Btn({
  * parameters — Flashbulb's bulb, tone, grain and shadow are four different
  * questions, and an unbroken run of thirteen sliders reads as one.
  */
+/**
+ * The grip a stack row is dragged by.
+ *
+ * Lives here rather than in the sidebar because two different stacks use it
+ * now — the vector layers and the free text — and a shared control imported
+ * from the file that renders both would be a cycle.
+ */
+export function GripIcon() {
+  return (
+    <svg width="10" height="13" viewBox="0 0 10 13" fill="currentColor" aria-hidden="true">
+      {[2, 6.5, 11].map((cy) => (
+        <g key={cy}><circle cx="2" cy={cy} r="1.1" /><circle cx="8" cy={cy} r="1.1" /></g>
+      ))}
+    </svg>
+  )
+}
+
+
 export function Sub({ label, children }) {
   return (
     <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>

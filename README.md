@@ -265,6 +265,19 @@ composite normally. Outrun adds light, which is why it wants a dark ground. Riso
 multiplies ink, which is why it wants paper. Three of them draw area rather than
 line, and export the boundary between regions so a plotter still gets a map.
 
+**Text on the plate.** A contour letters its own height and a peak letters its
+own name, and both are derived: the string comes from the data. A **text layer**
+is the same lettering with the derivation removed. You supply the words and the
+place. Everything else is what a point label already had: the four Space Mono
+faces or any of the 49 stroke faces, size, alignment, fill, and the plane that it
+stands in.
+
+Add as many as you want. Each one is a layer of its own, with its own ink. They
+stack and reorder by drag, and each one leaves the SVG as real `<text>` in its
+own named pen layer. Placement is a fraction of the plate rather than a world
+coordinate, and the app samples the ground under it. A title placed on a summit
+thus stays on that summit when the resolution or the exaggeration moves.
+
 **Reproducible randomness.** The stochastic modes are Stipple, Rock & Scree,
 Flashbulb, Halation and Reticulation. Each one carries a seed. The same seed
 always reproduces the identical pattern, so you can regenerate a piece exactly.
@@ -475,7 +488,7 @@ The app idles quietly and stays responsive under load.
 | State | Zustand (raster data) + React state (all UI parameters), persisted to `localStorage` between visits |
 | GIS parsing | GeoTIFF.js, plus in-house GeoJSON, GPX and Overpass readers with no dependency |
 | Icons | Maki (CC0), flattened to polylines through the SVG geometry API of the browser |
-| Labels | Space Mono (SIL OFL 1.1) in four faces. `npm run font` converts them to glyph outlines, flattened the same way. The wordmark of the panel uses the same face as a self-hosted woff2 of 9.6 kB, so the app contacts nobody on load |
+| Labels & text | Space Mono (SIL OFL 1.1) in four faces. `npm run font` converts them to glyph outlines, flattened the same way. The wordmark of the panel uses the same face as a self-hosted woff2 of 9.6 kB, so the app contacts nobody on load |
 | Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces. `npm run fonts:single-line` flattens them |
 | Map data | OpenStreetMap through the Overpass API — ODbL, attributed in the panel and in every SVG |
 | UI | Custom sidebar panel + Tailwind CSS |

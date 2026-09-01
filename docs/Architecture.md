@@ -34,6 +34,30 @@ which matters as much.
 Everything above the worker line is React. Everything inside the worker is plain
 functions over typed arrays, with no framework and no DOM.
 
+### Lettering, on the main thread
+
+Four passes sit between the worker and the renderer. Every one of them adds
+geometry that the worker cannot make:
+
+```
+  worker output ──> useVectorIcons   ──> useVectorLabels ──>
+                    useContourLabels ──> useTextLayers    ──> lineGeo
+```
+
+They run here for one reason. A face is *fetched*, not computed, and the worker
+has no fonts. `useVectorIcons` has a second reason: it flattens an SVG through
+the geometry API of the browser, which needs a rendered document.
+
+That placement is also what makes size, lift and orientation cost a frame rather
+than a worker rebuild. It is what lets a mark follow the camera at all.
+
+The four differ only in where the string and the anchor come from. An icon
+*substitutes* for the dot it is drawn from. A vector label is appended beside the
+mark, and reads its string from the feature. A contour label reads its string
+from the elevation range, and its place from gaps that the worker left. A text
+layer is told both. Free text is appended last, so it draws in front of the plate
+that it annotates.
+
 That split is deliberate. The builders are the part worth a direct test. Several
 specs import them straight from the dev server. Those specs do not infer the
 output of a builder from pixels.

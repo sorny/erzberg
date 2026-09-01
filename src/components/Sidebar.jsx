@@ -27,8 +27,10 @@ import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
-  Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
+  GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
+import { useStackDrag } from './panel/stackDrag'
+import { TextSection } from './panel/TextSection'
 import { SectionFilter, sectionMatches } from './panel/filter'
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { ModeMark } from './panel/modeMarks'
@@ -181,80 +183,7 @@ function EyeIcon({ off }) {
   )
 }
 
-function GripIcon() {
-  return (
-    <svg width="10" height="13" viewBox="0 0 10 13" fill="currentColor" aria-hidden="true">
-      {[2, 6.5, 11].map((cy) => (
-        <g key={cy}><circle cx="2" cy={cy} r="1.1" /><circle cx="8" cy={cy} r="1.1" /></g>
-      ))}
-    </svg>
-  )
-}
 
-/**
- * Drag-to-reorder for the layer stack.
- *
- * Pointer events with capture rather than HTML5 drag-and-drop: the sidebar is a
- * scrolling panel inside a WebGL page, and the native drag image, drop targets
- * and `dragover` bookkeeping buy nothing here that `setPointerCapture` does not
- * do in a third of the code. It also keeps the drag working with a pen or a
- * finger, which HTML5 dragging does not.
- *
- * Rows are measured live rather than at drag start. They have to be: the list
- * reflows the instant a move is committed, and an expanded layer is several
- * times the height of a collapsed one, so a cached set of boxes is wrong from
- * the first swap onwards.
- */
-function useStackDrag(layers, onReorder) {
-  const rows = useRef(new Map())
-  const [dragging, setDragging] = useState(null)
-
-  const bindRow = useCallback((id) => (el) => {
-    if (el) rows.current.set(id, el)
-    else rows.current.delete(id)
-  }, [])
-
-  const start = (e, id) => {
-    if (e.button !== 0) return
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    setDragging(id)
-  }
-
-  const move = (e) => {
-    if (!dragging) return
-    const from = layers.findIndex((l) => l.id === dragging)
-    if (from < 0) return
-    const y = e.clientY
-
-    // A row is crossed at its midpoint, not at its edge. Swapping on entry
-    // reads fine while every row is the same height and falls apart as soon as
-    // one is expanded: the shorter row lands back under the cursor and the list
-    // oscillates between two orders for as long as you hold still.
-    let target = from
-    for (let i = 0; i < layers.length; i++) {
-      if (i === from) continue
-      const r = rows.current.get(layers[i].id)?.getBoundingClientRect()
-      if (!r) continue
-      if (i < from) {
-        // Going up, the topmost row whose upper half we have reached wins…
-        if (target === from && y < r.bottom - r.height / 2) target = i
-      } else if (y > r.top + r.height / 2) {
-        // …going down, the lowest one.
-        target = i
-      }
-    }
-    if (target !== from) onReorder(dragging, target)
-  }
-
-  const end = (e) => {
-    if (!dragging) return
-    e.currentTarget.releasePointerCapture?.(e.pointerId)
-    setDragging(null)
-  }
-
-  return { dragging, bindRow, start, move, end }
-}
 
 /**
  * One mark's ink: stroke colour, width and opacity, then fill colour and
@@ -1267,6 +1196,7 @@ export function Sidebar({
   soundscape, onSoundscapeFit, flockAudio,
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
   geoTiffBbox,
+  textLayers, setTextLayers, textOverflow,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
@@ -1332,7 +1262,7 @@ export function Sidebar({
     modeSprite: false, modeRetic: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
-    hillshade: false, slopeShade: false, vectorLayers: false,
+    hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
     soundscapes: false,
@@ -2864,6 +2794,13 @@ export function Sidebar({
               />
             )}
           </Section>
+
+          <TextSection
+            open={sec.text} onToggle={() => tog('text')}
+            layers={textLayers} setLayers={setTextLayers} overflowed={textOverflow}
+            singleLineFonts={singleLineFonts}
+            viewTilt={view.tilt} viewSpin={view.rotation}
+          />
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />

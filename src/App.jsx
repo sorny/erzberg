@@ -20,6 +20,8 @@ import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useVectorIcons } from './hooks/useVectorIcons'
 import { useVectorLabels } from './hooks/useVectorLabels'
+import { useTextLayers } from './hooks/useTextLayers'
+import { adoptTextLayers } from './utils/textLayers'
 import { useContourLabels } from './hooks/useContourLabels'
 import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
@@ -446,6 +448,17 @@ export default function App() {
   const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored.current?.style))
   const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored.current?.points))
   const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored.current?.view))
+  /*
+   * Free text placed in the scene.
+   *
+   * Beside the vector layers rather than inside `style`, for the same reasons
+   * those are: there is an unbounded number of them, they are created at
+   * runtime, and each carries its own ink. `adoptTextLayers` re-seeds the id
+   * counter from what came back, so a text added after a restore cannot be
+   * handed an id the session is already using — two layers sharing one would
+   * collide in `layerStyle` and in React's keys at once.
+   */
+  const [textLayers, setTextLayers] = useState(() => adoptTextLayers(restored.current?.textLayers ?? []))
   // Cleared by the first Reset all, so the note stops claiming a session that
   // is no longer what is on screen.
   const [sessionRestored, setSessionRestored] = useState(() => restored.current != null)
@@ -494,10 +507,10 @@ export default function App() {
     const delay = Math.max(0, Math.min(SAVE_DEBOUNCE_MS, SAVE_MAX_WAIT_MS - waited))
     const t = setTimeout(() => {
       savePendingSince.current = 0
-      saveSession({ terrain, style, points, view, gradientStops, bgGradientStops })
+      saveSession({ terrain, style, points, view, gradientStops, bgGradientStops, textLayers })
     }, delay)
     return () => clearTimeout(t)
-  }, [terrain, style, points, view, gradientStops, bgGradientStops])
+  }, [terrain, style, points, view, gradientStops, bgGradientStops, textLayers])
   const [webmDuration, setWebmDuration]   = useState(5)
   const [externalPresets, setExternalPresets] = useState({})
   // Intrinsic elevation scale derived from GeoTIFF metadata (metres / pixel ratio).
@@ -1109,7 +1122,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
     elevScale: baseElevScale + terrain.elevScale,
-    vectorLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
+    vectorLayers, textLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
   }
@@ -1156,8 +1169,14 @@ export default function App() {
   // Contour labels are lettered here for the same reason the vector ones are:
   // the worker reserved the gaps and knows where the numbers go, but it has no
   // fonts and no idea what the raster's brightness means in metres.
-  const lineGeo = useContourLabels(vectorLabelled, style, geoTiffElevMin, geoTiffElevMax,
-                                   terrain.blackPoint, terrain.whitePoint)
+  const contourLabelled = useContourLabels(vectorLabelled, style, geoTiffElevMin, geoTiffElevMax,
+                                           terrain.blackPoint, terrain.whitePoint)
+
+  // Free text goes on last, which is what puts it in front of the drawing it
+  // annotates. Nothing derives it, so unlike every other label it needs no
+  // features, no raster and no worker — only a face and a place to stand.
+  const { lineGeo, overflowed: textOverflow } =
+    useTextLayers(contourLabelled, textLayers, terrainData, view.tilt, view.rotation)
 
   // The overlay means "nothing has come back for a while", not "a build is in
   // flight". Keying it on isComputing alone breaks under a continuous stream:
@@ -1392,6 +1411,9 @@ export default function App() {
         loadGeoJsonFromPicker={loadGeoJsonFromPicker}
         vectorSources={vectorSources}
         vectorLayers={vectorLayers}
+        textLayers={textLayers}
+        setTextLayers={setTextLayers}
+        textOverflow={textOverflow}
         vectorCoverage={vectorCoverage}
         vectorError={vectorError}
         onPatchVectorLayer={patchVectorLayer}

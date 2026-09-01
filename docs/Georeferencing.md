@@ -453,6 +453,11 @@ first.
 the same hole-aware triangulation that the icons use. Switch it off and outlined
 type stays, which is what the SVG carries either way.
 
+**Text the data does not supply** is a *text layer* instead. It is this same
+lettering with the derivation removed: you give it the words and the place, and
+it offers the same faces, the same fill and the same plane. A title, a note or a
+signature is not a property of a feature, so it is not a label.
+
 ### Ink: what a mark is drawn with
 
 An icon and a label each carry a full set of their own: **Colour**, **Stroke**

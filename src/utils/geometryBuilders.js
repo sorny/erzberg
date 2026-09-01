@@ -5,6 +5,7 @@
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
+import { isTextLayerId, textLayerName } from './textLayers'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,6 +43,26 @@ export function needsSurfaceShading(p) {
 }
 
 export function layerStyle(id, p) {
+  // Free text carries its ink on its own record, the way a vector layer does,
+  // so recolouring one is a material update rather than a worker rebuild. It
+  // never reaches the worker at all: the lettering is built on the main thread
+  // because a face is fetched rather than computed.
+  if (isTextLayerId(id)) {
+    const t = p.textLayers?.find((l) => l.id === id)
+    if (!t) return { weight: 1, opacity: 1, dash: 'solid' }
+    return {
+      weight: t.weight, opacity: t.opacity, dash: t.dash, color: t.color,
+      fillColor: t.fillColor ?? t.color,
+      fillOpacity: t.fillOpacity ?? t.opacity,
+      strokeOutside: !!t.strokeOutside,
+      // What the Inkscape layer is called, so a plot is separable by pen.
+      // Read from the text itself rather than from a name captured when the
+      // layer was made: two texts both exporting as "erzberg" because that is
+      // what they said when they were added is a plot nobody can separate.
+      name: textLayerName(t),
+    }
+  }
+
   // Vector layers carry their style on their own record instead of in flat
   // `<prop><Id>` params, and they carry `color` here too — their geometry has no
   // per-vertex colour buffer at all, so recolouring one is a material update
