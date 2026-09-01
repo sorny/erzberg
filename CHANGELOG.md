@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-09-01
+
+### Added
+
+- **Text layers.** A contour letters its own height and a peak letters its own
+  name. Both are derived: the string comes from the data and the place comes
+  from the feature. Neither can put a title on a plate, name a valley that the
+  survey never named, or sign it.
+
+  A text layer is that same lettering with the derivation removed. You supply
+  the words and the place. Everything else is what a point label already had,
+  because it is the same code. That is the four Space Mono faces or any of the
+  49 stroke faces, bold and italic, size and alignment. It is also the two
+  offsets, the fill with its own colour and opacity, and the outside stroke.
+  The plane that it stands in follows the camera, or takes a Tilt and a Spin of
+  your own.
+
+  Add as many as you want. Each one is a layer with its own ink, so a recolour
+  costs a frame rather than a rebuild. They stack and reorder by drag, exactly
+  as the vector layers do. The app appends them last, which is what draws them
+  in front of the plate that they annotate. Each one leaves the SVG as real
+  `<text>` in its own named pen layer. A plot thus stays separable by pen, and
+  the words stay editable in Inkscape.
+
+  Two decisions worth knowing. Placement is a fraction of the plate rather than
+  a world coordinate, and the app samples the ground under it. A title placed on
+  a summit thus stays on that summit when the resolution or the exaggeration
+  moves. A text also restores with the session, but is deliberately absent from
+  a *preset*. A preset is a look and travels to the rasters of other people,
+  while the words that you typed are content. That is the same line the app already
+  draws for hidden features and uploaded icons.
+
+### Changed
+
+- **The pipeline documentation names the lettering pass.** Four passes run
+  between the worker and the renderer, and none of them was in the diagram. They
+  are on the main thread because a face is fetched rather than computed, and the
+  worker has no fonts. An SVG icon also needs a rendered document to flatten. That placement is also what makes size, lift and orientation cost a
+  frame rather than a rebuild.
+
+- **`useStackDrag` and `GripIcon` moved out of `Sidebar.jsx`.** Two stacks use
+  them now, and a shared control imported from the file that renders both is a
+  cycle. The hook lives in `panel/stackDrag.js` rather than beside the
+  components, because a hook in a components file breaks fast refresh.
+
 ## [1.7.0] — 2026-09-01
 
 Colour. Every draw mode until now took its colour the same way: one scalar, into
