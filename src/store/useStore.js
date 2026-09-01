@@ -205,6 +205,17 @@ export const useStore = create((set) => ({
 
   clearVectorSources: () => set({ vectorSources: [], vectorHover: null, vectorSelected: null }),
 
+  /**
+   * The whole list at once, for putting one back.
+   *
+   * Reset all clears the vectors and offers an Undo, and an undo has to restore
+   * the *coordinates* rather than only the style records — those live here.
+   * Replaying `addVectorSource` would work and is worse: it is one set() per
+   * source, and it silently reverses nothing if the list came back empty.
+   */
+  setVectorSources: (sources) =>
+    set({ vectorSources: sources ?? [], vectorHover: null, vectorSelected: null }),
+
   setVectorHover: (h) => set({ vectorHover: h }),
   setVectorSelected: (v) => set({ vectorSelected: v }),
 

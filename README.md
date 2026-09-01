@@ -81,7 +81,8 @@ gradients to the browser as you work, and restores them on your next visit. A
 reload thus does not cost you the look that you built. The app does not store
 the raster. It opens on its sample plate and puts your parameters back onto it.
 *Reset all* returns everything to defaults and offers an Undo for the next eight
-seconds.
+seconds. Everything means everything: the fetched and uploaded vector layers and
+any text you placed go with the sliders, and the Undo brings all of it back.
 
 **Find a control.** The panel has more than thirty sections, which is a lot to
 remember the shape of. The field at the top of the panel narrows them. Type

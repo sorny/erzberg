@@ -257,6 +257,7 @@ export default function App() {
   const addVectorSource    = useStore((s) => s.addVectorSource)
   const removeVectorSource = useStore((s) => s.removeVectorSource)
   const clearVectorSources = useStore((s) => s.clearVectorSources)
+  const setVectorSources   = useStore((s) => s.setVectorSources)
 
   // The style half of the vector layers. Coordinates live in the store; these
   // are params like any other, which is what keeps recolouring one off the
@@ -788,13 +789,33 @@ export default function App() {
    * on one click with nothing offered afterwards.
    */
   const handleResetAll = useCallback(() => {
-    const before = { terrain, style, points, view, gradientStops, bgGradientStops }
+    /*
+     * Everything, which used to mean six state objects.
+     *
+     * The vectors and the free text were not among them, so a reset left a
+     * fetched province of roads, an uploaded track and a typed title sitting on
+     * top of bare defaults — the one state the button's own label says it does
+     * not produce. They are as much "settings" as a slider is: they came from
+     * the panel, they are what is on screen, and nothing else clears them.
+     *
+     * The Overpass response cache is deliberately *not* cleared with them, which
+     * is where this differs from `dropVectors`. That runs when a new raster is
+     * loaded, and a cached response is keyed to the old extent and can never be
+     * hit again. Here the raster has not moved: the cache is still valid for
+     * this place, and keeping it makes fetching the same layers back instant.
+     */
+    const before = { terrain, style, points, view, gradientStops, bgGradientStops,
+                     vectorLayers, vectorSources, textLayers }
     setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
     setStyle(STYLE_DEF)
     setPoints(POINTS_DEF)
     setView({ ...VIEW_DEF, zoom: baseZoom })
     setGradientStops(GRADIENT_PRESETS['Jet'])
     setBgGradientStops([{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+    setVectorLayers([])
+    clearVectorSources()
+    setVectorError(null)
+    setTextLayers([])
     // Clearing alone did nothing: the six setState calls above re-run the save
     // effect, which wrote the defaults straight back 400 ms later. The skip is
     // what makes the clear real.
@@ -811,9 +832,16 @@ export default function App() {
         setView(before.view)
         setGradientStops(before.gradientStops)
         setBgGradientStops(before.bgGradientStops)
+        // The style records and the coordinates they point at, together — one
+        // without the other is a layer list drawing nothing, or geometry with
+        // no layer to draw it.
+        setVectorLayers(before.vectorLayers)
+        setVectorSources(before.vectorSources)
+        setTextLayers(before.textLayers)
       },
     })
   }, [terrain, style, points, view, gradientStops, bgGradientStops,
+      vectorLayers, vectorSources, textLayers, clearVectorSources, setVectorSources,
       heightmapWidth, heightmapHeight, baseZoom, notify])
 
   const orbitRef = useRef()
