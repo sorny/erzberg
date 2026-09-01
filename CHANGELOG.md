@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] — 2026-09-01
+
+### Added
+
+- **A fetch says how far along it is.** The wait has three phases and only two of
+  them can be measured, so the panel reports each one for what it is.
+
+  Between the POST and the first byte there is nothing at all: no length, no
+  bytes, not even a status. Overpass withholds response headers until the query
+  has finished running. On a province that stretch is most of the wait. It
+  reports as indeterminate, with the elapsed time against the budget of the
+  server. A bar that sits at 0% for ninety seconds and then races to the end says
+  the wrong thing about which part is slow.
+
+  Once bytes arrive they are real progress. The body now reads through a stream
+  reader rather than in one call. Overpass sends chunked and rarely declares a
+  length, so the count pre-flight supplies the denominator instead, at about
+  1.1 kB an element. `JSON.parse` after it is one blocking call that cannot be
+  subdivided, so its label is set before it runs rather than animated through it.
+
+### Changed
+
+- **A roll never turns on a murmuration.** A flock is a decision about the scene
+  rather than about the drawing. A hundred thousand animated boids with a roost,
+  an updraft and an optional predator is not a look that you arrive at by dice.
+  Rolled at random it was the one thing that people switched off again. The
+  hologram still rolls: a static point cloud in the shape of the terrain is the
+  same kind of decision as the rest of a roll.
+
+  No seed changed. The particle draws were the last consumers of the random
+  stream. The drawing, the palette and the background of every previously rolled
+  seed are thus identical. Checked over 600 seeds: 26 of them used to roll a
+  flock, and each one now rolls a hologram instead.
+
+- **Race Line reaches 250 drop-ins.** It stopped at 20. Measured on a 512×512
+  grid, 250 drop-ins cost 85 ms, which is the same band as the screened ink
+  modes. Each drop-in blanks a radius of Spacing around itself, so that the braids
+  do not all start on one summit. A high count thus needs a low Spacing to have
+  anywhere to put them. Ask for more than the terrain has room for and you get
+  what fits.
+
+### Removed
+
+- **Exploded Frame.** The lattice and the bracing rule went with it, because
+  nothing else used them. A comment claimed that Section shared the lattice, and
+  the call sites said otherwise. Section is unaffected and now stands on its own in
+  the mode documentation.
+
+  A preset that enabled it draws nothing for that layer. No bundled preset did.
+
 ## [1.8.0] — 2026-09-01
 
 ### Added
