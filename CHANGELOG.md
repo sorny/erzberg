@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] — 2026-09-02
+
+### Fixed
+
+- **A test, not the app.** Nothing here changes what erzberg draws or exports.
+
+  `contour-labels.spec.js` looked for "Labels" in the *display* name of the pen
+  layer that carries the elevation numbers. That name is `Contours · Heights`,
+  because the control is called "Label heights" and "Labels" reads as a layer of
+  labels rather than as the heights themselves. The assertion went red when the
+  pen layers gained human names in 1.10.0, and it stayed red for two releases. It
+  read as a missing layer the whole time, while the export was correct:
+  `layer-Contours-Labels` was there, with 29 `<text>` elements in it.
+
+  Both names are pinned now. The id is what a script matches on. The label is
+  what a person sorting a plot by pen reads.
+
+  Nothing pinned the display names at all, which is how a rename reached an
+  end-to-end regex before anything nearer the change caught it.
+  `tests/unit/layer-names.test.js` covers `layerDisplayName`, so the next rename
+  fails against a name rather than against a layer that looks gone.
+
 ## [1.11.0] — 2026-09-02
 
 ### Fixed
