@@ -106,8 +106,22 @@ test('labels are lettered, and read as height above the ground', async ({ page }
   await page.waitForTimeout(3000)
   const after = await exportSvg(page)
 
-  // Its own pen layer, so the numbers can be a different pen from the lines.
-  expect(after).toMatch(/inkscape:label="[^"]*Labels"/)
+  /*
+   * Its own pen layer, so the numbers can be a different pen from the lines.
+   *
+   * Two names, and they are not the same name. The id stays `Contours-Labels`,
+   * because that is what a script matches on and it has to be a valid XML id.
+   * What Inkscape shows is `Contours · Heights`, from `SUB_LAYER_LABEL` — the
+   * control is called "Label heights", so "Labels" would have read as a layer of
+   * labels rather than as the heights themselves.
+   *
+   * This used to look for "Labels" in the *display* name, and went red when the
+   * pen layers gained human names in v1.10.0. The layer had been exported
+   * correctly the whole time. Both are pinned now, so the next rename fails
+   * against a name rather than against a missing layer.
+   */
+  expect(after, 'the numbers get their own pen layer')
+    .toMatch(/<g id="layer-Contours-Labels"[^>]*inkscape:label="Contours · Heights"/)
 
   // An outline face exports as editable text, exactly like the vector labels.
   const texts = [...after.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1])
