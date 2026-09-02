@@ -7,6 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] — 2026-09-02
+
+### Fixed
+
+- **The SVG wrote inks that the screen never showed.** The `<Canvas>` comes from
+  React Three Fiber, which gives it ACES filmic tone mapping and an sRGB output
+  encode, and neither is overridden. Every fragment the renderer draws passes
+  through both. The exporter wrote the raw number, so the file and the viewport
+  disagreed. They disagreed most where a colour was bright and saturated, because
+  that is where the tone curve does the most work. Jet's top stop is `#800000`, and the screen
+  shows it as `#ca0006`: a deep red in the tool, a brown in the file.
+
+  `screenInk` applies the same two steps to every ink that the file carries.
+  Measured against the running app, exact on every channel:
+
+  | picked | on screen | SVG before | SVG now |
+  |---|---|---|---|
+  | `#800000` | `#ca0006` | `#800000` | `#ca0006` |
+  | `#00cce6` | `#85dcde` | `#00cce6` | `#85dcde` |
+  | `#66cf00` | `#c3db50` | `#66cf00` | `#c3db50` |
+  | `#ffffff` | `#e2e2e2` | `#ffffff` | `#e2e2e2` |
+
+  Black maps to black, so plain black-on-white line art is unchanged. That is why
+  this stood for so long. The background is written raw, because it arrives
+  through `setClearColor` and is not tone mapped: white paper stays `#ffffff`
+  while white geometry renders `#e2e2e2`.
+
+### Added
+
+- **The area modes export filled polygons.** Indexed, Mineral and Watershed paint
+  blocks of colour, and a fill is not a stroke. They left the SVG as unordered
+  boundary edges: enough to look at, and nothing to plot, because Inkscape had no
+  closed shape to select and its hatch-fill tools had nothing to work on.
+
+  `fillCells` now also ships the lattice that it painted, and `traceAreaRings`
+  walks that into closed rings by boundary following. Each ink gets its own
+  Inkscape pen layer, named with its hex — `Watershed · ink 03 #e04f2a` — holding
+  one closed `<path>`. The line layer for that mode is dropped, because a traced
+  ring is the same boundary edges in order.
+
+  The lattice is keyed by **ink**, not by the region that the mode counts by.
+  Watershed deals ten inks to the catchments that survive the fold, so two
+  neighbouring basins often hold the same colour. Keyed by region they traced as
+  two shapes with a shared seam and a doubled stroke: 31 189 of them on the
+  reference plate, against the ten flat areas that the screen shows.
+
+  A catchment with a lake in it keeps the lake. The winding puts the region on
+  the right of every edge. An outer ring comes out clockwise and a hole
+  counter-clockwise, and both are subpaths of one `<path>`. The path carries
+  `fill-rule="evenodd"`.
+
+  The fills follow the **Occlusion** switch rather than a new control. With it
+  on, a cell whose centre fails the same depth test the lines use is dropped, and
+  the ring closes along the silhouette. With it off, every area comes out whole —
+  a map rather than a view, which is the file to plot from. The cut edge is a
+  cell boundary, so it steps at the lattice pitch.
+
+  A mirrored scene has no lattice, because the lattice describes one octant. Such
+  a scene falls back to the boundary lines, which are mirrored with everything
+  else.
+
+  Measured on the reference plate: Indexed 6 pen layers and 0.33 MB, Mineral 5,
+  Watershed 10. The export takes 0.4 s.
+
 ## [1.10.1] — 2026-09-02
 
 ### Fixed
