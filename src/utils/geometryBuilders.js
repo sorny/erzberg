@@ -6,6 +6,7 @@ import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINE
 import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
 import { isTextLayerId, textLayerName } from './textLayers'
+import { layerDisplayName } from './drawModes'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -42,7 +43,21 @@ export function needsSurfaceShading(p) {
             p.showWaterFill || p.showAO || p.showAspectMap || p.profileMode)
 }
 
+/**
+ * How one layer is drawn, and what it is called.
+ *
+ * The name matters as much as the style: it is the `inkscape:label` on the pen
+ * layer, and the only thing the person at the plotter reads to tell one pass
+ * from another. Vector and text layers carry a name of their own; a draw mode's
+ * comes from the registry, and is added here on the way out rather than in each
+ * of the thirty branches below.
+ */
 export function layerStyle(id, p) {
+  const st = resolveLayerStyle(id, p)
+  return st.name ? st : { ...st, name: layerDisplayName(id) }
+}
+
+function resolveLayerStyle(id, p) {
   // Free text carries its ink on its own record, the way a vector layer does,
   // so recolouring one is a material update rather than a worker rebuild. It
   // never reaches the worker at all: the lettering is built on the main thread

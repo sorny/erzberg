@@ -64,6 +64,35 @@ output of a builder from pixels.
 
 ---
 
+## Undo
+
+`hooks/useHistory.js` snapshots rather than records commands.
+
+A command history wants every mutation site to describe itself, and there are
+several hundred of them here: every slider, every colour well, every toggle in a
+three-thousand-line panel. Nothing keeps that honest, and the first control that
+somebody forgets to annotate is silently un-undoable.
+
+A snapshot comes from the state itself, so a control cannot opt out of it by
+being written carelessly. It is affordable because everything tracked is already
+immutable. The panel replaces `style` rather than mutating it, so a snapshot is a
+list of references and not a copy. The tracked list is the four parameter
+objects, both gradients, the text layers, the vector layers and the vector
+sources.
+
+Two details carry the design:
+
+- **A drag is one step.** Changes that arrive within `coalesceMs` of the last one
+  belong to the same gesture and do not push again. The entry already on the
+  stack is the state from before the gesture began, which is the one to go back
+  to.
+- **A restore is recognised by identity, not by a flag.** The effect compares the
+  incoming values against the snapshot that the last undo applied. A flag has
+  timing in it, and both ways of clearing one are wrong: cleared on a microtask
+  it is gone before React runs the effect, so the restore records as a fresh edit
+  and clears the redo stack. Cleared by the effect, it never clears at all when a
+  restore happens to change nothing.
+
 ## State: three homes, on purpose
 
 | Where | What lives there | Why |

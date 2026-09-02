@@ -149,6 +149,66 @@ export const DRAW_MODES = [
   },
 ]
 
+/** id → the label the panel and the plot both use. */
+export const MODE_LABEL = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.label]))
+
+/**
+ * What each *part* of a multi-pen mode is called.
+ *
+ * A mode that returns sub-layers gets one pen layer each, and the name on that
+ * layer is what makes a plot separable — it is the only thing the person at the
+ * plotter reads. It used to be the raw id with a regex spacing out the capitals,
+ * which produced "Contours- Minor", "Swiss- Scree" and "Riso- A", and left the
+ * internal ids showing on any mode whose label differs from its id: "Dag" for a
+ * stream network, "Retic" for reticulation, "Shed" for a watershed.
+ *
+ * Keyed by the whole id rather than the suffix, because the suffix is not always
+ * unique or self-explanatory — "Face" means the cut face in a Section and would
+ * mean something else anywhere else.
+ */
+export const SUB_LAYER_LABEL = {
+  'Contours-Minor':          'Minor',
+  'Contours-Major':          'Major',
+  'Contours-Labels':         'Heights',
+  'Contours-Tanaka-Bright':  'Tanaka, lit',
+  'Contours-Tanaka-Dark':    'Tanaka, shaded',
+  'Swiss-Rock':              'Cliff hachures',
+  'Swiss-Scree':             'Scree',
+  'Bitplane-Step':           'Staircase',
+  'Bitplane-Screen':         'Dither screen',
+  'Halation-Grain':          'Grain',
+  'Halation-Bloom':          'Bloom',
+  'Air-Flight':              'Flight',
+  'Air-RunIn':               'Run-in',
+  'RaceLine-Field':          'Field',
+  'RaceLine-Best':           'Best line',
+  'Section-Face':            'Cut face',
+  'Section-Hatch':           'Hatch',
+  'Section-Beyond':          'Beyond',
+  'Outrun-Core':             'Filament',
+  'Outrun-Glow':             'Halo',
+  'Riso-A':                  'Ink A',
+  'Riso-B':                  'Ink B',
+  'Riso-C':                  'Ink C',
+}
+
+/**
+ * What a layer is called on the plot.
+ *
+ * `Mode · Part`, with the same separator the vector layers already use for
+ * "Roads · Motorway" and "Peaks · labels" — so one convention covers every pen
+ * layer in the file whatever produced it.
+ */
+export function layerDisplayName(id) {
+  if (!id) return 'Lines'
+  if (MODE_LABEL[id]) return MODE_LABEL[id]
+  const cut = id.indexOf('-')
+  if (cut < 0) return id
+  const base = MODE_LABEL[id.slice(0, cut)] ?? id.slice(0, cut)
+  const part = SUB_LAYER_LABEL[id] ?? id.slice(cut + 1).replace(/([A-Z])/g, ' $1').trim()
+  return `${base} · ${part}`
+}
+
 /** Draw-mode ids in pipeline order. */
 export const DRAW_MODE_IDS = DRAW_MODES.map((m) => m.id)
 

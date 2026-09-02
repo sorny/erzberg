@@ -265,6 +265,9 @@ composite normally. Outrun adds light, which is why it wants a dark ground. Riso
 multiplies ink, which is why it wants paper. Three of them draw area rather than
 line, and export the boundary between regions so a plotter still gets a map.
 
+**Undo.** The buttons sit beside *Reset all*, and `⌘Z` works anywhere outside a
+text box.
+
 **Text on the plate.** A contour letters its own height and a peak letters its
 own name, and both are derived: the string comes from the data. A **text layer**
 is the same lettering with the derivation removed. You supply the words and the
@@ -420,9 +423,21 @@ Presets save and load as JSON, and they can carry the heightmap with them.
 | `Q` | Toggle auto-rotate |
 | `\` | Show or hide the control panel |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
+| `⌘Z` / `Ctrl+Z` | Undo |
+| `⌘⇧Z` / `Ctrl+Y` | Redo |
 
-Every shortcut is a bare key. A chord — `⌘1`, `⌘E`, `Ctrl+5` — belongs to the
-browser or the OS and passes through untouched.
+Every shortcut but undo is a bare key. A chord — `⌘1`, `⌘E`, `Ctrl+5` — belongs
+to the browser or the OS and passes through untouched.
+
+Undo is the exception, and it is the case where that reasoning runs the other
+way: `⌘Z` means undo *in the application* on every platform and in every editor,
+so a tool that ignored it is the thing behaving oddly. Inside a text box it still
+belongs to the browser, and the app never sees it. A typo in a text layer is thus
+taken back on its own, without the last slider you touched going with it.
+
+A drag is one step. The panel emits a change per frame, and one press per frame
+means forty presses to cross one slider. Undo covers everything the panel can
+change, the vector layers and the text included.
 
 ---
 

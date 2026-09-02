@@ -21,6 +21,7 @@ import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useVectorIcons } from './hooks/useVectorIcons'
 import { useVectorLabels } from './hooks/useVectorLabels'
 import { useTextLayers } from './hooks/useTextLayers'
+import { useHistory } from './hooks/useHistory'
 import { adoptTextLayers } from './utils/textLayers'
 import { useContourLabels } from './hooks/useContourLabels'
 import { flattenSvg } from './utils/svgFlatten'
@@ -1276,9 +1277,56 @@ export default function App() {
     setCameraPreset({ name, ts: Date.now() })
   }, [])
 
+  /*
+   * Undo and redo, over everything the panel can change.
+   *
+   * The whole tracked set in one list, in a fixed order, because the history
+   * takes it as its own dependency array — a fresh array of the same references
+   * does not count as a change, which is exactly the identity test a snapshot
+   * history wants.
+   *
+   * `vectorSources` is in here with the rest. It is the heaviest thing in the
+   * list and the one most obviously "data rather than settings", but leaving it
+   * out would make undo lie: fetch a province, press undo, and the layer records
+   * would go while the geometry they name stayed. Reset all already restores
+   * both together for the same reason.
+   */
+  const historyState = [terrain, style, points, view, gradientStops, bgGradientStops,
+                        textLayers, vectorLayers, vectorSources]
+  const restoreHistory = useCallback((s) => {
+    setTerrain(s[0]); setStyle(s[1]); setPoints(s[2]); setView(s[3])
+    setGradientStops(s[4]); setBgGradientStops(s[5])
+    setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
+  }, [setVectorSources])
+  const { undo, redo, canUndo, canRedo } = useHistory(historyState, restoreHistory)
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+
+      /*
+       * The one chord, and why it is the exception.
+       *
+       * Everything below is a bare key, because a chord belongs to the browser
+       * or the OS — see the note under the guard. Undo is the case where that
+       * reasoning runs the other way: ⌘Z means undo *in the application* on
+       * every platform and in every editor, and a tool that ignored it would be
+       * the thing behaving oddly.
+       *
+       * The text-field guard above is what keeps it honest. Inside the text
+       * layer's box, ⌘Z is the browser's own text undo and this never sees it.
+       */
+      const meta = e.metaKey || e.ctrlKey
+      if (meta && e.code === 'KeyZ' && !editMode) {
+        e.preventDefault()
+        if (e.shiftKey) redo(); else undo()
+        return
+      }
+      if (meta && e.code === 'KeyY' && !editMode) {   // the Windows spelling
+        e.preventDefault()
+        redo()
+        return
+      }
       // Bare keys only. Every shortcut below is a single unmodified key, so a
       // chord belongs to the browser or the OS: on macOS Cmd+1 switches tab and
       // would otherwise also write an SVG, and Cmd+5 would start a recording the
@@ -1307,7 +1355,8 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
     // beginSvgExport belongs here for the same reason handleStl does: both claim
     // the single export slot, and a stale copy would not see it taken.
-  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport, beginPngExport])
+  }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport,
+      beginPngExport, undo, redo])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -1442,6 +1491,7 @@ export default function App() {
         textLayers={textLayers}
         setTextLayers={setTextLayers}
         textOverflow={textOverflow}
+        onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
         vectorCoverage={vectorCoverage}
         vectorError={vectorError}
         onPatchVectorLayer={patchVectorLayer}

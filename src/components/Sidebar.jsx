@@ -1227,6 +1227,7 @@ export function Sidebar({
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
   geoTiffBbox,
   textLayers, setTextLayers, textOverflow,
+  onUndo, onRedo, canUndo, canRedo,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
@@ -1690,6 +1691,20 @@ export function Sidebar({
           {/* "Reset" alone taught the wrong lesson: the camera preset row and the
               mirror block both use the word for something harmless, and this one
               throws away every setting in the app. */}
+          {/* Undo has a keyboard shortcut, and a shortcut nobody is told about is
+              a feature only its author has. These are the affordance; the glyphs
+              are the arrows every editor uses rather than words, because the row
+              is 272px wide and "Reset all" already has most of it. */}
+          <button onClick={onUndo} disabled={!canUndo} data-testid="undo"
+            title="Undo — ⌘Z" aria-label="Undo"
+            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5,
+                     color: canUndo ? '#a1a1aa' : '#52525b', fontSize:11, padding:'2px 7px',
+                     cursor: canUndo ? 'pointer' : 'default', marginRight:4 }}>↶</button>
+          <button onClick={onRedo} disabled={!canRedo} data-testid="redo"
+            title="Redo — ⌘⇧Z" aria-label="Redo"
+            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5,
+                     color: canRedo ? '#a1a1aa' : '#52525b', fontSize:11, padding:'2px 7px',
+                     cursor: canRedo ? 'pointer' : 'default', marginRight:6 }}>↷</button>
           <button onClick={handleResetAll} title="Return every setting to its default"
             style={{ background:'none', border:`1px solid #52525b`, borderRadius:5, color:'#a1a1aa', fontSize:10, padding:'2px 8px', cursor:'pointer' }}>Reset all</button>
         </div>
@@ -3211,7 +3226,7 @@ export function Sidebar({
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <ExpBtn label="SVG" hint="1" onClick={onSvg} /><ExpBtn label="PNG" hint="2" onClick={onPng} /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} /><ExpBtn label="STL" hint="4" onClick={onStl} />
+              <ExpBtn label="SVG" hint="1" onClick={onSvg} testId="export-svg" /><ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" /><ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />

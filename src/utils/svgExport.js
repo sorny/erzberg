@@ -887,6 +887,16 @@ async function runExport({
     return out
   }
 
+  /**
+   * One Inkscape pen layer.
+   *
+   * `inkscape:label` is what the editor shows and what somebody sorting a plot
+   * by pen actually reads, so it carries the human name; `id` stays a slug,
+   * because it has to be a valid XML id and is what a script would match on.
+   */
+  const penLayer = (id, label, body) =>
+    `<g id="layer-${id}" inkscape:groupmode="layer" inkscape:label="${label}">${body}</g>`
+
   const layerGroups = []
   for (const layer of svgLayers) {
     const sw        = (layer.weight * 0.5).toFixed(3)
@@ -923,7 +933,7 @@ async function runExport({
         `opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round" ` +
         `font-family="${xmlAttr(st.family ?? 'Space Mono')}, monospace" ` +
         `font-weight="${st.weight ?? 400}" font-style="${st.style ?? 'normal'}">${els.join('')}</g>`)
-      layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
+      layerGroups.push(penLayer(modeId, modeLabel, inner.join('')))
       continue
     }
 
@@ -932,14 +942,15 @@ async function runExport({
       if (layer.ghostDots.length > 0) {
         const els = await mapPaced(layer.ghostDots, ({ cx, cy, fill }) =>
           `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
-        inner.push(`<g stroke="none" opacity="${ghostOpac * layer.opacity}">${els.join('')}</g>`)
+        layerGroups.push(penLayer(`${modeId}-hidden`, `${modeLabel} · hidden`,
+          `<g stroke="none" opacity="${ghostOpac * layer.opacity}">${els.join('')}</g>`))
       }
       if (layer.visibleDots.length > 0) {
         const els = await mapPaced(layer.visibleDots, ({ cx, cy, fill }) =>
           `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r}" fill="${fill}"/>`)
         inner.push(`<g stroke="none" opacity="${layer.opacity}">${els.join('')}</g>`)
       }
-      layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
+      if (inner.length) layerGroups.push(penLayer(modeId, modeLabel, inner.join('')))
       continue
     }
 
@@ -1006,21 +1017,30 @@ async function runExport({
       return perSeg
     }
 
-    // Ghost pass (Hidden)
+    /*
+     * The hidden pass gets a pen layer of its own.
+     *
+     * It used to be a second `<g>` inside the visible layer's, which reads as one
+     * pen with two opacities. It is not: hidden strokes carry their own colour
+     * and their own opacity by definition — that is the whole point of the ghost
+     * — so on paper they are a different pen, or a pass to delete before
+     * plotting. Either decision needs them separable, and a nested group is not.
+     *
+     * `fill="none"` is load-bearing now that these groups can hold a
+     * `<polyline>`: a line has no interior, but a polyline does, and the initial
+     * fill is black, so every joined stroke would paint as a solid.
+     */
     if (layer.ghostSegs.length > 0) {
       const ghostEls = await buildLineEls(layer.ghostSegs)
-      // `fill="none"` is load-bearing now that these groups can hold a
-      // `<polyline>`: a line has no interior, but a polyline does, and the
-      // initial fill is black — every joined stroke would paint as a solid.
-      inner.push(`<g fill="none" stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`)
+      layerGroups.push(penLayer(`${modeId}-hidden`, `${modeLabel} · hidden`,
+        `<g fill="none" stroke-width="${sw}" opacity="${ghostOpac * layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${ghostEls.join('')}</g>`))
     }
-    // Main pass (Visible)
     if (layer.visibleSegs.length > 0) {
       const lineEls = await buildLineEls(layer.visibleSegs)
       inner.push(`<g fill="none" stroke-width="${sw}" opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round">${lineEls.join('')}</g>`)
     }
 
-    layerGroups.push(`<g id="layer-${modeId}" inkscape:groupmode="layer" inkscape:label="${modeLabel}">${inner.join('')}</g>`)
+    if (inner.length) layerGroups.push(penLayer(modeId, modeLabel, inner.join('')))
   }
 
   const pColor = particleColor ?? '#000000'

@@ -1464,7 +1464,14 @@ test.describe('vector layers', () => {
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
 
-    const pens = [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
+    /*
+     * The hidden pass of each entry is its own pen layer, written immediately
+     * before the visible one — so "directly behind" is a claim about the drawn
+     * layers and the ghosts are not part of it. Occlusion is on by default, so
+     * they are always here to be filtered.
+     */
+    const drawnPens = (all) => all.filter((n) => !n.endsWith(' · hidden'))
+    const pens = drawnPens([...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1]))
     const peaks = pens.indexOf('Peaks')
     const labels = pens.indexOf('Peaks · labels')
     expect(peaks, 'the layer must export').toBeGreaterThanOrEqual(0)
@@ -1489,7 +1496,7 @@ test.describe('vector layers', () => {
     await expect.poll(() => stackIds(page).then((s) => s[0])).toBe(ids[ids.length - 1])
     await page.waitForTimeout(1500)
 
-    const pens2 = await exportedPenLayers(page)
+    const pens2 = drawnPens(await exportedPenLayers(page))
     expect(pens2.indexOf('Peaks · labels')).toBe(pens2.indexOf('Peaks') + 1)
     expect(pens2.indexOf('Peaks · labels'), 'behind everything the stack puts above it')
       .toBeLessThan(pens2.length - 1)
@@ -1994,7 +2001,7 @@ test.describe('vector layers', () => {
     await page.evaluate(() => document.activeElement?.blur())
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60000 }),
-      page.click('text=SVG'),
+      page.click('[data-testid="export-svg"]'),
     ])
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
@@ -2165,7 +2172,7 @@ test.describe('vector layers', () => {
 
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60000 }),
-      page.click('text=SVG'),
+      page.click('[data-testid="export-svg"]'),
     ])
     const stream = await download.createReadStream()
     let svg = ''
