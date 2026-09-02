@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.1] — 2026-09-02
+
+### Fixed
+
+- **The panel header.** Five things shared one row 248 px wide inside its
+  padding, and they did not fit: "Reset all" wrapped onto two lines, which is
+  what made the header look broken rather than tight. Undo and redo tipped it
+  over, but the row was already carrying a name, a version, a link and a
+  destructive button.
+
+  Identity now has a line and the actions have another. Undo and redo share one
+  border, because they are a pair and read as one control. The two glyphs became
+  drawn arrows: `↶` and `↷` render as thin hooks, at whatever size and baseline
+  the font decides. In a bordered box that looks like a stray pen mark. The new
+  header is the height that the wrapped one had already reached.
+
+- **A fresh load offered an undo of the look that it opened on.** The app applies
+  its opening preset from an effect on mount, and that is a state change like any
+  other. The history recorded it, and the first press of undo left bare defaults. `clear()` now carries its intent across the commit that prompted it.
+  A clear on its own empties the stack a moment before the entry that it is meant
+  to disown gets pushed.
+
 ## [1.10.0] — 2026-09-02
 
 ### Added
