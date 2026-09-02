@@ -151,6 +151,9 @@ self.onmessage = (e) => {
       xfer(L.lids?.indices)
       xfer(L.fills?.positions)
       xfer(L.fills?.indices)
+      xfer(L.areas?.region)
+      xfer(L.areas?.elev)
+      xfer(L.areas?.inks)
       xfer(L.featureOfSegment)
     }
 

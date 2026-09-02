@@ -555,18 +555,53 @@ Indexed, Mineral and Watershed draw fills, and a fill is not a stroke. The SVG
 exporter reads the per-vertex colour buffer and never looks at `lids`, so these
 three exported an empty plate.
 
-Each cell edge where the ink changes is now a real stroke. The plot is the
-outline of each *region* rather than of each square: on Watershed those edges are
-the divides, on Mineral the material boundaries, on Indexed the band steps. Every
-cell edge is a wall of grid lines, and a plotter has no use for that.
+The first answer was to make each cell edge where the ink changes a real stroke.
+That is the outline of each *region* rather than of each square: on Watershed
+those edges are the divides, on Mineral the material boundaries, on Indexed the
+band steps. Every cell edge is a wall of grid lines, and a plotter has no use for
+that.
 
 What counts as the same area is the **region**, not the pixel colour. Mineral
 grains every cell and Indexed dithers between two entries on purpose, so a
 comparison of colours made every single cell edge a boundary. Each stroke also
 carries the *base* ink of its region, without the grain or the relief shading
 that the fill carries. Those modulate every cell separately, and using the fill
-colour put 703 near-identical greens into a Mineral plot. Measured on the sample
-plate, the modes now plot 6, 5 and 10 inks.
+colour put 703 near-identical greens into a Mineral plot.
+
+### Filled areas in the SVG
+
+Strokes were enough to look at and not enough to plot. They leave as unordered
+two-point pieces, so an editor has no closed shape to select and a hatch-fill
+tool has nothing to work on.
+
+As a result, `fillCells` also ships the lattice it painted: which cell holds
+which ink, at what height. `traceAreaRings` in `src/utils/areaRings.js` walks that into
+closed rings, and the exporter writes one `<path>` for each ink in its own
+Inkscape pen layer, named `Watershed · ink 03 #e04f2a`. The lines are dropped for
+that mode, because a traced ring *is* those same boundary edges in order.
+
+Four things are worth knowing about the result.
+
+- **The lattice is keyed by ink, not by region.** Watershed deals ten inks to the
+  catchments that survive the fold, so two neighbouring basins often hold the
+  same colour. Keyed by region they trace as two shapes with a shared seam and a
+  doubled stroke. That is 31 189 shapes on the reference plate, against the ten
+  flat areas the screen shows.
+- **Winding puts the region on the right of every edge.** An outer ring comes out
+  clockwise and a hole counter-clockwise, and both are subpaths of the same
+  `<path>` under `fill-rule="evenodd"`. A catchment with a lake in it plots with
+  the lake cut out.
+- **The fill follows the Occlusion switch.** With it on, a cell whose centre
+  fails the same depth test the lines use is dropped, and the ring closes along
+  the silhouette. With it off, every area comes out whole — a map rather than a
+  view, which is the file to plot from. There is no separate control.
+- **The cut edge is a cell boundary.** It steps at the lattice pitch. The ghost
+  line layer is sampled per pixel, so the two can disagree by up to half a cell
+  along a silhouette.
+
+Measured on the sample plate, the three modes export 6, 5 and 10 pen layers, one
+`<path>` each. A mirrored scene has no lattice — it describes one octant — so it
+falls back to the boundary lines, which are mirrored with everything else.
 
 ---
 

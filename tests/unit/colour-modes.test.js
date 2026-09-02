@@ -11,6 +11,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTerrain } from '../../src/utils/terrain'
 import { buildLineGeometry } from '../../src/utils/geometryBuilders'
+import { traceAreaRings, ringSignedArea } from '../../src/utils/areaRings'
 import { STYLE_DEF, TERRAIN_DEF, VIEW_DEF, POINTS_DEF } from '../../src/defaults'
 
 const W = 96, H = 96
@@ -159,5 +160,76 @@ describe('colour modes produce geometry', () => {
     let diff = 0
     for (let i = 0; i < a.length; i++) if (Math.abs(a[i] - b[i]) > 1e-6) diff++
     expect(diff).toBeGreaterThan(0)
+  })
+})
+
+/**
+ * The lattice the SVG traces its filled areas from.
+ *
+ * Boundary strokes were enough to look at and not enough to plot: they arrive as
+ * unordered two-point pieces, so Inkscape had no closed shape to select and its
+ * hatch-fill tools had nothing to work on. `fillCells` now also ships the
+ * lattice — which cell belongs to which area, at what height, in what ink — and
+ * `traceAreaRings` walks that into closed rings.
+ */
+describe('the area lattice reaches the exporter', () => {
+  const px = plate()
+  const mask = new Uint8Array(W * H).fill(1)
+  const p0 = { ...TERRAIN_DEF, ...STYLE_DEF, ...VIEW_DEF, ...POINTS_DEF, elevScale: 1 }
+  const terrain = buildTerrain(px, mask, W, H, p0)
+  const layerOf = (id) => buildLineGeometry(terrain, { ...p0, [`enabled${id}`]: true })
+    .find((x) => x.id === id)
+
+  for (const id of ['Indexed', 'Mineral', 'Shed']) {
+    it(`${id} ships a lattice that traces into closed rings`, () => {
+      const a = layerOf(id).areas
+      expect(a, `${id} areas`).toBeTruthy()
+      expect(a.region.length).toBe(a.lw * a.lh)
+      expect(a.elev.length).toBe(a.lw * a.lh)
+      expect(a.inks.length % 3).toBe(0)
+
+      // Every area index names an ink, and no cell points past the end of the
+      // table. Getting this wrong would write `#NaNNaNNaN` into the file.
+      const nAreas = a.inks.length / 3
+      for (const v of a.region) expect(v).toBeLessThan(nAreas)
+      for (const v of a.inks) { expect(v).toBeGreaterThanOrEqual(0); expect(v).toBeLessThanOrEqual(1) }
+
+      const rings = traceAreaRings(a.region, a.lw, a.lh, null, (x, y) => a.elev[x] === a.elev[y])
+      expect(rings.length, `${id} areas traced`).toBeGreaterThan(0)
+      let loops = 0
+      for (const { loops: ls } of rings) {
+        for (const l of ls) {
+          expect(l.corners.length).toBeGreaterThanOrEqual(3)
+          expect(l.corners.length).toBe(l.cells.length)
+          loops++
+        }
+      }
+      expect(loops, `${id} closed loops`).toBeGreaterThan(0)
+    })
+  }
+
+  it('the rings enclose the cells the fills painted', () => {
+    // The one claim that ties the two halves together. Winding is region-on-the
+    // -right, so an outer ring is positive and a hole negative in the lattice's
+    // own y-down coordinates. The signed areas must therefore sum to the number
+    // of painted cells — holes cancelling the parts of an outer ring that are
+    // not really filled.
+    const a = layerOf('Shed').areas
+    const rings = traceAreaRings(a.region, a.lw, a.lh)
+    let total = 0
+    for (const { loops } of rings) {
+      for (const l of loops) total += ringSignedArea(l, a.lw + 1)
+    }
+    let painted = 0
+    for (const v of a.region) if (v >= 0) painted++
+    // Twice the signed area, because ringSignedArea is the shoelace sum.
+    expect(total / 2).toBe(painted)
+  })
+
+  it('a mirrored scene falls back to lines, because the lattice is one octant', () => {
+    const p = { ...p0, enabledShed: true, showMirrorPlusX: true, showMirrorMinusX: true }
+    const l = buildLineGeometry(terrain, p).find((x) => x.id === 'Shed')
+    expect(l.areas).toBe(null)
+    expect(l.positions.length).toBeGreaterThan(0)
   })
 })

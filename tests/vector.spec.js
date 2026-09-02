@@ -2,6 +2,17 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fromArrayBuffer } from 'geotiff'
 import { unprojectWgs84 } from '../src/utils/geoCoords.js'
+/*
+ * The colour a pen layer carries is the colour the *screen* shows for the ink
+ * that was picked, not the hex itself. The renderer tone maps and encodes every
+ * fragment, and the exporter applies the same two steps so the file matches the
+ * viewport — so `#00ff00` picked in the panel reaches the SVG as something else.
+ *
+ * Going through the same function rather than writing the result out keeps these
+ * about propagation, which is what they are for. The transform itself is pinned
+ * against colours measured off the running app, in unit/screen-ink.test.js.
+ */
+import { screenInkHex } from '../src/utils/svgExport.js'
 import { resetToDefaults } from './helpers.js'
 
 /**
@@ -1144,7 +1155,7 @@ test.describe('vector layers', () => {
     await page.waitForTimeout(1500)
 
     const after = await download()
-    expect(penOf(after, 'labels').stroke).toBe('#00ff00')
+    expect(penOf(after, 'labels').stroke).toBe(screenInkHex('#00ff00'))
     expect(penOf(after, 'labels').opacity).toBeCloseTo(0.4, 3)
     // …and the marks it labels are untouched by either.
     expect(penOf(after, 'icons')).toEqual(penOf(before, 'icons'))
@@ -1206,8 +1217,8 @@ test.describe('vector layers', () => {
 
     // The three stroke inks are visible in the export, per pen layer.
     const svg = await download()
-    expect(penOf(svg, 'icons')).toEqual({ stroke: '#ff00ff', width: expect.any(Number), opacity: 0.5 })
-    expect(penOf(svg, 'labels').stroke).toBe('#00ff00')
+    expect(penOf(svg, 'icons')).toEqual({ stroke: screenInkHex('#ff00ff'), width: expect.any(Number), opacity: 0.5 })
+    expect(penOf(svg, 'labels').stroke).toBe(screenInkHex('#00ff00'))
     expect(penOf(svg, 'labels').opacity).toBeCloseTo(0.9, 3)
     expect(penOf(svg, 'labels').width).toBeLessThan(penOf(svg, 'icons').width)
 
@@ -1229,8 +1240,8 @@ test.describe('vector layers', () => {
     await page.click(`[data-testid="icon-match-${id}"]`)
     await page.waitForTimeout(1500)
     const after = await download()
-    expect(penOf(after, 'icons').stroke).toBe(layerColor)
-    expect(penOf(after, 'labels').stroke).toBe('#00ff00')
+    expect(penOf(after, 'icons').stroke).toBe(screenInkHex(layerColor))
+    expect(penOf(after, 'labels').stroke).toBe(screenInkHex('#00ff00'))
     // …and the width, which is the mark's own number rather than the layer's,
     // survives Match layer: it is ink, not inheritance.
     expect(penOf(after, 'icons').width).toBe(penOf(svg, 'icons').width)

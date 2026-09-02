@@ -276,7 +276,7 @@ The app generates two things from that set. Nobody writes them by hand:
 
 | Exporter | Reads | Note |
 |---|---|---|
-| SVG | `lineGeo` and `surfaceGeo` | Projects on the CPU with its own software Z-buffer. Thus the occlusion matches the viewport without a GPU readback |
+| SVG | `lineGeo` and `surfaceGeo` | Projects on the CPU with its own software Z-buffer. Thus the occlusion matches the viewport without a GPU readback. An area mode also ships `areas`, and exports as filled polygons |
 | PNG / PNG α | The scene | Rendered offscreen into a 4× render target, then trimmed to the content through the alpha channel |
 | STL | `surfaceGeo` | Computes its own facet normals. It must skip vertices parked at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
 | Heightmap PNG | `terrain.grid` | The processed raster, after resolution and levels |
@@ -286,6 +286,59 @@ The app generates two things from that set. Nobody writes them by hand:
 Every exporter reads the *derived* terrain. Thus the features upstream of it
 need no support in any exporter. Edit Mode clips, erosion, the mirror and
 soundscapes are all upstream of it.
+
+### The area modes export filled polygons
+
+Indexed, Mineral and Watershed paint blocks of colour, and a fill is not a
+stroke. They used to leave as unordered boundary edges: enough to look at, and
+nothing to plot, because an editor had no closed shape to select.
+
+The `lids` mesh is the wrong input, because a triangle soup has no outline. So
+`fillCells` also ships the lattice it painted. That is one entry per cell, with
+the ink and the height. `utils/areaRings.js` then walks it into closed rings by
+boundary following. The exporter writes one `<path>` per ink, each in its own
+Inkscape pen layer, and drops that mode's line layer: a traced ring is the same
+boundary edges in order, so writing both puts the geometry in the file twice.
+
+Three parts of this live where they do for a reason:
+
+- **The lattice is built in the worker**, beside the fills it describes, and its
+  arrays ride the same transfer list.
+- **The ring walk is in the exporter**, not in the worker, because the depth test
+  that decides which cells to hand it needs the camera.
+- **The clip is a polygon clip**, not the segment clip the lines use. Cutting a
+  filled area edge by edge leaves the shape open and the paint runs out of it.
+
+The vector layers' own area fills are still not exported. Those arrive as
+triangles with no ring topology, which is the problem this solves for the draw
+modes and does not solve for them.
+
+### An ink is not the number it was written as
+
+The `<Canvas>` comes from React Three Fiber, which gives it ACES filmic tone
+mapping and an sRGB output encode. `App.jsx` overrides neither, so every fragment
+the renderer draws passes through both on its way to a pixel.
+
+The SVG exporter wrote the raw number, so the file and the viewport disagreed.
+They disagreed most where a colour was bright and saturated, because that is
+where the tone curve does the most work. Jet's top stop is `#800000`, and the
+screen shows it as `#ca0006` — a deep red on screen, a brown in the file. Black
+line art was never affected, because the curve maps 0 to 0, which is why this
+stood for so long.
+
+`screenInk` in `utils/svgExport.js` applies the same two steps. Two things were
+measured rather than assumed, and both changed the answer:
+
+- **A per-vertex colour and a flat material colour come out the same.** Under
+  colour management a material colour arrives converted from sRGB, and the
+  exporter then needs two transforms. That is not what happens here.
+- **The background is not tone mapped.** It arrives through `setClearColor`
+  rather than through a fragment shader. White paper stays `#ffffff` while white
+  *geometry* renders `#e2e2e2`, so `bgColor` and the gradient stops are written
+  raw.
+
+`tests/unit/screen-ink.test.js` pins four pairs read off the running app, not
+off the shader source.
 
 ### The ODbL credit goes wherever the data does
 

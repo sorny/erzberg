@@ -236,6 +236,13 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Mineral | Five materials classified by slope and curvature, each with a flat colour and its own grain |
 | Watershed | Every cell labelled with the sink it drains to, one flat ink per catchment. The divides are ridgelines |
 
+The three modes that block colour are Indexed, Mineral and Watershed. Each of
+them leaves the SVG as closed filled paths, one per ink. Each ink gets its own
+Inkscape pen layer, named with its hex. Select a layer and run a hatch fill on
+it. A catchment with a lake in it keeps the lake: the outer ring and its holes
+are subpaths of one path under the even-odd rule. Switch **Occlusion** off to
+export whole areas rather than the part the camera can see.
+
 **Layered ghost occlusion.** Each line segment makes an invisible 3D curtain
 mesh that acts as a depth buffer. Lines then occlude other lines, and the
 terrain surface does not swallow them. Hidden segments can take their own colour
@@ -394,7 +401,7 @@ density and harmony as layers over one timeline.
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer projection with fill-based terrain occlusion. One named Inkscape or Illustrator layer per draw mode and per vector layer. Dash patterns are faithful. The export shows progress and you can cancel it. A dense plate takes real time, and the page stays responsive throughout |
+| **SVG** | Software Z-buffer projection with fill-based terrain occlusion. One named Inkscape or Illustrator layer per draw mode and per vector layer. Indexed, Mineral and Watershed export as **filled polygons**, one closed path per ink in its own pen layer, ready for a hatch fill. Dash patterns are faithful. The export shows progress and you can cancel it. A dense plate takes real time, and the page stays responsive throughout |
 | **PNG** | 4K with MSAA, trimmed to content |
 | **PNG α** | Transparent background |
 | **STL** | Watertight mesh for 3D printing. The export shows progress and you can cancel it, like the SVG export. A vector layer with **STL ribbon** on gets a second solid for multicolour printing. The default is on for GPX and off for OSM |

@@ -545,6 +545,12 @@ export function buildLineGeometry(terrain, p) {
           lids: hasLids ? { positions: baseLidP, colors: baseLidC, indices: baseLidI,
                             hugsSurface: !!res.lids?.hugsSurface } : null,
           isPoints: res.isPoints ?? false,
+          // The lattice the SVG traces its filled areas from. It rides this path
+          // only, for the same reason `labelAnchors` does: it describes one
+          // octant in the terrain's own coordinates, and a mirrored copy of the
+          // scene has no lattice of its own. A mirrored layer falls back to the
+          // boundary lines, which *are* mirrored — see `traceAreaRings`.
+          areas: res.areas ?? null,
           // Placements for the main thread to letter. Not geometry, so it rides
           // the un-mirrored path only: a mirrored label reads backwards, and a
           // kaleidoscope of reversed numbers is not what the option is for.
@@ -626,6 +632,10 @@ export function buildLineGeometry(terrain, p) {
           ? { positions: layerLidPos, colors: layerLidCol, indices: layerLidInd,
               hugsSurface: !!res.lids?.hugsSurface }
           : null,
+        // No lattice for a mirrored scene: it describes one octant, and the
+        // copies have none. The SVG falls back to the boundary lines, which are
+        // mirrored with everything else.
+        areas: null,
         isPoints: res.isPoints ?? false,
       })
     }
@@ -4470,6 +4480,38 @@ function fillCells(terrain, p, spacing, colorFn, regionFn, inkFn) {
   // boundaries. A boundary is where two cells disagree, which cannot be known
   // while the first of them is being written.
   const colAt = new Map(), elevAt = new Map(), regAt = new Map(), inkAt = new Map()
+
+  /*
+   * The same pass, written a second way, for the SVG.
+   *
+   * A fill is not a line and a triangle soup has no outline, so an exporter
+   * given only `lids` can write nothing a plotter can hatch. What it needs is
+   * the lattice itself — which cell belongs to which area, at what height, in
+   * what ink — and `traceAreaRings` walks that into closed rings. Building it
+   * here rather than in the exporter is what keeps the walk off the main thread
+   * and puts the arrays in the worker's transfer list.
+   *
+   * The lattice is keyed by **ink**, not by the caller's region. Those are not
+   * the same thing and the difference is large: Watershed deals ten inks to
+   * however many catchments survive the fold, so two neighbouring basins often
+   * hold the same colour. Keyed by region they trace as two shapes with a shared
+   * seam and a doubled stroke — 31 189 of them on the reference plate, against
+   * the ten flat areas the screen shows. Keyed by ink they merge, which is both
+   * what the picture looks like and the shape a hatch fill wants.
+   *
+   * The key is the ink rounded to 8 bits, so it cannot disagree with the hex the
+   * exporter writes. The ink itself is the region's *base* colour, without the
+   * per-cell grain Mineral adds or the dither Indexed adds, so this does not
+   * reintroduce the every-cell-is-its-own-area problem `regionFn` exists to
+   * avoid.
+   */
+  const lw = Math.ceil(cols / step)
+  const lh = Math.ceil(rows / step)
+  const areaRegion = new Int32Array(lw * lh).fill(-1)
+  const areaElev = new Float32Array(lw * lh)
+  const areaInk = []
+  const denseOf = new Map()
+
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
       const i = r * cols + c
@@ -4492,6 +4534,19 @@ function fillCells(terrain, p, spacing, colorFn, regionFn, inkFn) {
       // supposed to avoid. Modes that have no such distinction pass none, and
       // the colour is the region.
       if (regionFn) regAt.set(i, regionFn(i, r, c, elev))
+
+      const ink = inkAt.get(i) ?? col
+      const key = (Math.round(ink[0] * 255) << 16) | (Math.round(ink[1] * 255) << 8) |
+                   Math.round(ink[2] * 255)
+      let dense = denseOf.get(key)
+      if (dense === undefined) {
+        dense = areaInk.length / 3
+        denseOf.set(key, dense)
+        areaInk.push(ink[0], ink[1], ink[2])
+      }
+      const li = (r / step) * lw + c / step
+      areaRegion[li] = dense
+      areaElev[li] = elev
     }
   }
 
@@ -4575,6 +4630,12 @@ function fillCells(terrain, p, spacing, colorFn, regionFn, inkFn) {
       : null,
     positions: outP.toArray(),
     colors: outC.toArray(),
+    areas: colAt.size > 0
+      ? {
+          lw, lh, step, scl, halfW, halfH, half,
+          region: areaRegion, elev: areaElev, inks: new Float32Array(areaInk),
+        }
+      : null,
   }
 }
 
@@ -4812,7 +4873,7 @@ function buildIndexed(terrain, p, o) {
     return entry(Math.floor(k / nS), k % nS)
   })
   void rows; void cols
-  return { positions: cells.positions, colors: cells.colors, lids: cells.lids }
+  return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
 }
 
 /** How far up its own band a cell sits — the residual the dither screens on. */
@@ -5024,7 +5085,7 @@ function buildMineral(terrain, p, o) {
     return [Math.min(1, base[0] * g), Math.min(1, base[1] * g), Math.min(1, base[2] * g)]
   }, (i) => classOf(i), (i, r, c, elev) => cols5[classOf(i, elev)])
   void elevScale; void jitterAmt; void maxSlope; void cMax
-  return { positions: cells.positions, colors: cells.colors, lids: cells.lids }
+  return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
 }
 
 /**
@@ -5148,5 +5209,5 @@ function buildWatershed(terrain, p, o) {
   }, (i) => (label[i] < 0 ? -1 : remap[label[i]]),
      (i) => (label[i] < 0 ? null : pal[pick[remap[label[i]]] % pal.length]))
   void minElev; void maxElev
-  return { positions: cells.positions, colors: cells.colors, lids: cells.lids }
+  return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
 }

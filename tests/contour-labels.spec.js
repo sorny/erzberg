@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
+import { screenInkHex } from '../src/utils/svgExport.js'
 
 /**
  * Contour labels — the elevation printed *into* the line.
@@ -259,10 +260,18 @@ test('labels carry their own ink, and follow the contours until they do', async 
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   await page.waitForTimeout(2500)
 
+  /*
+   * Through `screenInkHex`, not as the literal. The renderer tone maps every
+   * fragment and the exporter applies the same step, so an ink reaches the file
+   * as the colour the screen shows for it rather than as the hex that was
+   * picked. Black is unaffected, which is why the first assertion above is still
+   * a literal.
+   */
   const after = await exportSvg(page)
-  expect(inkOf(after, 'Contours-Labels'), 'and take an ink of their own').toBe('#cc0000')
-  // The lines are untouched. They are written per vertex as `rgb(...)`, which is
-  // the very reason the flat lettering needed a colour of its own.
+  expect(inkOf(after, 'Contours-Labels'), 'and take an ink of their own')
+    .toBe(screenInkHex('#cc0000'))
+  // The lines are untouched. They are coloured per vertex, which is the very
+  // reason the flat lettering needed a colour of its own.
   expect(inkOf(after, 'Contours-Major'), 'the contours keep their own colouring')
-    .not.toBe('#cc0000')
+    .not.toBe(screenInkHex('#cc0000'))
 })

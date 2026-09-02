@@ -39,6 +39,8 @@
 import * as THREE from 'three'
 import { DASH_SEGMENT_SIZES } from './stylePresets'
 import { clipSegment, insideRect } from './frame'
+import { hexToRgb } from './colorUtils'
+import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
@@ -253,6 +255,134 @@ function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
   }))
 }
 
+/**
+ * Sutherland-Hodgman: one closed loop against one half-plane of the paper.
+ *
+ * `clipSegment` in ./frame does this for a line, and a line is the wrong shape
+ * here. Cutting a filled area edge by edge leaves the cut open, so the paint
+ * runs out of it; a polygon clip walks the border of the paper instead and
+ * closes the shape along it.
+ *
+ * `side` is 0 left, 1 right, 2 top, 3 bottom, and `v` is that border. Two
+ * endpoints on opposite sides of the border always differ in the coordinate
+ * being tested, so the division below cannot be by zero.
+ */
+function clipHalf(pts, side, v) {
+  const n = pts.length / 2
+  if (n === 0) return pts
+  const inside = (x, y) => side === 0 ? x >= v : side === 1 ? x <= v : side === 2 ? y >= v : y <= v
+  const out = []
+  for (let i = 0; i < n; i++) {
+    const ax = pts[i * 2], ay = pts[i * 2 + 1]
+    const j = (i + 1) % n
+    const bx = pts[j * 2], by = pts[j * 2 + 1]
+    const ai = inside(ax, ay), bi = inside(bx, by)
+    if (ai) out.push(ax, ay)
+    if (ai !== bi) {
+      const t = side < 2 ? (v - ax) / (bx - ax) : (v - ay) / (by - ay)
+      out.push(ax + (bx - ax) * t, ay + (by - ay) * t)
+    }
+  }
+  return out
+}
+
+/** A closed loop cut to a rectangle, as a flat [x,y,…] list. Empty if it misses. */
+function clipPolygon(pts, r) {
+  let out = pts
+  out = clipHalf(out, 0, r.x)
+  out = clipHalf(out, 1, r.x + r.w)
+  out = clipHalf(out, 2, r.y)
+  out = clipHalf(out, 3, r.y + r.h)
+  return out
+}
+
+/** Twice the signed area of a closed screen-space loop, for the speck filter. */
+function loopArea2(pts) {
+  const n = pts.length / 2
+  let a = 0
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n
+    a += pts[i * 2] * pts[j * 2 + 1] - pts[j * 2] * pts[i * 2 + 1]
+  }
+  return a
+}
+
+const hex2 = (v) => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0')
+
+/* ─── The colour the screen actually shows ───────────────────────────────────
+ *
+ * An ink does not reach the eye as the number it was written as. React Three
+ * Fiber gives its `<Canvas>` ACES filmic tone mapping and an sRGB output
+ * encode, and `App.jsx` does not override either, so every fragment the
+ * renderer draws passes through both before it is a pixel.
+ *
+ * The exporter wrote the raw number, so the SVG and the viewport disagreed —
+ * and disagreed *most* where a colour was bright and saturated, because that is
+ * where the tone curve does the most work. Jet's top stop is `#800000` and the
+ * screen shows it as `#ca0006`: a deep red on screen, a brown in the file.
+ *
+ * Measured against the running app, on four inks, exact on every channel:
+ *
+ *   picked    on screen   this function
+ *   #800000   #ca0006     #ca0006
+ *   #00cce6   #85dcde     #85dcde
+ *   #66cf00   #c3db50     #c3db50
+ *   #ffffff   #e2e2e2     #e2e2e2
+ *
+ * Two things that measurement settled, and neither was safe to assume:
+ *
+ * A per-vertex colour and a flat material colour come out the *same*. Colour
+ * management would convert a material colour from sRGB on its way in and this
+ * would need two transforms; it does not, and one transform is right for both.
+ *
+ * The background is not tone mapped. It arrives through `setClearColor` rather
+ * than through a fragment shader, and white paper stays `#ffffff` while white
+ * *geometry* renders `#e2e2e2`. So `bgColor` and the gradient stops are written
+ * raw, and only ink goes through here.
+ *
+ * Black maps to black, so ordinary black-on-white line art is unchanged.
+ */
+const RRT = (v) => (v * (v + 0.0245786) - 0.000090537) /
+                   (v * (0.983729 * v + 0.432951) + 0.238081)
+const encodeSRGB = (c) => c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055
+const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v)
+
+/*
+ * Keyed on the 8-bit triple, which is the precision the file is written at
+ * anyway. The segment walk asks this once per segment — a quarter of a million
+ * times on a dense plate — for a handful of distinct inks, and three `pow` calls
+ * each would be pure waste.
+ */
+const _inkCache = new Map()
+
+/** An ink in 0–1 floats, as the `#rrggbb` the screen shows for it. */
+export function screenInk(r, g, b) {
+  const key = (Math.round(clamp01(r) * 255) << 16) |
+              (Math.round(clamp01(g) * 255) << 8) |
+               Math.round(clamp01(b) * 255)
+  const hit = _inkCache.get(key)
+  if (hit !== undefined) return hit
+  // `toneMappingExposure / 0.6` with the default exposure of 1, then the ACES
+  // input matrix, the RRT/ODT fit and the output matrix — three.js's
+  // `ACESFilmicToneMapping`, term for term.
+  const x = r / 0.6, y = g / 0.6, z = b / 0.6
+  const a0 = RRT(0.59719 * x + 0.35458 * y + 0.04823 * z)
+  const a1 = RRT(0.07600 * x + 0.90834 * y + 0.01566 * z)
+  const a2 = RRT(0.02840 * x + 0.13383 * y + 0.83777 * z)
+  const out = '#' +
+    hex2(encodeSRGB(clamp01( 1.60475 * a0 - 0.53108 * a1 - 0.07367 * a2))) +
+    hex2(encodeSRGB(clamp01(-0.10208 * a0 + 1.10813 * a1 - 0.00605 * a2))) +
+    hex2(encodeSRGB(clamp01(-0.00327 * a0 - 0.07276 * a1 + 1.07602 * a2)))
+  _inkCache.set(key, out)
+  return out
+}
+
+/** The same, for an ink that arrives as a `#rrggbb` style string. */
+export function screenInkHex(hex) {
+  const c = hexToRgb(hex || '#000000')
+  return screenInk(c[0], c[1], c[2])
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 /**
@@ -299,6 +429,9 @@ async function runExport({
 }, pacer) {
   const bias = occlusionBias ?? 0.1
   const ghostOpac = occlusionOpacity ?? 0
+  // One ghost ink for the whole file: the hidden pass, the hidden dots and the
+  // hidden half of the flock all draw in it, and they must not disagree.
+  const ghostInk = screenInkHex(occlusionColor)
   const camInv = camera.matrixWorldInverse
   const wld2 = new THREE.Vector3()
   const viw2 = new THREE.Vector3()
@@ -478,18 +611,126 @@ async function runExport({
   let walkDone = 0
   report(PHASE.walk, 0, WALK_LABEL)
 
+  // Where a filled area is cut off. With framing on that is the paper, and
+  // without it the canvas — the viewBox crops there anyway, and a ring left
+  // uncut would drag the bounding box out to wherever the terrain runs off.
+  const paperRect = clipRect ?? { x: 0, y: 0, w: width, h: height }
+
+  /**
+   * The filled areas of one blocking colour mode, grouped one bucket per ink.
+   *
+   * ── OCCLUSION ───────────────────────────────────────────────────────────────
+   * A catchment can run behind a ridge, and the whole of the answer is which
+   * lattice cells are handed to the tracer. With a depth buffer built, a cell
+   * whose centre fails the same test the segment walk applies is dropped, and
+   * the ring closes along the silhouette. With no depth buffer — Depth occlusion
+   * off and no fill layer drawing — every cell is kept and each area comes out
+   * whole. That is a map rather than a view, and it is the mode to export from
+   * for plotting.
+   *
+   * The cut edge is a cell boundary, so it steps at the lattice pitch. The ghost
+   * line layer is sampled per pixel, so the two can disagree by up to half a
+   * cell along a silhouette. Refining it would mean clipping rings against the
+   * depth buffer in vector form, which is a different and much larger problem.
+   *
+   * ── ORDER ───────────────────────────────────────────────────────────────────
+   * Areas are written farthest first. With occlusion on this changes nothing,
+   * because two visible cells of a heightfield do not overlap on screen. With it
+   * off they can, and painter order by mean depth is then a heuristic: it is
+   * wrong for an area that wraps around a ridge and holds both its near and its
+   * far side. There is no ordering that is right for that case.
+   */
+  const buildAreaGroups = async (layer) => {
+    const { lw, lh, step, scl, halfW, halfH, half, region, elev, inks } = layer.areas
+    const nCells = lw * lh
+    if (nCells === 0 || inks.length === 0) return null
+
+    const keep = new Uint8Array(nCells)
+    for (let li = 0; li < nCells; li++) {
+      if ((li & STRIDE) === 0 && pacer.due()) await pacer.yield()
+      if (region[li] < 0) continue
+      if (!surfViewZ) { keep[li] = 1; continue }
+      const lr = (li / lw) | 0, lc = li - lr * lw
+      const [sx, sy, vz] = project(lc * step * scl - halfW, elev[li], lr * step * scl - halfH)
+      if (vz > nearZ) continue
+      const sz = surfViewZ(sx, sy)
+      if (sz === -Infinity || vz >= sz - bias) keep[li] = 1
+    }
+
+    const traced = traceAreaRings(region, lw, lh,
+      (i) => keep[i] === 1, (a, b) => elev[a] === elev[b])
+    if (traced.length === 0) return null
+
+    // One traced area is one ink: the lattice is keyed by ink, so a number here
+    // is just its index, stable across a re-export.
+    const cw = lw + 1
+    const byInk = new Map()
+    for (const { area, loops } of traced) {
+      const hex = screenInk(inks[area * 3], inks[area * 3 + 1], inks[area * 3 + 2])
+      const kept = []
+      let depthSum = 0, depthN = 0
+      for (const loop of loops) {
+        if (pacer.due()) await pacer.yield()
+        const raw = []
+        for (let k = 0; k < loop.corners.length; k++) {
+          const cid = loop.corners[k]
+          const gx = (cid % cw) * step * scl - halfW - half
+          const gz = ((cid / cw) | 0) * step * scl - halfH - half
+          const [sx, sy, vz] = project(gx, elev[loop.cells[k]], gz)
+          raw.push(sx, sy)
+          depthSum += vz; depthN++
+        }
+        const cut = clipPolygon(raw, paperRect)
+        if (cut.length < 6) continue
+        // Under one square pixel. Mineral's areas are material classes rather
+        // than connected shapes, so it throws off thousands of single-cell
+        // specks that no pen can draw and that would dominate the file.
+        if (Math.abs(loopArea2(cut)) < 2) continue
+        for (let k = 0; k < cut.length; k += 2) expandBB(cut[k], cut[k + 1])
+        kept.push(cut)
+      }
+      if (kept.length === 0) continue
+      const depth = depthN > 0 ? depthSum / depthN : 0
+      let g = byInk.get(hex)
+      if (!g) { g = { hex, no: area + 1, paths: [], depthSum: 0, count: 0 }; byInk.set(hex, g) }
+      g.paths.push({ loops: kept, depth })
+      g.depthSum += depth; g.count++
+    }
+
+    // View-space z is negative in front of the camera, so ascending is far to
+    // near — the order a painter works in.
+    const groups = [...byInk.values()]
+    for (const g of groups) g.paths.sort((a, b) => a.depth - b.depth)
+    groups.sort((a, b) => (a.depthSum / a.count) - (b.depthSum / b.count))
+    return groups
+  }
+
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
       const { weight = 1, opacity = 1, dash = 'solid', color, name } = lineStyles[id] ?? {}
       // Vector layers carry no per-vertex colour buffer unless hypsometric is
       // on; their one colour arrives with the style instead, so it can be
-      // changed without a geometry rebuild. Fills are not exported: they are
-      // thousands of terrain-conforming quads that would need painter-order
-      // depth sorting against the Z-buffer, and this is a line-art format. The
-      // outline of every filled area is here, so nothing goes missing.
-      const flatStroke = color || '#000000'
-      if (!positions || positions.length === 0) continue
+      // changed without a geometry rebuild. A vector layer's *area* fill is
+      // still not exported: it arrives as thousands of terrain-conforming
+      // triangles, and a triangle soup has no outline to trace. The outline of
+      // every such area is here as lines, so nothing goes missing.
+      const flatStroke = screenInkHex(color)
+
+      // ── Area layers (Indexed, Mineral, Watershed) ────────────────────────
+      //
+      // These modes block colour rather than draw it, and used to leave as
+      // unordered boundary edges — enough to look at, and nothing an editor
+      // could select or a hatch-fill tool could work on. `layer.areas` carries
+      // the lattice they were painted from, which is the one input a closed ring
+      // can be traced out of.
+      const areaGroups = layer.areas ? await buildAreaGroups(layer) : null
+      const suppressLines = !!(areaGroups && areaGroups.length > 0)
+
+      if (!positions || positions.length === 0) {
+        if (suppressLines) svgLayers.push({ id, name, isAreas: true, groups: areaGroups, weight, opacity })
+        continue
+      }
 
       // ── Point layers (stipple dots) ──────────────────────────────────────────
       if (isPoints) {
@@ -510,7 +751,7 @@ async function runExport({
           if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           if (!dotInside(sx, sy)) continue
           const fill = (colors && colors.length > i + 2)
-            ? `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
+            ? screenInk(colors[i], colors[i+1], colors[i+2])
             : flatStroke
           let visible = true
           if (surfViewZ) {
@@ -521,7 +762,7 @@ async function runExport({
             visibleDots.push({ cx: sx, cy: sy, fill })
             expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
           } else if (ghostOpac > 0) {
-            ghostDots.push({ cx: sx, cy: sy, fill: occlusionColor || '#000000' })
+            ghostDots.push({ cx: sx, cy: sy, fill: ghostInk })
             expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
           }
         }
@@ -571,6 +812,9 @@ async function runExport({
           })
         }
         if (runs.length) {
+          // `flatStroke`, so the ink has already been through `screenInk` — the
+          // writer must not put it through a second time. Measured: a label set
+          // to #00ff00 went out as #d0dfb9 rather than #93e459.
           svgLayers.push({ id, name, isText: true, runs, style: layer.textStyle,
                            color: flatStroke, weight, opacity })
           // The strokes for this layer are not walked, so their share of the
@@ -614,7 +858,7 @@ async function runExport({
 
         let stroke = flatStroke
         if (colors && colors.length > i + 2) {
-          stroke = `rgb(${Math.round(colors[i]*255)},${Math.round(colors[i+1]*255)},${Math.round(colors[i+2]*255)})`
+          stroke = screenInk(colors[i], colors[i+1], colors[i+2])
         }
 
         // The one funnel every segment passes through, visible and ghost alike,
@@ -654,7 +898,7 @@ async function runExport({
             if (ghostLastX === null || Math.hypot(x0 - ghostLastX, y0 - ghostLastY) > CONNECT_EPS) ghostCumLen = 0
             if (drawn >= 0.1) {
               ghostSegs.push({ x0: cx0, y0: cy0, x1: cx1, y1: cy1,
-                               stroke: occlusionColor || '#000000',
+                               stroke: ghostInk,
                                dashOffset: ghostCumLen + tHead * segLen })
               expandBB(cx0, cy0); expandBB(cx1, cy1)
             }
@@ -721,9 +965,17 @@ async function runExport({
       }
 
       walkDone += segCount
-      if (visibleSegs.length > 0 || ghostSegs.length > 0) {
-        svgLayers.push({ id, name, visibleSegs, ghostSegs, weight, opacity, dash })
+      /*
+       * The traced rings *are* these boundary edges, in order, so writing both
+       * would put the same geometry in the file twice — and a plotter would draw
+       * every divide a second time. The ghost pass is kept: it is the geometry
+       * the terrain hides, which no fill can stand in for.
+       */
+      const keptSegs = suppressLines ? [] : visibleSegs
+      if (keptSegs.length > 0 || ghostSegs.length > 0) {
+        svgLayers.push({ id, name, visibleSegs: keptSegs, ghostSegs, weight, opacity, dash })
       }
+      if (suppressLines) svgLayers.push({ id, name, isAreas: true, groups: areaGroups, weight, opacity })
     }
   }
 
@@ -863,6 +1115,7 @@ async function runExport({
   const BUILD_LABEL = 'Assembling SVG…'
   const buildTotal = svgLayers.reduce((n, l) => n +
     (l.isText   ? l.runs.length
+    : l.isAreas ? l.groups.reduce((k, g) => k + g.paths.length, 0)
     : l.isPoints ? l.visibleDots.length + l.ghostDots.length
                  : l.visibleSegs.length + l.ghostSegs.length), 0)
   let buildDone = 0
@@ -907,6 +1160,42 @@ async function runExport({
     const modeLabel = xmlAttr(layer.name ?? (layer.id ?? 'Lines').replace(/([A-Z])/g, ' $1').trim())
     const inner = []
 
+    /*
+     * ── Filled areas, one pen layer per ink ──────────────────────────────
+     *
+     * One `<path>` per area rather than one per ink: the area stays a single
+     * object an editor can select and a hatch-fill tool can work on, while the
+     * layer still groups a whole pen.
+     *
+     * `fill-rule="evenodd"` is what makes a hole a hole. An area's outer ring
+     * and its holes are subpaths of the same `<path>`, and the tracer gives them
+     * opposite windings, so either rule would do — even-odd is chosen because it
+     * survives an editor reversing a subpath, which the non-zero rule does not.
+     *
+     * Fill and stroke are the same ink on purpose. The ring is the boundary, so
+     * a plot of the outlines alone is still the map these modes used to export,
+     * and a plot of the fills is the map filled in.
+     */
+    if (layer.isAreas) {
+      for (const g of layer.groups) {
+        const els = await mapPaced(g.paths, ({ loops }) => {
+          let d = ''
+          for (const pts of loops) {
+            for (let i = 0; i < pts.length; i += 2) {
+              d += `${i === 0 ? 'M' : 'L'}${(pts[i] - vx).toFixed(1)},${(pts[i + 1] - vy).toFixed(1)}`
+            }
+            d += 'Z'
+          }
+          return `<path d="${d}"/>`
+        })
+        const no = String(g.no).padStart(2, '0')
+        layerGroups.push(penLayer(`${modeId}-ink-${no}`, `${modeLabel} · ink ${no} ${g.hex}`,
+          `<g fill="${g.hex}" fill-rule="evenodd" stroke="${g.hex}" stroke-width="${sw}" ` +
+          `stroke-linejoin="round" opacity="${layer.opacity}">${els.join('')}</g>`))
+      }
+      continue
+    }
+
     if (layer.isText) {
       const st = layer.style ?? {}
       // font-size 1 with the em box carried in the matrix: the transform is the
@@ -929,7 +1218,7 @@ async function runExport({
       // label's own ink. Filling instead would silently discard the stroke
       // colour and weight, and would export a stroke-only label as a solid.
       inner.push(
-        `<g fill="none" stroke="${layer.color || '#000000'}" stroke-width="${sw}" ` +
+        `<g fill="none" stroke="${layer.color}" stroke-width="${sw}" ` +
         `opacity="${layer.opacity}" stroke-linecap="round" stroke-linejoin="round" ` +
         `font-family="${xmlAttr(st.family ?? 'Space Mono')}, monospace" ` +
         `font-weight="${st.weight ?? 400}" font-style="${st.style ?? 'normal'}">${els.join('')}</g>`)
@@ -1043,22 +1332,22 @@ async function runExport({
     if (inner.length) layerGroups.push(penLayer(modeId, modeLabel, inner.join('')))
   }
 
-  const pColor = particleColor ?? '#000000'
+  const pColor = screenInkHex(particleColor)
   // The viewport sprite is a soft radial falloff; an SVG circle is a flat disc,
   // so the export already only approximates it. Carrying the opacity across at
   // least keeps a deliberately faint field faint on paper.
   const pOpac = particleOpacity ?? 1
-  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : occlusionColor}" opacity="${(visible ? pOpac : ghostOpac).toFixed(3)}"/>`)
+  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : ghostInk}" opacity="${(visible ? pOpac : ghostOpac).toFixed(3)}"/>`)
   const shadowEls = projectedShadows.map(({ cx, cy, r }) =>
     `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}"/>`)
   const shadowGroup = shadowEls.length > 0
-    ? [`<g id="layer-flock-shadow" inkscape:groupmode="layer" inkscape:label="Flock shadow" fill="${particleShadowColor ?? '#000000'}" stroke="none" opacity="${(particleShadowOpacity ?? 0.35).toFixed(3)}">${shadowEls.join('')}</g>`]
+    ? [`<g id="layer-flock-shadow" inkscape:groupmode="layer" inkscape:label="Flock shadow" fill="${screenInkHex(particleShadowColor)}" stroke="none" opacity="${(particleShadowOpacity ?? 0.35).toFixed(3)}">${shadowEls.join('')}</g>`]
     : []
   // Its own Inkscape layer, unlike the dots: a plotter run is sorted by layer,
   // and streaks are the pen-drawn half of the flock.
   const trailStroke = Math.max(0.3, (particleSize ?? 4) * 0.15)
   const trailEls = projectedTrails.map(({ x0, y0, x1, y1, visible }) =>
-    `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${visible ? pColor : occlusionColor}" opacity="${(visible ? 0.75 * pOpac : ghostOpac).toFixed(3)}"/>`)
+    `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${visible ? pColor : ghostInk}" opacity="${(visible ? 0.75 * pOpac : ghostOpac).toFixed(3)}"/>`)
   const trailGroup = trailEls.length > 0
     ? [`<g id="layer-flock" inkscape:groupmode="layer" inkscape:label="Flock" fill="none" stroke-width="${trailStroke.toFixed(2)}" stroke-linecap="round">${trailEls.join('')}</g>`]
     : []
