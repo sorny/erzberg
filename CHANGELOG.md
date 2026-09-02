@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] — 2026-09-02
+
+### Added
+
+- **Undo and redo.** Two hundred and fifty parameters and no way back: a slider
+  nudged past the good value was gone. `⌘Z` and `⌘⇧Z` now work anywhere outside a
+  text box. The buttons sit beside *Reset all*, because a shortcut that nobody is
+  told about is a feature only its author has.
+
+  It covers everything that the panel can change: the four parameter objects,
+  both gradients, the text layers, the vector layers and the coordinates that
+  those layers point at.
+
+  A drag is one step. The panel emits a change per frame, and one entry per frame
+  means forty presses to cross one slider. Changes that arrive inside the
+  coalescing window thus belong to the same gesture.
+
+  `⌘Z` is the one chord that the app takes, against the rule that every shortcut
+  is a bare key. Undo is where that reasoning runs the other way: `⌘Z` means undo
+  *in the application* on every platform and in every editor. Inside a text box
+  it still belongs to the browser, so a typo in a text layer is taken back on its
+  own.
+
+### Fixed
+
+- **Pen layers in the SVG were named after the internal ids.** A stream network
+  exported as "Dag", reticulation as "Retic", a watershed as "Shed". Every
+  multi-pen mode also carried a stray separator from the regex that spaced out
+  the capitals: "Contours- Minor", "Swiss- Scree", "Riso- A".
+
+  The names now come from the mode registry, with the separator that the vector
+  layers already used: "Contours · Minor", "Rock & scree · Scree", "Riso · Ink
+  A". The label on a pen layer is the only thing that the person at the plotter
+  reads, so it is worth being a name.
+
+### Changed
+
+- **The hidden pass is a pen layer of its own.** It used to be a second group
+  inside the layer of the visible pass, which reads as one pen with two
+  opacities. It is not one: a hidden stroke carries its own colour and its own
+  opacity by definition. On paper it is a different pen, or a pass to delete
+  before plotting, and either decision needs it separable.
+
 ## [1.9.2] — 2026-09-01
 
 ### Fixed
