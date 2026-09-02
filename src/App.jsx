@@ -463,6 +463,7 @@ export default function App() {
   const [textLayers, setTextLayers] = useState(() => adoptTextLayers(restored.current?.textLayers ?? []))
   // Cleared by the first Reset all, so the note stops claiming a session that
   // is no longer what is on screen.
+
   const [sessionRestored, setSessionRestored] = useState(() => restored.current != null)
   // Largest drawing buffer this context has been observed to actually deliver.
   // Infinity until DprGuard catches a clamp; only ever ratchets downward.
@@ -481,6 +482,29 @@ export default function App() {
   const [gradientStops,   setGradientStops]   = useState(() => restored.current?.gradientStops ?? GRADIENT_PRESETS['Jet'])
   const [bgGradientStops, setBgGradientStops] = useState(() => restored.current?.bgGradientStops
     ?? [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
+
+  /*
+   * Undo and redo, over everything the panel can change.
+   *
+   * The whole tracked set in one list, in a fixed order, because the history
+   * takes it as its own dependency array — a fresh array of the same references
+   * does not count as a change, which is exactly the identity test a snapshot
+   * history wants.
+   *
+   * `vectorSources` is in here with the rest. It is the heaviest thing in the
+   * list and the one most obviously "data rather than settings", but leaving it
+   * out would make undo lie: fetch a province, press undo, and the layer records
+   * would go while the geometry they name stayed. Reset all already restores
+   * both together for the same reason.
+   */
+  const historyState = [terrain, style, points, view, gradientStops, bgGradientStops,
+                        textLayers, vectorLayers, vectorSources]
+  const restoreHistory = useCallback((s) => {
+    setTerrain(s[0]); setStyle(s[1]); setPoints(s[2]); setView(s[3])
+    setGradientStops(s[4]); setBgGradientStops(s[5])
+    setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
+  }, [setVectorSources])
+  const { undo, redo, clear: clearHistory, canUndo, canRedo } = useHistory(historyState, restoreHistory)
 
   // ── Keep the session ──────────────────────────────────────────────────────
   /**
@@ -649,7 +673,16 @@ export default function App() {
   const markPristine = useCallback(() => {
     skipNextSave.current = true
     savePendingSince.current = 0
-  }, [])
+    /*
+     * …and not an undo step either, for exactly the reason above.
+     *
+     * The opening preset is applied by an effect on mount, which is a state
+     * change like any other — so the history recorded it and the app booted with
+     * undo already lit. Pressing it threw away the look the app opens on and
+     * left bare defaults, which is not a step anybody took.
+     */
+    clearHistory()
+  }, [clearHistory])
 
   /**
    * One export job at a time, whichever writer is running.
@@ -1277,28 +1310,6 @@ export default function App() {
     setCameraPreset({ name, ts: Date.now() })
   }, [])
 
-  /*
-   * Undo and redo, over everything the panel can change.
-   *
-   * The whole tracked set in one list, in a fixed order, because the history
-   * takes it as its own dependency array — a fresh array of the same references
-   * does not count as a change, which is exactly the identity test a snapshot
-   * history wants.
-   *
-   * `vectorSources` is in here with the rest. It is the heaviest thing in the
-   * list and the one most obviously "data rather than settings", but leaving it
-   * out would make undo lie: fetch a province, press undo, and the layer records
-   * would go while the geometry they name stayed. Reset all already restores
-   * both together for the same reason.
-   */
-  const historyState = [terrain, style, points, view, gradientStops, bgGradientStops,
-                        textLayers, vectorLayers, vectorSources]
-  const restoreHistory = useCallback((s) => {
-    setTerrain(s[0]); setStyle(s[1]); setPoints(s[2]); setView(s[3])
-    setGradientStops(s[4]); setBgGradientStops(s[5])
-    setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
-  }, [setVectorSources])
-  const { undo, redo, canUndo, canRedo } = useHistory(historyState, restoreHistory)
 
   useEffect(() => {
     const onKey = (e) => {

@@ -1145,6 +1145,41 @@ function ProjectionParams({ params, values, onChange }) {
 }
 
 // ── Helper for per-mode styling ───────────────────────────────────────────────
+/*
+ * Undo and redo, drawn rather than typed.
+ *
+ * The glyphs `↶` and `↷` were the first attempt and they render as thin hooks —
+ * a stray pen mark in a bordered box, at whatever size and baseline the font
+ * feels like. These are the arc-and-arrowhead every editor uses, in the same
+ * currentColor SVG the GitHub mark beside them already is, so both scale and
+ * align the same way.
+ */
+const UNDO_PATHS = 'M3.2 6.6h6.3a3.6 3.6 0 0 1 0 7.2H6.4M5.9 3.8 3.2 6.6l2.7 2.8'
+const REDO_PATHS = 'M12.8 6.6H6.5a3.6 3.6 0 0 0 0 7.2h3.1M10.1 3.8l2.7 2.8-2.7 2.8'
+
+/** A header action: 16px icon in a flat hit box, dimmed rather than blanked. */
+function HeaderIconBtn({ onClick, disabled, testId, title, label, icon }) {
+  return (
+    <button onClick={onClick} disabled={disabled} data-testid={testId}
+      title={title} aria-label={label} type="button"
+      style={{
+        background:'none', border:'none', padding:'4px 8px', display:'flex',
+        alignItems:'center', justifyContent:'center', color: MUTED,
+        // A disabled control used to keep its border and lose its glyph, which
+        // reads as an empty box rather than as unavailable.
+        opacity: disabled ? 0.3 : 1,
+        cursor: disabled ? 'default' : 'pointer',
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = '#F0EBE3' }}
+      onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>
+      <svg width="16" height="16" viewBox="0 0 16 17" fill="none" stroke="currentColor"
+        strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d={icon} />
+      </svg>
+    </button>
+  )
+}
+
 function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
@@ -1671,42 +1706,66 @@ export function Sidebar({
         boxShadow:'-3px 0 16px rgba(0,0,0,.4)',
         fontFamily:'system-ui,-apple-system,sans-serif',
       }}>
-        <div style={{ padding:'12px 12px 12px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, display:'flex', alignItems:'baseline', gap:8 }}>
-          <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3', margin:0 }}>erzberg</h1>
-          <span style={{ fontSize:10, color: MUTED, fontWeight:600, opacity: 0.8 }}>v{version}</span>
-          <a
-            href="https://github.com/sorny/erzberg"
-            target="_blank"
-            rel="noopener noreferrer"
-            title="View on GitHub"
-            style={{ display:'flex', alignItems:'center', color: MUTED, opacity:0.8, alignSelf:'center', textDecoration:'none' }}
-            onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#F0EBE3' }}
-            onMouseLeave={e => { e.currentTarget.style.opacity = '0.8'; e.currentTarget.style.color = MUTED }}
-          >
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-            </svg>
-          </a>
-          <div style={{ flex: 1 }} />
-          {/* "Reset" alone taught the wrong lesson: the camera preset row and the
-              mirror block both use the word for something harmless, and this one
-              throws away every setting in the app. */}
-          {/* Undo has a keyboard shortcut, and a shortcut nobody is told about is
-              a feature only its author has. These are the affordance; the glyphs
-              are the arrows every editor uses rather than words, because the row
-              is 272px wide and "Reset all" already has most of it. */}
-          <button onClick={onUndo} disabled={!canUndo} data-testid="undo"
-            title="Undo — ⌘Z" aria-label="Undo"
-            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5,
-                     color: canUndo ? '#a1a1aa' : '#52525b', fontSize:11, padding:'2px 7px',
-                     cursor: canUndo ? 'pointer' : 'default', marginRight:4 }}>↶</button>
-          <button onClick={onRedo} disabled={!canRedo} data-testid="redo"
-            title="Redo — ⌘⇧Z" aria-label="Redo"
-            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5,
-                     color: canRedo ? '#a1a1aa' : '#52525b', fontSize:11, padding:'2px 7px',
-                     cursor: canRedo ? 'pointer' : 'default', marginRight:6 }}>↷</button>
-          <button onClick={handleResetAll} title="Return every setting to its default"
-            style={{ background:'none', border:`1px solid #52525b`, borderRadius:5, color:'#a1a1aa', fontSize:10, padding:'2px 8px', cursor:'pointer' }}>Reset all</button>
+        {/*
+          * Identity on one line, actions on the next.
+          *
+          * All five used to share a row 248px wide inside its padding, and they
+          * did not fit: "Reset all" wrapped to two lines, which is what made the
+          * header 62px tall and look broken rather than tight. Adding undo and
+          * redo is what tipped it over, but the row was already carrying a name,
+          * a version, a link and a destructive button — identity and actions are
+          * not the same kind of thing and were only ever together because there
+          * was just enough room.
+          *
+          * Two rows cost nothing here: the split header is the same height the
+          * wrapped one had reached, and every control now has space to be the
+          * size it should be.
+          */}
+        <div style={{ padding:'11px 12px 9px', borderBottom:`1px solid ${BORDER}`, flexShrink:0 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3', margin:0 }}>erzberg</h1>
+            <span style={{ fontSize:10, color: MUTED, fontWeight:600, opacity:0.8, letterSpacing:'0.01em' }}>v{version}</span>
+            <div style={{ flex:1 }} />
+            <a
+              href="https://github.com/sorny/erzberg"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="View on GitHub"
+              style={{ display:'flex', alignItems:'center', color: MUTED, opacity:0.75, textDecoration:'none' }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#F0EBE3' }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.color = MUTED }}
+            >
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
+              </svg>
+            </a>
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:9 }}>
+            {/* One control, not two. Undo and redo are a pair and read as a pair
+                when they share a border — which also buys back the width that a
+                second bordered box was spending on nothing. */}
+            <div style={{ display:'flex', border:`1px solid ${BORDER}`, borderRadius:5, overflow:'hidden' }}>
+              <HeaderIconBtn onClick={onUndo} disabled={!canUndo} testId="undo"
+                title="Undo — ⌘Z" label="Undo" icon={UNDO_PATHS} />
+              <div style={{ width:1, background: BORDER }} aria-hidden="true" />
+              <HeaderIconBtn onClick={onRedo} disabled={!canRedo} testId="redo"
+                title="Redo — ⌘⇧Z" label="Redo" icon={REDO_PATHS} />
+            </div>
+            <div style={{ flex:1 }} />
+            {/* "Reset" alone taught the wrong lesson: the camera preset row and
+                the mirror block both use the word for something harmless, and
+                this one throws away every setting in the app. `nowrap` is what
+                stops it breaking across two lines again if the row ever tightens.
+                It sits apart from undo because it is a different magnitude of
+                undoing — one step back against everything at once. */}
+            <button onClick={handleResetAll} title="Return every setting to its default"
+              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5,
+                       color: MUTED, fontSize:10, lineHeight:1, padding:'5px 9px',
+                       whiteSpace:'nowrap', cursor:'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
+              onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>Reset all</button>
+          </div>
         </div>
 
         {/* Thirty-one sections over 2 700 px of scroll: without this the only way

@@ -49,9 +49,27 @@ export function useHistory(tracked, restore, { limit = 60, coalesceMs = 450 } = 
    */
   const applied = useRef(null)
   const lastAt = useRef(0)
+  /*
+   * Set by `clear()`, and consumed by the next run of the effect.
+   *
+   * A caller clears the history because something just happened that was not an
+   * edit — the app applying its opening preset, say. But that something is a
+   * state change, and the effect below does not run until *after* it commits, so
+   * a clear on its own empties the stack a moment before the entry it was meant
+   * to disown gets pushed. This carries the intent across that gap.
+   */
+  const rebase = useRef(false)
   const [depth, setDepth] = useState({ undo: 0, redo: 0 })
 
   useEffect(() => {
+    if (rebase.current) {
+      rebase.current = false
+      past.current = []
+      future.current = []
+      prev.current = tracked
+      setDepth({ undo: 0, redo: 0 })
+      return
+    }
     if (applied.current && applied.current.length === tracked.length &&
         applied.current.every((v, i) => v === tracked[i])) {
       applied.current = null
@@ -96,6 +114,7 @@ export function useHistory(tracked, restore, { limit = 60, coalesceMs = 450 } = 
   const clear = useCallback(() => {
     past.current = []
     future.current = []
+    rebase.current = true
     setDepth({ undo: 0, redo: 0 })
   }, [])
 

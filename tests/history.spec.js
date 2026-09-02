@@ -99,6 +99,24 @@ test('undo is disabled with nothing to undo', async ({ page }) => {
   await expect(redoBtn(page)).toBeDisabled()
 })
 
+test('a fresh load has nothing to undo', async ({ page }) => {
+  /*
+   * The app applies its opening preset from an effect on mount, and that is a
+   * state change like any other — so it was recorded, and the app booted with
+   * undo lit. Pressing it threw away the look the app opens on and left bare
+   * defaults, which is not a step anybody took.
+   *
+   * No `boot()` here on purpose: that presses Reset all, which *is* an edit and
+   * would hide exactly the thing this is checking.
+   */
+  await page.goto(PAGE)
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('[data-testid="jump-to-presets"]', { timeout: 20_000 }).catch(() => {})
+  await page.waitForTimeout(2500)
+  await expect(undoBtn(page), 'the opening preset is not an edit').toBeDisabled()
+  await expect(redoBtn(page)).toBeDisabled()
+})
+
 test('the keyboard shortcut works, and text fields keep their own', async ({ page }) => {
   await boot(page)
   const s = spacing(page)
