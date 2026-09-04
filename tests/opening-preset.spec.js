@@ -80,6 +80,10 @@ test.describe('opening preset', () => {
     await holdPresets(page)
     await page.goto(PAGE)
     await page.waitForSelector('canvas', { timeout: 30_000 })
+    // Presets opens shut now, so the roller is one click behind the label that
+    // names the applied style — which is the shortest it has ever been, against
+    // the 1 450 px scroll it used to sit behind.
+    await page.click('[data-testid="jump-to-presets"]')
     const surprise = page.locator('[data-testid="surprise-me"]')
     await surprise.waitFor({ state: 'visible', timeout: 20_000 })
     await surprise.click()

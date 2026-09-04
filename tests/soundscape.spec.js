@@ -221,8 +221,7 @@ test('freezing the whole track updates the sidebar spectrogram', async ({ page }
   await openSoundscapes(page)
   await uploadTrack(page)
 
-  const spectro = page.locator('#hm-panel-body > div')
-    .filter({ hasText: /^Soundscapes/ }).first().locator('canvas').first()
+  const spectro = page.locator('[data-section="Soundscapes"]').locator('canvas').first()
   const freeze = page.locator('[data-testid="soundscape-freeze"]')
 
   // Mean luminance of the readout. The overlay marking "this is what is driving

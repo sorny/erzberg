@@ -81,7 +81,7 @@ test('raw terrain view shows the heightmap as a flat greyscale plane', async ({ 
   // Nothing else may be drawn — so a draw mode going on or off cannot move a
   // single pixel. A weaker "are lines dark?" check would pass even with lines
   // visible, since most of them are dark against a dark plane anyway.
-  const lines = page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ }).first()
+  const lines = page.locator('[data-section="Mode: Lines"]')
     .locator('label').first()
   const wasOn = await lines.isChecked()
   await lines.click({ force: true })

@@ -136,7 +136,7 @@ const GEOTIFF = 'tests/testdata/geotiff.tif'
 
 /** Switches a draw mode's section toggle, by the section's own title. */
 async function setMode(page, title, on) {
-  const row = page.locator('#hm-panel-body > div').filter({ hasText: new RegExp(`^${title}`) }).first()
+  const row = page.locator(`[data-section="${title}"]`)
   const tog = row.locator('input[type=checkbox]').first()
   await tog.scrollIntoViewIfNeeded()
   if ((await tog.isChecked()) !== on) await tog.click({ force: true })

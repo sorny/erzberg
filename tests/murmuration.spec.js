@@ -605,8 +605,8 @@ test('the beat is visible in the flock, not just present in the numbers', async 
   await openApp(page)
 
   // Lines off: the flock has to be measurable on its own.
-  await page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ })
-    .first().locator('label').first().click({ force: true })
+  await page.locator('[data-section="Mode: Lines"]')
+    .locator('label').first().click({ force: true })
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()

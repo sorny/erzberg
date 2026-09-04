@@ -26,14 +26,16 @@ import { PAPERS, paperRatioLabel } from '../utils/frame'
 import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
-  ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow,
+  ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage,
   GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
 import { useStackDrag } from './panel/stackDrag'
 import { TextSection } from './panel/TextSection'
 import { SectionFilter, sectionMatches } from './panel/filter'
 import { SECTION_TERMS } from './panel/sectionTerms'
+import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { ModeMark } from './panel/modeMarks'
+import { ModeIndex } from './panel/ModeIndex'
 
 /**
  * Square-law mapping for the flock-size slider.
@@ -1304,7 +1306,24 @@ export function Sidebar({
   const [singleLineFonts, setSingleLineFonts] = useState([])
   useEffect(() => { loadSingleLineManifest().then(setSingleLineFonts) }, [])
   const q = filter.trim().toLowerCase()
-  const filterCtx = useMemo(() => ({ q, terms: SECTION_TERMS }), [q])
+  /**
+   * What every shut section says about itself.
+   *
+   * Rebuilt whenever the params move, which is the point — the header is reading
+   * the same state its controls are bound to. It rides the filter context rather
+   * than becoming a fiftieth prop: `Section` already looks its search terms up by
+   * title there, so this is the same lookup with a second key and not one call
+   * site in this file had to change.
+   */
+  const summaries = useMemo(() => buildSectionSummaries({
+    terrain, style, view, points,
+    zoomPercent: (view.zoom / baseZoom) * 100,
+    vectorLayers, textLayers, soundscape,
+  }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape])
+  const filterCtx = useMemo(() => ({ q, terms: SECTION_TERMS, summaries }), [q, summaries])
+  /** The same reading one level up: the whole plate, for the standing line. */
+  const plate = useMemo(() => buildPlateLine({ style, vectorLayers, textLayers }),
+    [style, vectorLayers, textLayers])
   // Counted with the same predicate each Section uses, over the same index it
   // reads — so the number and the list cannot disagree. A section whose title is
   // missing from SECTION_TERMS would still slip past this, which is what the
@@ -1317,7 +1336,12 @@ export function Sidebar({
     // Presets open, Levels closed: the grid of 56 looks is the most persuasive
     // thing in the panel and it used to be the tenth section down, collapsed,
     // below four surface overlays. A histogram is not what anyone needs first.
-    terrain: true, levels: false, view: true, camera: false, presets: true, style: true,
+    // Presets closed, and first. It is the front door, so it used to open by
+    // default from tenth place — 2 346 px of thumbnails that everything after
+    // it had to be scrolled past. Now the style it applied has a permanent line
+    // in the head, which buys the same discoverability for sixteen pixels, and
+    // the grid is one click from the top rather than a wall in the middle.
+    terrain: true, levels: false, view: true, camera: false, presets: false, style: true,
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
@@ -1325,7 +1349,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeSection: false, modeZeroCross: false,
-    modeSprite: false, modeRetic: false,
+    modeSprite: false, modeRetic: false, modeIndex: true,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1534,6 +1558,30 @@ export function Sidebar({
       modeMineral:  !!newStyle.enabledMineral,
       modeShed:     !!newStyle.enabledShed,
     }))
+  }
+
+  /**
+   * A tile in the Draw Modes index.
+   *
+   * It writes the same `enabled<Id>` the section's own switch writes, and that
+   * is deliberately all it writes — the tile and the switch are two views of one
+   * boolean rather than two pieces of state to keep in step.
+   *
+   * Switching a mode *on* also opens its section and scrolls to it, because
+   * turning one on is almost always the first half of tuning it. Switching one
+   * off does not: you are done with it, and the panel jumping to a section you
+   * just dismissed would be the tool arguing.
+   */
+  const handleModeTile = (key, next, sectionId) => {
+    ss({ [key]: next })
+    if (!next) return
+    setSec(prev => ({ ...prev, ['mode' + key.slice('enabled'.length)]: true }))
+    // After the section has been told to open, so the scroll lands on a box
+    // with a height rather than on a zero-height grid row.
+    requestAnimationFrame(() => {
+      document.querySelector(`[data-testid="${sectionId}"]`)
+        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    })
   }
 
   const applyPreset = (preset, name = null) => {
@@ -1766,6 +1814,31 @@ export function Sidebar({
               onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
               onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>Reset all</button>
           </div>
+
+          {/*
+            * The standing line — what you are looking at, in one row.
+            *
+            * The section headers say what each control is set to. This says what
+            * they add up to, which nothing on screen ever did: thirty-one draw
+            * modes compose freely, and counting the lit ones meant scrolling
+            * 2 239 px past the thirty that were off.
+            *
+            * It is a readout and not a set of links. Every token here would want
+            * a different target and "3 inks" has no single one — the panel
+            * already has a filter for going somewhere, and this is for knowing
+            * where you are.
+            */}
+          <div data-testid="standing-line" style={{
+            marginTop:8, fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums',
+            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>
+            {[
+              `${plate.marks} mark${plate.marks === 1 ? '' : 's'}`,
+              `${plate.inks} ink${plate.inks === 1 ? '' : 's'}`,
+              plate.layers && `${plate.layers} layer${plate.layers === 1 ? '' : 's'}`,
+              plate.text && `${plate.text} text`,
+            ].filter(Boolean).join(' · ')}
+          </div>
         </div>
 
         {/* Thirty-one sections over 2 700 px of scroll: without this the only way
@@ -1856,6 +1929,75 @@ export function Sidebar({
             )}
           </div>
 
+          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
+            {/* Roll a look. The seed is shown because it *is* the look — note it
+                down and the same roll comes back. */}
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+              <button data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise} style={{
+                flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
+                borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
+              }}>🎲 Surprise me</button>
+              <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
+                style={{
+                  padding:'8px 8px', background: SURF, color: rollHistory.length ? DIM : MUTED,
+                  border:`1px solid ${BORDER}`, borderRadius:5,
+                  cursor: rollHistory.length ? 'pointer' : 'default', fontSize:11,
+                  opacity: rollHistory.length ? 1 : 0.5,
+                }}>↩</button>
+            </div>
+            {rollSeed != null && (
+              <div data-testid="roll-seed" style={{ fontSize:10, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
+                seed {rollSeed}
+              </div>
+            )}
+
+            <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>
+              STYLES <span style={{ opacity:0.7, fontWeight:400 }}>({presetNames.length})</span>
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+              {Object.entries(externalPresets || {}).map(([name, preset]) => {
+                const showThumb = !noThumb.has(name)
+                return (
+                  <button key={name} data-testid={`preset-${name}`} title={name}
+                    onClick={() => applyPreset(preset, name)}
+                    style={{
+                      position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
+                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT_DEEP : BORDER}`,
+                      borderRadius:5, cursor:'pointer', overflow:'hidden', lineHeight:0,
+                    }}>
+                    {showThumb && (
+                      <img
+                        src={`${import.meta.env.BASE_URL || '/'}presets/thumbs/${encodeURIComponent(name)}.webp`}
+                        alt=""
+                        loading="lazy"
+                        onError={() => setNoThumb(s => new Set(s).add(name))}
+                        style={{ display:'block', width:'100%', aspectRatio:'16/10', objectFit:'cover' }}
+                      />
+                    )}
+                    {lastPreset === name && presetEdited && (
+                      <span data-testid="preset-edited" style={{
+                        position:'absolute', top:3, right:3, fontSize:10, lineHeight:1,
+                        padding:'2px 4px', borderRadius:2, background:'rgba(0,0,0,.72)',
+                        color:'#f4f4f5', letterSpacing:'0.06em', textTransform:'uppercase',
+                      }}>edited</span>
+                    )}
+                    <span style={{
+                      display:'block', lineHeight:1.2,
+                      ...(showThumb ? {
+                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 2px',
+                        background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
+                        color:'#f4f4f5', fontSize:10, textShadow:'0 1px 2px rgba(0,0,0,.9)',
+                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+                      } : {}),
+                    }}>{name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </Section>
+
+          <Stage n={1} title="Source">
+
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
             {hypsometricIntegral != null && (
               <HypsometricRow value={hypsometricIntegral} />
@@ -1883,104 +2025,156 @@ export function Sidebar({
             </div>
           </Section>
 
-          <Section title="View" open={sec.view} onToggle={() => tog('view')}>
-            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              {/* Four camera presets. The last one is the *view* Reset, which is
-                  not the panel header's "Reset all" — the label is short because
-                  the row is, so the scope lives in the title and the name. */}
-              {[['Top', 'top', 'Look straight down'], ['Front', 'front', 'Look from the front'],
-                ['Iso', 'iso', 'Isometric three-quarter view'], ['Reset', 'reset', 'Reset the view only']]
-                .map(([label, name, hint]) => (
-                <Btn key={name} block onClick={() => onCameraPreset(name)}
-                  title={hint} aria-label={name === 'reset' ? 'Reset view' : hint}
-                  style={{ padding:'2px 0' }}>{label}</Btn>
-              ))}
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
-            </div>
-            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
-            <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
-            <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
-            {view.autoRotate && (
-              <Sub>
-                <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
-                <div style={{ display:'flex', gap:4 }}>
-                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                  {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
-                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
-                      style={{ 
-                        fontSize:10, padding:'2px 8px', border:`1px solid ${BORDER}`, borderRadius:3, 
-                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT_DEEP : SURF, 
-                        color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
-                      }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              </Sub>
-            )}
-            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
-            <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
-              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
-            {view.showFrame && (
-              <Sub>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
-                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
-                    onChange={e => sv({ framePaper: e.target.value })}
-                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
-                    {['ISO','US','Ratio'].map(group => (
-                      <optgroup key={group} label={group}>
-                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
-                          <option key={id} value={id}>
-                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                {(view.framePaper ?? 'iso') === 'custom' && (
-                  <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
-                    help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
-                )}
-                <SegRow label="Format" testIdPrefix="frame-orient"
-                  options={[['Portrait', false],['Landscape', true]]}
-                  value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
-                  help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
-                <InlineSl label="Scale" min={0.1} max={1} step={0.01} value={view.frameScale ?? 0.85} onChange={v => sv({ frameScale: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-scale"
-                  help="How much of the viewport the sheet covers. Smaller crops tighter; at 100% the sheet touches whichever pair of edges its shape reaches first." />
-                <InlineSl label="Offset X" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetX ?? 0} onChange={v => sv({ frameOffsetX: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-x"
-                  help="Slides the sheet across the viewport, as a fraction of its width. The canvas fills the window and this panel floats over it, so a centred frame sits a little left of the free space — nudge it right to compose against what you can actually see." />
-                <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
-                <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
-                  help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
-              </Sub>
-            )}
-          </Section>
 
-          <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
-            <Sub>
-              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
-              {!view.orthographic && (
-                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
-              )}
-              {/* fmt is not decoration: these mirror the orbit target, which a
-                  mouse pan moves continuously, and without it a drag left the
-                  field reading `-247.38194837`. Scene.jsx rounds at the source
-                  now; this keeps any stray float legible if one ever arrives. */}
-              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
-              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
-              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
-                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
-            </Sub>
-          </Section>
 
           {/* ── Global Style ───────────────────────────────────────────────── */}
 
-          <Section title="Terrain Style" open={sec.style} onToggle={() => tog('style')}>
+          <ErosionSection open={sec.erosion} onToggle={() => tog('erosion')} />
+          <Section title="Soundscapes" open={sec.soundscapes} onToggle={() => tog('soundscapes')} enabled={snd.active}>
+            <button
+              className="hmload"
+              onClick={() => snd.loadFromPicker(onSoundscapeFit)}
+              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
+            >↑ Audio (MP3 / WAV / OGG / M4A)</button>
+
+            {snd.error && (
+              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
+                {snd.error}
+              </div>
+            )}
+
+            {snd.fileName && (
+              <div style={{ fontSize:10, color: MUTED, marginBottom:8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {snd.fileName}
+              </div>
+            )}
+
+            {snd.isAnalyzing && (
+              <div style={{ marginBottom:8 }}>
+                <div style={{ fontSize:10, color: MUTED, marginBottom:4 }}>Analysing spectrogram… {snd.progress}%</div>
+                <div style={{ height:3, background: BORDER, borderRadius:2, overflow:'hidden' }}>
+                  <div style={{ height:'100%', width:`${snd.progress}%`, background: ACCENT, transition:'width .1s' }} />
+                </div>
+              </div>
+            )}
+
+            {snd.spec && (
+              <>
+                <SpectrogramView
+                  spec={snd.spec}
+                  currentTime={snd.currentTime}
+                  duration={snd.duration}
+                  windowFrames={snd.opts.windowFrames}
+                  dbFloor={snd.opts.dbFloor}
+                  contrast={snd.opts.contrast}
+                  frozen={snd.frozen}
+                  onSeek={snd.seek}
+                />
+
+                <div style={{ display:'flex', gap:4, alignItems:'center', marginBottom:8 }}>
+                  <button
+                    data-testid="soundscape-play"
+                    onClick={snd.toggle}
+                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : '#fff', border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  >{snd.isPlaying ? '❙❙ Pause' : '▶ Play'}</button>
+                  <button
+                    onClick={snd.stop}
+                    style={{ padding:'8px 12px', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  >■</button>
+                  <span style={{ fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', minWidth:74, textAlign:'right' }}>
+                    {fmtTime(snd.currentTime)} / {fmtTime(snd.duration)}
+                  </span>
+                </div>
+
+                <Sub>
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>ANALYSIS</div>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[1024, 2048, 4096].map(n => (
+                      <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
+                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2,
+                          background: snd.opts.fftSize === n ? ACCENT_DEEP : SURF,
+                          color: snd.opts.fftSize === n ? '#fff' : MUTED,
+                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{n}</button>
+                    ))}
+                  </div>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['Log', true], ['Linear', false]].map(([lbl, v]) => (
+                      <button key={lbl} onClick={() => snd.setOpts({ logFreq: v })}
+                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase',
+                          background: snd.opts.logFreq === v ? ACCENT_DEEP : SURF,
+                          color: snd.opts.logFreq === v ? '#fff' : MUTED,
+                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
+                    ))}
+                  </div>
+                  <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
+                    min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
+
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>STREAM</div>
+                  <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
+                    min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
+                  <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
+                    min={2} max={60} value={snd.opts.fps} onChange={v => snd.setOpts({ fps: v })} fmt={v => v + '/s'} />
+                  <InlineSl label="dB Floor" help="Noise gate. Raise it to drop quiet detail into flat ground and leave only the loud structure standing."
+                    min={0} max={0.9} step={0.01} value={snd.opts.dbFloor} onChange={v => snd.setOpts({ dbFloor: v })} fmt={v => Math.round(v*100)+'%'} />
+                  <InlineSl label="Contrast" help="Gamma applied after the gate. Above 1 sharpens peaks into ridges; below 1 flattens them into plateaus."
+                    min={0.3} max={3} step={0.1} value={snd.opts.contrast} onChange={v => snd.setOpts({ contrast: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+
+                {/* Which shape the whole track takes when frozen. A stretched
+                    spectrogram is only one answer; the others fold the track so
+                    its structure — repeats, sections, groove — becomes relief. */}
+                <Sub>
+                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>WHOLE TRACK</div>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:4 }}>
+                    {TRACK_PROJECTIONS.map(pj => (
+                      <button key={pj.id} data-testid={`projection-${pj.id}`}
+                        onClick={() => snd.setOpts({ projection: pj.id })}
+                        style={{ fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
+                          background: projection.id === pj.id ? ACCENT_DEEP : SURF,
+                          color: projection.id === pj.id ? '#fff' : MUTED,
+                          border:`1px solid ${projection.id === pj.id ? ACCENT_DEEP : BORDER}` }}>{pj.label}</button>
+                    ))}
+                  </div>
+                  <div style={{ fontSize:10, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
+
+                  {projection.id === 'weave' && (
+                    <div style={{ fontSize:10, color: MUTED, marginBottom:8 }}>
+                      Detected tempo: <span style={{ color:'#a1a1aa', fontVariantNumeric:'tabular-nums' }}>
+                        {detectedBpm ? `${Math.round(detectedBpm)} BPM` : '—'}
+                      </span>
+                    </div>
+                  )}
+
+                  <ProjectionParams
+                    params={projection.params}
+                    values={snd.opts?.proj?.[projection.id]}
+                    onChange={(k, v) => snd.setProjParam(projection.id, k, v)}
+                  />
+                </Sub>
+
+                <button
+                  data-testid="soundscape-freeze"
+                  onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
+                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
+                <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.4 }}>
+                  {snd.frozen
+                    ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
+                    : `Pauses playback and writes the entire track as one static heightmap — the ${projection.label} projection above. Useful for erosion, STL and SVG, which need a terrain that holds still.`}
+                </div>
+              </>
+            )}
+          </Section>
+          </Stage>
+
+          <Stage n={2} title="Surface">
+
+          {/* The dot is lit by the section's own readout rather than by a second
+              expression beside it: `enabled` and the summary answered the same
+              question separately, and three sections that could be switched on
+              had a value in the header and no dot to the left of it. */}
+          <Section title="Terrain Style" open={sec.style} onToggle={() => tog('style')}
+                   enabled={summaries['Terrain Style'] !== '—'}>
             <TogColor label="Fill" checked={style.showFill} onToggle={v => ss({ showFill: v })} color={style.fillColor} onColor={v => ss({ fillColor: v })} />
             {style.showFill && (
               <Sub>
@@ -2094,75 +2288,19 @@ export function Sidebar({
           </Section>
 
           {/* ── Presets ────────────────────────────────────────────────────── */}
+          </Stage>
 
-          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
-            {/* Roll a look. The seed is shown because it *is* the look — note it
-                down and the same roll comes back. */}
-            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <button data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise} style={{
-                flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
-                borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
-              }}>🎲 Surprise me</button>
-              <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
-                style={{
-                  padding:'8px 8px', background: SURF, color: rollHistory.length ? DIM : MUTED,
-                  border:`1px solid ${BORDER}`, borderRadius:5,
-                  cursor: rollHistory.length ? 'pointer' : 'default', fontSize:11,
-                  opacity: rollHistory.length ? 1 : 0.5,
-                }}>↩</button>
-            </div>
-            {rollSeed != null && (
-              <div data-testid="roll-seed" style={{ fontSize:10, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>
-                seed {rollSeed}
-              </div>
-            )}
-
-            <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>
-              STYLES <span style={{ opacity:0.7, fontWeight:400 }}>({presetNames.length})</span>
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              {Object.entries(externalPresets || {}).map(([name, preset]) => {
-                const showThumb = !noThumb.has(name)
-                return (
-                  <button key={name} data-testid={`preset-${name}`} title={name}
-                    onClick={() => applyPreset(preset, name)}
-                    style={{
-                      position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
-                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT_DEEP : BORDER}`,
-                      borderRadius:5, cursor:'pointer', overflow:'hidden', lineHeight:0,
-                    }}>
-                    {showThumb && (
-                      <img
-                        src={`${import.meta.env.BASE_URL || '/'}presets/thumbs/${encodeURIComponent(name)}.webp`}
-                        alt=""
-                        loading="lazy"
-                        onError={() => setNoThumb(s => new Set(s).add(name))}
-                        style={{ display:'block', width:'100%', aspectRatio:'16/10', objectFit:'cover' }}
-                      />
-                    )}
-                    {lastPreset === name && presetEdited && (
-                      <span data-testid="preset-edited" style={{
-                        position:'absolute', top:3, right:3, fontSize:10, lineHeight:1,
-                        padding:'2px 4px', borderRadius:2, background:'rgba(0,0,0,.72)',
-                        color:'#f4f4f5', letterSpacing:'0.06em', textTransform:'uppercase',
-                      }}>edited</span>
-                    )}
-                    <span style={{
-                      display:'block', lineHeight:1.2,
-                      ...(showThumb ? {
-                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 2px',
-                        background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
-                        color:'#f4f4f5', fontSize:10, textShadow:'0 1px 2px rgba(0,0,0,.9)',
-                        overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
-                      } : {}),
-                    }}>{name}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </Section>
+          <Stage n={3} title="Marks">
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
+
+          {/* The index, at the head of the thirty-one sections it stands for.
+              It is a Section like everything else so that it can be closed by
+              anyone who does not want it, found by the filter, and given the
+              same shut-state readout every other header carries. */}
+          <Section title="Draw Modes" open={sec.modeIndex} onToggle={() => tog('modeIndex')}>
+            <ModeIndex style={style} onToggle={handleModeTile} />
+          </Section>
 
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
             <Tog label="Enabled" checked={style.enabledLines} onChange={v => ss({ enabledLines: v })} />
@@ -2837,6 +2975,10 @@ export function Sidebar({
               OpenStreetMap, GPX, GeoJSON, labels, icons — was simply absent from
               the default session, which reads as "this tool doesn't do that"
               rather than "this tool needs a different file first". */}
+          </Stage>
+
+          <Stage n={4} title="Overlay">
+
           <Section title="Vector Layers" open={sec.vectorLayers} onToggle={() => tog('vectorLayers')}
                    enabled={vectorLayers?.length > 0}>
             {geoTiffElevMin == null ? (
@@ -2875,13 +3017,13 @@ export function Sidebar({
             )}
           </Section>
 
+
           <TextSection
             open={sec.text} onToggle={() => tog('text')}
             layers={textLayers} setLayers={setTextLayers} overflowed={textOverflow}
             singleLineFonts={singleLineFonts}
             viewTilt={view.tilt} viewSpin={view.rotation}
           />
-
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
@@ -3065,7 +3207,8 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}>
+          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}
+                   enabled={summaries['Texture'] !== '—'}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && !style.showFill && (
               <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
@@ -3109,7 +3252,112 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}>
+
+          {/* ── Soundscapes ─────────────────────────────────────────────────
+              Streams an audio spectrogram into the heightmap slot, so every
+              draw mode / overlay / export works on it like any other terrain. */}
+
+
+
+          </Stage>
+
+          <Stage n={5} title="Frame">
+
+          <Section title="View" open={sec.view} onToggle={() => tog('view')}>
+            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
+              {/* Four camera presets. The last one is the *view* Reset, which is
+                  not the panel header's "Reset all" — the label is short because
+                  the row is, so the scope lives in the title and the name. */}
+              {[['Top', 'top', 'Look straight down'], ['Front', 'front', 'Look from the front'],
+                ['Iso', 'iso', 'Isometric three-quarter view'], ['Reset', 'reset', 'Reset the view only']]
+                .map(([label, name, hint]) => (
+                <Btn key={name} block onClick={() => onCameraPreset(name)}
+                  title={hint} aria-label={name === 'reset' ? 'Reset view' : hint}
+                  style={{ padding:'2px 0' }}>{label}</Btn>
+              ))}
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
+              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
+            </div>
+            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
+            <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
+            {view.autoRotate && (
+              <Sub>
+                <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
+                <div style={{ display:'flex', gap:4 }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
+                  {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
+                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
+                      style={{ 
+                        fontSize:10, padding:'2px 8px', border:`1px solid ${BORDER}`, borderRadius:3, 
+                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT_DEEP : SURF, 
+                        color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
+                      }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </Sub>
+            )}
+            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
+              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
+            {view.showFrame && (
+              <Sub>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
+                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
+                    onChange={e => sv({ framePaper: e.target.value })}
+                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
+                    {['ISO','US','Ratio'].map(group => (
+                      <optgroup key={group} label={group}>
+                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
+                          <option key={id} value={id}>
+                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {(view.framePaper ?? 'iso') === 'custom' && (
+                  <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
+                    help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
+                )}
+                <SegRow label="Format" testIdPrefix="frame-orient"
+                  options={[['Portrait', false],['Landscape', true]]}
+                  value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
+                  help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
+                <InlineSl label="Scale" min={0.1} max={1} step={0.01} value={view.frameScale ?? 0.85} onChange={v => sv({ frameScale: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-scale"
+                  help="How much of the viewport the sheet covers. Smaller crops tighter; at 100% the sheet touches whichever pair of edges its shape reaches first." />
+                <InlineSl label="Offset X" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetX ?? 0} onChange={v => sv({ frameOffsetX: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-x"
+                  help="Slides the sheet across the viewport, as a fraction of its width. The canvas fills the window and this panel floats over it, so a centred frame sits a little left of the free space — nudge it right to compose against what you can actually see." />
+                <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
+                <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
+                  help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
+              </Sub>
+            )}
+          </Section>
+          <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
+            <Sub>
+              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
+              {!view.orthographic && (
+                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+              )}
+              {/* fmt is not decoration: these mirror the orbit target, which a
+                  mouse pan moves continuously, and without it a drag left the
+                  field reading `-247.38194837`. Scene.jsx rounds at the source
+                  now; this keeps any stray float legible if one ever arrives. */}
+              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
+              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
+              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
+                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
+            </Sub>
+          </Section>
+          <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
+                   enabled={summaries['Mirror'] !== '—'}>
             <div style={{ fontSize:10, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />
@@ -3140,152 +3388,27 @@ export function Sidebar({
               border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
             }}>Reset Symmetry</button>
           </Section>
+          </Stage>
 
-          {/* ── Soundscapes ─────────────────────────────────────────────────
-              Streams an audio spectrogram into the heightmap slot, so every
-              draw mode / overlay / export works on it like any other terrain. */}
-          <Section title="Soundscapes" open={sec.soundscapes} onToggle={() => tog('soundscapes')} enabled={snd.active}>
-            <button
-              className="hmload"
-              onClick={() => snd.loadFromPicker(onSoundscapeFit)}
-              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
-            >↑ Audio (MP3 / WAV / OGG / M4A)</button>
-
-            {snd.error && (
-              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
-                {snd.error}
-              </div>
-            )}
-
-            {snd.fileName && (
-              <div style={{ fontSize:10, color: MUTED, marginBottom:8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                {snd.fileName}
-              </div>
-            )}
-
-            {snd.isAnalyzing && (
-              <div style={{ marginBottom:8 }}>
-                <div style={{ fontSize:10, color: MUTED, marginBottom:4 }}>Analysing spectrogram… {snd.progress}%</div>
-                <div style={{ height:3, background: BORDER, borderRadius:2, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${snd.progress}%`, background: ACCENT, transition:'width .1s' }} />
-                </div>
-              </div>
-            )}
-
-            {snd.spec && (
-              <>
-                <SpectrogramView
-                  spec={snd.spec}
-                  currentTime={snd.currentTime}
-                  duration={snd.duration}
-                  windowFrames={snd.opts.windowFrames}
-                  dbFloor={snd.opts.dbFloor}
-                  contrast={snd.opts.contrast}
-                  frozen={snd.frozen}
-                  onSeek={snd.seek}
-                />
-
-                <div style={{ display:'flex', gap:4, alignItems:'center', marginBottom:8 }}>
-                  <button
-                    data-testid="soundscape-play"
-                    onClick={snd.toggle}
-                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : '#fff', border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                  >{snd.isPlaying ? '❙❙ Pause' : '▶ Play'}</button>
-                  <button
-                    onClick={snd.stop}
-                    style={{ padding:'8px 12px', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                  >■</button>
-                  <span style={{ fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', minWidth:74, textAlign:'right' }}>
-                    {fmtTime(snd.currentTime)} / {fmtTime(snd.duration)}
-                  </span>
-                </div>
-
-                <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>ANALYSIS</div>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[1024, 2048, 4096].map(n => (
-                      <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
-                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2,
-                          background: snd.opts.fftSize === n ? ACCENT_DEEP : SURF,
-                          color: snd.opts.fftSize === n ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{n}</button>
-                    ))}
-                  </div>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['Log', true], ['Linear', false]].map(([lbl, v]) => (
-                      <button key={lbl} onClick={() => snd.setOpts({ logFreq: v })}
-                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase',
-                          background: snd.opts.logFreq === v ? ACCENT_DEEP : SURF,
-                          color: snd.opts.logFreq === v ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
-                    ))}
-                  </div>
-                  <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
-                    min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
-
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>STREAM</div>
-                  <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
-                    min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
-                  <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
-                    min={2} max={60} value={snd.opts.fps} onChange={v => snd.setOpts({ fps: v })} fmt={v => v + '/s'} />
-                  <InlineSl label="dB Floor" help="Noise gate. Raise it to drop quiet detail into flat ground and leave only the loud structure standing."
-                    min={0} max={0.9} step={0.01} value={snd.opts.dbFloor} onChange={v => snd.setOpts({ dbFloor: v })} fmt={v => Math.round(v*100)+'%'} />
-                  <InlineSl label="Contrast" help="Gamma applied after the gate. Above 1 sharpens peaks into ridges; below 1 flattens them into plateaus."
-                    min={0.3} max={3} step={0.1} value={snd.opts.contrast} onChange={v => snd.setOpts({ contrast: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-
-                {/* Which shape the whole track takes when frozen. A stretched
-                    spectrogram is only one answer; the others fold the track so
-                    its structure — repeats, sections, groove — becomes relief. */}
-                <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>WHOLE TRACK</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:4 }}>
-                    {TRACK_PROJECTIONS.map(pj => (
-                      <button key={pj.id} data-testid={`projection-${pj.id}`}
-                        onClick={() => snd.setOpts({ projection: pj.id })}
-                        style={{ fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
-                          background: projection.id === pj.id ? ACCENT_DEEP : SURF,
-                          color: projection.id === pj.id ? '#fff' : MUTED,
-                          border:`1px solid ${projection.id === pj.id ? ACCENT_DEEP : BORDER}` }}>{pj.label}</button>
-                    ))}
-                  </div>
-                  <div style={{ fontSize:10, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
-
-                  {projection.id === 'weave' && (
-                    <div style={{ fontSize:10, color: MUTED, marginBottom:8 }}>
-                      Detected tempo: <span style={{ color:'#a1a1aa', fontVariantNumeric:'tabular-nums' }}>
-                        {detectedBpm ? `${Math.round(detectedBpm)} BPM` : '—'}
-                      </span>
-                    </div>
-                  )}
-
-                  <ProjectionParams
-                    params={projection.params}
-                    values={snd.opts?.proj?.[projection.id]}
-                    onChange={(k, v) => snd.setProjParam(projection.id, k, v)}
-                  />
-                </Sub>
-
-                <button
-                  data-testid="soundscape-freeze"
-                  onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
-                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
-                <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.4 }}>
-                  {snd.frozen
-                    ? 'The whole track is the heightmap. Play or scrub to go back to streaming a moving window.'
-                    : `Pauses playback and writes the entire track as one static heightmap — the ${projection.label} projection above. Useful for erosion, STL and SVG, which need a terrain that holds still.`}
-                </div>
-              </>
-            )}
-          </Section>
-
-          <ErosionSection open={sec.erosion} onToggle={() => tog('erosion')} />
-
+          <Stage n={6} title="Output">
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
+            {/* What the SVG will contain, said as a sentence.
+                It *cuts* at the paper frame rather than hiding what falls outside
+                it, so a switch two stages away in Frame decides what you get —
+                and nothing else in the panel says so. It carries no count: the
+                stats block below prints the segment total already, and one
+                number in two places is one number that can look like two. */}
+            <div data-testid="export-extent" style={{ marginBottom:6, fontSize:10, color: MUTED }}>
+              {view.showFrame
+                ? `SVG cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
+                : 'SVG writes the full canvas'}
+            </div>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <ExpBtn label="SVG" hint="1" onClick={onSvg} testId="export-svg" /><ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" /><ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" /><ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
+              <ExpBtn label="SVG" hint="1" onClick={onSvg} testId="export-svg" />
+              <ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" />
+              <ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" />
+              <ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
@@ -3319,6 +3442,7 @@ export function Sidebar({
                 : 'Elevation Profile'}
             </button>
           </Section>
+          </Stage>
 
           {/* ── Stats ─────────────────────────────────────────────────────── */}
           <div style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
@@ -3344,6 +3468,7 @@ export function Sidebar({
           </div>
           </SectionFilter.Provider>
         </div>
+
       </aside>
     </>
   )

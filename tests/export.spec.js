@@ -198,8 +198,7 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
       await page.getByText(title, { exact: true }).click()
       await page.waitForTimeout(500)
     }
-    const tog = page.locator('#hm-panel-body > div')
-      .filter({ hasText: new RegExp(`^${title}`) }).first()
+    const tog = page.locator(`[data-section="${title}"]`)
       .locator('input[type=checkbox]').first()
     await tog.scrollIntoViewIfNeeded()
     await tog.click({ force: true })
@@ -421,7 +420,7 @@ test('a dashed layer still exports as separate pieces', async ({ page }) => {
   await setTilt(page)
 
   // Mode: Lines is the one draw-mode section open by default.
-  const lines = page.locator('#hm-panel-body > div').filter({ hasText: /^Mode: Lines/ }).first()
+  const lines = page.locator('[data-section="Mode: Lines"]')
   await lines.getByRole('button', { name: 'dashed', exact: true }).click()
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   await page.waitForTimeout(1500)

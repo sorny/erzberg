@@ -91,6 +91,43 @@ Sections answer to their own vocabulary as well as to their titles, so the field
 also finds sections that are switched off. Clear the field. The panel then
 returns to exactly its previous state.
 
+**A shut section says what it holds.** Every collapsed header carries its own
+setting on the right. Hillshade reads `315° · 60%`. Terrain Style reads
+`hypso · mesh`. A section that is switched off reads `—`, which the eye skips, and a section
+that is on carries a green dot beside its name.
+Close every section and the panel states the whole plate in one column of fifty
+rows, 2 337 px instead of the 6 577 px it opens at. Export, Analysis and
+Hydraulic Erosion stay blank on purpose. They are actions and hold no setting,
+and a dash there would claim that they were switched off. A draw mode shows its
+own dial as a bare number, because a title such as `MODE: ZERO CROSSINGS` fills
+most of a 272 px panel by itself. Rest the pointer on the number to read the name
+of the control that it comes from.
+
+**The head counts what you composed.** One standing line under the wordmark:
+`4 marks · 3 inks · 2 layers`. The ink count is a count of pens. Two modes in
+the same black are one pen, and a separation is three or five. Thirty-one draw
+modes compose freely, and this is the line that says how many are drawing
+without your opening anything.
+
+**Export says what the SVG will contain.** A line above the buttons: *SVG
+writes the full canvas*, or *SVG cuts at the frame ↑*. The export cuts at the
+paper frame rather than hiding what falls outside it, so a switch two stages
+away in Frame decides what you get.
+
+**The body is the pipeline.** Six stage rules divide it, and each one sticks to
+the top of the panel while you are inside it: *Source, Surface, Marks, Overlay,
+Frame, Output*. Every section belongs to one stage, and the order is the order
+the renderer runs. This is what makes a control findable before you know where
+it is. Jitter changes the source, so jitter is in Source. Hydraulic Erosion used
+to sit at position 48, immediately before Export.
+
+**Thirty-one modes on one screen.** The Draw Modes index opens the Marks stage.
+It is a grid of the thirty-one marks themselves — the same glyphs the section
+headers carry. A lit tile is drawing. Click one to switch it on, and the panel
+opens its section and scrolls to it. Click a lit one to switch it off, and the
+panel stays where it is. The tile and the section switch are two views of one
+setting, so they cannot disagree.
+
 ---
 
 ## Input

@@ -534,8 +534,13 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
  * "azimuth" has to find Hillshade even while Hillshade is switched off and its
  * controls are not rendered, so the index is stated rather than scraped from
  * whatever happens to be mounted.
+ *
+ * `summary` is what the header says while the section is shut — see
+ * `sectionSummary.js`. Like `terms` it arrives through the context rather than
+ * as a prop, so the fifty call sites in Sidebar.jsx are untouched; passing it
+ * directly still works, for a section whose state the panel cannot see.
  */
-export function Section({ title, terms, open, onToggle, enabled, icon, children }) {
+export function Section({ title, terms, summary, open, onToggle, enabled, icon, children }) {
   const ctx = useContext(SectionFilter)
   const q = ctx?.q ?? ''
   /**
@@ -558,8 +563,29 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
   // While filtering, a surviving section is open: the point of finding it is to
   // reach the control inside, and a hit that still needs a click is half an answer.
   const isOpen = q ? true : open
+  /**
+   * The readout, and only while the section is shut.
+   *
+   * An open section has its controls on screen saying the same thing in full, so
+   * a summary beside the title would be a second, shorter copy of what is
+   * already there — and it would move under the cursor on the way to the header,
+   * which is the one place it must not.
+   */
+  const raw = isOpen ? null : (summary ?? ctx?.summaries?.[title])
+  // A summary is a string, or `{ text, hint }` where the hint names the
+  // parameter the number came from — a bare `10` is short enough to fit beside
+  // MODE: CROSSHATCH, and the label it lost comes back on hover.
+  const readout = typeof raw === 'string' ? { text: raw } : raw
   return (
-    <div style={{ borderBottom: `1px solid ${BORDER}`, ...(matches ? null : { display: 'none' }) }}
+    /*
+     * `data-section` is a handle, and it exists because the specs had to reach a
+     * section without one. They matched `#hm-panel-body > div` on its text,
+     * which is a bet on how deep in the tree a section happens to sit — and the
+     * stage wrappers moved every section down one level and collected that bet:
+     * seven specs went red on a change that altered nothing they were testing.
+     */
+    <div data-section={title}
+         style={{ borderBottom: `1px solid ${BORDER}`, ...(matches ? null : { display: 'none' }) }}
          data-filtered-out={matches ? undefined : 'true'}>
       {/* A collapsed section is a zero-height grid row, so nothing inside it is
           clickable until it is opened — the header needs a handle a spec can
@@ -572,7 +598,7 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
       <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
         aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
-          display:'flex', justifyContent:'space-between', alignItems:'center',
+          display:'flex', justifyContent:'space-between', alignItems:'center', gap:10,
           padding:'10px 14px', userSelect:'none', width:'100%',
           // One `style`, not two. This element used to carry the prop twice —
           // a filtering-only `{ cursor: 'default' }` and then this object — and
@@ -586,16 +612,87 @@ export function Section({ title, terms, open, onToggle, enabled, icon, children 
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
         </span>
-        <span aria-hidden="true" style={{
-          fontSize:22, fontWeight:700, color: MUTED, lineHeight:1, display:'inline-block', flexShrink:0,
-          transform: isOpen ? 'none' : 'rotate(-90deg)', transition:'transform .18s'
-        }}>▾</span>
+        <span style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, minWidth:0 }}>
+          {/* The same role a slider's own readout uses — 10 px, MUTED, tabular
+              — because it is the same thing one level up, and the panel runs on
+              four type roles rather than five. Capped so a long line truncates
+              rather than pushing a section's name off its header; with the
+              readouts as short as they are, nothing reaches the cap. */}
+          {readout && (
+            <span data-testid={`summary-${title.toLowerCase().replace(/\s+/g, '-')}`}
+              title={readout.hint} style={{
+                fontSize:10, fontWeight:400, color: MUTED, fontVariantNumeric:'tabular-nums',
+                maxWidth:104, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+              }}>{readout.text}</span>
+          )}
+          <span aria-hidden="true" style={{
+            fontSize:22, fontWeight:700, color: MUTED, lineHeight:1, display:'inline-block', flexShrink:0,
+            transform: isOpen ? 'none' : 'rotate(-90deg)', transition:'transform .18s'
+          }}>▾</span>
+        </span>
       </button>
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
         <div style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
           {children}
         </div>
       </div>
+    </div>
+  )
+}
+
+/**
+ * One stage of the pipeline: a heavy sticky line, and the sections under it.
+ *
+ * The panel's fifty sections are the render pipeline written out, and they used
+ * to be in the order they were written rather than the order they run: View and
+ * Camera between Levels and Terrain Style, Hydraulic Erosion at position 48
+ * immediately before Export. Nothing was wrong with any one of them, and there
+ * was no way to predict where the next one would be.
+ *
+ * Six rules put that order on screen. `Where is jitter` becomes `jitter changes
+ * the source, so it is in Source`, and that reasoning works for a control you
+ * have never opened — which is the thing a search box cannot give you.
+ *
+ * It names the stage and nothing else. A count here would be the third counter
+ * in the panel: a shut section already states its own setting, the Draw Modes
+ * header already counts the modes, and the standing line already counts the
+ * plate. This one is about *order*.
+ *
+ * Sticky, so the stage you are inside is always named at the top of the panel.
+ * It sits directly inside `#hm-panel-body`, which is the scroll container, and
+ * carries an opaque background because it passes over content rather than
+ * pushing it. Hidden while filtering: the filter is a flat list of hits, and a
+ * stage heading over none of its own sections is furniture pointing nowhere.
+ */
+export function Stage({ n, title, children }) {
+  const q = useContext(SectionFilter)?.q ?? ''
+  // A fragment, not the bare children: the caller renders this among siblings.
+  if (q) return <>{children}</>
+  return (
+    /*
+     * The wrapper is not decoration — it is the mechanism.
+     *
+     * Six `position: sticky` siblings sharing one scroll container do not hand
+     * over to each other. Each one sticks from the moment it reaches the top
+     * until its *containing block* leaves, and with a single container that is
+     * the whole panel, so all six pile up at the top: measured, Source, Surface
+     * and Marks were pinned at y=0 together. Giving each stage its own block is
+     * what makes the sixth push the fifth out of the way.
+     */
+    <div>
+      <div data-testid={`stage-${title.toLowerCase()}`} style={{
+        position:'sticky', top:0, zIndex:2,
+        display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
+        background: BG, borderTop:`1px solid ${BORDER}`, borderBottom:`2px solid ${BORDER}`,
+      }}>
+        <span style={{ fontSize:9, fontWeight:700, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+          {String(n).padStart(2, '0')}
+        </span>
+        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: DIM }}>
+          {title}
+        </span>
+      </div>
+      {children}
     </div>
   )
 }

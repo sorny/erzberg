@@ -22,7 +22,7 @@ async function contoursOnly(page) {
   await page.waitForSelector('text=Grid:', { timeout: 30_000 })
   await resetToDefaults(page)
   const setMode = async (title, on) => {
-    const row = page.locator('#hm-panel-body > div').filter({ hasText: new RegExp(`^${title}`) }).first()
+    const row = page.locator(`[data-section="${title}"]`)
     // The section's own enable switch. Named as the checkbox rather than as
     // "the first label in the row": the first label is now the toggle's text,
     // which no longer wraps the input.

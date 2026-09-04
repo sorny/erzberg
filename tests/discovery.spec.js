@@ -206,11 +206,20 @@ test('the app opens on a style, not on bare defaults', async ({ page }) => {
   await page.waitForSelector('[data-testid="section-presets"]', { timeout: 30000 })
   await page.waitForTimeout(4000)
 
-  // The panel names the look, and the tile for it is the selected one.
+  // The panel names the look. It does not open the grid to do it: Presets is
+  // the first section and it is shut, because 2 346 px of thumbnails between
+  // the head and everything else is a high price for a label. The label is the
+  // link, and the link opens the grid.
   await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveText('Alpine Survey')
   await expect(page.locator('[data-testid="preset-edited"]')).toHaveCount(0)
   await expect(page.locator('[data-testid="section-presets"]'))
+    .toHaveAttribute('aria-expanded', 'false')
+
+  await page.click('[data-testid="jump-to-presets"]')
+  await page.waitForTimeout(500)
+  await expect(page.locator('[data-testid="section-presets"]'))
     .toHaveAttribute('aria-expanded', 'true')
+  await expect(page.locator('[data-testid="surprise-me"]')).toBeVisible()
 
   // And it is an opening state, not a new baseline: Reset all still goes to the
   // defaults, which carry no preset at all.

@@ -28,6 +28,7 @@ export const SECTION_TERMS = {
   'Water Fill':       'flood level sea lake opacity',
   'Aspect Map':       'slope direction hue wheel compass facing',
   'Presets':          'styles looks surprise me random roll seed thumbnails',
+  'Draw Modes':       'index grid overview marks glyphs which modes are on thirty-one all',
   'Mode: Lines':      'ridgelines parallel spacing shift angle bearing unknown pleasures dash weight opacity',
   'Mode: Crosshatch': 'hatch two directions perpendicular angle spacing',
   'Mode: Pillars':    'extrusion cuboid cylinder columns pins bars',

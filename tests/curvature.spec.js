@@ -4,7 +4,7 @@ import { resetToDefaults } from './helpers.js'
 // Section roots are direct children of #hm-panel-body, which disambiguates the
 // many identically-labelled "Enabled" toggles.
 const section = (page, title) =>
-  page.locator('#hm-panel-body > div').filter({ hasText: new RegExp(`^${title}`) }).first()
+  page.locator(`[data-section="${title}"]`)
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
