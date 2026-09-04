@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] — 2026-09-04
+
+### Added
+
+- **A shut panel section now states its own setting.** The panel has fifty
+  sections and 371 controls over 6 577 px of scroll, against a viewport that
+  shows 880 px of it. A closed section used to say its name and nothing else, so
+  the tidiest possible panel was also the blindest one: the only way to learn
+  that Hillshade was lit at 315° was to open it, and the only way to learn which
+  four of the thirty-one draw modes were drawing was to scroll past all
+  thirty-one.
+
+  Each header now carries a readout on the right, read off the same state the
+  controls inside it are bound to. Hillshade says `315° · 60%`. Terrain Style
+  says `hypso · mesh`. Vector Layers says `2 of 3`. Off is an em dash rather
+  than the word, because the eye skips a dash and lands on the values, which is
+  what turns fifty rows into the handful that are doing something. Close
+  everything and the panel is 2 337 px and describes the whole plate.
+
+  A draw mode shows its dial as a bare number. `MODE: CROSSHATCH` and
+  `every 10` do not fit in a 272 px panel together, and the half that got cut
+  was the section's own name. The label the number lost comes back on hover.
+
+  Export, Analysis and Hydraulic Erosion say nothing at all. They are actions
+  rather than settings and hold nothing that survives being closed, and a dash
+  there would say that they were switched off, which is a different thing.
+
+  No control moved, no control changed shape, and no section changed position.
+  The strings ride the same context that already carries each section's search
+  vocabulary, so `Section` looks its own line up by title and not one of the
+  fifty call sites in `Sidebar.jsx` was touched.
+
+  Fifty hand-written strings are fifty things that can drift when a parameter is
+  renamed, which is the same failure the search index carries and has hit once
+  already. `tests/unit/section-summary.test.js` checks the two indexes against
+  each other in both directions — a section with no readout, and a readout with
+  no section — and asserts that each string moves when the parameter under it
+  moves.
+
+- **Export says what the SVG will contain.** One line above the buttons: *SVG
+  writes the full canvas*, or *SVG cuts at the frame ↑*. The export cuts at the
+  paper frame rather than hiding what falls outside it, so a switch two stages
+  away in Frame decides what you get, and nothing else in the panel said so.
+
+  It carries no count. The stats block prints the segment total a few rows
+  below, and one number in two places is one number that can look like two.
+
+- **Three sections that could be switched on now say so.** Terrain Style,
+  Texture and Mirror all had a value in their header and no green dot beside the
+  name, while every other section that can be on had one. The dot is lit by the
+  section's own readout now rather than by a second expression next to it, so
+  what the header shows and what the dot claims cannot disagree.
+
+- **The head counts what you have composed.** One standing line under the
+  wordmark: `4 marks · 3 inks · 2 layers`. Thirty-one draw modes compose
+  freely, and nothing on screen ever said how many were drawing — you counted
+  green dots down 2 239 px of scroll, or you did not know.
+
+  The ink count is a count of pens rather than of settings. Two modes in the
+  same black are one pen. A separation carries a lettered set and contributes
+  all of it, and where a mode has both a lettered set and a base colour only
+  the lettered ones reach `geometryBuilders`, so the base is not counted as a
+  pen nothing draws with. Watershed generates one ink per basin while the
+  geometry is built, so there is nothing to name and `inksShed` is the count.
+
+  It is a readout and not a set of links. Every token would want a different
+  target and "3 inks" has no single one. The panel already has a filter for
+  going somewhere; this is for knowing where you are.
+
+- **Thirty-one draw modes now fit on one screen.** The modes were the largest
+  thing in the panel and the least visible: thirty-one sections over 2 239 px,
+  each a header that says a noun. The new Draw Modes index is a grid of the
+  marks themselves, 188 px for all thirty-one, at the head of the Marks stage.
+  The glyphs are not new — `panel/modeMarks.jsx` has drawn every one of them
+  since the section headers got icons, one per header, where only one is ever on
+  screen at a time. `mark` moved onto `DRAW_MODES` so both views read the same
+  fact.
+
+  It is not a layer stack. Nothing reorders, nothing is dragged, and no mode
+  becomes a record in a store: a tile reads `style.enabled<Id>` and writes
+  `style.enabled<Id>`. The tile and the section's own switch are two views of one
+  boolean, which is what separates this from a duplicate control — there is no
+  second piece of state that can drift.
+
+  Switching a mode on also opens its section and scrolls to it, because turning
+  one on is the first half of tuning it. Switching one off does not: you are
+  done with it, and jumping to a section you just dismissed would be the tool
+  arguing.
+
+### Changed
+
+- **The panel is in pipeline order, under six stage rules.** *Source, Surface,
+  Marks, Overlay, Frame, Output* — each a heavy line that sticks to the top of
+  the panel while you are inside that stage. Every section belongs to exactly
+  one, and the order is the order the renderer runs them in.
+
+  The order it replaces was the order the sections were written. View and Camera
+  sat between Levels and Terrain Style. Mirror sat after Texture. Hydraulic
+  Erosion — a source operation — sat at position 48, immediately before Export.
+  Nothing was wrong with any one of them, and there was no way to predict where
+  the next one would be. Now there is: jitter changes the source, so jitter is
+  in Source, and that reasoning works for a control you have never opened.
+
+  A stage rule names its stage and nothing else. A count there would be the
+  third counter in the panel — a shut section already states its own setting,
+  the Draw Modes header already counts the modes, and the standing line already
+  counts the plate.
+
+  Six `position: sticky` siblings in one scroll container do not hand over to
+  each other: each stays pinned until its own containing block leaves, and with
+  one container that is the whole panel. Measured, Source, Surface and Marks
+  were pinned at the top together. Each stage is its own block now, which is
+  what makes the next rule push the last one out of the way.
+
+- **Presets is first, and closed.** It is the front door, so it opened by
+  default — from tenth place, where 2 346 px of thumbnails sat between the
+  surface sections and the draw modes and everything after it had to be scrolled
+  past. It is now the first thing under the loaded file, shut, with the style it
+  applied named on a permanent line in the head. That is the same
+  discoverability for sixteen pixels instead of two thousand.
+
+  Together with the stage rules, the panel opens at **4 678 px** rather than
+  6 577 px, with more of it legible: fifty readouts, a plate line, thirty-one
+  marks in a grid, and six headings that say where you are.
+
 ## [1.11.1] — 2026-09-02
 
 ### Fixed
