@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * Play & discovery — preset thumbnails and the randomiser.
@@ -18,7 +18,7 @@ const PRESETS_DIR = path.resolve(here, '../public/presets')
 
 async function boot(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   await page.waitForSelector('text=Grid:', { timeout: 30000 })
   await resetToDefaults(page)
 }

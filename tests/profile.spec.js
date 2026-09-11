@@ -7,11 +7,11 @@
  * the standalone SVG the popup writes.
  */
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(3000)

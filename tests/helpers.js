@@ -52,3 +52,19 @@ export async function resetToDefaults(page) {
   }
   await page.locator('#hm-panel-body').evaluate((el) => { el.scrollTop = 0 })
 }
+
+/**
+ * Waits for the app to have rendered, by its wordmark.
+ *
+ * Twenty specs used `text=erzberg` for this, which is a bet that the app's own
+ * name appears exactly once in the DOM. It does not have to: a line of panel
+ * copy naming the app collected the two that used a *strict* locator, and the
+ * other forty-one survived only because `waitForSelector` takes the first match
+ * and the heading happens to come first.
+ *
+ * None of them asserts anything about the wordmark — it is a "the app has
+ * rendered" sentinel — so the heading is what they all actually mean.
+ */
+export async function waitForApp(page, timeout = 30_000) {
+  await page.getByRole('heading', { name: 'erzberg' }).waitFor({ state: 'visible', timeout })
+}

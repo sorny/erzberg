@@ -14,7 +14,23 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
+import { migrateAzimuths } from './presetFile'
+
 const KEY = 'erzberg.session.v1'
+
+/**
+ * The azimuth scale the stored settings are on.
+ *
+ * A session written before v1.14.0 holds azimuths a quarter turn from a compass
+ * bearing, because that is what the light was built from. Restoring one as-is
+ * would swing the sun ninety degrees on a reload, which is the one thing a
+ * session exists not to do — so it is migrated on the way out, exactly as a
+ * preset of the same age is.
+ *
+ * A number rather than a new key, because bumping the key throws the session
+ * away and this is the situation the session was written for.
+ */
+const AZIMUTH_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -59,8 +75,9 @@ export function loadSession(defaults) {
     if (!raw) return null
     const data = JSON.parse(raw)
     if (!data || typeof data !== 'object') return null
-    const out = {}
+    let out = {}
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
+    if ((data.azimuthScale ?? 1) < AZIMUTH_SCALE) out = migrateAzimuths(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
       out[field] = { ...out[field] }
@@ -103,7 +120,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = {}
+    const out = { azimuthScale: AZIMUTH_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {

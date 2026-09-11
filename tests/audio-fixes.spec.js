@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 /**
  * The three defects the changelog carried for a while under "Known, not fixed".
@@ -20,7 +21,7 @@ test('the beat impulse is the same at 60 Hz and at 144 Hz', async ({ page }) => 
    * under test is the arithmetic and a real display runs at whatever it runs at.
    */
   await page.goto(PAGE)
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { applyBurst } = await import('/src/utils/murmuration.js')
@@ -91,7 +92,7 @@ test('a tempo is never inferred from a couple of cycles', async ({ page }) => {
    * one beat period was then handed a tempo decided by its own length.
    */
   await page.goto(PAGE)
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { detectBpm } = await import('/src/utils/trackProjections.js')
@@ -139,7 +140,7 @@ test('Weave Bands does nothing it cannot do', async ({ page }) => {
    * did not merely do nothing for this source; it made the output worse.
    */
   await page.goto(PAGE)
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { getProjection, projectionDefaults } = await import('/src/utils/trackProjections.js')

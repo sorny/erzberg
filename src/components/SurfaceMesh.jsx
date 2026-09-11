@@ -287,14 +287,15 @@ const SURFACE_FRAG = /* glsl */ `
         float sumL = 0.0;
         for (int d = 0; d < 8; d++) {
           float az = float(d) * 0.7853981634; // π/4 steps
-          vec3 ldir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
+          vec3 ldir = normalize(vec3(sin(az) * cos(alt), sin(alt), -cos(az) * cos(alt)));
           sumL += clamp(dot(exagNormal, ldir), 0.0, 1.0);
         }
         lambert = sumL / 8.0;
         // Cast shadows not applicable in multi-directional mode
       } else {
         float az = uHillshadeAzimuth * 3.14159265 / 180.0;
-        vec3 lightDir = normalize(vec3(cos(az) * cos(alt), sin(alt), sin(az) * cos(alt)));
+        // A true bearing: 0° north, 90° east. East is +X and north is −Z.
+        vec3 lightDir = normalize(vec3(sin(az) * cos(alt), sin(alt), -cos(az) * cos(alt)));
         lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
 
         // Cast shadow: ray-march in UV space toward the sun using progressive step
@@ -303,8 +304,8 @@ const SURFACE_FRAG = /* glsl */ `
         if (uCastShadows) {
           float h0 = texture2D(uHeightmapTex, vUv).r;
           // UV displacement per one grid cell toward the light source.
-          // cos(az) → +U (east); -sin(az) → +V (north, V is flipped vs row index).
-          vec2 uvStep = vec2(cos(az) / uHeightmapCols, -sin(az) / uHeightmapRows);
+          // sin(az) → +U (east); cos(az) → +V (north, V is flipped vs row index).
+          vec2 uvStep = vec2(sin(az) / uHeightmapCols, cos(az) / uHeightmapRows);
 
           // Track the maximum horizon angle seen along the ray.
           // Shadow condition: maxHorizonAngle > sunAltitude.
@@ -477,7 +478,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uTextureBlendMode:    { value: 0 },
       uTextureOpacity:      { value: 1.0 },
       uHillshade:             { value: false },
-      uHillshadeAzimuth:      { value: 315.0 },
+      uHillshadeAzimuth:      { value: 45.0 },
       uHillshadeAltitude:     { value: 45.0 },
       uHillshadeIntensity:    { value: 1.0 },
       uHillshadeOpacity:      { value: 0.6 },
@@ -550,7 +551,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uTextureOpacity.value = p.textureOpacity ?? 1.0
 
     surfMat.uniforms.uHillshade.value             = !!(p.showHillshade)
-    surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 315
+    surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 45
     surfMat.uniforms.uHillshadeAltitude.value     = p.hillshadeAltitude     ?? 45
     surfMat.uniforms.uHillshadeIntensity.value    = p.hillshadeIntensity    ?? 1.0
     surfMat.uniforms.uHillshadeOpacity.value      = p.hillshadeOpacity      ?? 0.6

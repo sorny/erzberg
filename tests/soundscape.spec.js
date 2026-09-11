@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 // 6 s mono MP3: exponential 120 Hz→8 kHz sweep + steady 300 Hz drone + 1.5 kHz
@@ -11,7 +11,7 @@ const MP3 = path.join(here, 'testdata', 'sweep.mp3')
 
 async function openSoundscapes(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   const toggle = page.locator('[data-testid="sidebar-toggle"]')
   if ((await toggle.innerText()) === '◀') { await toggle.click(); await page.waitForTimeout(400) }
   await resetToDefaults(page)
@@ -374,7 +374,7 @@ test('weave and strata projections freeze with plausible shapes', async ({ page 
  */
 test('projections satisfy their structural invariants', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const report = await page.evaluate(async () => {
     const { computeSpectrogram } = await import('/src/utils/spectrogram.js')

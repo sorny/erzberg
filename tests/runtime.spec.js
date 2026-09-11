@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 test('app loads without console errors', async ({ page }) => {
   const errors = []
@@ -31,14 +32,8 @@ test('app loads without console errors', async ({ page }) => {
   await page.waitForSelector('#root', { timeout: 10000 })
   await page.waitForTimeout(3000)
 
-  // The wordmark, by its heading rather than by its text.
-  //
-  // `text=erzberg` is a bet that the app's own name appears exactly once in the
-  // DOM, and a line of panel copy naming the app has already collected it once.
-  // Both of these use the wordmark as a "the app has rendered" sentinel and
-  // neither asserts anything about it, so the heading is what they actually mean.
-  const header = page.getByRole('heading', { name: 'erzberg' })
-  await expect(header).toBeVisible({ timeout: 10000 })
+  // The app has rendered, by its wordmark. See `waitForApp`.
+  await waitForApp(page, 10_000)
   
   await page.waitForSelector('canvas', { timeout: 20000 })
 

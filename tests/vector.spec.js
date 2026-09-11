@@ -13,7 +13,7 @@ import { unprojectWgs84 } from '../src/utils/geoCoords.js'
  * against colours measured off the running app, in unit/screen-ink.test.js.
  */
 import { screenInkHex } from '../src/utils/svgExport.js'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * Vector layers — OpenStreetMap, GeoJSON and GPX draped on the terrain.
@@ -104,7 +104,7 @@ function overpassFixture() {
 /** Loads the fixture raster and opens the Vector Layers section. */
 async function openVectorPanel(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   await resetToDefaults(page)
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
@@ -751,7 +751,7 @@ test.describe('vector layers', () => {
      * in the face and still produce plausible-looking output.
      */
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
 
     const r = await page.evaluate(async () => {
       const m = await import('/src/utils/textGeometry.js')
@@ -796,7 +796,7 @@ test.describe('vector layers', () => {
     // normalises outside the unit box, would be a visible defect on the terrain
     // and invisible here without this.
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
 
     const rows = await page.evaluate(async () => {
       const { flattenSvg } = await import('/src/utils/svgFlatten.js')
@@ -922,7 +922,7 @@ test.describe('vector layers', () => {
     // entirely. Every bundled icon starts at `0 0`, which is exactly why this
     // went unnoticed; an uploaded one need not.
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
 
     const box = await page.evaluate(async () => {
       const { flattenSvg } = await import('/src/utils/svgFlatten.js')
@@ -960,7 +960,7 @@ test.describe('vector layers', () => {
     // The solid variant is the one that flattens to the single ring wanted, and
     // this is what stops the wrong one being swapped in later.
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
 
     const geo = await page.evaluate(async () => {
       const { flattenSvg } = await import('/src/utils/svgFlatten.js')
@@ -1567,7 +1567,7 @@ test.describe('vector layers', () => {
     // oval is not a skull. Measured as area rather than by eye: with the holes
     // cut, the filled area is strictly less than the sum of every ring.
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
 
     const area = await page.evaluate(async () => {
       const { flattenSvg } = await import('/src/utils/svgFlatten.js')

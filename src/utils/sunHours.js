@@ -74,16 +74,10 @@ function accumulateSample(field, elev, gx, gz, mask, rows, cols, cellW, sample, 
    * Row 0 of a georeferenced raster is its northern edge and column 0 its
    * western one, so east is +column and north is −row.
    *
-   * This is deliberately **not** the convention `hillshadeAzimuth` uses. That
-   * one builds its light as `(cos az, sin alt, sin az)`, which puts azimuth 0 at
-   * +X — the *east* edge of the raster — so the whole scale sits a quarter turn
-   * from a bearing. Every draw mode with a sun of its own inherits that, and
-   * changing it would relight all fifty-six presets, so it stands.
-   *
-   * It cannot stand *here*. This field is a measurement of the ground rather
-   * than a shading choice: a north face that came out sunny would not be a
-   * stylistic difference, it would be wrong. The panel says which convention
-   * this mode uses, in as many words.
+   * This mode was written this way when it was the only one that was. Every
+   * other sun in the app built its light as `(cos az, sin alt, sin az)`, a
+   * quarter turn from a compass, and the two conventions sat side by side until
+   * v1.14.0 moved all of them onto this one.
    */
   const cosAlt = Math.cos(altR)
   const dc = Math.sin(azR), dr = -Math.cos(azR)
@@ -147,6 +141,26 @@ function accumulateSample(field, elev, gx, gz, mask, rows, cols, cellW, sample, 
 }
 
 /**
+ * The last field computed, and what it was computed from.
+ *
+ * Three of the mode's eight parameters do not touch the field at all: the
+ * contour count picks levels off a finished one, and the two smoothing controls
+ * act after it exists. Every one of them is a *geometry* parameter — correctly,
+ * since they move vertices — so each drags a full rebuild behind it, and without
+ * this that rebuild pays for a few hundred shadow sweeps to draw the same
+ * numbers at different heights. A second of it on a 1024² grid, per slider tick.
+ *
+ * One entry, not a map. The mode is being tuned or it is not, and a second entry
+ * would hold a second terrain alive for nothing. The terrain is compared by
+ * identity, which is exactly right: the worker builds a new one whenever
+ * anything upstream of it moves, and holds the previous grid only until the next
+ * build overwrites this.
+ *
+ * Same shape as the worker's own `vectorCache`, and for the same reason.
+ */
+let fieldCache = { key: null, terrain: null, value: null }
+
+/**
  * Hours of direct sun over a period, per cell.
  *
  * @param {object} terrain the worker's terrain product
@@ -162,6 +176,13 @@ function accumulateSample(field, elev, gx, gz, mask, rows, cols, cellW, sample, 
  *   the way the isophotes do.
  */
 export function sunHoursField(terrain, { elevScale, lat, dayNumbers, perDay, daysStandFor }) {
+  // Everything the field depends on, and nothing that only decides how it is
+  // drawn. The terrain rides alongside as an identity rather than in the key:
+  // hashing a grid of a million cells to avoid recomputing over it would be its
+  // own kind of silly.
+  const key = `${elevScale}|${lat}|${perDay}|${daysStandFor}|${dayNumbers.join(',')}`
+  if (fieldCache.terrain === terrain && fieldCache.key === key) return fieldCache.value
+
   const { grid, gridMask, rows, cols, scl } = terrain
   const n = rows * cols
   const mask = terrain.hasNoData ? gridMask : null
@@ -214,10 +235,14 @@ export function sunHoursField(terrain, { elevScale, lat, dayNumbers, perDay, day
     if (v < min) min = v
   }
 
-  return {
+  const out = {
     hours: field, max, min: min === Infinity ? 0 : min,
     samples: samples.length, dayHours: dayHours * stand,
   }
+  // Handed out by reference. Every caller reads it — `smoothField` returns a new
+  // array rather than blurring in place — so one copy serves them all.
+  fieldCache = { key, terrain, value: out }
+  return out
 }
 
 /**

@@ -1,4 +1,5 @@
 {
+  "format": 2,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -179,7 +180,7 @@
     "spacingEngrave": 3,
     "angleEngrave": 45,
     "levelsEngrave": 3,
-    "sunAzimuthEngrave": 315,
+    "sunAzimuthEngrave": 45,
     "gammaEngrave": 1.5,
     "colorEngrave": "#000000",
     "weightEngrave": 1,
@@ -228,7 +229,7 @@
     "hypsoBandedGpx": false,
     "hypsoIntervalGpx": 10,
     "showHillshade": false,
-    "hillshadeAzimuth": 315,
+    "hillshadeAzimuth": 45,
     "hillshadeAltitude": 45,
     "hillshadeIntensity": 1,
     "hillshadeOpacity": 0.42,

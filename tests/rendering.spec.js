@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 // The switch itself, by the name it carries. This used to walk
 // `//span[text()="X"]/following-sibling::label` because the text was a bare
@@ -13,7 +13,7 @@ const toggleFor = (page, label) =>
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
@@ -97,7 +97,7 @@ test('raw terrain view shows the heightmap as a flat greyscale plane', async ({ 
 
 test('brightness bounds follow the data, not the 0–1 range', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   // buildTerrain is pure, so the dev server can hand it over directly — this
   // checks the numbers the greyscale stretch is built on rather than inferring

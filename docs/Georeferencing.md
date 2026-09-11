@@ -841,13 +841,13 @@ Innsbruck for the same mountain would be a bug wearing a time zone.
 
 #### Two honest limits, both stated in the panel
 
-**The sun here is a true bearing. Every other sun in the app is not.** The
-hillshade builds its light as `(cos az, sin alt, sin az)`, which puts azimuth 0
-at the raster's *eastern* edge — the whole scale sits a quarter turn from a
-compass bearing. Every draw mode with a sun of its own inherits that, and
-changing it would relight all fifty-six presets, so it stands. It cannot stand
-here: this field is a measurement, and a north face that came out sunny would be
-wrong rather than stylistic.
+**The sun here is a true bearing**, and it was the only one that was when this
+mode was written. Every other light built itself as `(cos az, sin alt, sin az)`,
+which puts azimuth 0 at the raster's *eastern* edge — a quarter turn from a
+compass. That could not stand here, because this field is a measurement and a
+north face that came out sunny would be wrong rather than stylistic. v1.14.0
+moved the rest of the app onto this scale, adding 90° to every stored azimuth so
+that no plate changed. See [Draw modes](Draw-Modes.md) §15.
 
 **The shadows are the shadows of the terrain as exaggerated.** The sweep works in
 world units, so at the exaggeration a GeoTIFF suggests the hours are real hours,

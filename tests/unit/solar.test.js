@@ -14,9 +14,9 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  bearingToAppAzimuth, formatClock, julianDay, parseDate, solarDate, solarPosition,
-  sunTimes, zoneForLongitude,
+  formatClock, julianDay, parseDate, solarDate, solarPosition, sunTimes, zoneForLongitude,
 } from '../../src/utils/solar'
+import { lightVector } from '../../src/utils/geometryBuilders'
 
 /** The mountain the tool is named after. */
 const ERZ = { lat: 47.53, lon: 14.89 }
@@ -139,20 +139,20 @@ describe('sunTimes', () => {
   })
 })
 
-describe('bearingToAppAzimuth', () => {
+describe('the shading convention', () => {
   /**
-   * The app's light is `(cos az, sin alt, sin az)` in world space, where +X is
-   * the raster's eastern edge. Reproduced here rather than imported, because
-   * importing `lambertDarkness` would drag the whole geometry builder in — and
-   * because a copy that drifts from the shader is exactly what this is checking
-   * for.
+   * The app's own light, asked rather than reproduced.
+   *
+   * This helper began as a copy of the three lines in `lambertDarkness`, and the
+   * copy drifted the moment the convention changed — which is the exact failure
+   * it was written to catch, arriving from the other direction. `lightVector` is
+   * exported for this.
    *
    * `gx > 0` means the ground rises toward +column, so the surface faces west.
    * `gz > 0` means it rises toward +row, so the surface faces north.
    */
   const lit = (azimuth, altitude, gx, gz) => {
-    const az = azimuth * Math.PI / 180, alt = altitude * Math.PI / 180
-    const Lx = Math.cos(az) * Math.cos(alt), Ly = Math.sin(alt), Lz = Math.sin(az) * Math.cos(alt)
+    const [Lx, Ly, Lz] = lightVector(azimuth, altitude)
     return Math.max(0, (-gx * Lx + Ly - gz * Lz) / Math.sqrt(gx * gx + gz * gz + 1))
   }
   const FACE = { west: [1, 0], east: [-1, 0], north: [0, 1], south: [0, -1] }
@@ -161,24 +161,36 @@ describe('bearingToAppAzimuth', () => {
     .map(([name, [gx, gz]]) => [name, lit(azimuth, 30, gx, gz)])
     .sort((a, b) => b[1] - a[1])[0][0]
 
-  it('puts the sun where the bearing says it is', () => {
-    // The assertion the almanac needed and did not have. Feeding a bearing in
-    // raw renders a perfectly plausible plate lit from the wrong quarter: at
-    // noon it lit the west faces and called it south.
-    expect(brightest(bearingToAppAzimuth(90))).toBe('east')
-    expect(brightest(bearingToAppAzimuth(180))).toBe('south')
-    expect(brightest(bearingToAppAzimuth(270))).toBe('west')
-    expect(brightest(bearingToAppAzimuth(0))).toBe('north')
+  it('is a compass bearing, so an azimuth lights the face it names', () => {
+    /*
+     * The assertion the almanac needed and did not have, and now the one that
+     * holds the whole v1.14.0 migration in place.
+     *
+     * Until then the light was `(cos az, sin alt, sin az)`, which puts azimuth 0
+     * at the raster's *eastern* edge — so feeding in a real bearing rendered a
+     * perfectly plausible plate lit from the wrong quarter. At noon it lit the
+     * west faces and called it south.
+     */
+    expect(brightest(90)).toBe('east')
+    expect(brightest(180)).toBe('south')
+    expect(brightest(270)).toBe('west')
+    expect(brightest(0)).toBe('north')
   })
 
-  it('names the offset the rest of the app carries', () => {
-    // The classic cartographic NW light is 225 on this scale, not 315. The
-    // default 315 is a bearing of 45 — the north-east.
-    expect(bearingToAppAzimuth(315)).toBe(225)
-    expect(bearingToAppAzimuth(45)).toBe(315)
-    // And it wraps rather than going negative, because the slider runs 0…360.
-    expect(bearingToAppAzimuth(0)).toBe(270)
-    expect(bearingToAppAzimuth(89)).toBe(359)
+  it('puts the classic cartographic light in the north-west', () => {
+    // 315° is NW, which the panel has claimed all along and only now means. The
+    // shipped default is 45° — the same north-east light the old 315° gave, kept
+    // so the migration changed no picture.
+    const nw = lit(315, 30, ...FACE.west), ne = lit(315, 30, ...FACE.east)
+    expect(nw).toBeGreaterThan(ne)
+    expect(lit(315, 30, ...FACE.north)).toBeGreaterThan(lit(315, 30, ...FACE.south))
+    // And the shipped default, 45°, which is the old default's light under a
+    // true name: north-east, so the north and east faces are lit exactly alike
+    // and the two behind them exactly alike.
+    const at45 = (f) => lit(45, 30, ...FACE[f])
+    expect(at45('north')).toBeCloseTo(at45('east'), 9)
+    expect(at45('south')).toBeCloseTo(at45('west'), 9)
+    expect(at45('north')).toBeGreaterThan(at45('south'))
   })
 })
 

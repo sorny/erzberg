@@ -244,15 +244,23 @@ That is the same Lambert quantity that Engraving (§12) hatches by. The shared
 `lambertDarkness` helper computes it against the same light convention as the
 hillshade shader, and the altitude is fixed at 45°.
 
-That convention is **a quarter turn from a compass bearing**, which is worth
-knowing before reaching for a number. The light is built as
-`(cos az, sin alt, sin az)`, so azimuth 0° lights east-facing slopes: it comes
-from the raster's eastern edge, not from its north. The default 315° therefore
-lights from the north-east and not, as one would assume, from the north-west.
-For a bearing, subtract 90° — the classic NW light is azimuth 225° here. Every
-mode with a sun of its own uses this same scale. The one exception is Sun Hours
-(§32), which is a measurement rather than a shading choice and takes a true
-bearing. Engraving
+Every azimuth in erzberg is a **true bearing**: 0° north, 90° east, 315° the
+classic north-west light. `lightVector` in `geometryBuilders.js` is the single
+place it is built, as `(sin az, sin alt, −cos az)` — east is +X and north is −Z,
+which is why the pair is `(sin, −cos)`.
+
+It was not always. Until v1.14.0 the light was `(cos az, sin alt, sin az)`,
+putting azimuth 0° at the raster's *eastern* edge, so the scale sat a quarter
+turn from a compass and the default 315° lit from the north-east. Tanaka (§4) was
+the exception and had been right all along, which meant the same 315° lit two
+modes from opposite corners. The almanac, handed a real bearing, put the noon sun
+in the west.
+
+The migration added 90° to every stored azimuth except Tanaka's, so **no plate
+changed** — `sin(a + 90) = cos a`, which makes the old light and the new one the
+same vector at the new number. The shipped default is 45°, which is the old 315°
+under a true name. Presets, sessions and the parameters embedded in exported
+plates are all migrated on the way in, gated on the preset format. Engraving
 *thresholds* this field to decide stroke density. Isophotes *traces its level
 set*.
 
@@ -654,11 +662,11 @@ longitude and the time zone shift *when* the sun reaches a given hour angle, and
 none of them changes how long it is up. So the field needs a latitude and a date
 and nothing else. See [Georeferencing](Georeferencing.md) for the rest.
 
-**A true bearing, unlike every other sun here.** §15 sets out the app's azimuth
-convention: it sits a quarter turn from a compass bearing. This mode does not use
-it. A shading convention can be a quarter turn off and still make a good picture;
-a *measurement* cannot, because a north face that came out sunny would be wrong
-rather than stylistic.
+**A true bearing**, which it was written with when it was the only thing here
+that had one — see §15. A shading convention can sit a quarter turn from a
+compass and still make a good picture; a *measurement* cannot, because a north
+face that came out sunny would be wrong rather than stylistic. That argument is
+what eventually moved every other sun onto this scale too.
 
 **The levels are fitted to the field's own range**, at a round 1-2-5 hour step —
 500 h, 200 h, 2 h — chosen from how many lines the panel asks for. A year's field

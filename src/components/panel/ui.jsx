@@ -679,9 +679,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
 /**
  * One stage of the pipeline: a heavy sticky line, and the sections under it.
  *
- * The panel's fifty sections are the render pipeline written out, and they used
- * to be in the order they were written rather than the order they run: View and
- * Camera between Levels and Terrain Style, Hydraulic Erosion at position 48
+ * The panel's fifty-four sections are the render pipeline written out, and they
+ * used to be in the order they were written rather than the order they run:
+ * View and Camera between Levels and Terrain Style, Hydraulic Erosion at 48
  * immediately before Export. Nothing was wrong with any one of them, and there
  * was no way to predict where the next one would be.
  *

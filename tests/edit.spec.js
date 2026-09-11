@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
+import { waitForApp } from './helpers.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const MP3 = path.join(here, 'testdata', 'sweep.mp3')
@@ -18,7 +19,7 @@ const GEOTIFF = 'tests/testdata/geotiff.tif'
 
 async function boot(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   await expect(page.locator('text=Grid: 1024×1024')).toBeVisible({ timeout: 20000 })
 }
 
@@ -81,7 +82,7 @@ test('Escape leaves Edit Mode without applying the draft', async ({ page }) => {
 
 test('the clip maths crops, masks, feathers and re-georeferences', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   // heightmapEdit is pure, so the dev server can hand it over directly rather
   // than these numbers being inferred from what the terrain looks like.
@@ -171,7 +172,7 @@ test('a lasso selection clips the terrain down to what it encloses', async ({ pa
 
 test('a clip holds while a Soundscape streams new frames under it', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   await page.locator('text=SOUNDSCAPES').click()
 
   const [chooser] = await Promise.all([
@@ -205,7 +206,7 @@ test.describe('GeoTIFF', () => {
 
   test('cropping keeps the elevation range the raster reported', async ({ page }) => {
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser'),
       page.click('[data-testid="load-geotiff"]'),

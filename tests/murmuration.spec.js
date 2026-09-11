@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 // The Soundscapes fixture: 6 s mono, a 120 Hz→8 kHz sweep over a 300 Hz drone
 // with 1.5 kHz bursts once a second — so it has bass, air and onsets.
@@ -24,7 +24,7 @@ const togColorFor = (page, label) =>
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
@@ -106,7 +106,7 @@ const DEFAULTS = {
 
 test('the flock stays finite, above ground, on the map and in flight', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   // With the predator on: it is the strongest force in the simulation by an
   // order of magnitude, so if anything is going to fling a bird to infinity or
@@ -133,7 +133,7 @@ test('the flock stays finite, above ground, on the map and in flight', async ({ 
 
 test('same seed, same flock — at any frame rate', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const a = await runSim(page, { n: 200, seed: 7, frames: 180, dt: 1 / 60, params: DEFAULTS })
   const b = await runSim(page, { n: 200, seed: 7, frames: 180, dt: 1 / 60, params: DEFAULTS })
@@ -199,7 +199,7 @@ test('murmuration mode animates on screen, and freezes when told to', async ({ p
  */
 test('the flock stays over an off-centre crop instead of the whole grid', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { makeTerrainField, createFlock, stepFlock } = await import('/src/utils/murmuration.js')
@@ -251,7 +251,7 @@ test('the flock stays over an off-centre crop instead of the whole grid', async 
 
 test('shadows fall only on real terrain, never on empty space', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { makeTerrainField, createFlock, stepFlock } = await import('/src/utils/murmuration.js')
@@ -276,7 +276,9 @@ test('shadows fall only on real terrain, never on empty space', async ({ page })
 
     // A 10° sun throws shadows their maximum distance — the case that used to
     // fling them off the side of the raster.
-    const params = { shadow: true, predator: true, sunAzimuth: 315, sunAltitude: 10, roost: 0.4 }
+    // 45°, not 315°: the same low north-east sun these numbers were tuned
+    // against, under the true-bearing scale v1.14.0 moved everything onto.
+    const params = { shadow: true, predator: true, sunAzimuth: 45, sunAltitude: 10, roost: 0.4 }
     const flock = createFlock(3000, 42, field, params)
     for (let i = 0; i < 900; i++) stepFlock(flock, 1 / 60, field, params)
 
@@ -355,7 +357,7 @@ const runAudio = (page, opts) => page.evaluate(async ({ shapeSrc, seconds, dt, p
 
 test('the flock hears bands, onsets and silence', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   // Log-spaced bins put the low frequencies in the first rows. Energy only
   // there must read as bass and not as air.
@@ -408,7 +410,7 @@ test('the flock hears bands, onsets and silence', async ({ page }) => {
 
 test('windowing recovers dynamics from a signal that never lets up', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const r = await page.evaluate(async () => {
     const { window01, shapeFeatures, audioRanges } = await import('/src/utils/audioFeatures.js')

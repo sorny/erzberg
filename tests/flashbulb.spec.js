@@ -59,7 +59,10 @@ test('ink increases with distance from the bulb — a directional light cannot d
   // Bulb close and overhead: the falloff bites, so the far half of the plate is
   // dark and the near half is blown out. Split the plate along the light's own
   // bearing and the two halves must be lopsided.
-  const r = await run(page, { azimuthFlashbulb: 0, distanceFlashbulb: 0.6,
+  //
+  // Due east, because the split below is along x. This read `0` until v1.14.0,
+  // when azimuth 0 stopped meaning +X and started meaning north.
+  const r = await run(page, { azimuthFlashbulb: 90, distanceFlashbulb: 0.6,
                               falloffFlashbulb: 0.35, shadowFlashbulb: false })
   expect(r.dots).toBeGreaterThan(500)
   const near = r.pts.filter(([x]) => x > r.N * 0.6).length

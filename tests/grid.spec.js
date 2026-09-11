@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 /**
  * Grid resolution test.
@@ -13,7 +14,7 @@ test('grid size matches resolution for the default 1024px image', async ({ page 
   await page.goto('http://localhost:5173')
 
   // Wait for the main UI and Sidebar to render
-  await page.waitForSelector('text=erzberg', { timeout: 15000 })
+  await waitForApp(page)
 
   // --- Check default (Resolution 1 → 1024×1024) ---
   console.log('Checking default resolution...')

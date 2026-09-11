@@ -2302,7 +2302,7 @@ function mulberry32(seed) {
 /**
  * Per-cell darkness: 1 − Lambert illumination, tone-curved.
  *
- * The same light convention as the hillshade shader — azimuth 315° is NW, and
+ * The same light convention as the hillshade shader — a true bearing, and
  * the altitude is fixed at 45° — so a scene lit one way on screen is lit the
  * same way in every mode that hatches by light.
  *
@@ -2320,6 +2320,30 @@ function mulberry32(seed) {
  * Shared by Engraving, which hatches where this exceeds a threshold, and
  * Isophotes, which traces its level set.
  */
+/**
+ * Where the light comes from, as a unit vector.
+ *
+ * The azimuth is a **true bearing**: 0° north, 90° east. East is +X and north is
+ * −Z in this scene, which is why the pair is `(sin, −cos)` rather than
+ * `(cos, sin)`.
+ *
+ * It did not used to be. Until v1.14.0 every light here but Tanaka's was built
+ * as `(cos az, sin alt, sin az)`, putting azimuth 0 at the raster's *eastern*
+ * edge — so the same 315° lit Tanaka from the north-west and the hillshade from
+ * the north-east, and the almanac, fed a real bearing, lit the noon sun in the
+ * west. Every stored azimuth gained 90° in the migration, so no plate changed.
+ *
+ * Exported because the unit suite needs to ask the app which face an azimuth
+ * lights, and a copy of these three lines in a test is a copy that drifts. The
+ * surface shader holds the one unavoidable second copy, in GLSL.
+ */
+export function lightVector(azimuthDeg, altitudeDeg) {
+  const az = (azimuthDeg * Math.PI) / 180
+  const alt = (altitudeDeg * Math.PI) / 180
+  const c = Math.cos(alt)
+  return [Math.sin(az) * c, Math.sin(alt), -Math.cos(az) * c]
+}
+
 function lambertDarkness(terrain, sunAzimuth, gamma, elevScale, radius = 0) {
   const { gridMask, rows, cols, scl } = terrain
   // Mask-aware, or the step down to the zeros in NoData would read as a cliff
@@ -2327,11 +2351,7 @@ function lambertDarkness(terrain, sunAzimuth, gamma, elevScale, radius = 0) {
   const grid = radius > 0
     ? boxBlur(terrain.grid, cols, rows, radius, terrain.hasNoData ? gridMask : null)
     : terrain.grid
-  const azRad  = ((sunAzimuth ?? 315) * Math.PI) / 180
-  const altRad = Math.PI / 4
-  const Lx = Math.cos(azRad) * Math.cos(altRad)
-  const Ly = Math.sin(altRad)
-  const Lz = Math.sin(azRad) * Math.cos(altRad)
+  const [Lx, Ly, Lz] = lightVector(sunAzimuth ?? 45, 45)
   const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
   const gam = gamma ?? 1
 
@@ -3932,12 +3952,15 @@ export function blueNoiseTile() {
 function flashLightPos(terrain, azimuthDeg, distFrac, heightFrac) {
   const { spanHalfW, spanHalfH, minElev, maxElev } = terrain
   const reach = Math.hypot(spanHalfW, spanHalfH) || 1
-  const az = ((azimuthDeg ?? 315) * Math.PI) / 180
+  // A true bearing, like every other light here. The altitude is not free for a
+  // bulb — its height is a fraction of the terrain's own relief — so only the
+  // ground plane comes from `lightVector`.
+  const [ux, , uz] = lightVector(azimuthDeg ?? 45, 0)
   const d = reach * (distFrac ?? 0.9)
   return [
-    Math.cos(az) * d,
+    ux * d,
     minElev + (maxElev - minElev) * (heightFrac ?? 1.2),
-    Math.sin(az) * d,
+    uz * d,
   ]
 }
 
@@ -5101,7 +5124,7 @@ function buildOutrun(terrain, p, o) {
  */
 function buildRiso(terrain, p, o) {
   const { cols, gridSlopes, minElev, maxElev } = terrain
-  const lam = lambertDarkness(terrain, o.azimuth ?? 315, 1, p.elevScale, 0)
+  const lam = lambertDarkness(terrain, o.azimuth ?? 45, 1, p.elevScale, 0)
   // Each separation is stretched to its own range first. Raw, the three fields
   // occupy narrow and *different* bands on real terrain, so one ink covers the
   // sheet while the other two barely print — measured on the sample plate, the
@@ -5336,7 +5359,7 @@ function buildWatershed(terrain, p, o) {
   for (let k = 0; k < sizes.length; k++) pick[k] = Math.floor(rng() * pal.length)
 
   const shade = Math.max(0, Math.min(1, o.shade ?? 0.32))
-  const lam = shade > 0 ? lambertDarkness(terrain, o.azimuth ?? 315, 1, elevScale, 0) : null
+  const lam = shade > 0 ? lambertDarkness(terrain, o.azimuth ?? 45, 1, elevScale, 0) : null
 
   const cells = fillCells(terrain, p, o.spacing, (i) => {
     const l = label[i]

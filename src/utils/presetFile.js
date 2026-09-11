@@ -39,8 +39,57 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * current defaults, so an old plate missing a field gets that field's default
  * rather than `undefined`, which is the same rule `withDefaults` follows for a
  * restored session.
+ *
+ * 2 is the true-bearing scale. Every azimuth in a format-1 payload is a quarter
+ * turn from a compass, and `parsePreset` adds the 90° on the way in — which is
+ * what lets a plate exported by v1.13 reopen looking exactly as it did.
  */
-export const PRESET_FORMAT = 1
+export const PRESET_FORMAT = 2
+
+/**
+ * The azimuths that gained 90° when the light became a true bearing.
+ *
+ * `tanakaSunAzimuth` is deliberately absent. It was built as `(sin, −cos)` from
+ * the day it was written — a true bearing already — while everything else was a
+ * quarter turn from one, so the same 315° lit Tanaka from the north-west and the
+ * hillshade from the north-east. Migrating it too would have been the one edit
+ * that changed a picture.
+ */
+export const MIGRATED_AZIMUTHS = [
+  'hillshadeAzimuth', 'sunAzimuthIso', 'sunAzimuthEngrave',
+  'azimuthRiso', 'azimuthShed', 'azimuthFlashbulb', 'azimuthHalation',
+]
+
+/**
+ * Bring a payload written before v1.14.0 up to the true-bearing scale.
+ *
+ * Adding 90 leaves every plate rendering exactly as it did: the light vector
+ * changed from `(cos a, sin alt, sin a)` to `(sin b, sin alt, −cos b)`, and
+ * `sin(a + 90) = cos a`, so the two agree precisely when `b = a + 90`. Only the
+ * number changes, and it changes into one that is true.
+ *
+ * Returns a new object. A preset is applied by spreading it over live state, and
+ * mutating the caller's copy would migrate a bundled preset twice if it were
+ * ever applied twice.
+ */
+export function migrateAzimuths(payload) {
+  if (!payload || typeof payload !== 'object') return payload
+  const out = { ...payload }
+  for (const group of ['style', 'terrain', 'points', 'view']) {
+    const src = out[group]
+    if (!src || typeof src !== 'object') continue
+    let touched = false
+    const next = { ...src }
+    for (const key of MIGRATED_AZIMUTHS) {
+      if (typeof next[key] === 'number') {
+        next[key] = (((next[key] + 90) % 360) + 360) % 360
+        touched = true
+      }
+    }
+    if (touched) out[group] = next
+  }
+  return out
+}
 
 /**
  * The look, as a plain object.
@@ -117,7 +166,17 @@ export function parsePreset(text) {
     // preset — `Preset ⬇` wrote the same six fields. So the test is whether it
     // holds any of them, not whether it announces itself.
     const FIELDS = ['terrain', 'style', 'points', 'view', 'gradientStops', 'bgGradientStops']
-    return FIELDS.some((f) => d[f] != null) ? d : null
+    if (!FIELDS.some((f) => d[f] != null)) return null
+    /*
+     * Anything without a format is older than the true-bearing scale.
+     *
+     * That covers the JSON `Preset ⬇` wrote before the field existed, and it
+     * covers every plate v1.13.x embedded — those carry `format: 1`. The
+     * bundled presets in `public/presets` never reach here: the app fetches and
+     * applies them directly, and they were migrated on disk, so a second pass
+     * would turn their light a further quarter.
+     */
+    return (d.format ?? 1) < 2 ? migrateAzimuths(d) : d
   } catch {
     return null
   }

@@ -35,6 +35,14 @@ export default defineConfig({
    * 99 passing. Serial costs about six seconds against the fastest parallel run,
    * because workers contending for a single GPU were never buying throughput.
    *
+   * Those figures are from a 99-test suite and the suite is 295 tests now. The
+   * serial half has been re-measured — 25.3 min, one worker, 294 of 295 passing
+   * — and the parallel half has not, so the six-second verdict above describes a
+   * suite a third of this size. The reasoning still holds: the contention is for
+   * one GPU and there are more canvas-reading specs than there were. The
+   * arithmetic may not, and re-measuring it is worth an afternoon before anyone
+   * raises this on the strength of a number from 2026-09-02.
+   *
    * Note the cold/warm gap before raising this again: a cold Vite server staggers
    * test starts and hides the contention, so a green parallel run is evidence about
    * the compile cache, not about concurrency being safe.

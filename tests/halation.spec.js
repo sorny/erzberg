@@ -64,12 +64,12 @@ const run = (page, over) => page.evaluate(async (over) => {
 }, over)
 
 const BULB = {
-  azimuthHalation: 315, distanceHalation: 0.9, heightHalation: 2, falloffHalation: 1.6,
+  azimuthHalation: 45, distanceHalation: 0.9, heightHalation: 2, falloffHalation: 1.6,
   exposureHalation: 2, gammaHalation: 1, contrastHalation: 1.2, grainHalation: 1,
   shadowHalation: false, seedHalation: 42,
 }
 const SAME_BULB = {
-  azimuthFlashbulb: 315, distanceFlashbulb: 0.9, heightFlashbulb: 2, falloffFlashbulb: 1.6,
+  azimuthFlashbulb: 45, distanceFlashbulb: 0.9, heightFlashbulb: 2, falloffFlashbulb: 1.6,
   exposureFlashbulb: 2, gammaFlashbulb: 1, contrastFlashbulb: 1.2, grainFlashbulb: 1,
   shadowFlashbulb: false, seedFlashbulb: 42,
 }

@@ -102,8 +102,8 @@ returns to exactly its previous state.
 setting on the right. Hillshade reads `315° · 60%`. Terrain Style reads
 `hypso · mesh`. A section that is switched off reads `—`, which the eye skips, and a section
 that is on carries a green dot beside its name.
-Close every section and the panel states the whole plate in one column of fifty
-rows, 2 337 px instead of the 6 577 px it opens at. Export, Analysis and
+Close every section and the panel states the whole plate in one column of
+fifty-four rows, 2 725 px instead of the 5 037 px it opens at. Export, Analysis and
 Hydraulic Erosion stay blank on purpose. They are actions and hold no setting,
 and a dash there would claim that they were switched off. A draw mode shows its
 own dial as a bare number, because a title such as `MODE: ZERO CROSSINGS` fills

@@ -671,13 +671,14 @@ function stepPredator(flock, dt, field, s) {
  */
 function writeShadows(flock, field, s, params) {
   const { n, pos, shadow, shadowLift } = flock
-  const az  = ((params.sunAzimuth  ?? 315) * Math.PI) / 180
+  // A true bearing, the same one the hillshade this shadow borrows uses.
+  const az  = ((params.sunAzimuth  ?? 45) * Math.PI) / 180
   // A sun on the horizon throws a shadow to infinity. Clamped, and the offset
   // is capped again below, so a low sun stretches the flock's shadow across the
   // valley instead of flinging it off the map.
   const alt = Math.max(5, Math.min(89, params.sunAltitude ?? 45)) * Math.PI / 180
   const run = Math.cos(alt) / Math.sin(alt)          // horizontal travel per unit of drop
-  const ux  = -Math.cos(az) * run, uz = -Math.sin(az) * run
+  const ux  = -Math.sin(az) * run, uz = Math.cos(az) * run
   const invBand = 1 / Math.max(1e-6, s.band * 2)
 
   for (let i = 0; i < n; i++) {

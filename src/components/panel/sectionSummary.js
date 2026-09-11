@@ -106,7 +106,7 @@ export const PANEL_MODES = [
  * The section readouts answer "what is this control set to". This answers the
  * question above them: *what am I looking at*. Thirty-one draw modes compose
  * freely and nothing on screen ever said how many were drawing — you counted
- * green dots down 2 239 px of scroll, or you did not know.
+ * green dots down 2 282 px of scroll, or you did not know.
  *
  * The ink count is the one a plotter user actually needs, so it counts pens and
  * not settings. Most modes carry a single `color*`, and a set of those is what

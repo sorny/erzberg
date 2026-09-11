@@ -168,6 +168,48 @@ describe('sunHoursField', () => {
   })
 })
 
+describe('the field cache', () => {
+  it('recomputes only when the field itself would change', () => {
+    /*
+     * Three of the mode's parameters do not touch the field — the contour count
+     * and the two smoothings — and every one of them is a geometry parameter, so
+     * each drags a full rebuild behind it. Without the cache that rebuild pays
+     * for a few hundred shadow sweeps to draw the same numbers at different
+     * heights: a second a tick on a large grid.
+     *
+     * Identity is the assertion. A recomputed field is a new object even when
+     * every number in it matches, so `toBe` catches a cache that silently is not
+     * one, which `toEqual` would not.
+     */
+    const t = cone(64)
+    const first = sunHoursField(t, year())
+    expect(sunHoursField(t, year())).toBe(first)
+
+    // A different latitude is a different field.
+    expect(sunHoursField(t, year({ lat: 20 }))).not.toBe(first)
+    // So is a different exaggeration: the sweep shadows the terrain as drawn.
+    expect(sunHoursField(t, year({ elevScale: 4 }))).not.toBe(first)
+
+    // One entry, so going back to the first set recomputes rather than
+    // returning it. That is the trade: the mode is being tuned or it is not, and
+    // a second entry would hold a second terrain alive for nothing.
+    const again = sunHoursField(t, year())
+    expect(again).not.toBe(first)
+    expect(again.max).toBeCloseTo(first.max, 6)
+  })
+
+  it('never serves one terrain’s field for another', () => {
+    // The grid is compared by identity, because the worker builds a new one
+    // whenever anything upstream moves — and hashing a million cells to avoid
+    // recomputing over them would be its own kind of silly.
+    const a = cone(64), b = cone(64, 0.4)
+    const fa = sunHoursField(a, year())
+    const fb = sunHoursField(b, year())
+    expect(fb).not.toBe(fa)
+    expect(fb.max).not.toBeCloseTo(fa.max, 0)
+  })
+})
+
 describe('sunHourLevels', () => {
   it('picks a round hour step to fit the field it was given', () => {
     // The interval is chosen, not typed: the range runs from thousands of hours

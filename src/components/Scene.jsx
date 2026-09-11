@@ -602,7 +602,7 @@ export function Scene({
 
 // ── Sun orb ───────────────────────────────────────────────────────────────────
 function SunIndicator({ p, terrain }) {
-  const az  = (p.hillshadeAzimuth  ?? 315) * Math.PI / 180
+  const az  = (p.hillshadeAzimuth  ?? 45) * Math.PI / 180
   const alt = (p.hillshadeAltitude ?? 45)  * Math.PI / 180
 
   // Keep the sun at ~1.1× halfExtent so it stays within the camera's FOV
@@ -613,10 +613,12 @@ function SunIndicator({ p, terrain }) {
     : 100
   const dist = halfExtent * 1.1
 
+  // A true bearing: east is +X, north is −Z. The orb has to stand where the
+  // shader says the light is, or it points at a sun that is not there.
   const pos = useMemo(() => new THREE.Vector3(
-    Math.cos(az) * Math.cos(alt) * dist,
+     Math.sin(az) * Math.cos(alt) * dist,
     Math.sin(alt) * dist,
-    Math.sin(az) * Math.cos(alt) * dist,
+    -Math.cos(az) * Math.cos(alt) * dist,
   ), [az, alt, dist])
 
   const r = Math.max(halfExtent * 0.07, 6)

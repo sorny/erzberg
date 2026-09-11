@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import path from 'path'
+import { waitForApp } from './helpers.js'
 
 /**
  * Performance Benchmark — full GeoTIFF workflow:
@@ -32,7 +33,7 @@ test('performance benchmark', async ({ page }) => {
   })
 
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   // ─── PHASE 1: GeoTIFF Upload, Parse & Display ─────────────────────────────
   console.log('--- Phase 1: GeoTIFF Upload & Parse ---')

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 /**
  * Crop-edge behaviour of the draw modes.
@@ -91,7 +92,7 @@ async function measure(page, shape) {
 
 test('a clipped selection does not fringe the draw modes with plunging strokes', async ({ page }) => {
   await page.goto(PAGE)
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const clipped = await measure(page, { type: 'ellipse', cx: 64, cy: 64, rx: 40, ry: 30 })
   const solid   = await measure(page, null)
@@ -114,7 +115,7 @@ test('a clipped selection does not fringe the draw modes with plunging strokes',
 
 test('blur is taken over valid ground only, so a clipped edge does not sag', async ({ page }) => {
   await page.goto(PAGE)
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const sag = await page.evaluate(async () => {
     const { boxBlur, buildTerrain } = await import('/src/utils/terrain.js')

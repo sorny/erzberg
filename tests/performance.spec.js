@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 test('rotation remains responsive during resolution change', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   
   // Ensure sidebar is open (shows ▶ when open)
   const openToggle = page.locator('[data-testid="sidebar-toggle"]')
@@ -43,7 +44,7 @@ test('render-performance-baseline', async ({ page }) => {
   })
 
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
 
   const openToggle = page.locator('[data-testid="sidebar-toggle"]')
   if ((await openToggle.innerText()) === '◀') {

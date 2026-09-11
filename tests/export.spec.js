@@ -17,7 +17,7 @@
 import { test, expect } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 
@@ -177,7 +177,7 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
  */
 test('any fill layer makes the terrain occlude lines in SVG export', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
   const toggle = page.locator('[data-testid="sidebar-toggle"]')
   if ((await toggle.innerText()) === '◀') { await toggle.click(); await page.waitForTimeout(400) }
   await resetToDefaults(page)
@@ -259,7 +259,7 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
  */
 test('exporting never blocks the page for long enough to look hung', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
   await page.waitForTimeout(2500)
 
   const r = await page.evaluate(async () => {
@@ -317,7 +317,7 @@ test('exporting never blocks the page for long enough to look hung', async ({ pa
 
 test('Cancel abandons an export without writing a file', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
   await page.waitForTimeout(2500)
 
   let downloads = 0

@@ -87,6 +87,34 @@ test('a period is a measurement, and changing it changes the answer', async ({ p
   await expect(page.locator('[data-testid="sunhours-date"]')).toBeVisible()
 })
 
+test('the panel says what the field is about to cost', async ({ page }) => {
+  // The two sampling sliders multiply and nothing said so: the top of both
+  // ranges is over a thousand sweeps of the whole grid, which on a large raster
+  // reads as a hang rather than as work.
+  test.setTimeout(180_000)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  await openMode(page)
+  await page.locator('[data-testid="mode-sunhours"]').click()
+  await page.waitForTimeout(4000)
+
+  const note = page.locator('[data-testid="sunhours-note"]')
+  // The defaults are the cheap end: 8 days by 12 positions.
+  await expect(note).toContainText('96 sun positions')
+
+  // Four times the positions is four times the work, and the estimate follows.
+  // It is the seconds rather than the count that is worth printing: the same
+  // count is a fifth of a second on a small grid and thirteen on a large one.
+  const seconds = (t) => Number(/about ([\d.]+)s a rebuild/.exec(t)?.[1] ?? 0)
+  const before = seconds(await note.textContent())
+  await page.locator('input.hmr[aria-label="Per day"]').fill('48')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(4000)
+  await expect(note).toContainText('384 sun positions')
+  expect(seconds(await note.textContent())).toBeGreaterThan(before * 3)
+})
+
 test('a plain PNG has to be told where it is', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')

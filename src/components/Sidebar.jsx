@@ -1475,6 +1475,24 @@ export function Sidebar({
   // the almanac asks, and the same answer: a GeoTIFF carries it, a PNG does not.
   const sunHoursGeoreferenced = !!bboxToWgs84(geoTiffBbox, geoTiffCRS)
   /**
+   * What the sun-hours field is about to cost, in sweeps and in seconds.
+   *
+   * Three numbers multiply and nothing on screen said so: the two sampling
+   * sliders and the size of the grid. Twenty-four days by forty-eight positions
+   * over a 1024² raster is 1 152 passes and about thirteen seconds, which reads
+   * as a hang rather than as work.
+   *
+   * The count alone would be the wrong thing to print, because the same count is
+   * a fifth of a second on a small grid. The constant is measured: 80 sweeps
+   * over 1024² took 934 ms, so a cell-sweep is about 11 nanoseconds. An upper
+   * bound either way — a polar night contributes no positions at all.
+   */
+  const sunHoursSweeps = (style.periodSunHours === 'day' ? 1 : (style.daysSunHours ?? 8))
+    * (style.perDaySunHours ?? 12)
+  const sunHoursSeconds = terrainData
+    ? (sunHoursSweeps * terrainData.rows * terrainData.cols * 1.11e-8)
+    : 0
+  /**
    * What the sheet marks measure, straight off the render loop.
    *
    * Written by `Scene` every frame the camera moves, which is the only place it
@@ -2021,7 +2039,7 @@ export function Sidebar({
             * The section headers say what each control is set to. This says what
             * they add up to, which nothing on screen ever did: thirty-two draw
             * modes compose freely, and counting the lit ones meant scrolling
-            * 2 239 px past the thirty-one that were off.
+            * 2 282 px past the thirty-one that were off.
             *
             * It is a readout and not a set of links. Every token here would want
             * a different target and "3 inks" has no single one — the panel
@@ -2453,7 +2471,7 @@ export function Sidebar({
                     onChange={v => ss({ hillshadeAlmanac: v === 'almanac' })} />
                 )}
                 {!style.hillshadeMultiDir && !almanac && (
-                  <InlineSl label="Azimuth" help="Light direction: 0°=N, 90°=E, 315°=NW (classic)." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Azimuth" help="Where the light comes from, as a compass bearing: 0°=N, 90°=E, 315°=NW (classic). The default 45° is a north-east light — it was 315° on a scale that was a quarter turn from a compass, and the migration in v1.14.0 kept the light and corrected the number." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
                 )}
                 {!almanac && (
                   <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
@@ -3233,6 +3251,17 @@ export function Sidebar({
                       and the sun here is a true bearing while every other sun in
                       this panel is a quarter turn off one. */}
                   <div data-testid="sunhours-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
+                    {/* What this is about to cost, before it costs it. The two
+                        sampling sliders multiply, and the top of both ranges is
+                        a thousand shadow sweeps over the whole grid — long
+                        enough on a large raster to read as a hang rather than
+                        as work. The count is the honest way to say so. */}
+                    <div style={{ color: sunHoursSeconds > 2 ? '#f97316' : MUTED }}>
+                      {`${sunHoursSweeps.toLocaleString()} sun positions`}
+                      {sunHoursSeconds >= 0.1
+                        ? ` · about ${sunHoursSeconds < 1 ? sunHoursSeconds.toFixed(1) : Math.round(sunHoursSeconds)}s a rebuild`
+                        : ''}
+                    </div>
                     <div>{sunHoursGeoreferenced
                       ? 'Latitude from the raster · true north from its rows'
                       : 'No georeference — the latitude is the one above'}</div>
@@ -3487,7 +3516,7 @@ export function Sidebar({
                             here because that section hides them unless Hillshade is
                             enabled — and the flock's shadows do not require it. One
                             value, two places to reach it, so they cannot disagree. */}
-                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 315} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
+                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 45} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
                           help="Which way the shadows fall: 0°=N, 90°=E, 315°=NW. This is the Hillshade sun — the same slider, shown here too because Hillshade hides it when it is switched off. Moving it here moves the terrain's shading as well." />
                         <InlineSl label="Sun alt." min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
                           help="Sun height above the horizon. Overhead drops each shadow straight under its bird; low sun throws the whole flock's shadow long across the valley. Clamped at 5° for the shadow maths, since a sun on the horizon casts to infinity." />

@@ -66,7 +66,7 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
   const preset = readPngPreset(readFileSync(file))
   expect(preset, 'the exported PNG carries no erzberg:preset chunk').not.toBeNull()
   expect(preset.app).toBe('erzberg')
-  expect(preset.format).toBe(1)
+  expect(preset.format).toBe(2)
   expect(preset.view.tilt).toBe(TILT)
   // The promise the README makes. A plate is a picture that leaves the machine.
   expect(JSON.stringify(preset)).not.toContain('heightmapDataURL')

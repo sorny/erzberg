@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
-import { resetToDefaults } from './helpers.js'
+import { resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * STL export content, which nothing covered before.
@@ -67,7 +67,7 @@ function noDataHeightmap() {
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
+  await waitForApp(page)
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(2000)
@@ -177,7 +177,7 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
  */
 test('exporting STL keeps the page alive and says what it is doing', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=erzberg', { timeout: 30_000 })
+  await waitForApp(page)
   await page.waitForTimeout(2500)
 
   const driven = await page.evaluate(() => {

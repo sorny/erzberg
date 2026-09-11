@@ -11,8 +11,9 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  PRESET_FORMAT, PRESET_KEYWORD,
-  buildPreset, parsePreset, presetComment, presetToText, readPngPreset, readSvgPreset,
+  MIGRATED_AZIMUTHS, PRESET_FORMAT, PRESET_KEYWORD,
+  buildPreset, migrateAzimuths, parsePreset, presetComment, presetToText,
+  readPngPreset, readSvgPreset,
 } from '../../src/utils/presetFile'
 import { withTextChunks } from '../../src/utils/pngExport'
 
@@ -167,12 +168,66 @@ describe('the SVG comment', () => {
   })
 })
 
+describe('migrateAzimuths', () => {
+  it('turns every offset sun into a true bearing', () => {
+    const before = { style: Object.fromEntries(MIGRATED_AZIMUTHS.map((k) => [k, 315])) }
+    const after = migrateAzimuths(before)
+    for (const k of MIGRATED_AZIMUTHS) expect(after.style[k]).toBe(45)
+  })
+
+  it('leaves Tanaka alone, because Tanaka was always right', () => {
+    /*
+     * The one edit that would have changed a picture.
+     *
+     * `tanakaSunAzimuth` was built as `(sin, −cos)` from the day it was written
+     * — a true bearing — while every other light here was a quarter turn from
+     * one. So the same 315° lit Tanaka from the north-west and the hillshade
+     * from the north-east, and a blanket migration would have swung Tanaka to
+     * the north-east to match a mistake.
+     */
+    expect(MIGRATED_AZIMUTHS).not.toContain('tanakaSunAzimuth')
+    const out = migrateAzimuths({ style: { tanakaSunAzimuth: 315, hillshadeAzimuth: 315 } })
+    expect(out.style.tanakaSunAzimuth).toBe(315)
+    expect(out.style.hillshadeAzimuth).toBe(45)
+  })
+
+  it('wraps rather than running past a circle', () => {
+    expect(migrateAzimuths({ style: { hillshadeAzimuth: 300 } }).style.hillshadeAzimuth).toBe(30)
+    expect(migrateAzimuths({ style: { hillshadeAzimuth: 0 } }).style.hillshadeAzimuth).toBe(90)
+  })
+
+  it('does not touch the caller’s copy', () => {
+    // A preset is applied by spreading it over live state, and a bundled one can
+    // be applied twice. Mutating in place would turn its light a further quarter
+    // on the second click.
+    const src = { style: { hillshadeAzimuth: 315 } }
+    migrateAzimuths(src)
+    expect(src.style.hillshadeAzimuth).toBe(315)
+  })
+
+  it('shrugs at a payload with no sun in it', () => {
+    expect(migrateAzimuths({ style: { enabledLines: true } }).style.enabledLines).toBe(true)
+    expect(migrateAzimuths(null)).toBeNull()
+  })
+})
+
 describe('parsePreset', () => {
   it('accepts a preset written before the format field existed', () => {
-    // Every preset in `public/presets` predates this module and is still a
-    // preset. The test is whether the object holds a parameter group, not
-    // whether it announces itself.
+    // A preset written before this module existed is still a preset. The test is
+    // whether the object holds a parameter group, not whether it announces
+    // itself.
     expect(parsePreset('{"style":{"enabledLines":true}}')).toEqual({ style: { enabledLines: true } })
+  })
+
+  it('migrates anything older than the true-bearing scale, once', () => {
+    // A plate v1.13 exported carries `format: 1`, and a preset older than the
+    // field carries none. Both are on the offset scale and both get the 90°.
+    expect(parsePreset('{"format":1,"style":{"hillshadeAzimuth":315}}').style.hillshadeAzimuth).toBe(45)
+    expect(parsePreset('{"style":{"hillshadeAzimuth":315}}').style.hillshadeAzimuth).toBe(45)
+    // And one already on it is left exactly as it is — the failure that turns a
+    // bundled preset's light a further quarter every time it is opened.
+    expect(parsePreset(`{"format":${PRESET_FORMAT},"style":{"hillshadeAzimuth":315}}`)
+      .style.hillshadeAzimuth).toBe(315)
   })
 
   it('rejects JSON that is not a preset', () => {

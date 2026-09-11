@@ -2,8 +2,8 @@
  * Thirty-one draw modes, on one screen.
  *
  * The modes are the largest thing in the panel and the least visible: thirty-two
- * sections over 2 239 px, each a header that says a noun. Which four were
- * drawing was a question you answered by scrolling past the twenty-seven that
+ * sections over 2 282 px, each a header that says a noun. Which four were
+ * drawing was a question you answered by scrolling past the twenty-eight that
  * were not, counting green dots. The grid answers it in one look, and lets you
  * switch one on from wherever you are.
  *

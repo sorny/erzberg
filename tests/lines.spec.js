@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { waitForApp } from './helpers.js'
 
 test('verify black lines are rendered on the canvas center', async ({ page }) => {
   // 1. Navigate to the app
@@ -10,14 +11,8 @@ test('verify black lines are rendered on the canvas center', async ({ page }) =>
   // 3. Wait a few seconds for the geometry to be computed by the worker
   await page.waitForTimeout(3000)
 
-  // The wordmark, by its heading rather than by its text.
-  //
-  // `text=erzberg` is a bet that the app's own name appears exactly once in the
-  // DOM, and a line of panel copy naming the app has already collected it once.
-  // Both of these use the wordmark as a "the app has rendered" sentinel and
-  // neither asserts anything about it, so the heading is what they actually mean.
-  const header = page.getByRole('heading', { name: 'erzberg' })
-  await expect(header).toBeVisible({ timeout: 10000 })
+  // The app has rendered, by its wordmark. See `waitForApp`.
+  await waitForApp(page, 10_000)
 
   // 4. Capture pixel data from the 100x100 center region
   // Default bg is #ffffff, default lines are #000000.

@@ -6,6 +6,7 @@ import {
   suggestElevScale, unprojectWgs84, wgs84ExtentKm,
 } from '../src/utils/geoCoords.js'
 import { areaResample } from '../src/utils/terrain.js'
+import { waitForApp } from './helpers.js'
 
 /**
  * GeoTIFF CRS handling, which nothing covered before.
@@ -582,7 +583,7 @@ test.describe('GeoTIFF load path', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('http://localhost:5173')
-    await page.waitForSelector('text=erzberg', { timeout: 30000 })
+    await waitForApp(page)
     const [chooser] = await Promise.all([
       page.waitForEvent('filechooser'),
       page.click('[data-testid="load-geotiff"]'),
