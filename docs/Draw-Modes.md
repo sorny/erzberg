@@ -437,7 +437,7 @@ The hatch is a set of parallel rays marched across the grid and broken wherever 
 
 The hatch is the material *below* the plane rather than the disc that the plane cuts, and the two move in opposite directions. On a cone the disc shrinks as the plane rises while the ground under it grows to nearly the whole raster. Beyond is the complement and shrinks to nothing. The spec asserts both directions, because getting them the wrong way round still produces a picture.
 
-## 24. Zero Crossings
+## 24. Crossings
 
 Every sign change of the scanline after the app takes out its own running mean. The density of the marks is the local **pitch** of the terrain: how often the ground crosses its own average. That is a different measurement from either slope or curvature. It is dense on scree and broken rock, and empty on a glacier, regardless of how steep either one is. The detrend is what makes it a pitch rather than a horizon. Without the detrend, a scanline crosses its mean twice on a whole mountain and the mode draws two dots.
 
@@ -642,10 +642,56 @@ falls back to the boundary lines, which are mirrored with everything else.
 
 ---
 
-## 32. Sun Hours
+## 32. Shadow Line
+
+Where the sunlight stops, at one instant. Sun Hours (§33) sums the lit moments
+over a year and contours the total; this asks the same question once and traces
+the single boundary. With a date and a clock on it, the line is a shadow that was
+really there.
+
+**The field.** `litField` runs one pass of the shadow sweep: 1 where the ground
+is in direct sun at this bearing and elevation, 0 where it is not, −1 where there
+is no ground. A cell is lit only if both tests pass — the terrain does not block
+the sun, *and* the surface faces it — so the boundary is the cast shadow and the
+self-shading terminator together, which is what "where the sunlight stops" means.
+
+**One level, not a set.** Lit is 1 and unlit is 0, so a half is the only
+meaningful contour. There is nothing for a levels control to do: the line is the
+answer, and the date and the clock are what move it.
+
+**It was cheap because the expensive half already existed.** Before Sun Hours
+brought the sweep, this needed a ray march per cell. Afterwards the single term
+was already inside the sum, and the mode is one call plus the tracer §4 and §15
+already share.
+
+**The shape of the day** is the behaviour worth knowing, and the suite asserts
+it. A low sun reaches under everything and throws long shadows; a high one
+shadows almost nothing. Measured on the benchmark raster at midwinter:
+
+| local time | sun | segments |
+|---|---|---|
+| 07:30 | 122°, 3° up | 5 804 |
+| 09:00 | 138°, 16° up | 2 147 |
+| 12:00 | 180°, 29° up | **293** |
+| 15:00 | 223°, 15° up | 2 811 |
+| 16:30 | 238°, 2° up | 4 618 |
+| 18:00 | below the horizon | 0 |
+
+**Night draws nothing.** A sun below the horizon returns a uniform field, and a
+uniform field has no level set. Tracing the outline of the whole raster instead
+would be a lie with a closed boundary round it, so the altitude is checked first
+and the panel says which it is.
+
+**Unlike Sun Hours, it needs a clock.** A total does not care *when* the sun was
+somewhere, only how long it was up, so Sun Hours needs a latitude and a date and
+nothing else. A terminator is a fact about one moment, so this needs the
+longitude and the zone as well — both decide which moment a reading on a clock is
+naming. See [Georeferencing](Georeferencing.md).
+
+## 33. Sun Hours
 
 Isolines of how long the ground is in direct sun. The same construction as
-Contours (§4) and Isophotes (§15) — marching squares over a scalar field — and
+Contours (§4), Isophotes (§15) and Shadow Line (§32) — marching squares over a scalar field — and
 the field is the whole difference. A contour is a height. An isophote is a
 shading convention. This is the number an alpine hut, a ski aspect or a panel
 array is chosen by.

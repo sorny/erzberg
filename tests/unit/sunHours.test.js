@@ -15,7 +15,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  SHADE_EDGE, latitudeFor, samplingFor, smoothField, sunHourLevels, sunHoursField,
+  SHADE_EDGE, latitudeFor, litField, samplingFor, shadowSun, smoothField,
+  sunHourLevels, sunHoursField,
 } from '../../src/utils/sunHours'
 import { sunPath, yearDays } from '../../src/utils/solar'
 
@@ -165,6 +166,84 @@ describe('sunHoursField', () => {
     const tall = sunHoursField(cone(n), year({ elevScale: 4 }))
     const north = (f) => f.hours[(m - 30) * n + m]
     expect(north(tall)).toBeLessThan(north(flat))
+  })
+})
+
+describe('litField', () => {
+  it('lights a flat plain whole, so there is no edge to draw', () => {
+    // Nothing casts and nothing turns away: the field is uniform, and a uniform
+    // field has no level set. An empty plate is the right answer here.
+    const f = litField(plain(48), { elevScale: 1, azimuth: 180, altitude: 30 })
+    expect([...f].every((v) => v === 1)).toBe(true)
+  })
+
+  it('draws nothing at all after sunset', () => {
+    // There is no shadow edge at night. Tracing the outline of the whole raster
+    // instead would be a lie with a closed boundary round it.
+    const f = litField(cone(48), { elevScale: 1, azimuth: 180, altitude: -5 })
+    expect([...f].every((v) => v === 0)).toBe(true)
+  })
+
+  it('puts the shadow on the side away from the sun', () => {
+    const n = 96, m = (n - 1) / 2 | 0
+    // A low sun due south: the northern flank of the cone is the dark one, both
+    // because it faces away and because the summit stands in the way.
+    const f = litField(cone(n), { elevScale: 1, azimuth: 180, altitude: 12 })
+    const at = (dc, dr) => f[(m + dr) * n + (m + dc)]
+    expect(at(0, 30)).toBe(1)     // south flank, toward the sun
+    expect(at(0, -30)).toBe(0)    // north flank, away from it
+  })
+
+  it('throws a strip of shadow behind a wall', () => {
+    // The cast half, separate from the facing half: flat ground on the far side
+    // of a ridge is unlit even though it faces straight up.
+    const n = 96, wall = 48
+    const t = plain(n)
+    for (let c = 0; c < n; c++) t.grid[wall * n + c] = 1
+    const f = litField(t, { elevScale: 1, azimuth: 180, altitude: 10 })
+    expect(f[(wall - 3) * n + 40]).toBe(0)     // north of the wall, in its shadow
+    expect(f[(wall + 3) * n + 40]).toBe(1)     // south of it, in the sun
+  })
+
+  it('leaves a void out of it entirely', () => {
+    const n = 32
+    const t = plain(n)
+    t.hasNoData = true
+    t.gridMask[5 * n + 5] = 0
+    const f = litField(t, { elevScale: 1, azimuth: 180, altitude: 30 })
+    expect(f[5 * n + 5]).toBe(-1)
+  })
+})
+
+describe('shadowSun', () => {
+  it('needs a clock, where the hours field does not', () => {
+    // A terminator is a fact about one moment, so the longitude and the zone
+    // both matter — they decide which moment a time on a clock is naming.
+    const base = {
+      dateShadowLine: '2026-12-21', hourShadowLine: 15, zoneShadowLine: 1,
+      latShadowLine: 47.53, lonShadowLine: 14.89,
+    }
+    const s = shadowSun(base)
+    expect(s.fromRaster).toBe(false)
+    expect(s.altitude).toBeGreaterThan(0)
+    expect(s.azimuth).toBeGreaterThan(180)        // afternoon, west of south
+    // Move the clock an hour and the sun moves with it.
+    expect(shadowSun({ ...base, hourShadowLine: 9 }).azimuth).toBeLessThan(180)
+    // Move the zone and the same clock reading names a different moment.
+    expect(shadowSun({ ...base, zoneShadowLine: 5 }).azimuth).not.toBeCloseTo(s.azimuth, 3)
+  })
+
+  it('reads the raster when the raster knows', () => {
+    const s = shadowSun({
+      geoTiffCRS: 'EPSG:32633', geoTiffBbox: [490000, 5260000, 510000, 5280000],
+      dateShadowLine: '2026-06-21', hourShadowLine: 12, zoneShadowLine: 1,
+    })
+    expect(s.fromRaster).toBe(true)
+    expect(s.lat).toBeGreaterThan(47)
+  })
+
+  it('puts the sun below the horizon rather than guess at a half-typed date', () => {
+    expect(shadowSun({ dateShadowLine: '2026-12', latShadowLine: 47 }).altitude).toBeLessThan(0)
   })
 })
 

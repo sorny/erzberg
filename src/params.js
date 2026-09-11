@@ -103,6 +103,9 @@ const RENDER_SIDE = [
   // runs on geometry the worker has already built — a decision about the order
   // strokes come out in cannot change where any of them are.
   /^plot/,
+  // The anaglyph modifier. It draws each layer twice with a world offset and two
+  // filter inks — a property of the render, not of a single vertex.
+  /^anaglyph/,
   // Particles: both fields are built on the main thread from the terrain grid
   // the worker already returned.
   /^(flock|holo|point|particle|animateParticles|showPoints)/,

@@ -185,6 +185,26 @@ export const STYLE_DEF = {
   hatchWeightSection: 1, beyondWeightSection: 1,
   hypsoSection: false, hypsoModeSection: 'elevation', hypsoBandedSection: false, hypsoIntervalSection: 10,
 
+  // ── Shadow line ───────────────────────────────────────────────────────────
+  // The edge of the shadow at one instant: the terminator the terrain casts on
+  // itself, as ink. Sun Hours sums the lit moments over a year; this asks the
+  // same question once and traces the single boundary. See utils/sunHours.js.
+  //
+  // Unlike Sun Hours this needs a *clock* — the longitude and the zone as well
+  // as the latitude — because a terminator is a fact about one moment. The date
+  // is stored rather than "today", for the reason every seed here is a number: a
+  // preset has to draw the same plate tomorrow.
+  //
+  // Midwinter at 15:00 by default, which is when the shadow is longest and the
+  // line has the most to say. `lat`/`lon` are the fallback for a plain PNG; a
+  // GeoTIFF answers both from its own bounding box and they are ignored.
+  enabledShadowLine: false,
+  dateShadowLine: '2026-12-21', hourShadowLine: 15, zoneShadowLine: 1,
+  latShadowLine: 47.53, lonShadowLine: 14.89,
+  smoothingShadowLine: 2, radiusShadowLine: 1,
+  colorShadowLine: '#1a1a1a', weightShadowLine: 2, opacityShadowLine: 1, dashShadowLine: 'solid',
+  hypsoShadowLine: false, hypsoModeShadowLine: 'elevation', hypsoBandedShadowLine: false, hypsoIntervalShadowLine: 10,
+
   // ── Sun hours ─────────────────────────────────────────────────────────────
   // Isolines of how long the ground is in direct sun, over a year or over one
   // date. The only field in the app that is a measurement of the *ground* rather
@@ -426,6 +446,24 @@ export const VIEW_DEF = {
   // the terrain. See utils/sheetMarks.js.
   frameScaleBar: false, frameNorth: false,
   frameMarkScale: 1, frameMarkColor: '#000000',
+
+  // ── Anaglyph ──────────────────────────────────────────────────────────────
+  // A modifier rather than a mode: it takes whatever the thirty-three modes are
+  // drawing and makes it stereo, for the cost of drawing each layer twice.
+  //
+  // The offset is a lateral *world* translation, which under the perspective
+  // camera is a real eye separation — a near mark moves further across the
+  // screen than a far one, and that difference is the depth. Under the
+  // orthographic camera it is a rigid shift with no depth in it, and the panel
+  // says so rather than letting you wonder why the glasses do nothing.
+  //
+  // `anaglyphEye` is a multiplier on the terrain's own reach, not a world
+  // distance: a separation that reads on a 400-unit quarry is invisible on a
+  // 12 000-unit massif. The two inks are the filters the glasses carry — red on
+  // the left lens, cyan on the right — and they multiply, because these plates
+  // are drawn on paper and multiply is the blend that can only darken.
+  anaglyph: false, anaglyphEye: 2,
+  anaglyphLeft: '#ff2020', anaglyphRight: '#20e0ff',
 
   // ── The plot ──────────────────────────────────────────────────────────────
   // How wide the sheet is on paper. The one fact the exporter cannot know and

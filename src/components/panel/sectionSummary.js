@@ -80,10 +80,12 @@ export const PANEL_MODES = [
   ['Mode: Outrun',         'enabledOutrun',    'Levels',    (s) => num(s.levelsOutrun)],
   // Riso and Mineral are separations rather than one mark: the ink count is the
   // fact, and the algorithm fixes it rather than a slider. Both titles are short
-  // enough to carry the word.
+  // enough to carry the word — Watershed's is not, which is why it takes the
+  // bare number the rest of the modes take. Measured: with the word, its header
+  // truncated its own name by 4 px.
   ['Mode: Riso',           'enabledRiso',      'Inks',      () => '3 inks'],
   ['Mode: Mineral',        'enabledMineral',   'Inks',      () => '5 inks'],
-  ['Mode: Watershed',      'enabledShed',      'Inks',      (s) => `${num(s.inksShed)} inks`],
+  ['Mode: Watershed',      'enabledShed',      'Inks',      (s) => num(s.inksShed)],
   ['Mode: Flashbulb',      'enabledFlashbulb', 'Azimuth',   (s) => deg(s.azimuthFlashbulb)],
   ['Mode: Halation',       'enabledHalation',  'Azimuth',   (s) => deg(s.azimuthHalation)],
   ['Mode: Fall Line',      'enabledFallLine',  'Spacing',   (s) => num(s.spacingFallLine)],
@@ -91,11 +93,16 @@ export const PANEL_MODES = [
   ['Mode: Air',            'enabledAir',       'Spacing',   (s) => num(s.spacingAir)],
   ['Mode: Race Line',      'enabledRaceLine',  'Fan',       (s) => num(s.fanRaceLine)],
   ['Mode: Section',        'enabledSection',   'Cut',       (s) => pct(s.cutSection)],
+  // The hour, because that is what the line is about — every other mode's one
+  // fact is a setting and this one's is a moment. Bare, like the rest: a clock
+  // reading is five characters and `MODE: SHADOW LINE` cannot spare them. The
+  // hover says `Time 15`, and 15 is three in the afternoon.
+  ['Mode: Shadow Line',    'enabledShadowLine', 'Time',     (s) => num(s.hourShadowLine)],
   // The period, not a dial. Every other mode's one fact is a number it was set
   // to; this one's is *what it measured* — a year or a date — and the hour marks
   // it draws at are chosen by the field rather than by a slider.
   ['Mode: Sun Hours',      'enabledSunHours',  'Period',    (s) => (s.periodSunHours === 'day' ? 'a day' : 'a year')],
-  ['Mode: Zero Crossings', 'enabledZeroCross', 'Spacing',   (s) => num(s.spacingZeroCross)],
+  ['Mode: Crossings',      'enabledZeroCross', 'Spacing',   (s) => num(s.spacingZeroCross)],
   ['Mode: Sprite Blocks',  'enabledSprite',    'Tiers',     (s) => num(s.tiersSprite)],
   ['Mode: Reticulation',   'enabledRetic',     'Cells',     (s) => num(s.cellRetic)],
 ]
@@ -225,7 +232,7 @@ export function buildSectionSummaries({
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
 
   // ── Marks ─────────────────────────────────────────────────────────────────
-  // The index says how many of the thirty-two are drawing. It is the one header
+  // The index says how many of the thirty-three are drawing. It is the one header
   // whose readout is about the sections under it rather than about itself.
   out['Draw Modes'] = `${PANEL_MODES.filter(([, k]) => style[k]).length} of ${PANEL_MODES.length}`
   for (const [title, key, label, fact] of PANEL_MODES) {
@@ -262,6 +269,8 @@ export function buildSectionSummaries({
   out['Mirror'] = mirrored.length ? mirrored.join(' ') : OFF
   // Named rather than counted, like Mirror above it: two marks, and which of
   // them is on is the whole question.
+  // The separation is the only dial it has, and it is what you reach for.
+  out['Anaglyph'] = when(view.anaglyph, `${num(view.anaglyphEye ?? 2)}× apart`)
   const sheet = [view.frameScaleBar && 'bar', view.frameNorth && 'north'].filter(Boolean)
   out['Scale and North'] = sheet.length ? sheet.join(' · ') : OFF
 

@@ -129,7 +129,7 @@ it is. Jitter changes the source, so jitter is in Source. Hydraulic Erosion used
 to sit at position 48, immediately before Export.
 
 **Thirty-one modes on one screen.** The Draw Modes index opens the Marks stage.
-It is a grid of the thirty-two marks themselves — the same glyphs the section
+It is a grid of the thirty-three marks themselves — the same glyphs the section
 headers carry. A lit tile is drawing. Click one to switch it on, and the panel
 opens its section and scrolls to it. Click a lit one to switch it off, and the
 panel stays where it is. The tile and the section switch are two views of one
@@ -261,6 +261,7 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot density driven by slope or elevation |
 | Isophotes | Lines of constant illumination — light drawn, not hatched by |
+| Shadow Line | The edge of the shadow at one instant — the terminator the terrain casts on itself. Set a date, a time and a zone; the line is longest at dawn and dusk and nearly absent at noon |
 | Sun Hours | Isolines of how long the ground is in direct sun, over a year or over one date. The only field here that measures the ground rather than the picture, and the only one whose sun is a true bearing |
 | Engraving | Copperplate illumination cross-hatch — shadows accumulate over up to 4 stacked stroke directions |
 | Curvature | Evenly spaced streamlines through the principal-curvature direction field — strokes wrap the shape rather than the light |
@@ -275,7 +276,7 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Air | The jumps, found rather than drawn — spans where the ballistic path clears the surface, on their true parabola |
 | Race Line | Every line that one drop-in could take, with the one that reaches lowest ground soonest inked heavier |
 | Section | A cutting plane drawn as a drawing: heavy cut face, 45° hatch over the material below, outline beyond |
-| Zero Crossings | Sign changes of the detrended scanline — the local pitch of the terrain, which is neither slope nor curvature |
+| Crossings | Sign changes of the detrended scanline — the local pitch of the terrain, which is neither slope nor curvature |
 | Indexed | Colour as a lookup, not a sample: elevation tier by slope class, Bayer-dithered between adjacent palette entries |
 | Outrun | An additive halo under a near-white filament — where contours crowd, the halos sum and the ground lifts |
 | Riso | Three spot inks screened at 15°, 45° and 75°, multiplied together. Registration and a coverage cap decide which press you are on |
@@ -355,6 +356,22 @@ rather than about the drawing, and it is one to ask for rather than to be
 handed. The panel shows the seed, and the
 arrow steps back through recent rolls. The seed *is* the look, so you can always
 return to it.
+
+**Anaglyph** is a modifier rather than a mode. Switch it on and every layer is
+drawn twice — offset sideways and inked in two filter colours — so the plate
+stands up off the paper through red/cyan glasses. It works on whatever is
+already drawing, which makes all thirty-three modes new at once.
+
+The depth is real parallax, not a double image: the offset is a lateral
+translation in world space, and under the perspective camera a near mark moves
+further across the page than a far one. Under an orthographic camera it
+degenerates to a rigid shift with no depth in it, and the panel says so.
+
+The SVG export writes the two eyes as two named pen layers, which is what makes
+it native to a two-pen plotter: load red, plot the first group, load cyan, plot
+the second. That export runs the whole pipeline twice, once per eye, because the
+projection, the depth buffer and the paper clip all depend on where the camera
+is. It costs what it says it costs.
 
 ---
 

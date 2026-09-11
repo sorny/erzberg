@@ -349,6 +349,61 @@ test.describe('panel', () => {
     await expect(page.locator('[data-testid="summary-draw-modes"]')).toHaveText(`1 of ${MODE_COUNT}`)
   })
 
+  test('no section header truncates its own name', async ({ page }) => {
+    /*
+     * A header is at its tightest when the mode is **on** and the section is
+     * **shut**: that is when the green dot and the readout both appear and take
+     * their width out of the title. Neither state alone finds it, which is how
+     * three headers came to be silently clipped — `Mode: Zero Crossings` by
+     * 11 px, `Mode: Shadow Line` by 10, `Mode: Watershed` by 4.
+     *
+     * The panel is 272 px and that is load-bearing: it insets the canvas and
+     * sets the paper overlay's geometry. So the fix is names and readouts that
+     * fit, and this is the thing that says when one stops fitting — the next
+     * mode with a long title fails here rather than in somebody's screenshot.
+     */
+    test.setTimeout(300_000)
+    await openApp(page)
+
+    const index = page.locator('[data-testid="section-draw-modes"]')
+    await index.scrollIntoViewIfNeeded()
+    if ((await index.getAttribute('aria-expanded')) !== 'true') {
+      await index.click()
+      await page.waitForTimeout(300)
+    }
+    for (const tile of await page.locator('[data-testid^="mode-tile-"]').all()) {
+      if ((await tile.getAttribute('aria-pressed')) !== 'true') await tile.click()
+    }
+    await page.waitForTimeout(8000)
+
+    // Every section shut, which is when a header carries its readout.
+    await page.evaluate(() => {
+      for (const b of document.querySelectorAll('[data-testid^="section-"]')) {
+        if (b.getAttribute('aria-expanded') === 'true') b.click()
+      }
+    })
+    await page.waitForTimeout(1500)
+
+    const clipped = await page.evaluate(() => {
+      const out = []
+      for (const sec of document.querySelectorAll('[data-section]')) {
+        const btn = sec.querySelector('button.hmsec')
+        if (!btn) continue
+        // The innermost span holding the title — the one with overflow:hidden.
+        // The outer flex container carries the same text and sizes to content,
+        // so measuring that one finds nothing however badly the name is clipped.
+        const all = [...btn.querySelectorAll('span')].filter(
+          (el) => el.textContent.trim() === sec.dataset.section && !el.querySelector('span'))
+        const t = all[all.length - 1]
+        if (!t) continue
+        const over = Math.round(t.scrollWidth - t.clientWidth)
+        if (over > 0) out.push(`${sec.dataset.section} (cut by ${over}px)`)
+      }
+      return out
+    })
+    expect(clipped, `headers clipping their own name: ${clipped.join(', ')}`).toEqual([])
+  })
+
   test('a tile and the section switch are two views of one boolean', async ({ page }) => {
     // Not a layer stack and not a duplicate control: the tile reads and writes
     // the same `enabled<Id>` the section's own Enabled switch does, so there is

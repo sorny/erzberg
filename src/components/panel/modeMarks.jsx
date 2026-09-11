@@ -125,6 +125,16 @@ const MARKS = {
       <path d="M15 1.5 C18.5 4.5, 18.5 8.5, 15 11.5" />
     </g>
   ),
+  // The edge of the shadow: one boundary, not a set. The hatching on the far
+  // side is the unlit ground, and the line itself is the only thing this mode
+  // actually draws — the shading is here to say which side is which.
+  shadowline: (
+    <g {...BASE}>
+      <path d="M1 3.5 C5 3, 7 8, 11 8 C15 8, 17 2.5, 21 2" strokeWidth="1.4" />
+      <path d="M2 11.5 L4.5 8.6 M5.5 11.5 L8.5 9.1 M9 11.5 L12 8.7 M12.5 11.5 L15.5 6.6 M16 11.5 L18.5 4.3 M19.5 11.5 L21 6.4"
+            strokeWidth="0.6" />
+    </g>
+  ),
   // Hours of direct sun. Nested like a contour set and deliberately lopsided:
   // the rings crowd against the shaded flank and open out toward the sun, and
   // the closed loop at the heart of them is the ground that never sees it —

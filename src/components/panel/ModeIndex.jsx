@@ -1,9 +1,9 @@
 /**
  * Thirty-one draw modes, on one screen.
  *
- * The modes are the largest thing in the panel and the least visible: thirty-two
+ * The modes are the largest thing in the panel and the least visible: thirty-three
  * sections over 2 282 px, each a header that says a noun. Which four were
- * drawing was a question you answered by scrolling past the twenty-eight that
+ * drawing was a question you answered by scrolling past the twenty-nine that
  * were not, counting green dots. The grid answers it in one look, and lets you
  * switch one on from wherever you are.
  *
@@ -12,7 +12,7 @@
  * mode becomes a record in a store: a tile reads `style.enabled<Id>` and writes
  * `style.enabled<Id>` and does nothing else. That distinction is the whole
  * reason this can exist at all — the stack was built twice and reverted twice,
- * because it arrived beside the thirty-two sections as a second way of working
+ * because it arrived beside the thirty-three sections as a second way of working
  * rather than a shorter way to the same one.
  *
  * The tile and the section's own Enabled switch are two views of one boolean, so
@@ -24,7 +24,7 @@
  * that list. The marks are what a mode actually puts on paper, they already
  * exist in `modeMarks.jsx` — one per section header, where only one is ever on
  * screen at a time — and side by side they are the only form in which
- * thirty-two modes fit above the fold. Every tile carries its name as a tooltip
+ * thirty-three modes fit above the fold. Every tile carries its name as a tooltip
  * and as its accessible name, because a glyph teaches less than a word.
  */
 import { DRAW_MODES } from '../../utils/drawModes'
@@ -38,7 +38,7 @@ const MARK_FOR = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.mark]))
 /**
  * The grid, in the panel's own mode order.
  *
- * `PANEL_MODES` rather than `DRAW_MODES`: the two hold the same thirty-two in
+ * `PANEL_MODES` rather than `DRAW_MODES`: the two hold the same thirty-three in
  * different orders, and the tile under the cursor has to be the section the
  * click scrolls to. `DRAW_MODES` is in pipeline order, which is the order the
  * geometry is built in and not the order the panel lists.

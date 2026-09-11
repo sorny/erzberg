@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-two at once.
+ * does the index that shows all thirty-three at once.
  */
 export const DRAW_MODES = [
   {
@@ -116,6 +116,13 @@ export const DRAW_MODES = [
     pick: { cell: [5, 26], spacing: [1, 4], width: [0.2, 1], gamma: [0.6, 2] },
   },
   {
+    // Cheap, because the expensive half was already built. It is one call to the
+    // shadow sweep Sun Hours sums over a year, traced at the single level where
+    // lit meets unlit.
+    id: 'ShadowLine', label: 'Shadow line', cost: 1.5, mark: 'shadowline',
+    pick: { hour: [7, 17], smoothing: [0, 4], radius: [0, 3] },
+  },
+  {
     // The most expensive mode here by a distance: a few hundred shadow sweeps
     // over the whole grid per rebuild. The randomiser spends a budget rather
     // than counting modes, so this cost is what keeps it from rolling a look
@@ -124,7 +131,10 @@ export const DRAW_MODES = [
     pick: { levels: [4, 10], days: [6, 12], perDay: [8, 16], smoothing: [0, 3], radius: [0, 3] },
   },
   {
-    id: 'ZeroCross', label: 'Zero crossings', cost: 1.5, mark: 'zerocross',
+    // 'Crossings', not 'Zero crossings': the longer name was the one title in
+    // the panel that could not fit its own header beside a readout. The id is
+    // untouched, so every `*ZeroCross` parameter and every saved preset is too.
+    id: 'ZeroCross', label: 'Crossings', cost: 1.5, mark: 'zerocross',
     pick: { detrend: [2, 16], spacing: [1, 6] },
   },
   {

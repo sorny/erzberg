@@ -25,6 +25,7 @@ import { AudioTransport } from './AudioTransport'
 import { PAPERS, frameRect, paperAspect, paperRatioLabel } from '../utils/frame'
 import { formatClock, zoneForLongitude } from '../utils/solar'
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
+import { shadowSun } from '../utils/sunHours'
 import { plotEstimate } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { SpectrogramView } from './SpectrogramView'
@@ -1487,6 +1488,14 @@ export function Sidebar({
    * over 1024² took 934 ms, so a cell-sweep is about 11 nanoseconds. An upper
    * bound either way — a polar night contributes no positions at all.
    */
+  /**
+   * Where the sun stood for the Shadow Line, resolved the same way the worker
+   * resolves it — one function, so the readout and the line cannot disagree
+   * about which moment is being drawn.
+   */
+  const shadowLineSun = style.enabledShadowLine
+    ? shadowSun({ ...style, geoTiffBbox, geoTiffCRS })
+    : null
   const sunHoursSweeps = (style.periodSunHours === 'day' ? 1 : (style.daysSunHours ?? 8))
     * (style.perDaySunHours ?? 12)
   const sunHoursSeconds = terrainData
@@ -1572,7 +1581,7 @@ export function Sidebar({
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
-    sheetMarks: false, fetchTerrain: false,
+    sheetMarks: false, fetchTerrain: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false,
   })
 
@@ -2037,9 +2046,9 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-two draw
+            * they add up to, which nothing on screen ever did: thirty-three draw
             * modes compose freely, and counting the lit ones meant scrolling
-            * 2 282 px past the thirty-one that were off.
+            * 2 282 px past the thirty-two that were off.
             *
             * It is a readout and not a set of links. Every token here would want
             * a different target and "3 inks" has no single one — the panel
@@ -2589,7 +2598,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The index, at the head of the thirty-two sections it stands for.
+          {/* The index, at the head of the thirty-three sections it stands for.
               It is a Section like everything else so that it can be closed by
               anyone who does not want it, found by the filter, and given the
               same shut-state readout every other header carries. */}
@@ -3206,6 +3215,58 @@ export function Sidebar({
             )}
           </Section>
 
+          {/* ── Shadow line ──────────────────────────────────────────────
+              Where the sunlight stops, at one instant. One call to the same
+              shadow sweep Sun Hours sums over a year, traced at the single level
+              where lit meets unlit. See utils/sunHours.js. */}
+          <Section title="Mode: Shadow Line" icon={<ModeMark kind="shadowline" />} open={sec.modeShadowLine} onToggle={() => tog('modeShadowLine')} enabled={style.enabledShadowLine}>
+            <Tog label="Enabled" testId="mode-shadowline" checked={style.enabledShadowLine} onChange={v => ss({ enabledShadowLine: v })} />
+            {style.enabledShadowLine && (
+              <>
+                <Sub>
+                  <DateRow label="Date" testId="shadowline-date"
+                    help="A stored date, so a preset draws the same plate tomorrow. Midwinter by default, when the shadow is longest and the line has the most to say."
+                    value={style.dateShadowLine} onChange={v => ss({ dateShadowLine: v })} />
+                  <InlineSl label="Time" testId="shadowline-hour"
+                    help="Local standard time at the zone below. No summer clock: an hour of daylight saving is a political fact about a country, not an astronomical one about the sky."
+                    min={0} max={24} step={0.25} value={style.hourShadowLine ?? 12}
+                    onChange={v => ss({ hourShadowLine: v })} fmt={formatClock} />
+                  <InlineSl label="Zone" testId="shadowline-zone"
+                    help="Hours ahead of UTC. This mode needs a clock where Sun Hours does not: a shadow edge is a fact about one moment, and the zone decides which moment a time names."
+                    min={-12} max={14} step={0.5} value={style.zoneShadowLine ?? 0}
+                    onChange={v => ss({ zoneShadowLine: v })}
+                    fmt={v => `UTC${v >= 0 ? '+' : '−'}${Math.abs(v) % 1 ? Math.abs(v).toFixed(1) : Math.abs(v)}`} />
+                  {!sunHoursGeoreferenced && (<>
+                    <InlineSl label="Latitude" testId="shadowline-lat" min={-89} max={89} step={0.01}
+                      value={style.latShadowLine ?? 0} onChange={v => ss({ latShadowLine: v })}
+                      fmt={v => `${Math.abs(v).toFixed(2)}° ${v < 0 ? 'S' : 'N'}`} />
+                    <InlineSl label="Longitude" testId="shadowline-lon" min={-180} max={180} step={0.01}
+                      value={style.lonShadowLine ?? 0} onChange={v => ss({ lonShadowLine: v })}
+                      fmt={v => `${Math.abs(v).toFixed(2)}° ${v < 0 ? 'W' : 'E'}`} />
+                  </>)}
+                  <InlineSl label="Detail" help="How much the lit/unlit field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the line follows every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowLine ?? 1} onChange={v => ss({ radiusShadowLine: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Smoothing" help="Chaikin passes over the finished line, rounding the staircase left by tracing a level set across grid cells." min={0} max={25} step={1} value={style.smoothingShadowLine ?? 2} onChange={v => ss({ smoothingShadowLine: Math.round(v) })} />
+                  {shadowLineSun && (
+                    <div data-testid="shadowline-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
+                      <div style={{ color: shadowLineSun.altitude > 0 ? DIM : '#f97316' }}>
+                        {shadowLineSun.altitude > 0
+                          ? `${Math.round(shadowLineSun.azimuth)}° · ${Math.round(shadowLineSun.altitude)}° above`
+                          : 'Below the horizon — there is no shadow edge at night'}
+                      </div>
+                      <div>
+                        {shadowLineSun.times?.polar === 'day' ? 'sun never sets'
+                          : shadowLineSun.times?.polar === 'night' ? 'sun never rises'
+                          : `rise ${formatClock(shadowLineSun.times?.rise)} · set ${formatClock(shadowLineSun.times?.set)}`}
+                      </div>
+                      <div>{sunHoursGeoreferenced ? 'from the raster' : 'no georeference — the position is the one above'}</div>
+                    </div>
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="ShadowLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           {/* ── Sun hours ────────────────────────────────────────────────
               The one field in the app that measures the ground rather than the
               picture. See utils/sunHours.js. */}
@@ -3278,7 +3339,7 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Mode: Zero Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
+          <Section title="Mode: Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
             <Tog label="Enabled" checked={style.enabledZeroCross} onChange={v => ss({ enabledZeroCross: v })} />
             {style.enabledZeroCross && (
               <>
@@ -3704,6 +3765,41 @@ export function Sidebar({
                 <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
                 <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
                   help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Anaglyph ─────────────────────────────────────────────────
+              A modifier, not a mode: it takes whatever the thirty-three modes
+              are drawing and makes it stereo. See defaults.js. */}
+          <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
+                   enabled={summaries['Anaglyph'] !== '—'}>
+            <Tog label="Enabled" testId="anaglyph-on"
+                 help="Draws every layer twice, offset sideways and inked in the two filter colours. Through red/cyan glasses the plate stands up off the paper. It is a modifier rather than a mode, so it works on whatever is already drawing."
+                 checked={!!view.anaglyph} onChange={v => sv({ anaglyph: v })} />
+            {view.anaglyph && (
+              <Sub>
+                <InlineSl label="Separation" testId="anaglyph-eye"
+                  help="How far the two eyes sit apart, as a fraction of the plate's own size. Too little and there is no depth; too much and the two images refuse to fuse and you see double."
+                  min={0.5} max={20} step={0.5} value={view.anaglyphEye ?? 2}
+                  onChange={v => sv({ anaglyphEye: v })} fmt={v => v.toFixed(1)} />
+                <ColorRow label="Left" value={view.anaglyphLeft ?? '#ff2020'}
+                  onChange={v => sv({ anaglyphLeft: v })} testId="anaglyph-left" />
+                <ColorRow label="Right" value={view.anaglyphRight ?? '#20e0ff'}
+                  onChange={v => sv({ anaglyphRight: v })} testId="anaglyph-right" />
+                {/* What it is and is not, said where it is switched on. The
+                    depth comes from the perspective divide — a near mark shifts
+                    further across the screen than a far one — so an orthographic
+                    camera gives a rigid double image with no depth in it. */}
+                <div data-testid="anaglyph-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
+                  <div style={{ color: view.orthographic ? '#f97316' : MUTED }}>
+                    {view.orthographic
+                      ? 'Orthographic — no depth. Switch the camera to perspective.'
+                      : 'Depth comes from the perspective camera'}
+                  </div>
+                  <div>Per-layer colour is replaced by the two filters</div>
+                  <div>SVG runs the whole export twice — once per eye</div>
+                </div>
               </Sub>
             )}
           </Section>

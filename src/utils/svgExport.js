@@ -403,6 +403,7 @@ export function screenInkHex(hex) {
 export async function exportSVG(opts) {
   const pacer = makePacer(opts.shouldCancel)
   try {
+    if (opts.anaglyph && !opts.measureOnly) return await runAnaglyph(opts, pacer)
     return await runExport(opts, pacer)
   } catch (e) {
     // The pacer throws this the moment Cancel is pressed. The download is the
@@ -410,6 +411,70 @@ export async function exportSVG(opts) {
     if (e === CANCELLED) return 'cancelled'
     throw e
   }
+}
+
+/**
+ * Two eyes, one document.
+ *
+ * The projection, the software Z-buffer, the occlusion walk and the paper clip
+ * all depend on where the camera is, so a stereo pair cannot be a shifted copy
+ * of one pass — it has to be two. The eye offset rides on the group matrix,
+ * which every one of those already goes through, so each pass is a complete and
+ * self-consistent view of the scene from its own eye.
+ *
+ * It therefore costs twice a plain export, which is stated in the panel. That is
+ * the honest price of the thing and there is no cheaper correct version.
+ *
+ * The two sets of pen layers land in one file, each in its own filter ink, which
+ * is what makes this native to a two-pen plotter: load red, plot the first
+ * group, load cyan, plot the second. On screen it needs the glasses; on paper it
+ * needs the glasses and two pens.
+ */
+async function runAnaglyph(opts, pacer) {
+  const { anaglyphEye: sep = 2, rotation = 0, imageWidth = 800, imageHeight = 800 } = opts
+  // The camera's own right vector on the ground plane, so the stereo axis stays
+  // horizontal on the page however the plate is turned. The same expression the
+  // viewport uses, and the same scaling by the raster's reach.
+  const th = (rotation * Math.PI) / 180
+  const reach = Math.max(1, Math.hypot(imageWidth, imageHeight) / 2)
+  const d = reach * 0.0012 * sep
+  const axis = [Math.cos(th) * d, -Math.sin(th) * d]
+
+  const left = await runExport({
+    ...opts, partsOnly: true, eye: [-axis[0], -axis[1]],
+    eyeInk: opts.anaglyphLeft ?? '#ff2020',
+  }, pacer)
+  const right = await runExport({
+    ...opts, partsOnly: true, eye: axis,
+    eyeInk: opts.anaglyphRight ?? '#20e0ff',
+    // The progress bar has already run to the end once. Reporting a second pass
+    // over the same range would read as the export restarting.
+    onProgress: null, onStats: null,
+  }, pacer)
+  if (typeof left === 'string') return left        // 'empty' or 'cancelled'
+  if (typeof right === 'string') return right
+
+  const { vw, vh } = left
+  const tag = (name, groups) =>
+    `<g id="anaglyph-${name}" inkscape:groupmode="layer" inkscape:label="Anaglyph · ${name}">${groups.join('')}</g>`
+
+  const svg = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(1)}" height="${vh.toFixed(1)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
+    ...(opts.attribution ? [`<!-- ${xmlAttr(opts.attribution)} -->`] : []),
+    ...(opts.preset ? [opts.preset] : []),
+    `<rect width="100%" height="100%" fill="${opts.bgColor}"/>`,
+    // One outer layer per eye, so the plot is two pen changes rather than
+    // sixty-six interleaved ones.
+    tag('left', left.parts),
+    tag('right', right.parts),
+    ...sheetMarkGroup(opts.sheetMarks, opts.sheetMarkColor ?? '#000000', left.vx, left.vy),
+    `</svg>`,
+  ].join('\n')
+
+  await pacer.yield()
+  download(svg, `${opts.baseName ?? 'heightmap'}.svg`, 'image/svg+xml')
+  return 'done'
 }
 
 async function runExport({
@@ -430,6 +495,15 @@ async function runExport({
   // panel can answer "is this drawing too dense" before the click rather than at
   // the machine. See utils/penRoute.js.
   penOrder = false, measureOnly = false, onStats = null,
+  /*
+   * Anaglyph. `eye` is a world-space offset applied before the camera, which is
+   * a real eye separation under a perspective camera: a near mark moves further
+   * across the page than a far one. `eyeInk` forces every stroke to one filter
+   * colour, because a per-vertex ramp underneath is a colour a stereo pair
+   * cannot carry. `partsOnly` returns the pieces instead of writing a file, so
+   * `exportSVG` can run this twice and assemble one document.
+   */
+  eye = null, eyeInk = null, partsOnly = false,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   surfaceOccludes,
@@ -443,6 +517,15 @@ async function runExport({
   frame, frameClip,
   baseName,
 }, pacer) {
+  // The eye offset is a translation of the whole scene before the camera, so it
+  // rides on the matrix `project` already applies — the software Z-buffer,
+  // the frame clip and the occlusion walk all move with it, which is what makes
+  // each eye a complete and self-consistent view rather than a shifted copy.
+  if (eye) {
+    const shift = new THREE.Matrix4().makeTranslation(eye[0], 0, eye[1])
+    groupMatrix = groupMatrix ? shift.clone().multiply(groupMatrix) : shift
+  }
+
   const bias = occlusionBias ?? 0.1
   const ghostOpac = occlusionOpacity ?? 0
   // One ghost ink for the whole file: the hidden pass, the hidden dots and the
@@ -731,7 +814,10 @@ async function runExport({
       // still not exported: it arrives as thousands of terrain-conforming
       // triangles, and a triangle soup has no outline to trace. The outline of
       // every such area is here as lines, so nothing goes missing.
-      const flatStroke = screenInkHex(color)
+      // One filter colour for the whole eye when an anaglyph is being written.
+      // A per-vertex ramp underneath would be seen by one eye and not the other,
+      // which is not a colour a stereo pair can carry.
+      const flatStroke = eyeInk ? screenInkHex(eyeInk) : screenInkHex(color)
 
       // ── Area layers (Indexed, Mineral, Watershed) ────────────────────────
       //
@@ -872,8 +958,11 @@ async function runExport({
           else            { bx = cx3; by = cy3; bz = cz3 }
         }
 
+        // `eyeInk` short-circuits the per-vertex ramp: one filter colour for the
+        // whole eye, because a ramp under an anaglyph is a colour only one eye
+        // would see.
         let stroke = flatStroke
-        if (colors && colors.length > i + 2) {
+        if (!eyeInk && colors && colors.length > i + 2) {
           stroke = screenInk(colors[i], colors[i+1], colors[i+2])
         }
 
@@ -1399,6 +1488,14 @@ async function runExport({
     ? [`<g id="layer-flock" inkscape:groupmode="layer" inkscape:label="Flock" fill="none" stroke-width="${trailStroke.toFixed(2)}" stroke-linecap="round">${trailEls.join('')}</g>`]
     : []
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
+  // One eye of an anaglyph is a complete drawing that is not a document: the
+  // caller assembles both into one. Returned before the header is written, so
+  // there is exactly one `<svg>` element and one background in the result.
+  if (partsOnly) {
+    onStats?.({ ...plot, bytes: 0, width: vw, height: vh })
+    return { parts: layerGroups, vx, vy, vw, vh }
+  }
+
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     // width/height at the same precision as the viewBox, so the page is not

@@ -7,7 +7,7 @@ import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
 import { isTextLayerId, textLayerName } from './textLayers'
 import { layerDisplayName } from './drawModes'
-import { latitudeFor, samplingFor, smoothField, sunHourLevels, sunHoursField } from './sunHours'
+import { latitudeFor, litField, samplingFor, shadowSun, smoothField, sunHourLevels, sunHoursField } from './sunHours'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -391,6 +391,8 @@ export function buildLineGeometry(terrain, p) {
     { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
+    { id:'ShadowLine', builder: (t, ctx) => buildShadowLine(t, ctx, {
+        ...shadowSun(p), smoothing: p.smoothingShadowLine, radius: p.radiusShadowLine }) },
     { id:'SunHours',builder: (t, ctx) => buildSunHours(t, ctx, {
         levels: p.levelsSunHours, period: p.periodSunHours, days: p.daysSunHours,
         perDay: p.perDaySunHours, date: p.dateSunHours,
@@ -2721,6 +2723,125 @@ function buildSunHours(terrain, p, o) {
         }
         lastC = fc; lastR = fr
       }
+    }
+  }
+
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Shadow line ─────────────────────────────────────────────────────────────
+
+/**
+ * The edge of the shadow, at one instant, as a line.
+ *
+ * Sun Hours (above) sums the lit moments over a year and contours the total.
+ * This asks the same question once and traces the single boundary: where the
+ * sunlight stops. It is the terminator the terrain casts on itself, and with a
+ * date and a clock on it, it is a shadow that was really there.
+ *
+ * The whole mode is `litField` plus the tracer the other two level-set modes
+ * already share. That is not a coincidence — it is why this was worth building
+ * the week the sweep arrived. Before the sweep existed it would have needed a
+ * ray march per cell; after it, the single term was already inside the sum.
+ *
+ * **One level, not a set.** Lit is 1 and unlit is 0, so a half is the only
+ * meaningful contour and there is nothing for a levels control to do. The line
+ * is the answer; its *position* is what the date and the clock move.
+ *
+ * A sun below the horizon draws nothing, which is the honest picture of night.
+ * The panel says so rather than leaving an empty plate unexplained.
+ */
+function buildShadowLine(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 2)))
+
+  if (!(o.altitude > 0)) return { positions: new Float32Array(0), colors: new Float32Array(0) }
+
+  // Blurred, then the sentinel put back — `smoothField` owns that rule. A shadow
+  // edge is hard by nature, so without this the line follows every notch in the
+  // skyline and reads as noise rather than as a boundary.
+  const lit = smoothField(
+    litField(terrain, { elevScale, azimuth: o.azimuth, altitude: o.altitude }),
+    cols, rows, o.radius ?? 0, sMask)
+
+  const LEVEL = 0.5
+  const positions = new F32List(), colors = new F32List()
+  const ex = _edgeX, ey = _edgeY, eid = _edgeId
+  const scratch = getChainScratch(rows * cols * 2)
+  const segE = new I32List(), segXY = new F64List()
+
+  for (let r = 0; r < rows - 1; r++) {
+    const row0 = r * cols, row1 = row0 + cols
+    for (let c = 0; c < cols - 1; c++) {
+      const d00 = lit[row0 + c],     d10 = lit[row0 + c + 1]
+      const d01 = lit[row1 + c],     d11 = lit[row1 + c + 1]
+      if (d00 < 0 || d10 < 0 || d01 < 0 || d11 < 0) continue
+
+      const idx = (d00 >= LEVEL ? 8 : 0) | (d10 >= LEVEL ? 4 : 0) |
+                  (d11 >= LEVEL ? 2 : 0) | (d01 >= LEVEL ? 1 : 0)
+      if (idx === 0 || idx === 15) continue
+
+      ex[0] = c + edgeLerp01(d00, d10, LEVEL); ey[0] = r
+      ex[1] = c + 1;                           ey[1] = r + edgeLerp01(d10, d11, LEVEL)
+      ex[2] = c + edgeLerp01(d01, d11, LEVEL); ey[2] = r + 1
+      ex[3] = c;                               ey[3] = r + edgeLerp01(d00, d01, LEVEL)
+
+      const base = (row0 + c) * 2
+      eid[0] = base
+      eid[1] = (row0 + c + 1) * 2 + 1
+      eid[2] = (row1 + c) * 2
+      eid[3] = base + 1
+
+      const pairs = MARCHING_TABLE[idx]
+      for (let pi = 0; pi < pairs.length; pi += 2) {
+        const e0 = pairs[pi], e1 = pairs[pi + 1]
+        segE.push2(eid[e0], eid[e1])
+        segXY.push4(ex[e0], ey[e0], ex[e1], ey[e1])
+      }
+    }
+  }
+  if (segE.length === 0) return { positions: positions.toArray(), colors: colors.toArray() }
+
+  for (const chain of chainLevelSegments(segE.a, segXY.a, segE.length / 2, scratch)) {
+    const pts = smooth > 0
+      ? simplifyFlat(
+          chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth),
+          SMOOTH_SIMPLIFY_EPS,
+        )
+      : chain.pts
+
+    // Draped a cell at a time, for the reason the isophotes set out at length: a
+    // terminator crosses elevations freely, so a decimated chord is horizontally
+    // faithful and says nothing about the ground under it.
+    let prevC = 0, prevR = 0, prevE = 0, inRun = false
+    let lastC = 0, lastR = 0
+    const step = (fc, fr) => {
+      const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+      const elev = (b - 0.5) * 100 * elevScale
+      const ok = b === b && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+      if (ok && inRun) {
+        positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
+                        fc * scl - halfW, elev, fr * scl - halfH)
+        const ci = Math.min(cols - 1, Math.max(0, Math.round(fc)))
+        const ri = Math.min(rows - 1, Math.max(0, Math.round(fr)))
+        colors.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev),
+                                           gridSlopes[ri * cols + ci] / (maxSlope || 1), 0, p))
+      }
+      inRun = ok
+      prevC = fc; prevR = fr; prevE = elev
+    }
+
+    for (let i = 0; i < pts.length; i += 2) {
+      const fc = pts[i], fr = pts[i + 1]
+      if (i === 0) { step(fc, fr) }
+      else {
+        const n = Math.max(1, Math.ceil(Math.hypot(fc - lastC, fr - lastR)))
+        for (let k = 1; k <= n; k++) step(lastC + (fc - lastC) * k / n,
+                                          lastR + (fr - lastR) * k / n)
+      }
+      lastC = fc; lastR = fr
     }
   }
 

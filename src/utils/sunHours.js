@@ -43,7 +43,7 @@
  * the hillshade's own cast shadows already make, and the panel says so.
  */
 import { boxBlur } from './terrain'
-import { dayOfYear, parseDate, sunPath, yearDays } from './solar'
+import { dayOfYear, parseDate, solarPosition, sunPath, sunTimes, yearDays } from './solar'
 import { bboxToWgs84 } from './geoCoords'
 // The same 1-2-5 rule the scale bar picks its distance by. Imported rather than
 // restated: two descriptions of one rule is how the two come to disagree, and a
@@ -141,6 +141,69 @@ function accumulateSample(field, elev, gx, gz, mask, rows, cols, cellW, sample, 
 }
 
 /**
+ * The per-cell terms every sun position is tested against.
+ *
+ * Elevation in world units, and the two gradients the incidence test reads.
+ * Neither changes between sun positions, so computing them once is most of the
+ * difference between a sweep that is affordable a few hundred times over and one
+ * that is not.
+ *
+ * `field` comes back seeded: −1 in a void, 0 on ground. That sentinel is what the
+ * tracer skips on, and it is the same one whether the caller is summing a year or
+ * asking about one instant.
+ */
+function surfaceTerms(terrain, elevScale) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const mask = terrain.hasNoData ? gridMask : null
+  const elev = new Float32Array(n)
+  const gx = new Float32Array(n), gz = new Float32Array(n)
+  const field = new Float32Array(n)
+  const eScale = 100 * elevScale
+  const dScale = eScale / (2 * scl)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (mask && !mask[i]) { elev[i] = 0; field[i] = -1; continue }
+      const b = grid[i]
+      elev[i] = (b - 0.5) * eScale
+      const bL = (c > 0 && (!mask || mask[i - 1])) ? grid[i - 1] : b
+      const bR = (c < cols - 1 && (!mask || mask[i + 1])) ? grid[i + 1] : b
+      const bU = (r > 0 && (!mask || mask[i - cols])) ? grid[i - cols] : b
+      const bD = (r < rows - 1 && (!mask || mask[i + cols])) ? grid[i + cols] : b
+      gx[i] = (bR - bL) * dScale
+      gz[i] = (bD - bU) * dScale
+    }
+  }
+  return { elev, gx, gz, mask, field }
+}
+
+/**
+ * Where the sunlight ends, at one instant.
+ *
+ * Sun Hours sums the lit moments over a year. This asks the same question once:
+ * 1 where the ground is in direct sun at this bearing and elevation, 0 where it
+ * is not, −1 where there is no ground. Contour it at a half and the line is the
+ * edge of the shadow — the terminator the terrain is casting on itself.
+ *
+ * It is one call to the same sweep, which is the whole reason this mode was
+ * cheap to build: the machinery was written for the sum and the single term was
+ * already inside it.
+ *
+ * A sun below the horizon returns all zeroes. There is no shadow edge at night,
+ * and drawing the outline of the whole raster instead would be a lie with a
+ * closed boundary.
+ */
+export function litField(terrain, { elevScale, azimuth, altitude }) {
+  const { rows, cols, scl } = terrain
+  const { elev, gx, gz, mask, field } = surfaceTerms(terrain, elevScale)
+  if (!(altitude > 0)) return field
+  accumulateSample(field, elev, gx, gz, mask, rows, cols, scl,
+    { azimuth, altitude, hours: 1 }, new Float32Array(rows * cols))
+  return field
+}
+
+/**
  * The last field computed, and what it was computed from.
  *
  * Three of the mode's eight parameters do not touch the field at all: the
@@ -183,34 +246,10 @@ export function sunHoursField(terrain, { elevScale, lat, dayNumbers, perDay, day
   const key = `${elevScale}|${lat}|${perDay}|${daysStandFor}|${dayNumbers.join(',')}`
   if (fieldCache.terrain === terrain && fieldCache.key === key) return fieldCache.value
 
-  const { grid, gridMask, rows, cols, scl } = terrain
+  const { rows, cols, scl } = terrain
   const n = rows * cols
-  const mask = terrain.hasNoData ? gridMask : null
-
+  const { elev, gx, gz, mask, field } = surfaceTerms(terrain, elevScale)
   const samples = sunPath({ lat, dayNumbers, perDay })
-  const field = new Float32Array(n)
-
-  // Elevation in world units, and the two gradients the incidence test needs.
-  // Computed once: they do not change between sun positions, and recomputing
-  // them a few hundred times is most of the cost of not doing this.
-  const elev = new Float32Array(n)
-  const gx = new Float32Array(n), gz = new Float32Array(n)
-  const eScale = 100 * elevScale
-  const dScale = eScale / (2 * scl)
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      if (mask && !mask[i]) { elev[i] = 0; field[i] = -1; continue }
-      const b = grid[i]
-      elev[i] = (b - 0.5) * eScale
-      const bL = (c > 0 && (!mask || mask[i - 1])) ? grid[i - 1] : b
-      const bR = (c < cols - 1 && (!mask || mask[i + 1])) ? grid[i + 1] : b
-      const bU = (r > 0 && (!mask || mask[i - cols])) ? grid[i - cols] : b
-      const bD = (r < rows - 1 && (!mask || mask[i + cols])) ? grid[i + cols] : b
-      gx[i] = (bR - bL) * dScale
-      gz[i] = (bD - bU) * dScale
-    }
-  }
 
   const S = new Float32Array(n)
   for (const sample of samples) {
@@ -300,6 +339,33 @@ export function latitudeFor(p) {
   return {
     lat: wgs ? (wgs[1] + wgs[3]) / 2 : (p.latSunHours ?? 0),
     fromRaster: !!wgs,
+  }
+}
+
+/**
+ * Where the sun stood, for the Shadow Line mode.
+ *
+ * Unlike Sun Hours this needs a *clock*, so it needs the longitude and the zone
+ * as well as the latitude — a terminator is a fact about one moment, and the
+ * equation of time and the meridian both decide which moment a clock is naming.
+ * Sun Hours needs neither, because a total does not care when the sun was
+ * somewhere, only how long it was up.
+ *
+ * A GeoTIFF answers the position from its own bounding box. A plain PNG carries
+ * none, so the mode has its own pair, exactly as every mode here carries its own
+ * sun.
+ */
+export function shadowSun(p) {
+  const wgs = bboxToWgs84(p.geoTiffBbox, p.geoTiffCRS)
+  const lat = wgs ? (wgs[1] + wgs[3]) / 2 : (p.latShadowLine ?? 0)
+  const lon = wgs ? (wgs[0] + wgs[2]) / 2 : (p.lonShadowLine ?? 0)
+  const when = parseDate(p.dateShadowLine)
+  if (!when) return { azimuth: 0, altitude: -90, lat, lon, fromRaster: !!wgs }
+  const at = { lat, lon, ...when, utcOffset: p.zoneShadowLine ?? 0 }
+  return {
+    ...solarPosition({ ...at, hours: p.hourShadowLine ?? 12 }),
+    times: sunTimes(at),
+    lat, lon, fromRaster: !!wgs,
   }
 }
 

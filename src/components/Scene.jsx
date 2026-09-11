@@ -465,6 +465,13 @@ export function Scene({
         sheetMarks: marks,
         sheetMarkColor: p.frameMarkColor ?? '#000000',
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
+        // The anaglyph runs the whole pipeline twice, once per eye, so the
+        // exporter needs the separation and the two filter inks as well as the
+        // switch. `rotation` and the raster size are what put the stereo axis
+        // horizontal on the page, exactly as they do in the viewport.
+        anaglyph: !!p.anaglyph && !p.showRawTerrain,
+        anaglyphEye: p.anaglyphEye, anaglyphLeft: p.anaglyphLeft, anaglyphRight: p.anaglyphRight,
+        rotation: p.rotation, imageWidth: p.imageWidth, imageHeight: p.imageHeight,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
         // hasFillLayer, not showFill: the viewport makes the surface a depth

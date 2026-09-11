@@ -96,14 +96,20 @@ const BLEND_MODES = {
   normal:   THREE.NormalBlending,
 }
 
-function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex }) {
+function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift }) {
   const { positions, colors } = layer
   const base = (layerIndex ?? 0) + 1
-  // A layer either carries per-vertex colour (every draw mode) or takes a flat
-  // one from the live params (every vector layer). The second case is what lets
-  // a vector layer be recoloured without a worker rebuild, since nothing about
-  // its geometry changes.
-  const flat = !colors || colors.length !== positions?.length
+  /**
+   * A layer either carries per-vertex colour (every draw mode) or takes a flat
+   * one from the live params (every vector layer). The second case is what lets
+   * a vector layer be recoloured without a worker rebuild, since nothing about
+   * its geometry changes.
+   *
+   * `tint` forces the flat case. An anaglyph draws each layer twice in two
+   * filter colours, and a per-vertex ramp underneath would be seen by one eye
+   * and not the other — which is not a colour a stereo pair can carry.
+   */
+  const flat = !!tint || !colors || colors.length !== positions?.length
 
   /**
    * An **outside** stroke, without moving a single vertex.
@@ -374,7 +380,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
 
     // Flat layers take their one colour from the live params, which is what
     // makes recolouring a vector layer a frame rather than a worker rebuild.
-    if (flat) material.color.set(color || '#000000')
+    if (flat) material.color.set(tint || color || '#000000')
 
     // linewidth/opacity/dashSize/gapSize map to uniforms and depthTest is plain
     // render state — none need a shader recompile, so no needsUpdate here. The
@@ -405,7 +411,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostMaterial.gapSize = d.gapSize
       ghostLines.renderOrder = base + SUB_GHOST
     }
-  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base])
 
   useEffect(() => () => {
     material?.dispose()
@@ -419,7 +425,17 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   if (!lines && !fillGeo && !lidGeo) return null
 
   return (
-    <group>
+    /*
+     * `shift` is the one thing an anaglyph needs from this component.
+     *
+     * Translating the whole layer sideways is a *stereo* offset rather than a
+     * flat one, because the camera is a perspective camera: a lateral world
+     * translation moves a near mark further across the screen than a far one,
+     * which is exactly the parallax an eye separation produces. Under the
+     * orthographic camera it degenerates to a rigid shift with no depth in it,
+     * and the panel says so.
+     */
+    <group position={shift}>
       {curtainGeo && depthOcclusion && <mesh geometry={curtainGeo} material={curtainMat} />}
       {fillGeo && <mesh geometry={fillGeo} material={fillMat}
                         renderOrder={base + (outside ? SUB_FILL_OVER : SUB_FILL)} />}
@@ -450,6 +466,27 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gl, size.width, size.height])
 
+  /**
+   * The eye separation, as a world offset along the camera's right vector.
+   *
+   * `(cos θ, −sin θ)` in the ground plane is screen-right for this orbit at
+   * rotation θ, so the stereo axis stays horizontal however the plate is turned.
+   * Both `rotation` and the anaglyph parameters are render-side, so turning the
+   * view or dragging the separation costs no worker rebuild.
+   *
+   * Scaled by the raster's own size rather than given in world units: the mesh
+   * lays one world unit per raster pixel, so this is the plate's real reach, and
+   * a separation that reads on a 400 px quarry would be invisible on a 12 000 px
+   * massif.
+   */
+  const anaglyph = !!p.anaglyph && !p.showRawTerrain
+  const eye = useMemo(() => {
+    const th = ((p.rotation ?? 0) * Math.PI) / 180
+    const reach = Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2)
+    const d = reach * 0.0012 * (p.anaglyphEye ?? 2)
+    return [Math.cos(th) * d, -Math.sin(th) * d]
+  }, [p.rotation, p.anaglyphEye, p.imageWidth, p.imageHeight])
+
   return (
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
@@ -463,17 +500,37 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           ones drawn after it. */}
       {!p.showRawTerrain && <VectorHighlight lineGeo={lineGeo} resolution={resolution} />}
 
-      {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.map((layer, i) => {
+      {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.flatMap((layer, i) => {
         const { weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside } = layerStyle(layer.id, p)
-        return (
+        /*
+         * An anaglyph draws every layer twice, and that is the whole of it.
+         *
+         * A modifier rather than a mode: it takes whatever the thirty-three
+         * modes happen to be drawing and makes it stereo, so it costs one loop
+         * here instead of a builder of its own. Two eyes, two filter colours,
+         * and the marks between them are the parallax.
+         *
+         * The offset runs along the camera's own right vector, which for this
+         * orbit is `(cos θ, 0, −sin θ)` at rotation θ — so the stereo axis stays
+         * horizontal on screen however the plate is turned. `rotation` is
+         * render-side, so turning the view costs no rebuild and the axis follows
+         * immediately.
+         */
+        const eyes = anaglyph ? [
+          { key: 'L', tint: p.anaglyphLeft ?? '#ff2020', shift: [-eye[0], 0, -eye[1]] },
+          { key: 'R', tint: p.anaglyphRight ?? '#20e0ff', shift: [eye[0], 0, eye[1]] },
+        ] : [{ key: '', tint: undefined, shift: undefined }]
+        return eyes.map((e) => (
         <LineLayer
-          key={layer.id}
+          key={layer.id + e.key}
+          tint={e.tint}
+          shift={e.shift}
           layer={layer}
           weight={weight}
           opacity={opacity}
           dash={dash}
           color={color}
-          blending={blending}
+          blending={anaglyph ? 'multiply' : blending}
           fillColor={fillColor}
           fillOpacity={fillOpacity}
           strokeOutside={strokeOutside}
@@ -485,7 +542,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           tilt={p.tilt}
           layerIndex={i}
         />
-        )
+        ))
       })}
     </group>
   )

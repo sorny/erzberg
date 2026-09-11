@@ -996,7 +996,7 @@ framing, and the STL base plate.
 | `src/utils/geoCoords.js` | `classifyCRS`, forward and inverse projection, `bboxToWgs84`, `geoToPixel` / `geoToWorld`, `featureCoverage`, `suggestElevScale`, `groundPixelMetres` |
 | `src/utils/demFetch.js` | Nominatim geocoding, the tile budget, terrarium decoding, stitch and crop |
 | `src/utils/solar.js` | NOAA solar position, sunrise and sunset, the zone guess, and the sun-path sampling the hours field walks |
-| `src/utils/sunHours.js` | The shadow sweep, the hours field, and the contour levels fitted to it |
+| `src/utils/sunHours.js` | The shadow sweep, the hours field, the single-instant lit field behind Shadow Line, and the contour levels fitted to them |
 | `src/utils/sheetMarks.js` | `measureScale`, and the scale bar and north arrow as renderer-agnostic shapes |
 | `src/hooks/useHeightmap.js` | GeoTIFF decode, geokey reading, NoData, CRS detection |
 | `src/utils/vectorLayers.js` | The packed source and layer-record model shared by all three sources |
@@ -1019,6 +1019,7 @@ framing, and the STL base plate.
 | `tests/terrain-fetch.spec.js` | The whole fetch, with both servers played by the spec — and the assertion that nothing is sent until a button is pressed |
 | `tests/sun-almanac.spec.js` | The almanac drives the light, and never writes to the sliders it replaces |
 | `tests/sun-hours.spec.js` | The mode draws off the raster's own latitude, and the period reaches the worker |
+| `tests/shadow-line.spec.js` | The shadow is longest at the ends of the day and shortest at noon, and absent at night |
 | `tests/sheet-marks.spec.js` | The bar measures the raster and follows the camera, in the viewport and in the SVG |
 
 ### A note on geotiff.js

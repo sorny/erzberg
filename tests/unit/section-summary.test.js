@@ -115,8 +115,16 @@ describe('the readouts follow the params', () => {
 
   it('counts the inks for the modes that are separations, not one mark', () => {
     expect(atDefaults({ style: { ...STYLE_DEF, enabledRiso: true } })['Mode: Riso'].text).toBe('3 inks')
-    expect(atDefaults({ style: { ...STYLE_DEF, enabledShed: true, inksShed: 12 } })['Mode: Watershed'].text)
-      .toBe('12 inks')
+  })
+
+  it('drops the word where the title cannot spare it', () => {
+    // The convention's own excuse for Riso and Mineral is that their titles are
+    // short enough to carry the word. Watershed's is not: measured, its header
+    // truncated its own name by 4 px while saying `12 inks`. So it takes the
+    // bare number the other twenty-nine modes take, and the label comes back on
+    // hover.
+    const shed = atDefaults({ style: { ...STYLE_DEF, enabledShed: true, inksShed: 12 } })['Mode: Watershed']
+    expect(shed).toEqual({ text: '12', hint: 'Inks 12' })
   })
 
   it('writes a fractional dial as it is, never as 0.50', () => {
