@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.1] — 2026-09-11
+
+### Changed
+
+- **Every sun opens from the north-west now.** 315°, the cartographic
+  convention, because light from the upper left is what defeats the
+  relief-inversion illusion — and the number the panel has claimed since long
+  before it meant anything of the sort.
+
+  v1.14.0 made the scale a true bearing and deliberately left the defaults where
+  they rendered, so the migration could change no picture. The number was
+  therefore honest and the *light* was still north-east. This is the other half,
+  taken separately because this one does change the plate a fresh start and
+  `Reset all` give you.
+
+  Five moved: the hillshade, Isophotes, Engraving, Riso and Watershed. Tanaka had
+  sat at a true 315° since the day it was written. For the first time every sun
+  in the app opens from the same corner.
+
+  **The two bulbs did not move**, and the difference is what the two things are.
+  Flashbulb and Halation open at 45° still. A sun is a convention; a bulb is a
+  light somebody placed in the scene, and its azimuth was measured together with
+  its distance, height, falloff and exposure for a particular ink coverage —
+  about 40% of a reference massif, against a first guess that covered 59% and
+  came out a black slab. Rotating one member out of a measured set is picking
+  again, which is what that measurement exists to avoid.
+
+  **No preset changed.** A preset is a composition and carries its own light.
+  Only a fresh start and `Reset all` see this.
+
 ## [1.14.0] — 2026-09-11
 
 ### Changed
