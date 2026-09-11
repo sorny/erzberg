@@ -13,6 +13,10 @@ import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { osmAttribution } from '../utils/osmFetch'
+import { presetComment, presetToText } from '../utils/presetFile'
+import { measureScale, sheetMarks } from '../utils/sheetMarks'
+import { groundPixelMetres } from '../utils/geoCoords'
+import { useStore } from '../store/useStore'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { VectorPicker } from './VectorPicker'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
@@ -34,11 +38,49 @@ function maxPointSize(renderer) {
   } catch { return Infinity }
 }
 
+/**
+ * The rect the sheet marks are laid out inside — the paper, or the whole canvas.
+ *
+ * The marks belong to the *sheet*, so a declared paper frame is what they go
+ * inside: put in the bleed instead, the SVG export would cut them off at the
+ * frame edge along with everything else outside it.
+ */
+function sheetBox(p, width, height) {
+  if (!p.showFrame) return null
+  return frameRect(width, height,
+    paperAspect(p.framePaper ?? 'iso', !!p.frameLandscape, p.frameCustomRatio),
+    p.frameScale ?? 0.85, p.frameOffsetX ?? 0, p.frameOffsetY ?? 0)
+}
+
+/**
+ * A world → screen-pixel projection, for whichever pixels the caller is in.
+ *
+ * The viewport measures in CSS pixels and the PNG export in the pixels of its
+ * own render target, and the scale bar's whole job is to be right in the units
+ * it is drawn in — so the width and height come from the call site rather than
+ * from the renderer. `measureScale` and `sheetMarks` are pure and take this.
+ */
+function screenProjector(camera, groupMatrix, width, height) {
+  const v = new THREE.Vector3()
+  return (x, y, z) => {
+    v.set(x, y, z)
+    if (groupMatrix) v.applyMatrix4(groupMatrix)
+    v.project(camera)
+    return [(v.x + 1) * 0.5 * width, (-v.y + 1) * 0.5 * height]
+  }
+}
+
 export function Scene({
   terrain, lineGeo, surfaceGeo, p,
   getParams, setParams, orbitRef,
   svgTrigger, onSvgDone, onSvgProgress, svgCancelRef, pngTrigger, pngAlphaTrigger, onPngDone,
+  // A preflight runs the SVG pipeline and writes nothing, so the panel can say
+  // what a plot costs before anyone commits a pen to paper.
+  preflightTrigger, onPlotStats,
   bgGradientStops,
+  // The look as a plain object, built once in App.jsx. Turned into a chunk here
+  // for the PNG and into a comment for the SVG — one payload, two containers.
+  exportPreset,
   cameraPreset,
   webmRecording,
   exportBaseName,
@@ -139,6 +181,31 @@ export function Scene({
     autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * frameDelta(delta) * 40 * (p.autoRotateDir ?? 1)
     updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY, p.panZ)
     invalidate()  // keep the on-demand loop running while auto-rotating
+  })
+
+  /**
+   * How much ground one screen pixel covers, measured every frame that draws.
+   *
+   * The scale bar and the north arrow are DOM, drawn over the canvas by
+   * `SheetMarks`. They need the camera, and during an orbit drag the camera is
+   * moved directly by OrbitControls without React hearing about it — that is
+   * deliberate, and it is why this is measured in the render loop and published
+   * through the store rather than lifted into App state.
+   *
+   * `setMapScale` drops a measurement that says nothing new, so a still camera
+   * writes nothing and re-renders nothing. Three projections a frame.
+   */
+  const setMapScale = useStore((s) => s.setMapScale)
+  const wantsMarks = !!(p.frameScaleBar || p.frameNorth)
+  useFrame(() => {
+    const cam = activeCamera || currentCamera
+    if (!wantsMarks || !cam) return
+    const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
+    if (!ground) { setMapScale(null); return }
+    const el = gl.domElement
+    setMapScale(measureScale(
+      screenProjector(cam, groupRef.current?.matrixWorld, el.clientWidth, el.clientHeight),
+      ground))
   })
 
   // WebM capture reads the live canvas via captureStream; under on-demand
@@ -321,8 +388,22 @@ export function Scene({
       imgData.data.set(flipped)
       offCtx.putImageData(imgData, 0, 0)
 
+      // The sheet marks are measured in *this* capture's pixels, not the
+      // viewport's: a 4× plate has four times as many pixels per metre, and a
+      // bar laid out against the screen would come out a quarter the length.
+      const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
+      const scale = ground && measureScale(
+        screenProjector(cam, groupRef.current?.matrixWorld, targetW, targetH), ground)
+      const marks = scale && sheetMarks({
+        width: targetW, height: targetH, frame: sheetBox(p, targetW, targetH),
+        metresPerPixel: scale.metresPerPixel, northAngle: scale.northAngle,
+        bar: !!p.frameScaleBar, north: !!p.frameNorth, scale: p.frameMarkScale ?? 1,
+      })
+
       captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha,
-        exportBaseName, osmAttribution(p.vectorLayers))
+        exportBaseName, osmAttribution(p.vectorLayers),
+        exportPreset ? presetToText(exportPreset) : null,
+        marks ? { ...marks, color: p.frameMarkColor ?? '#000000' } : null)
     } finally {
       // Restore materials and camera
       lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
@@ -333,10 +414,19 @@ export function Scene({
     }
   }
 
-  // SVG export — setTimeout yields to the browser so the loading overlay can
-  // paint before the synchronous exportSVG call blocks the main thread.
-  useEffect(() => {
-    if (!svgTrigger) return
+  /**
+   * Project the scene and write an SVG — or, with `measureOnly`, project it and
+   * write nothing.
+   *
+   * One function and two triggers, because a preflight *is* the export: the only
+   * way to know what a plot costs is to build the file the plotter will be given,
+   * after the occlusion walk has cut the strokes and the frame has clipped them.
+   * Anything cheaper would be a guess about a different drawing.
+   *
+   * `setTimeout` yields to the browser so the loading overlay can paint before
+   * the run blocks the main thread.
+   */
+  const runSvgExport = (measureOnly) => {
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     // weight/opacity/dash live in params (not the worker geometry) — resolve per layer id.
@@ -345,6 +435,16 @@ export function Scene({
     const lineStyles = Array.isArray(lineGeo)
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}
+    // Measured before the yield, while the camera is still the one on screen.
+    const exportCam = activeCamera || currentCamera
+    const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
+    const scale = ground && exportCam && measureScale(
+      screenProjector(exportCam, groupMatrix, width, height), ground)
+    const marks = scale && sheetMarks({
+      width, height, frame: sheetBox(p, width, height),
+      metresPerPixel: scale.metresPerPixel, northAngle: scale.northAngle,
+      bar: !!p.frameScaleBar, north: !!p.frameNorth, scale: p.frameMarkScale ?? 1,
+    })
     setTimeout(async () => {
       // Loaded on demand. The exporter carries the software Z-buffer, the dash
       // splitter and the whole SVG writer, and a session that never presses
@@ -358,6 +458,13 @@ export function Scene({
         onProgress: onSvgProgress,
         shouldCancel: svgCancelRef?.current,
         lineGeo, lineStyles, attribution, camera: activeCamera || currentCamera, width, height,
+        preset: exportPreset ? presetComment(exportPreset) : null,
+        // Measured here rather than inside the exporter: this is where the live
+        // camera and the terrain group's matrix are, and both exporters then get
+        // the same shapes from the same pure function.
+        sheetMarks: marks,
+        sheetMarkColor: p.frameMarkColor ?? '#000000',
+        penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
         bgColor: p.bgColor, bgGradient: p.bgGradient, bgGradientStops,
         surfaceGeo, groupMatrix,
         // hasFillLayer, not showFill: the viewport makes the surface a depth
@@ -399,11 +506,16 @@ export function Scene({
       })
       onSvgDone?.(status)
     }, 0)
-    // Trigger-counter effect: it fires when the counter moves and exports whatever
-    // the scene was at that render. Listing what it reads would re-export on any
-    // unrelated setting change after a trigger, which is the bug this shape avoids.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svgTrigger])
+  }
+
+  // Trigger-counter effects: each fires when its counter moves and works on
+  // whatever the scene was at that render. Listing what they read would re-run
+  // on any unrelated setting change after a trigger, which is the bug this shape
+  // avoids.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (svgTrigger) runSvgExport(false) }, [svgTrigger])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (preflightTrigger) runSvgExport(true) }, [preflightTrigger])
 
   // PNG exports. Deferred a tick for the same reason the SVG export is: the whole
   // capture is synchronous, so without the yield the overlay announcing it is

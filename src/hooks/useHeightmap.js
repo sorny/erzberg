@@ -4,6 +4,7 @@
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
 import { groundPixelSize, squareGroundShape, suggestElevScale } from '../utils/geoCoords'
+import { demToHeightmap } from '../utils/demFetch'
 import { areaResample } from '../utils/terrain'
 
 // ── Image (PNG / JPG) loader ─────────────────────────────────────────────────
@@ -491,11 +492,39 @@ export function useHeightmap() {
       })
   }, [setHeightmap, setGeoTiffMeta])
 
+  /**
+   * Take a DEM the app fetched rather than one somebody opened.
+   *
+   * The same two writes `loadGeoTiff` ends with — the elevation metadata, then
+   * the raster — because a fetched DEM *is* a georeferenced raster and nothing
+   * downstream should be able to tell the difference. What it is not is a file:
+   * there is no `File` to read and no parse to fail, so the whole picker and
+   * decode path above is skipped and the caller hands over finished pixels.
+   *
+   * The name it is given is the place that was typed. That is what the export
+   * base name is built from, so a plate fetched for the Erzberg writes
+   * `Erzberg.svg`.
+   */
+  const loadDem = useCallback((dem, name) => {
+    const { pixels, nodataMask, width, height } = demToHeightmap(dem)
+    setGeoTiffMeta(dem.elevMin, dem.elevMax, dem.bbox, dem.crs, 'Web Mercator')
+    setHeightmap(pixels, nodataMask, width, height, name)
+    return {
+      width, height, dataWidth: width, dataHeight: height,
+      // Ground metres rather than the projection's own pixel size: Web Mercator
+      // overstates distance by 1/cos(lat), and a suggestion made from the raw
+      // figure comes out flatter than the terrain by half at alpine latitudes.
+      suggestedElevScale: suggestElevScale(
+        dem.elevMax - dem.elevMin, dem.groundMetres, dem.crs, dem.bbox),
+    }
+  }, [setHeightmap, setGeoTiffMeta])
+
   const loadGeoTiffFromPicker = useCallback((onLoaded) => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.tif,.tiff,.geotiff,image/tiff' })
     input.onchange = (e) => { if (e.target.files[0]) loadGeoTiff(e.target.files[0]).then(r => { if (r) onLoaded(r) }) }
     input.click()
   }, [loadGeoTiff])
 
-  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError, showError }
+  return { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, loadDem,
+    isLoading, loadingMsg, loadError, clearError, showError }
 }

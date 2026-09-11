@@ -22,11 +22,15 @@ import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
-import { PAPERS, paperRatioLabel } from '../utils/frame'
+import { PAPERS, frameRect, paperAspect, paperRatioLabel } from '../utils/frame'
+import { formatClock, zoneForLongitude } from '../utils/solar'
+import { formatDistance, niceDistance } from '../utils/sheetMarks'
+import { plotEstimate } from '../utils/penRoute'
+import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { SpectrogramView } from './SpectrogramView'
 import {
   ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
-  ColorRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage,
+  ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage,
   GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
 import { useStackDrag } from './panel/stackDrag'
@@ -703,6 +707,139 @@ function FeatureList({ layer, bucket, onPatch }) {
 }
 
 /**
+ * Terrain by name.
+ *
+ * Modelled on `VectorLayersPanel` below, and deliberately: it is the same shape
+ * of thing — a request to somebody else's server, on demand, with a cancel and a
+ * credit — so it owns its own query, its own candidates and its own progress
+ * rather than putting seven more fields into App state. The app hears about it
+ * once, when a raster is ready.
+ *
+ * Nothing is sent until Search is pressed. Not a prefetch, not an autocomplete:
+ * Nominatim's usage policy asks that nobody attach it to a keystroke, and this
+ * app has no business sending one request per letter either way.
+ */
+function TerrainFetchPanel({ onFetched }) {
+  const [query, setQuery] = useState('')
+  const [places, setPlaces] = useState(null)
+  const [busy, setBusy] = useState(null)        // 'search' | 'fetch' | null
+  const [progress, setProgress] = useState(0)
+  const [credit, setCredit] = useState(null)
+  // Its own error, shown in its own section. The vector panel's banner would
+  // have been one import away and it lives three stages down the panel — an
+  // error about a fetch you just started has to appear where you started it.
+  const [error, setError] = useState(null)
+  const abortRef = useRef(null)
+  const onError = setError
+
+  const search = async (e) => {
+    e?.preventDefault?.()
+    const q = query.trim()
+    if (!q || busy) return
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setBusy('search'); setPlaces(null); onError(null)
+    try {
+      const found = await geocodePlace(q, { signal: ctrl.signal })
+      if (ctrl.signal.aborted) return
+      setPlaces(found)
+      if (!found.length) onError(`Nothing found for “${q}”. Try a summit, a valley or a town.`)
+    } catch (err) {
+      if (err?.name !== 'AbortError') onError(`Place search failed: ${err.message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const take = async (place) => {
+    if (busy) return
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+    setBusy('fetch'); setProgress(0); onError(null)
+    try {
+      // A summit resolves to a bounding box a few metres across — the node
+      // itself. Everything this tool does needs an area, so a named point
+      // becomes the ground around it.
+      const dem = await fetchDem(padBbox(place.bbox), {
+        signal: ctrl.signal,
+        onProgress: setProgress,
+      })
+      if (ctrl.signal.aborted) return
+      onFetched(dem, place.name)
+      setPlaces(null)
+      // The credit names the surveys the tiles themselves reported, which is
+      // better provenance than any fixed line — and it is what has to travel
+      // with the plate.
+      setCredit({ sources: dem.sources, tiles: dem.tiles, zoom: dem.zoom,
+                  metres: dem.groundMetres, place: place.name })
+    } catch (err) {
+      if (err?.name !== 'AbortError') onError(`Terrain fetch failed: ${err.message}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <>
+      {error && (
+        <div data-testid="fetch-error" style={{ marginBottom:6, fontSize:10, lineHeight:1.6,
+             color:'#f97316', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.35)',
+             borderRadius:4, padding:'5px 7px' }}>{error}</div>
+      )}
+      <form onSubmit={search} style={{ display:'flex', gap:4, marginBottom:6 }}>
+        <input type="text" value={query} data-testid="place-query"
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Erzberg, Eiger, Snowdon…" aria-label="Place name"
+          style={{ flex:1, minWidth:0, background:SURF, color:DIM, fontSize:11,
+                   border:`1px solid ${BORDER}`, borderRadius:4, padding:'4px 6px' }} />
+        <Btn type="submit" data-testid="place-search" disabled={!!busy || !query.trim()}>
+          {busy === 'search' ? '…' : 'Search'}
+        </Btn>
+      </form>
+
+      {busy === 'fetch' ? (
+        <div data-testid="dem-progress" style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
+          <div style={{ marginBottom:4 }}>{`Fetching terrain… ${Math.round(progress * 100)}%`}</div>
+          <div style={{ height:3, background:BORDER, borderRadius:2, overflow:'hidden' }}>
+            <div style={{ height:'100%', width:`${Math.round(progress * 100)}%`, background:ACCENT }} />
+          </div>
+          <Btn block onClick={() => abortRef.current?.abort()} style={{ marginTop:6 }}>Cancel</Btn>
+        </div>
+      ) : places?.length ? (
+        <div data-testid="place-results" style={{ marginBottom:6 }}>
+          {places.map((pl, i) => (
+            <button key={i} type="button" onClick={() => take(pl)} data-testid={`place-result-${i}`}
+              style={{ display:'block', width:'100%', textAlign:'left', marginBottom:3, cursor:'pointer',
+                       background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4,
+                       padding:'5px 7px', fontSize:11 }}>
+              <span style={{ fontWeight:700 }}>{pl.name}</span>
+              {pl.kind && <span style={{ color:MUTED }}>{` · ${pl.kind}`}</span>}
+              <span style={{ display:'block', fontSize:9.5, color:MUTED, overflow:'hidden',
+                             textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{pl.detail}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {credit && (
+        <div data-testid="dem-credit" style={{ fontSize:9.5, color:MUTED, lineHeight:1.7, marginBottom:6 }}>
+          <div style={{ color:DIM }}>
+            {`${credit.place} · ${credit.tiles} tiles at zoom ${credit.zoom} · ${Math.round(credit.metres)} m per pixel`}
+          </div>
+          <div>{GEOCODER_CREDIT}</div>
+          <div>{DEM_CREDIT}</div>
+          {/* The tiles say which survey they came from. Printing that beats
+              printing the whole list of everything the dataset might contain. */}
+          {credit.sources.length > 0 && (
+            <div style={{ wordBreak:'break-word' }}>{`This ground: ${credit.sources.join(', ')}`}</div>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
+/**
  * The Vector Layers panel — sources at the top, one editable row per layer below.
  *
  * Deliberately additive: it replaces the old GPX Track section in place and
@@ -1260,9 +1397,16 @@ export function Sidebar({
   heightmapPixels, heightmapFilename,
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
+  // Terrain by name: the panel resolves the place and pulls the tiles itself,
+  // and hands over one finished raster.
+  onFetchTerrain,
   soundscape, onSoundscapeFit, flockAudio,
   geoTiffElevMin, geoTiffElevMax, geoTiffCRS, geoTiffCRSName,
   geoTiffBbox,
+  // Where the sun is, or null while the panel is set to the convention. Computed
+  // once in App.jsx and handed to both the shader and this panel, so the plate
+  // and the line that describes it read the same number.
+  sun,
   textLayers, setTextLayers, textOverflow,
   onUndo, onRedo, canUndo, canRedo,
   loadGpxFromPicker, loadGeoJsonFromPicker,
@@ -1275,6 +1419,9 @@ export function Sidebar({
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
+  // The plotter preflight: a run of the SVG pipeline that writes no file, and
+  // the four numbers it comes back with.
+  onPreflight, plotStats,
   externalPresets,
   onReset,
   sessionRestored,
@@ -1315,6 +1462,58 @@ export function Sidebar({
    * title there, so this is the same lookup with a second key and not one call
    * site in this file had to change.
    */
+  /**
+   * Whether the sun is being read rather than chosen.
+   *
+   * Multi-direction shading averages eight light directions, so it has no
+   * azimuth for an ephemeris to drive — the almanac and it are mutually
+   * exclusive by construction rather than by a warning, and this is the one
+   * place that is decided.
+   */
+  const almanac = !!style.hillshadeAlmanac && !style.hillshadeMultiDir
+  // Whether the raster answers the sun-hours latitude itself. The same question
+  // the almanac asks, and the same answer: a GeoTIFF carries it, a PNG does not.
+  const sunHoursGeoreferenced = !!bboxToWgs84(geoTiffBbox, geoTiffCRS)
+  /**
+   * What the sheet marks measure, straight off the render loop.
+   *
+   * Written by `Scene` every frame the camera moves, which is the only place it
+   * can be read: an orbit drag moves the camera without React hearing about it.
+   * The panel subscribes to the same value the overlay draws from, so the number
+   * in the header and the bar on the plate are one measurement.
+   */
+  const mapScale = useStore((s) => s.mapScale)
+  /**
+   * How wide the sheet is on screen, in the same pixels `mapScale` was measured
+   * in — the paper frame when one is declared, the whole canvas otherwise.
+   *
+   * The same rect `sheetMarks` lays the bar inside and the same rect the SVG
+   * export cuts to, so the two readouts below describe the plate somebody will
+   * actually hold rather than the window it was composed in.
+   */
+  const sheetPx = (() => {
+    const w = window.innerWidth - W, h = window.innerHeight
+    if (!view.showFrame) return w
+    return frameRect(w, h,
+      paperAspect(view.framePaper ?? 'iso', !!view.frameLandscape, view.frameCustomRatio),
+      view.frameScale ?? 0.85, view.frameOffsetX ?? 0, view.frameOffsetY ?? 0).w
+  })()
+  // The same 22%-of-the-sheet target the layout uses, so the readout names the
+  // distance the bar will actually be drawn at rather than a second guess at it.
+  const barTargetMetres = mapScale ? sheetPx * 0.22 * mapScale.metresPerPixel : 0
+  /**
+   * The map's ratio — the thing a scale bar cannot say on its own.
+   *
+   * It needs the sheet's physical size, which is why it could not ship with the
+   * bar: `frame.js` is keyed by *ratio* on purpose, because an export carries
+   * pixel dimensions rather than millimetres. The plotter section asks for the
+   * width in millimetres for its own reasons, and once that number exists this
+   * one is arithmetic.
+   */
+  const mapRatio = mapScale && (view.plotWidthMm ?? 0) > 0 && sheetPx > 0
+    ? (mapScale.metresPerPixel * sheetPx * 1000) / view.plotWidthMm
+    : null
+
   const summaries = useMemo(() => buildSectionSummaries({
     terrain, style, view, points,
     zoomPercent: (view.zoom / baseZoom) * 100,
@@ -1349,12 +1548,13 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeSection: false, modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeIndex: true,
+    modeSprite: false, modeRetic: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
+    sheetMarks: false, fetchTerrain: false,
     soundscapes: false,
   })
 
@@ -1819,9 +2019,9 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-one draw
+            * they add up to, which nothing on screen ever did: thirty-two draw
             * modes compose freely, and counting the lit ones meant scrolling
-            * 2 239 px past the thirty that were off.
+            * 2 239 px past the thirty-one that were off.
             *
             * It is a readout and not a set of links. Every token here would want
             * a different target and "3 inks" has no single one — the panel
@@ -1997,6 +2197,16 @@ export function Sidebar({
           </Section>
 
           <Stage n={1} title="Source">
+
+          {/* ── Terrain by name ───────────────────────────────────────────
+              The front door for anyone who does not already own a GeoTIFF,
+              which until now was everyone on their first visit. It is the one
+              part of this app that talks to a server, so it says so, it does
+              nothing until pressed, and it credits what it got. See
+              utils/demFetch.js. */}
+          <Section title="Fetch Terrain" open={sec.fetchTerrain} onToggle={() => tog('fetchTerrain')}>
+            <TerrainFetchPanel onFetched={onFetchTerrain} />
+          </Section>
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
             {hypsometricIntegral != null && (
@@ -2226,10 +2436,77 @@ export function Sidebar({
             {style.showHillshade && (
               <Sub>
                 <Tog label="Multi-direction" help="Average 8 light directions — eliminates directional bias (Swiss-style shading). Hides azimuth and cast shadows." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
+                {/* ── Where the light comes from ─────────────────────────
+                    Two answers, and the convention is not the lesser one.
+                    315°/45° is a bearing the sun never reaches at any latitude
+                    this tool gets pointed at, and it is still what every relief
+                    map uses, because light from the upper left is what stops a
+                    ridge from reading as a gully. The almanac is the setting for
+                    the other question — what the ground really looked like at an
+                    hour — and it drives the same two numbers from the raster's
+                    own latitude. See utils/solar.js. */}
                 {!style.hillshadeMultiDir && (
+                  <SegRow label="Sun" testIdPrefix="sun-mode"
+                    help="Convention: pick the light by hand — 315°/45° is the cartographic standard and no real sun ever sits there. Almanac: the sun where it actually was, from this raster's own latitude, on a date and at an hour you set."
+                    options={[['Convention', 'convention'], ['Almanac', 'almanac']]}
+                    value={style.hillshadeAlmanac ? 'almanac' : 'convention'}
+                    onChange={v => ss({ hillshadeAlmanac: v === 'almanac' })} />
+                )}
+                {!style.hillshadeMultiDir && !almanac && (
                   <InlineSl label="Azimuth" help="Light direction: 0°=N, 90°=E, 315°=NW (classic)." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
                 )}
-                <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
+                {!almanac && (
+                  <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
+                )}
+                {almanac && (<>
+                  <DateRow label="Date" testId="sun-date"
+                    help="A stored date, not today's. A preset has to draw the same plate tomorrow as it does now, which a moving date could not promise."
+                    value={style.hillshadeDate} onChange={v => ss({ hillshadeDate: v })} />
+                  <InlineSl label="Time" testId="sun-hour"
+                    help="Local standard time at the zone below. No summer clock: an hour of daylight saving is a political fact about a country, not an astronomical one about the sky."
+                    min={0} max={24} step={0.25} value={style.hillshadeHour ?? 12}
+                    onChange={v => ss({ hillshadeHour: v })} fmt={formatClock} />
+                  <InlineSl label="Zone" testId="sun-zone"
+                    help="Hours ahead of UTC. The button below sets the zone whose standard meridian is nearest this raster — a guess about geometry, since real zones follow borders."
+                    min={-12} max={14} step={0.5} value={style.hillshadeZone ?? 0}
+                    onChange={v => ss({ hillshadeZone: v })}
+                    fmt={v => `UTC${v >= 0 ? '+' : '−'}${Math.abs(v) % 1 ? Math.abs(v).toFixed(1) : Math.abs(v)}`} />
+                  {/* A plain PNG has no location to read, so the latitude becomes
+                      a control rather than a fact. A GeoTIFF answers it from its
+                      own bounding box and these never appear. */}
+                  {sun && !sun.fromRaster && (<>
+                    <InlineSl label="Latitude" min={-89} max={89} step={0.01} value={style.hillshadeLat ?? 0}
+                      onChange={v => ss({ hillshadeLat: v })} fmt={v => `${Math.abs(v).toFixed(2)}° ${v < 0 ? 'S' : 'N'}`} />
+                    <InlineSl label="Longitude" min={-180} max={180} step={0.01} value={style.hillshadeLon ?? 0}
+                      onChange={v => ss({ hillshadeLon: v })} fmt={v => `${Math.abs(v).toFixed(2)}° ${v < 0 ? 'W' : 'E'}`} />
+                  </>)}
+                  {sun && (
+                    <div data-testid="sun-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.7, marginBottom:6 }}>
+                      <div style={{ color: sun.altitude > 0 ? DIM : '#f97316' }}>
+                        {sun.altitude > 0
+                          ? `${Math.round(sun.azimuth)}° · ${Math.round(sun.altitude)}° above`
+                          : `${Math.round(sun.azimuth)}° · below the horizon`}
+                      </div>
+                      <div>
+                        {sun.times.polar === 'day' ? 'sun never sets'
+                          : sun.times.polar === 'night' ? 'sun never rises'
+                          : `rise ${formatClock(sun.times.rise)} · noon ${formatClock(sun.times.noon)} · set ${formatClock(sun.times.set)}`}
+                      </div>
+                      <div>
+                        {sun.fromRaster ? 'from the raster: ' : 'no georeference: '}
+                        {`${Math.abs(sun.lat).toFixed(2)}° ${sun.lat < 0 ? 'S' : 'N'}, ${Math.abs(sun.lon).toFixed(2)}° ${sun.lon < 0 ? 'W' : 'E'}`}
+                      </div>
+                      {Math.abs((style.hillshadeZone ?? 0) - zoneForLongitude(sun.lon)) > 0.01 && (
+                        <button type="button" data-testid="sun-zone-suggest"
+                          onClick={() => ss({ hillshadeZone: zoneForLongitude(sun.lon) })}
+                          style={{ marginTop:2, padding:'2px 6px', fontSize:10, borderRadius:3, cursor:'pointer',
+                                   background: SURF, color: DIM, border:`1px solid ${BORDER}` }}>
+                          use UTC{zoneForLongitude(sun.lon) >= 0 ? '+' : '−'}{Math.abs(zoneForLongitude(sun.lon))} for this longitude
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>)}
                 <InlineSl label="Intensity" min={0} max={3} step={0.05} value={style.hillshadeIntensity} onChange={v => ss({ hillshadeIntensity: v })} fmt={v => v.toFixed(2)} />
                 <InlineSl label="Opacity" help="Blend strength over the fill colour." min={0} max={1} step={0.01} value={style.hillshadeOpacity} onChange={v => ss({ hillshadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <InlineSl label="Exaggeration" help="Amplifies normals for dramatic relief at low elevation scales." min={0.1} max={10} step={0.1} value={style.hillshadeExaggeration} onChange={v => ss({ hillshadeExaggeration: v })} fmt={v => v.toFixed(1)} />
@@ -2294,7 +2571,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The index, at the head of the thirty-one sections it stands for.
+          {/* The index, at the head of the thirty-two sections it stands for.
               It is a Section like everything else so that it can be closed by
               anyone who does not want it, found by the filter, and given the
               same shut-state readout every other header carries. */}
@@ -2911,6 +3188,67 @@ export function Sidebar({
             )}
           </Section>
 
+          {/* ── Sun hours ────────────────────────────────────────────────
+              The one field in the app that measures the ground rather than the
+              picture. See utils/sunHours.js. */}
+          <Section title="Mode: Sun Hours" icon={<ModeMark kind="sunhours" />} open={sec.modeSunHours} onToggle={() => tog('modeSunHours')} enabled={style.enabledSunHours}>
+            <Tog label="Enabled" testId="mode-sunhours" checked={style.enabledSunHours} onChange={v => ss({ enabledSunHours: v })} />
+            {style.enabledSunHours && (
+              <>
+                <Sub>
+                  <SegRow label="Period" testIdPrefix="sunhours-period"
+                    help="A whole year, or one date. A year is the figure a hut or a panel array is sited by; a single date is the one a ski line or a winter photograph is planned around, and midwinter is where the difference between two aspects is starkest."
+                    options={[['Year', 'year'], ['A date', 'day']]}
+                    value={style.periodSunHours ?? 'year'} onChange={v => ss({ periodSunHours: v })} />
+                  {(style.periodSunHours ?? 'year') === 'day' ? (
+                    <DateRow label="Date" testId="sunhours-date"
+                      help="A stored date, so a preset draws the same plate tomorrow. The clock never enters into it: counting hours needs the latitude and the date and nothing else — the time zone shifts when the sun is somewhere, not how long it is up."
+                      value={style.dateSunHours} onChange={v => ss({ dateSunHours: v })} />
+                  ) : (
+                    <InlineSl label="Days" testId="sunhours-days"
+                      help="How many days across the year to sample. Each stands for a twelfth or so of the year. More is slower and barely different: the declination is a sine wave and eight evenly spaced days already trace it."
+                      min={4} max={24} step={1} value={style.daysSunHours ?? 8}
+                      onChange={v => ss({ daysSunHours: Math.round(v) })} />
+                  )}
+                  <InlineSl label="Per day" testId="sunhours-perday"
+                    help="Sun positions between sunrise and sunset. This is the resolution of the answer: at 12, each sample stands for about an hour of a summer day, so a shadow that comes and goes faster than that is missed."
+                    min={4} max={48} step={1} value={style.perDaySunHours ?? 12}
+                    onChange={v => ss({ perDaySunHours: Math.round(v) })} />
+                  <InlineSl label="Lines" testId="sunhours-levels"
+                    help="Roughly how many isolines, not an interval. The range of the field is not knowable in advance — thousands of hours over a year, a handful over one winter day — so the builder fits a round step inside whatever it turned out to be. There is always one extra line just above zero: it traces the ground that never sees the sun at all."
+                    min={1} max={24} step={1} value={style.levelsSunHours ?? 6}
+                    onChange={v => ss({ levelsSunHours: Math.round(v) })} />
+                  {!sunHoursGeoreferenced && (
+                    <InlineSl label="Latitude" testId="sunhours-lat"
+                      help="A plain PNG carries no location, so the mode needs one. A GeoTIFF answers it from its own bounding box and this control disappears."
+                      min={-66} max={66} step={0.1} value={style.latSunHours ?? 47.53}
+                      onChange={v => ss({ latSunHours: v })}
+                      fmt={v => `${Math.abs(v).toFixed(1)}° ${v < 0 ? 'S' : 'N'}`} />
+                  )}
+                  <InlineSl label="Detail" help="How much the field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the lines follow every notch in the skyline. This is the control that makes a line broad." min={0} max={12} step={0.5} value={style.radiusSunHours ?? 1} onChange={v => ss({ radiusSunHours: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Smoothing" help="Chaikin passes over each finished line, rounding the staircase left by tracing a level set across grid cells. Most of the effect lands in the first two." min={0} max={25} step={1} value={style.smoothingSunHours ?? 1} onChange={v => ss({ smoothingSunHours: Math.round(v) })} />
+                  {/* What this mode is honest about, said where it is set.
+                      Two things a user has to know and could not guess: the
+                      shadows are the shadows of the terrain *as exaggerated*,
+                      and the sun here is a true bearing while every other sun in
+                      this panel is a quarter turn off one. */}
+                  <div data-testid="sunhours-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
+                    <div>{sunHoursGeoreferenced
+                      ? 'Latitude from the raster · true north from its rows'
+                      : 'No georeference — the latitude is the one above'}</div>
+                    <div>Shadows follow the terrain as exaggerated, not as surveyed</div>
+                    <div style={{ color: (terrain.elevScale ?? 0) !== 0 ? '#f97316' : MUTED }}>
+                      {(terrain.elevScale ?? 0) !== 0
+                        ? `Exaggeration is ${terrain.elevScale > 0 ? '+' : ''}${terrain.elevScale.toFixed(1)} — set it to 0 for true hours`
+                        : 'Exaggeration is 0 — the hours are the ground’s own'}
+                    </div>
+                  </div>
+                </Sub>
+                <ModeStyleOverride prefix="SunHours" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           <Section title="Mode: Zero Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
             <Tog label="Enabled" checked={style.enabledZeroCross} onChange={v => ss({ enabledZeroCross: v })} />
             {style.enabledZeroCross && (
@@ -3340,6 +3678,58 @@ export function Sidebar({
               </Sub>
             )}
           </Section>
+
+          {/* ── Scale and North ────────────────────────────────────────────
+              The two marks that make a plate a document. Both are ink: they are
+              drawn over the viewport, composited into the PNG and written into
+              the SVG as their own Inkscape layer, so a plotter can put them in a
+              different pen. See utils/sheetMarks.js. */}
+          <Section title="Scale and North" open={sec.sheetMarks} onToggle={() => tog('sheetMarks')}
+                   enabled={summaries['Scale and North'] !== '—'}>
+            <Tog label="Scale bar" testId="mark-bar"
+                 help="A bar of round length — 200 m, 500 m, 1 km — measured from this raster's own bounding box. Needs a georeferenced GeoTIFF: a PNG heightmap has no ground to measure."
+                 checked={!!view.frameScaleBar} onChange={v => sv({ frameScaleBar: v })} />
+            <Tog label="North arrow" testId="mark-north"
+                 help="Points along the raster's own rows, and turns with the camera. It is grid north, which is not true north away from a projection's central meridian."
+                 checked={!!view.frameNorth} onChange={v => sv({ frameNorth: v })} />
+            {(view.frameScaleBar || view.frameNorth) && (
+              <Sub>
+                <InlineSl label="Size" min={0.4} max={3} step={0.05} value={view.frameMarkScale ?? 1}
+                  onChange={v => sv({ frameMarkScale: v })} fmt={v => v.toFixed(2) + '×'} testId="mark-size" />
+                <ColorRow label="Ink" value={view.frameMarkColor ?? '#000000'}
+                  onChange={v => sv({ frameMarkColor: v })} testId="mark-color" />
+                {/* What the marks are, and what they are not. The bar is exact
+                    only for a plan view through an orthographic camera: tilt it
+                    and the far edge of the plate is at a different scale from
+                    the near one, so the figure is measured at the centre of the
+                    scene and the tilt is said out loud. Same register the panel
+                    already uses for `assumed UTM`. */}
+                <div data-testid="mark-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
+                  {!mapScale ? (
+                    <span style={{ color:'#f97316' }}>
+                      No georeference — load a GeoTIFF and the bar can be measured.
+                    </span>
+                  ) : (<>
+                    <div>{`${formatDistance(niceDistance(barTargetMetres) ?? 0)} bar · ${mapScale.metresPerPixel.toFixed(2)} m per pixel`}</div>
+                    <div style={{ color: (view.tilt ?? 0) < 6 ? MUTED : '#f97316' }}>
+                      {(view.tilt ?? 0) < 6
+                        ? 'plan view — the bar is exact'
+                        : `tilted ${Math.round(view.tilt)}° — measured at the centre, approximate elsewhere`}
+                    </div>
+                    {!view.orthographic && (
+                      <div>perspective — tilt to 0° and switch to orthographic for a true plan</div>
+                    )}
+                    {mapRatio && (
+                      <div data-testid="map-ratio">
+                        {`1 : ${Math.round(mapRatio).toLocaleString()} on a ${view.plotWidthMm} mm sheet`}
+                      </div>
+                    )}
+                  </>)}
+                </div>
+              </Sub>
+            )}
+          </Section>
+
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
             <Sub>
               <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
@@ -3399,10 +3789,18 @@ export function Sidebar({
                 and nothing else in the panel says so. It carries no count: the
                 stats block below prints the segment total already, and one
                 number in two places is one number that can look like two. */}
-            <div data-testid="export-extent" style={{ marginBottom:6, fontSize:10, color: MUTED }}>
+            <div data-testid="export-extent" style={{ marginBottom:4, fontSize:10, color: MUTED }}>
               {view.showFrame
                 ? `SVG cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
                 : 'SVG writes the full canvas'}
+            </div>
+            {/* The second thing a plate carries, and the one nobody would guess
+                at: every PNG and SVG holds the whole parameter set, so the
+                picture opens again through Preset ⬆. Said here because a file
+                that is quietly also a project file is worth exactly nothing if
+                you never learn that it is one. */}
+            <div data-testid="export-carries" style={{ marginBottom:6, fontSize:10, color: MUTED }}>
+              PNG and SVG carry the preset
             </div>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               <ExpBtn label="SVG" hint="1" onClick={onSvg} testId="export-svg" />
@@ -3413,14 +3811,63 @@ export function Sidebar({
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
               <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
-              <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} />
+              <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} testId="preset-save" />
               {/* Spends the opening on the *click*, not on the file landing: the
                   picker is a dialog the user sits in front of, and the opening
                   arriving behind it would be overwritten by the load anyway —
                   or worse, land after it. */}
-              <ExpBtn label="Preset ⬆" hint="load" onClick={() => { spendOpening(); onLoadPreset?.() }} />
+              <ExpBtn label="Preset ⬆" hint="open" onClick={() => { spendOpening(); onLoadPreset?.() }} testId="preset-load" />
             </div>
             <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
+
+            {/* ── The plot ─────────────────────────────────────────────────
+                The stated audience of this whole tool is a pen plotter, and
+                until now nothing here said what a plot would cost. Two numbers
+                decide whether it takes twenty minutes or ninety: the ink laid
+                down, which the drawing fixes, and the distance the carriage
+                covers between strokes with the pen in the air, which is an
+                ordering problem nobody had looked at. See utils/penRoute.js. */}
+            <div style={{ marginTop:10, paddingTop:8, borderTop:`1px solid ${BORDER}` }}>
+              <InlineSl label="Sheet" testId="plot-width"
+                help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Scale and North."
+                min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
+                onChange={v => sv({ plotWidthMm: Math.round(v) })} fmt={v => Math.round(v) + ' mm'} />
+              <Tog label="Plotter order" testId="plot-order" small
+                help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."
+                checked={!!view.plotPenOrder} onChange={v => sv({ plotPenOrder: v })} />
+              <Btn block onClick={onPreflight} data-testid="preflight">Preflight</Btn>
+              <div data-testid="preflight-readout" style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.8 }}>
+                {!plotStats ? (
+                  'Measures the file a plotter would be given — after occlusion and the frame.'
+                ) : (() => {
+                  const width = view.plotWidthMm ?? 297
+                  const now = plotEstimate({
+                    ink: plotStats.ink,
+                    travel: view.plotPenOrder ? plotStats.travelOrdered : plotStats.travelAsBuilt,
+                    widthPx: plotStats.width, widthMm: width,
+                    strokes: plotStats.strokes, penChanges: Math.max(0, plotStats.pens - 1),
+                  })
+                  const mm = (px) => (px * width) / Math.max(1, plotStats.width)
+                  const metres = (px) => `${(mm(px) / 1000).toFixed(1)} m`
+                  const saved = plotStats.travelAsBuilt > 0
+                    ? 1 - plotStats.travelOrdered / plotStats.travelAsBuilt : 0
+                  return (<>
+                    <div>{`${plotStats.strokes.toLocaleString()} strokes · ${plotStats.pens} pen${plotStats.pens === 1 ? '' : 's'}`}</div>
+                    <div>{`ink ${metres(plotStats.ink)} · pen up ${metres(view.plotPenOrder ? plotStats.travelOrdered : plotStats.travelAsBuilt)}`}</div>
+                    <div style={{ color: DIM }}>
+                      {now ? `about ${now.minutes < 1 ? '<1' : Math.round(now.minutes)} min at 120 mm/s` : ''}
+                    </div>
+                    {/* The saving, said only while it is still on the table. */}
+                    {!view.plotPenOrder && saved > 0.02 && (
+                      <div style={{ color: ACCENT }}>
+                        {`Plotter order would cut the pen-up travel by ${Math.round(saved * 100)}%`}
+                      </div>
+                    )}
+                    {plotStats.dashed && <div>a dashed layer is counted as solid</div>}
+                  </>)
+                })()}
+              </div>
+            </div>
           </Section>
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}

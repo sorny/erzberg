@@ -563,6 +563,35 @@ export function wgs84ExtentKm(bboxWgs84) {
 }
 
 /**
+ * Ground size of one raster pixel in metres, taken the long way round.
+ *
+ * `groundPixelSize` above answers the same question from the raster's own
+ * resolution and is the right tool for its own job — deciding what *shape* a
+ * pixel is. It is the wrong tool for a scale bar, and Web Mercator is why: its
+ * projected distances are inflated by 1/cos(lat), equally on both axes, so the
+ * cell stays square and the figures stay usable for a ratio while being wrong
+ * for a measurement. A bar drawn from them would read 1 000 m over 675 m of
+ * ground at 47° N.
+ *
+ * Going through WGS84 asks the ellipsoid instead of the projection, so every
+ * CRS the app can unproject at all — UTM, Web Mercator, plain geographic —
+ * gives a distance somebody could walk. It also needs no linear-unit key, which
+ * is the one piece of GeoTIFF metadata that never reaches this side of the app.
+ *
+ * The mesh lays one world unit per raster pixel, so this doubles as metres per
+ * world unit on the ground plane, which is what `measureScale` wants.
+ *
+ * Returns null for a raster with no georeference — a PNG heightmap has no scale
+ * and must say so rather than print a number.
+ */
+export function groundPixelMetres(bbox, crs, imageWidth, imageHeight) {
+  if (!(imageWidth > 0) || !(imageHeight > 0)) return null
+  const km = wgs84ExtentKm(bboxToWgs84(bbox, crs))
+  if (!km || !(km.w > 0) || !(km.h > 0)) return null
+  return { x: (km.w * 1000) / imageWidth, y: (km.h * 1000) / imageHeight }
+}
+
+/**
  * WGS84 (lat, lon) → fractional pixel coordinates in the raster.
  * Returns { col, row } unclamped, or null if the CRS is not transformable.
  * Row 0 is the top of the image, hence the Y-flip.

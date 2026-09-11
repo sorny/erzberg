@@ -177,6 +177,29 @@ export const STYLE_DEF = {
   hatchWeightSection: 1, beyondWeightSection: 1,
   hypsoSection: false, hypsoModeSection: 'elevation', hypsoBandedSection: false, hypsoIntervalSection: 10,
 
+  // ── Sun hours ─────────────────────────────────────────────────────────────
+  // Isolines of how long the ground is in direct sun, over a year or over one
+  // date. The only field in the app that is a measurement of the *ground* rather
+  // than of the picture — see utils/sunHours.js.
+  //
+  // `levels` is roughly how many lines, not an interval: the field's range runs
+  // from a few thousand hours a year to a handful on one winter day, so the
+  // builder fits a round 1-2-5 hour step inside whatever it turned out to be.
+  //
+  // `lat` is the fallback for a plain PNG, which carries no location. A GeoTIFF
+  // answers it from its own bounding box and this is ignored — the same rule the
+  // almanac follows, with the mode's own control, because every mode here
+  // already carries its own sun.
+  //
+  // The defaults are the cheap end on purpose: 8 days by 12 positions is 96
+  // shadow sweeps, which is about 150 ms on a 512² grid and a second on a 1024².
+  enabledSunHours: false, levelsSunHours: 6,
+  periodSunHours: 'year', daysSunHours: 8, perDaySunHours: 12,
+  dateSunHours: '2026-12-21', latSunHours: 47.53,
+  smoothingSunHours: 1, radiusSunHours: 1,
+  colorSunHours: '#1a1a1a', weightSunHours: 1, opacitySunHours: 1, dashSunHours: 'solid',
+  hypsoSunHours: false, hypsoModeSunHours: 'elevation', hypsoBandedSunHours: false, hypsoIntervalSunHours: 10,
+
   // The scanline as a signal: every sign change of its own detrended profile,
   // which measures the terrain's local pitch rather than its slope.
   enabledZeroCross: false, detrendZeroCross: 6, spacingZeroCross: 2, axesZeroCross: 'both',
@@ -244,6 +267,25 @@ export const STYLE_DEF = {
   // Vector layers (OSM / GeoJSON / GPX) carry their own style on their layer
   // records instead of flat params here — there is an unbounded number of them
   // and they are created at runtime. See VECTOR_LAYER_DEF in utils/vectorLayers.js.
+
+  // ── The sun ───────────────────────────────────────────────────────────────
+  // Two ways to place it, and the convention is the default on purpose.
+  //
+  // 315°/45° is a position the sky never offers — at the Erzberg's latitude the
+  // sun never passes 307° of bearing on any day of any year — and it is still
+  // the right default, because light from the upper left is what defeats the
+  // relief-inversion illusion. The almanac is the thing you switch to when the
+  // question is what the ground really looked like at an hour.
+  //
+  // The date is a stored solstice rather than "today" for the same reason a seed
+  // is a number: a preset has to draw the same plate tomorrow. `hillshadeLat`
+  // and `hillshadeLon` are the fallback for a plain PNG, which carries no
+  // location to read — they name the Erzberg, which is the mountain this tool
+  // was written for. A GeoTIFF answers both from its own bounding box and these
+  // are ignored. See utils/solar.js.
+  hillshadeAlmanac: false,
+  hillshadeDate: '2026-06-21', hillshadeHour: 9, hillshadeZone: 1,
+  hillshadeLat: 47.53, hillshadeLon: 14.89,
 
   // Hillshade
   showHillshade: false, hillshadeAzimuth: 315, hillshadeAltitude: 45,
@@ -357,4 +399,25 @@ export const VIEW_DEF = {
   // margin is a fraction of the frame's shorter side. See utils/frame.js.
   showFrame: false, framePaper: 'iso', frameLandscape: false, frameCustomRatio: 1.414,
   frameScale: 0.85, frameOffsetX: 0, frameOffsetY: 0, frameMargin: 0,
+  // The two marks that say where the sheet is and which way up it goes. Both
+  // are ink: they are drawn in the viewport, composited into the PNG and
+  // written into the SVG as their own Inkscape layer. Named `frame*` because
+  // they belong to the sheet — and because that prefix is what puts them on the
+  // render side of `params.js`, where a paper decision cannot cost a rebuild of
+  // the terrain. See utils/sheetMarks.js.
+  frameScaleBar: false, frameNorth: false,
+  frameMarkScale: 1, frameMarkColor: '#000000',
+
+  // ── The plot ──────────────────────────────────────────────────────────────
+  // How wide the sheet is on paper. The one fact the exporter cannot know and
+  // will not guess: it writes pixel dimensions rather than millimetres, on
+  // purpose, and every physical number — the plot's duration, the map's ratio —
+  // needs this to exist. 297 mm is A4's long edge.
+  plotWidthMm: 297,
+  // Off by default, and it is not timidity. Re-ordering strokes changes which
+  // ink lies on top where two of different colours cross, on screen and on
+  // paper alike, so it is the user's decision rather than the exporter's — and
+  // the preflight prints what it would save so the decision is an informed one.
+  // See utils/penRoute.js.
+  plotPenOrder: false,
 }

@@ -256,6 +256,33 @@ last week lands on a fresh fetch of the same valley today. A preset written
 before vector layers existed carries the old flat `*Gpx` params. The app still
 honours those for GPX layers.
 
+### A preset in every plate
+
+Every PNG and every SVG the app exports carries the whole parameter set inside
+it. `utils/presetFile.js` owns the shape, so the JSON file and the two containers
+cannot drift into carrying different things.
+
+- **PNG** — a `tEXt` chunk under the keyword `erzberg:preset`, spliced in after
+  `IHDR` beside the OpenStreetMap credit that was already there.
+- **SVG** — a comment above the first mark. An editor shows it, and a plotter
+  never draws it.
+
+The payload is escaped to printable ASCII first. `tEXt` is Latin-1 and drops
+anything it cannot represent, so a layer named in Greek would cost the whole
+preset without a word. An XML comment ends at the first `-->`, so every `-` that
+is followed by another becomes `\u002d` — in valid JSON two minus signs in a row
+can only occur inside a string, where that escape is legal and the parser undoes
+it.
+
+The raster is not in it, and neither is the *name* of the raster. The promise at
+the top of the README is that your files stay on your machine, and a plate posted
+to a forum is that file leaving by another route. The payload has no field for a
+filename, which is a stronger guarantee than remembering to strip one.
+
+`format: 1` says what shape it is. A preset written before this existed has no
+such field and is still a preset, so `parsePreset` tests for a parameter group
+rather than for the announcement.
+
 The app generates two things from that set. Nobody writes them by hand:
 
 - **Thumbnails**, from `npm run thumbs`. There is one WebP per preset in
@@ -286,6 +313,49 @@ The app generates two things from that set. Nobody writes them by hand:
 Every exporter reads the *derived* terrain. Thus the features upstream of it
 need no support in any exporter. Edit Mode clips, erosion, the mirror and
 soundscapes are all upstream of it.
+
+### Preflight is the export
+
+The stated audience of this tool is a pen plotter, and until v1.13 nothing said
+what a plot would cost. Two numbers decide whether a plot takes twenty minutes
+or ninety: the ink laid down, which the drawing fixes, and the distance the
+carriage covers between strokes with the pen in the air.
+
+*Preflight* runs `exportSVG` with `measureOnly: true`. It builds the whole file
+and writes none of it.
+
+That is deliberate and it is not wasteful. The only way to know what a plot costs
+is to measure the file the plotter will be given — after the occlusion walk has
+cut the strokes and the paper frame has clipped them, and after `joinRuns` has
+folded the two-point pieces back into whole pen strokes. Anything cheaper is a
+guess about a different drawing.
+
+The numbers are cleared whenever `lineGeo` or `view` changes identity. A figure
+that describes a plate you are no longer looking at is worse than no figure,
+because it looks exactly like one that does.
+
+### Pen order
+
+`utils/penRoute.js` re-orders the strokes inside a pen layer by greedy nearest
+neighbour over their endpoints, against a uniform grid sized for about one
+endpoint per cell. Each step takes the nearest unvisited endpoint and draws that
+stroke from it, so a stroke whose tail is nearer is drawn backwards.
+
+The ring search stops one ring after it has a candidate: a ring at Chebyshev
+distance $k$ cannot hold anything closer than $(k-1)\cdot\text{cell}$. That is
+what makes it near-linear. Measured on 40 000 synthetic strokes, the travel falls
+from 26.6 M px to 67 k px in 37 ms. On the sample plate the pen-up travel falls
+from 52.4 m to 1.4 m.
+
+Two limits are structural rather than cautious:
+
+- **Filled areas are never re-ordered.** An area layer's paint order decides what
+  covers what, and re-ordering it puts a lake on top of the contours that should
+  cross it.
+- **The switch is off by default.** Where two strokes of *different* colours
+  cross, the order decides which ink is on top — on screen and on paper alike. It
+  is the user's decision, and the preflight prints what it would save so the
+  decision is informed.
 
 ### The area modes export filled polygons
 

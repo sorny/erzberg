@@ -99,6 +99,10 @@ const RENDER_SIDE = [
   // them reaches the worker at all.
   /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides)/,
   /^(frame|showFrame)/,
+  // Plotter preflight and pen routing. Read by the SVG exporter alone, and it
+  // runs on geometry the worker has already built — a decision about the order
+  // strokes come out in cannot change where any of them are.
+  /^plot/,
   // Particles: both fields are built on the main thread from the terrain grid
   // the worker already returned.
   /^(flock|holo|point|particle|animateParticles|showPoints)/,

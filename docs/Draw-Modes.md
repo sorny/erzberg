@@ -242,7 +242,17 @@ surface turns away from the sun, and open out where it faces the sun.
 **The field.** Per-cell darkness is $D = (1 - \max(0, \mathbf{n}\cdot\mathbf{l}))^{\gamma}$.
 That is the same Lambert quantity that Engraving (§12) hatches by. The shared
 `lambertDarkness` helper computes it against the same light convention as the
-hillshade shader: azimuth 315° is NW, and the altitude is fixed at 45°. Engraving
+hillshade shader, and the altitude is fixed at 45°.
+
+That convention is **a quarter turn from a compass bearing**, which is worth
+knowing before reaching for a number. The light is built as
+`(cos az, sin alt, sin az)`, so azimuth 0° lights east-facing slopes: it comes
+from the raster's eastern edge, not from its north. The default 315° therefore
+lights from the north-east and not, as one would assume, from the north-west.
+For a bearing, subtract 90° — the classic NW light is azimuth 225° here. Every
+mode with a sun of its own uses this same scale. The one exception is Sun Hours
+(§32), which is a measurement rather than a shading choice and takes a true
+bearing. Engraving
 *thresholds* this field to decide stroke density. Isophotes *traces its level
 set*.
 
@@ -604,6 +614,66 @@ Measured on the sample plate, the three modes export 6, 5 and 10 pen layers, one
 falls back to the boundary lines, which are mirrored with everything else.
 
 ---
+
+## 32. Sun Hours
+
+Isolines of how long the ground is in direct sun. The same construction as
+Contours (§4) and Isophotes (§15) — marching squares over a scalar field — and
+the field is the whole difference. A contour is a height. An isophote is a
+shading convention. This is the number an alpine hut, a ski aspect or a panel
+array is chosen by.
+
+**The field.** For every sun position in the period, a cell gains the hours that
+position stands for when two tests pass:
+
+1. The terrain does not block the sun.
+2. The surface faces it at all: $\mathbf{n}\cdot\mathbf{l} > 0$.
+
+The second test is the same Lambert quantity Engraving and Isophotes use, read
+only for its sign. The first is a shadow sweep.
+
+**The sweep.** Ray-marching every cell toward the sun is $O(\text{cells} \cdot
+\text{steps})$ per position, and a year holds a few hundred positions. Instead
+the grid is walked *in the sun's own direction*, carrying one number — the height
+a shadow has reached:
+
+$$S_i = \max\bigl(e_i,\, S_{i-1} - d\tan\alpha\bigr)$$
+
+A cell is dark when $S_{i-1} - d\tan\alpha$ is above its own elevation. One pass
+per sun position, $O(\text{cells})$, with no step budget to tune. The walk runs
+along whichever axis the sun leans on hardest, so the step upstream is always one
+row or one column across and a fraction along the other; that fraction is
+interpolated between two neighbours, which is what keeps the pass linear.
+
+Measured: 96 sun positions over a 512² grid in 150 ms, and a 1024² grid in a
+second. `cost: 7` in `drawModes.js`, the highest in the table.
+
+**No clock.** The day is walked in hour angle, from $-H_0$ at sunrise to $+H_0$ at
+sunset, where $\cos H_0 = -\tan\varphi\tan\delta$. The equation of time, the
+longitude and the time zone shift *when* the sun reaches a given hour angle, and
+none of them changes how long it is up. So the field needs a latitude and a date
+and nothing else. See [Georeferencing](Georeferencing.md) for the rest.
+
+**A true bearing, unlike every other sun here.** §15 sets out the app's azimuth
+convention: it sits a quarter turn from a compass bearing. This mode does not use
+it. A shading convention can be a quarter turn off and still make a good picture;
+a *measurement* cannot, because a north face that came out sunny would be wrong
+rather than stylistic.
+
+**The levels are fitted to the field's own range**, at a round 1-2-5 hour step —
+500 h, 200 h, 2 h — chosen from how many lines the panel asks for. A year's field
+clusters against its maximum, so levels counted up from zero would spend almost
+all of themselves on ground where nothing is happening.
+
+One extra level always sits just above zero, at half an hour. Marching squares
+cannot trace the zero region itself, because a test of `field ≥ 0` puts every
+cell on the same side of it; a level just above zero traces its boundary instead.
+That closed ring around the ground which never sees the sun is what the mode was
+built for.
+
+**NoData is a hole, not a shoreline** — the same rule Isophotes follows. There is
+no sunlight where there is no ground, so a cell with any masked corner is
+skipped.
 
 ## NoData and clipped edges
 

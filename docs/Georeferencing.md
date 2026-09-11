@@ -1,10 +1,13 @@
 # Georeferencing
 
 A PNG heightmap is only a grid of numbers. A GeoTIFF also says *where on Earth*
-that grid sits, and in which coordinate system. `erzberg` uses that for four
+that grid sits, and in which coordinate system. `erzberg` uses that for seven
 things. It drapes vector features on the terrain. It asks OpenStreetMap what is
 inside the extent. It suggests a vertical exaggeration that is proportional
-rather than arbitrary. And it reports the elevation range in real metres.
+rather than arbitrary. It reports the elevation range in real metres. It puts
+the sun where the sun really was. It draws a scale bar and a north arrow that
+are measurements rather than decoration. And it lets you skip the file
+altogether: type a place, and the app fetches the ground.
 
 All four depend on a correct read of the metadata of the file. When that read
 goes wrong, the failure is silent: features do not appear, or a mountain renders
@@ -671,6 +674,267 @@ command that fixes it, and does not draw the file in the wrong place.
 
 ---
 
+## Terrain by name
+
+Every session used to begin with a problem the app did not help with: finding a
+heightmap. The app would fetch roads, rivers, rail and peaks for an extent. It
+would not fetch the ground under them.
+
+*Fetch Terrain*, in the Source stage, closes that gap with two requests.
+
+**The place.** OpenStreetMap's Nominatim geocoder turns a typed name into a
+bounding box. The request runs on submit, never on a keystroke. The usage policy
+of the service asks for that, and one request per letter of "Kaisergebirge" is
+not defensible in any case.
+
+Nominatim orders its box `[minLat, maxLat, minLon, maxLon]`, which is the order
+nothing else in this codebase uses. `geocodePlace` reorders it once.
+
+**The ground.** Terrain Tiles on AWS Open Data, in the Mapzen terrarium
+encoding: elevation in metres packed into an ordinary PNG.
+
+$$h = 256R + G + \frac{B}{256} - 32768$$
+
+The tiles are EPSG:3857, which `classifyCRS` already knows how to unproject, so
+a fetched raster arrives georeferenced exactly like a GeoTIFF and needs no
+special case anywhere downstream. The ocean is not a hole: terrarium carries real
+bathymetry, so every cell is data.
+
+### The budget
+
+One press may pull at most 36 tiles, which is a 1 536 px raster and a couple of
+megabytes. The zoom is chosen as the finest that fits, capped at 14. Deeper is
+upsampling rather than surveying: the underlying data is 30 m at best over most
+of the world.
+
+The cap is a promise to the tile host as much as to the user. A request for a
+whole country at full zoom is not a feature. It is an outage somebody else pays
+for. The tiles are fetched one at a time for the same reason, which also makes
+the progress bar mean something and lets Cancel work between any two.
+
+### A point is not a terrain
+
+A summit resolves to a bounding box a few metres across — the node itself.
+`padBbox` grows any box to at least 6 km around its centre. Degrees of longitude
+shrink with latitude, so the two axes are padded by different amounts, which is
+what makes the result square on the ground.
+
+### Provenance
+
+Each tile reports the survey it came from in an `x-amz-meta-x-imagery-sources`
+header, which the bucket exposes to script through
+`Access-Control-Expose-Headers`. The panel prints the set of surveys that
+actually produced the ground on screen — `eudem/eudem_dem_5deg_n45e010.tif` —
+which is better provenance than the full list of everything the dataset might
+contain.
+
+### Web Mercator overstates distance
+
+Web Mercator inflates ground distance by 1/cos(lat), equally on both axes. The
+cell therefore stays square, and every figure that is a *ratio* is unaffected.
+Every figure that is a *measurement* is not.
+
+Two places had to account for it:
+
+- **The suggested exaggeration.** `useHeightmap.loadDem` passes the corrected
+  ground size rather than the projected pixel size. Without the correction, an
+  alpine DEM comes back flatter than the terrain by about a third.
+- **The scale bar.** `groundPixelMetres` goes through WGS84 rather than through
+  the projection, so it asks the ellipsoid instead of the map. See below.
+
+---
+
+## The sun
+
+Hillshade takes an azimuth and an altitude as two free numbers. The default pair
+is 315° and 45°, which is the cartographic convention.
+
+It is also a position the sky never offers. Swept minute by minute across a whole
+year at the Erzberg's latitude, the sun turns back at about 307° of bearing, at
+the moment of midsummer sunset. `tests/unit/solar.test.js` asserts that.
+
+The convention is still the right default, because light from the upper left is
+what defeats the relief-inversion illusion. So the almanac stands beside it
+rather than replacing it.
+
+### What it computes
+
+`src/utils/solar.js` implements the NOAA solar position polynomials, as published
+in their spreadsheet and in Meeus, *Astronomical Algorithms*, chapter 25.
+Arithmetic only: no dependency, no table and no network. The unit suite checks it
+against published figures — the solstice declinations, both extremes of the
+equation of time, and the sunrise and sunset of a real day at a real place.
+
+Three corrections separate a clock from the sky, and the true solar time carries
+all three:
+
+$$\text{TST} = 60t + E + 4\lambda - 60z$$
+
+where $t$ is the local clock in hours, $E$ the equation of time in minutes,
+$\lambda$ the longitude and $z$ the offset of the zone from UTC. The hour angle
+is $\text{TST}/4 - 180$.
+
+Atmospheric refraction is applied to the altitude. Without it, a winter afternoon
+at a high latitude reports a negative altitude for light that is visibly on the
+hill: the sun is already fully above the horizon at the moment geometry says its
+centre is still below.
+
+### How it reaches the shader
+
+The computed pair overrides `hillshadeAzimuth` and `hillshadeAltitude` on the
+merged parameter bus in `App.jsx`. It is never written into `style`.
+
+That distinction is the whole design. Written through, an ephemeris would
+overwrite the numbers the user set by hand, and it would put an entry in the undo
+history for every tick of the clock. Overridden, the sliders keep their values
+and simply are not what is lighting the scene.
+
+The altitude is clamped at the horizon. Below it there is no direct light at all,
+and the honest render is a black plate — but a black plate reads as a broken app,
+so the shading grazes at zero and the panel says *below the horizon* in words.
+
+A plain PNG carries no location. The panel then asks for a latitude and a
+longitude rather than guessing one.
+
+### Hours of direct sun
+
+The almanac answers where the sun is at 09:15. *Mode: Sun Hours* answers the
+question the ground cares about: how much sun a slope gets, as a scalar field in
+hours that the existing marching-squares tracer contours without modification.
+
+A cell counts a sun position when two tests pass. The terrain must not block it,
+and the surface must face it. A north wall gets no direct sun even with a clear
+horizon, because the sun is behind the wall.
+
+#### The shadow test is a sweep
+
+Ray-marching every cell toward the sun is O(cells · steps) per sun position, and
+a year holds a few hundred positions. The sweep is O(cells).
+
+Walk the grid in the sun's own direction and carry one number: the height a
+shadow has reached. A cell is dark when that height is above it, and it hands on
+
+$$S_i = \max\bigl(e_i,\; S_{i-1} - d \tan\alpha\bigr)$$
+
+to the next cell along, where $d$ is the horizontal step in world units. The grid
+is walked along whichever axis the sun leans on hardest, so the step to the cell
+toward the sun is always one row or one column across and a fraction along the
+other. That fraction is what makes the carried value interpolable and the whole
+pass linear.
+
+Measured: 150 ms for 96 sun positions on a 512² grid, and a second on a 1024².
+
+#### There is no clock in it
+
+The day is walked in **hour angle** rather than in local time:
+
+$$\cos H_0 = -\tan\varphi \cdot \tan\delta$$
+
+for latitude $\varphi$ and declination $\delta$, giving $-H_0$ at sunrise, 0 at
+solar noon and $+H_0$ at sunset.
+
+The equation of time, the longitude and the time zone all shift *when on a clock*
+the sun reaches a given hour angle. None of them changes how long it is up, and
+none changes where it is in the sky while it is. So this field needs the latitude
+and the date and nothing else — a total that came out different in Vienna and in
+Innsbruck for the same mountain would be a bug wearing a time zone.
+
+#### Two honest limits, both stated in the panel
+
+**The sun here is a true bearing. Every other sun in the app is not.** The
+hillshade builds its light as `(cos az, sin alt, sin az)`, which puts azimuth 0
+at the raster's *eastern* edge — the whole scale sits a quarter turn from a
+compass bearing. Every draw mode with a sun of its own inherits that, and
+changing it would relight all fifty-six presets, so it stands. It cannot stand
+here: this field is a measurement, and a north face that came out sunny would be
+wrong rather than stylistic.
+
+**The shadows are the shadows of the terrain as exaggerated.** The sweep works in
+world units, so at the exaggeration a GeoTIFF suggests the hours are real hours,
+and a hand-raised relief lengthens them. This is the same bargain the hillshade's
+own cast shadows already make. The panel prints the current exaggeration and says
+to set it to 0 for true hours.
+
+#### The levels are fitted to the field
+
+The range cannot be known in advance: thousands of hours over a year, a handful
+over one winter day, less again in a deep valley. So the panel asks roughly how
+many lines and the builder fits a round 1-2-5 hour step inside whatever came out,
+between the field's own minimum and maximum.
+
+Counted up from zero instead, a year's plate is nearly empty. A gentle landscape
+gets almost all of the daylight almost everywhere and all of the shape is in the
+top fifth. A contour map does not start a plateau at sea level either.
+
+One extra line always sits just above zero, and it is the line the mode exists
+for. Marching squares cannot trace the zero region itself, because a test of
+`field ≥ 0` puts every cell on the same side of it. A level at half an hour
+traces its boundary instead: the ground that never sees the sun, closed and
+separate from everything around it.
+
+---
+
+## Scale and north
+
+Contours already letter their heights in metres. Until v1.13 the plate had no
+scale bar and no north arrow, which are the two marks that separate a map from a
+picture of a hill. Both are computable from numbers the app has had since it
+learned to read a GeoTIFF.
+
+### Metres per screen pixel
+
+The bar is drawn horizontally, so the question is not "how big is a world unit"
+but "which ground displacement moves one pixel to the right". `measureScale`
+projects the origin and the two ground axes, then solves a 2×2 system for the
+world displacement whose screen image is $(1, 0)$:
+
+$$\begin{bmatrix} \Delta x_x & \Delta z_x \\ \Delta x_y & \Delta z_y \end{bmatrix}
+\begin{bmatrix} a \\ b \end{bmatrix} = \begin{bmatrix} 1 \\ 0 \end{bmatrix}$$
+
+and reports $\sqrt{(a g_x)^2 + (b g_y)^2}$ metres, where $g$ is the ground size
+of a raster pixel. The mesh lays one world unit per raster pixel, which is what
+makes $g$ the right conversion.
+
+This is exact for an orthographic camera and correct at the centre for a
+perspective one. A vanishing determinant is the ground seen edge-on, and returns
+null rather than a number.
+
+### What it is honest about
+
+A scale bar is exactly true only for a plan view through an orthographic camera.
+Tilt the camera and the far edge of the plate is at a different scale from the
+near edge. The panel therefore states the tilt in the same register it already
+uses for *assumed UTM*, rather than making the figure look more certain than it
+is.
+
+The **ratio** — 1:25 000 — needs the physical size of the sheet, and `frame.js`
+is keyed by ratio on purpose, because an export carries pixel dimensions rather
+than millimetres. State the sheet width in the Export section and the ratio
+appears.
+
+### Three renderers, one layout
+
+The marks appear in three places that share no drawing code: the viewport, which
+is DOM over a WebGL canvas; the SVG export, which writes elements; and the PNG
+export, which composites through a 2D context.
+
+`sheetMarks` therefore returns *shapes* — line segments, filled rectangles and
+text runs, in screen pixels — and each renderer is a loop over them. Three
+implementations of one layout is how three of them come to disagree about where
+the bar sits, which is the same failure the four exporters once had over the
+OpenStreetMap credit.
+
+Each renderer measures in its own pixels. A 4× plate has four times as many
+pixels per metre, so a bar laid out against the screen would come out a quarter
+of its length.
+
+The PNG compositor draws the marks into the trim mask as well as into the
+picture. Drawn on the composite alone, they would be cropped away by the very
+scan that decides where the content ends — a scale bar sitting in the margin is
+exactly the thing that scan calls empty.
+
+---
+
 ## Vertical exaggeration
 
 On load, a GeoTIFF gets a suggested `elevScale`, so the terrain starts at roughly
@@ -729,7 +993,11 @@ framing, and the STL base plate.
 
 | File | Role |
 |---|---|
-| `src/utils/geoCoords.js` | `classifyCRS`, forward and inverse projection, `bboxToWgs84`, `geoToPixel` / `geoToWorld`, `featureCoverage`, `suggestElevScale` |
+| `src/utils/geoCoords.js` | `classifyCRS`, forward and inverse projection, `bboxToWgs84`, `geoToPixel` / `geoToWorld`, `featureCoverage`, `suggestElevScale`, `groundPixelMetres` |
+| `src/utils/demFetch.js` | Nominatim geocoding, the tile budget, terrarium decoding, stitch and crop |
+| `src/utils/solar.js` | NOAA solar position, sunrise and sunset, the zone guess, and the sun-path sampling the hours field walks |
+| `src/utils/sunHours.js` | The shadow sweep, the hours field, and the contour levels fitted to it |
+| `src/utils/sheetMarks.js` | `measureScale`, and the scale bar and north arrow as renderer-agnostic shapes |
 | `src/hooks/useHeightmap.js` | GeoTIFF decode, geokey reading, NoData, CRS detection |
 | `src/utils/vectorLayers.js` | The packed source and layer-record model shared by all three sources |
 | `src/utils/gpxParser.js` | GPX → segments → a vector source |
@@ -748,6 +1016,10 @@ framing, and the STL base plate.
 | `tests/projection.spec.js` | CRS classification, projection maths, round-trips, coverage, load path |
 | `tests/vector.spec.js` | Fetch → layers, hide and remove, fills, uploads, SVG export |
 | `tests/osm-detail.spec.js` | Detail tiers by extent, and the pre-flight count that refuses a province by name |
+| `tests/terrain-fetch.spec.js` | The whole fetch, with both servers played by the spec — and the assertion that nothing is sent until a button is pressed |
+| `tests/sun-almanac.spec.js` | The almanac drives the light, and never writes to the sliders it replaces |
+| `tests/sun-hours.spec.js` | The mode draws off the raster's own latitude, and the period reaches the worker |
+| `tests/sheet-marks.spec.js` | The bar measures the raster and follows the camera, in the viewport and in the SVG |
 
 ### A note on geotiff.js
 

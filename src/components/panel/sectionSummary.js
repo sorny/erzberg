@@ -29,6 +29,8 @@
  * dash there would claim they were switched off, which is a different thing.
  */
 
+import { formatClock } from '../../utils/solar'
+
 // ── Formatters ───────────────────────────────────────────────────────────────
 /** The panel writes 4 as `4` and 0.5 as `0.5`, never as `4.0`. */
 const num = (v) => (Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100))
@@ -89,6 +91,10 @@ export const PANEL_MODES = [
   ['Mode: Air',            'enabledAir',       'Spacing',   (s) => num(s.spacingAir)],
   ['Mode: Race Line',      'enabledRaceLine',  'Fan',       (s) => num(s.fanRaceLine)],
   ['Mode: Section',        'enabledSection',   'Cut',       (s) => pct(s.cutSection)],
+  // The period, not a dial. Every other mode's one fact is a number it was set
+  // to; this one's is *what it measured* — a year or a date — and the hour marks
+  // it draws at are chosen by the field rather than by a slider.
+  ['Mode: Sun Hours',      'enabledSunHours',  'Period',    (s) => (s.periodSunHours === 'day' ? 'a day' : 'a year')],
   ['Mode: Zero Crossings', 'enabledZeroCross', 'Spacing',   (s) => num(s.spacingZeroCross)],
   ['Mode: Sprite Blocks',  'enabledSprite',    'Tiers',     (s) => num(s.tiersSprite)],
   ['Mode: Reticulation',   'enabledRetic',     'Cells',     (s) => num(s.cellRetic)],
@@ -143,8 +149,8 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [] 
 /**
  * The sections that say nothing, and why each one is silent.
  *
- * Export, Analysis and Hydraulic Erosion are actions rather than settings: they
- * hold nothing that survives being closed. Presets is the one deliberate
+ * Export, Analysis, Hydraulic Erosion and Fetch Terrain are actions rather than
+ * settings: they hold nothing that survives being closed. Presets is the one deliberate
  * omission — the applied style already has a permanent line at the top of the
  * panel, above the filter, and a header that repeats it costs a row and adds no
  * fact.
@@ -153,7 +159,7 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [] 
  * both directions. Without the list, "every section has a summary" could only be
  * asserted by hard-coding a number, which is what went stale last time.
  */
-export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis']
+export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis', 'Fetch Terrain']
 
 /**
  * Build the whole map, keyed by section title.
@@ -203,16 +209,23 @@ export function buildSectionSummaries({
   if (style.showMesh) surface.push('mesh')
   out['Terrain Style'] = surface.length ? surface.join(' · ') : OFF
 
+  // Three ways to be lit, and the first fact says which. Multi-direction has no
+  // azimuth at all; the almanac has one but it is computed, so the *hour* is the
+  // setting a user changed and the azimuth is its consequence. The second fact
+  // stays opacity in all three, which is what keeps the four shading rows
+  // readable down the column.
   out['Hillshade'] = when(style.showHillshade,
     style.hillshadeMultiDir
       ? `multi · ${pct(style.hillshadeOpacity)}`
-      : `${deg(style.hillshadeAzimuth)} · ${pct(style.hillshadeOpacity)}`)
+      : style.hillshadeAlmanac
+        ? `${formatClock(style.hillshadeHour)} · ${pct(style.hillshadeOpacity)}`
+        : `${deg(style.hillshadeAzimuth)} · ${pct(style.hillshadeOpacity)}`)
   out['Slope Shading'] = when(style.showSlopeShade, pct(style.slopeShadeOpacity))
   out['Water Fill']    = when(style.showWaterFill,  `level ${pct(style.waterLevel)}`)
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
 
   // ── Marks ─────────────────────────────────────────────────────────────────
-  // The index says how many of the thirty-one are drawing. It is the one header
+  // The index says how many of the thirty-two are drawing. It is the one header
   // whose readout is about the sections under it rather than about itself.
   out['Draw Modes'] = `${PANEL_MODES.filter(([, k]) => style[k]).length} of ${PANEL_MODES.length}`
   for (const [title, key, label, fact] of PANEL_MODES) {
@@ -247,6 +260,10 @@ export function buildSectionSummaries({
     style.showMirrorMinusZ && '−Z',
   ].filter(Boolean)
   out['Mirror'] = mirrored.length ? mirrored.join(' ') : OFF
+  // Named rather than counted, like Mirror above it: two marks, and which of
+  // them is on is the whole question.
+  const sheet = [view.frameScaleBar && 'bar', view.frameNorth && 'north'].filter(Boolean)
+  out['Scale and North'] = sheet.length ? sheet.join(' · ') : OFF
 
   return out
 }

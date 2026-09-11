@@ -34,6 +34,13 @@ machine. There is no server, no upload and no account. The app makes no
 third-party request on load, because it serves the one webfont from its own
 origin.
 
+Two features contact a server, and only when you press their button. *Vector
+Layers* asks OpenStreetMap for roads and rivers inside the raster's extent.
+*Fetch Terrain* asks a geocoder for a place, then asks a tile host for the ground
+under it. Each sends a place name or a bounding box. Neither sends a file, and
+neither needs an account or a key. If you use neither, the app opens no
+connection at all.
+
 <table>
   <tr>
     <td width="33%"><img src="docs/images/preset-unknown-pleasures.png" alt="Unknown Pleasures preset"></td>
@@ -122,7 +129,7 @@ it is. Jitter changes the source, so jitter is in Source. Hydraulic Erosion used
 to sit at position 48, immediately before Export.
 
 **Thirty-one modes on one screen.** The Draw Modes index opens the Marks stage.
-It is a grid of the thirty-one marks themselves — the same glyphs the section
+It is a grid of the thirty-two marks themselves — the same glyphs the section
 headers carry. A lit tile is drawing. Click one to switch it on, and the panel
 opens its section and scrolls to it. Click a lit one to switch it off, and the
 panel stays where it is. The tile and the section switch are two views of one
@@ -139,6 +146,7 @@ setting, so they cannot disagree.
 | **Audio** | MP3, WAV, OGG or M4A. The app analyses the file into a spectrogram that drives the terrain. |
 | **GPX** | The app drapes the track line over a georeferenced raster. |
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
+| **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 
 **Vector layers.** The section is always in the panel. If the section has
@@ -253,6 +261,7 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Valley Detection | Topographic Position Index troughs |
 | Stipple Dots | Stochastic dot density driven by slope or elevation |
 | Isophotes | Lines of constant illumination — light drawn, not hatched by |
+| Sun Hours | Isolines of how long the ground is in direct sun, over a year or over one date. The only field here that measures the ground rather than the picture, and the only one whose sun is a true bearing |
 | Engraving | Copperplate illumination cross-hatch — shadows accumulate over up to 4 stacked stroke directions |
 | Curvature | Evenly spaced streamlines through the principal-curvature direction field — strokes wrap the shape rather than the light |
 | Rock & Scree | Swisstopo-style cliff hachures plus slope-graded debris dots |
@@ -357,6 +366,22 @@ return to it.
   Azimuth and altitude drive both the Lambert shading and the shadows, and an
   amber sun indicator marks the light in the scene. Multi-directional mode
   blends several azimuths.
+- **Sun hours** — a draw mode rather than an overlay, listed with the others
+  below, and the only field in the app that measures the ground rather than the
+  picture. See *Draw modes*.
+- **The sun, as an almanac.** Hillshade takes the azimuth and the altitude as
+  two free numbers, and the default pair — 315° and 45° — is the cartographic
+  convention. It is also a position the sky never offers. At the Erzberg's
+  latitude the sun never passes 307° of bearing on any day of the year.
+
+  Switch *Sun* to **Almanac** and the two numbers come from the ground instead.
+  Set a date, a time and a zone. The app computes the real solar position from
+  the raster's own latitude, which a GeoTIFF already carries. A plain PNG has no
+  location, so the panel asks for one.
+
+  The panel states the bearing, the elevation, and the times of sunrise, solar
+  noon and sunset. The cast shadows follow. The sliders keep the values you left
+  them at: switch back to *Convention* and your hand-set light returns unchanged.
 - **Slope shading** — a two-colour steepness gradient blended over the fill.
 - **Aspect map** — slope direction as a hue wheel.
 - **Sky View Factor** ambient occlusion, ray-marched over the sky hemisphere.
@@ -451,6 +476,34 @@ The app names exports after the source file. `graz.tif` produces `graz.svg`,
 `graz-profile.svg`, `graz-vectors.stl` and `graz.webm`. Each export says which
 name it wrote when it finishes, so the download shelf is not the only evidence.
 Presets save and load as JSON, and they can carry the heightmap with them.
+
+**Every plate is its own project file.** A PNG carries the whole parameter set in
+a `tEXt` chunk. An SVG carries it in a comment above the first mark, where an
+editor shows it and a plotter never draws it. Open that file with *Preset ⬆* and
+the look comes back. The terrain does not: the raster is yours and stays yours,
+and the file name of the raster is never written into the plate.
+
+**The sheet can say its scale.** Switch on *Scale bar* and *North arrow* in
+*Scale and North*. The bar is measured from the raster's own bounding box, and
+it is always a round distance — 200 m, 500 m, 1 km. Both marks are ink: they
+appear in the viewport, in the PNG, and in the SVG as their own pen layer. A
+scale bar is exact for a plan view through an orthographic camera. The panel
+says the tilt out loud, because a tilted view is at a different scale front to
+back. State the sheet width in millimetres and the panel also prints the map
+ratio.
+
+**Preflight, before the pen touches paper.** Press *Preflight* in the Export
+section. The app builds the file a plotter would be given — after occlusion, and
+after the frame has clipped it — and reports the stroke count, the pen count, the
+ink laid down, the distance travelled with the pen up, and an estimate in
+minutes.
+
+Switch on *Plotter order* and the app re-orders the strokes inside each pen layer
+so the carriage travels less. A stroke is drawn backwards if its far end is
+nearer. On the sample plate this cuts the pen-up travel from 52.4 m to 1.4 m.
+Filled areas are never re-ordered, because their paint order decides what covers
+what. The switch is off by default: where two strokes of different colours cross,
+the order decides which ink is on top, so the decision is yours.
 
 ---
 
@@ -553,6 +606,9 @@ The app idles quietly and stays responsive under load.
 | Labels & text | Space Mono (SIL OFL 1.1) in four faces. `npm run font` converts them to glyph outlines, flattened the same way. The wordmark of the panel uses the same face as a self-hosted woff2 of 9.6 kB, so the app contacts nobody on load |
 | Single-line fonts | 49 stroke faces — Hershey (liberal, acknowledgement required) and EMS (SIL OFL 1.1) from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine) (SIL OFL 1.1), ISO 3098 (public domain), and the Commodore 1520 (WTFPL), Apple 410 (MIT) and DearPlotter (SIL OFL 1.1) plotter faces. `npm run fonts:single-line` flattens them |
 | Map data | OpenStreetMap through the Overpass API — ODbL, attributed in the panel and in every SVG |
+| Place search | OpenStreetMap Nominatim — ODbL, no key, and only on submit. The usage policy of the service asks that nobody attach it to a keystroke |
+| Elevation data | Terrain Tiles on AWS Open Data, in the Mapzen terrarium encoding. The sources include SRTM, GMTED2010, EU-DEM and 3DEP. Every tile names the survey it came from, and the panel prints that name |
+| Solar position | The NOAA polynomials, in-house. Arithmetic only: no dependency, no table and no network |
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
 | Audio | Web Audio `decodeAudioData` + an in-house radix-2 FFT with no dependency |

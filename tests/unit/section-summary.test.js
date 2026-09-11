@@ -74,6 +74,28 @@ describe('the readouts follow the params', () => {
       .toBe('multi · 60%')
   })
 
+  it('says the hour when the sun is an almanac, not the azimuth it computed', () => {
+    // The azimuth is a *consequence* in Almanac mode. The hour is the setting
+    // somebody moved, and it is also what says at a glance which mode is on.
+    const style = {
+      ...STYLE_DEF, showHillshade: true, hillshadeOpacity: 0.6,
+      hillshadeAlmanac: true, hillshadeHour: 9.25,
+    }
+    expect(atDefaults({ style })['Hillshade']).toBe('09:15 · 60%')
+    // Multi-direction wins: it averages eight light directions, so there is no
+    // azimuth for an ephemeris to drive and the two are exclusive.
+    expect(atDefaults({ style: { ...style, hillshadeMultiDir: true } })['Hillshade'])
+      .toBe('multi · 60%')
+  })
+
+  it('names the sheet marks rather than counting them', () => {
+    expect(atDefaults()['Scale and North']).toBe('—')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true } })['Scale and North']).toBe('bar')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameNorth: true } })['Scale and North']).toBe('north')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true, frameNorth: true } })['Scale and North'])
+      .toBe('bar · north')
+  })
+
   it('lists what the surface is drawing rather than counting it', () => {
     expect(atDefaults({ style: { ...STYLE_DEF, showFill: true } })['Terrain Style']).toBe('fill')
     expect(atDefaults({ style: { ...STYLE_DEF, showFill: true, fillHypsometric: true } })['Terrain Style'])

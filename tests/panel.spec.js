@@ -1,9 +1,20 @@
 import { test, expect } from '@playwright/test'
 import { resetToDefaults } from './helpers.js'
 import { SECTION_TERMS } from '../src/components/panel/sectionTerms.js'
+import { PANEL_MODES } from '../src/components/panel/sectionSummary.js'
 
 /** Every section the filter index knows about should be on the panel. */
 const SECTION_COUNT = Object.keys(SECTION_TERMS).length
+
+/**
+ * How many draw modes there are, asked rather than remembered.
+ *
+ * It was written down here as thirty-one, and the thirty-second mode collected
+ * it — in the test's *name* as well as in two assertions. `PANEL_MODES` is the
+ * one place the panel's own order and count are stated, and it is what the index
+ * renders from, so asking it is the same question the index answers.
+ */
+const MODE_COUNT = PANEL_MODES.length
 
 /**
  * The control panel itself — the filter, the typed values, the shortcut.
@@ -322,12 +333,12 @@ test.describe('panel', () => {
     await expect(line).toHaveText('2 marks · 1 ink')
   })
 
-  test('the index shows all thirty-one draw modes and which are drawing', async ({ page }) => {
-    // Thirty-one sections over 2 239 px, each a header that says a noun. Which
+  test('the index shows every draw mode, and which are drawing', async ({ page }) => {
+    // Thirty-odd sections over 2 239 px, each a header that says a noun. Which
     // ones were drawing was a question you answered by scrolling past the ones
     // that were not.
     await openApp(page)
-    await expect(page.locator('[data-testid^="mode-tile-"]')).toHaveCount(31)
+    await expect(page.locator('[data-testid^="mode-tile-"]')).toHaveCount(MODE_COUNT)
     const lines = page.locator('[data-testid="mode-tile-Lines"]')
     await expect(lines).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-testid="mode-tile-Stipple"]')).toHaveAttribute('aria-pressed', 'false')
@@ -335,7 +346,7 @@ test.describe('panel', () => {
     // And the header counts them while the index itself is shut.
     await page.click('[data-testid="section-draw-modes"]')
     await page.waitForTimeout(300)
-    await expect(page.locator('[data-testid="summary-draw-modes"]')).toHaveText('1 of 31')
+    await expect(page.locator('[data-testid="summary-draw-modes"]')).toHaveText(`1 of ${MODE_COUNT}`)
   })
 
   test('a tile and the section switch are two views of one boolean', async ({ page }) => {

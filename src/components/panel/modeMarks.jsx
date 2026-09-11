@@ -125,6 +125,19 @@ const MARKS = {
       <path d="M15 1.5 C18.5 4.5, 18.5 8.5, 15 11.5" />
     </g>
   ),
+  // Hours of direct sun. Nested like a contour set and deliberately lopsided:
+  // the rings crowd against the shaded flank and open out toward the sun, and
+  // the closed loop at the heart of them is the ground that never sees it —
+  // the one line the whole mode was built for.
+  sunhours: (
+    <g {...BASE}>
+      <path d="M5 6.5 C5 5, 7.5 4.6, 8 6.5 C8.4 8.2, 5.6 8.5, 5 6.5 Z" />
+      <path d="M3.5 6.5 C3.3 4, 9 3.2, 9.8 6.5 C10.5 9.4, 3.9 9.6, 3.5 6.5 Z" />
+      <path d="M2 6.5 C1.6 2.5, 11.5 1.6, 12.6 6.5 C13.6 11, 2.5 11.3, 2 6.5 Z" />
+      <path d="M16 1.5 C13.5 4, 13.5 9, 16 11.5" />
+      <path d="M20 1 C17 4, 17 9, 20 12" />
+    </g>
+  ),
   engraving: (
     <g {...BASE}>
       <path d="M1 2 L21 2"   strokeWidth="0.6" />

@@ -16,6 +16,7 @@ import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
 import { FrameOverlay } from './components/FrameOverlay'
+import { SheetMarks } from './components/SheetMarks'
 import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useVectorIcons } from './hooks/useVectorIcons'
@@ -28,7 +29,7 @@ import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
-import { featureCoverage } from './utils/geoCoords'
+import { bboxToWgs84, featureCoverage } from './utils/geoCoords'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
@@ -39,6 +40,8 @@ import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache, osmAttribution } from './utils/osmFetch'
 import { GROUP_OF } from './params'
+import { buildPreset, readPresetFile } from './utils/presetFile'
+import { parseDate, solarPosition, sunTimes } from './utils/solar'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
@@ -140,6 +143,10 @@ const EXPORT_KINDS = {
   // has to match what pngExport.js actually writes, or the one message whose
   // whole job is to name the file names a file that is not there.
   pngAlpha: ['-alpha.png', 'Transparent PNG'],
+  // Not a file, and the message at the end says so. A preflight runs the whole
+  // SVG pipeline and throws the file away, which is the only honest way to
+  // measure what a plot will cost.
+  preflight: [null, 'Preflight'],
 }
 
 // ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────────
@@ -228,7 +235,7 @@ function ViewportHint({ onDismiss }) {
 
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker, loadGeoTiffFromPicker, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
+  const { load, loadFromPicker, loadGeoTiffFromPicker, loadDem, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
@@ -735,6 +742,7 @@ export default function App() {
     if (status === 'cancelled')   notify(`${name} export cancelled.`)
     else if (status === 'failed')  notify(`${name} export failed — see the console.`)
     else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
+    else if (status === 'measured' || ext === null) notify('Preflight done — see the Export section.')
     else                          notify(`Wrote ${exportBaseName}${ext.startsWith('-') ? '' : '.'}${ext}`)
   }, [notify, exportBaseName])
 
@@ -758,6 +766,22 @@ export default function App() {
   const beginSvgExport = useCallback(() => {
     if (beginExport('svg')) setSvgTrigger(n => n + 1)
   }, [beginExport])
+
+  /**
+   * What the plot will cost, before a pen touches paper.
+   *
+   * Runs the SVG exporter with the file-writing step removed, so the figures
+   * describe the drawing that would actually be plotted — after occlusion has
+   * cut the strokes and the paper frame has clipped them — rather than the
+   * geometry the worker built. Cleared whenever the drawing changes, because a
+   * stale answer about a different plate is worse than none.
+   */
+  const [preflightTrigger, setPreflightTrigger] = useState(0)
+  const [plotStats, setPlotStats] = useState(null)
+  const beginPreflight = useCallback(() => {
+    if (beginExport('preflight')) setPreflightTrigger(n => n + 1)
+  }, [beginExport])
+
   const [pngTrigger,        setPngTrigger]         = useState(0)
   const [pngAlphaTrigger,   setPngAlphaTrigger]    = useState(0)
   /**
@@ -897,33 +921,20 @@ export default function App() {
       ctx.putImageData(img, 0, 0)
       heightmapDataURL = c.toDataURL('image/png')
     }
-    const payload = { terrain, style, points, view, gradientStops, bgGradientStops }
-    // Vector layer *style* travels with a preset; the coordinates do not. A
-    // preset is a look, not a data set — and matching on `bucket` rather than on
-    // layer id is what lets last week's palette land on today's fresh fetch of
-    // the same valley.
-    if (vectorLayers.length) {
-      // `hidden` is stripped along with the identity fields: it holds feature
-      // *indices*, which mean nothing against a different fetch of the same
-      // area. Re-applying them would hide five arbitrary peaks rather than the
-      // five that were chosen. A preset is a look; a selection is data.
-      //
-      // `iconCustom` goes too, and it is the same rule one level down: it holds
-      // an uploaded file's flattened geometry, whose `polylines` are typed
-      // arrays. `JSON.stringify` writes those as `{"0":…,"1":…}` objects, which
-      // come back with no `length` — so every loop over them runs zero times and
-      // the layer draws neither its icon nor its dots, having been told it has
-      // an icon. Rather than teach the format to rehydrate a glyph, the preset
-      // simply does not carry one: `icon` falls back with it.
-      payload.vectorStyles = vectorLayers.map(
-        ({ id: _id, sourceId: _s, count: _c, hidden: _h, iconCustom: _ic, ...rest }) =>
-          (rest.icon === 'custom' ? { ...rest, icon: null } : rest))
-      // Says that `vectorStyles` is in *stack* order, top of the list first.
-      // Presets written before the stack existed hold the same array in paint
-      // order, and there is no way to tell the two apart by looking — so the
-      // flag is what `applyVectorStyles` waits for before reordering anything.
-      payload.vectorStackOrder = true
-    }
+    /*
+     * The same payload every export now carries, plus the raster.
+     *
+     * `buildPreset` owns the shape — which fields travel, and which parts of a
+     * vector layer are style rather than data — because the PNG chunk and the
+     * SVG comment write it too, and three descriptions of one object is how the
+     * three come to disagree. See utils/presetFile.js for the rules.
+     *
+     * `heightmapDataURL` stays here and only here. A whole raster as base64 is
+     * right in a file somebody deliberately saved and wrong in every plate.
+     */
+    const payload = buildPreset({
+      terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers,
+    })
     if (heightmapDataURL) payload.heightmapDataURL = heightmapDataURL
     const data = JSON.stringify(payload, null, 2) + '\n'
     /*
@@ -949,26 +960,51 @@ export default function App() {
   }, [terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers,
       heightmapPixels, heightmapWidth, heightmapHeight, heightmapFilename])
 
+  /**
+   * The look every export carries with it.
+   *
+   * The same object `Preset ⬇` writes, minus the raster, memoised because both
+   * exporters read it at the moment a trigger fires and neither should rebuild
+   * it — the PNG turns it into a `tEXt` chunk, the SVG into a comment.
+   */
+  const exportPreset = useMemo(
+    () => buildPreset({ terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers }),
+    [terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers])
+
+  /**
+   * Open a look — from the JSON `Preset ⬇` writes, or from a plate that carries
+   * one.
+   *
+   * Every PNG and SVG erzberg exports has the parameters inside it, so the
+   * picture is the project file and there is nothing to remember to save. What
+   * comes back is the look and not the ground: a plate carries no raster, which
+   * is why the terrain under it is left exactly as it is.
+   */
   const loadPresetFromFile = useCallback(() => {
-    const input = Object.assign(document.createElement('input'), { type:'file', accept:'.json' })
+    const input = Object.assign(document.createElement('input'),
+      { type:'file', accept:'.json,.png,.svg' })
     input.onchange = async (e) => {
       const file = e.target.files[0]; if (!file) return
-      try {
-        const d = JSON.parse(await file.text())
-        if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
-        if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
-        if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
-        if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
-        if (d.gradientStops)   setGradientStops(d.gradientStops)
-        if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
-        applyVectorStyles(d)
-        if (d.heightmapDataURL) load(d.heightmapDataURL)
-      } catch {
-        // Everything else that fails to load says so in the banner at the foot
-        // of the screen; a system dialog on top of a dark tool broke the frame
-        // and said nothing about what to check.
-        showError('That file isn’t an erzberg preset. Presets are the JSON written by Preset ⬇ in the Export section.')
+      // Everything that fails to load says so in the banner at the foot of the
+      // screen; a system dialog on top of a dark tool broke the frame and said
+      // nothing about what to check.
+      let d = null
+      try { d = await readPresetFile(file) } catch { d = null }
+      if (!d) {
+        const png = /\.png$/i.test(file.name), svg = /\.svg$/i.test(file.name)
+        showError(png || svg
+          ? `That ${png ? 'PNG' : 'SVG'} carries no erzberg preset. Only a plate this app exported does — every PNG and SVG it writes has the settings inside it.`
+          : 'That file isn’t an erzberg preset. Open the JSON written by Preset ⬇, or any PNG or SVG this app exported.')
+        return
       }
+      if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
+      if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
+      if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
+      if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
+      if (d.gradientStops)   setGradientStops(d.gradientStops)
+      if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
+      applyVectorStyles(d)
+      if (d.heightmapDataURL) load(d.heightmapDataURL)
     }
     input.click()
   }, [load, applyVectorStyles, showError])
@@ -1098,6 +1134,25 @@ export default function App() {
     })
   }, [soundscape, loadFromPicker, autoZoom, dropVectors])
 
+  /**
+   * Take a DEM the app fetched for a typed place.
+   *
+   * The same three moves every other loader ends with — fit the camera, take the
+   * exaggeration the raster's own ground pixel suggests, pick a grid stride —
+   * because a fetched DEM is a georeferenced raster and deserves no special
+   * case. The vectors go, unlike on a GeoTIFF load: a *named place* is by
+   * definition somewhere else, and last valley's roads over this one's ground is
+   * not an overlay, it is a mistake with a legend.
+   */
+  const fetchTerrainAndFit = useCallback((dem, name) => {
+    soundscape.release()
+    const r = loadDem(dem, name)
+    autoZoom({ width: r.dataWidth, height: r.dataHeight })
+    setBaseElevScale(r.suggestedElevScale ?? 1)
+    setTerrain(prev => ({ ...prev, resolution: autoResolution(r.width, r.height), elevScale: 0 }))
+    dropVectors()
+  }, [soundscape, loadDem, autoZoom, dropVectors])
+
   const loadGeoTiffAndFit = useCallback(() => {
     soundscape.release()
     loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
@@ -1124,7 +1179,10 @@ export default function App() {
    * answer to the same question, and asking twice is how the SVG came to be
    * the only exporter that credited anything.
    */
-  const osmCredit = osmAttribution(style.vectorLayers)
+  // `style.vectorLayers` was the wrong address: the layer records are their own
+  // state, and STYLE_DEF has never held a key by that name — so this asked an
+  // undefined for its contents and every recording went out uncredited.
+  const osmCredit = osmAttribution(vectorLayers)
 
   const handleWebmState = useCallback((active) => {
     setWebmActive(active)
@@ -1172,6 +1230,37 @@ export default function App() {
     return Math.min(desired, Math.max(0.5, Math.floor(fitted * 4) / 4))
   }, [view.renderScale, maxBufferPx, winSize, viewInset])
 
+  /**
+   * Where the sun really is, when the panel is set to ask.
+   *
+   * Null in Convention mode, which is the default and is not a fallback: 315°/45°
+   * is a bearing the sky never offers at any latitude this tool has been pointed
+   * at, and it is still the right default because light from the upper left is
+   * what stops a ridge reading as a gully. The almanac is a second setting beside
+   * it rather than a correction to it.
+   *
+   * Computed here, once, and read by both the shader and the panel — the same
+   * object, so the picture and the readout beside it cannot disagree about what
+   * hour it is. A GeoTIFF answers the latitude and longitude from its own
+   * bounding box; a plain PNG has no location at all, which is what the two
+   * fallback parameters are for.
+   */
+  const sun = useMemo(() => {
+    if (!style.hillshadeAlmanac) return null
+    const when = parseDate(style.hillshadeDate)
+    if (!when) return null
+    const wgs = bboxToWgs84(geoTiffBbox, geoTiffCRS)
+    const lat = wgs ? (wgs[1] + wgs[3]) / 2 : (style.hillshadeLat ?? 0)
+    const lon = wgs ? (wgs[0] + wgs[2]) / 2 : (style.hillshadeLon ?? 0)
+    const at = { lat, lon, ...when, utcOffset: style.hillshadeZone ?? 0 }
+    return {
+      ...solarPosition({ ...at, hours: style.hillshadeHour ?? 12 }),
+      times: sunTimes(at),
+      lat, lon, fromRaster: !!wgs,
+    }
+  }, [style.hillshadeAlmanac, style.hillshadeDate, style.hillshadeHour, style.hillshadeZone,
+      style.hillshadeLat, style.hillshadeLon, geoTiffBbox, geoTiffCRS])
+
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
   //
@@ -1184,6 +1273,21 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const p = { ...terrain, ...style, ...points, ...view, gradientStops,
     elevScale: baseElevScale + terrain.elevScale,
+    /*
+     * The almanac overrides the two sliders rather than writing to them.
+     *
+     * Written through here, the sliders keep the convention pair they were left
+     * at and simply are not what is lighting the scene — switch back and the
+     * plate you had returns untouched. Writing the computed pair into `style`
+     * instead would overwrite the user's own numbers, put an entry in the undo
+     * history for every tick of a clock, and make an ephemeris look like an edit.
+     *
+     * Clamped at the horizon. Below it there is no direct light at all, and the
+     * honest render is a black plate — but a black plate reads as a broken app,
+     * so the shading grazes at zero and the panel says *below the horizon* in
+     * words. See the readout in the Hillshade section.
+     */
+    ...(sun ? { hillshadeAzimuth: sun.azimuth, hillshadeAltitude: Math.max(0, sun.altitude) } : null),
     vectorLayers, textLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
@@ -1239,6 +1343,11 @@ export default function App() {
   // features, no raster and no worker — only a face and a place to stand.
   const { lineGeo, overflowed: textOverflow } =
     useTextLayers(contourLabelled, textLayers, terrainData, view.tilt, view.rotation)
+
+  // A preflight describes one drawing seen from one camera. Both of those are
+  // objects that change identity whenever anything inside them does, which makes
+  // this the whole staleness rule in one line.
+  useEffect(() => { setPlotStats(null) }, [lineGeo, view])
 
   // The overlay means "nothing has come back for a while", not "a build is in
   // flight". Keying it on isComputing alone breaks under a continuous stream:
@@ -1427,6 +1536,8 @@ export default function App() {
           setParams={setParams}
           orbitRef={orbitRef}
           svgTrigger={svgTrigger}
+          preflightTrigger={preflightTrigger}
+          onPlotStats={setPlotStats}
           onSvgDone={finishExport}
           onSvgProgress={handleExportProgress}
           svgCancelRef={exportCancelRef}
@@ -1434,6 +1545,7 @@ export default function App() {
           pngAlphaTrigger={pngAlphaTrigger}
           onPngDone={finishExport}
           bgGradientStops={bgGradientStops}
+          exportPreset={exportPreset}
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
           exportBaseName={exportBaseName}
@@ -1487,6 +1599,7 @@ export default function App() {
         setTextureImage={setTextureImage}
         loadFromPicker={loadPngAndFit}
         loadGeoTiffFromPicker={loadGeoTiffAndFit}
+        onFetchTerrain={fetchTerrainAndFit}
         soundscape={soundscape}
         flockAudio={flockAudio}
         onSoundscapeFit={fitSoundscape}
@@ -1495,6 +1608,7 @@ export default function App() {
         geoTiffCRS={geoTiffCRS}
         geoTiffCRSName={geoTiffCRSName}
         geoTiffBbox={geoTiffBbox}
+        sun={sun}
         loadGpxFromPicker={loadGpxFromPicker}
         loadGeoJsonFromPicker={loadGeoJsonFromPicker}
         vectorSources={vectorSources}
@@ -1525,6 +1639,8 @@ export default function App() {
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
+        onPreflight={beginPreflight}
+        plotStats={plotStats}
         onSavePreset={savePreset}
         onLoadPreset={loadPresetFromFile}
         externalPresets={externalPresets}
@@ -1547,6 +1663,9 @@ export default function App() {
       {/* ── Center guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
       {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} rightInset={viewInset} />}
+      {/* Ink, unlike the frame above it: a recording is a picture of the plate,
+          so the marks stay while the veiled frame does not. */}
+      <SheetMarks view={view} rightInset={viewInset} />
       {!webmActive && <FeatureTooltip layers={vectorLayers} rightInset={viewInset} />}
 
       {/* ── WebM REC badge ───────────────────────────────────────────────── */}

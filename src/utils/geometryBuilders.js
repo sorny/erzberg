@@ -7,6 +7,7 @@ import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
 import { isTextLayerId, textLayerName } from './textLayers'
 import { layerDisplayName } from './drawModes'
+import { latitudeFor, samplingFor, smoothField, sunHourLevels, sunHoursField } from './sunHours'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -390,6 +391,10 @@ export function buildLineGeometry(terrain, p) {
     { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
+    { id:'SunHours',builder: (t, ctx) => buildSunHours(t, ctx, {
+        levels: p.levelsSunHours, period: p.periodSunHours, days: p.daysSunHours,
+        perDay: p.perDaySunHours, date: p.dateSunHours,
+        smoothing: p.smoothingSunHours, radius: p.radiusSunHours }) },
     { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
     { id:'Sprite',  builder: (t, ctx) => buildSprite(t, ctx, {
         tiers: p.tiersSprite, spacing: p.spacingSprite, size: p.sizeSprite,
@@ -2533,6 +2538,140 @@ function buildIsophotes(terrain, p, levels, sunAzimuth, gamma, smoothing, radius
        * stored at. Measured on a clipped dome: max span 18.79 cells before,
        * 1.41 — one diagonal grid edge — after.
        */
+      let prevC = 0, prevR = 0, prevE = 0, inRun = false
+      let lastC = 0, lastR = 0
+      const step = (fc, fr) => {
+        const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+        const elev = (b - 0.5) * 100 * elevScale
+        const ok = b === b && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+        if (ok && inRun) {
+          positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH,
+                          fc * scl - halfW, elev, fr * scl - halfH)
+          const ci = Math.min(cols - 1, Math.max(0, Math.round(fc)))
+          const ri = Math.min(rows - 1, Math.max(0, Math.round(fr)))
+          const col = computeVertexColor(normElev(elev, minElev, maxElev),
+                                         gridSlopes[ri * cols + ci] / (maxSlope || 1), 0, p)
+          colors.pushRgb2(col)
+        }
+        inRun = ok
+        prevC = fc; prevR = fr; prevE = elev
+      }
+
+      for (let i = 0; i < pts.length; i += 2) {
+        const fc = pts[i], fr = pts[i + 1]
+        if (i === 0) { step(fc, fr) }
+        else {
+          const n = Math.max(1, Math.ceil(Math.hypot(fc - lastC, fr - lastR)))
+          for (let k = 1; k <= n; k++) step(lastC + (fc - lastC) * k / n,
+                                            lastR + (fr - lastR) * k / n)
+        }
+        lastC = fc; lastR = fr
+      }
+    }
+  }
+
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Sun hours ───────────────────────────────────────────────────────────────
+
+/**
+ * Isolines of how many hours of direct sun a place gets.
+ *
+ * The same construction as the contours and the isophotes above — marching
+ * squares over a scalar field, chained, then draped — and the field is the only
+ * one in this file that is a **measurement of the ground rather than of the
+ * picture**. A contour is a height and an isophote is a shading convention; this
+ * is the number an alpine hut, a ski aspect or a panel array is chosen by, and it
+ * falls out of the raster's own latitude. See utils/sunHours.js for how it is
+ * computed and what "lit" means.
+ *
+ * Four things follow from the field being hours rather than a fraction:
+ *
+ * - **The levels are round numbers of hours, not evenly spaced fractions.** The
+ *   range is not knowable in advance — a few thousand hours for a year, a
+ *   handful for a day, and less in a deep valley — so the panel asks roughly how
+ *   many lines and `sunHourLevels` fits a 1-2-5 step inside whatever the field
+ *   turned out to be. A line at 1 000 h means a thousand hours.
+ * - **There is a line at almost nothing.** The lowest level sits just above zero
+ *   and traces the edge of the ground that never sees the sun at all. Marching
+ *   squares cannot trace the zero region itself, and that closed ring round the
+ *   north face is the whole reason the field is worth drawing.
+ * - **It is the most expensive mode here, by a distance.** A few hundred shadow
+ *   sweeps over the whole grid, once per rebuild. `cost: 7` says so to the
+ *   randomiser and the panel says so to the user.
+ * - **NoData is a hole, not a shoreline** — the same rule the isophotes follow,
+ *   for the same reason. There is no sunlight where there is no ground.
+ */
+function buildSunHours(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 1)))
+
+  const { lat } = latitudeFor(p)
+  const sampling = samplingFor(o.period, o.days, o.date)
+  const field = sunHoursField(terrain, {
+    elevScale, lat, perDay: Math.max(2, Math.min(96, Math.round(o.perDay ?? 12))), ...sampling,
+  })
+
+  // A blur on the *field*, not on the trace — and one that puts the no-ground
+  // sentinel back afterwards. See `smoothField`.
+  const hours = smoothField(field.hours, cols, rows, o.radius ?? 0, sMask)
+
+  const levels = sunHourLevels(field.min, field.max, o.levels)
+  const positions = new F32List(), colors = new F32List()
+  const ex = _edgeX, ey = _edgeY, eid = _edgeId
+  const scratch = getChainScratch(rows * cols * 2)
+
+  for (const level of levels) {
+    const segE = new I32List(), segXY = new F64List()
+
+    for (let r = 0; r < rows - 1; r++) {
+      const row0 = r * cols, row1 = row0 + cols
+      for (let c = 0; c < cols - 1; c++) {
+        const d00 = hours[row0 + c],     d10 = hours[row0 + c + 1]
+        const d01 = hours[row1 + c],     d11 = hours[row1 + c + 1]
+        if (d00 < 0 || d10 < 0 || d01 < 0 || d11 < 0) continue
+
+        const idx = (d00 >= level ? 8 : 0) | (d10 >= level ? 4 : 0) |
+                    (d11 >= level ? 2 : 0) | (d01 >= level ? 1 : 0)
+        if (idx === 0 || idx === 15) continue
+
+        ex[0] = c + edgeLerp01(d00, d10, level); ey[0] = r
+        ex[1] = c + 1;                           ey[1] = r + edgeLerp01(d10, d11, level)
+        ex[2] = c + edgeLerp01(d01, d11, level); ey[2] = r + 1
+        ex[3] = c;                               ey[3] = r + edgeLerp01(d00, d01, level)
+
+        const base = (row0 + c) * 2
+        eid[0] = base
+        eid[1] = (row0 + c + 1) * 2 + 1
+        eid[2] = (row1 + c) * 2
+        eid[3] = base + 1
+
+        const pairs = MARCHING_TABLE[idx]
+        for (let pi = 0; pi < pairs.length; pi += 2) {
+          const e0 = pairs[pi], e1 = pairs[pi + 1]
+          segE.push2(eid[e0], eid[e1])
+          segXY.push4(ex[e0], ey[e0], ex[e1], ey[e1])
+        }
+      }
+    }
+
+    if (segE.length === 0) continue
+    const chains = chainLevelSegments(segE.a, segXY.a, segE.length / 2, scratch)
+
+    for (const chain of chains) {
+      const pts = smooth > 0
+        ? simplifyFlat(
+            chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth),
+            SMOOTH_SIMPLIFY_EPS,
+          )
+        : chain.pts
+
+      // Draped a cell at a time, for the reason the isophotes set out at length:
+      // a sun-hours isoline crosses elevations freely, so a decimated chord is
+      // horizontally faithful and says nothing about the ground under it.
       let prevC = 0, prevR = 0, prevE = 0, inRun = false
       let lastC = 0, lastR = 0
       const step = (fc, fr) => {

@@ -216,6 +216,33 @@ export const useStore = create((set) => ({
   setVectorSources: (sources) =>
     set({ vectorSources: sources ?? [], vectorHover: null, vectorSelected: null }),
 
+  /**
+   * How much ground one screen pixel covers, and where north points on screen.
+   *
+   * Here rather than in App state for the reason the file's opening note gives:
+   * it cannot live in plain React state. It is measured off the *camera*, which
+   * OrbitControls drives directly during a drag precisely so that orbiting does
+   * not re-render the app sixty times a second — so the only place to read it is
+   * inside the render loop, and the only thing that may re-render on it is the
+   * one small overlay that draws the marks.
+   *
+   * Guarded rather than written blind. A drag produces a new measurement every
+   * frame and almost all of them are the same measurement; the epsilon is a
+   * twentieth of a percent of the scale and a tenth of a degree of bearing,
+   * which is finer than either mark can express and coarse enough that a
+   * stationary camera writes nothing at all.
+   */
+  mapScale: null,
+  setMapScale: (next) =>
+    set((s) => {
+      const prev = s.mapScale
+      if (prev === next) return {}
+      if (prev && next
+        && Math.abs(prev.metresPerPixel - next.metresPerPixel) < prev.metresPerPixel * 5e-4
+        && Math.abs(prev.northAngle - next.northAngle) < 0.0017) return {}
+      return { mapScale: next }
+    }),
+
   setVectorHover: (h) => set({ vectorHover: h }),
   setVectorSelected: (v) => set({ vectorSelected: v }),
 

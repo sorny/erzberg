@@ -2,6 +2,7 @@
  * PNG export utilities.
  * Exports the full viewport at 4× resolution, trimmed to content bounds.
  */
+import { PRESET_KEYWORD } from './presetFile'
 
 const MARGIN = 16 // px padding around trimmed content
 
@@ -105,6 +106,35 @@ export function withTextChunks(png, entries) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/**
+ * The scale bar and north arrow, onto a 2D context.
+ *
+ * One of three renderers over the shapes `sheetMarks` returns — the SVG
+ * exporter writes elements and the viewport writes DOM, and all three loop over
+ * the same lists so none of them can put the bar somewhere the others do not.
+ *
+ * Text is the browser's own, matching the text layers the SVG exporter already
+ * writes as `<text>`. It is the one mark here a pen has to be told how to draw.
+ */
+function drawMarks(ctx, marks, color) {
+  ctx.save()
+  ctx.fillStyle = color
+  ctx.strokeStyle = color
+  ctx.lineWidth = Math.max(1, (marks.texts[0]?.size ?? 12) * 0.08)
+  ctx.lineCap = 'butt'
+  for (const [x, y, w, h] of marks.rects) ctx.fillRect(x, y, w, h)
+  ctx.beginPath()
+  for (const [x0, y0, x1, y1] of marks.lines) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1) }
+  ctx.stroke()
+  for (const t of marks.texts) {
+    ctx.font = `${t.size.toFixed(1)}px sans-serif`
+    ctx.textAlign = t.anchor === 'middle' ? 'center' : t.anchor
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillText(t.text, t.x, t.y)
+  }
+  ctx.restore()
+}
+
 function triggerDownload(url, filename, revoke = false) {
   const a = Object.assign(document.createElement('a'), { href: url, download: filename })
   document.body.appendChild(a)
@@ -182,8 +212,11 @@ function trimAndDownload(compositeCtx, maskData, width, height, filename, meta) 
  * @param {boolean}           isAlpha   If true, background is transparent
  * @param {string}            baseName  Download filename stem
  * @param {string|null}       attribution  ODbL credit, when OSM data is in the picture
+ * @param {string|null}       presetText   the look as ASCII JSON, so the plate reopens
+ * @param {object|null}       marks     scale bar and north arrow, from sheetMarks()
  */
-export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName, attribution = null) {
+export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
+                                    attribution = null, presetText = null, marks = null) {
   const { width, height } = glCanvas
   const out = document.createElement('canvas')
   out.width = width
@@ -208,14 +241,26 @@ export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
   const mask = document.createElement('canvas')
   mask.width = width
   mask.height = height
-  mask.getContext('2d').drawImage(glCanvas, 0, 0)
-  const maskData = mask.getContext('2d').getImageData(0, 0, width, height).data
+  const maskCtx = mask.getContext('2d')
+  maskCtx.drawImage(glCanvas, 0, 0)
+
+  // The sheet marks are ink, so they go into the picture *and* into the trim
+  // mask. Drawn on the composite alone they would be cropped away by the very
+  // scan that decides where the content ends — a scale bar sitting in the
+  // margin is exactly the thing that scan calls empty.
+  if (marks) { drawMarks(ctx, marks, marks.color); drawMarks(maskCtx, marks, '#000000') }
+
+  const maskData = maskCtx.getImageData(0, 0, width, height).data
 
   const base = baseName ?? 'heightmap'
   // ODbL: the credit travels with the picture, not with the app that drew it.
   // `Copyright` is the keyword every reader already looks for, and unlike the
   // SVG's XML comment it survives the file being re-encoded by an image tool.
+  //
+  // The preset rides in the chunk beside it, under a keyword of erzberg's own.
+  // Both are dropped by `downloadCanvas` when null, so an uncredited plate with
+  // no look to record still writes no chunks at all.
   return trimAndDownload(ctx, maskData, width, height,
     isAlpha ? `${base}-alpha.png` : `${base}.png`,
-    attribution ? { Copyright: attribution } : null)
+    { Copyright: attribution, [PRESET_KEYWORD]: presetText })
 }

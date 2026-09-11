@@ -42,6 +42,7 @@ import { clipSegment, insideRect } from './frame'
 import { hexToRgb } from './colorUtils'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
+import { orderRuns, routeStats } from './penRoute'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -397,7 +398,7 @@ export function screenInkHex(hex) {
  *
  * @param onProgress  (fraction 0…1, label) — called at yield points only.
  * @param shouldCancel called at each yield; returning true unwinds without writing.
- * @returns 'done' | 'cancelled' | 'empty'
+ * @returns 'done' | 'cancelled' | 'empty' | 'measured'
  */
 export async function exportSVG(opts) {
   const pacer = makePacer(opts.shouldCancel)
@@ -414,6 +415,21 @@ export async function exportSVG(opts) {
 async function runExport({
   onProgress,
   lineGeo, lineStyles = {}, camera, width, height, attribution = null,
+  // The look, already serialised and ASCII-escaped by `presetFile`. Written as a
+  // comment so an SVG opened in an editor shows how it was made, and so a
+  // plotter — which draws marks, not comments — never sees it.
+  preset = null,
+  // The scale bar and the north arrow, already laid out in this export's own
+  // pixels by `sheetMarks`. Its own Inkscape layer, because a plotter run is
+  // sorted by layer and these two marks are the ones you might want in a
+  // different pen from the terrain.
+  sheetMarks: marks = null, sheetMarkColor = '#000000',
+  // Plotter routing and preflight. `penOrder` re-orders open strokes so the
+  // carriage travels less; `onStats` reports what the plot costs either way, and
+  // `measureOnly` runs the whole pipeline and writes no file — which is how the
+  // panel can answer "is this drawing too dense" before the click rather than at
+  // the machine. See utils/penRoute.js.
+  penOrder = false, measureOnly = false, onStats = null,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   surfaceOccludes,
@@ -1147,8 +1163,22 @@ async function runExport({
    * by pen actually reads, so it carries the human name; `id` stays a slug,
    * because it has to be a valid XML id and is what a script would match on.
    */
+  /**
+   * What this plot costs, tallied as the file is built.
+   *
+   * Measured here rather than estimated from the segment count because the two
+   * numbers a plotter cares about are distances, and the segment count says
+   * nothing about either: forty thousand stipple dots and forty long contours
+   * can carry the same total and take an hour apart.
+   *
+   * `travelAsBuilt` is the pen-up distance in the order the exporter thinks in —
+   * by depth, which is right for occlusion and blind to the carriage. The other
+   * is what a nearest-neighbour route would cost instead.
+   */
+  const plot = { ink: 0, travelAsBuilt: 0, travelOrdered: 0, strokes: 0, pens: 0, dashed: false }
+
   const penLayer = (id, label, body) =>
-    `<g id="layer-${id}" inkscape:groupmode="layer" inkscape:label="${label}">${body}</g>`
+    (plot.pens++, `<g id="layer-${id}" inkscape:groupmode="layer" inkscape:label="${label}">${body}</g>`)
 
   const layerGroups = []
   for (const layer of svgLayers) {
@@ -1282,8 +1312,21 @@ async function runExport({
 
     const buildLineEls = async (segs) => {
       if (!dashSizes) {
-        const runs = await joinRuns(segs)
-        return mapPaced(runs, ({ pts, stroke }) => {
+        const joined = await joinRuns(segs)
+        // What this layer costs a plotter, measured on the strokes that will
+        // actually be written — after the occlusion walk has cut them and after
+        // `joinRuns` has folded the pieces back into whole pen strokes.
+        const asBuilt = routeStats(joined)
+        plot.ink += asBuilt.ink
+        plot.travelAsBuilt += asBuilt.travel
+        plot.strokes += asBuilt.strokes
+        // The optimised figure costs a pass of its own, so it is computed when
+        // it is going to be used — either because the export is taking it, or
+        // because a preflight asked what it would be worth.
+        const wantOrder = penOrder || measureOnly
+        const runs = wantOrder ? orderRuns(joined) : joined
+        plot.travelOrdered += wantOrder ? routeStats(runs).travel : asBuilt.travel
+        return mapPaced(penOrder ? runs : joined, ({ pts, stroke }) => {
           // A run of one is still a `<line>`: it is shorter than the equivalent
           // two-point polyline, and it keeps the element every plotter and
           // editor handles most simply.
@@ -1298,7 +1341,11 @@ async function runExport({
         }, segs.length)
       }
       // A dashed segment expands to however many on-pieces the pattern gives it,
-      // so this maps to arrays and flattens rather than one-for-one.
+      // so this maps to arrays and flattens rather than one-for-one. The plot
+      // tally counts it as solid and the panel says so: the pieces are built as
+      // strings here, and re-measuring them would mean parsing back what was
+      // just written.
+      plot.dashed = true
       const { dashPx, gapPx } = dashSizes
       const perSeg = await mapPaced(segs, ({ x0, y0, x1, y1, stroke, dashOffset }) =>
         splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx).map((s) =>
@@ -1364,6 +1411,9 @@ async function runExport({
     // comment rather than drawn text, so it survives being opened in Inkscape
     // without appearing on the plot.
     ...(attribution ? [`<!-- ${xmlAttr(attribution)} -->`] : []),
+    // The whole parameter set, one line, above the first mark. `presetComment`
+    // has already escaped it so nothing inside can close the comment early.
+    ...(preset ? [preset] : []),
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     `<rect width="100%" height="100%" fill="${useBgGrad ? 'url(#bg-grad)' : bgColor}"/>`,
     ...layerGroups,
@@ -1373,6 +1423,9 @@ async function runExport({
     ...shadowGroup,
     ...trailGroup,
     ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : []),
+    // Last, and over everything: the two marks are annotation on the sheet
+    // rather than part of the picture, so nothing may draw across them.
+    ...sheetMarkGroup(marks, sheetMarkColor, vx, vy),
     `</svg>`,
   ].join('\n')
 
@@ -1380,8 +1433,35 @@ async function runExport({
   // point where honouring it still means "nothing was written".
   await pacer.yield()
   report(PHASE.build, 1, BUILD_LABEL)
+  // The plot tally goes out either way: an export that has just written a file
+  // is the cheapest possible moment to learn what plotting it will cost.
+  onStats?.({ ...plot, bytes: svg.length, width: vw, height: vh })
+  if (measureOnly) return 'measured'
   download(svg, `${baseName ?? 'heightmap'}.svg`, 'image/svg+xml')
   return 'done'
+}
+
+/**
+ * The scale bar and north arrow as one SVG layer.
+ *
+ * The third renderer over `sheetMarks`' shapes — the PNG compositor strokes them
+ * onto a 2D context and the viewport writes DOM. Offsets by the viewBox origin
+ * because a framed export cuts its page out of the canvas, and these were laid
+ * out in canvas pixels like everything else here.
+ */
+function sheetMarkGroup(marks, color, vx, vy) {
+  if (!marks) return []
+  const ink = screenInkHex(color)
+  const stroke = Math.max(0.4, (marks.texts[0]?.size ?? 12) * 0.08)
+  const els = [
+    ...marks.rects.map(([x, y, w, h]) =>
+      `<rect x="${(x - vx).toFixed(1)}" y="${(y - vy).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"/>`),
+    ...marks.lines.map(([x0, y0, x1, y1]) =>
+      `<line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="${stroke.toFixed(2)}"/>`),
+    ...marks.texts.map((t) =>
+      `<text x="${(t.x - vx).toFixed(1)}" y="${(t.y - vy).toFixed(1)}" font-family="sans-serif" font-size="${t.size.toFixed(1)}" text-anchor="${t.anchor}" fill="${ink}" stroke="none">${xmlText(t.text)}</text>`),
+  ]
+  return [`<g id="layer-sheet-marks" inkscape:groupmode="layer" inkscape:label="Scale and north" fill="${ink}">${els.join('')}</g>`]
 }
 
 function download(content, filename, mime) {

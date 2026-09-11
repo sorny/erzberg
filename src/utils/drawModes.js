@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-one at once.
+ * does the index that shows all thirty-two at once.
  */
 export const DRAW_MODES = [
   {
@@ -114,6 +114,14 @@ export const DRAW_MODES = [
   {
     id: 'Retic', label: 'Reticulation', cost: 4, mark: 'retic',
     pick: { cell: [5, 26], spacing: [1, 4], width: [0.2, 1], gamma: [0.6, 2] },
+  },
+  {
+    // The most expensive mode here by a distance: a few hundred shadow sweeps
+    // over the whole grid per rebuild. The randomiser spends a budget rather
+    // than counting modes, so this cost is what keeps it from rolling a look
+    // that takes a second a frame.
+    id: 'SunHours', label: 'Sun hours', cost: 7, mark: 'sunhours',
+    pick: { levels: [4, 10], days: [6, 12], perDay: [8, 16], smoothing: [0, 3], radius: [0, 3] },
   },
   {
     id: 'ZeroCross', label: 'Zero crossings', cost: 1.5, mark: 'zerocross',

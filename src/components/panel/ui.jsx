@@ -346,7 +346,7 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
   )
 }
 
-export function Tog({ label, hint, help, checked, onChange, small }) {
+export function Tog({ label, hint, help, checked, onChange, small, testId }) {
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const fs = small ? 11 : 12
@@ -359,17 +359,17 @@ export function Tog({ label, hint, help, checked, onChange, small }) {
           {hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <Switch id={id} label={label} checked={checked} onChange={onChange} />
+        <Switch id={id} label={label} checked={checked} onChange={onChange} testId={testId} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
     </div>
   )
 }
 
-export function Switch({ id, label, checked, onChange }) {
+export function Switch({ id, label, checked, onChange, testId }) {
   return (
     <label style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
-      <input type="checkbox" id={id} checked={checked} aria-label={label}
+      <input type="checkbox" id={id} checked={checked} aria-label={label} data-testid={testId}
         onChange={e => onChange(e.target.checked)}
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer' }} />
       <span style={{ position:'absolute', inset:0, background: checked ? ACCENT : BORDER, borderRadius:9, transition:'background .15s', pointerEvents:'none' }}>
@@ -394,6 +394,42 @@ export function ColorRow({ label, help, value, onChange, testId }) {
         </span>
         <input type="color" className="hmc" id={id} data-testid={testId} aria-label={label}
           value={value} onChange={e => onChange(e.target.value)} />
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
+    </div>
+  )
+}
+
+/**
+ * A calendar field.
+ *
+ * The panel is otherwise sliders and switches, and a date is neither: there is
+ * no useful continuum between 21 June and 22 June that a drag along a track
+ * would express, and the one thing a user wants to type is a solstice. So this
+ * is the browser's own date control, which brings a picker and a keyboard entry
+ * path with it and needs no calendar of ours.
+ *
+ * `colorScheme: dark` is not decoration — without it Chrome draws its calendar
+ * glyph in near-black on the panel's near-black surface, and the control looks
+ * like an empty box.
+ */
+export function DateRow({ label, help, value, onChange, testId }) {
+  const [showHelp, setShowHelp] = useState(false)
+  const id = useId()
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap: 7 }}>
+        <span style={{ fontSize: 11, color: MUTED, display:'flex', alignItems:'center', whiteSpace:'nowrap' }}>
+          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
+          {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <input type="date" id={id} data-testid={testId} aria-label={label}
+          value={value ?? ''} onChange={e => onChange(e.target.value)}
+          style={{
+            flex: 1, minWidth: 0, fontSize: 11, padding:'3px 5px', borderRadius: 3,
+            background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+            colorScheme: 'dark', fontFamily: 'inherit',
+          }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
     </div>
