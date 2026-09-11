@@ -602,7 +602,7 @@ export function Scene({
 
 // ── Sun orb ───────────────────────────────────────────────────────────────────
 function SunIndicator({ p, terrain }) {
-  const az  = (p.hillshadeAzimuth  ?? 45) * Math.PI / 180
+  const az  = (p.hillshadeAzimuth  ?? 315) * Math.PI / 180
   const alt = (p.hillshadeAltitude ?? 45)  * Math.PI / 180
 
   // Keep the sun at ~1.1× halfExtent so it stays within the camera's FOV

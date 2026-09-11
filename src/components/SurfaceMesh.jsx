@@ -478,7 +478,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uTextureBlendMode:    { value: 0 },
       uTextureOpacity:      { value: 1.0 },
       uHillshade:             { value: false },
-      uHillshadeAzimuth:      { value: 45.0 },
+      uHillshadeAzimuth:      { value: 315.0 },
       uHillshadeAltitude:     { value: 45.0 },
       uHillshadeIntensity:    { value: 1.0 },
       uHillshadeOpacity:      { value: 0.6 },
@@ -551,7 +551,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uTextureOpacity.value = p.textureOpacity ?? 1.0
 
     surfMat.uniforms.uHillshade.value             = !!(p.showHillshade)
-    surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 45
+    surfMat.uniforms.uHillshadeAzimuth.value      = p.hillshadeAzimuth      ?? 315
     surfMat.uniforms.uHillshadeAltitude.value     = p.hillshadeAltitude     ?? 45
     surfMat.uniforms.uHillshadeIntensity.value    = p.hillshadeIntensity    ?? 1.0
     surfMat.uniforms.uHillshadeOpacity.value      = p.hillshadeOpacity      ?? 0.6

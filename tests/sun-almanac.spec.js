@@ -30,9 +30,9 @@ const hourSlider = (page) => page.locator('input.hmr[aria-label="Time"]')
 test('the almanac replaces the azimuth slider and says where the sun is', async ({ page }) => {
   await openHillshade(page)
 
-  // Convention is the default, and it is not a fallback. 45° is a north-east
-  // light — the same light the old 315° gave, under the true-bearing scale.
-  await expect(page.locator('input.hmr[aria-label="Azimuth"]')).toHaveValue('45')
+  // Convention is the default, and it is not a fallback: 315° is the classic
+  // north-west light, and no real sun ever sits there at this latitude.
+  await expect(page.locator('input.hmr[aria-label="Azimuth"]')).toHaveValue('315')
   await expect(page.locator('[data-testid="sun-readout"]')).toHaveCount(0)
 
   await page.click('[data-testid="sun-mode-almanac"]')

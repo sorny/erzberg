@@ -144,8 +144,8 @@ test.describe('panel', () => {
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Azimuth"]')
-    await expect(slider).toHaveValue('45')
-    await expect(slider).toHaveAttribute('aria-valuetext', '45°')
+    await expect(slider).toHaveValue('315')
+    await expect(slider).toHaveAttribute('aria-valuetext', '315°')
 
     // And it tracks the value rather than being a one-off at mount.
     await page.locator('input.hmval[aria-label="Azimuth value"]').fill('90')

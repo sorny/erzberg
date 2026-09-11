@@ -178,19 +178,17 @@ describe('the shading convention', () => {
   })
 
   it('puts the classic cartographic light in the north-west', () => {
-    // 315° is NW, which the panel has claimed all along and only now means. The
-    // shipped default is 45° — the same north-east light the old 315° gave, kept
-    // so the migration changed no picture.
+    // 315° is NW, which the panel has claimed all along and only now means — and
+    // as of v1.14.1 it is what every sun here opens at.
     const nw = lit(315, 30, ...FACE.west), ne = lit(315, 30, ...FACE.east)
     expect(nw).toBeGreaterThan(ne)
     expect(lit(315, 30, ...FACE.north)).toBeGreaterThan(lit(315, 30, ...FACE.south))
-    // And the shipped default, 45°, which is the old default's light under a
-    // true name: north-east, so the north and east faces are lit exactly alike
-    // and the two behind them exactly alike.
-    const at45 = (f) => lit(45, 30, ...FACE[f])
-    expect(at45('north')).toBeCloseTo(at45('east'), 9)
-    expect(at45('south')).toBeCloseTo(at45('west'), 9)
-    expect(at45('north')).toBeGreaterThan(at45('south'))
+    // And 315° is the shipped default, so the north and west faces are lit
+    // exactly alike and the two behind them exactly alike.
+    const at315 = (f) => lit(315, 30, ...FACE[f])
+    expect(at315('north')).toBeCloseTo(at315('west'), 9)
+    expect(at315('south')).toBeCloseTo(at315('east'), 9)
+    expect(at315('north')).toBeGreaterThan(at315('south'))
   })
 })
 

@@ -2351,7 +2351,7 @@ function lambertDarkness(terrain, sunAzimuth, gamma, elevScale, radius = 0) {
   const grid = radius > 0
     ? boxBlur(terrain.grid, cols, rows, radius, terrain.hasNoData ? gridMask : null)
     : terrain.grid
-  const [Lx, Ly, Lz] = lightVector(sunAzimuth ?? 45, 45)
+  const [Lx, Ly, Lz] = lightVector(sunAzimuth ?? 315, 45)
   const dScale = (100 * elevScale) / (2 * scl)   // brightness diff → world slope
   const gam = gamma ?? 1
 
@@ -5124,7 +5124,7 @@ function buildOutrun(terrain, p, o) {
  */
 function buildRiso(terrain, p, o) {
   const { cols, gridSlopes, minElev, maxElev } = terrain
-  const lam = lambertDarkness(terrain, o.azimuth ?? 45, 1, p.elevScale, 0)
+  const lam = lambertDarkness(terrain, o.azimuth ?? 315, 1, p.elevScale, 0)
   // Each separation is stretched to its own range first. Raw, the three fields
   // occupy narrow and *different* bands on real terrain, so one ink covers the
   // sheet while the other two barely print — measured on the sample plate, the
@@ -5359,7 +5359,7 @@ function buildWatershed(terrain, p, o) {
   for (let k = 0; k < sizes.length; k++) pick[k] = Math.floor(rng() * pal.length)
 
   const shade = Math.max(0, Math.min(1, o.shade ?? 0.32))
-  const lam = shade > 0 ? lambertDarkness(terrain, o.azimuth ?? 45, 1, elevScale, 0) : null
+  const lam = shade > 0 ? lambertDarkness(terrain, o.azimuth ?? 315, 1, elevScale, 0) : null
 
   const cells = fillCells(terrain, p, o.spacing, (i) => {
     const l = label[i]

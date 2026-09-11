@@ -2471,7 +2471,7 @@ export function Sidebar({
                     onChange={v => ss({ hillshadeAlmanac: v === 'almanac' })} />
                 )}
                 {!style.hillshadeMultiDir && !almanac && (
-                  <InlineSl label="Azimuth" help="Where the light comes from, as a compass bearing: 0°=N, 90°=E, 315°=NW (classic). The default 45° is a north-east light — it was 315° on a scale that was a quarter turn from a compass, and the migration in v1.14.0 kept the light and corrected the number." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Azimuth" help="Where the light comes from, as a compass bearing: 0°=N, 90°=E, 315°=NW. The default is the classic north-west, because light from the upper left is what stops a ridge from reading as a gully." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
                 )}
                 {!almanac && (
                   <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
@@ -3516,7 +3516,7 @@ export function Sidebar({
                             here because that section hides them unless Hillshade is
                             enabled — and the flock's shadows do not require it. One
                             value, two places to reach it, so they cannot disagree. */}
-                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 45} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
+                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 315} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
                           help="Which way the shadows fall: 0°=N, 90°=E, 315°=NW. This is the Hillshade sun — the same slider, shown here too because Hillshade hides it when it is switched off. Moving it here moves the terrain's shading as well." />
                         <InlineSl label="Sun alt." min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
                           help="Sun height above the horizon. Overhead drops each shadow straight under its bird; low sun throws the whole flock's shadow long across the valley. Clamped at 5° for the shadow maths, since a sun on the horizon casts to infinity." />

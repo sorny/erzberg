@@ -706,7 +706,7 @@ function flockParams(p) {
     shadow:       !!p.flockShadow,
     // Deliberately the hillshade sun rather than a private one: a flock lit from
     // a different angle than the ground it flies over looks wrong immediately.
-    sunAzimuth:   p.hillshadeAzimuth ?? 45,
+    sunAzimuth:   p.hillshadeAzimuth ?? 315,
     sunAltitude:  p.hillshadeAltitude ?? 45,
   }
 }

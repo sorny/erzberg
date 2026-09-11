@@ -258,9 +258,20 @@ in the west.
 
 The migration added 90° to every stored azimuth except Tanaka's, so **no plate
 changed** — `sin(a + 90) = cos a`, which makes the old light and the new one the
-same vector at the new number. The shipped default is 45°, which is the old 315°
-under a true name. Presets, sessions and the parameters embedded in exported
-plates are all migrated on the way in, gated on the preset format. Engraving
+same vector at the new number. Presets, sessions and the parameters embedded in
+exported plates are all migrated on the way in, gated on the preset format.
+
+The defaults then moved separately, in v1.14.1. Every **sun** opens at 315° now —
+the hillshade, Isophotes, Engraving, Riso and Watershed joining Tanaka, which had
+sat there all along. That is the first time every sun in the app has opened from
+the same corner, and it is the corner the convention asks for, because light from
+the upper left is what defeats relief inversion.
+
+The two **bulbs** did not move. Flashbulb (§17) and Halation (§18) open at 45°,
+and the difference is what the two things are. A sun is a convention. A bulb is a
+light somebody placed in the scene, and its azimuth was measured together with
+its distance, height, falloff and exposure for a particular ink coverage —
+rotating one member out of a measured set is picking again. Engraving
 *thresholds* this field to decide stroke density. Isophotes *traces its level
 set*.
 
@@ -330,6 +341,14 @@ One bare bulb inside the scene, and the terrain as a police flash photograph. Th
 **Why nothing else in the tool can light it this way.** Engraving, Isophotes and the hillshade shader share one convention: azimuth around, altitude pinned at 45°, and *parallel* rays. Parallel rays have no falloff, and falloff is the entire subject. The light goes at a world position inside the scene instead:
 
 $$E = \frac{\max(0,\; \hat{n} \cdot \hat{d})}{1 + (r/r_0)^2}, \qquad d = L - P,\; r = |d|$$
+
+**Its azimuth is a true bearing like every other, and its default is not.** The
+suns open at 315°; this and Halation open at **45°**. The bulb's azimuth was
+measured together with its distance, height, falloff and exposure — the set that
+puts ink on about 40% of a reference massif, against a first guess that covered
+59% and came out a black slab. A cartographic convention is about where a sun
+belongs. This is a light somebody aimed, and rotating one number out of a
+measured set is picking again. See §15 for the scale itself.
 
 The $1+$ keeps the light finite as the bulb approaches the ground. $r_0$ decides which band of terrain survives at all, and everything after it is a tone curve.
 

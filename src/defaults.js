@@ -88,11 +88,11 @@ export const STYLE_DEF = {
   // height: measured off the raw DEM it fractures into noise. On the reference
   // terrain the level set goes 1 386 994 segments at radius 0 to 87 372 at 6,
   // which is where it stops being a black mass and starts being a drawing.
-  enabledIso: false, levelsIso: 8, sunAzimuthIso: 45, gammaIso: 1, smoothingIso: 1, radiusIso: 6,
+  enabledIso: false, levelsIso: 8, sunAzimuthIso: 315, gammaIso: 1, smoothingIso: 1, radiusIso: 6,
   colorIso: '#000000', weightIso: 1, opacityIso: 1, dashIso: 'solid',
   hypsoIso: false, hypsoModeIso: 'elevation', hypsoBandedIso: false, hypsoIntervalIso: 10,
 
-  enabledEngrave: false, spacingEngrave: 3, angleEngrave: 45, levelsEngrave: 3, sunAzimuthEngrave: 45, gammaEngrave: 1.5,
+  enabledEngrave: false, spacingEngrave: 3, angleEngrave: 45, levelsEngrave: 3, sunAzimuthEngrave: 315, gammaEngrave: 1.5,
   colorEngrave: '#000000', weightEngrave: 1, opacityEngrave: 1, dashEngrave: 'solid',
   hypsoEngrave: false, hypsoModeEngrave: 'elevation', hypsoBandedEngrave: false, hypsoIntervalEngrave: 10,
   // Curvature engraving — strokes trace the principal-curvature direction field
@@ -124,6 +124,12 @@ export const STYLE_DEF = {
   // 1, exposure 1.15) covered 59% and came out a black slab — most of a terrain
   // faces away from a low bulb, and the shadow march then takes a third of what
   // is left.
+  //
+  // The azimuth stayed at 45° when every sun moved to 315°, and the difference
+  // is what the two things are. A sun is a convention, and the convention is
+  // north-west. A bulb is a light somebody placed in the scene, and these six
+  // numbers were measured together for a coverage — rotating one of them out of
+  // that set would be picking again, which is what the first line here is about.
   azimuthFlashbulb: 45, distanceFlashbulb: 0.9, heightFlashbulb: 2, falloffFlashbulb: 1.6,
   exposureFlashbulb: 2, gammaFlashbulb: 1, contrastFlashbulb: 1.2, grainFlashbulb: 1,
   spacingFlashbulb: 1.5, seedFlashbulb: 42, foldFlashbulb: false,
@@ -134,6 +140,8 @@ export const STYLE_DEF = {
   // Halation — Flashbulb's optics, plus the glow that a blown highlight throws
   // into the shadow beside it. `glowOpacity`/`glowWeight` are the halo's own
   // ink; `glowColor` is baked per vertex like every other mode's colour.
+  // The bulb's azimuth stays at 45° with Flashbulb's, and for the same reason:
+  // these are one measured set, not a cartographic convention.
   enabledHalation: false,
   azimuthHalation: 45, distanceHalation: 0.9, heightHalation: 2, falloffHalation: 1.6,
   exposureHalation: 2, gammaHalation: 1, contrastHalation: 1.2, grainHalation: 1,
@@ -242,7 +250,7 @@ export const STYLE_DEF = {
   // `limitRiso` at 3 is off: three inks cannot sum past 3.0, so the cap
   // cannot bind. Lower it and the shadows go flat, the way an overloaded
   // press does. `offsetRiso` at 0 is a press in perfect register.
-  enabledRiso: false, pitchRiso: 2, offsetRiso: 1.4, limitRiso: 3, azimuthRiso: 45,
+  enabledRiso: false, pitchRiso: 2, offsetRiso: 1.4, limitRiso: 3, azimuthRiso: 315,
   colorARiso: '#ff48b0', colorBRiso: '#5ec8e5', colorCRiso: '#ffe800',
   gammaARiso: 2.6, gammaBRiso: 2, gammaCRiso: 2.2, seedRiso: 42,
   // No `colorRiso`: the three separations each carry their own ink, and
@@ -260,7 +268,7 @@ export const STYLE_DEF = {
 
   // Watershed — D8 catchments, one flat ink each.
   enabledShed: false, spacingShed: 2, inksShed: 10, minBasinShed: 0.4, radiusShed: 3,
-  shadeShed: 0.32, azimuthShed: 45, seedShed: 11,
+  shadeShed: 0.32, azimuthShed: 315, seedShed: 11,
   colorShed: '#ff3d6e', weightShed: 1, opacityShed: 1, dashShed: 'solid',
   hypsoShed: false, hypsoModeShed: 'elevation', hypsoBandedShed: false, hypsoIntervalShed: 10,
 
@@ -278,9 +286,15 @@ export const STYLE_DEF = {
   // at the same number. Every stored azimuth gained 90° in the migration, so the
   // plates are unchanged and only the labels are true.
   //
-  // The default 45° is that same north-east light. It is not the cartographic
-  // convention, which is 315° — moving it there is a separate decision, because
-  // it changes the plate the app opens on.
+  // Every *sun* here opens at 315°, the cartographic north-west. That is the
+  // convention because light from the upper left is what defeats the
+  // relief-inversion illusion, and it is the number the panel has claimed since
+  // long before it was true. Tanaka has sat there all along; v1.14.1 brought the
+  // hillshade, Isophotes, Engraving, Riso and Watershed to join it, so for the
+  // first time every sun in the app opens from the same corner.
+  //
+  // Bundled presets are not touched by that. A preset is a composition and it
+  // carries its own light; only a fresh start and `Reset all` see this.
   //
   // The date is a stored solstice rather than "today" for the same reason a seed
   // is a number: a preset has to draw the same plate tomorrow. `hillshadeLat`
@@ -293,7 +307,7 @@ export const STYLE_DEF = {
   hillshadeLat: 47.53, hillshadeLon: 14.89,
 
   // Hillshade
-  showHillshade: false, hillshadeAzimuth: 45, hillshadeAltitude: 45,
+  showHillshade: false, hillshadeAzimuth: 315, hillshadeAltitude: 45,
   hillshadeIntensity: 1.0, hillshadeOpacity: 0.6, hillshadeExaggeration: 2.0,
   hillshadeHighlightColor: '#ffffff', hillshadeShadowColor: '#000000',
   hillshadeCastShadows: false, hillshadeShadowSteps: 64,
