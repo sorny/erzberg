@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0] — 2026-09-11
+
+### Changed
+
+- **Every azimuth in erzberg is a true bearing now.** 0° is north, 90° east,
+  315° the classic north-west light. It has never been true before, and the
+  panel has been saying it was.
+
+  The light was built as `(cos az, sin alt, sin az)` in world space, where +X is
+  the raster's *eastern* edge — so azimuth 0 lit east-facing slopes and the whole
+  scale sat a quarter turn from a compass. The default 315° lit from the
+  north-east. Every mode with a sun of its own inherited it: Isophotes,
+  Engraving, Riso, Watershed, Flashbulb, Halation, the hillshade, the cast
+  shadows, the flock's ground shadows and the sun orb in the scene.
+
+  **Tanaka never did.** It has built its light as `(sin, −cos)` since the day it
+  was written — a true bearing — so the same 315° has been lighting Tanaka from
+  the north-west and the hillshade from the north-east, in the same plate, for as
+  long as both have existed. A blanket migration would have swung Tanaka round to
+  match a mistake. Seven parameters moved; `tanakaSunAzimuth` did not, and a unit
+  test pins that it never will.
+
+  **No plate changed.** Every stored azimuth gained 90°, and the light vector
+  became `(sin az, sin alt, −cos az)`. Those two agree exactly —
+  `sin(a + 90) = cos a` — so the old number under the old formula and the new
+  number under the new one are the same vector. Twelve presets were rendered
+  before and after and compared pixel by pixel: ten byte-identical, and the two
+  with a residual showed precisely the same residual when the *unchanged* code
+  was run twice, which is nondeterminism in those two plates rather than a
+  change. The shipped default is 45°, which is the old default's light under a
+  true name. Moving it to a genuine 315° is a separate decision, because that one
+  does change the plate the app opens on.
+
+  Everything already saved is migrated on the way in, gated on the preset format,
+  which went to 2: the JSON `Preset ⬇` wrote, the parameters embedded in plates
+  v1.13 exported, and the session in `localStorage`. The bundled presets were
+  migrated on disk and stamped `format: 2`, because a file that does not say
+  which scale it is on is a file that gets migrated twice — which is exactly what
+  the pixel comparison caught before any of this shipped.
+
+  Six specs had the old convention written into them and went red, which is the
+  suite doing its job. Four pinned a literal azimuth and were testing a
+  *geometry* — a bulb split along x at azimuth 0, a low sun culling shadows at
+  315 — so their numbers were migrated the same way a stored preset's were, and
+  they test the same light they always did. Two were reading the default's number
+  off a slider. `isophotes.spec.js` was left alone: it compares two opposite
+  azimuths, so it passed either way, and its `nw`/`se` variables are accurate for
+  the first time.
+
+  `lightVector` in `geometryBuilders.js` is the single place the direction is
+  built, and it is exported so the unit suite can ask the app which face an
+  azimuth lights. The previous test held a hand-copy of those three lines and the
+  copy drifted the moment the convention changed, which is the failure it had
+  been written to catch, arriving from the other side. The surface shader holds
+  the one unavoidable second copy, in GLSL.
+
+### Added
+
+- **Sun Hours says what a rebuild will cost.** Two sampling sliders and the size
+  of the grid all multiply, and nothing on screen said so: twenty-four days by
+  forty-eight positions over a 1024² raster is 1 152 sweeps and about thirteen
+  seconds, which reads as a hang rather than as work. The panel prints the
+  position count and an estimate in seconds, and colours it once the estimate
+  passes two.
+
+### Fixed
+
+- **Sun Hours recomputed the sun when only the lines had changed.** Three of the
+  mode's eight parameters do not touch the field — the contour count picks levels
+  off a finished one, and the two smoothing controls act after it exists — and
+  every one of them is a geometry parameter, correctly, because they move
+  vertices. So each dragged a full rebuild behind it and that rebuild paid for a
+  few hundred shadow sweeps to draw the same numbers at different heights. About
+  a second a tick on a large grid. The field is cached on what it is actually
+  computed from, in the same shape the worker already caches vector geometry in.
+
+- **A moderate advisory in `fflate`,** reached through `three-stdlib`. Two patch
+  bumps, lock file only.
+
+### Documentation
+
+- **Three measured figures had gone stale,** and this project treats measured
+  figures as load-bearing. The panel is fifty-four sections, not fifty. Closed,
+  it is 2 725 px against the 5 037 px it opens at. The draw-mode stack is 2 282
+  px. All re-measured against the app as it opens, rather than estimated.
+
+- **`playwright.config.js` justified serial running with a measurement from a
+  99-test suite.** It is 297 tests now. The serial half has been re-measured —
+  25.3 minutes, one worker — and the parallel half has not, so the note says
+  which half is current and that the six-second verdict describes a suite a third
+  of this size.
+
+- **Forty-three test call sites waited on `text=erzberg`,** which is a bet that
+  the app's own name appears exactly once in the DOM. It need not: a line of
+  panel copy naming the app collected the two that used a strict locator, and the
+  rest survived only because `waitForSelector` takes the first match. They wait
+  on `waitForApp` now, which asks for the heading.
+
 ## [1.13.1] — 2026-09-11
 
 ### Fixed
