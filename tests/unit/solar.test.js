@@ -14,7 +14,8 @@
  */
 import { describe, expect, it } from 'vitest'
 import {
-  formatClock, julianDay, parseDate, solarDate, solarPosition, sunTimes, zoneForLongitude,
+  bearingToAppAzimuth, formatClock, julianDay, parseDate, solarDate, solarPosition,
+  sunTimes, zoneForLongitude,
 } from '../../src/utils/solar'
 
 /** The mountain the tool is named after. */
@@ -135,6 +136,49 @@ describe('sunTimes', () => {
     const winter = sunTimes({ lat: 78, lon: 15, year: 2026, month: 12, day: 21, utcOffset: 1 })
     expect(winter.set).toBeNull()
     expect(winter.polar).toBe('night')
+  })
+})
+
+describe('bearingToAppAzimuth', () => {
+  /**
+   * The app's light is `(cos az, sin alt, sin az)` in world space, where +X is
+   * the raster's eastern edge. Reproduced here rather than imported, because
+   * importing `lambertDarkness` would drag the whole geometry builder in — and
+   * because a copy that drifts from the shader is exactly what this is checking
+   * for.
+   *
+   * `gx > 0` means the ground rises toward +column, so the surface faces west.
+   * `gz > 0` means it rises toward +row, so the surface faces north.
+   */
+  const lit = (azimuth, altitude, gx, gz) => {
+    const az = azimuth * Math.PI / 180, alt = altitude * Math.PI / 180
+    const Lx = Math.cos(az) * Math.cos(alt), Ly = Math.sin(alt), Lz = Math.sin(az) * Math.cos(alt)
+    return Math.max(0, (-gx * Lx + Ly - gz * Lz) / Math.sqrt(gx * gx + gz * gz + 1))
+  }
+  const FACE = { west: [1, 0], east: [-1, 0], north: [0, 1], south: [0, -1] }
+  /** Which face a light at this app-azimuth falls on hardest. */
+  const brightest = (azimuth) => Object.entries(FACE)
+    .map(([name, [gx, gz]]) => [name, lit(azimuth, 30, gx, gz)])
+    .sort((a, b) => b[1] - a[1])[0][0]
+
+  it('puts the sun where the bearing says it is', () => {
+    // The assertion the almanac needed and did not have. Feeding a bearing in
+    // raw renders a perfectly plausible plate lit from the wrong quarter: at
+    // noon it lit the west faces and called it south.
+    expect(brightest(bearingToAppAzimuth(90))).toBe('east')
+    expect(brightest(bearingToAppAzimuth(180))).toBe('south')
+    expect(brightest(bearingToAppAzimuth(270))).toBe('west')
+    expect(brightest(bearingToAppAzimuth(0))).toBe('north')
+  })
+
+  it('names the offset the rest of the app carries', () => {
+    // The classic cartographic NW light is 225 on this scale, not 315. The
+    // default 315 is a bearing of 45 — the north-east.
+    expect(bearingToAppAzimuth(315)).toBe(225)
+    expect(bearingToAppAzimuth(45)).toBe(315)
+    // And it wraps rather than going negative, because the slider runs 0…360.
+    expect(bearingToAppAzimuth(0)).toBe(270)
+    expect(bearingToAppAzimuth(89)).toBe(359)
   })
 })
 

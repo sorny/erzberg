@@ -85,6 +85,69 @@ test('moving the clock moves the light', async ({ page }) => {
   expect(morning.length).toBeGreaterThan(1000)
 })
 
+test('the lit side of the plate is the side the bearing names', async ({ page }) => {
+  /*
+   * The assertion the other tests here were missing, and the one that would
+   * have caught v1.13.0's almanac bug.
+   *
+   * "Moving the clock moves the light" passes whether or not the light is in
+   * the right quarter, and so does a readout that prints the bearing. The sun
+   * was being fed into `hillshadeAzimuth` as a raw bearing, and that scale sits
+   * a quarter turn from one — so the morning sun lit the south faces and noon
+   * lit the west. The plate looked entirely plausible.
+   *
+   * So this measures the picture. From directly overhead with north up, an
+   * eastern sun lights the eastern half brighter than the western half, and an
+   * evening sun reverses it. Nothing about that can be true by accident.
+   */
+  test.setTimeout(180_000)
+  await openHillshade(page)
+  // Straight down, so east is screen-right and the test is about the compass
+  // rather than about the camera.
+  const tilt = page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
+  await tilt.fill('1')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(1200)
+
+  await page.click('[data-testid="sun-mode-almanac"]')
+  await page.waitForTimeout(800)
+
+  /** Mean luminance of the left and right thirds of the canvas. */
+  const halves = async () => page.locator('canvas').first().evaluate((c) => {
+    const gl = c.getContext('webgl2', { preserveDrawingBuffer: true })
+      || c.getContext('webgl', { preserveDrawingBuffer: true })
+    const w = c.width, h = c.height
+    const px = new Uint8Array(w * h * 4)
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    let left = 0, nl = 0, right = 0, nr = 0
+    for (let y = Math.floor(h * 0.3); y < h * 0.7; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4
+        if (px[i + 3] < 8) continue                    // nothing drawn here
+        const v = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114
+        if (x < w * 0.35) { left += v; nl++ }
+        else if (x > w * 0.65) { right += v; nr++ }
+      }
+    }
+    return { left: nl ? left / nl : 0, right: nr ? right / nr : 0 }
+  })
+
+  await hourSlider(page).fill('8')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(1500)
+  const morning = await halves()
+
+  await hourSlider(page).fill('17')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.waitForTimeout(1500)
+  const evening = await halves()
+
+  // An eight o'clock sun is in the east, which is the right of a north-up plate.
+  expect(morning.right).toBeGreaterThan(morning.left)
+  // And a five o'clock sun is in the west, which is the left of it.
+  expect(evening.left).toBeGreaterThan(evening.right)
+})
+
 test('the almanac never writes to the sliders it replaces', async ({ page }) => {
   await openHillshade(page)
   await page.locator('input.hmval[aria-label="Azimuth value"]').fill('120')

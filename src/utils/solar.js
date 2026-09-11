@@ -298,6 +298,27 @@ export function zoneForLongitude(lon) {
 }
 
 /**
+ * A true bearing → the number `hillshadeAzimuth` wants.
+ *
+ * They are a quarter turn apart, and the gap is silent. The app builds its light
+ * as `(cos az, sin alt, sin az)` in world space, where +X is the raster's
+ * eastern edge — so azimuth 0 lights east-facing slopes, and the whole scale
+ * sits 90° from a compass bearing. The default 315° lights from the north-east;
+ * the classic NW is 225° on that scale. `docs/Draw-Modes.md` §15 sets it out.
+ *
+ * Nothing warns you. A bearing fed in raw renders a perfectly plausible picture
+ * lit from the wrong quarter — the almanac shipped in v1.13.0 doing exactly
+ * that, putting the noon sun in the west and calling it south.
+ *
+ * So the conversion is a named function rather than a `- 90` at the call site.
+ * It is the one place the offset is written down, and it is the thing to delete
+ * if the scale is ever made a true bearing.
+ */
+export function bearingToAppAzimuth(bearing) {
+  return wrap360(bearing - 90)
+}
+
+/**
  * `9.25` → `09:15`. The panel says hours as a clock, never as a decimal.
  *
  * Rounded to the minute *before* the wrap, not after: 23.999 h rounds to 1440

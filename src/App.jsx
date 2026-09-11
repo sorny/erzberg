@@ -41,7 +41,7 @@ import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache, osmAttribution } from './utils/osmFetch'
 import { GROUP_OF } from './params'
 import { buildPreset, readPresetFile } from './utils/presetFile'
-import { parseDate, solarPosition, sunTimes } from './utils/solar'
+import { bearingToAppAzimuth, parseDate, solarPosition, sunTimes } from './utils/solar'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
@@ -1287,7 +1287,13 @@ export default function App() {
      * so the shading grazes at zero and the panel says *below the horizon* in
      * words. See the readout in the Hillshade section.
      */
-    ...(sun ? { hillshadeAzimuth: sun.azimuth, hillshadeAltitude: Math.max(0, sun.altitude) } : null),
+    ...(sun ? {
+      // Converted, not copied. `sun.azimuth` is a true bearing and
+      // `hillshadeAzimuth` is a quarter turn from one — see
+      // `bearingToAppAzimuth`, the only place that offset is written down.
+      hillshadeAzimuth: bearingToAppAzimuth(sun.azimuth),
+      hillshadeAltitude: Math.max(0, sun.altitude),
+    } : null),
     vectorLayers, textLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
