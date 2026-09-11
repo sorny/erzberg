@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.1] — 2026-09-11
+
+### Fixed
+
+- **The almanac lit the plate from the wrong quarter.** A sun set to 08:00 said
+  it was at a bearing of 95° — due east — and shaded the *south* faces, leaving
+  the north ones black. At noon it said 179° and lit the west. Every hour was a
+  quarter turn out, in a feature whose whole point is that the sun is where the
+  sun really was.
+
+  `solarPosition` returns a true compass bearing. `hillshadeAzimuth` is not one:
+  the app builds its light as `(cos az, sin alt, sin az)` in world space, where
+  +X is the raster's eastern edge, so azimuth 0 lights east-facing slopes and
+  the whole scale sits 90° from a bearing. The default 315° lights from the
+  north-east, and the classic north-west is 225° on it. Every draw mode with a
+  sun of its own uses that same scale. The bearing was being copied into it
+  rather than converted.
+
+  Nothing warns you, which is the part worth recording. The offset does not
+  produce a broken picture — it produces a perfectly plausible one, lit from
+  somewhere else, and no shape in the app disagrees with it. The conversion is a
+  named function now, `bearingToAppAzimuth`, so the offset is written down in
+  one place and there is one thing to delete if the scale is ever made a true
+  bearing.
+
+  The test suite had the same blind spot the code did. *Moving the clock moves
+  the light* passes whether or not the light is in the right quarter, and so
+  does a readout that prints the bearing it was handed. Both did. The suite now
+  measures the **picture**: from directly overhead with north up, an eight
+  o'clock sun has to light the eastern half of the plate brighter than the
+  western half, and a five o'clock sun has to reverse it. It fails against the
+  1.13.0 build and passes against this one.
+
+  Sun Hours is unaffected — it carries its own bearing and never went through
+  that scale.
+
 ## [1.13.0] — 2026-09-11
 
 Six features from one idea sheet, and they share an axis: each replaces a number
