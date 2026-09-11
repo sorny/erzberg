@@ -7,6 +7,103 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.15.0] — 2026-09-11
+
+### Changed
+
+- **Zero Crossings is called Crossings**, and three headers stopped clipping
+  their own names.
+
+  A section header is at its tightest when the mode is *on* and the section is
+  *shut* — that is when the green dot and the readout both appear and take their
+  width out of the title. Measured in that state, three were being ellipsised:
+  `Mode: Zero Crossings` by 11 px, `Mode: Shadow Line` by 10 and
+  `Mode: Watershed` by 4.
+
+  Two of the three were breaking a rule this file already states. A draw mode
+  shows its dial as a **bare number**, because "`MODE: CROSSHATCH` and `every 10`
+  do not fit in a 272 px panel together" — and Shadow Line was printing a
+  five-character clock while Watershed printed `12 inks`. The convention's own
+  excuse for Riso and Mineral is that their titles are short enough to carry the
+  word; Watershed's is not, and that was never checked. Both take the bare number
+  now, and the label comes back on hover.
+
+  The third needed a shorter name. Only the **label** changed: the id stays
+  `ZeroCross`, so every `*ZeroCross` parameter and every saved preset is
+  untouched. Exported SVG pen layers are named `Crossings` rather than
+  `Zero crossings`. The search index still finds it under *zero*, *sign change*
+  and *pitch*.
+
+  The panel was not widened, and 272 px is why: it insets the canvas and sets the
+  paper overlay's geometry, so 28 px of drawing area to recover 11 px of header
+  is a bad trade.
+
+  `panel.spec.js` now switches every mode on, shuts every section, and asserts
+  that no header clips its own name — with the overflow in the failure message.
+  It catches the regression it was written for: restoring `12 inks` fails it with
+  *Mode: Watershed (cut by 4px)*. It also has to read the innermost span, because
+  the outer flex container carries the same text and sizes to content, which is
+  why the first two attempts at measuring this found nothing at all.
+
+### Added
+
+- **Anaglyph — a modifier rather than a mode.** Every layer drawn twice, offset
+  sideways and inked in two filter colours, so the plate stands up off the paper
+  through red/cyan glasses. It works on whatever is already drawing, which makes
+  all thirty-three modes new at once for the cost of one loop.
+
+  The depth is real parallax. The offset is a lateral translation in world space,
+  and under the perspective camera that moves a near mark further across the page
+  than a far one — which is exactly what an eye separation does. Under an
+  orthographic camera it degenerates to a rigid double image with no depth in it,
+  so the panel says so rather than leaving somebody wondering why the glasses do
+  nothing. The separation is a fraction of the raster's own reach rather than a
+  world distance, because one that reads on a 400 px quarry is invisible on a
+  12 000 px massif.
+
+  **The SVG writes two eyes as two named pen layers**, which is what makes this
+  native to a two-pen plotter: load red, plot the first group, load cyan, plot
+  the second. That export runs the whole pipeline twice, once per eye, and there
+  is no cheaper correct version — the projection, the software Z-buffer, the
+  occlusion walk and the paper clip all depend on where the camera is, so a
+  stereo pair has to be two complete passes rather than a shifted copy of one.
+  The panel states the doubled cost where the switch is.
+
+  Per-vertex colour is replaced by the filter ink in both eyes. A hypsometric
+  ramp underneath would be a colour one eye sees and the other does not, which is
+  not something a stereo pair can carry.
+
+- **Shadow line — the thirty-third draw mode.** Where the sunlight stops, at one
+  instant: the terminator the terrain casts on itself. Set a date, a time and a
+  zone, and the line is a shadow that was really there.
+
+  Sun Hours sums the lit moments over a year and contours the total. This asks
+  the same question once and traces the single boundary, at the only level a
+  lit/unlit field has — a half. There is nothing for a levels control to do here:
+  the line is the answer, and the clock is what moves it.
+
+  It was cheap because the expensive half was built last week. Before the shadow
+  sweep arrived this needed a ray march per cell; afterwards the single term was
+  already inside the sum, and the mode is one call to `litField` plus the tracer
+  that Contours, Isophotes and Sun Hours already share.
+
+  A cell counts as lit only if the terrain does not block the sun *and* the
+  surface faces it, so the boundary is the cast shadow and the self-shading
+  terminator together — which is what "where the sunlight stops" means.
+
+  The shape of the day is the behaviour, and the suite asserts it: a low sun
+  reaches under everything and a high one shadows almost nothing. On the
+  benchmark raster at midwinter, 5 804 segments at 07:30, **293 at noon**, 4 618
+  at 16:30, and nothing at all after the sun sets — where the panel says *below
+  the horizon* rather than leaving an empty plate unexplained. Tracing the
+  outline of the whole raster instead, which a uniform field of darkness would
+  give, would be a lie with a closed boundary round it.
+
+  Unlike Sun Hours it needs a **clock**, and therefore a longitude and a zone as
+  well as a latitude. A total does not care when the sun was somewhere, only how
+  long it was up. A terminator is a fact about one moment, and both of those
+  decide which moment a reading on a clock is naming.
+
 ## [1.14.1] — 2026-09-11
 
 ### Changed
