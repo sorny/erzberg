@@ -7,6 +7,207 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] — 2026-09-11
+
+Six features from one idea sheet, and they share an axis: each replaces a number
+the app invented with one the ground already answers. The app has always loaded a
+GeoTIFF with a coordinate system and a bounding box, so it has always known where
+on earth the terrain is to within a metre — and it spent that on one Overpass
+query and nothing else.
+
+### Added
+
+- **Every plate is its own project file.** `Preset ⬇` has always been able to
+  write the parameters out as JSON, and almost nobody presses it before the
+  interesting plate is exported and the panel has moved on. So the file that
+  *does* get kept — the PNG somebody posts, the SVG they hand to the plotter —
+  carried no way back to the settings that made it, and "how did you make this"
+  had no answer but memory.
+
+  Every PNG now carries the whole parameter set in a `tEXt` chunk, beside the
+  OpenStreetMap credit that was already there. Every SVG carries it in a comment
+  above the first mark, where an editor shows it and a plotter never draws it.
+  Open either file with `Preset ⬆` and the look comes back.
+
+  The terrain does not come back, and that is the point: the raster is yours and
+  stays yours. Neither does its *filename*. The promise at the top of the README
+  is that your files stay on your machine, and a plate posted to a forum is that
+  file leaving by another route — it would otherwise carry
+  `Kaisergebirge-private-survey.tif` in a chunk nobody thinks to look in. The
+  payload has no field for a filename, which is a stronger guarantee than
+  remembering to strip one.
+
+  The bytes are escaped to printable ASCII before they go into either container.
+  `tEXt` is Latin-1 and drops what it cannot represent, so a layer named in Greek
+  would have cost the whole preset without a word; an XML comment ends at the
+  first `-->`, so every `-` followed by another becomes `\u002d`. In valid JSON
+  two minus signs in a row can only occur inside a string, where that escape is
+  legal and the parser undoes it.
+
+- **The sun can have a date.** Hillshade takes an azimuth and an altitude as two
+  free numbers, and the default pair — 315° and 45° — is the cartographic
+  convention. It is also a position the sky never offers: swept minute by minute
+  across a whole year at the Erzberg's latitude, the sun turns back at about
+  **307°** of bearing, at the moment of midsummer sunset.
+
+  The convention is still the right default, because light from the upper left is
+  what defeats the relief-inversion illusion. So the almanac stands beside it
+  rather than replacing it. Switch *Sun* to **Almanac**, set a date, a time and a
+  zone, and the two numbers come from the ground: the real solar position at the
+  raster's own latitude, which a GeoTIFF has been carrying all along. The panel
+  states the bearing, the elevation above the horizon, and sunrise, solar noon
+  and sunset. The cast shadows the surface shader already marches become the
+  shadows that fell at that hour.
+
+  NOAA's polynomials, in house — arithmetic only, no dependency and no network —
+  with atmospheric refraction applied, because without it a winter afternoon at a
+  high latitude reports a negative altitude for light that is visibly on the hill.
+
+  The computed pair overrides the sliders rather than writing to them. Written
+  through, an ephemeris would overwrite the numbers you set by hand and put an
+  entry in the undo history for every tick of the clock. Switch back to
+  *Convention* and the plate you had returns untouched.
+
+- **A draw mode that measures the ground rather than the picture.** *Mode: Sun
+  Hours* traces isolines of how long the ground is in direct sun — over a whole
+  year, or over one date. It is the same construction as the contours and the
+  isophotes, marching squares over a scalar field, and the field is the
+  difference: a contour is a height and an isophote is a shading convention,
+  while this is the number an alpine hut, a ski aspect or a panel array is chosen
+  by.
+
+  A cell counts a sun position when the terrain does not block it *and* the
+  surface faces it. The first test is a sweep rather than a ray march: walk the
+  grid in the sun's own direction carrying one number — the height a shadow has
+  reached — and a cell is dark when that height is above it. One pass per sun
+  position instead of one march per cell, which is what makes a few hundred
+  positions affordable at all. About 150 ms on a 512² grid, a second on a 1024²,
+  and `cost: 7` says so to the randomiser.
+
+  **The levels are round numbers of hours fitted to the field's own range.** The
+  range cannot be known in advance — thousands of hours over a year, a handful
+  over one winter day — so the panel asks roughly how many lines and the builder
+  fits a 1-2-5 hour step inside whatever came out. Counted up from zero instead,
+  a year's plate would be nearly empty: a gentle landscape gets almost all of the
+  daylight almost everywhere, and all of the shape is in the top fifth. A contour
+  map does not start a plateau at sea level either.
+
+  There is always one extra line just above zero, and it is the line the idea was
+  for. Marching squares cannot trace the zero region itself — a test of
+  `field ≥ 0` puts every cell on the same side of it — so a level at half an hour
+  traces its boundary instead. The north face comes out as a closed ring of
+  nothing.
+
+  **Its sun is a true bearing, and every other sun in the panel is not.** The
+  hillshade builds its light as `(cos az, sin alt, sin az)`, which puts azimuth 0
+  at the raster's *eastern* edge — the whole scale sits a quarter turn from a
+  compass bearing, and every draw mode with a sun of its own inherits that.
+  Changing it would relight all fifty-six presets, so it stands. It cannot stand
+  here: a north face that came out sunny would not be a stylistic difference, it
+  would be wrong. The panel says which convention this mode uses.
+
+  The shadows are the shadows of the terrain *as exaggerated*, which is the same
+  bargain the hillshade's own cast shadows already make. The panel says that too,
+  and says what the exaggeration currently is.
+
+- **The sheet can say its scale.** Contours have lettered their heights in metres
+  since v0.10, so the plate could always say where it was and never did. A scale
+  bar and a north arrow are the two marks that separate a map from a picture of a
+  hill, and both were computable from numbers the app has had since it learned to
+  read a GeoTIFF.
+
+  Both are ink. They appear in the viewport, they are composited into the PNG,
+  and they are written into the SVG as their own Inkscape layer — so a plotter run
+  can put the annotation in a different pen from the terrain. The bar is always a
+  round distance somebody would say out loud: 200 m, 500 m, 1 km, never 437 m.
+
+  It is honest about what it is. A scale bar is exactly true only for a plan view
+  through an orthographic camera; tilt the camera and the far edge of the plate is
+  at a different scale from the near edge. So the figure is measured at the centre
+  of the scene and the panel says the tilt out loud, in the same register it
+  already uses for *assumed UTM*. A raster with no georeference gets no bar at
+  all, and is told why.
+
+  The ratio — 1:25 000 — needs the physical size of the sheet, which `frame.js`
+  deliberately does not carry, because an export writes pixel dimensions rather
+  than millimetres. State the sheet width in the Export section and the ratio
+  appears beside the bar.
+
+- **Preflight, and a route for the pen.** The stated audience of this tool is a
+  pen plotter, and nothing here ever said what a plot would cost. Two numbers
+  decide whether it takes twenty minutes or ninety: the ink laid down, which the
+  drawing fixes, and the distance the carriage covers between strokes with the
+  pen in the air. The second is an ordering problem and nobody had looked at it —
+  the exporter sorts by *depth*, which is correct for occlusion and has nothing
+  whatever to do with the carriage.
+
+  *Preflight* runs the whole SVG pipeline and writes no file, so the figures
+  describe the drawing a plotter would actually be given: after occlusion has cut
+  the strokes and the frame has clipped them. It reports the stroke count, the pen
+  count, the ink, the pen-up travel and an estimate in minutes.
+
+  *Plotter order* re-orders the strokes inside each pen layer by greedy nearest
+  neighbour, drawing any stroke backwards if its far end is nearer. On the sample
+  plate the pen-up travel falls from **52.4 m to 1.4 m**; on 40 000 synthetic
+  strokes, from 26.6 M px to 67 k px in 37 ms.
+
+  Two limits are structural rather than cautious. Filled areas are never
+  re-ordered, because an area layer's paint order decides what covers what. And
+  the switch is off by default: where two strokes of *different* colours cross,
+  the order decides which ink is on top, on screen and on paper alike. That is the
+  user's call, not the exporter's — which is why the preflight prints what the
+  switch would save while it is still off.
+
+- **Terrain by name.** Every session began with a problem the app did not help
+  with: finding a heightmap. It would fetch roads, rivers, rail and peaks for an
+  extent from OpenStreetMap, and it would not fetch the ground under them.
+
+  Type a place into *Fetch Terrain*, pick one of the answers, and the ground
+  arrives georeferenced with real metres — so the contour heights, the vector
+  overlay, the scale bar and the almanac's latitude all work on it exactly as they
+  do on a file you own. The place search is OpenStreetMap's Nominatim; the ground
+  is Terrain Tiles on AWS Open Data, in the Mapzen terrarium encoding. No account,
+  no key, and nothing in the bundle to expire.
+
+  The README's promise survives it, and the three rules that keep it there are
+  written into the module: nothing happens until a button is pressed — not a
+  prefetch, and not an autocomplete on keystroke, which the usage policy of the
+  geocoder asks for and which this app has no business doing either way; no key
+  and no account; and every existing path is untouched, so the app still works
+  with the network unplugged.
+
+  One press may pull at most 36 tiles, at a zoom capped where the underlying
+  surveys stop resolving. The cap is a promise to the tile host as much as to the
+  user: a request for a whole country at full zoom is not a feature, it is an
+  outage somebody else pays for. The tiles are fetched one at a time for the same
+  reason, which also makes the progress bar mean something and lets Cancel work
+  between any two.
+
+  Each tile reports the survey it came from in a response header the bucket
+  exposes, so the credit the panel prints is the provenance of the ground on
+  screen — `eudem/eudem_dem_5deg_n45e010.tif` — rather than the full list of
+  everything the dataset might contain.
+
+### Fixed
+
+- **A recording carried no OpenStreetMap credit.** `osmAttribution` was asked for
+  `style.vectorLayers`, and the layer records are their own state — `STYLE_DEF`
+  has never held a key by that name. So the expression asked an `undefined` for
+  its contents, decided nothing was owed, and every WebM went out uncredited with
+  no warning in the toast either. Found while threading the preset through the
+  same call sites.
+
+### Changed
+
+- **`captureAndExportPNG` and `exportSVG` take more.** The PNG writer takes the
+  preset text and the sheet marks; the SVG writer takes the preset comment, the
+  sheet marks, and the three plotter options. All are optional and default to the
+  previous behaviour, so an export with nothing switched on writes the same file
+  it wrote before.
+- **The panel has two more sections**, both additive and both in the stage they
+  belong to: *Fetch Terrain* opens the Source stage, and *Scale and North* sits in
+  Frame beside View. Nothing moved and no control changed shape.
+
 ## [1.12.0] — 2026-09-04
 
 ### Added
