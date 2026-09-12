@@ -7,6 +7,131 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.16.0] — 2026-09-12
+
+### Added
+
+- **The history is a list.** A `▾` beside Undo and Redo opens the stack, newest
+  first, with a `now` line between what can be undone and what can be redone.
+  Every step is named: *Hillshade*, *Stipple Dots on*,
+  *Terrain Style · 3 changes*, *Preset · Blueprint*. Clicking a step jumps
+  straight back to it — the picture rebuilds once, not once per step, and
+  everything passed over stays on the redo side in order.
+
+  Nothing in the panel was annotated to make this work, and that was the point.
+  `useHistory` has always argued against a command-pattern history: several
+  hundred mutation sites would each have to describe themselves, nothing would
+  keep that honest, and the first control anybody forgot would be silently
+  unnamed. All of that is still true. What changed is that there is now a
+  complete parameter-to-section index — see the reset below — so a name can be
+  *derived* from the diff between two snapshots instead of declared at the
+  mutation site. A unit test moves every one of the 672 parameters in turn and
+  asserts that all of them come back named.
+
+  One exception, and it is stated as one. A preset moves forty parameters across
+  nine sections, which the diff can only report as `9 sections`. Which preset it
+  was is the single fact a diff cannot recover, so the loader tags it. Reset all
+  and the per-section resets tag themselves for the same reason.
+
+  Jumping several steps is one operation rather than a loop over single steps.
+  That is a correctness point: `prev` is only updated by an effect, which does
+  not run until React commits, so stepping twice in one tick would push the same
+  snapshot into the other stack both times and lose the state in between.
+
+- **Reset one section.** A `↺` appears in a section's header when that section
+  differs from its defaults, and puts that section alone back, with the same
+  Undo that *Reset all* offers.
+
+  Drawn only where something changed, so the same control is also a map: the
+  headers carrying a `↺` are the places where work happened, open or shut. That
+  is a question a fifty-five-section panel could not otherwise answer without
+  opening all of it.
+
+  The scope comes from a new index, `panel/sectionParams.js`, and being wrong
+  here is destructive rather than merely unhelpful — a reset reaching one key too
+  far throws away work in a section nobody was looking at. Two thirds of it needs
+  no table at all: a draw mode's parameters end in that mode's id, which is the
+  convention the worker already reads them by, so 503 of the 672 keys are
+  derived. Longest suffix wins, and that is load-bearing — `enabledZeroCross`
+  ends in both `Cross` and `ZeroCross`, and a first-match rule would hand twelve
+  of Crossings' parameters to Crosshatch.
+
+  The remaining 169 are stated, and a unit suite holds the whole table against
+  the panel's own source in both directions: every key has exactly one owner, no
+  section claims a control it does not draw, and no section draws a control it
+  neither owns nor declares as a read. Three parameters turned out to have no
+  control anywhere in the panel — `gridOffsetX`, `gridOffsetY` and
+  `autoRotateAxis` — and are now recorded as such rather than being invisible.
+
+- **Drag and drop.** Drop a file anywhere on the window. A GeoTIFF becomes the
+  terrain, a GPX or GeoJSON becomes an overlay, a preset restores the look and
+  leaves the ground alone. Six file buttons existed and not one of them was
+  reachable by dragging a file in, which is the first thing anybody tries with a
+  tool that opens terrain.
+
+  A PNG is the one genuinely ambiguous case, because it is both the heightmap
+  format and an export format. It is decided from the bytes rather than guessed:
+  every plate this app writes carries its whole parameter set in a `tEXt` chunk,
+  so a PNG with that chunk is a preset and one without is terrain. Getting this
+  backwards would load a picture of a mountain *as* a mountain — plausible on
+  screen and entirely wrong — so a browser test drops an exported plate and
+  checks both that the look came back and that the grid did not move.
+
+  A file with no route says where it does go. An MP3 points at Soundscapes, a
+  JPEG at Texture. Refusing a file the app has a section for is the least useful
+  true thing it could say.
+
+- **A keyboard card, on `?`.** Fourteen keys were bound and four were
+  discoverable. The card lists all of them, grouped, and the viewport hint gained
+  a **? keys** button because a card nobody can find is a card that does not
+  exist. `?` is matched on the character rather than the physical key, since it
+  is Shift+/ on one layout and Shift+ß on another.
+
+  A unit test reads the source of all four files that listen for a key, collects
+  every `KeyboardEvent.code` they compare against, and fails if one is missing
+  from the card. Bind a key and forget the list, and the suite says so by name.
+
+  While the card is open the export keys do not fire — `1` underneath it would
+  write an SVG from a reading position rather than a working one.
+
+- **What a rebuild costs.** The panel stats now report how long the last rebuild
+  took. Measured, not estimated from a cost table: the figure was already being
+  computed for the benchmark log and thrown away, and a cost times a grid size is
+  a guess about a machine it has never run on. Switch a mode on and watch the
+  number — that is a direct answer to *is this the slow one*. Most modes rebuild
+  the sample plate in well under a tenth of a second; Sun Hours integrates a
+  whole year of sunlight and takes about two.
+
+### Changed
+
+- **Two thresholds for "computing", not one.** A rebuild showed nothing at all
+  for a full second and then covered the screen. A quarter of a second now brings
+  up a small spinner at bottom right; the blocking overlay waits until nothing
+  has come back for 1.2 s. Simply lowering the old threshold would have strobed a
+  full-screen dim on every slider drag, which is worse than the silence it
+  replaced.
+
+### Fixed
+
+- **The anaglyph combined its two filters the wrong way on a dark ground.** The
+  blend was always multiply, which is right on paper — where the eyes cross, the
+  ink goes dark — and meaningless on black, where there is nothing left to
+  darken. Forcing multiply on a black background drops the ink pixel count in the
+  middle of the plate from about 40 000 to *zero*: every mark goes to the ground
+  and the plate comes out empty. The blend now follows the background, and the
+  panel note says which way the filters are combining.
+
+  The test that pins it reads luminance from the canvas and deliberately asserts
+  only the two unambiguous readings. On paper, antialiasing runs from the white
+  ground *down* to the ink and can never reach 60, so anything below that is
+  multiply. On black it runs *up* and can never reach 250, so anything above that
+  is additive. The mirrored pair — nothing light on paper, nothing dark on black
+  — is not assertable at all: both are the antialiasing ramp, and a first version
+  of this test measured exactly that and called it a result. The sample is also
+  restricted to the middle of the plate, because the orientation gizmo renders
+  into the same canvas in bright unblended primaries and otherwise reads as the
+  brightest thing present whatever the filters did.
+
 ## [1.15.0] — 2026-09-11
 
 ### Changed
