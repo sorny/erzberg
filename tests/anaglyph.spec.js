@@ -118,6 +118,102 @@ test('the SVG carries two eyes as two pen layers', async ({ page }) => {
   expect(firstX(left)).not.toBe(firstX(right))
 })
 
+test('the filters change how they combine when the ground goes dark', async ({ page }) => {
+  /*
+   * Multiply can only darken, which is right on paper and wrong on black: there
+   * is nothing left to darken, so every mark goes to the ground and the plate
+   * comes out empty. Forcing multiply here drops the ink pixel count from ~40k
+   * to *zero*. Additive is the same relationship the other way up.
+   *
+   * The assertion is that the overlap flips: on paper, where the eyes cross is
+   * *darker* than either; on a dark ground it is *lighter*.
+   */
+  test.setTimeout(180_000)
+  await page.goto('http://localhost:5173')
+  await waitForApp(page)
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  await openAnaglyph(page)
+  await page.locator('[data-testid="anaglyph-on"]').click()
+  await page.waitForTimeout(2500)
+
+  const note = page.locator('[data-testid="anaglyph-note"]')
+  await expect(note).toContainText('the filters multiply')
+
+  /*
+   * The darkest and lightest *ink* on the plate, with the ground excluded.
+   *
+   * Counting dark pixels outright would only measure the background: on black
+   * almost everything is dark whatever the filters do. What separates the two
+   * blends is where the crossings land — the two inks alone sit at luma 99 and
+   * 170, so anything below 60 or above 200 can only be an overlap.
+   */
+  const inkRange = (bgLuma) => page.locator('canvas').first().evaluate((c, bg) => {
+    const gl = c.getContext('webgl2', { preserveDrawingBuffer: true })
+      || c.getContext('webgl', { preserveDrawingBuffer: true })
+    const w = c.width, h = c.height
+    const px = new Uint8Array(w * h * 4)
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px)
+    let min = 255, max = 0, n = 0
+    // The middle of the plate only. The orientation gizmo renders into this same
+    // canvas in the bottom-left corner, in bright unblended primaries — sampling
+    // the whole frame reads *it* as the brightest thing present and reports 248
+    // whatever the filters did.
+    const x0 = Math.floor(w * 0.25), x1 = Math.floor(w * 0.75)
+    const y0 = Math.floor(h * 0.25), y1 = Math.floor(h * 0.75)
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++) {
+        const i = (y * w + x) * 4
+        if (px[i + 3] < 8) continue
+        const l = px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114
+        if (Math.abs(l - bg) < 20) continue        // the ground, not a mark
+        if (l < min) min = l
+        if (l > max) max = l
+        n++
+      }
+    }
+    return { min, max, n }
+  }, bgLuma)
+  const onPaper = await inkRange(255)
+
+  // Now a black ground. The Terrain Style section owns the background colour.
+  await page.evaluate(() => {
+    const el = document.querySelector('input.hmc[aria-label="Background"]')
+      || [...document.querySelectorAll('input[type=color]')].find((i) => i.value === '#ffffff')
+    if (el) {
+      const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+      set.call(el, '#000000')
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+  })
+  await page.waitForTimeout(2500)
+
+  await expect(note).toContainText('the filters add')
+  const onBlack = await inkRange(0)
+
+  expect(onPaper.n).toBeGreaterThan(1000)
+  expect(onBlack.n).toBeGreaterThan(1000)
+
+  /*
+   * The inversion, in three comparisons.
+   *
+   * The two filters alone sit at luma 99 and 170, so anything outside that band
+   * is an overlap — and each ground can only produce one side of it.
+   *
+   * On paper, antialiasing runs from the white ground *down* to the ink, so it
+   * can never reach 60. A reading below that is multiply darkening past both
+   * filters. On black it runs *up* to the ink, so it can never reach 250, and a
+   * reading above that is additive stacking them to white.
+   *
+   * The mirrored pair — nothing light on paper, nothing dark on black — is not
+   * assertable for exactly that reason: both are the antialiasing ramp, at 235
+   * and 26, and neither says anything about the blend.
+   */
+  expect(onPaper.min).toBeLessThan(60)
+  expect(onBlack.max).toBeGreaterThan(250)
+})
+
 test('the panel says when the camera cannot give it depth', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')

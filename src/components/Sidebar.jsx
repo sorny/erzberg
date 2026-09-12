@@ -16,6 +16,7 @@ import { CANCELLED } from '../utils/pacing'
 import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
+import { GROUP_OF } from '../params'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { loadSingleLineManifest } from '../utils/textGeometry'
 import { GradientPicker } from './GradientPicker'
@@ -26,6 +27,7 @@ import { PAPERS, frameRect, paperAspect, paperRatioLabel } from '../utils/frame'
 import { formatClock, zoneForLongitude } from '../utils/solar'
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
 import { shadowSun } from '../utils/sunHours'
+import { isDarkBackground } from '../utils/colorUtils'
 import { plotEstimate } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { SpectrogramView } from './SpectrogramView'
@@ -37,6 +39,10 @@ import {
 import { useStackDrag } from './panel/stackDrag'
 import { TextSection } from './panel/TextSection'
 import { SectionFilter, sectionMatches } from './panel/filter'
+import { modifiedSections } from './panel/sectionParams'
+
+/** Every tweakable key, from the one index that already enumerates them. */
+const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { ModeMark } from './panel/modeMarks'
@@ -1320,6 +1326,76 @@ function HeaderIconBtn({ onClick, disabled, testId, title, label, icon }) {
   )
 }
 
+/**
+ * The undo stack, as a list you can read and jump into.
+ *
+ * Undo was a button that took you back one step, and after four presses you
+ * were somewhere you could not name and could not tell how far you had come.
+ * The stack always held the answer; nothing showed it.
+ *
+ * The names are derived from the diff between each pair of snapshots — see
+ * `utils/historyLabel.js` — so nothing in the panel had to be annotated for
+ * this to exist, and nothing in the panel can fall out of it.
+ *
+ * Read downward as going back in time: the row under `now` is the most recent
+ * change, and clicking it undoes exactly that. Redo sits above `now`, so the
+ * line reads as one timeline with the present in the middle of it.
+ */
+function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
+  const undo = labels?.undo ?? []
+  const redo = labels?.redo ?? []
+  const Row = ({ children, onClick, testId, dim }) => (
+    <button type="button" onClick={onClick} data-testid={testId} style={{
+      display:'block', width:'100%', textAlign:'left', background:'none',
+      border:'none', cursor:'pointer', padding:'5px 10px',
+      fontSize:11, color: dim ? DIM : '#c4c4cc', borderRadius:4,
+    }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}>
+      {children}
+    </button>
+  )
+  return (
+    <>
+      {/* Catches the click that closes it, under the card and over everything
+          else — a menu that only closes on its own button is a menu people
+          leave open. */}
+      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:900 }} />
+      <div data-testid="history-menu" style={{
+        position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:901,
+        minWidth:210, maxWidth:260, maxHeight:320, overflowY:'auto',
+        background:'#18181b', border:`1px solid ${BORDER}`, borderRadius:6,
+        boxShadow:'0 12px 32px rgba(0,0,0,.45)', padding:4,
+      }}>
+        {/* Newest redo nearest `now`, so the column is chronological throughout
+            rather than two lists that happen to touch. */}
+        {[...redo].reverse().map((label, i) => (
+          <Row key={`r${i}`} dim testId={`history-redo-${redo.length - 1 - i}`}
+            onClick={() => { onRedoTo(redo.length - i); onClose() }}>
+            ↷ {label}
+          </Row>
+        ))}
+        <div style={{
+          display:'flex', alignItems:'center', gap:8, padding:'4px 10px',
+          fontSize:9.5, letterSpacing:'1.2px', textTransform:'uppercase', color: MUTED,
+        }}>
+          now
+          <span style={{ flex:1, height:1, background: BORDER }} />
+        </div>
+        {undo.map((label, i) => (
+          <Row key={`u${i}`} testId={`history-undo-${i}`}
+            onClick={() => { onUndoTo(i + 1); onClose() }}>
+            {label}
+          </Row>
+        ))}
+        {!undo.length && !redo.length && (
+          <div style={{ padding:'6px 10px', fontSize:11, color: DIM }}>Nothing yet.</div>
+        )}
+      </div>
+    </>
+  )
+}
+
 function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
@@ -1410,6 +1486,7 @@ export function Sidebar({
   sun,
   textLayers, setTextLayers, textOverflow,
   onUndo, onRedo, canUndo, canRedo,
+  onUndoTo, onRedoTo, historyLabels,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
@@ -1425,10 +1502,13 @@ export function Sidebar({
   onPreflight, plotStats,
   externalPresets,
   onReset,
+  onResetSection,
+  paramDefaults,
   sessionRestored,
   baseZoom = 1,
   lineGeo, surfaceGeo, terrainData,
   hypsometricIntegral,
+  lastBuildMs, isComputing,
   profileMode, profileClicks, onProfileMode,
   onEditHeightmap, editSummary, onClearEdit,
   open: openProp, onOpenChange, onPristine,
@@ -1546,7 +1626,21 @@ export function Sidebar({
     zoomPercent: (view.zoom / baseZoom) * 100,
     vectorLayers, textLayers, soundscape,
   }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape])
-  const filterCtx = useMemo(() => ({ q, terms: SECTION_TERMS, summaries }), [q, summaries])
+  /**
+   * Which sections differ from their defaults.
+   *
+   * Recomputed whenever any parameter moves, which is every drag frame — so it
+   * is 672 comparisons against a plain object, and nothing more. What it buys
+   * is that the reset control is drawn only where there is something to reset,
+   * which turns fifty-five identical icons into a map of where the work is.
+   */
+  const modified = useMemo(() => modifiedSections(
+    { ...terrain, ...style, ...points, ...view, gradientStops },
+    paramDefaults, Object.keys(SECTION_TERMS), PARAM_KEYS,
+  ), [terrain, style, points, view, gradientStops, paramDefaults])
+  const filterCtx = useMemo(
+    () => ({ q, terms: SECTION_TERMS, summaries, modified, onReset: onResetSection }),
+    [q, summaries, modified, onResetSection])
   /** The same reading one level up: the whole plate, for the standing line. */
   const plate = useMemo(() => buildPlateLine({ style, vectorLayers, textLayers }),
     [style, vectorLayers, textLayers])
@@ -1592,6 +1686,7 @@ export function Sidebar({
   // stays highlighted — it is still where this look started, and that is worth
   // knowing — but it says so rather than claiming the settings still match.
   const [presetEdited, setPresetEdited] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [rollSeed,    setRollSeed]    = useState(null)   // seed behind the current roll
   const [rollHistory, setRollHistory] = useState([])
   // Presets whose thumbnail failed to load, so the tile falls back to a label.
@@ -2020,12 +2115,30 @@ export function Sidebar({
             {/* One control, not two. Undo and redo are a pair and read as a pair
                 when they share a border — which also buys back the width that a
                 second bordered box was spending on nothing. */}
-            <div style={{ display:'flex', border:`1px solid ${BORDER}`, borderRadius:5, overflow:'hidden' }}>
+            <div style={{ position:'relative', display:'flex', border:`1px solid ${BORDER}`, borderRadius:5 }}>
               <HeaderIconBtn onClick={onUndo} disabled={!canUndo} testId="undo"
                 title="Undo — ⌘Z" label="Undo" icon={UNDO_PATHS} />
               <div style={{ width:1, background: BORDER }} aria-hidden="true" />
               <HeaderIconBtn onClick={onRedo} disabled={!canRedo} testId="redo"
                 title="Redo — ⌘⇧Z" label="Redo" icon={REDO_PATHS} />
+              {/* The list the two buttons were always stepping through. Beside
+                  them rather than anywhere else in the panel, because it is the
+                  same mechanism and not a new one. */}
+              <div style={{ width:1, background: BORDER }} aria-hidden="true" />
+              <button type="button" data-testid="history-open"
+                onClick={() => setHistoryOpen((v) => !v)}
+                disabled={!canUndo && !canRedo}
+                title="History" aria-label="Show the history"
+                aria-expanded={historyOpen}
+                style={{
+                  background:'none', border:'none', padding:'4px 6px', cursor: (canUndo || canRedo) ? 'pointer' : 'default',
+                  color: historyOpen ? '#F0EBE3' : MUTED, fontSize:10, lineHeight:1,
+                  opacity: (canUndo || canRedo) ? 1 : 0.3,
+                }}>▾</button>
+              {historyOpen && (
+                <HistoryMenu labels={historyLabels} onUndoTo={onUndoTo} onRedoTo={onRedoTo}
+                  onClose={() => setHistoryOpen(false)} />
+              )}
             </div>
             <div style={{ flex:1 }} />
             {/* "Reset" alone taught the wrong lesson: the camera preset row and
@@ -3798,6 +3911,11 @@ export function Sidebar({
                       : 'Depth comes from the perspective camera'}
                   </div>
                   <div>Per-layer colour is replaced by the two filters</div>
+                  <div>
+                    {isDarkBackground(style.bgColor)
+                      ? 'Dark ground — the filters add, so their overlap goes white'
+                      : 'Paper — the filters multiply, so their overlap goes dark'}
+                  </div>
                   <div>SVG runs the whole export twice — once per eye</div>
                 </div>
               </Sub>
@@ -4020,6 +4138,19 @@ export function Sidebar({
           <div style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
             <div>Segments: {segs} · Verts: {verts}</div>
             <div>Triangles: {tris} · Grid: {grid}</div>
+            {/* Measured, not estimated. `drawModes.js` carries a cost per mode,
+                but a cost times a grid size is a guess about a machine it has
+                never run on — and the real figure was already being computed
+                for the benchmark log and thrown away. It answers the question
+                the panel could not: is this slow because of what I just
+                switched on. Switch a mode, watch the number. */}
+            {lastBuildMs != null && (
+              <div data-testid="build-time" style={{ color: isComputing ? DIM : MUTED }}>
+                Rebuild: {lastBuildMs < 1000
+                  ? `${Math.round(lastBuildMs)} ms`
+                  : `${(lastBuildMs / 1000).toFixed(1)} s`}
+              </div>
+            )}
             {geoTiffElevMin != null && geoTiffElevMax != null && (
               <div style={{ marginTop:2, color: MUTED }}>
                 Elevation: {Math.round(geoTiffElevMin)} – {Math.round(geoTiffElevMax)} m

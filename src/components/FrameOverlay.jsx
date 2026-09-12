@@ -18,6 +18,7 @@
  */
 import { useEffect, useState } from 'react'
 import { frameRect, insetRect, paperAspect } from '../utils/frame'
+import { isDarkBackground } from '../utils/colorUtils'
 
 export function FrameOverlay({ view, bgColor, rightInset = 0 }) {
   const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
@@ -34,15 +35,14 @@ export function FrameOverlay({ view, bgColor, rightInset = 0 }) {
   // overlay exists not to do.
   const size = { w: win.w - rightInset, h: win.h }
 
-  // Same brightness test CenterGuides uses, so the frame reads on paper and ink
-  // alike rather than disappearing into whichever background is set.
-  const rgb = String(bgColor || '#ffffff').match(/\w\w/g)?.map((h) => parseInt(h, 16)) ?? [255, 255, 255]
-  const bright = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
-  const line = bright > 128 ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.6)'
-  const soft = bright > 128 ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.2)'
+  // The same test the centre guides and the anaglyph use, so the frame reads on
+  // paper and ink alike rather than disappearing into whichever background is set.
+  const dark = isDarkBackground(bgColor)
+  const line = dark ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.55)'
+  const soft = dark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.18)'
   // Dimming the outside is what makes the crop legible at a glance. Kept light:
   // it is a composition aid, not a preview of the export.
-  const veil = bright > 128 ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)'
+  const veil = dark ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.55)'
 
   const r = frameRect(
     size.w, size.h,

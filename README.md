@@ -91,6 +91,41 @@ the raster. It opens on its sample plate and puts your parameters back onto it.
 seconds. Everything means everything: the fetched and uploaded vector layers and
 any text you placed go with the sliders, and the Undo brings all of it back.
 
+**The history is a list.** The `▾` beside Undo and Redo opens the stack, newest
+first, with a `now` line between what you can undo and what you can redo. Each
+step is named: *Hillshade*, *Stipple Dots on*, *Terrain Style · 3 changes*,
+*Preset · Blueprint*. Click a step to jump straight back to it. The picture
+rebuilds once, and everything you passed over stays on the redo side in order.
+
+Nothing in the panel is annotated for this. The names come from comparing the
+two snapshots either side of each step and looking each changed parameter up in
+the same section index the reset below uses, so a control nobody thought about
+is named correctly anyway. The one exception is a preset: it moves forty
+parameters across nine sections, and which preset it was is the one fact a diff
+cannot recover, so the loader states it.
+
+**Reset one section.** A `↺` appears in a section's header when that section
+differs from its defaults, and it puts that section alone back. So the mark is
+also a map: scroll the panel and the headers carrying a `↺` are the places where
+you changed something, open or shut. A section reset offers the same Undo that
+*Reset all* does.
+
+What each section owns is stated in `src/components/panel/sectionParams.js`, and
+a unit suite holds it against the panel's own source in both directions. A reset
+that reached one key too far would throw away work in a section you were not
+looking at, which is the one failure here that must not be possible.
+
+**What it costs.** The stats at the foot of the panel report how long the last
+rebuild took. The figure is measured, not estimated from a table, so switching a
+mode on and watching the number is a direct answer to *is this the slow one*.
+Most modes rebuild the sample plate in well under a tenth of a second. Sun Hours
+integrates a whole year of sunlight and takes about two.
+
+While a rebuild runs, a small spinner appears at bottom right after a quarter of
+a second. If nothing comes back for 1.2 seconds, the app covers the screen
+instead. Two thresholds rather than one: a modal dim flashing on every slider
+drag is worse than the silence it replaced.
+
 **Find a control.** The panel has more than thirty sections, which is a lot to
 remember the shape of. The field at the top of the panel narrows them. Type
 `azimuth`. Only Hillshade then remains, open, with the sun controls in it.
@@ -148,6 +183,20 @@ setting, so they cannot disagree.
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
 | **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
+
+**Drag and drop.** Drop a file anywhere on the window and the app routes it by
+what it is. A GeoTIFF becomes the terrain. A GPX or GeoJSON becomes an overlay.
+A preset — the JSON from `Preset ⬇`, or any PNG or SVG this app exported —
+restores the look and leaves the ground alone.
+
+A PNG is the one file that could be either, because it is both the heightmap
+format and an export format. The app decides from the bytes: every plate it
+writes carries the whole parameter set in a `tEXt` chunk, so a PNG with that
+chunk is a preset and a PNG without one is terrain. Nothing is guessed and no
+dialog asks.
+
+A file with no route says where it does go. Drop an MP3 and the banner points at
+Soundscapes; drop a JPEG and it points at Texture.
 
 **Vector layers.** The section is always in the panel. If the section has
 nothing to work with, it says what it needs. With a georeferenced raster loaded,
@@ -535,10 +584,16 @@ the order decides which ink is on top, so the decision is yours.
 | `Shift` | While you draw or resize an ellipse, constrain it to a circle |
 | Right-click | Remove a point from a committed lasso or polygon |
 | `Q` | Toggle auto-rotate |
+| `Space` | Freeze the particle field, when one is drawn |
 | `\` | Show or hide the control panel |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⌘⇧Z` / `Ctrl+Y` | Redo |
+| `?` | Show this table in the app |
+
+Press `?` for the same list on screen, or use the **? keys** button in the
+viewport hint. The card and the handlers are kept in step by a unit test that
+reads both: bind a key and forget the card, and the suite says so.
 
 Every shortcut but undo is a bare key. A chord — `⌘1`, `⌘E`, `Ctrl+5` — belongs
 to the browser or the OS and passes through untouched.

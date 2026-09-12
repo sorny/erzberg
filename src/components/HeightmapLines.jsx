@@ -10,6 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS } from '../utils/stylePresets'
 import { layerStyle } from '../utils/geometryBuilders'
+import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 
 /**
@@ -480,6 +481,19 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
    * massif.
    */
   const anaglyph = !!p.anaglyph && !p.showRawTerrain
+  /**
+   * Which way the two filters combine, decided by the paper.
+   *
+   * Multiply can only darken, which is what a red and a cyan ink do on white and
+   * why it is right for a plate. On a dark ground it is the wrong operation
+   * entirely — it turns both filters to mud, because there is nothing to darken.
+   * Additive is the same relationship the other way up: it can only lighten, so
+   * on black the two filters glow and their overlap goes white.
+   *
+   * Same threshold the paper frame and the centre guides use, so the three
+   * overlays on one canvas cannot disagree about whether the ground is dark.
+   */
+  const anaglyphBlend = isDarkBackground(p.bgColor) ? 'additive' : 'multiply'
   const eye = useMemo(() => {
     const th = ((p.rotation ?? 0) * Math.PI) / 180
     const reach = Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2)
@@ -530,7 +544,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           opacity={opacity}
           dash={dash}
           color={color}
-          blending={anaglyph ? 'multiply' : blending}
+          blending={anaglyph ? anaglyphBlend : blending}
           fillColor={fillColor}
           fillOpacity={fillOpacity}
           strokeOutside={strokeOutside}

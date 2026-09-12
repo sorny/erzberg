@@ -179,6 +179,14 @@ export function PanelStyles() {
         font:inherit; color:inherit; text-align:left; }
       .hmsec:hover { background:rgba(255,255,255,.03); }
       .hmsec:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
+      /* The per-section reset. Revealed on hover rather than drawn outright,
+         and that is a width decision rather than a taste one: a header is at
+         its tightest when its mode is on and the section is shut, and reserving
+         room for this clipped ten of them by up to 25 px. It costs no layout at
+         all — the mark beside it is what says a section has something to reset
+         while the pointer is elsewhere. */
+      .hmreset { opacity:0; transition:opacity .12s; }
+      [data-section]:hover .hmreset, .hmreset:focus-visible { opacity:1; }
 
       /* Dual-handle range. Two native inputs stacked: the tracks are inert and
          only the thumbs take the pointer, which keeps keyboard control and the
@@ -612,6 +620,18 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
   // parameter the number came from — a bare `10` is short enough to fit beside
   // MODE: CROSSHATCH, and the label it lost comes back on hover.
   const readout = typeof raw === 'string' ? { text: raw } : raw
+  /*
+   * The reset, and why it is not on every header.
+   *
+   * Fifty-five identical icons down the panel would be chrome. Drawn only where
+   * a section differs from its defaults, the same control is information: shut
+   * or open, the mark says *this is one of the places you changed something*,
+   * which is the question a panel this size cannot otherwise answer.
+   *
+   * `modified` is computed in the Sidebar from `sectionParams.js` and arrives
+   * through the context, so a section that holds no settings never has one.
+   */
+  const canReset = !q && !!ctx?.onReset && !!ctx?.modified?.has(title)
   return (
     /*
      * `data-section` is a handle, and it exists because the specs had to reach a
@@ -621,7 +641,8 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
      * seven specs went red on a change that altered nothing they were testing.
      */
     <div data-section={title}
-         style={{ borderBottom: `1px solid ${BORDER}`, ...(matches ? null : { display: 'none' }) }}
+         style={{ position: 'relative', borderBottom: `1px solid ${BORDER}`,
+                  ...(matches ? null : { display: 'none' }) }}
          data-filtered-out={matches ? undefined : 'true'}>
       {/* A collapsed section is a zero-height grid row, so nothing inside it is
           clickable until it is opened — the header needs a handle a spec can
@@ -667,6 +688,38 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           }}>▾</span>
         </span>
       </button>
+      {/* Two marks, both siblings of the header rather than children of it. The
+          header is a button — it has to be, or a collapsed section is
+          unreachable from the keyboard — and a button inside a button is
+          invalid markup that browsers resolve by dropping one of them.
+
+          Both are pinned to the top of the section and given the header's own
+          box: `10px` of padding either side of a `22px` line, which is exactly
+          what the header's padding and its chevron come to. So they stay
+          centred on the header without anything here knowing its height, and
+          they move with it if that padding ever changes. */}
+      {canReset && (<>
+        {/* The mark. Zero width, so no header loses a pixel to it, and visible
+            whether or not the pointer is anywhere near — which is what lets a
+            scroll down the panel show where the work is. */}
+        <span aria-hidden="true"
+          data-testid={`modified-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          style={{
+            position:'absolute', left:0, top:0, width:2, height:42,
+            background: ACCENT, opacity:0.55, pointerEvents:'none',
+          }} />
+        <button type="button" className="hmreset"
+          data-testid={`reset-${title.toLowerCase().replace(/\s+/g, '-')}`}
+          onClick={() => ctx.onReset(title)}
+          title={`Reset ${title} to its defaults`}
+          aria-label={`Reset ${title} to its defaults`}
+          style={{
+            position:'absolute', right:30, top:0,
+            background:'none', border:'none', cursor:'pointer',
+            padding:'10px 4px', lineHeight:'22px',
+            color: MUTED, fontSize:12, borderRadius:4,
+          }}>↺</button>
+      </>)}
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
         <div style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
           {children}

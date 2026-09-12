@@ -27,6 +27,19 @@ export function useTerrainGeometry(p) {
   // and nothing has come back" (a genuine stall worth an overlay).
   const [resultCount, setResultCount] = useState(0)
   /**
+   * How long the last rebuild took, in milliseconds.
+   *
+   * Measured rather than predicted. `drawModes.js` carries a `cost` per mode
+   * and the randomiser spends it as a budget, but a cost times a grid size is a
+   * guess about a machine it has never run on — and the honest number is right
+   * here, already computed for the benchmark log and thrown away.
+   *
+   * What it is for is the question the panel could not answer: *is this slow
+   * because of what I just switched on*. Switch a mode on, watch the number,
+   * and the answer is a fact rather than a feeling.
+   */
+  const [lastBuildMs, setLastBuildMs] = useState(null)
+  /**
    * The last rebuild failure, for the caller to say out loud.
    *
    * A failed rebuild leaves the *previous* picture on screen, which is exactly
@@ -113,6 +126,7 @@ export function useTerrainGeometry(p) {
             // the only copy, since they were transferred out of the worker.
             if ('vectorGeo' in e.data) setVectorGeo(e.data.vectorGeo)
             setResultCount((n) => n + 1)
+            setLastBuildMs(elapsed)
           })
           // Timing telemetry — also parsed by tests/benchmark.spec.js + performance.spec.js.
           console.log(`[Benchmark] Viewport Updated: Worker: ${elapsed}ms`)
@@ -295,5 +309,5 @@ export function useTerrainGeometry(p) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lineGeo, vectorGeo, vectorOrderKey])
 
-  return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount, error }
+  return { terrain, lineGeo: merged, surfaceGeo, isComputing, resultCount, lastBuildMs, error }
 }

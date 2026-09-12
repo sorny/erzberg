@@ -17,6 +17,7 @@ import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
 import { FrameOverlay } from './components/FrameOverlay'
 import { SheetMarks } from './components/SheetMarks'
+import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
 import { useVectorIcons } from './hooks/useVectorIcons'
@@ -30,6 +31,7 @@ import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
 import { bboxToWgs84, featureCoverage } from './utils/geoCoords'
+import { isDarkBackground } from './utils/colorUtils'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
@@ -40,7 +42,13 @@ import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache, osmAttribution } from './utils/osmFetch'
 import { GROUP_OF } from './params'
+
+/** Every tweakable key, from the index that already enumerates them. */
+const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, readPresetFile } from './utils/presetFile'
+import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
+import { describeChange } from './utils/historyLabel'
+import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
@@ -212,7 +220,7 @@ const HINT_KEY = 'erzberg.viewportHint.seen'
  * It goes away for good the first time someone orbits, because at that point it
  * has been read; the dismiss button is for people who would rather not.
  */
-function ViewportHint({ onDismiss }) {
+function ViewportHint({ onDismiss, onKeys }) {
   return (
     <div data-testid="viewport-hint" style={{
       // Top-left, not bottom-left where Edit Mode puts its bar: the axis gizmo
@@ -225,6 +233,13 @@ function ViewportHint({ onDismiss }) {
       <span style={{ background:'rgba(0,0,0,.55)', padding:'5px 9px', borderRadius:5 }}>
         drag to orbit · scroll to zoom · right-drag to pan
       </span>
+      {/* The way in to the rest of them. A `?` card nobody can find is a card
+          that does not exist, and this hint is already the one place in the app
+          that talks about input at all. */}
+      <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts" style={{
+        background:'rgba(0,0,0,.55)', border:'none', borderRadius:5, cursor:'pointer',
+        color:'#c4c4cc', fontSize:11, lineHeight:1, padding:'6px 8px',
+      }}>? keys</button>
       <button onClick={onDismiss} aria-label="Dismiss the viewport hint" style={{
         background:'rgba(0,0,0,.55)', border:'none', borderRadius:5, cursor:'pointer',
         color:'#8f8f99', fontSize:12, lineHeight:1, padding:'6px 8px',
@@ -233,9 +248,70 @@ function ViewportHint({ onDismiss }) {
   )
 }
 
+/**
+ * What the window will do with the file currently over it.
+ *
+ * Named formats rather than "drop files here": the routing is not obvious —
+ * a PNG is a heightmap or a whole preset depending on what is inside it — and
+ * the moment somebody is holding a file over the window is the moment that is
+ * worth one line to say.
+ *
+ * `pointerEvents: none` throughout. This is drawn over the drop target, and an
+ * overlay that intercepted the drop would be an overlay that swallowed it.
+ */
+function DropTarget() {
+  return (
+    <div data-testid="drop-target" style={{
+      position:'fixed', inset:0, zIndex:3800, pointerEvents:'none',
+      display:'flex', alignItems:'center', justifyContent:'center',
+      background:'rgba(10,10,14,0.55)', backdropFilter:'blur(2px)',
+      fontFamily:'system-ui,sans-serif',
+    }}>
+      <div style={{
+        border:'2px dashed rgba(255,255,255,0.28)', borderRadius:12,
+        padding:'26px 38px', textAlign:'center', background:'rgba(20,20,24,0.85)',
+      }}>
+        <div style={{ fontSize:14, color:'#e4e4e7', marginBottom:8 }}>Drop to open</div>
+        <div style={{ fontSize:11.5, color:'#8f8f99', lineHeight:1.7 }}>
+          PNG or GeoTIFF heightmap · GPX or GeoJSON overlay<br />
+          a preset, or any plate this app exported
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The quiet half of the two-tier progress signal.
+ *
+ * Bottom right, out of the way of the hint at top left, the toast up the middle
+ * and the gizmo at bottom left. `pointerEvents: none` — a rebuild is not modal
+ * and this must not behave as though it were.
+ */
+function ComputingPill() {
+  return (
+    <div data-testid="computing-pill" style={{
+      position:'fixed', right:14, bottom:14, zIndex:3600, pointerEvents:'none',
+      display:'flex', alignItems:'center', gap:7,
+      background:'rgba(20,20,24,0.82)', backdropFilter:'blur(6px)',
+      border:'1px solid rgba(255,255,255,0.08)', borderRadius:14,
+      padding:'5px 12px 5px 9px',
+      fontFamily:'system-ui,sans-serif', fontSize:11, color:'#a1a1aa',
+    }}>
+      <span style={{
+        width:10, height:10, border:'2px solid rgba(255,255,255,.14)',
+        borderTopColor:'#3b82f6', borderRadius:'50%',
+        animation:'hm-spin .7s linear infinite',
+      }} />
+      Computing
+      <style>{`@keyframes hm-spin { to { transform:rotate(360deg) } }`}</style>
+    </div>
+  )
+}
+
 // ── Root ─────────────────────────────────────────────────────────────────────
 export default function App() {
-  const { load, loadFromPicker, loadGeoTiffFromPicker, loadDem, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
+  const { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, loadDem, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
   const heightmapWidth    = useStore((s) => s.heightmapWidth)
   const heightmapHeight   = useStore((s) => s.heightmapHeight)
@@ -511,7 +587,17 @@ export default function App() {
     setGradientStops(s[4]); setBgGradientStops(s[5])
     setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
   }, [setVectorSources])
-  const { undo, redo, clear: clearHistory, canUndo, canRedo } = useHistory(historyState, restoreHistory)
+  /*
+   * The names, derived rather than declared.
+   *
+   * Stable, because the history holds it across the life of the app and a fresh
+   * identity every render would be a new option object on every push. It closes
+   * over nothing but the module-level key list.
+   */
+  const describeHistory = useCallback(
+    (before, after) => describeChange(before, after, PARAM_KEYS), [])
+  const { undo, redo, undoTo, redoTo, clear: clearHistory, tag: tagHistory, labels: historyLabels,
+          canUndo, canRedo } = useHistory(historyState, restoreHistory, { describe: describeHistory })
 
   // ── Keep the session ──────────────────────────────────────────────────────
   /**
@@ -551,6 +637,9 @@ export default function App() {
   const [baseElevScale, setBaseElevScale] = useState(1)
   // Zoom fit calculated on load; view.zoom is the user-facing multiplier (1 = 100%).
   const [baseZoom, setBaseZoom] = useState(1)
+
+  // ── The keyboard card ─────────────────────────────────────────────────────
+  const [showKeys, setShowKeys] = useState(false)
 
   // ── Elevation profile ─────────────────────────────────────────────────────
   const [profileMode,   setProfileMode]   = useState(false)
@@ -862,6 +951,7 @@ export default function App() {
      * hit again. Here the raster has not moved: the cache is still valid for
      * this place, and keeping it makes fetching the same layers back instant.
      */
+    tagHistory('Reset all')
     const before = { terrain, style, points, view, gradientStops, bgGradientStops,
                      vectorLayers, vectorSources, textLayers }
     setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
@@ -900,7 +990,71 @@ export default function App() {
     })
   }, [terrain, style, points, view, gradientStops, bgGradientStops,
       vectorLayers, vectorSources, textLayers, clearVectorSources, setVectorSources,
-      heightmapWidth, heightmapHeight, baseZoom, notify])
+      heightmapWidth, heightmapHeight, baseZoom, notify, tagHistory])
+
+  /**
+   * What a parameter goes back to.
+   *
+   * Not simply the four `*_DEF` objects: two keys have a default that depends
+   * on the raster rather than on the code. `resolution` is chosen from the
+   * pixel count so a 4000 px DEM does not open at a stride of 1, and `zoom` is
+   * the fit computed on load. `handleResetAll` has always used both, and the
+   * per-section reset has to agree with it — otherwise resetting Terrain and
+   * resetting everything leave the panel in two different states.
+   *
+   * Shared with the panel so the ↺ marks and the reset cannot disagree about
+   * what "changed" means.
+   */
+  const paramDefaults = useMemo(() => ({
+    ...TERRAIN_DEF, ...STYLE_DEF, ...POINTS_DEF, ...VIEW_DEF,
+    resolution: autoResolution(heightmapWidth, heightmapHeight),
+    zoom: baseZoom,
+    gradientStops: GRADIENT_PRESETS['Jet'],
+  }), [heightmapWidth, heightmapHeight, baseZoom])
+
+  /**
+   * One section, back to its defaults.
+   *
+   * The scope comes from `panel/sectionParams.js`, which a unit suite holds
+   * against the panel's own source in both directions — a reset that reached a
+   * key the section does not own would throw away work somewhere off screen,
+   * and that table is what makes it safe to do this at all.
+   *
+   * Undo is the same shape `handleResetAll` uses: the whole of the four groups
+   * is captured, not just the keys about to move, so the restore is exact even
+   * if something else changed in the same tick.
+   */
+  const resetSection = useCallback((title) => {
+    const keys = paramsForSection(title, PARAM_KEYS)
+    if (!keys.length) return
+    tagHistory(`Reset ${title.replace(/^Mode:\s*/, '')}`)
+    const before = { terrain, style, points, view, gradientStops }
+    const patch = { terrain: {}, style: {}, points: {}, view: {} }
+    let stops = null
+    for (const k of keys) {
+      // `gradientStops` is declared in STYLE_DEF and lives in its own state —
+      // the picker writes the standalone one, and the copy inside `style` is
+      // never read. Writing the default into `style` would reset nothing.
+      if (k === 'gradientStops') { stops = paramDefaults.gradientStops; continue }
+      const group = GROUP_OF.get(k)
+      if (group) patch[group][k] = paramDefaults[k]
+    }
+    if (Object.keys(patch.terrain).length) setTerrain((p) => ({ ...p, ...patch.terrain }))
+    if (Object.keys(patch.style).length)   setStyle((p)   => ({ ...p, ...patch.style }))
+    if (Object.keys(patch.points).length)  setPoints((p)  => ({ ...p, ...patch.points }))
+    if (Object.keys(patch.view).length)    setView((p)    => ({ ...p, ...patch.view }))
+    if (stops) setGradientStops(stops)
+    notify(`${title} reset.`, {
+      action: 'Undo',
+      onAction: () => {
+        setTerrain(before.terrain)
+        setStyle(before.style)
+        setPoints(before.points)
+        setView(before.view)
+        setGradientStops(before.gradientStops)
+      },
+    })
+  }, [terrain, style, points, view, gradientStops, paramDefaults, notify, tagHistory])
 
   const orbitRef = useRef()
 
@@ -980,6 +1134,28 @@ export default function App() {
    * comes back is the look and not the ground: a plate carries no raster, which
    * is why the terrain under it is left exactly as it is.
    */
+  /**
+   * Spread one parsed preset over the live state.
+   *
+   * Lifted out of the picker so a dropped plate takes exactly the same path —
+   * two ways in, one set of writes, and no chance of the drop growing its own
+   * slightly different idea of what a preset restores.
+   */
+  const applyPreset = useCallback((d, name) => {
+    // The one thing a diff cannot recover. Forty parameters across nine
+    // sections is `9 sections` to `describeChange`, and `Preset · Blueprint` to
+    // anybody reading the list back.
+    tagHistory(name ? `Preset · ${name}` : 'Preset')
+    if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
+    if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
+    if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
+    if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
+    if (d.gradientStops)   setGradientStops(d.gradientStops)
+    if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
+    applyVectorStyles(d)
+    if (d.heightmapDataURL) load(d.heightmapDataURL)
+  }, [load, applyVectorStyles, tagHistory])
+
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'),
       { type:'file', accept:'.json,.png,.svg' })
@@ -988,8 +1164,10 @@ export default function App() {
       // Everything that fails to load says so in the banner at the foot of the
       // screen; a system dialog on top of a dark tool broke the frame and said
       // nothing about what to check.
-      let d = null
-      try { d = await readPresetFile(file) } catch { d = null }
+      // `readPresetFile` is async, so a bad file rejects rather than throwing —
+      // one `.catch` covers every way it can fail, and null is the single
+      // answer the branch below needs.
+      const d = await readPresetFile(file).catch(() => null)
       if (!d) {
         const png = /\.png$/i.test(file.name), svg = /\.svg$/i.test(file.name)
         showError(png || svg
@@ -997,17 +1175,10 @@ export default function App() {
           : 'That file isn’t an erzberg preset. Open the JSON written by Preset ⬇, or any PNG or SVG this app exported.')
         return
       }
-      if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
-      if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
-      if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
-      if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
-      if (d.gradientStops)   setGradientStops(d.gradientStops)
-      if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
-      applyVectorStyles(d)
-      if (d.heightmapDataURL) load(d.heightmapDataURL)
+      applyPreset(d, file.name.replace(/\.[^.]+$/, ''))
     }
     input.click()
-  }, [load, applyVectorStyles, showError])
+  }, [applyPreset, showError])
 
   // ── Keyboard bridge for Controls.jsx ───
   const getParams = useCallback(
@@ -1123,16 +1294,34 @@ export default function App() {
     dropVectors()
   }, [autoZoom, dropVectors])
 
+  /*
+   * What every raster load ends with.
+   *
+   * Named and shared because there are now two ways in to each — the picker and
+   * a drop — and these four moves are the difference between a loaded raster and
+   * a usable one. Inlined twice, a drop would sooner or later fit the camera and
+   * forget the stride.
+   */
+  const afterRaster = useCallback(({ width, height, dataWidth, dataHeight }) => {
+    autoZoom({ width: dataWidth, height: dataHeight })
+    setBaseElevScale(1)
+    setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+    dropVectors()
+  }, [autoZoom, dropVectors])
+
+  // No `dropVectors`: a GeoTIFF is georeferenced, so an overlay already on the
+  // ground may well belong on this one too. Same reasoning as the picker path.
+  const afterGeoTiff = useCallback(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
+    autoZoom({ width: dataWidth, height: dataHeight })
+    setBaseElevScale(suggestedElevScale ?? 1)
+    setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
+  }, [autoZoom])
+
   // Loading a raster takes the heightmap slot, so stop any audio still driving it.
   const loadPngAndFit = useCallback(() => {
     soundscape.release()
-    loadFromPicker(({ width, height, dataWidth, dataHeight }) => {
-      autoZoom({ width: dataWidth, height: dataHeight })
-      setBaseElevScale(1)
-      setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-      dropVectors()
-    })
-  }, [soundscape, loadFromPicker, autoZoom, dropVectors])
+    loadFromPicker(afterRaster)
+  }, [soundscape, loadFromPicker, afterRaster])
 
   /**
    * Take a DEM the app fetched for a typed place.
@@ -1155,12 +1344,109 @@ export default function App() {
 
   const loadGeoTiffAndFit = useCallback(() => {
     soundscape.release()
-    loadGeoTiffFromPicker(({ width, height, dataWidth, dataHeight, suggestedElevScale }) => {
-      autoZoom({ width: dataWidth, height: dataHeight })
-      setBaseElevScale(suggestedElevScale ?? 1)
-      setTerrain(prev => ({ ...prev, resolution: autoResolution(width, height), elevScale: 0 }))
-    })
-  }, [soundscape, loadGeoTiffFromPicker, autoZoom])
+    loadGeoTiffFromPicker(afterGeoTiff)
+  }, [soundscape, loadGeoTiffFromPicker, afterGeoTiff])
+
+  // ── Drop ──────────────────────────────────────────────────────────────────
+  /**
+   * One file, onto the window.
+   *
+   * Six buttons take files and none of them was reachable by dragging one in,
+   * which is the gesture anybody tries first with a tool that opens terrain.
+   * The routing lives in `utils/dropRoute.js`; this is the half that has to
+   * touch state, and it does it through the same functions the buttons use —
+   * `applyPreset`, `afterRaster`, `afterGeoTiff`, `adoptVectorSource` — so a
+   * drop cannot end up doing three quarters of what a click does.
+   *
+   * Routes are tried in order and the first that takes the file wins. Only two
+   * extensions ever have a second route, and in both cases the first is decided
+   * from the content rather than guessed.
+   */
+  const handleDroppedFile = useCallback(async (file) => {
+    const routes = classifyDrop(file.name)
+    for (const route of routes) {
+      if (route === 'preset') {
+        const d = await readPresetFile(file).catch(() => null)
+        if (!d) continue
+        applyPreset(d, file.name.replace(/\.[^.]+$/, ''))
+        notify(`Applied the preset in ${file.name}`)
+        return
+      }
+      if (route === 'raster') {
+        soundscape.release()
+        const r = await load(file)
+        if (r) afterRaster(r)          // null means the banner is already up
+        return
+      }
+      if (route === 'geotiff') {
+        soundscape.release()
+        const r = await loadGeoTiff(file)
+        if (r) afterGeoTiff(r)
+        return
+      }
+      if (route === 'gpx' || route === 'geojson') {
+        const parse = route === 'gpx' ? gpxToSource : parseGeoJson
+        try {
+          adoptVectorSource(parse(await file.text(), file.name))
+          return
+        } catch {
+          // A `.json` that is neither a preset nor GeoJSON lands here with both
+          // routes spent, so fall through to the explanation rather than
+          // reporting a parse error for a format the file never claimed.
+          if (route === routes[routes.length - 1]) break
+        }
+      }
+    }
+    showError(explainDrop(file.name, routes))
+  }, [applyPreset, load, loadGeoTiff, afterRaster, afterGeoTiff, adoptVectorSource,
+      soundscape, showError, notify])
+
+  /**
+   * The highlight, and the two events that are harder than they look.
+   *
+   * `dragleave` fires every time the pointer crosses into a child element, so
+   * a naive pair of handlers flickers the overlay across the whole window. The
+   * usual fix is a depth counter, and it is the one used here: enter increments,
+   * leave decrements, and the overlay is up while the count is above zero. Drop
+   * and a drag that ends outside the window both reset it outright.
+   *
+   * `dragover` must call `preventDefault` on every single event or the browser
+   * keeps the default action, which for a dropped PNG is *navigating to it* —
+   * the app unloads and the file opens as a page.
+   */
+  const [dragDepth, setDragDepth] = useState(0)
+  useEffect(() => {
+    const onOver = (e) => { if (dragHasFiles(e.dataTransfer)) e.preventDefault() }
+    const onEnter = (e) => { if (dragHasFiles(e.dataTransfer)) setDragDepth((d) => d + 1) }
+    const onLeave = () => setDragDepth((d) => Math.max(0, d - 1))
+    const onDrop = (e) => {
+      setDragDepth(0)
+      if (!dragHasFiles(e.dataTransfer)) return
+      e.preventDefault()
+      // One file. A drop of several would race four loaders for the heightmap
+      // slot, and there is no order that makes that mean anything.
+      const [file] = e.dataTransfer.files
+      if (!file) return
+      if (e.dataTransfer.files.length > 1) {
+        notify(`Took ${file.name} — a drop is one file at a time.`)
+      }
+      handleDroppedFile(file)
+    }
+    // `dragend` catches the release outside the window, which fires no drop.
+    const onEnd = () => setDragDepth(0)
+    window.addEventListener('dragover', onOver)
+    window.addEventListener('dragenter', onEnter)
+    window.addEventListener('dragleave', onLeave)
+    window.addEventListener('drop', onDrop)
+    window.addEventListener('dragend', onEnd)
+    return () => {
+      window.removeEventListener('dragover', onOver)
+      window.removeEventListener('dragenter', onEnter)
+      window.removeEventListener('dragleave', onLeave)
+      window.removeEventListener('drop', onDrop)
+      window.removeEventListener('dragend', onEnd)
+    }
+  }, [handleDroppedFile, notify])
 
   // ── Export keyboard shortcuts ─────────────────────────────────────────────
   /**
@@ -1315,7 +1601,7 @@ export default function App() {
 
   // ── Terrain geometry (lifted so Sidebar can read stats) ───────────────────
   const { terrain: terrainData, lineGeo: workerGeo, surfaceGeo, isComputing, resultCount,
-          error: geometryError } = useTerrainGeometry(p)
+          lastBuildMs, error: geometryError } = useTerrainGeometry(p)
 
   // A failed rebuild leaves the previous picture on screen, which is exactly what
   // a successful-but-subtle one looks like. Eight other failure paths already say
@@ -1361,12 +1647,30 @@ export default function App() {
   // overlay latches on permanently even though frames are arriving 30× a second.
   // Including resultCount restarts the timer on every delivered frame, so the
   // overlay appears only when the terrain genuinely stops updating.
-  const [showComputingOverlay, setShowComputingOverlay] = useState(false)
+  /*
+   * Two tiers, because one threshold cannot serve both cases.
+   *
+   * At a second of silence the app looked frozen and said nothing. But the
+   * overlay is a full-screen dim with a modal card, and flashing *that* at
+   * every 300 ms rebuild is worse than the silence — the screen strobes while
+   * you drag a slider.
+   *
+   * So: a small pill in the corner at 250 ms, which is about where a pause
+   * stops reading as responsiveness and starts reading as a hang; and the
+   * blocking overlay only once nothing has come back for 1.2 s, by which point
+   * something really is wrong and covering the screen is the honest signal.
+   *
+   * Both timers restart on `resultCount`. Rebuild requests queue back to back,
+   * so `isComputing` never falls under a continuous stream and keying on it
+   * alone latches the overlay on permanently while frames arrive 30× a second.
+   */
+  const [computingTier, setComputingTier] = useState(0)
   useEffect(() => {
-    if (!isComputing) { setShowComputingOverlay(false); return }
-    setShowComputingOverlay(false)
-    const t = setTimeout(() => setShowComputingOverlay(true), 1000)
-    return () => clearTimeout(t)
+    if (!isComputing) { setComputingTier(0); return }
+    setComputingTier(0)
+    const pill = setTimeout(() => setComputingTier(1), 250)
+    const full = setTimeout(() => setComputingTier(2), 1200)
+    return () => { clearTimeout(pill); clearTimeout(full) }
   }, [isComputing, resultCount])
 
   // ── Vector layer coverage ─────────────────────────────────────────────────
@@ -1458,6 +1762,25 @@ export default function App() {
       // would otherwise also write an SVG, and Cmd+5 would start a recording the
       // user cannot see beginning.
       if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      /*
+       * The card, and the two keys that close it.
+       *
+       * Tested on `e.key` rather than `e.code`, alone among these: `?` sits on
+       * Shift+/ on a US layout, Shift+' on a UK one and Shift+ß on a German
+       * one, so the code is a different key on each and the character is the
+       * same on all three. Shift is not excluded by the guard above for exactly
+       * this reason.
+       *
+       * It answers before Edit Mode's early return, and before Escape reaches
+       * the profile tool: a card over the screen is the thing Escape means
+       * while it is up, whatever else that key does underneath.
+       */
+      if (e.key === '?') { e.preventDefault(); setShowKeys((v) => !v); return }
+      if (showKeys) {
+        if (e.code === 'Escape') { e.preventDefault(); setShowKeys(false) }
+        return
+      }
       // Edit Mode owns the keyboard while it is open — the export shortcuts
       // would otherwise fire on a terrain the user cannot currently see.
       if (editMode) {
@@ -1482,7 +1805,7 @@ export default function App() {
     // beginSvgExport belongs here for the same reason handleStl does: both claim
     // the single export slot, and a stale copy would not see it taken.
   }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport,
-      beginPngExport, undo, redo])
+      beginPngExport, undo, redo, showKeys])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -1622,7 +1945,10 @@ export default function App() {
         textLayers={textLayers}
         setTextLayers={setTextLayers}
         textOverflow={textOverflow}
-        onUndo={undo} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
+        onUndo={undo}
+        onUndoTo={undoTo}
+        onRedoTo={redoTo}
+        historyLabels={historyLabels} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
         vectorCoverage={vectorCoverage}
         vectorError={vectorError}
         onPatchVectorLayer={patchVectorLayer}
@@ -1651,12 +1977,16 @@ export default function App() {
         onLoadPreset={loadPresetFromFile}
         externalPresets={externalPresets}
         onReset={handleResetAll}
+        onResetSection={resetSection}
+        paramDefaults={paramDefaults}
         sessionRestored={sessionRestored}
         baseZoom={baseZoom}
         lineGeo={lineGeo}
         surfaceGeo={surfaceGeo}
         terrainData={terrainData}
         hypsometricIntegral={hypsometricIntegral}
+        lastBuildMs={lastBuildMs}
+        isComputing={isComputing}
         profileMode={profileMode}
         profileClicks={profileClicks}
         onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]) }}
@@ -1689,7 +2019,8 @@ export default function App() {
 
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
-      {showComputingOverlay && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
+      {computingTier === 1 && !isLoading && !exportJob && <ComputingPill />}
+      {computingTier === 2 && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
       {exportJob && !isLoading && (() => {
         // The PNG capture is one synchronous pass: there is no progress to
         // report and nothing to interrupt, so it gets the plain spinner the
@@ -1708,7 +2039,14 @@ export default function App() {
       })()}
 
       {/* ── What the viewport can do ─────────────────────────────────────── */}
-      {showHint && !editMode && !webmActive && !noHmap && <ViewportHint onDismiss={dismissHint} />}
+      {showHint && !editMode && !webmActive && !noHmap
+        && <ViewportHint onDismiss={dismissHint} onKeys={() => setShowKeys(true)} />}
+
+      {/* ── The keyboard ─────────────────────────────────────────────────── */}
+      {showKeys && <ShortcutsOverlay onDismiss={() => setShowKeys(false)} />}
+
+      {/* ── A file over the window ───────────────────────────────────────── */}
+      {dragDepth > 0 && <DropTarget />}
 
       {/* ── What just happened ───────────────────────────────────────────── */}
       <Toast key={toast?.seq} toast={toast} onDismiss={dismissToast} />
@@ -1763,9 +2101,7 @@ export default function App() {
 // ── UI helper components ──────────────────────────────────────────────────────
 
 function CenterGuides({ bgColor }) {
-  const rgb = bgColor.match(/\w\w/g)?.map(h => parseInt(h, 16)) ?? [255,255,255]
-  const brightness = (rgb[0]*299 + rgb[1]*587 + rgb[2]*114) / 1000
-  const lc = brightness > 128 ? 'rgba(0,0,0,0.25)' : 'rgba(255,255,255,0.25)'
+  const lc = isDarkBackground(bgColor) ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)'
   return (
     <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:500 }}>
       <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:1, background:lc }} />

@@ -46,6 +46,23 @@ function prepareStops(stops) {
 
 /** NOTE: the returned triple may come from a small rotating pool — treat it as
  *  read-only and copy it if it must be retained across further sample calls. */
+/**
+ * Whether a background is dark enough that ink has to switch sides.
+ *
+ * ITU-R BT.601 luma, which is the weighting the eye actually uses — green
+ * carries most of the brightness and blue almost none, so `#0000ff` is dark and
+ * `#00ff00` is not, which a plain average gets wrong in both directions.
+ *
+ * It had three copies before this: the paper frame, the centre guides and the
+ * anaglyph all need the same answer, and the first two carried the constants
+ * inline. One description, because a threshold that drifts between two overlays
+ * on the same canvas is a threshold nobody can reason about.
+ */
+export function isDarkBackground(bgColor) {
+  const rgb = String(bgColor || '#ffffff').match(/\w\w/g)?.map((h) => parseInt(h, 16)) ?? [255, 255, 255]
+  return (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 <= 128
+}
+
 export function sampleGradient(stops, t) {
   if (!stops || stops.length === 0) return [1, 1, 1]
   if (stops.length === 1) return hexToRgb(stops[0].color)

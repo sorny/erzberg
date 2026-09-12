@@ -4,7 +4,10 @@
  * Q      → toggle auto-rotate
  * Space  → pause/resume the particle field
  *
- * Export shortcuts (1–5) are handled in App.jsx.
+ * Export shortcuts (1–5) are handled in App.jsx. Both of these appear on the
+ * `?` card, which reads `utils/shortcuts.js`; a unit test checks that list
+ * against the `e.code` values this switch tests for, so adding a case here
+ * without adding a row there fails the suite.
  */
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'

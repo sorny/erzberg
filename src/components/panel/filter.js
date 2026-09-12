@@ -2,10 +2,14 @@
  * The panel filter, kept out of ui.jsx so that file exports components only and
  * fast refresh keeps working.
  *
- * `SectionFilter` carries `{ q, terms }`: what is typed (lowercased) and a map
- * from section title to the extra words that section should answer to. A context
- * rather than props on all thirty-odd sections — it is one value the whole panel
- * reads and nothing writes back.
+ * `SectionFilter` carries `{ q, terms, summaries, modified, onReset }`: what is
+ * typed (lowercased), a map from section title to the extra words that section
+ * should answer to, each section's shut-state readout, the set of sections that
+ * differ from their defaults, and the callback that puts one back.
+ *
+ * A context rather than props on all fifty-five sections. Every one of these is
+ * a single value the whole panel reads, and threading five of them through
+ * `<Section>` at every call site is fifty-five edits for each one added.
  */
 import { createContext } from 'react'
 

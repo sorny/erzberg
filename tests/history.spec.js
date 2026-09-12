@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test'
+import { readFileSync } from 'fs'
+import path from 'path'
 import { resetToDefaults } from './helpers.js'
 
 /**
@@ -13,6 +15,10 @@ import { resetToDefaults } from './helpers.js'
  *
  * And a new edit after an undo has to abandon the redo branch, or redo replays a
  * look nobody asked for.
+ *
+ * The second half of this file is about the stack being *readable*: the entries
+ * carry names now, derived from the diff between each pair of snapshots, and
+ * the list can be jumped into rather than only stepped through.
  */
 const PAGE = 'http://localhost:5173'
 
@@ -148,4 +154,114 @@ test('the keyboard shortcut works, and text fields keep their own', async ({ pag
   await page.waitForTimeout(500)
   // The text layer is still there: the app's history never saw the keystroke.
   expect(await page.locator('[data-testid^="text-layer-"]').count()).toBe(rows)
+})
+
+// ── The list ────────────────────────────────────────────────────────────────
+/**
+ * Undo was a button that took you back one step. After four presses you were
+ * somewhere you could not name, with no way to tell how far you had come. The
+ * stack always held the answer and nothing showed it.
+ *
+ * The names are derived, so a control nobody annotated is still named. That
+ * property holds for all 672 parameters and `tests/unit/historyLabel.test.js`
+ * checks them one at a time; here it only has to be shown reaching the screen.
+ */
+const menu = (page) => page.locator('[data-testid="history-menu"]')
+
+async function openMenu(page) {
+  await page.locator('[data-testid="history-open"]').click()
+  await expect(menu(page)).toBeVisible()
+}
+
+async function enableMode(page, testId, title) {
+  const section = page.locator(`[data-testid="section-mode:-${testId}"]`)
+  await section.scrollIntoViewIfNeeded()
+  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
+  await page.locator(`[data-section="Mode: ${title}"] input[type=checkbox][aria-label="Enabled"]`).click()
+  await page.waitForTimeout(900)
+}
+
+test('the steps are named by what they changed', async ({ page }) => {
+  test.setTimeout(240_000)
+  await boot(page)
+
+  await enableMode(page, 'stipple-dots', 'Stipple Dots')
+
+  const section = page.locator('[data-testid="section-terrain-style"]')
+  await section.scrollIntoViewIfNeeded()
+  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
+  await page.locator('[data-testid="bg-color"]').evaluate((el) => {
+    const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    set.call(el, '#7f1d3a')
+    el.dispatchEvent(new Event('input',  { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  })
+  await page.waitForTimeout(900)
+
+  // Newest first, under `now`. The section name comes from the same index the
+  // per-section reset uses; the switch is named as the action it was.
+  await openMenu(page)
+  await expect(page.locator('[data-testid="history-undo-0"]')).toHaveText('Terrain Style')
+  await expect(page.locator('[data-testid="history-undo-1"]')).toHaveText('Stipple Dots on')
+})
+
+test('a step in the list is a jump, not a press repeated', async ({ page }) => {
+  test.setTimeout(240_000)
+  await boot(page)
+
+  await enableMode(page, 'stipple-dots', 'Stipple Dots')
+  await enableMode(page, 'flow', 'Flow')
+  await enableMode(page, 'contours', 'Contours')
+
+  const stipple = page.locator('[data-section="Mode: Stipple Dots"] input[type=checkbox][aria-label="Enabled"]')
+  const flow = page.locator('[data-section="Mode: Flow"] input[type=checkbox][aria-label="Enabled"]')
+  const contours = page.locator('[data-section="Mode: Contours"] input[type=checkbox][aria-label="Enabled"]')
+  await expect(stipple).toBeChecked()
+
+  // Back past all three at once. Stepping one at a time would be a loop over an
+  // effect that has not run yet, and the states in between would be lost.
+  await openMenu(page)
+  await expect(page.locator('[data-testid="history-undo-2"]')).toHaveText('Stipple Dots on')
+  await page.locator('[data-testid="history-undo-2"]').click()
+  await page.waitForTimeout(1500)
+
+  await expect(stipple).not.toBeChecked()
+  await expect(flow).not.toBeChecked()
+  await expect(contours).not.toBeChecked()
+
+  // And everything passed over is on the redo side, in order — a jump is not a
+  // truncation, which is the one way this could quietly lose work.
+  await openMenu(page)
+  await expect(page.locator('[data-testid="history-redo-0"]')).toContainText('Stipple Dots on')
+  await expect(page.locator('[data-testid="history-redo-2"]')).toContainText('Contours')
+})
+
+test('a preset says which preset it was', async ({ page }) => {
+  /*
+   * The one exception to deriving everything.
+   *
+   * A preset moves forty parameters across nine sections, which the diff can
+   * only report as `9 sections`. The name is the single fact it cannot recover,
+   * so the loader tags it.
+   */
+  test.setTimeout(240_000)
+  await boot(page)
+
+  const file = path.join(process.cwd(), 'public', 'presets', 'Blueprint.json')
+  const b64 = readFileSync(file).toString('base64')
+  const dt = await page.evaluateHandle(({ b64 }) => {
+    const bin = atob(b64)
+    const buf = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i)
+    const dt = new DataTransfer()
+    dt.items.add(new File([buf], 'Blueprint.json', { type: 'application/json' }))
+    return dt
+  }, { b64 })
+  await page.dispatchEvent('body', 'dragenter', { dataTransfer: dt })
+  await page.dispatchEvent('body', 'dragover', { dataTransfer: dt })
+  await page.dispatchEvent('body', 'drop', { dataTransfer: dt })
+  await page.waitForTimeout(2500)
+
+  await openMenu(page)
+  await expect(page.locator('[data-testid="history-undo-0"]')).toHaveText('Preset · Blueprint')
 })
