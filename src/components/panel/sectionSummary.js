@@ -202,7 +202,7 @@ export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export
 export function buildSectionSummaries({
   terrain = {}, style = {}, view = {}, points = {},
   zoomPercent = 100, vectorLayers = [], textLayers = [], soundscape = null,
-  cover = null,
+  cover = null, imagery = null, masks = [],
 } = {}) {
   const out = {}
 
@@ -221,6 +221,10 @@ export function buildSectionSummaries({
   // The class count, not the plate's name: the name is a place and the header
   // already sits under a raster loaded from that same place, whereas how many
   // materials the ground was cut into is the fact every mask below depends on.
+  // The date, not the switch: which scene you are looking at is the fact that
+  // changes between two fetches, and the drape has its own dot on the header.
+  out['Satellite'] = imagery ? imagery.date : OFF
+  out['Masks'] = masks.length ? `${masks.length} drawn` : OFF
   out['Land Cover'] = cover?.classes?.length
     ? `${cover.classes.length} classes`
     : OFF

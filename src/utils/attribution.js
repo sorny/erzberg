@@ -1,9 +1,10 @@
 /**
  * What a produced work owes, in one answer.
  *
- * Two datasets in this app come with a credit attached, and both attach it to
- * the *output* rather than to the tool: ODbL 4.3 binds to the Produced Work, and
- * CC-BY binds to anything derived from the licensed material. So the question is
+ * Three datasets in this app come with a credit attached, and all three attach
+ * it to the *output* rather than to the tool: ODbL 4.3 binds to the Produced
+ * Work, CC-BY binds to anything derived from the licensed material, and the
+ * Copernicus terms ask for a line wherever the imagery goes. So the question is
  * never "is OpenStreetMap wired up" but "is OpenStreetMap in this file".
  *
  * `osmFetch.js` already learned that lesson the hard way — its own note records
@@ -49,5 +50,8 @@ export function workAttribution(src = {}) {
   const osm = osmAttribution(src.vectorLayers)
   if (osm) lines.push(osm)
   if (coverInUse(style, src.cover) && src.cover?.attribution) lines.push(src.cover.attribution)
+  // Imagery counts when it is actually draped. Fetched and switched off is the
+  // same as a hidden layer: it is not in the file.
+  if (style?.showImagery && src.imagery?.credit) lines.push(src.imagery.credit)
   return lines.length ? lines.join('\n') : null
 }

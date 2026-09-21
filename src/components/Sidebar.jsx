@@ -39,8 +39,9 @@ import {
 import { useStackDrag } from './panel/stackDrag'
 import { TextSection } from './panel/TextSection'
 import { CoverMap } from './panel/CoverMap'
-import { CoverPlate, SectionFilter, sectionMatches } from './panel/filter'
+import { CoverPlate, PaintedMasks, SectionFilter, sectionMatches } from './panel/filter'
 import { ALL_CLASSES, describeMask, maskHasClass, toggleClass } from '../utils/coverPlate'
+import { MAX_MASKS, NO_MASKS, describeSelection, maskCoverage, selectionHasMask, toggleMaskSelection } from '../utils/maskLayers'
 import { modifiedSections } from './panel/sectionParams'
 
 /** Every tweakable key, from the one index that already enumerates them. */
@@ -1530,6 +1531,54 @@ function CommandLine({ cmd }) {
   )
 }
 
+/**
+ * Which hand-drawn masks this layer is restricted to.
+ *
+ * The same shape as the cover row above it and a separate control, because the
+ * two stencils answer different questions and a layer may carry both: cover
+ * says what the ground *is*, a mask says which part of the picture you meant.
+ * A cell has to satisfy both to be marked.
+ */
+function PaintedMaskRow({ prefix, style, ss }) {
+  const masks = useContext(PaintedMasks)
+  if (!masks?.length) return null
+  const key = `layerMask${prefix}`
+  const selection = style[key] ?? NO_MASKS
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>MASKS</span>
+        <span style={{ fontSize: 10, color: selection ? ACCENT_DEEP : DIM }}>
+          {describeSelection(selection, masks)}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        {masks.map((m, i) => {
+          const on = selectionHasMask(selection, i)
+          return (
+            <button key={m.id} type="button"
+              title={m.name}
+              aria-label={`${m.name}, ${on ? 'drawn' : 'skipped'}`}
+              aria-pressed={on}
+              onClick={() => ss({ [key]: toggleMaskSelection(selection, i) })}
+              style={{
+                width: 22, height: 20, borderRadius: 3, padding: 0, cursor: 'pointer',
+                background: m.color,
+                opacity: on ? 1 : 0.25,
+                border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
+              }} />
+          )
+        })}
+        {selection !== NO_MASKS && (
+          <Btn size="xs" onClick={() => ss({ [key]: NO_MASKS })}
+            style={{ padding: '0 6px', fontSize: 10 }}>All</Btn>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** One stated fact about the loaded plate. Label left, value right. */
 function CoverFact({ label, value }) {
   return (
@@ -1615,6 +1664,7 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
           reason hypsometric is: masking works by thinning the terrain grid the
           layer is built from, and a road is not built from that grid. */}
       {showCover && <CoverMaskRow prefix={prefix} style={style} ss={ss} />}
+      {showCover && <PaintedMaskRow prefix={prefix} style={style} ss={ss} />}
 
       {/* Hypsometric is off the table for vector layers: a road has no elevation
           of its own, so the tint would have to read the ground under it, which
@@ -1686,6 +1736,9 @@ export function Sidebar({
   // Land cover: the plate itself, the two ways to get one, and the action that
   // deals a mark to each of its classes.
   cover, coverError, onLoadCover, onClearCover, onInkByClass,
+  // Hand-drawn masks, the Studio that paints them, and the imagery behind it.
+  masks = [], onAddMask, onPatchMask, onRemoveMask, onImportMask, onPaintMask,
+  imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
@@ -1822,8 +1875,8 @@ export function Sidebar({
   const summaries = useMemo(() => buildSectionSummaries({
     terrain, style, view, points,
     zoomPercent: (view.zoom / baseZoom) * 100,
-    vectorLayers, textLayers, soundscape, cover,
-  }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape, cover])
+    vectorLayers, textLayers, soundscape, cover, imagery, masks,
+  }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape, cover, imagery, masks])
   /**
    * Which sections differ from their defaults.
    *
@@ -1876,6 +1929,7 @@ export function Sidebar({
     points: false, texture: false, mirror: false, erosion: false, export: true,
     sheetMarks: false, fetchTerrain: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
+    satellite: false, masks: false,
   })
 
 
@@ -2407,6 +2461,7 @@ export function Sidebar({
         <div id="hm-panel-body" style={{ flex:1, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
           <SectionFilter.Provider value={filterCtx}>
           <CoverPlate.Provider value={cover}>
+          <PaintedMasks.Provider value={masks}>
           <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
@@ -2546,6 +2601,113 @@ export function Sidebar({
               utils/demFetch.js. */}
           <Section title="Fetch Terrain" open={sec.fetchTerrain} onToggle={() => tog('fetchTerrain')}>
             <TerrainFetchPanel onFetched={onFetchTerrain} />
+          </Section>
+
+          {/* ── Satellite ─────────────────────────────────────────────────
+              Unlike the cover plates, this one can be a button: Sentinel-2 on
+              AWS answers CORS where AlphaEarth's bucket does not. Same terms as
+              Fetch Terrain — no key, no account, nothing until it is pressed. */}
+          <Section title="Satellite" open={sec.satellite} onToggle={() => tog('satellite')} enabled={Boolean(imagery)}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
+              {!imagery && (
+                <CoverProse>
+                  True-colour Sentinel-2 over this extent, at 10 m. It drapes on the
+                  terrain and backs the Mask Studio, where you are drawing around
+                  ground you need to be able to see.
+                </CoverProse>
+              )}
+              {imagery && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <CoverFact label="Scene" value={imagery.date} />
+                  <CoverFact label="Cloud" value={`${Math.round(imagery.cloud)}%`} />
+                  <CoverFact label="Size" value={`${imagery.width} × ${imagery.height}`} />
+                </div>
+              )}
+              {imageryBusy && (
+                <div style={{ fontSize: 10, color: MUTED }}>
+                  <div style={{ marginBottom: 4 }}>
+                    {imageryBusy.phase === 'search' ? 'Finding a clear scene…'
+                      : `Fetching imagery… ${Math.round((imageryBusy.progress ?? 0) * 100)}%`}
+                  </div>
+                  <div style={{ height: 3, background: BORDER, borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: ACCENT,
+                                  width: `${Math.round((imageryBusy.progress ?? 0) * 100)}%` }} />
+                  </div>
+                </div>
+              )}
+              {imagery && (
+                <>
+                  <Tog label="Drape on terrain" checked={style.showImagery}
+                    onChange={(v) => ss({ showImagery: v })} />
+                  {style.showImagery && (
+                    <Sub>
+                      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.imageryOpacity}
+                        onChange={(v) => ss({ imageryOpacity: v })} fmt={(v) => `${Math.round(v * 100)}%`} />
+                    </Sub>
+                  )}
+                </>
+              )}
+              <CoverRow>
+                <Btn block onClick={onFetchImagery} disabled={!!imageryBusy} data-testid="fetch-imagery">
+                  {imagery ? 'Fetch again' : '↓ Fetch imagery'}
+                </Btn>
+                {imagery && <Btn block onClick={onClearImagery}>Clear</Btn>}
+              </CoverRow>
+              {imagery?.credit && (
+                <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
+              )}
+            </div>
+          </Section>
+
+          {/* ── Masks ─────────────────────────────────────────────────────
+              Land cover answers "what is this ground" for the whole window at
+              once. A mask answers a question only you can ask: the far side of
+              the ridge, the part the plate is actually about. Both are spent
+              through the same stencil. */}
+          <Section title="Masks" open={sec.masks} onToggle={() => tog('masks')} enabled={masks.length > 0}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 2 }}>
+              {!masks.length && (
+                <CoverProse>
+                  A mask is a region you draw. Any layer can be restricted to one,
+                  the same way it can be restricted to a land cover class — and a
+                  layer may carry both at once.
+                </CoverProse>
+              )}
+              {masks.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {masks.map((m) => (
+                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 13, height: 13, borderRadius: 3, background: m.color,
+                                     border: `1px solid ${BORDER}`, flex: '0 0 auto' }} />
+                      <input value={m.name} aria-label={`Name of ${m.name}`}
+                        onChange={(e) => onPatchMask(m.id, { name: e.target.value.slice(0, 32) })}
+                        style={{ flex: 1, minWidth: 0, background: SURF, color: MUTED, fontSize: 10,
+                                 border: `1px solid ${BORDER}`, borderRadius: 3, padding: '2px 5px' }} />
+                      <span style={{ fontSize: 9.5, color: DIM, fontVariantNumeric: 'tabular-nums',
+                                     minWidth: 30, textAlign: 'right' }}>
+                        {(maskCoverage(m) * 100).toFixed(0)}%
+                      </span>
+                      <Btn size="xs" onClick={() => onPaintMask(m.id)} data-testid={`paint-${m.id}`}
+                        style={{ padding: '0 6px', fontSize: 10 }}>Paint</Btn>
+                      <Btn size="xs" onClick={() => onRemoveMask(m.id)} aria-label={`Delete ${m.name}`}
+                        style={{ padding: '0 6px', fontSize: 10 }}>✕</Btn>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <CoverRow>
+                <Btn block data-testid="add-mask" disabled={masks.length >= MAX_MASKS}
+                  onClick={() => { const m = onAddMask?.(); if (m) onPaintMask(m.id) }}>
+                  + Draw a mask
+                </Btn>
+                <Btn block onClick={onImportMask} disabled={masks.length >= MAX_MASKS}>↑ Import…</Btn>
+              </CoverRow>
+              <CoverProse caption>
+                Drawing opens the Studio over the viewport, with the satellite
+                imagery behind it when there is some. Import takes a black-and-white
+                PNG or JPG — white is inside, and transparent is outside.
+              </CoverProse>
+            </div>
           </Section>
 
           {/* ── Land cover ────────────────────────────────────────────────
@@ -4524,6 +4686,7 @@ export function Sidebar({
               </div>
             )}
           </div>
+          </PaintedMasks.Provider>
           </CoverPlate.Provider>
           </SectionFilter.Provider>
         </div>

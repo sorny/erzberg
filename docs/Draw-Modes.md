@@ -4,8 +4,10 @@
 
 Thirty-three of them read $H$ and nothing else. The thirty-fourth reads a second
 field entirely — see [Land cover](#land-cover) — and every one of them can be
-stencilled by it without knowing it exists. The mechanism is in
-[docs/Land-Cover.md](Land-Cover.md#how-masking-works).
+stencilled without knowing it exists, by a land cover class, by a mask you drew,
+or by both at once. The mechanism is in
+[docs/Land-Cover.md](Land-Cover.md#how-masking-works) and
+[docs/Masks.md](Masks.md#how-it-reaches-the-draw-modes).
 
 ---
 

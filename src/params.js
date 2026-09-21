@@ -95,6 +95,10 @@ const RENDER_SIDE = [
   /^label(SingleLine|Font)Contours$/,
   // Texture overlay — sampled in the surface shader.
   /^(texture|showTexture)/,
+  // The drape's opacity is a shader uniform and nothing else. `showImagery` is
+  // deliberately NOT here: it decides whether the surface is built with normals
+  // and UVs at all, so it has to reach the worker.
+  /^imageryOpacity$/,
   // The camera, the lens, supersampling, the guides and the paper frame. None of
   // them reaches the worker at all.
   /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides)/,

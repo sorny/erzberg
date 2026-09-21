@@ -16,6 +16,8 @@ export function useTerrainGeometry(p) {
   const heightmapWidth  = useStore((s) => s.heightmapWidth)
   const heightmapHeight = useStore((s) => s.heightmapHeight)
   const vectorSources   = useStore((s) => s.vectorSources)
+  // The mask planes, already cropped to whatever Edit Mode is showing.
+  const masks           = useStore((s) => s.masks)
 
   const [terrain, setTerrain]       = useState(null)
   const [lineGeo, setLineGeo]       = useState(null)
@@ -67,6 +69,8 @@ export function useTerrainGeometry(p) {
   // `undefined` rather than `null` so that the first send always posts: `null`
   // is the legitimate value for "no plate loaded" and must reach a fresh worker.
   const workerCoverRef = useRef(undefined)
+  // And the mask planes, on the same terms.
+  const workerMaskRef = useRef(undefined)
   // Newest request that arrived while a build was running; only the latest is
   // kept, since intermediate states are never displayed.
   const pendingRef = useRef(null)
@@ -114,6 +118,7 @@ export function useTerrainGeometry(p) {
     workerPixelsRef.current = null
     workerVectorRef.current = null
     workerCoverRef.current = undefined
+    workerMaskRef.current = undefined
     workerRef.current.onmessage = (e) => {
       const elapsed = Math.round(performance.now() - startTimeRef.current)
       const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
@@ -191,6 +196,8 @@ export function useTerrainGeometry(p) {
     // only when the worker already holds the same object.
     const needsCover = workerCoverRef.current !== req.cover
     workerCoverRef.current = req.cover
+    const needsMasks = workerMaskRef.current !== req.masks
+    workerMaskRef.current = req.masks
     startTimeRef.current = performance.now()
     buildStartRef.current = startTimeRef.current
     busyRef.current = true
@@ -200,6 +207,7 @@ export function useTerrainGeometry(p) {
         : null),
       ...(needsVectors ? { vectorData: req.vectors } : null),
       ...(needsCover ? { coverData: req.cover } : null),
+      ...(needsMasks ? { maskData: req.masks } : null),
       p: req.p,
       _gen: ++genRef.current,
     })
@@ -213,6 +221,7 @@ export function useTerrainGeometry(p) {
       workerPixelsRef.current = null
       workerVectorRef.current = null
       workerCoverRef.current = undefined
+      workerMaskRef.current = undefined
       pendingRef.current = null
       busyRef.current = false
       setTerrain(null); setLineGeo(null); setVectorGeo(null); setSurfaceGeo(null); setIsComputing(false)
@@ -248,6 +257,7 @@ export function useTerrainGeometry(p) {
       // alignment depends on the extent and the dimensions rather than on any
       // parameter. Null whenever there is no plate or it no longer fits.
       cover: p.coverGrid ?? null,
+      masks,
     }
 
     setIsComputing(true)

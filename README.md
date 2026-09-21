@@ -39,12 +39,13 @@ machine. There is no server, no upload and no account. The app makes no
 third-party request on load, because it serves the one webfont from its own
 origin.
 
-Two features contact a server, and only when you press their button. *Vector
+Three features contact a server, and only when you press their button. *Vector
 Layers* asks OpenStreetMap for roads and rivers inside the raster's extent.
 *Fetch Terrain* asks a geocoder for a place, then asks a tile host for the ground
-under it. Each sends a place name or a bounding box. Neither sends a file, and
-neither needs an account or a key. If you use neither, the app opens no
-connection at all.
+under it. *Satellite* asks an open archive for a Sentinel-2 scene over that same
+extent. Each sends a place name or a bounding box. None sends a file, and none
+needs an account or a key. If you use none of them, the app opens no connection
+at all.
 
 <table>
   <tr>
@@ -188,6 +189,8 @@ setting, so they cannot disagree.
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
 | **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
+| **Satellite** | True-colour Sentinel-2 over the extent of the raster, at 10 m, from AWS Open Data. It drapes on the terrain and backs the Mask Studio. No account, no key, and nothing happens until you press Fetch. |
+| **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one yourself. See [Masks](#masks). |
 | **Cover plate** | A `.cover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
 
 **Drag and drop.** Drop a file anywhere on the window and the app routes it by
@@ -348,6 +351,40 @@ load.
 The dataset is CC-BY 4.0. The credit travels inside the plate file and into any
 export that draws from it.
 → [Land cover](docs/Land-Cover.md)
+
+---
+
+## Masks
+
+A cover plate answers *what is this ground*, for the whole window at once. A
+mask answers a question only you can ask: the far side of the ridge, the part of
+the valley the plate is actually about, everything except that one quarry.
+
+Both are spent through the same stencil, so a mask restricts a layer exactly the
+way a land cover class does — and a layer may carry both at once.
+
+**Draw one.** *Masks → + Draw a mask* opens the Studio over the viewport. Brush,
+rectangle, ellipse and lasso, with `E` to erase and `[` `]` to resize the brush.
+The backdrop is satellite imagery when you have fetched some, and the hillshade
+when you have not.
+
+**Or bring one.** *↑ Import…* takes a PNG, JPG or WebP. White is inside, black
+is outside, and transparent is outside too — a cut-out PNG is the other common
+way one of these arrives.
+
+**Satellite imagery.** *Satellite → ↓ Fetch imagery* pulls true-colour
+Sentinel-2 for the extent on screen, at 10 m. It drapes on the terrain and backs
+the Studio. Unlike the cover plates this one is a button rather than a script,
+because Sentinel-2 on AWS answers CORS where AlphaEarth's bucket does not — same
+terms as Fetch Terrain: no key, no account, nothing until you press it.
+
+The default search asks for the growing season of the last three years and sorts
+*that* by cloud. Cloud alone picks a snowy winter scene, which is a beautiful
+photograph and useless to draw a mask around.
+
+Copernicus data is free, full and open, commercial use included, against one
+line of attribution — which travels into any export that draws from it.
+→ [Masks and satellite imagery](docs/Masks.md)
 
 ---
 
@@ -783,6 +820,7 @@ The app idles quietly and stays responsive under load.
 - [Georeferencing: projections, vector layers, OpenStreetMap, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
 - [Land cover: classes, masks, and the AlphaEarth pipeline](docs/Land-Cover.md)
+- [Masks and satellite imagery](docs/Masks.md)
 - [Murmurations: boids over the terrain](docs/Murmurations.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)
 - [Changelog](CHANGELOG.md)

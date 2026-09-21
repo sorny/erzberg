@@ -28,8 +28,13 @@ import { latitudeFor, litField, samplingFor, shadowSun, smoothField, sunHourLeve
  * and unlit.
  */
 export function hasFillLayer(p) {
+  // `showImagery` belongs here even though it is not a *fill*: the satellite
+  // drape is painted by the surface shader, and with every other flag off the
+  // surface is not drawn at all — so fetching imagery on bare defaults put a
+  // texture on a mesh nobody could see and looked exactly like a broken fetch.
   return !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade ||
-            p.showWaterFill || p.showAO || p.showAspectMap)
+            p.showWaterFill || p.showAO || p.showAspectMap ||
+            (p.showImagery && p.imagery))
 }
 
 /**
@@ -41,8 +46,12 @@ export function hasFillLayer(p) {
  * reads. Profile mode is included because it needs the mesh as a raycast target.
  */
 export function needsSurfaceShading(p) {
+  // The drape samples `uImageryTex` at `vUv`, and UVs are one of the two
+  // attributes this gates. Without it the whole texture collapses to a single
+  // texel and the terrain comes out one flat colour.
   return !!(p.showFill || p.showHillshade || p.showSlopeShade ||
-            p.showWaterFill || p.showAO || p.showAspectMap || p.profileMode)
+            p.showWaterFill || p.showAO || p.showAspectMap || p.profileMode ||
+            (p.showImagery && p.imagery))
 }
 
 /**
@@ -380,19 +389,63 @@ function inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) {
  * same terrain would drift apart on the page and disagree about what colour
  * 1 200 m is. The picture has one coordinate system; only the stencil moves.
  */
-function maskedTerrain(terrain, mask) {
-  if (!mask || mask === ALL_CLASSES || !terrain.gridClass) return terrain
+function maskedTerrain(terrain, classMask, painted) {
+  const byClass = classMask && classMask !== ALL_CLASSES && terrain.gridClass
+  // `gridPaint` is the union of whichever hand-drawn masks this layer selected,
+  // already carried onto the grid. Two independent stencils, and a layer may
+  // carry both — cover says what the ground is, a painted mask says which part
+  // of the picture you meant. A cell has to satisfy both to be marked.
+  const byPaint = Boolean(painted)
+  if (!byClass && !byPaint) return terrain
 
   const src = terrain.gridMask
   const cls = terrain.gridClass
   const out = new Uint8Array(src.length)
   for (let i = 0; i < src.length; i++) {
-    if (src[i] && maskHasClass(mask, cls[i])) out[i] = 1
+    if (!src[i]) continue
+    if (byClass && !maskHasClass(classMask, cls[i])) continue
+    if (byPaint && !painted[i]) continue
+    out[i] = 1
   }
   // `hasNoData` switches on the mask-aware paths — the normalised blur, the
   // hole-skipping neighbour reads. A masked layer has holes by construction, so
   // it needs them on whatever the source raster looked like.
   return { ...terrain, gridMask: out, hasNoData: true }
+}
+
+/**
+ * The union of the masks one layer selected, carried onto the grid.
+ *
+ * Memoised on the selection for the length of a build, because several layers
+ * commonly share one — "everything inside the ridge" is the sort of mask a
+ * whole plate is drawn against — and the union is a pass over every cell.
+ */
+let paintCache = { gen: null, bySelection: new Map() }
+
+function paintFor(terrain, selection) {
+  if (!selection || !terrain.gridMasks?.length) return null
+  if (paintCache.gen !== terrain.gridMasks) {
+    paintCache = { gen: terrain.gridMasks, bySelection: new Map() }
+  }
+  const hit = paintCache.bySelection.get(selection)
+  if (hit !== undefined) return hit
+
+  const n = terrain.rows * terrain.cols
+  let out = null
+  for (let i = 0; i < terrain.gridMasks.length; i++) {
+    if (!(selection & (1 << i))) continue
+    const plane = terrain.gridMasks[i]
+    if (!plane || plane.length !== n) continue
+    if (!out) { out = plane; continue }
+    // Only copy once a second plane actually joins: a single selected mask is
+    // by far the common case and needs no allocation at all.
+    if (out === plane) continue
+    const merged = new Uint8Array(n)
+    for (let k = 0; k < n; k++) merged[k] = out[k] || plane[k] ? 1 : 0
+    out = merged
+  }
+  paintCache.bySelection.set(selection, out)
+  return out
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
@@ -515,9 +568,10 @@ export function buildLineGeometry(terrain, p) {
 
     const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`])
 
-    // The layer's own view of the ground, with any land-cover mask folded in.
-    // Identity when the layer has no mask, which is every layer by default.
-    const layerTerrain = maskedTerrain(terrain, p[`coverMask${cfg.id}`])
+    // The layer's own view of the ground, with both stencils folded in.
+    // Identity when the layer has neither, which is every layer by default.
+    const layerTerrain = maskedTerrain(terrain, p[`coverMask${cfg.id}`],
+                                       paintFor(terrain, p[`layerMask${cfg.id}`]))
 
     // Build the base pass for this layer once
     const baseRes = cfg.builder(layerTerrain, ctx)

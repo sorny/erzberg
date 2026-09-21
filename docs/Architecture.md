@@ -11,13 +11,15 @@ which matters as much.
   file ──> loader ──> STORE (source raster)
     OSM / GeoJSON / GPX ──> STORE (vector sources)
     .cover.json         ──> STORE (cover plate, in its own grid)
+    Mask Studio / import──> STORE (mask planes, on the SOURCE raster)
+    Satellite fetch     ──> STORE (imagery, on the raster's grid)
                         │
-                        ├── Edit Mode clip ──> derived raster
+                        ├── Edit Mode clip ──> derived raster + cropped masks
                         ├── alignCover()   ──> plate on the raster's grid
                         │
                         ▼
                   useTerrainGeometry            ← the only bridge to the worker
-                        │  postMessage({ pixels?, vectorData?, coverData?, p })
+                        │  postMessage({ pixels?, vectorData?, coverData?, maskData?, p })
                         ▼
   ┌──────────── geometry.worker ─────────────┐
   │  buildTerrain()       grid, slopes, bounds│
@@ -186,6 +188,12 @@ nothing.
   a plate flattened onto the old dimensions at load time would go quietly inert
   the moment that happened — the picture stays plausible and is simply no longer
   stencilled, which is the worst way for it to fail.
+- **And the mask planes**, on the same terms again: a byte per source pixel
+  each, replaced only when one is painted, imported or removed. They are cropped
+  in `derive()` alongside the pixels rather than re-authored when the clip moves,
+  because they are drawn against the *source* raster — a clip can be cleared at
+  any time and a mask authored against one would be the wrong size the moment it
+  was.
 - **Results come back as transferables.** Thus the main thread never copies the
   output of a rebuild. This includes the surface normals.
 - **The app coalesces requests. It does not cancel them.** When builds arrive
@@ -522,6 +530,24 @@ picture.
 ---
 
 ## Adding things
+
+### A stencil
+
+Both of them are already wired. `maskedTerrain` in `geometryBuilders.js` folds
+two sources of thinning into a layer's `gridMask` — the cover class selection
+and the union of its painted masks — and every builder already gates on that
+mask, because a GeoTIFF with a void in it has always been possible.
+
+A third source would be a third `continue` in the same loop and nothing else.
+
+### A surface overlay that is not a fill
+
+`hasFillLayer` decides whether the surface mesh is *drawn* and
+`needsSurfaceShading` whether it is built with normals and UVs. Anything painted
+by the surface shader has to appear in both, and the satellite drape is the case
+that proves why: with neither flag set it put a texture on a mesh nobody could
+see, and with only the first it would have sampled `vUv` on a mesh that had
+none — one flat colour over the whole terrain.
 
 ### A draw mode that reads land cover
 

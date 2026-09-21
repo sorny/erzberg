@@ -183,7 +183,7 @@ export function maskHasHoles(mask) {
  * when a style slider moves, so the worker caches it across rebuilds rather than
  * repeating the most expensive step in the pipeline on every drag tick.
  */
-export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null, cover = null) {
+export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null, cover = null, masks = null) {
   const { resolution: scl, blurRadius, gridOffsetX, gridOffsetY, blackPoint, whitePoint, elevScale } = p
   // `??` is lazy, so the full-resolution mask scan only runs when this call is
   // the one doing the blur — in the worker `preBlurred` is always supplied, and
@@ -250,6 +250,24 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
     }
   }
 
+  // Hand-drawn masks, carried onto the grid by the same subsample everything
+  // else took. One plane per mask, in the order the panel lists them, so a
+  // layer's selection bitmask indexes straight into this array.
+  let gridMasks = null
+  if (masks?.length) {
+    gridMasks = masks.map((m) => {
+      if (!m?.data || m.width !== imageWidth || m.height !== imageHeight) return null
+      const out = new Uint8Array(rows * cols)
+      for (let r = 0; r < rows; r++) {
+        const py = r * scl + lineOff
+        for (let c = 0; c < cols; c++) {
+          out[r * cols + c] = m.data[py * imageWidth + (c * scl + peakOff)]
+        }
+      }
+      return out
+    })
+  }
+
   // Ordered, not just computed: elevScale is signed (the slider reaches −10, and
   // the effective value is baseElevScale + the user's offset), so a negative
   // scale maps the brightest cell to the lowest elevation and crosses the pair.
@@ -297,6 +315,9 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
     // be silently wrong. A layer that wants its own ink gets it the ordinary
     // way, through `color<Mode>`.
     classColors: cover?.classColors ?? null,
+    // One plane per hand-drawn mask, or null when none are loaded. Indexed by
+    // the same order the panel shows, which is what a selection bitmask means.
+    gridMasks,
     // Does the grid have holes at all? Every mask-aware path is a cost the
     // ordinary solid raster should not pay, and the builders have no cheap way
     // to find out for themselves. Answered as a by-product of the scan above,

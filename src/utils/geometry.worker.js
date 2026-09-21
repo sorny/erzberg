@@ -46,6 +46,10 @@ let vectorSrc = null
 // the key explicitly and `undefined` is what means "unchanged".
 let coverSrc = null
 
+// And the hand-drawn masks, on the same terms: a byte per source pixel each,
+// replaced only when one is painted, imported or removed.
+let maskSrc = null
+
 // Last vector build, and the signature it was built from. `geo` is not retained
 // after posting (its buffers are transferred), so a hit means "the main thread's
 // copy is still correct", not "here it is again".
@@ -102,7 +106,7 @@ function blurredSource(p) {
 }
 
 self.onmessage = (e) => {
-  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, coverData, p, _gen } = e.data
+  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, coverData, maskData, p, _gen } = e.data
 
   // A message with pixels refreshes the cache; one without reuses it.
   // `hasNoData` is scanned once per raster, not per rebuild: the mask is always
@@ -114,9 +118,11 @@ self.onmessage = (e) => {
     // A new raster orphans the cover: the plate was aligned to the old pixel
     // grid, and the main thread sends the replacement (or null) alongside.
     coverSrc = null
+    maskSrc = null
     dataGen++
   }
   if (coverData !== undefined) coverSrc = coverData
+  if (maskData !== undefined) maskSrc = maskData
   if (vectorData !== undefined) {
     vectorSrc = vectorData
     dataGen++
@@ -129,7 +135,7 @@ self.onmessage = (e) => {
   try {
     const terrain = buildTerrain(
       src.heightmapPixels, src.nodataMask, src.heightmapWidth, src.heightmapHeight, p,
-      blurredSource(p), coverSrc
+      blurredSource(p), coverSrc, maskSrc
     )
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
@@ -185,6 +191,9 @@ self.onmessage = (e) => {
     // over does not detach anything this worker still needs.
     xfer(terrain.gridClass)
     xfer(terrain.gridPlate)
+    // Each plane is allocated fresh per build, like the two above, so handing
+    // the buffers over detaches nothing this worker still needs.
+    for (const plane of terrain.gridMasks ?? []) xfer(plane)
 
     // `vectorGeo` omitted entirely on a cache hit — null would be
     // indistinguishable from "this raster has no vector layers", and the two

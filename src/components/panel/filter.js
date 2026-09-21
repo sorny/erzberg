@@ -33,3 +33,12 @@ export const CoverPlate = createContext(null)
 export function sectionMatches(title, terms, q) {
   return !q || `${title} ${terms || ''}`.toLowerCase().includes(q)
 }
+
+/**
+ * The hand-drawn masks, on the same terms as `CoverPlate` above.
+ *
+ * A second context rather than one carrying both, because the two are loaded
+ * and cleared independently — a plate arrives from a file, masks are drawn —
+ * and a component that needs only one should not re-render when the other moves.
+ */
+export const PaintedMasks = createContext(null)

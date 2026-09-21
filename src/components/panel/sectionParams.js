@@ -57,6 +57,7 @@ export const SECTION_PARAMS = {
   'Slope Shading': ['showSlopeShade', 'slopeShadeOpacity', 'slopeColorLow', 'slopeColorHigh'],
   'Water Fill': ['showWaterFill', 'waterLevel', 'waterColor', 'waterOpacity'],
   'Aspect Map': ['showAspectMap', 'aspectMapOpacity'],
+  'Satellite': ['showImagery', 'imageryOpacity'],
   'Texture': [/^texture/, 'showTexture'],
   'Mirror': [/^showMirror/],
   'Particles': ['showPoints', 'pointColor', 'pointSize', 'pointOpacity',

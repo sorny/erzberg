@@ -44,6 +44,10 @@ const ACTIONS = [
   // meaning to are parameters, but they belong to the mode sections that render
   // them, not to this one.
   'Land Cover',
+  // Masks holds the list and the Studio that draws into it. The per-layer
+  // `layerMask*` keys it gives meaning to belong to the mode sections that
+  // render them, exactly as the cover classes' do.
+  'Masks',
 ]
 
 describe('the partition', () => {

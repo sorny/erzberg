@@ -1059,6 +1059,27 @@ embedding. Any projection `unprojectWgs84` handles works, which is the same set
 listed above. Anything else is refused rather than approximated, for the reason
 this whole document gives.
 
+## Satellite imagery
+
+The fourth thing that has to land on the raster's ground, and the only one
+fetched live. A Sentinel-2 scene is in the UTM zone it was taken over, which is
+usually — but not always — the zone the raster is in.
+
+`mapperFor` in `imageryFetch.js` takes the cheap road when it can. Two grids in
+the same projection map linearly and need no trigonometry at all, which is the
+common case because both tend to be the UTM zone the ground is in. Otherwise
+every output pixel goes out to WGS84 and back, which is correct everywhere and
+about forty times the cost.
+
+The scene window is found from the output's own corners *and edges*, for the
+reason `bboxToWgs84` samples nine points rather than four: a projected extent
+bows, and the sag at the middle of an edge falls outside the hull of the
+corners.
+
+Output is capped at 2048 on the long side. This is a backdrop and a texture, not
+a measurement — past that the extra detail is smaller than a screen pixel at any
+camera the app offers, and every output pixel costs a coordinate transform.
+
 ---
 
 ### Adding a CRS

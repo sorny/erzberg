@@ -26,6 +26,12 @@ export const STYLE_DEF = {
   occlusionColor: '#a80000',
   occlusionOpacity: 0.0,
 
+  // Satellite drape. Its own switch and its own opacity rather than sharing the
+  // texture overlay's: imagery is fetched for this extent and lands 1:1 on the
+  // raster, where a texture is an image the user brought and wants to scale and
+  // shift. Sharing one slot would mean fetching imagery threw away their texture.
+  showImagery: true, imageryOpacity: 0.85,
+
   // Texture overlay
   showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0, textureBlendMode: 'normal', textureOpacity: 1,
 
@@ -377,6 +383,20 @@ export const STYLE_DEF = {
    * `sectionParams` files each one under its own mode with no table to maintain.
    */
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`coverMask${id}`, 0])),
+
+  /*
+   * Which hand-drawn masks each draw mode is restricted to.
+   *
+   * Generated for the same reason `coverMask*` is, and a separate key rather
+   * than the same one because the two stencils answer different questions and
+   * a layer may carry both. Cover says what the ground *is*; a painted mask
+   * says which part of the picture you meant.
+   *
+   * 0 means the whole raster. A selection is a bitmask over the mask list in
+   * panel order, so it is one number through the parameter bus, the preset file
+   * and the rebuild key — exactly as the class selection is.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`layerMask${id}`, 0])),
 }
 
 export const POINTS_DEF = {

@@ -49,6 +49,9 @@ const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, readPresetFile } from './utils/presetFile'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, parseCover, suggestInks } from './utils/coverPlate'
+import { createMask, MAX_MASKS, maskFromImageData } from './utils/maskLayers'
+import { fetchImagery, findScenes, searchBboxFor } from './utils/imageryFetch'
+import { MaskStudio } from './components/MaskStudio'
 import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
@@ -346,6 +349,10 @@ export default function App() {
   const setVectorSources   = useStore((s) => s.setVectorSources)
   const cover              = useStore((s) => s.cover)
   const setCover           = useStore((s) => s.setCover)
+  const srcMasks           = useStore((s) => s.srcMasks)
+  const setMasks           = useStore((s) => s.setMasks)
+  const imagery            = useStore((s) => s.imagery)
+  const setImagery         = useStore((s) => s.setImagery)
 
   // The style half of the vector layers. Coordinates live in the store; these
   // are params like any other, which is what keeps recolouring one off the
@@ -788,6 +795,127 @@ export default function App() {
     const pct = decoded.variance != null ? `, ${Math.round(decoded.variance * 100)}% of variance` : ''
     notify(`${decoded.classes.length} land cover classes from ${filename}${pct}`)
   }, [heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS, setCover, notify])
+
+  // ── Masks ──────────────────────────────────────────────────────────────────
+  // Which mask the Studio is editing, by id rather than by object: the list is
+  // replaced on every commit, and holding the object would pin a stale one.
+  const [studioMaskId, setStudioMaskId] = useState(null)
+  const [imageryBusy, setImageryBusy] = useState(null)
+
+  /**
+   * A new empty mask over the source raster.
+   *
+   * Sized to the *source* and not to whatever Edit Mode is showing, because a
+   * clip can be changed or cleared at any time and a mask authored against one
+   * would be the wrong size the moment it was. The store crops it on the way
+   * through, exactly as it crops the raster.
+   */
+  const addMask = useCallback((name) => {
+    if (!srcWidth || !srcHeight) { showError('Load a terrain raster before drawing a mask.'); return null }
+    if (srcMasks.length >= MAX_MASKS) {
+      showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
+      return null
+    }
+    const mask = createMask(srcWidth, srcHeight, srcMasks.length, name)
+    setMasks([...srcMasks, mask])
+    return mask
+  }, [srcWidth, srcHeight, srcMasks, setMasks, showError])
+
+  /**
+   * Commits whatever the Studio just painted.
+   *
+   * The brush writes into the plane in place — it has to, or a stroke would
+   * allocate a copy of the raster per pointer event — so this replaces the
+   * array's identity to tell React and the worker that it moved. The bytes are
+   * the same bytes; only the wrapper is new.
+   */
+  const commitMask = useCallback((id) => {
+    setMasks(srcMasks.map((m) => (m.id === id ? { ...m, data: m.data } : m)))
+  }, [srcMasks, setMasks])
+
+  const patchMask = useCallback((id, patch) => {
+    setMasks(srcMasks.map((m) => (m.id === id ? { ...m, ...patch } : m)))
+  }, [srcMasks, setMasks])
+
+  const removeMask = useCallback((id) => {
+    if (studioMaskId === id) setStudioMaskId(null)
+    setMasks(srcMasks.filter((m) => m.id !== id))
+  }, [srcMasks, setMasks, studioMaskId])
+
+  /** A mask from an image file — a black-and-white stencil drawn anywhere else. */
+  const importMask = useCallback(() => {
+    if (!srcWidth || !srcHeight) { showError('Load a terrain raster before importing a mask.'); return }
+    const input = Object.assign(document.createElement('input'),
+      { type: 'file', accept: 'image/png,image/jpeg,image/webp' })
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      try {
+        const bitmap = await createImageBitmap(file)
+        const canvas = document.createElement('canvas')
+        canvas.width = bitmap.width
+        canvas.height = bitmap.height
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        ctx.drawImage(bitmap, 0, 0)
+        const image = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
+        bitmap.close?.()
+
+        const mask = createMask(srcWidth, srcHeight, srcMasks.length,
+          file.name.replace(/\.[^.]+$/, '').slice(0, 32))
+        mask.data = maskFromImageData(image, srcWidth, srcHeight)
+        setMasks([...srcMasks, mask])
+        notify(`Imported ${file.name} as a mask`)
+      } catch (err) {
+        showError(`Could not read ${file.name} as an image: ${err.message}`)
+      }
+    }
+    input.click()
+  }, [srcWidth, srcHeight, srcMasks, setMasks, notify, showError])
+
+  /**
+   * Satellite imagery for the extent on screen.
+   *
+   * On a press and never otherwise, like every other thing here that talks to a
+   * server. Sentinel-2 answers CORS, so unlike the cover plates this one does
+   * not need a script — see utils/imageryFetch.js for why that difference
+   * exists and why this source rather than the prettier ones.
+   */
+  const fetchSatellite = useCallback(async () => {
+    if (!geoTiffBbox || !geoTiffCRS) {
+      showError('Satellite imagery needs a georeferenced raster — a GeoTIFF, or Fetch Terrain.')
+      return
+    }
+    const wgs = searchBboxFor(geoTiffBbox, geoTiffCRS)
+    if (!wgs) {
+      showError(`${geoTiffCRS} cannot be turned into longitude and latitude, so no scene can be found for it.`)
+      return
+    }
+    setImageryBusy({ phase: 'search', progress: 0 })
+    try {
+      const scenes = await findScenes(wgs)
+      if (!scenes.length) throw new Error('No Sentinel-2 scene covers this extent.')
+      setImageryBusy({ phase: 'fetch', progress: 0 })
+      const got = await fetchImagery(scenes[0], {
+        bbox: geoTiffBbox, crs: geoTiffCRS,
+        width: heightmapWidth, height: heightmapHeight,
+      }, { onProgress: (progress) => setImageryBusy({ phase: 'fetch', progress }) })
+
+      // A canvas rather than the raw bytes: the surface shader takes a texture,
+      // and this is the one place that knows the bytes are an image.
+      const canvas = document.createElement('canvas')
+      canvas.width = got.width
+      canvas.height = got.height
+      canvas.getContext('2d').putImageData(new ImageData(got.rgba, got.width, got.height), 0, 0)
+      setImagery({ ...got, url: canvas.toDataURL('image/png') })
+      notify(`Sentinel-2, ${got.date} · ${Math.round(got.cloud)}% cloud`)
+    } catch (err) {
+      if (err?.name !== 'AbortError') showError(`Satellite imagery failed: ${err.message}`)
+    } finally {
+      setImageryBusy(null)
+    }
+  }, [geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight, setImagery, notify, showError])
+
+  const studioMask = studioMaskId ? srcMasks.find((m) => m.id === studioMaskId) ?? null : null
 
   /** Opens a plate through the file dialog, for people who do not drag files. */
   const loadCoverFromPicker = useCallback(() => {
@@ -1688,6 +1816,7 @@ export default function App() {
     // credit a plate carries has to reach them, and the geometry worker runs
     // off `p` and the classes have to reach that.
     cover, coverGrid,
+    imagery,
   }
 
   // Surface normals and UVs exist only for the terrain shader. STL export
@@ -2028,6 +2157,21 @@ export default function App() {
       </Canvas>
       </div>
 
+      {/* ── Mask Studio ──────────────────────────────────────────────────
+          A separate view from Edit Mode, because the two answer different
+          questions: a clip changes the raster for everything, a mask changes
+          one layer and leaves the rest alone. */}
+      {studioMask && (
+        <MaskStudio
+          srcPixels={srcPixels} srcMask={srcMask}
+          srcWidth={srcWidth}   srcHeight={srcHeight}
+          imagery={imagery}     mask={studioMask}
+          onCommit={() => commitMask(studioMask.id)}
+          onClose={() => setStudioMaskId(null)}
+          rightInset={PANEL_W}
+        />
+      )}
+
       {/* ── Edit Mode ────────────────────────────────────────────────────── */}
       {editMode && (
         <HeightmapEditor
@@ -2103,6 +2247,11 @@ export default function App() {
         onAdoptVectorSource={adoptVectorSource}
         cover={cover} coverError={coverError} onLoadCover={loadCoverFromPicker}
         onClearCover={() => setCover(null)} onInkByClass={inkByClass}
+        masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask}
+        onRemoveMask={removeMask} onImportMask={importMask}
+        onPaintMask={(id) => setStudioMaskId(id)}
+        imagery={imagery} imageryBusy={imageryBusy}
+        onFetchImagery={fetchSatellite} onClearImagery={() => setImagery(null)}
         onVectorError={setVectorError}
         vectorIdentify={vectorIdentify}
         onVectorIdentify={setVectorIdentify}
@@ -2186,7 +2335,7 @@ export default function App() {
       })()}
 
       {/* ── What the viewport can do ─────────────────────────────────────── */}
-      {showHint && !editMode && !webmActive && !noHmap
+      {showHint && !editMode && !studioMask && !webmActive && !noHmap
         && <ViewportHint onDismiss={dismissHint} onKeys={() => setShowKeys(true)} />}
 
       {/* ── The keyboard ─────────────────────────────────────────────────── */}

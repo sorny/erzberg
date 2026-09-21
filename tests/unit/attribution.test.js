@@ -61,6 +61,13 @@ describe('workAttribution', () => {
     expect(out).toContain('Google DeepMind')
   })
 
+  it('credits imagery only while it is draped', () => {
+    const imagery = { credit: 'Contains modified Copernicus Sentinel data' }
+    expect(workAttribution({ vectorLayers: [], style: { showImagery: false }, imagery })).toBeNull()
+    expect(workAttribution({ vectorLayers: [], style: { showImagery: true }, imagery }))
+      .toContain('Copernicus')
+  })
+
   it('reads the merged parameter bus as well as separate blocks', () => {
     // Scene passes `p`, where the style keys sit at the top level; App passes
     // the state objects. Both call sites hand over what they already hold.

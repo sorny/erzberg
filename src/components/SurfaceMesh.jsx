@@ -93,6 +93,9 @@ const SURFACE_FRAG = /* glsl */ `
   uniform int       uColorMode; // 0=Elevation, 1=Slope, 2=Aspect
 
   uniform sampler2D uOverlayTex;
+  uniform bool      uShowImagery;
+  uniform sampler2D uImageryTex;
+  uniform float     uImageryOpacity;
   uniform bool      uShowTexture;
   uniform float     uTextureScale;
   uniform vec2      uTextureOffset;
@@ -242,6 +245,15 @@ const SURFACE_FRAG = /* glsl */ `
     vec3 base = (uGradient || uHypsometricBanded)
       ? texture2D(uGradientTex, vec2(b, 0.5)).rgb
       : uFillColor;
+
+    // The satellite drape, composited before the user's own texture overlay:
+    // imagery is what the ground looks like, and a texture is something they
+    // chose to put on top of it. It lands 1:1 on the raster, so it needs no
+    // scale or offset of its own — plain vUv.
+    if (uShowImagery) {
+      vec4 sat = texture2D(uImageryTex, vUv);
+      base = mix(base, sat.rgb, sat.a * uImageryOpacity);
+    }
 
     if (uShowTexture) {
       vec2 uv = vUv * uTextureScale + uTextureOffset;
@@ -407,6 +419,23 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     return tex
   }, [p.fillHypsometric, p.gradientStops])
 
+  /**
+   * The satellite drape.
+   *
+   * Disposed on replacement rather than left to the collector: a fetch can be
+   * repeated for a different scene, and each one is a full-resolution RGBA
+   * texture the GPU is holding.
+   */
+  const imageryTexRef = useRef(null)
+  const imageryTex = useMemo(() => {
+    imageryTexRef.current?.dispose()
+    if (!p.imagery?.url) { imageryTexRef.current = null; return null }
+    const tex = new THREE.TextureLoader().load(p.imagery.url)
+    tex.colorSpace = THREE.SRGBColorSpace
+    imageryTexRef.current = tex
+    return tex
+  }, [p.imagery])
+
   const overlayTex = useMemo(() => {
     if (!textureImage) return null
     const loader = new THREE.TextureLoader()
@@ -473,6 +502,9 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uElevMaxCut:        { value: 100.0 },
       uOverlayTex:        { value: null },
       uShowTexture:         { value: false },
+      uShowImagery:         { value: false },
+      uImageryTex:          { value: null },
+      uImageryOpacity:      { value: 0.85 },
       uTextureScale:        { value: 1.0 },
       uTextureOffset:       { value: new THREE.Vector2(0, 0) },
       uTextureBlendMode:    { value: 0 },
@@ -543,6 +575,9 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uElevMinCut.value = p.elevMinCut ?? 0.0
     surfMat.uniforms.uElevMaxCut.value = p.elevMaxCut ?? 100.0
     
+    surfMat.uniforms.uShowImagery.value = !!(p.showImagery && imageryTex)
+    if (imageryTex) surfMat.uniforms.uImageryTex.value = imageryTex
+    surfMat.uniforms.uImageryOpacity.value = p.imageryOpacity ?? 0.85
     surfMat.uniforms.uShowTexture.value = !!(p.showTexture && overlayTex)
     surfMat.uniforms.uOverlayTex.value = overlayTex
     surfMat.uniforms.uTextureScale.value = 1.0 / (p.textureScale || 1.0)

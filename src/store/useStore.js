@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { applyEdit, buildEditMask, cropBbox } from '../utils/heightmapEdit'
+import { cropMaskData } from '../utils/maskLayers'
 
 /**
  * Global store — only holds data that cannot live in plain React state:
@@ -51,6 +52,7 @@ function derive(s) {
       heightmapWidth:  s.srcWidth,
       heightmapHeight: s.srcHeight,
       geoTiffBbox:     s.geoTiffBboxSrc ?? null,
+      masks:           s.srcMasks,
     }
   }
   const pre = editMaskFor(s.edit, s.srcMask, s.srcWidth, s.srcHeight)
@@ -67,6 +69,14 @@ function derive(s) {
     // the extent of the *whole* raster — leaving it uncropped would silently
     // project every GPX point against the wrong extent.
     geoTiffBbox:     pre ? cropBbox(s.geoTiffBboxSrc, pre, s.srcWidth, s.srcHeight) : (s.geoTiffBboxSrc ?? null),
+    // Painted masks are authored against the *source* raster, so they are
+    // cropped here alongside the pixels rather than being re-authored whenever
+    // the clip moves. Same rectangle, same arithmetic.
+    masks: pre
+      ? s.srcMasks.map((m) => (m.width === s.srcWidth && m.height === s.srcHeight
+          ? { ...m, data: cropMaskData(m.data, s.srcWidth, pre), width: pre.w, height: pre.h }
+          : m))
+      : s.srcMasks,
   }
 }
 
@@ -108,6 +118,16 @@ export const useStore = create((set) => ({
   // time would go quietly inert.
   // { labels, plate, width, height, bbox, crs, classes, attribution, … } | null
   cover: null,
+
+  // Masks drawn by hand or loaded from an image, on the *source* raster's grid.
+  // `masks` below is the same list cropped to whatever Edit Mode is showing —
+  // the same source-versus-derived split the raster itself has.
+  srcMasks: [],
+  masks: [],
+
+  // Satellite imagery for the current extent, resampled onto the raster's grid.
+  // { rgba, width, height, url, sceneId, date, cloud, credit } | null
+  imagery: null,
 
   // Which feature is under the cursor, and which one was last clicked or picked
   // in the panel. Here rather than in App's `p` bus for a specific reason: `p`
@@ -151,6 +171,10 @@ export const useStore = create((set) => ({
         // so it goes, for the same reason the clip goes. An Edit Mode crop does
         // not come through here and keeps its plate.
         cover: null,
+        // Masks and imagery go with it, and for the same reason: both are
+        // about one particular piece of ground.
+        srcMasks: [],
+        imagery: null,
       }
       return { ...next, ...derive({ ...s, ...next }) }
     }),
@@ -231,6 +255,22 @@ export const useStore = create((set) => ({
     set({ vectorSources: sources ?? [], vectorHover: null, vectorSelected: null }),
 
   setCover: (cover) => set({ cover: cover ?? null }),
+
+  /**
+   * Replaces the whole mask list.
+   *
+   * One setter rather than add/remove/patch, because every caller already holds
+   * the list it wants: the Studio commits a painted plane, the panel reorders
+   * or deletes, and a reset clears. Routing all of them through one door is what
+   * keeps `derive` the only place that knows about cropping.
+   */
+  setMasks: (masks) =>
+    set((s) => {
+      const next = { srcMasks: masks ?? [] }
+      return { ...next, ...derive({ ...s, ...next }) }
+    }),
+
+  setImagery: (imagery) => set({ imagery: imagery ?? null }),
 
   /**
    * How much ground one screen pixel covers, and where north points on screen.
