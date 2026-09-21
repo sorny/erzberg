@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.18.0] — 2026-09-21
+
+### Added
+
+- **Masks you draw yourself.** A cover plate answers "what is this ground" for
+  the whole window at once. A mask answers a question only you can ask, and is
+  spent through exactly the same stencil — `maskedTerrain` now folds in two
+  sources of thinning instead of one, and no draw mode changed for it. A layer
+  may carry both: cover says what the ground *is*, a mask says which part of the
+  picture you meant, and a cell has to satisfy both.
+
+  Masks overlap where classes partition, and that one difference decides the
+  rest. Each carries its own plane of bits rather than sharing an index array;
+  selecting two means their union; and unlike the classes, selecting *all* of
+  them does not collapse to "unfiltered", because the union of the regions you
+  drew is some particular shape and almost never the whole raster.
+
+  They live on the *source* raster and are cropped alongside the pixels in
+  `derive()`, because an Edit Mode clip can be cleared at any time and a mask
+  authored against one would be the wrong size the moment it was.
+
+- **The Mask Studio**, a view of its own rather than a second mode of Edit Mode:
+  a clip changes the raster for everything and a mask changes one layer, so
+  sharing a window would mean every gesture had to say which it meant. Brush,
+  rectangle, ellipse and lasso, with erase and a resizable brush. The brush is
+  hard-edged on purpose — a mask is a bit per pixel, so a soft edge would have to
+  dither or quantise, and both look deliberate and are not.
+
+- **Satellite imagery**, true-colour Sentinel-2 at 10 m over the extent on
+  screen. It drapes on the terrain through a second sampler in the surface
+  shader and backs the Studio, where you are drawing around ground you need to
+  be able to see.
+
+  Unlike the cover plates this is a button rather than a script, and the reason
+  is worth stating: AlphaEarth's bucket serves anonymous ranged reads to anyone
+  and sends no `access-control-*` header, so a page is refused where a terminal
+  is not. `sentinel-cogs` answers `Access-Control-Allow-Origin: *`.
+
+  Licence chose the source, not resolution. EOX s2cloudless is the same 10 m and
+  prettier, and it is CC BY-NC-SA — non-commercial and ShareAlike would attach
+  to every plate exported through it. Esri's is sharper again and its
+  redistribution terms do not clearly cover a printed plate. NASA GIBS is
+  unambiguously open and 250 m, which is sixteen pixels across a 4 km window.
+  Copernicus is free, full and open including commercial use, against one line
+  of attribution — which travels into any export that draws from it.
+
+  Scenes are searched over the growing season of recent years and *that* is
+  sorted by cloud. Cloud alone picks the clearest scene in the archive, which
+  over the Erzberg is the first of March under snow.
+
+- **Mask import** from a PNG, JPG or WebP. Luminance above the midpoint is
+  inside; alpha counts first, so a cut-out PNG does not read as its own inverse.
+
+
 ## [1.17.0] — 2026-09-21
 
 ### Added
