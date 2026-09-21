@@ -7,6 +7,95 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.17.0] — 2026-09-21
+
+### Added
+
+- **Land cover.** Every draw mode in this app reads the *shape* of the ground,
+  so two pieces of ground at the same gradient have always got the same mark
+  whatever was standing on them. A cover plate adds the missing fact: one class
+  per pixel, cut from AlphaEarth Foundations' satellite embedding by
+  `scripts/embed-window.js`. Three things follow from it.
+
+  *Masks.* Every layer takes a row of class swatches — pick the classes it may
+  draw on and it skips the rest. This works for all thirty-four modes, including
+  the ones written long before land cover existed, and it needed no change to
+  any of them. Every builder already asks `gridMask` whether a cell carries data,
+  because a GeoTIFF with a void in it has always been possible. A class filter is
+  not a new question to ask at every mark; it is the same question asked of a
+  mask with more zeros in it. Only `gridMask` is rebuilt per layer — `halfW`,
+  `minElev` and `maxSlope` carry over untouched, or two masked layers over one
+  terrain would drift apart on the page and disagree about what colour 1 200 m is.
+
+  *Ink by land class.* One press deals a mark to each class, masks each layer to
+  its own, and orders the assignment by measured mean slope. It does not claim to
+  know which class is forest: the classes are unnamed and the sign of a principal
+  axis means nothing, so any such mapping would be a guess dressed as a fact.
+
+  *A Land cover draw mode*, inking the classes either as the imagery they came
+  from or as one flat colour each — the first colour mode in the app that is not
+  the heightmap wearing different clothes.
+
+  *A class map*, because a legend that names six classes still cannot say where
+  any of them is — and that is the question that decides what to mask a layer
+  to. The plate is drawn flat at its own grid, in the classes' own colours.
+  Pointing at it names the class under the cursor; pointing at a legend row
+  lights that class up on the map. One piece of state drives both directions.
+
+  *Names for the classes*, which a cluster cannot supply about itself. The
+  script asks OpenStreetMap which landcover polygons cover the window and
+  tallies what each class sits on, so the legend reads *Quarry · gentle — 90%
+  quarry* rather than *Class A*. A name needs a 30% majority before it is
+  printed, names that collide are parted by the terrain word between them, and
+  the runner-up is shown. The mine itself is a `type=multipolygon` relation, so
+  this only works at all because relations are queried and their member ways
+  stitched back into closed rings — a way-only query found 93 polygons over the
+  Erzberg and not one of them the Erzberg.
+
+- **`scripts/embed-window.js`**, with two ways to say where. `--dem` cuts the
+  plate to a GeoTIFF you already have, taking the extent, the projection and the
+  pixel grid from the file — the raster does not have to be in UTM, because the
+  script reads the UTM window covering it and carries the vectors onto its grid.
+  `--place` cuts the terrain as well, for when there is no raster yet. Either
+  way the plate and the ground are aligned by construction rather than by typing
+  the same extent twice, and the Land Cover section prints the exact command for
+  whatever is already on screen.
+
+  The fetch cannot happen in the browser, and that is not a limitation of the
+  app: the AlphaEarth bucket serves anonymous ranged reads to anyone and sends
+  no `access-control-*` header at all, so a page is refused where a terminal is
+  not. Only a proxy would bridge that, and a proxy is a server. The script
+  reduces 64 bands to one, which is also the difference between a 64 MB download
+  and a 40 KB file.
+
+### Changed
+
+- A GeoTIFF carrying eight or more signed 8-bit bands is now refused with a
+  message naming the script to reduce it. Such a file used to load silently as
+  band `A00` rendered as terrain — a confident landscape built from one arbitrary
+  axis of a machine-learned description, with nothing on screen to say so.
+
+- Licence credits for an export are decided in one place, `utils/attribution.js`,
+  rather than at each export site. ODbL and CC-BY both attach to the produced
+  work rather than to the tool, so the question is whether the data is in *this
+  file*: a hidden OpenStreetMap layer and a loaded-but-undrawn cover plate both
+  earn no credit.
+
+### Fixed
+
+- Class masks now hold their full range. A layer's selection is one signed
+  32-bit integer, and the obvious `(1 << count) - 1` was wrong at both ends: at
+  31 classes it goes negative, where `&` coerces to int32 but `===` compares the
+  uncoerced number, so ticking every class stopped reading as "all of them"; at
+  32 the shift wraps to `1 << 0`, the mask comes out as 0, and *every* selection
+  read as unfiltered — picking one class turned the filter off. A plate
+  declaring more than 32 classes is refused outright, since past the ceiling the
+  bit for class 32 is the bit for class 0.
+
+- `geoCoords.js` imports `./terrain.js` with its extension, so plain Node can
+  load it. The script and the app now share one definition of every projection
+  instead of two that can drift.
+
 ## [1.16.0] — 2026-09-12
 
 ### Added
