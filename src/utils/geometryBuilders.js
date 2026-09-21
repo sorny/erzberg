@@ -7,6 +7,7 @@ import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
 import { isTextLayerId, textLayerName } from './textLayers'
 import { layerDisplayName } from './drawModes'
+import { ALL_CLASSES, maskHasClass } from './coverPlate'
 import { latitudeFor, litField, samplingFor, shadowSun, smoothField, sunHourLevels, sunHoursField } from './sunHours'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -354,6 +355,46 @@ function inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) {
 }
 
 
+// ─── Land cover masking ───────────────────────────────────────────────────────
+
+/**
+ * One layer's view of the ground, restricted to the classes it draws on.
+ *
+ * Thirty-three draw modes were already in this file, and not one of them needed
+ * changing. Every builder here already asks `gridMask` whether a cell carries data,
+ * because a GeoTIFF with a void in it has always been possible and a mode that
+ * ignored the mask would draw across the hole. So a class filter is not a new
+ * question to ask at every mark — it is the *same* question, asked of a mask
+ * with more zeros in it.
+ *
+ * That is the whole mechanism. The layers that trace descent runs, the ones that
+ * march isolines, the ones that fill lattice cells: all of them inherit masking
+ * for free, and all of them keep inheriting it when the next mode is added.
+ *
+ * ── What is deliberately not recomputed ──────────────────────────────────────
+ * Only `gridMask` changes. `halfW`, `minElev`, `maxElev` and `maxSlope` are
+ * carried over untouched, and that is load-bearing rather than lazy: they are
+ * the frame every layer is drawn against. Re-measuring them over one class's
+ * cells would re-centre that layer on its own bounding box and re-stretch its
+ * hypsometric ramp over its own elevation range, so two masked layers over the
+ * same terrain would drift apart on the page and disagree about what colour
+ * 1 200 m is. The picture has one coordinate system; only the stencil moves.
+ */
+function maskedTerrain(terrain, mask) {
+  if (!mask || mask === ALL_CLASSES || !terrain.gridClass) return terrain
+
+  const src = terrain.gridMask
+  const cls = terrain.gridClass
+  const out = new Uint8Array(src.length)
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] && maskHasClass(mask, cls[i])) out[i] = 1
+  }
+  // `hasNoData` switches on the mask-aware paths — the normalised blur, the
+  // hole-skipping neighbour reads. A masked layer has holes by construction, so
+  // it needs them on whatever the source raster looked like.
+  return { ...terrain, gridMask: out, hasNoData: true }
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
 /**
@@ -449,6 +490,9 @@ export function buildLineGeometry(terrain, p) {
         broken: p.brokenMineral, grain: p.grainMineral,
         colorA: p.colorAMineral, colorB: p.colorBMineral, colorC: p.colorCMineral,
         colorD: p.colorDMineral, colorE: p.colorEMineral, }) },
+    { id:'Cover',   builder: (t, ctx) => buildCover(t, ctx, {
+        spacing: p.spacingCover, source: p.sourceCover, grain: p.grainCover,
+        color: p.colorCover, }) },
     { id:'Shed',    builder: (t, ctx) => buildWatershed(t, ctx, {
         spacing: p.spacingShed, inks: p.inksShed, minBasin: p.minBasinShed, radius: p.radiusShed,
         shade: p.shadeShed, azimuth: p.azimuthShed, seed: p.seedShed, }) },
@@ -470,9 +514,13 @@ export function buildLineGeometry(terrain, p) {
     if (!p[`enabled${cfg.id}`]) continue
 
     const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`])
-    
+
+    // The layer's own view of the ground, with any land-cover mask folded in.
+    // Identity when the layer has no mask, which is every layer by default.
+    const layerTerrain = maskedTerrain(terrain, p[`coverMask${cfg.id}`])
+
     // Build the base pass for this layer once
-    const baseRes = cfg.builder(terrain, ctx)
+    const baseRes = cfg.builder(layerTerrain, ctx)
     if (!baseRes) continue
 
     // Handle builders that return sub-layers (e.g. { minor: {...}, major: {...} })
@@ -5368,6 +5416,61 @@ function buildMineral(terrain, p, o) {
     return [Math.min(1, base[0] * g), Math.min(1, base[1] * g), Math.min(1, base[2] * g)]
   }, (i) => classOf(i), (i, r, c, elev) => cols5[classOf(i, elev)])
   void elevScale; void jitterAmt; void maxSlope; void cMax
+  return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
+}
+
+/**
+ * 34 · COVER — colour by what the ground actually is.
+ *
+ * Every other colour mode in this app derives its palette from the shape of the
+ * land: Mineral classifies by slope and curvature, Indexed by elevation tier,
+ * Watershed by which way water runs. They are all, in the end, the heightmap
+ * wearing different clothes. This one is not — it inks a fact the heightmap does
+ * not contain, which is why a quarry and the spruce stand beside it can come out
+ * as different materials even where they are the same gradient.
+ *
+ * ── Two sources, one geometry ────────────────────────────────────────────────
+ * **Plate** inks each cell with its own colour, taken from the imagery the
+ * classes were cut from. It is continuous and it is the one that looks like a
+ * photograph of the ground rather than a map of it.
+ *
+ * **Class** inks each cell with its class's single flat colour, which is the
+ * same picture with the variation taken out — closer to a printed land-use
+ * sheet, and the one to reach for when the plate is going to be plotted.
+ *
+ * Both deal *regions* by class, not by colour. That is what keeps the SVG
+ * honest: `traceAreaRings` needs areas to hatch, and a plate keyed by its own
+ * per-cell colour would trace a hundred and sixty thousand of them.
+ */
+function buildCover(terrain, p, o) {
+  const { gridClass, gridPlate, cols } = terrain
+  // Nothing loaded is not an error — it is a layer that has nothing to draw, and
+  // the panel says so where the switch is rather than here.
+  if (!gridClass) return null
+
+  const palette = (terrain.classColors ?? []).map(hexToRgb)
+  const fallback = hexToRgb(o.color ?? '#888888')
+  const usePlate = o.source !== 'class' && Boolean(gridPlate)
+  const grain = Math.max(0, Math.min(1, o.grain ?? 0))
+
+  const inkOf = (i) => palette[gridClass[i]] ?? fallback
+
+  const cells = fillCells(terrain, p, o.spacing,
+    (i, r, c) => {
+      const base = usePlate
+        ? [gridPlate[i * 3] / 255, gridPlate[i * 3 + 1] / 255, gridPlate[i * 3 + 2] / 255]
+        : inkOf(i)
+      if (!grain) return base
+      // The same hash Mineral uses, seeded by the class, so two materials that
+      // happen to share a tone still read as two surfaces.
+      const m = gridClass[i]
+      const g = 1 - grain * 0.5 + grain * jitterNoise(c + m * 37, r + m * 91)
+      return [Math.min(1, base[0] * g), Math.min(1, base[1] * g), Math.min(1, base[2] * g)]
+    },
+    (i) => gridClass[i],
+    (i) => inkOf(i))
+
+  void cols
   return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
 }
 

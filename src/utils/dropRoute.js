@@ -11,9 +11,11 @@
  * dropped PNG is a preset if it has that chunk and a terrain if it does not —
  * decidable from the bytes, with no guessing and no dialog.
  *
- * **`.json`** is both what `Preset ⬇` writes and what GeoJSON is called half
- * the time. `parsePreset` already answers this: it returns null unless the
- * object holds one of the six parameter groups, and no GeoJSON does.
+ * **`.json`** is three things: what `Preset ⬇` writes, what GeoJSON is called
+ * half the time, and a land cover plate. Each answers for itself from the bytes.
+ * `parseCover` returns null unless the object declares its own `kind`, and
+ * `parsePreset` unless it holds one of the six parameter groups — and no GeoJSON
+ * does either.
  *
  * ── The shape ────────────────────────────────────────────────────────────────
  * Rather than return one answer, this returns the routes to *try*, in order.
@@ -35,7 +37,11 @@ export function classifyDrop(name) {
   if (ext(['.png']))                      return ['preset', 'raster']
   if (ext(['.svg']))                      return ['preset']
   if (ext(['.geojson']))                  return ['geojson', 'preset']
-  if (ext(['.json']))                     return ['preset', 'geojson']
+  // `.json` is now three things, and all three are decidable from the bytes.
+  // A cover plate declares its own `kind`, so it is tried first and answers for
+  // itself; `parsePreset` and `parseGeoJson` keep answering for themselves after
+  // it, exactly as before.
+  if (ext(['.json']))                     return ['cover', 'preset', 'geojson']
   if (ext(['.gpx']))                      return ['gpx']
   // Named so the caller can say where it goes rather than refusing in silence.
   if (ext(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])) return ['audio']
@@ -62,10 +68,13 @@ export function explainDrop(name, tried) {
   if (/\.png$/i.test(n)) {
     return `Could not read ${short} as a heightmap or a preset.`
   }
+  if (/\.cover\.json$/i.test(n)) {
+    return `${short} is named like a cover plate but does not read as one. Cut a fresh one with scripts/embed-window.js.`
+  }
   if (/\.(jpe?g|webp|gif|bmp|avif)$/i.test(n)) {
     return `${short} is not a heightmap — those are PNG or GeoTIFF. For a photographic texture over the terrain, use Texture under Terrain Style.`
   }
-  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX or GeoJSON overlay, or a preset — the JSON from Preset ⬇, or any PNG or SVG this app exported.`
+  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX or GeoJSON overlay, a land cover plate, or a preset — the JSON from Preset ⬇, or any PNG or SVG this app exported.`
 }
 
 /**

@@ -183,7 +183,7 @@ export function maskHasHoles(mask) {
  * when a style slider moves, so the worker caches it across rebuilds rather than
  * repeating the most expensive step in the pipeline on every drag tick.
  */
-export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null) {
+export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, preBlurred = null, cover = null) {
   const { resolution: scl, blurRadius, gridOffsetX, gridOffsetY, blackPoint, whitePoint, elevScale } = p
   // `??` is lazy, so the full-resolution mask scan only runs when this call is
   // the one doing the blur — in the worker `preBlurred` is always supplied, and
@@ -219,6 +219,33 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
         grid[r * cols + c] = norm; gridMask[r * cols + c] = 1
         if (norm < minBrightness) minBrightness = norm
         if (norm > maxBrightness) maxBrightness = norm
+      }
+    }
+  }
+
+  // The cover, carried onto the grid by the same subsample the elevation took.
+  //
+  // Nearest, and deliberately so: a class index is a name, not a quantity, and
+  // the average of "water" and "forest" is not a third material. It rides on the
+  // grid rather than being resampled per layer because every consumer — the
+  // masks, the Cover mode, the panel's per-class statistics — wants exactly this
+  // array, and building it once is the difference between free and thirty-odd
+  // times per rebuild.
+  let gridClass = null, gridPlate = null
+  if (cover?.labels && cover.width === imageWidth && cover.height === imageHeight) {
+    gridClass = new Uint8Array(rows * cols)
+    if (cover.plate) gridPlate = new Uint8Array(rows * cols * 3)
+    for (let r = 0; r < rows; r++) {
+      const py = r * scl + lineOff
+      for (let c = 0; c < cols; c++) {
+        const src = py * imageWidth + (c * scl + peakOff)
+        const dst = r * cols + c
+        gridClass[dst] = cover.labels[src]
+        if (gridPlate) {
+          gridPlate[dst * 3] = cover.plate[src * 3]
+          gridPlate[dst * 3 + 1] = cover.plate[src * 3 + 1]
+          gridPlate[dst * 3 + 2] = cover.plate[src * 3 + 2]
+        }
       }
     }
   }
@@ -260,6 +287,16 @@ export function buildTerrain(rawPixels, nodataMask, imageWidth, imageHeight, p, 
 
   return {
     grid, gridMask, rows, cols, scl,
+    // Land cover on the same lattice as `grid`, or null when no plate is
+    // loaded. Every path that reads them treats null as "no cover", so the
+    // whole feature is absent rather than empty when there is no file.
+    gridClass, gridPlate,
+    // The class table travels with the grid rather than through the parameter
+    // bus, because it is a fact about the loaded file and not a setting: a
+    // preset carrying one window's colours onto another window's classes would
+    // be silently wrong. A layer that wants its own ink gets it the ordinary
+    // way, through `color<Mode>`.
+    classColors: cover?.classColors ?? null,
     // Does the grid have holes at all? Every mask-aware path is a cost the
     // ordinary solid raster should not pay, and the builders have no cheap way
     // to find out for themselves. Answered as a by-product of the scan above,

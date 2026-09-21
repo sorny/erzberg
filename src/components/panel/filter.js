@@ -15,6 +15,20 @@ import { createContext } from 'react'
 
 export const SectionFilter = createContext(null)
 
+/**
+ * The loaded land-cover plate, for the same reason and on the same terms.
+ *
+ * Every draw mode carries a class mask, and the control for it lives in the one
+ * shared `ModeStyleOverride` that all thirty-four mode sections render. The
+ * plate is a single value that control needs and no call site has, so threading
+ * it as a prop would be thirty-four edits to hand every section the same object.
+ *
+ * `null` is the ordinary state — no plate loaded — and the control renders
+ * nothing at all in that case, so a panel that has never seen a cover file looks
+ * exactly as it always did.
+ */
+export const CoverPlate = createContext(null)
+
 /** Does a section survive the current filter? Exported so the panel can count. */
 export function sectionMatches(title, terms, q) {
   return !q || `${title} ${terms || ''}`.toLowerCase().includes(q)

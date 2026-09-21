@@ -284,6 +284,20 @@ function citationName(gk) {
   return s.length > 64 ? s.slice(0, 63) + '…' : s
 }
 
+/**
+ * Is this raster a stack of embedding bands rather than a surface?
+ *
+ * Exported so the rule can be held to its own test. It is deliberately narrow:
+ * an RGB plate is three bands and a stack of DEM epochs is a handful of floats,
+ * and both are legitimate things to open on band 0. Eight or more *signed
+ * 8-bit* samples is not elevation under any encoding this app supports, and is
+ * exactly the shape of a satellite embedding.
+ */
+export function isEmbeddingCube(samples, bitsPerSample, sampleFormat) {
+  // SampleFormat 2 is signed integer, per TIFF 6.0.
+  return samples >= 8 && bitsPerSample?.[0] === 8 && sampleFormat?.[0] === 2
+}
+
 async function loadGeoTiffPixels(file) {
   const { fromArrayBuffer } = await import('geotiff')
   const arrayBuffer = await file.arrayBuffer()
@@ -291,9 +305,38 @@ async function loadGeoTiffPixels(file) {
   const image  = await tiff.getImage()
   let width  = image.getWidth()
   let height = image.getHeight()
-  // Band 0 only. Without `samples`, geotiff decodes and allocates every band in
-  // the file — free on the single-band DEMs this is aimed at, and three times the
-  // peak allocation on an RGB-packed raster, none of which is ever read.
+  /*
+   * Band 0, and a guard for the file that makes band 0 a lie.
+   *
+   * Reading one sample is the point: without `samples`, geotiff decodes and
+   * allocates every band in the file — free on the single-band DEMs this is
+   * aimed at, and three times the peak allocation on an RGB-packed raster, none
+   * of which is ever read.
+   *
+   * It is right for a DEM and free for an RGB plate, and it is silently wrong
+   * for a *data cube*: a 64-band satellite embedding
+   * loads without complaint and renders band `A00` as if it were ground. That
+   * picture is not an error anywhere downstream — it has a range, it has relief,
+   * it takes contours — so the app would draw a confident landscape out of one
+   * arbitrary axis of a machine-learned description, and nothing on screen would
+   * say so.
+   *
+   * The test is the shape of such a file rather than the band count alone: a
+   * three-band RGB raster and a handful of stacked DEM epochs are both
+   * legitimate things to open on band 0. Eight or more signed 8-bit samples is
+   * not elevation under any encoding this app supports.
+   */
+  const samples = image.getSamplesPerPixel()
+  // `fileDirectory` resolves some tags lazily, so the plain property is
+  // undefined on exactly the files this has to recognise.
+  const tag = (k) => image.fileDirectory[k] ?? image.fileDirectory.getValue?.(k)
+  if (isEmbeddingCube(samples, tag('BitsPerSample'), tag('SampleFormat'))) {
+    throw new Error(
+      `This file carries ${samples} bands of 8-bit data, which is an embedding cube rather than ` +
+      `elevation — band 0 of it is not a heightmap. Reduce it first with scripts/embed-window.js, ` +
+      `which writes a terrain .tif and a land cover plate from the same window.`)
+  }
+
   const rasters = await image.readRasters({ samples: [0] })
   let band      = rasters[0]
   // The file's declared NoData value, which the sentinel list cannot stand in

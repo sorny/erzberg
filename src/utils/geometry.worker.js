@@ -39,6 +39,13 @@ let src = null
 // Cached vector sources — replaced only by a message carrying `vectorData`.
 let vectorSrc = null
 
+// Cached land cover, on the raster's own pixel grid. Cached for the raster's
+// reason rather than the vectors': it is a byte per source pixel, and a style
+// slider does not change what the ground is. `null` is a meaningful value here —
+// it is how the main thread says the plate was unloaded — so the message carries
+// the key explicitly and `undefined` is what means "unchanged".
+let coverSrc = null
+
 // Last vector build, and the signature it was built from. `geo` is not retained
 // after posting (its buffers are transferred), so a hit means "the main thread's
 // copy is still correct", not "here it is again".
@@ -95,7 +102,7 @@ function blurredSource(p) {
 }
 
 self.onmessage = (e) => {
-  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, p, _gen } = e.data
+  const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, coverData, p, _gen } = e.data
 
   // A message with pixels refreshes the cache; one without reuses it.
   // `hasNoData` is scanned once per raster, not per rebuild: the mask is always
@@ -104,8 +111,12 @@ self.onmessage = (e) => {
   if (heightmapPixels) {
     src = { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
             hasNoData: maskHasHoles(nodataMask) }
+    // A new raster orphans the cover: the plate was aligned to the old pixel
+    // grid, and the main thread sends the replacement (or null) alongside.
+    coverSrc = null
     dataGen++
   }
+  if (coverData !== undefined) coverSrc = coverData
   if (vectorData !== undefined) {
     vectorSrc = vectorData
     dataGen++
@@ -118,7 +129,7 @@ self.onmessage = (e) => {
   try {
     const terrain = buildTerrain(
       src.heightmapPixels, src.nodataMask, src.heightmapWidth, src.heightmapHeight, p,
-      blurredSource(p)
+      blurredSource(p), coverSrc
     )
     const lineGeo = buildLineGeometry(terrain, p)
     const surfaceGeo = buildSurfaceGeometry(terrain, p)
@@ -169,6 +180,11 @@ self.onmessage = (e) => {
     xfer(terrain.grid)
     xfer(terrain.gridMask)
     xfer(terrain.gridSlopes)
+    // Safe to transfer, unlike the cover cache these were derived from:
+    // buildTerrain allocates both fresh per message, so handing the buffers
+    // over does not detach anything this worker still needs.
+    xfer(terrain.gridClass)
+    xfer(terrain.gridPlate)
 
     // `vectorGeo` omitted entirely on a cache hit — null would be
     // indistinguishable from "this raster has no vector layers", and the two

@@ -12,7 +12,7 @@ import { frameDelta } from '../utils/frameClock'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { captureAndExportPNG } from '../utils/pngExport'
-import { osmAttribution } from '../utils/osmFetch'
+import { workAttribution } from '../utils/attribution'
 import { presetComment, presetToText } from '../utils/presetFile'
 import { measureScale, sheetMarks } from '../utils/sheetMarks'
 import { groundPixelMetres } from '../utils/geoCoords'
@@ -401,7 +401,7 @@ export function Scene({
       })
 
       captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha,
-        exportBaseName, osmAttribution(p.vectorLayers),
+        exportBaseName, workAttribution(p),
         exportPreset ? presetToText(exportPreset) : null,
         marks ? { ...marks, color: p.frameMarkColor ?? '#000000' } : null)
     } finally {
@@ -430,8 +430,9 @@ export function Scene({
     const { width, height } = gl.domElement
     const groupMatrix = groupRef.current ? groupRef.current.matrixWorld.clone() : null
     // weight/opacity/dash live in params (not the worker geometry) — resolve per layer id.
-    // ODbL: if OpenStreetMap data is on screen, the credit goes into the file.
-    const attribution = osmAttribution(p.vectorLayers)
+    // Licences attach to the output, not the tool: whatever is in this picture
+    // and owes a credit gets one written into the file. See utils/attribution.js.
+    const attribution = workAttribution(p)
     const lineStyles = Array.isArray(lineGeo)
       ? Object.fromEntries(lineGeo.map(l => [l.id, layerStyle(l.id, p)]))
       : {}

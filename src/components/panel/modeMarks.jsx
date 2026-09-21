@@ -362,6 +362,22 @@ const MARKS = {
       </g>
     </g>
   ),
+  // Parcels of cover, outlined. The boundaries cut across the relief rather
+  // than following it, which is the whole difference between this and Mineral.
+  cover: (
+    <g>
+      <g stroke="none" fill="currentColor">
+        <path d="M1 1.5 L7.5 1.5 L9.5 5.5 L5 8.5 L1 6.5 Z" opacity="0.8" />
+        <path d="M7.5 1.5 L14 1.5 L15.5 4 L9.5 5.5 Z" opacity="0.3" />
+        <path d="M14 1.5 L21 1.5 L21 5 L15.5 4 Z" opacity="0.6" />
+        <path d="M9.5 5.5 L15.5 4 L21 5 L21 11.5 L11 11.5 Z" opacity="0.18" />
+        <path d="M1 6.5 L5 8.5 L11 11.5 L1 11.5 Z" opacity="0.45" />
+      </g>
+      <g fill="none" stroke="currentColor" strokeWidth="0.7" opacity="0.9" vectorEffect="non-scaling-stroke">
+        <path d="M7.5 1.5 L9.5 5.5 L5 8.5 L1 6.5 M9.5 5.5 L15.5 4 L14 1.5 M15.5 4 L21 5 M9.5 5.5 L11 11.5 M5 8.5 L11 11.5" />
+      </g>
+    </g>
+  ),
 }
 
 export function ModeMark({ kind }) {

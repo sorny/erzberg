@@ -19,10 +19,15 @@
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
 The app renders it as 3D line art, structural relief or an architectural sketch.
-Thirty-one independent draw modes do the work. They range from surveyor's
+Thirty-four independent draw modes do the work. They range from surveyor's
 marks such as hachures and form lines to a quantised tilemap. Others are a
 flashbulb with a cast shadow, and tracks that something with mass laid down a
-face. Five of them are about colour rather than about mark-making.
+face. Six of them are about colour rather than about mark-making.
+
+Every mode reads the shape of the ground. Load a **land cover plate** and they
+can read what the ground *is* as well: each layer draws on the classes you pick
+and skips the rest, so hachures stop at the treeline and scree marks stay on
+scree. See [Land cover](#land-cover) below.
 
 Contours letter their own heights. The app sets the number into a break in the
 line, at the angle of the line, in the ink of the line.
@@ -147,7 +152,7 @@ of the control that it comes from.
 
 **The head counts what you composed.** One standing line under the wordmark:
 `4 marks · 3 inks · 2 layers`. The ink count is a count of pens. Two modes in
-the same black are one pen, and a separation is three or five. Thirty-one draw
+the same black are one pen, and a separation is three or five. Thirty-four draw
 modes compose freely, and this is the line that says how many are drawing
 without your opening anything.
 
@@ -163,8 +168,8 @@ the renderer runs. This is what makes a control findable before you know where
 it is. Jitter changes the source, so jitter is in Source. Hydraulic Erosion used
 to sit at position 48, immediately before Export.
 
-**Thirty-one modes on one screen.** The Draw Modes index opens the Marks stage.
-It is a grid of the thirty-three marks themselves — the same glyphs the section
+**Thirty-four modes on one screen.** The Draw Modes index opens the Marks stage.
+It is a grid of the thirty-four marks themselves — the same glyphs the section
 headers carry. A lit tile is drawing. Click one to switch it on, and the panel
 opens its section and scrolls to it. Click a lit one to switch it off, and the
 panel stays where it is. The tile and the section switch are two views of one
@@ -183,17 +188,22 @@ setting, so they cannot disagree.
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
 | **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
+| **Cover plate** | A `.cover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
 
 **Drag and drop.** Drop a file anywhere on the window and the app routes it by
 what it is. A GeoTIFF becomes the terrain. A GPX or GeoJSON becomes an overlay.
-A preset — the JSON from `Preset ⬇`, or any PNG or SVG this app exported —
-restores the look and leaves the ground alone.
+A cover plate becomes the land cover. A preset — the JSON from `Preset ⬇`, or
+any PNG or SVG this app exported — restores the look and leaves the ground
+alone.
 
-A PNG is the one file that could be either, because it is both the heightmap
-format and an export format. The app decides from the bytes: every plate it
-writes carries the whole parameter set in a `tEXt` chunk, so a PNG with that
-chunk is a preset and a PNG without one is terrain. Nothing is guessed and no
-dialog asks.
+Two extensions are ambiguous, and both are decided from the bytes rather than
+guessed. A **PNG** is both the heightmap format and an export format: every
+plate the app writes carries the whole parameter set in a `tEXt` chunk, so a PNG
+with that chunk is a preset and a PNG without one is terrain. A **`.json`** is
+three things — a preset, GeoJSON, or a cover plate — and each answers for
+itself: a cover plate declares its own `kind`, a preset holds one of the six
+parameter groups, and no GeoJSON does either. Nothing is guessed and no dialog
+asks.
 
 A file with no route says where it does go. Drop an MP3 and the banner points at
 Soundscapes; drop a JPEG and it points at Texture.
@@ -265,6 +275,82 @@ because that query needs the *inverse* projection.
 
 ---
 
+## Land cover
+
+Every draw mode in this app reads the *shape* of the ground — slope, curvature,
+aspect, how light falls on it. So two pieces of ground at the same gradient get
+the same mark, whatever is standing on them. A cover plate fixes that. It gives
+every pixel a class, and a class is a fact the heightmap does not contain.
+
+**Cut a plate first.** The classes come from AlphaEarth Foundations, Google
+DeepMind's satellite embedding: 64 numbers describing every 10 m of the planet,
+published for each year from 2017 to 2024.
+
+Already have a GeoTIFF? Point the script at it. The extent, the projection and
+the pixel grid all come from the file, and only the plate is written:
+
+```bash
+node scripts/embed-window.js --dem my-terrain.tif --classes 6
+```
+
+Otherwise name a place, and the script writes the matching terrain too:
+
+```bash
+node scripts/embed-window.js --place "Eisenerz" --km 4 --classes 6
+```
+
+Either way the plate and the ground under it are aligned by construction. Load
+`<name>.tif` as terrain if the script wrote one, then drop `<name>.cover.json`
+on the window. The Land Cover section prints the exact command for whatever is
+already on screen, so the extent never has to be typed back in.
+
+**Why a script and not a button.** The app promises that it asks no third party
+for anything without a press, and asks with no key and no account. The
+embeddings break the second promise on both routes that exist. Earth Engine
+wants an account, an OAuth flow and a Cloud project. The public bucket is open
+to anyone — a ranged read needs no credential at all — but it answers with no
+CORS header, so a browser refuses it and only a proxy would help. A proxy is a
+server. The reduction therefore happens on your machine, once, and the app loads
+the result: one byte per pixel instead of the sixty-four it came from.
+
+**The classes carry names, and the evidence for them.** A cluster cannot say
+what it is, so the script asks OpenStreetMap which landcover polygons cover the
+window and tallies what each class falls inside: *Quarry · gentle — 90% quarry*,
+*Forest · steep — 54% forest, 36% quarry*. A name needs a majority to be
+printed, repeated names are parted by the terrain word that distinguishes them,
+and the runner-up is shown so you can see which boundary to distrust. Where
+nothing is mapped, a class is described by its slope and height instead.
+
+**You can see where they are.** The section draws the plate flat, at its own
+grid, in the classes' own colours. Point at the map and it names the class under
+the cursor; point at a legend row and it lights that class up on the map.
+
+**Three things a plate buys you.**
+
+*Masks.* Every layer takes a row of class swatches. Pick the classes it may
+draw on and it skips the rest. This works for all thirty-four modes, including
+the ones written years before land cover existed, because a mask thins the same
+terrain grid every builder already reads.
+
+*Ink by land class.* One press deals a mark to each class and masks each layer
+to its own — broken rock at the top, tone and stipple at the bottom, ordered by
+the mean slope of each class. It is a starting point. Re-point any of them
+afterwards.
+
+*The Land cover mode.* A colour plate inked from the classes themselves, either
+as the continuous imagery or as one flat colour per class.
+
+The plate states its own extent and projection, and it is refused with a reason
+if it does not cover the same ground as the raster. A misaligned cover still
+renders and still looks deliberate, which is exactly why it is not allowed to
+load.
+
+The dataset is CC-BY 4.0. The credit travels inside the plate file and into any
+export that draws from it.
+→ [Land cover](docs/Land-Cover.md)
+
+---
+
 ## Edit Mode
 
 <img src="docs/images/edit-mode.png" alt="Edit Mode: a lasso selection with editable points and a feathered edge over the heightmap">
@@ -330,10 +416,11 @@ and hypsometric tinting. → [Draw mode mathematics](docs/Draw-Modes.md)
 | Outrun | An additive halo under a near-white filament — where contours crowd, the halos sum and the ground lifts |
 | Riso | Three spot inks screened at 15°, 45° and 75°, multiplied together. Registration and a coverage cap decide which press you are on |
 | Mineral | Five materials classified by slope and curvature, each with a flat colour and its own grain |
+| Land cover | The classes of a loaded cover plate, inked either as the imagery they came from or as one flat colour each. The only mode that reads what the ground *is* rather than what shape it is |
 | Watershed | Every cell labelled with the sink it drains to, one flat ink per catchment. The divides are ridgelines |
 
-The three modes that block colour are Indexed, Mineral and Watershed. Each of
-them leaves the SVG as closed filled paths, one per ink. Each ink gets its own
+The four modes that block colour are Indexed, Mineral, Land cover and
+Watershed. Each of them leaves the SVG as closed filled paths, one per ink. Each ink gets its own
 Inkscape pen layer, named with its hex. Select a layer and run a hatch fill on
 it. A catchment with a lake in it keeps the lake: the outer ring and its holes
 are subpaths of one path under the even-odd rule. Switch **Occlusion** off to
@@ -409,7 +496,7 @@ return to it.
 **Anaglyph** is a modifier rather than a mode. Switch it on and every layer is
 drawn twice — offset sideways and inked in two filter colours — so the plate
 stands up off the paper through red/cyan glasses. It works on whatever is
-already drawing, which makes all thirty-three modes new at once.
+already drawing, which makes all thirty-four modes new at once.
 
 The depth is real parallax, not a double image: the offset is a lateral
 translation in world space, and under the perspective camera a near mark moves
@@ -529,7 +616,7 @@ density and harmony as layers over one timeline.
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer projection with fill-based terrain occlusion. One named Inkscape or Illustrator layer per draw mode and per vector layer. Indexed, Mineral and Watershed export as **filled polygons**, one closed path per ink in its own pen layer, ready for a hatch fill. Dash patterns are faithful. The export shows progress and you can cancel it. A dense plate takes real time, and the page stays responsive throughout |
+| **SVG** | Software Z-buffer projection with fill-based terrain occlusion. One named Inkscape or Illustrator layer per draw mode and per vector layer. Indexed, Mineral, Land cover and Watershed export as **filled polygons**, one closed path per ink in its own pen layer, ready for a hatch fill. Dash patterns are faithful. The export shows progress and you can cancel it. A dense plate takes real time, and the page stays responsive throughout |
 | **PNG** | 4K with MSAA, trimmed to content |
 | **PNG α** | Transparent background |
 | **STL** | Watertight mesh for 3D printing. The export shows progress and you can cancel it, like the SVG export. A vector layer with **STL ribbon** on gets a second solid for multicolour printing. The default is on for GPX and off for OSM |
@@ -695,6 +782,7 @@ The app idles quietly and stays responsive under load.
 - [Edit Mode: cropping and selections](docs/Edit-Mode.md)
 - [Georeferencing: projections, vector layers, OpenStreetMap, elevation](docs/Georeferencing.md)
 - [Hydraulic erosion algorithm](docs/Hydraulic-Erosion.md)
+- [Land cover: classes, masks, and the AlphaEarth pipeline](docs/Land-Cover.md)
 - [Murmurations: boids over the terrain](docs/Murmurations.md)
 - [Soundscapes: audio → terrain](docs/Soundscapes.md)
 - [Changelog](CHANGELOG.md)

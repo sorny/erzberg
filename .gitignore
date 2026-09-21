@@ -13,3 +13,10 @@ CLAUDE.md
 tests/testdata/benchmark.tif
 tests/testdata/geotiff.tif
 tests/_visual.spec.js
+
+# Cached AlphaEarth export origins, rebuilt on demand by scripts/embed-window.js
+scripts/.ae-index/
+
+# Cover plates are generated output — cut one with scripts/embed-window.js
+# rather than committing it. They run to megabytes.
+*.cover.json

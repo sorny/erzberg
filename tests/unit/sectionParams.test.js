@@ -39,6 +39,11 @@ const TITLES = Object.keys(SECTION_TERMS)
 const ACTIONS = [
   'Presets', 'Draw Modes', 'Analysis', 'Fetch Terrain', 'Hydraulic Erosion',
   'Soundscapes', 'Vector Layers', 'Text',
+  // Land Cover holds a loaded file and the action that deals marks from it, the
+  // same shape as Vector Layers. The per-layer `coverMask*` keys it gives
+  // meaning to are parameters, but they belong to the mode sections that render
+  // them, not to this one.
+  'Land Cover',
 ]
 
 describe('the partition', () => {

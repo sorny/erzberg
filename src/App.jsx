@@ -40,13 +40,15 @@ import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
-import { clearOsmCache, osmAttribution } from './utils/osmFetch'
+import { clearOsmCache } from './utils/osmFetch'
+import { workAttribution } from './utils/attribution'
 import { GROUP_OF } from './params'
 
 /** Every tweakable key, from the index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, readPresetFile } from './utils/presetFile'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
+import { alignCover, classBit, decodeCover, parseCover, suggestInks } from './utils/coverPlate'
 import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
@@ -342,6 +344,8 @@ export default function App() {
   const removeVectorSource = useStore((s) => s.removeVectorSource)
   const clearVectorSources = useStore((s) => s.clearVectorSources)
   const setVectorSources   = useStore((s) => s.setVectorSources)
+  const cover              = useStore((s) => s.cover)
+  const setCover           = useStore((s) => s.setCover)
 
   // The style half of the vector layers. Coordinates live in the store; these
   // are params like any other, which is what keeps recolouring one off the
@@ -758,6 +762,50 @@ export default function App() {
   const dismissToast = useCallback(() => setToast(null), [])
 
   /**
+   * Takes a cover plate, once it has been checked against the ground it claims.
+   *
+   * The check happens here because this is where the raster's extent is known,
+   * and it throws rather than shrugging when the two do not match. That is
+   * deliberate: a plate laid over the wrong ground still renders, still looks
+   * like a considered drawing, and is wrong in a way nothing downstream can
+   * detect. Refusing it at the door is the only place the mistake is visible.
+   */
+  const adoptCover = useCallback((decoded, filename) => {
+    // Checked here and kept in the plate's *own* grid. Laying it onto the
+    // raster is a derivation rather than a decision — a crop in Edit Mode
+    // changes the raster under it, and a plate flattened onto the old
+    // dimensions at load time would go quietly inert the moment that happened.
+    // See `coverGrid` below.
+    alignCover(decoded, {
+      width: heightmapWidth, height: heightmapHeight,
+      bbox: geoTiffBbox, crs: geoTiffCRS,
+    })
+    setCover({
+      ...decoded,
+      classColors: decoded.classes.map((c) => c.color),
+      filename,
+    })
+    const pct = decoded.variance != null ? `, ${Math.round(decoded.variance * 100)}% of variance` : ''
+    notify(`${decoded.classes.length} land cover classes from ${filename}${pct}`)
+  }, [heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS, setCover, notify])
+
+  /** Opens a plate through the file dialog, for people who do not drag files. */
+  const loadCoverFromPicker = useCallback(() => {
+    const input = Object.assign(document.createElement('input'),
+      { type: 'file', accept: '.json,application/json' })
+    input.onchange = async (e) => {
+      const file = e.target.files?.[0]
+      if (!file) return
+      try {
+        const obj = parseCover(await file.text())
+        if (!obj) throw new Error(`${file.name} is not a cover plate. Cut one with scripts/embed-window.js.`)
+        adoptCover(await decodeCover(obj), file.name)
+      } catch (err) { showError(err.message) }
+    }
+    input.click()
+  }, [adoptCover, showError])
+
+  /**
    * "Nothing here came from the user" — hold the next session write.
    *
    * The opening preset is applied by the panel as ordinary state changes, which
@@ -939,11 +987,12 @@ export default function App() {
     /*
      * Everything, which used to mean six state objects.
      *
-     * The vectors and the free text were not among them, so a reset left a
-     * fetched province of roads, an uploaded track and a typed title sitting on
-     * top of bare defaults — the one state the button's own label says it does
-     * not produce. They are as much "settings" as a slider is: they came from
-     * the panel, they are what is on screen, and nothing else clears them.
+     * The vectors, the free text and the cover plate were not among them, so a
+     * reset left a fetched province of roads, an uploaded track, a typed title
+     * and a loaded set of land cover classes sitting on top of bare defaults —
+     * the one state the button's own label says it does not produce. They are
+     * as much "settings" as a slider is: they came from the panel, they are
+     * what is on screen, and nothing else clears them.
      *
      * The Overpass response cache is deliberately *not* cleared with them, which
      * is where this differs from `dropVectors`. That runs when a new raster is
@@ -953,7 +1002,7 @@ export default function App() {
      */
     tagHistory('Reset all')
     const before = { terrain, style, points, view, gradientStops, bgGradientStops,
-                     vectorLayers, vectorSources, textLayers }
+                     vectorLayers, vectorSources, textLayers, cover }
     setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
     setStyle(STYLE_DEF)
     setPoints(POINTS_DEF)
@@ -964,6 +1013,11 @@ export default function App() {
     clearVectorSources()
     setVectorError(null)
     setTextLayers([])
+    // The cover plate goes with them, and for their reason rather than the
+    // raster's: it is optional data loaded from the panel, every `coverMask*`
+    // the reset just cleared pointed at it, and leaving it would put a live
+    // plate on top of bare defaults.
+    setCover(null)
     // Clearing alone did nothing: the six setState calls above re-run the save
     // effect, which wrote the defaults straight back 400 ms later. The skip is
     // what makes the clear real.
@@ -986,10 +1040,12 @@ export default function App() {
         setVectorLayers(before.vectorLayers)
         setVectorSources(before.vectorSources)
         setTextLayers(before.textLayers)
+        setCover(before.cover)
       },
     })
   }, [terrain, style, points, view, gradientStops, bgGradientStops,
       vectorLayers, vectorSources, textLayers, clearVectorSources, setVectorSources,
+      cover, setCover,
       heightmapWidth, heightmapHeight, baseZoom, notify, tagHistory])
 
   /**
@@ -1384,6 +1440,16 @@ export default function App() {
         if (r) afterGeoTiff(r)
         return
       }
+      if (route === 'cover') {
+        const obj = parseCover(await file.text().catch(() => ''))
+        if (!obj) continue
+        try {
+          adoptCover(await decodeCover(obj), file.name)
+        } catch (err) {
+          showError(err.message)
+        }
+        return
+      }
       if (route === 'gpx' || route === 'geojson') {
         const parse = route === 'gpx' ? gpxToSource : parseGeoJson
         try {
@@ -1399,7 +1465,7 @@ export default function App() {
     }
     showError(explainDrop(file.name, routes))
   }, [applyPreset, load, loadGeoTiff, afterRaster, afterGeoTiff, adoptVectorSource,
-      soundscape, showError, notify])
+      adoptCover, soundscape, showError, notify])
 
   /**
    * The highlight, and the two events that are harder than they look.
@@ -1458,17 +1524,21 @@ export default function App() {
    * a file and said nothing at all.
    */
   /**
-   * The ODbL credit this session owes, or null.
+   * Every credit this session owes, or null.
+   *
+   * ODbL for OpenStreetMap features and CC-BY for a land cover plate, both
+   * decided by whether the data is in *this* picture rather than by whether it
+   * is loaded. `utils/attribution.js` owns that judgement for all four
+   * exporters, because asking it four ways is how the SVG came to be the only
+   * one that credited anything.
    *
    * Hoisted rather than computed inside the toggle so the recorder and the
-   * notice cannot disagree about whether one is owed — they are the same
-   * answer to the same question, and asking twice is how the SVG came to be
-   * the only exporter that credited anything.
+   * notice cannot disagree about whether one is owed.
    */
   // `style.vectorLayers` was the wrong address: the layer records are their own
   // state, and STYLE_DEF has never held a key by that name — so this asked an
   // undefined for its contents and every recording went out uncredited.
-  const osmCredit = osmAttribution(vectorLayers)
+  const workCredit = workAttribution({ vectorLayers, style, cover })
 
   const handleWebmState = useCallback((active) => {
     setWebmActive(active)
@@ -1480,18 +1550,18 @@ export default function App() {
     if (!canvas) return
     if (isRecording()) {
       stopWebM(handleWebmState)
-    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName, osmCredit)) {
+    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName, workCredit)) {
       // Said out loud as well as written into the file. A Matroska tag is read
       // by ffprobe and by nothing a viewer is likely to open, so for video —
       // unlike an SVG or a PNG somebody edits — the metadata alone is a weak
       // way to make anyone aware of where the data came from.
-      notify(osmCredit
-        ? `Recording — ${webmDuration}s, or press 5 to stop. Contains OpenStreetMap data: credit ${osmCredit} when you publish it.`
+      notify(workCredit
+        ? `Recording — ${webmDuration}s, or press 5 to stop. Credit ${workCredit.replace(/\n/g, ' · ')} when you publish it.`
         : `Recording — ${webmDuration}s, or press 5 to stop.`)
     } else {
       notify('Could not start recording — this browser refused the canvas stream.')
     }
-  }, [webmDuration, exportBaseName, notify, handleWebmState, osmCredit])
+  }, [webmDuration, exportBaseName, notify, handleWebmState, workCredit])
 
   // ── Canvas pixel ratio ────────────────────────────────────────────────────
   // The canvas fills the window, so its CSS size is the window size. Supersampling
@@ -1547,6 +1617,36 @@ export default function App() {
   }, [style.hillshadeAlmanac, style.hillshadeDate, style.hillshadeHour, style.hillshadeZone,
       style.hillshadeLat, style.hillshadeLon, geoTiffBbox, geoTiffCRS])
 
+  /**
+   * The plate laid onto the raster as it is *now*.
+   *
+   * Derived rather than stored, because the raster moves under it: an Edit Mode
+   * crop changes both the dimensions and the extent, and the aligned arrays have
+   * to follow or every mask silently stops applying — the picture stays
+   * plausible and is simply no longer stencilled, which is the worst way for
+   * this to fail.
+   *
+   * Re-cut on the plate, the dimensions and the extent, and nothing else. The
+   * cost is one nearest-neighbour pass over the raster, and none of those four
+   * moves during a slider drag.
+   */
+  const { grid: coverGrid, error: coverError } = useMemo(() => {
+    if (!cover) return { grid: null, error: null }
+    try {
+      const aligned = alignCover(cover, {
+        width: heightmapWidth, height: heightmapHeight,
+        bbox: geoTiffBbox, crs: geoTiffCRS,
+      })
+      return { grid: { ...aligned, classColors: cover.classColors }, error: null }
+    } catch (err) {
+      // Surfaced in the Land Cover section rather than thrown: the plate loaded
+      // cleanly once, so this is the raster having changed out from under it,
+      // and that is a thing to report where the plate is rather than a failure
+      // to render.
+      return { grid: null, error: err.message }
+    }
+  }, [cover, heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS])
+
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
   //
@@ -1583,6 +1683,11 @@ export default function App() {
     vectorLayers, textLayers, vectorIdentify, geoTiffBbox, geoTiffCRS,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
     profileMode,
+    // Data rather than settings, carried on the bus for the same reason
+    // `vectorLayers` and `geoTiffBbox` are: the exporters run off `p` and the
+    // credit a plate carries has to reach them, and the geometry worker runs
+    // off `p` and the classes have to reach that.
+    cover, coverGrid,
   }
 
   // Surface normals and UVs exist only for the terrain shader. STL export
@@ -1635,6 +1740,46 @@ export default function App() {
   // features, no raster and no worker — only a face and a place to stand.
   const { lineGeo, overflowed: textOverflow } =
     useTextLayers(contourLabelled, textLayers, terrainData, view.tilt, view.rotation)
+
+  /**
+   * One mark per land-cover class, in one press.
+   *
+   * The sheet this imitates is older than the app: a surveyor does not shade
+   * scree and forest with the same stroke, because they are not the same thing.
+   * Until now erzberg could not make that distinction at all — every mode chose
+   * its mark from gradient, so identical slopes got identical marks whatever
+   * was standing on them.
+   *
+   * The ordering is by measured mean slope and nothing else. It would be easy to
+   * label the classes "forest" and "water" and assign marks from that, and it
+   * would be a guess: the plate's classes are unnamed and its colour axes carry
+   * no fixed meaning. Slope is a number this app already computed. Every
+   * assignment it makes is a starting point the user re-points afterwards, which
+   * is why this deals marks rather than hard-wiring them.
+   */
+  const inkByClass = useCallback(() => {
+    if (!cover?.classes?.length || !terrainData?.gridClass) return
+    const { gridClass, gridSlopes, gridMask } = terrainData
+    const count = cover.classes.length
+    const sum = new Float64Array(count), seen = new Int32Array(count)
+    for (let i = 0; i < gridClass.length; i++) {
+      const c = gridClass[i]
+      if (!gridMask[i] || c >= count) continue
+      sum[c] += gridSlopes[i]; seen[c]++
+    }
+    const meanSlope = {}
+    for (const c of cover.classes) meanSlope[c.index] = seen[c.index] ? sum[c.index] / seen[c.index] : 0
+
+    const plan = suggestInks(cover.classes, meanSlope)
+    const patch = {}
+    for (const { mode, classIndex, color } of plan) {
+      patch[`enabled${mode}`] = true
+      patch[`coverMask${mode}`] = classBit(classIndex)
+      patch[`color${mode}`] = color
+    }
+    setStyle((s) => ({ ...s, ...patch }))
+    notify(`${plan.length} layers inked by land cover class, steepest first`)
+  }, [cover, terrainData, notify])
 
   // A preflight describes one drawing seen from one camera. Both of those are
   // objects that change identity whenever anything inside them does, which makes
@@ -1956,6 +2101,8 @@ export default function App() {
         onRemoveVectorLayer={removeVectorLayer}
         onRemoveVectorSource={dropVectorSource}
         onAdoptVectorSource={adoptVectorSource}
+        cover={cover} coverError={coverError} onLoadCover={loadCoverFromPicker}
+        onClearCover={() => setCover(null)} onInkByClass={inkByClass}
         onVectorError={setVectorError}
         vectorIdentify={vectorIdentify}
         onVectorIdentify={setVectorIdentify}

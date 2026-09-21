@@ -83,13 +83,19 @@ export function effectiveBounds(edit, srcW, srcH) {
 }
 
 /**
- * Even-odd scanline fill of a closed polygon into `out` (1 = inside).
+ * Even-odd scanline fill of a closed polygon into `out` (`value` = inside).
  *
  * A lasso is just a polygon whose vertices came from a drag, so both tools land
  * here. The closing edge is implicit. Sampling is at pixel centres, which is
  * what keeps a rectangle drawn by hand from gaining a half-pixel fringe.
+ *
+ * `value` defaults to 1, which is every caller in this module — a selection
+ * mask is a boolean. It is a parameter because `scripts/embed-window.js` paints
+ * OpenStreetMap landcover rings with a tag id instead, to find out what each
+ * cover class actually sits on, and an even-odd scanline fill is not an
+ * algorithm worth keeping two copies of.
  */
-function fillPolygon(out, points, b) {
+export function fillPolygon(out, points, b, value = 1) {
   const n = points.length / 2
   const xs = new Float64Array(n)
   for (let row = 0; row < b.h; row++) {
@@ -108,7 +114,7 @@ function fillPolygon(out, points, b) {
     for (let k = 0; k + 1 < count; k += 2) {
       const cx0 = Math.max(0, Math.ceil(spans[k] - b.x - 0.5))
       const cx1 = Math.min(b.w - 1, Math.floor(spans[k + 1] - b.x - 0.5))
-      for (let c = cx0; c <= cx1; c++) out[rowOff + c] = 1
+      for (let c = cx0; c <= cx1; c++) out[rowOff + c] = value
     }
   }
 }

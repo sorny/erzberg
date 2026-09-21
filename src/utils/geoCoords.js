@@ -44,7 +44,11 @@
  * through `gdalwarp -t_srs EPSG:4326` first.
  */
 
-import { sampleBilinear } from './terrain'
+// Explicit extension: `scripts/embed-window.js` loads this module in plain Node
+// to project its window, and Node's ESM resolver does not guess extensions the
+// way the bundler does. Keeping the two in step is what lets the script and the
+// app share one definition of every projection rather than two that can drift.
+import { sampleBilinear } from './terrain.js'
 
 // ── CRS classification ────────────────────────────────────────────────────────
 

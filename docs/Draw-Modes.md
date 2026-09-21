@@ -1,6 +1,11 @@
 # Draw Modes
 
-`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Thirty-one independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
+`erzberg` treats the loaded heightmap as a discrete scalar field $H(x, y)$. Thirty-four independent algorithms extract topographic features from it. Each mode produces its own `LineSegmentsGeometry`. You can style, dash and hypsometrically tint each mode separately.
+
+Thirty-three of them read $H$ and nothing else. The thirty-fourth reads a second
+field entirely — see [Land cover](#land-cover) — and every one of them can be
+stencilled by it without knowing it exists. The mechanism is in
+[docs/Land-Cover.md](Land-Cover.md#how-masking-works).
 
 ---
 
@@ -460,17 +465,22 @@ A Fortune sweep gives exact edges and costs a real data structure. This costs ni
 Crack width is proportional to cell size. Total coverage thus stays roughly constant as the cells open up: fewer boundaries, each one wider. The crazing looks like crazing at any scale instead of a fade. Coverage is thus the job of `width`, not of the cell. The **tone gate** is what stops the whole thing from being wallpaper. The builder draws walls only where the plate is dark enough for a crack, on the same density modes that Stipple offers. The crazing thus pools in the shadows and leaves the highlights clean.
 
 
-## 27–31. Colour modes — Indexed, Outrun, Riso, Mineral, Watershed
+## 27–32. Colour modes — Indexed, Outrun, Riso, Mineral, Watershed, Land cover
 
 Every mode above takes its colour the same way. One scalar goes into one shared
 gradient, and `computeVertexColor` samples it once per vertex. That single
 function is where all colour in the tool comes from, and it is also the ceiling:
-one input, one dimension, one ramp. These five break it in five different places.
+one input, one dimension, one ramp. These six break it in six different places.
 
-Three of them draw **area** rather than line, through the `lids` mesh that
+Four of them draw **area** rather than line, through the `lids` mesh that
 Pillars and Sprite Blocks already use for their caps. Two of them are about the
 **blend** rather than the colour. They are the first line layers in the tool that
 do not composite normally.
+
+Five of the six are the heightmap wearing different clothes — Indexed reads
+elevation and slope, Mineral reads slope and curvature, Watershed reads which
+way water runs. Land cover is the one that is not: it inks a field the heightmap
+does not contain.
 
 ### Indexed
 
@@ -565,6 +575,32 @@ Curvature is taken on a blurred grid, for the reason that Ridge (§9) and
 Curvature (§14) give. A second difference on a raw DEM turns every pixel of
 sensor grain into its own rock type.
 
+### Land cover
+
+The only mode in the tool that reads something other than $H$. A cover plate
+gives every cell a class index, and this inks those classes directly — either
+with the imagery colour of each cell, or with one flat colour per class.
+
+$$
+C(i) = \begin{cases}
+  \text{plate}(i) \cdot g(i) & \text{source} = \text{plate} \\
+  \text{palette}[k(i)] \cdot g(i) & \text{source} = \text{class}
+\end{cases}
+$$
+
+where $k(i)$ is the class at cell $i$ and $g(i)$ is the same per-cell grain hash
+Mineral uses, seeded by the class so two materials that happen to share a tone
+still read as two surfaces.
+
+Both sources deal **regions** by class rather than by colour, and that is what
+keeps the SVG honest. `traceAreaRings` needs areas to hatch; a plate keyed by
+its own per-cell colour would trace one region per cell — a hundred and sixty
+thousand of them on a 400 × 400 window — where the screen shows six.
+
+The mode renders nothing at all without a plate loaded, which is why it carries
+`needsData` in `drawModes.js` and the randomiser skips it: a roll is a pure
+function of its seed and cannot be told whether a file happens to be open.
+
 ### Watershed
 
 Big flat areas of unmixed colour, with hard edges along the divides. The picture
@@ -588,14 +624,14 @@ Two things were needed to make it a map rather than confetti:
 
 ### What the area modes plot
 
-Indexed, Mineral and Watershed draw fills, and a fill is not a stroke. The SVG
-exporter reads the per-vertex colour buffer and never looks at `lids`, so these
-three exported an empty plate.
+Indexed, Mineral, Land cover and Watershed draw fills, and a fill is not a
+stroke. The SVG exporter reads the per-vertex colour buffer and never looks at
+`lids`, so these four exported an empty plate.
 
 The first answer was to make each cell edge where the ink changes a real stroke.
 That is the outline of each *region* rather than of each square: on Watershed
 those edges are the divides, on Mineral the material boundaries, on Indexed the
-band steps. Every cell edge is a wall of grid lines, and a plotter has no use for
+band steps, on Land cover the class boundaries. Every cell edge is a wall of grid lines, and a plotter has no use for
 that.
 
 What counts as the same area is the **region**, not the pixel colour. Mineral
@@ -636,13 +672,13 @@ Four things are worth knowing about the result.
   line layer is sampled per pixel, so the two can disagree by up to half a cell
   along a silhouette.
 
-Measured on the sample plate, the three modes export 6, 5 and 10 pen layers, one
+Measured on the sample plate, Indexed, Mineral and Watershed export 6, 5 and 10 pen layers, one
 `<path>` each. A mirrored scene has no lattice — it describes one octant — so it
 falls back to the boundary lines, which are mirrored with everything else.
 
 ---
 
-## 32. Shadow Line
+## 33. Shadow Line
 
 Where the sunlight stops, at one instant. Sun Hours (§33) sums the lit moments
 over a year and contours the total; this asks the same question once and traces
@@ -688,7 +724,7 @@ nothing else. A terminator is a fact about one moment, so this needs the
 longitude and the zone as well — both decide which moment a reading on a clock is
 naming. See [Georeferencing](Georeferencing.md).
 
-## 33. Sun Hours
+## 34. Sun Hours
 
 Isolines of how long the ground is in direct sun. The same construction as
 Contours (§4), Isophotes (§15) and Shadow Line (§32) — marching squares over a scalar field — and

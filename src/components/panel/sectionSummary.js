@@ -85,6 +85,11 @@ export const PANEL_MODES = [
   // truncated its own name by 4 px.
   ['Mode: Riso',           'enabledRiso',      'Inks',      () => '3 inks'],
   ['Mode: Mineral',        'enabledMineral',   'Inks',      () => '5 inks'],
+  // The ink *source*, not a count: how many inks this mode lays down is a fact
+  // about the loaded plate rather than about any setting, so the number would
+  // read as a control that is not there. What the shut header can usefully say
+  // is which of the two the layer is drawing.
+  ['Mode: Land cover',     'enabledCover',     'Ink',       (s) => (s.sourceCover === 'class' ? 'classes' : 'plate')],
   ['Mode: Watershed',      'enabledShed',      'Inks',      (s) => num(s.inksShed)],
   ['Mode: Flashbulb',      'enabledFlashbulb', 'Azimuth',   (s) => deg(s.azimuthFlashbulb)],
   ['Mode: Halation',       'enabledHalation',  'Azimuth',   (s) => deg(s.azimuthHalation)],
@@ -111,7 +116,7 @@ export const PANEL_MODES = [
  * The plate, in one line, for the top of the panel.
  *
  * The section readouts answer "what is this control set to". This answers the
- * question above them: *what am I looking at*. Thirty-one draw modes compose
+ * question above them: *what am I looking at*. Thirty-four draw modes compose
  * freely and nothing on screen ever said how many were drawing — you counted
  * green dots down 2 282 px of scroll, or you did not know.
  *
@@ -129,7 +134,7 @@ export const PANEL_MODES = [
  *
  * @returns {{marks: number, inks: number, layers: number, text: number}}
  */
-export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [] } = {}) {
+export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [], coverClasses = 0 } = {}) {
   const inks = new Set()
   let marks = 0
   let generated = 0
@@ -140,6 +145,11 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [] 
     // this a lookup rather than a second table to keep in step.
     const suffix = key.slice('enabled'.length)
     if (suffix === 'Shed') { generated += style.inksShed ?? 0; continue }
+    // Land cover inks one colour per class, and how many classes there are is a
+    // fact about the loaded plate rather than about any setting here — so it is
+    // counted the way Watershed's basins are, from the data rather than from a
+    // `color*` key that does not exist.
+    if (suffix === 'Cover') { generated += coverClasses; continue }
     const lettered = ['A', 'B', 'C', 'D', 'E']
       .map((l) => style[`color${l}${suffix}`]).filter(Boolean)
     const used = lettered.length ? lettered : [style[`color${suffix}`]].filter(Boolean)
@@ -192,6 +202,7 @@ export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export
 export function buildSectionSummaries({
   terrain = {}, style = {}, view = {}, points = {},
   zoomPercent = 100, vectorLayers = [], textLayers = [], soundscape = null,
+  cover = null,
 } = {}) {
   const out = {}
 
@@ -206,6 +217,12 @@ export function buildSectionSummaries({
   out['Levels'] = `${Math.round(terrain.blackPoint ?? 0)} – ${Math.round(terrain.whitePoint ?? 255)}`
   out['Soundscapes'] = soundscape?.fileName
     ? (soundscape.active ? 'playing' : 'loaded')
+    : OFF
+  // The class count, not the plate's name: the name is a place and the header
+  // already sits under a raster loaded from that same place, whereas how many
+  // materials the ground was cut into is the fact every mask below depends on.
+  out['Land Cover'] = cover?.classes?.length
+    ? `${cover.classes.length} classes`
     : OFF
 
   // ── Surface ───────────────────────────────────────────────────────────────
@@ -232,7 +249,7 @@ export function buildSectionSummaries({
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
 
   // ── Marks ─────────────────────────────────────────────────────────────────
-  // The index says how many of the thirty-three are drawing. It is the one header
+  // The index says how many of the thirty-four are drawing. It is the one header
   // whose readout is about the sections under it rather than about itself.
   out['Draw Modes'] = `${PANEL_MODES.filter(([, k]) => style[k]).length} of ${PANEL_MODES.length}`
   for (const [title, key, label, fact] of PANEL_MODES) {

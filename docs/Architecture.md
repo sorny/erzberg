@@ -10,12 +10,14 @@ which matters as much.
 ```
   file ──> loader ──> STORE (source raster)
     OSM / GeoJSON / GPX ──> STORE (vector sources)
+    .cover.json         ──> STORE (cover plate, in its own grid)
                         │
                         ├── Edit Mode clip ──> derived raster
+                        ├── alignCover()   ──> plate on the raster's grid
                         │
                         ▼
                   useTerrainGeometry            ← the only bridge to the worker
-                        │  postMessage({ pixels?, vectorData?, p })
+                        │  postMessage({ pixels?, vectorData?, coverData?, p })
                         ▼
   ┌──────────── geometry.worker ─────────────┐
   │  buildTerrain()       grid, slopes, bounds│
@@ -171,6 +173,19 @@ nothing.
   the arrays that it already holds. It must keep them, because the worker
   transferred them out and no longer owns them. A `null` value cannot be told
   apart from "this raster has no vector layers", so the key is absent instead.
+- **The worker caches the cover plate too**, for the raster's reason rather than
+  the vectors': it is a byte per source pixel, and a style slider does not change
+  what the ground is. `null` is a meaningful value on this key — it is how the
+  main thread says the plate was unloaded — so the message carries the key
+  explicitly and `undefined` is what means "unchanged". A new raster orphans the
+  plate, and the worker drops it without being told.
+
+  The *alignment* happens on the main thread, not here, because it depends on
+  the extent and the dimensions rather than on any parameter. It is derived
+  rather than stored: an Edit Mode crop changes the raster under the plate, and
+  a plate flattened onto the old dimensions at load time would go quietly inert
+  the moment that happened — the picture stays plausible and is simply no longer
+  stencilled, which is the worst way for it to fail.
 - **Results come back as transferables.** Thus the main thread never copies the
   output of a rebuild. This includes the surface normals.
 - **The app coalesces requests. It does not cancel them.** When builds arrive
@@ -410,15 +425,25 @@ measured rather than assumed, and both changed the answer:
 `tests/unit/screen-ink.test.js` pins four pairs read off the running app, not
 off the shader source.
 
-### The ODbL credit goes wherever the data does
+### Every credit goes wherever its data does
 
 OpenStreetMap data is ODbL. Section 4.3 attaches the notice to the *Produced
-Work* and not to the application. Thus the question is not "is OSM loaded". The
-question is "is OSM data in this file".
+Work* and not to the application. A cover plate is CC-BY, which binds the same
+way. Thus the question is never "is this loaded". The question is "is this in
+the file".
 
-`osmAttribution()` in `osmFetch.js` answers that question once, for every
-exporter. Four exporters asked it in four ways before, and that is how three of
-them came to answer it differently.
+`workAttribution()` in `attribution.js` answers that for every exporter, and it
+is one module rather than a line at each export site because `osmFetch.js`
+records how it went the other way: four exporters asked in four ways, and three
+of them came to answer differently — the SVG credited while PNG, STL and WebM
+silently did not.
+
+It asks two things. OpenStreetMap features count when a layer carrying them is
+*visible*. A cover plate counts when the Land cover mode inks it, or when any
+other layer carries a class mask — a masked layer is shaped by the plate, its
+marks stop where a class stops, and that is derivation just as surely. A loaded
+plate that nothing draws from earns no credit, for the same reason a hidden
+layer does not.
 
 Each format takes the credit where the format provides for one:
 
@@ -497,6 +522,20 @@ picture.
 ---
 
 ## Adding things
+
+### A draw mode that reads land cover
+
+Nothing. Every builder already gates on `gridMask`, because a GeoTIFF with a
+void in it has always been possible, so a class filter is the same question
+asked of a mask with more zeros in it. `maskedTerrain` in `geometryBuilders.js`
+shallow-clones the terrain with a thinned mask and hands that to the builder;
+the builder never learns land cover exists. See
+[docs/Land-Cover.md](Land-Cover.md#how-masking-works) for why only `gridMask` is
+rebuilt and the frame — `halfW`, `minElev`, `maxSlope` — is not.
+
+A mode that wants to *ink* from the plate rather than be stencilled by it reads
+`terrain.gridClass` and `terrain.classColors`, both of which `buildTerrain`
+carries onto the grid with the same subsample the elevation took.
 
 ### A draw mode
 

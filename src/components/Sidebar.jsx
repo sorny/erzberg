@@ -1,7 +1,7 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext, Fragment } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
@@ -38,7 +38,9 @@ import {
 } from './panel/ui'
 import { useStackDrag } from './panel/stackDrag'
 import { TextSection } from './panel/TextSection'
-import { SectionFilter, sectionMatches } from './panel/filter'
+import { CoverMap } from './panel/CoverMap'
+import { CoverPlate, SectionFilter, sectionMatches } from './panel/filter'
+import { ALL_CLASSES, describeMask, maskHasClass, toggleClass } from '../utils/coverPlate'
 import { modifiedSections } from './panel/sectionParams'
 
 /** Every tweakable key, from the one index that already enumerates them. */
@@ -1396,7 +1398,192 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
   )
 }
 
-function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, gradientStops, setGradientStops }) {
+/**
+ * Which land-cover classes this layer is allowed to mark.
+ *
+ * Absent entirely until a plate is loaded, rather than present and disabled: a
+ * control that cannot do anything is worse than no control, and the Land Cover
+ * section three rows up is where the app explains what a plate is.
+ *
+ * The swatches are the classes' own colours, taken from the imagery rather than
+ * from a palette, so the row reads as the ground it stands for — which is the
+ * only way to tell six unnamed classes apart at a glance.
+ */
+function CoverMaskRow({ prefix, style, ss }) {
+  const cover = useContext(CoverPlate)
+  if (!cover?.classes?.length) return null
+  const key = `coverMask${prefix}`
+  const mask = style[key] ?? ALL_CLASSES
+  const classes = cover.classes
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>LAND COVER</span>
+        <span style={{ fontSize: 10, color: mask === ALL_CLASSES ? DIM : ACCENT_DEEP }}>
+          {describeMask(mask, classes)}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        {classes.map((c) => {
+          const on = maskHasClass(mask, c.index)
+          return (
+            <button key={c.index} type="button"
+              title={`${c.name} · ${Math.round(c.share * 100)}%`}
+              aria-label={`${c.name}, ${on ? 'drawn' : 'skipped'}`}
+              aria-pressed={on}
+              onClick={() => ss({ [key]: toggleClass(mask, c.index, classes.length) })}
+              style={{
+                // The same chip as the legend in the Land Cover section, because
+                // it stands for the same thing — 3 px, not the 2 px the dash row
+                // beside it uses, which is a button rather than a swatch.
+                width: 22, height: 20, borderRadius: 3, padding: 0, cursor: 'pointer',
+                background: c.color,
+                opacity: on ? 1 : 0.25,
+                border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
+              }} />
+          )
+        })}
+        {mask !== ALL_CLASSES && (
+          <Btn size="xs" onClick={() => ss({ [key]: ALL_CLASSES })}
+            style={{ padding: '0 6px', fontSize: 10 }}>All</Btn>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The command that would cut a plate for what is on screen.
+ *
+ * The extent is already stated — in the loaded file, or in the bounding box a
+ * fetch came back with — so asking the reader to type a place name back in is
+ * asking them to restate something the app knows, and to get it slightly wrong.
+ * A plate cut for ground a few hundred metres off still renders and still looks
+ * deliberate, which is the failure this exists to avoid.
+ *
+ * Three cases, narrowing to the most precise one available:
+ *
+ *  · a georeferenced file on disk → `--dem`, which takes the extent, the
+ *    projection *and* the pixel grid from the file, so the plate comes back
+ *    matching it exactly;
+ *  · georeferenced but not from a file the reader can name — a fetched
+ *    terrain — → `--bbox`, in the lon/lat the flag wants;
+ *  · no coordinates at all → the generic form, because there is nothing
+ *    truthful to fill in.
+ */
+function plateCommand({ filename, bbox, crs }) {
+  const base = 'node scripts/embed-window.js'
+  const wgs = bboxToWgs84(bbox, crs)
+  const fromFile = /\.(tif|tiff|geotiff)$/i.test(filename ?? '')
+  if (fromFile) return { cmd: `${base} --dem "${filename}"`, exact: true }
+  if (wgs) {
+    const r = (v) => Number(v).toFixed(4)
+    return { cmd: `${base} --bbox ${r(wgs[0])},${r(wgs[1])},${r(wgs[2])},${r(wgs[3])}`, exact: false }
+  }
+  return { cmd: `${base} --place "Eisenerz"`, exact: false }
+}
+
+/**
+ * A command to run elsewhere, with the one gesture that matters on it.
+ *
+ * `flex-start` on the row rather than the default stretch: a two-line command
+ * with a stretched button beside it turns Copy into a slab twice the height of
+ * every other button in the panel. It keeps its own size and sits at the top,
+ * next to the line it copies.
+ *
+ * The line wraps between arguments and nowhere else, which takes a span per
+ * token to achieve. No wrapping mode does it alone: a hyphen is a break
+ * opportunity in its own right, so `--dem` split across two lines under
+ * `break-all`, under `break-word` and under `anywhere` alike. A command broken
+ * mid-flag reads as a different command. `overflowX` is the safety valve for
+ * the one token that genuinely cannot fit — a very long filename — which
+ * scrolls rather than pushing the panel sideways.
+ */
+function CommandLine({ cmd }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
+      <code style={{
+        flex: 1, minWidth: 0, fontSize: 9.5, lineHeight: 1.6, color: MUTED, background: SURF,
+        border: `1px solid ${BORDER}`, borderRadius: 4, padding: '5px 7px',
+        fontFamily: 'ui-monospace, monospace', userSelect: 'all', overflowX: 'auto',
+      }}>
+        {/* The separating space sits *outside* the span. Inside it, the
+            span's own `nowrap` swallows the only break opportunity in the
+            line and the command stops wrapping altogether. */}
+        {cmd.split(' ').map((word, i) => (
+          <Fragment key={i}>
+            {i ? ' ' : null}
+            <span style={{ whiteSpace: 'nowrap' }}>{word}</span>
+          </Fragment>
+        ))}
+      </code>
+      <Btn size="xs" style={{ padding: '4px 8px', whiteSpace: 'nowrap', flexShrink: 0 }}
+        aria-label={copied ? 'Command copied' : 'Copy the command'}
+        onClick={() => {
+          navigator.clipboard?.writeText(cmd)
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1600)
+        }}>{copied ? 'Copied' : 'Copy'}</Btn>
+    </div>
+  )
+}
+
+/** One stated fact about the loaded plate. Label left, value right. */
+function CoverFact({ label, value }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+      <span style={{ fontSize: 10, color: DIM, flexShrink: 0 }}>{label}</span>
+      <span style={{ fontSize: 10, color: MUTED, textAlign: 'right', overflowWrap: 'anywhere' }}>{value}</span>
+    </div>
+  )
+}
+
+/**
+ * Prose inside this section, and why it is not `<Note>`.
+ *
+ * `Note` carries `marginTop: -4` because it is a *caption*: it hugs the control
+ * directly above it and reads as that control's small print. Used as a
+ * standalone paragraph it pulls into whatever precedes it — as the first child
+ * of a section it clipped its own first line against the header, and under a
+ * button it overlapped the button's bottom edge.
+ *
+ * So the rail belongs to captions only. Everything else here is a paragraph
+ * with no margin of its own, spaced by the column it sits in.
+ */
+function CoverProse({ caption = false, children }) {
+  return (
+    <div style={{
+      fontSize: 9.5, color: MUTED, lineHeight: 1.6,
+      ...(caption ? { paddingLeft: 6, borderLeft: `2px solid ${BORDER}` } : null),
+    }}>{children}</div>
+  )
+}
+
+/** The small uppercase label the mode sections use for a group, without a rail. */
+function CoverLabel({ children }) {
+  return (
+    <div style={{ fontSize: 9, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>{children}</div>
+  )
+}
+
+/**
+ * One row of buttons.
+ *
+ * `Btn block` is `flex: 1`, which does nothing at all outside a flex row — a
+ * lone `<Btn block>` sized itself to its label and sat there half-width. Every
+ * button in this section goes through here so that cannot happen again.
+ */
+function CoverRow({ children }) {
+  return <div style={{ display: 'flex', gap: 4 }}>{children}</div>
+}
+
+// `showCover` keys off the prefix rather than off `showHypso`: several draw
+// modes switch hypsometric off because they ink from their own table, and every
+// one of them is still a draw mode built from the terrain grid and so still
+// maskable. The empty prefix is the vector-layer call, and only that one.
+function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
@@ -1423,6 +1610,11 @@ function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash =
           ))}
         </div>
       )}
+
+      {/* Off the table for vector layers for a sharper version of the same
+          reason hypsometric is: masking works by thinning the terrain grid the
+          layer is built from, and a road is not built from that grid. */}
+      {showCover && <CoverMaskRow prefix={prefix} style={style} ss={ss} />}
 
       {/* Hypsometric is off the table for vector layers: a road has no elevation
           of its own, so the tint would have to read the ground under it, which
@@ -1491,6 +1683,9 @@ export function Sidebar({
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
   onAdoptVectorSource, onVectorError, vectorIdentify, onVectorIdentify,
+  // Land cover: the plate itself, the two ways to get one, and the action that
+  // deals a mark to each of its classes.
+  cover, coverError, onLoadCover, onClearCover, onInkByClass,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
   onSvg, onPng, onPngAlpha, onStl, onHeightmap,
@@ -1528,6 +1723,9 @@ export function Sidebar({
     onOpenChange?.(value)
   }, [onOpenChange])
   const [filter, setFilter] = useState('')
+  // Which cover class the pointer is over, shared by the class map and the
+  // legend so that pointing at either lights up the other.
+  const [hoveredClass, setHoveredClass] = useState(null)
   // The bundled stroke faces, for the contour-label face picker. `LabelPicker`
   // fetches the same manifest for the vector labels; `loadSingleLineManifest`
   // caches at module level, so asking twice costs one request.
@@ -1624,8 +1822,8 @@ export function Sidebar({
   const summaries = useMemo(() => buildSectionSummaries({
     terrain, style, view, points,
     zoomPercent: (view.zoom / baseZoom) * 100,
-    vectorLayers, textLayers, soundscape,
-  }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape])
+    vectorLayers, textLayers, soundscape, cover,
+  }), [terrain, style, view, points, baseZoom, vectorLayers, textLayers, soundscape, cover])
   /**
    * Which sections differ from their defaults.
    *
@@ -1642,8 +1840,9 @@ export function Sidebar({
     () => ({ q, terms: SECTION_TERMS, summaries, modified, onReset: onResetSection }),
     [q, summaries, modified, onResetSection])
   /** The same reading one level up: the whole plate, for the standing line. */
-  const plate = useMemo(() => buildPlateLine({ style, vectorLayers, textLayers }),
-    [style, vectorLayers, textLayers])
+  const plate = useMemo(
+    () => buildPlateLine({ style, vectorLayers, textLayers, coverClasses: cover?.classes?.length ?? 0 }),
+    [style, vectorLayers, textLayers, cover])
   // Counted with the same predicate each Section uses, over the same index it
   // reads — so the number and the list cannot disagree. A section whose title is
   // missing from SECTION_TERMS would still slip past this, which is what the
@@ -1676,7 +1875,7 @@ export function Sidebar({
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
     sheetMarks: false, fetchTerrain: false, modeShadowLine: false, anaglyph: false,
-    soundscapes: false,
+    soundscapes: false, landCover: false, modeCover: false,
   })
 
 
@@ -2159,7 +2358,7 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-three draw
+            * they add up to, which nothing on screen ever did: thirty-four draw
             * modes compose freely, and counting the lit ones meant scrolling
             * 2 282 px past the thirty-two that were off.
             *
@@ -2207,6 +2406,7 @@ export function Sidebar({
 
         <div id="hm-panel-body" style={{ flex:1, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
           <SectionFilter.Provider value={filterCtx}>
+          <CoverPlate.Provider value={cover}>
           <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
@@ -2346,6 +2546,133 @@ export function Sidebar({
               utils/demFetch.js. */}
           <Section title="Fetch Terrain" open={sec.fetchTerrain} onToggle={() => tog('fetchTerrain')}>
             <TerrainFetchPanel onFetched={onFetchTerrain} />
+          </Section>
+
+          {/* ── Land cover ────────────────────────────────────────────────
+              The one fact in this app that the heightmap does not contain.
+              Everything else here is derived from elevation; a plate says what
+              the ground *is*, which is what lets a mark follow material rather
+              than gradient. Cut one with scripts/embed-window.js — the fetch
+              cannot happen in the browser, and the section says why. */}
+          <Section title="Land Cover" open={sec.landCover} onToggle={() => tog('landCover')} enabled={Boolean(cover)}>
+            {/* One column, one gap, and nothing carrying a margin of its own.
+                The section body has no top padding — the first child sits
+                against the header — so anything with a negative top margin
+                clips itself on the way in. */}
+            {!cover && (() => {
+              const { cmd, exact } = plateCommand({
+                filename: heightmapFilename, bbox: geoTiffBbox, crs: geoTiffCRS,
+              })
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
+                  <CoverProse>
+                    A cover plate gives every pixel a class — worked rock, conifer, water —
+                    so a layer can draw on one material and skip the rest. Nothing here
+                    contacts a server: cut a plate first, then load it.
+                  </CoverProse>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                    <CoverLabel>CUT ONE</CoverLabel>
+                    <CommandLine cmd={cmd} />
+                    <CoverProse caption>
+                      {exact
+                        ? 'Cut for this raster exactly — the extent, the projection and the pixel grid all come from the file.'
+                        : 'The extent of what is on screen, in the lon/lat the flag wants.'}
+                    </CoverProse>
+                  </div>
+                  <CoverRow><Btn block onClick={onLoadCover}>↑ Load cover plate…</Btn></CoverRow>
+                </div>
+              )
+            })()}
+            {cover && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 2 }}>
+                {coverError && (
+                  <div style={{ fontSize: 10, color: '#fca5a5', lineHeight: 1.5 }}>{coverError}</div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {/* The file keeps the geocoder's full answer — "Erzberg,
+                      Eisenerz, Bezirk Leoben, Steiermark, Österreich" — because
+                      that is what identifies the window. The panel has one column
+                      and needs the first two parts of it. */}
+                  <CoverFact label="Plate" value={cover.name.split(',').slice(0, 2).join(',').trim()} />
+                  {cover.year != null && <CoverFact label="Year" value={String(cover.year)} />}
+                  {cover.variance != null && (
+                    <CoverFact label="Colour axes" value={`${Math.round(cover.variance * 100)}% of variance`} />
+                  )}
+                </div>
+
+                {/* The class list is a different kind of thing from the facts
+                    above it — a legend rather than a readout — and ran straight
+                    on from them at the same rhythm, so the two read as one list.
+                    The label is what parts them; the count lives here rather
+                    than as a fact of its own, beside what it counts. */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <CoverLabel>CLASSES</CoverLabel>
+                    <span style={{ fontSize: 9.5, color: DIM }}>{cover.classes.length}</span>
+                  </div>
+                  {/* The legend says what the classes are; this says where they
+                      are, which is the question you ask next and the one that
+                      decides what to mask a layer to. */}
+                  <CoverMap cover={cover} hovered={hoveredClass} onHover={setHoveredClass} />
+                  {/* Two lines per class, because one was not enough to be
+                      useful. A cluster cannot say what it is, so the script
+                      asks OpenStreetMap what covers it and the second line is
+                      that answer with its percentage still attached — a name
+                      you can weigh rather than a word you have to trust. */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {cover.classes.map((c) => (
+                      <div key={c.index}
+                        onPointerEnter={() => setHoveredClass(c.index)}
+                        onPointerLeave={() => setHoveredClass(null)}
+                        style={{ display: 'flex', alignItems: 'flex-start', gap: 7, cursor: 'default',
+                                 // Lit rather than outlined: a border would move
+                                 // the row by a pixel as the pointer crossed it.
+                                 background: hoveredClass === c.index ? 'var(--hm-surf)' : 'transparent',
+                                 borderRadius: 3, margin: '0 -4px', padding: '1px 4px',
+                                 opacity: hoveredClass == null || hoveredClass === c.index ? 1 : 0.45,
+                                 transition: 'opacity .12s, background .12s' }}>
+                        <span style={{ width: 13, height: 13, borderRadius: 3, background: c.color,
+                                       border: `1px solid ${BORDER}`, flex: '0 0 auto', marginTop: 1 }} />
+                        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'baseline' }}>
+                            <span style={{ fontSize: 10, color: MUTED, flex: 1, minWidth: 0,
+                                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+                            <span style={{ fontSize: 10, color: DIM, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+                              {(c.share * 100).toFixed(1)}%
+                            </span>
+                          </div>
+                          {c.note && (
+                            <span style={{ fontSize: 9, color: DIM, lineHeight: 1.45 }}>{c.note}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  <CoverRow><Btn block onClick={onInkByClass}>Ink by land class</Btn></CoverRow>
+                  <CoverProse caption>
+                    Deals one draw mode to each class, steepest ground first, and masks each
+                    layer to its own class. Re-point any of them afterwards.
+                  </CoverProse>
+                </div>
+
+                <CoverRow>
+                  <Btn block onClick={onLoadCover}>Replace…</Btn>
+                  <Btn block onClick={onClearCover}>Clear</Btn>
+                </CoverRow>
+
+                {(cover.attribution || cover.osmCredit) && (
+                  <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
+                    {cover.attribution && <div>{cover.attribution}</div>}
+                    {/* ODbL travels with the work too: a class named from
+                        OpenStreetMap is derived from OpenStreetMap. */}
+                    {cover.osmCredit && <div>{cover.osmCredit}</div>}
+                  </div>
+                )}
+              </div>
+            )}
           </Section>
 
           <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
@@ -2711,7 +3038,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The index, at the head of the thirty-three sections it stands for.
+          {/* The index, at the head of the thirty-four sections it stands for.
               It is a Section like everything else so that it can be closed by
               anyone who does not want it, found by the filter, and given the
               same shut-state readout every other header carries. */}
@@ -3138,6 +3465,34 @@ export function Sidebar({
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Land cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover}>
+            <Tog label="Enabled" checked={style.enabledCover} onChange={v => ss({ enabledCover: v })} />
+            {style.enabledCover && !cover && (
+              <Note>No cover plate loaded, so this layer draws nothing. Open one under Land Cover.</Note>
+            )}
+            {style.enabledCover && cover && (
+              <>
+                <Sub label="INK">
+                  <div style={{ display: 'flex', gap: 2, marginBottom: 4 }}>
+                    {[['Plate', 'plate'], ['Class', 'class']].map(([label, val]) => (
+                      <Btn key={val} block variant="toggle" on={style.sourceCover === val}
+                        onClick={() => ss({ sourceCover: val })}
+                        style={{ fontSize: 10, padding: '2px 0', borderRadius: 2 }}>{label}</Btn>
+                    ))}
+                  </div>
+                  <Note>
+                    {style.sourceCover === 'class'
+                      ? 'One flat colour per class, as a printed land-use sheet would have it.'
+                      : 'Every cell takes its own colour from the imagery the classes were cut from.'}
+                  </Note>
+                  <InlineSl label="Grain" help="A per-cell tooth, seeded by class, so two materials that share a tone still read as two surfaces." min={0} max={1} step={0.02} value={style.grainCover} onChange={v => ss({ grainCover: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingCover} onChange={v => ss({ spacingCover: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Cover" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
               </>
             )}
           </Section>
@@ -3883,7 +4238,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the thirty-three modes
+              A modifier, not a mode: it takes whatever the thirty-four modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>
@@ -4169,6 +4524,7 @@ export function Sidebar({
               </div>
             )}
           </div>
+          </CoverPlate.Provider>
           </SectionFilter.Provider>
         </div>
 

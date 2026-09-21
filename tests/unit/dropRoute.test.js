@@ -25,9 +25,11 @@ describe('classifyDrop', () => {
   })
 
   it('tries .json as a preset and .geojson as geometry', () => {
-    // Same two routes, opposite order, decided by what the extension says the
+    // Same routes, opposite order, decided by what the extension says the
     // author meant. `Preset ⬇` writes `.json`; nobody names a preset `.geojson`.
-    expect(classifyDrop('look.json')).toEqual(['preset', 'geojson'])
+    // A cover plate is tried first on `.json` because it is the only one of the
+    // three that declares its own `kind`, so it answers for itself outright.
+    expect(classifyDrop('look.json')).toEqual(['cover', 'preset', 'geojson'])
     expect(classifyDrop('trails.geojson')).toEqual(['geojson', 'preset'])
   })
 

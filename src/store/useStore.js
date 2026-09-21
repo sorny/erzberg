@@ -101,6 +101,14 @@ export const useStore = create((set) => ({
   // App.jsx, joined to these by `sourceId`.
   vectorSources: [],
 
+  // Land cover, in the plate's *own* grid and extent, exactly as the file
+  // stated them. Laying it onto the raster is a derivation App re-runs whenever
+  // the raster moves — see `coverGrid` there — because a crop changes both the
+  // dimensions and the extent, and a plate flattened onto the old ones at load
+  // time would go quietly inert.
+  // { labels, plate, width, height, bbox, crs, classes, attribution, … } | null
+  cover: null,
+
   // Which feature is under the cursor, and which one was last clicked or picked
   // in the panel. Here rather than in App's `p` bus for a specific reason: `p`
   // is rebuilt every render and is what gets postMessage'd to the geometry
@@ -137,6 +145,12 @@ export const useStore = create((set) => ({
         srcPixels: pixels, srcMask: mask, srcWidth: width, srcHeight: height,
         heightmapFilename: filename,
         edit: keep ? s.edit : null,
+        // A cover plate describes one particular piece of ground, and this
+        // setter is only ever called with a *new* raster — a load, or a
+        // Soundscape's next frame. Neither is the ground the plate described,
+        // so it goes, for the same reason the clip goes. An Edit Mode crop does
+        // not come through here and keeps its plate.
+        cover: null,
       }
       return { ...next, ...derive({ ...s, ...next }) }
     }),
@@ -215,6 +229,8 @@ export const useStore = create((set) => ({
    */
   setVectorSources: (sources) =>
     set({ vectorSources: sources ?? [], vectorHover: null, vectorSelected: null }),
+
+  setCover: (cover) => set({ cover: cover ?? null }),
 
   /**
    * How much ground one screen pixel covers, and where north points on screen.

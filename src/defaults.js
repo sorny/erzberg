@@ -7,6 +7,7 @@
  * App.jsx remains the only place that seeds React state from them.
  */
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
+import { DRAW_MODE_IDS } from './utils/drawModes'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 export const TERRAIN_DEF = {
@@ -286,6 +287,13 @@ export const STYLE_DEF = {
   colorMineral: '#3e2a1f', weightMineral: 1, opacityMineral: 1, dashMineral: 'solid',
   hypsoMineral: false, hypsoModeMineral: 'elevation', hypsoBandedMineral: false, hypsoIntervalMineral: 10,
 
+  // Land cover — the loaded plate's own classes, inked from the imagery.
+  // `sourceCover` picks between the continuous plate and the flat class colours;
+  // there is no colour table here because the classes bring their own.
+  enabledCover: false, spacingCover: 2, sourceCover: 'plate', grainCover: 0.12,
+  colorCover: '#8a8f98', weightCover: 1, opacityCover: 1, dashCover: 'solid',
+  hypsoCover: false, hypsoModeCover: 'elevation', hypsoBandedCover: false, hypsoIntervalCover: 10,
+
   // Watershed — D8 catchments, one flat ink each.
   enabledShed: false, spacingShed: 2, inksShed: 10, minBasinShed: 0.4, radiusShed: 3,
   shadeShed: 0.32, azimuthShed: 315, seedShed: 11,
@@ -354,6 +362,21 @@ export const STYLE_DEF = {
 
   // Global Gradient Stops
   gradientStops: GRADIENT_PRESETS['Jet'],
+
+  /*
+   * Which land-cover classes each draw mode is allowed to mark.
+   *
+   * Generated rather than typed out, because there is one per mode and the list
+   * of modes is already stated once in `drawModes.js`. Writing them by hand
+   * would mean a new mode silently arriving without a mask — it would build over
+   * the whole raster while every other layer honoured the stencil, which reads
+   * as a rendering bug rather than a missing default.
+   *
+   * 0 means every class, which is what a layer that has never met a cover plate
+   * wants. The key ends in the mode id like every other per-mode parameter, so
+   * `sectionParams` files each one under its own mode with no table to maintain.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`coverMask${id}`, 0])),
 }
 
 export const POINTS_DEF = {
@@ -448,7 +471,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the thirty-three modes are
+  // A modifier rather than a mode: it takes whatever the thirty-four modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

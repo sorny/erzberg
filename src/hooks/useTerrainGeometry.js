@@ -63,6 +63,10 @@ export function useTerrainGeometry(p) {
   // Same idea for the vector sources — an OSM fetch is millions of coordinates
   // and must not be cloned into the worker on every slider tick.
   const workerVectorRef = useRef(null)
+  // And for the cover plate, which is a byte per source pixel. Seeded
+  // `undefined` rather than `null` so that the first send always posts: `null`
+  // is the legitimate value for "no plate loaded" and must reach a fresh worker.
+  const workerCoverRef = useRef(undefined)
   // Newest request that arrived while a build was running; only the latest is
   // kept, since intermediate states are never displayed.
   const pendingRef = useRef(null)
@@ -109,6 +113,7 @@ export function useTerrainGeometry(p) {
     workerRef.current = new GeometryWorker()
     workerPixelsRef.current = null
     workerVectorRef.current = null
+    workerCoverRef.current = undefined
     workerRef.current.onmessage = (e) => {
       const elapsed = Math.round(performance.now() - startTimeRef.current)
       const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
@@ -159,6 +164,7 @@ export function useTerrainGeometry(p) {
       workerRef.current = null
       workerPixelsRef.current = null
       workerVectorRef.current = null
+      workerCoverRef.current = undefined
       fail(msg)
     }
     workerRef.current.onerror = (ev) => {
@@ -180,6 +186,11 @@ export function useTerrainGeometry(p) {
     workerPixelsRef.current = req.pixels
     const needsVectors = workerVectorRef.current !== req.vectors
     workerVectorRef.current = req.vectors
+    // `null` is a real value here — it is how an unloaded plate is announced —
+    // so this tracks identity rather than truthiness, and the key is omitted
+    // only when the worker already holds the same object.
+    const needsCover = workerCoverRef.current !== req.cover
+    workerCoverRef.current = req.cover
     startTimeRef.current = performance.now()
     buildStartRef.current = startTimeRef.current
     busyRef.current = true
@@ -188,6 +199,7 @@ export function useTerrainGeometry(p) {
         ? { heightmapPixels: req.pixels, nodataMask: req.mask, heightmapWidth: req.w, heightmapHeight: req.h }
         : null),
       ...(needsVectors ? { vectorData: req.vectors } : null),
+      ...(needsCover ? { coverData: req.cover } : null),
       p: req.p,
       _gen: ++genRef.current,
     })
@@ -200,6 +212,7 @@ export function useTerrainGeometry(p) {
       workerRef.current = null
       workerPixelsRef.current = null
       workerVectorRef.current = null
+      workerCoverRef.current = undefined
       pendingRef.current = null
       busyRef.current = false
       setTerrain(null); setLineGeo(null); setVectorGeo(null); setSurfaceGeo(null); setIsComputing(false)
@@ -231,6 +244,10 @@ export function useTerrainGeometry(p) {
       pixels: heightmapPixels, mask: nodataMask,
       w: heightmapWidth, h: heightmapHeight,
       vectors: vectorSources,
+      // The plate already laid onto this raster — App derives it, because the
+      // alignment depends on the extent and the dimensions rather than on any
+      // parameter. Null whenever there is no plate or it no longer fits.
+      cover: p.coverGrid ?? null,
     }
 
     setIsComputing(true)
@@ -279,6 +296,10 @@ export function useTerrainGeometry(p) {
     // colour-picker tick, so depending on its identity would rebuild every
     // draw modes to recolour one road. See layerBuildKey in utils/vectorLayers.js.
     vectorSources, vectorBuildKey,
+    // The aligned plate. Depended on by identity, like the raster and the
+    // vector sources: App memoises it on the plate and the raster, so it is a
+    // new object only when one of those actually moved.
+    p.coverGrid,
   ])
 
   useEffect(() => () => workerRef.current?.terminate(), [])

@@ -1031,6 +1031,36 @@ unit test thus passes while a georeferenced file reads as unreferenced and a
 declared NoData value reads as absent. All tag access goes through one accessor
 that handles both that shape and the older plain-object one.
 
+## Cover plates
+
+A cover plate is the third thing in this app that has to land on the raster's
+ground, after a GPX track and an OpenStreetMap query. It states its own extent
+and projection in the file so it can be *checked* rather than trusted, and
+`alignCover` refuses one that does not match — a misaligned plate still renders
+and still looks deliberate, so it has to be caught at the door or not at all.
+
+Two routes, and the order matters:
+
+- **Same dimensions.** A plate cut for this very raster matches pixel for pixel,
+  and copying it is exact and free. No resampling error, no dependence on two
+  bounding boxes agreeing to the metre.
+- **Through the extents**, nearest-neighbour, when the grids differ. Nearest and
+  not bilinear because a class index has no meaningful average: halfway between
+  water and forest is not a third thing.
+
+The alignment is **derived, not stored**. An Edit Mode crop changes both the
+dimensions and the extent of the raster, and a plate flattened onto the old ones
+at load time would go quietly inert the moment that happened.
+
+`scripts/embed-window.js` goes the other way for `--dem`: it reads the UTM
+window covering your raster and carries the embeddings onto *your* grid,
+backwards per output pixel — your pixel, your projection, WGS84, UTM, nearest
+embedding. Any projection `unprojectWgs84` handles works, which is the same set
+listed above. Anything else is refused rather than approximated, for the reason
+this whole document gives.
+
+---
+
 ### Adding a CRS
 
 Add the code to the relevant table in `classifyCRS`: `GEOGRAPHIC_EXACT`,

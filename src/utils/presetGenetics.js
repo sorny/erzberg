@@ -132,6 +132,10 @@ export function randomPreset(seed) {
   const chosen = []
   for (const mode of shuffled(rng, DRAW_MODES)) {
     if (chosen.length >= 3) break
+    // A mode that needs a loaded file draws nothing without one, and this
+    // function cannot be told whether that file is there without giving up the
+    // promise that a seed is a look. See `needsData` in drawModes.js.
+    if (mode.needsData) continue
     if (mode.cost > budget && chosen.length > 0) continue
     chosen.push(mode)
     budget -= mode.cost

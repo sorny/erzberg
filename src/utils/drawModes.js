@@ -19,7 +19,11 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-three at once.
+ * does the index that shows all thirty-four at once.
+ *
+ * `needsData` marks a mode that draws nothing without a file the app cannot roll
+ * — today only the cover plate. Such a mode carries no `pick` block and the
+ * randomiser skips it, because a roll has to stay a pure function of its seed.
  */
 export const DRAW_MODES = [
   {
@@ -165,6 +169,18 @@ export const DRAW_MODES = [
     id: 'Mineral', label: 'Mineral', cost: 3, mark: 'mineral',
     pick: { spacing: [1.5, 5], radius: [1, 4], steep: [0.45, 0.8],
             broken: [0.25, 0.65], grain: [0.1, 0.5] },
+  },
+  {
+    /*
+     * `needsData` keeps this out of the randomiser, and it is the seed contract
+     * that decides it rather than taste. A roll is reproducible because
+     * `randomPreset` is a pure function of its seed — so it cannot be told
+     * whether a cover plate happens to be loaded, and a mode that draws nothing
+     * without one would come back as an empty layer on the same seed that gave
+     * a picture yesterday. No `pick` ranges either, for the same reason: nothing
+     * rolls this.
+     */
+    id: 'Cover', label: 'Land cover', cost: 3, mark: 'cover', needsData: true,
   },
   {
     id: 'Shed', label: 'Watershed', cost: 3, mark: 'shed',
