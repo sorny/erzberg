@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`scripts/embed-window.js` writes `<name>.landcover.json`** instead of
+  `<name>.cover.json`. "Cover" on its own is ambiguous next to cloud cover,
+  ground cover and a cover image; the panel and the docs have said "land cover"
+  throughout.
+
+  **Plates cut by earlier versions still load**, and nothing had to be migrated
+  for that: a plate is recognised by the `kind` in its bytes, so every `.json`
+  dropped on the window is offered to the cover reader first and the filename
+  was never read. The one place it *is* read — the hint that tells you a file is
+  named like a plate but does not parse as one — accepts both spellings.
+
 ## [1.19.0] — 2026-09-22
 
 ### Added

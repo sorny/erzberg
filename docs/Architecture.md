@@ -10,7 +10,7 @@ which matters as much.
 ```
   file ──> loader ──> STORE (source raster)
     OSM / GeoJSON / GPX ──> STORE (vector sources)
-    .cover.json         ──> STORE (cover plate, in its own grid)
+    .landcover.json     ──> STORE (cover plate, in its own grid)
     Mask Studio / import──> STORE (mask planes, on the SOURCE raster)
     Satellite fetch     ──> STORE (imagery, on the raster's grid)
                         │

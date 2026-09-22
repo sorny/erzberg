@@ -191,7 +191,7 @@ setting, so they cannot disagree.
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 | **Satellite** | True-colour Sentinel-2 over the extent of the raster, at 10 m, from AWS Open Data. It drapes on the terrain and backs the Mask Studio. No account, no key, and nothing happens until you press Fetch. |
 | **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one, or cut one from loaded features. See [Masks](#masks). |
-| **Cover plate** | A `.cover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
+| **Cover plate** | A `.landcover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
 
 **Drag and drop.** Drop a file anywhere on the window and the app routes it by
 what it is. A GeoTIFF becomes the terrain. A GPX or GeoJSON becomes an overlay.
@@ -303,7 +303,7 @@ node scripts/embed-window.js --place "Eisenerz" --km 4 --classes 6
 ```
 
 Either way the plate and the ground under it are aligned by construction. Load
-`<name>.tif` as terrain if the script wrote one, then drop `<name>.cover.json`
+`<name>.tif` as terrain if the script wrote one, then drop `<name>.landcover.json`
 on the window. The Land Cover section prints the exact command for whatever is
 already on screen, so the extent never has to be typed back in.
 

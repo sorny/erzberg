@@ -70,7 +70,7 @@ function syntheticPlate() {
   })
 }
 
-async function dropPlate(page, text, name = 'bands.cover.json') {
+async function dropPlate(page, text, name = 'bands.landcover.json') {
   const dt = await page.evaluateHandle(({ text, name }) => {
     const dt = new DataTransfer()
     dt.items.add(new File([text], name, { type: 'application/json' }))

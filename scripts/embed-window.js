@@ -26,11 +26,11 @@
  *
  * ── What it writes ───────────────────────────────────────────────────────────
  * With `--dem`, one file:
- *   <name>.cover.json  The plate, on the supplied raster's own grid.
+ *   <name>.landcover.json  The plate, on the supplied raster's own grid.
  *
  * Otherwise two, because there is no raster yet:
- *   <name>.tif         Elevation for the window. Float32, north-up, EPSG:326xx.
- *   <name>.cover.json  The land cover plate for that same window.
+ *   <name>.tif             Elevation for the window. Float32, north-up, EPSG:326xx.
+ *   <name>.landcover.json  The land cover plate for that same window.
  *
  * Either way the plate and the ground under it are aligned by construction —
  * cut against the supplied raster, or cut from one grid in the same run. That
@@ -127,8 +127,8 @@ Land cover for a window, from AlphaEarth Foundations.
   --no-osm            Skip the OpenStreetMap lookup that names the classes.
                       They are then described by their terrain alone.
 
-With --dem, writes <stem>.cover.json alone — you already have the terrain.
-Otherwise writes <stem>.tif and <stem>.cover.json: load the first as terrain,
+With --dem, writes <stem>.landcover.json alone — you already have the terrain.
+Otherwise writes <stem>.tif and <stem>.landcover.json: load the first as terrain,
 then drop the second on top.
 `
 
@@ -1668,7 +1668,7 @@ async function main() {
     // exactly as the embedding's does.
     ...(osmCredit ? { osmCredit } : null),
   }
-  const coverPath = path.join(args.out, `${stem}.cover.json`)
+  const coverPath = path.join(args.out, `${stem}.landcover.json`)
   await writeFile(coverPath, JSON.stringify(cover), 'utf8')
 
   console.log('')

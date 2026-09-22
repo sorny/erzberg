@@ -33,6 +33,25 @@ describe('classifyDrop', () => {
     expect(classifyDrop('trails.geojson')).toEqual(['geojson', 'preset'])
   })
 
+  it('routes a cover plate by its bytes, whatever it is called', () => {
+    // The script writes `.landcover.json` and used to write `.cover.json`.
+    // Neither name is load-bearing: a plate declares its own `kind`, so every
+    // `.json` is offered to the cover reader first and a file cut by an older
+    // version keeps working with no migration at all.
+    for (const n of ['erz.landcover.json', 'erz.cover.json', 'anything.json']) {
+      expect(classifyDrop(n)).toEqual(['cover', 'preset', 'geojson'])
+    }
+  })
+
+  it('names the plate in its hint under either spelling', () => {
+    // The one place the name *is* read: telling someone their file is called
+    // like a plate but does not parse as one.
+    for (const n of ['erz.landcover.json', 'erz.cover.json']) {
+      expect(explainDrop(n, ['cover', 'preset', 'geojson']))
+        .toMatch(/named like a cover plate/)
+    }
+  })
+
   it('takes an SVG only as a preset', () => {
     // An icon needs a layer to belong to, and a drop on the viewport names no
     // layer. `explainDrop` says so rather than the drop doing nothing.

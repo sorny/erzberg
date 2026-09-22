@@ -68,7 +68,10 @@ export function explainDrop(name, tried) {
   if (/\.png$/i.test(n)) {
     return `Could not read ${short} as a heightmap or a preset.`
   }
-  if (/\.cover\.json$/i.test(n)) {
+  // Both spellings. The script writes `.landcover.json` now; `.cover.json` is
+  // what it wrote before and those files still load, because a plate is
+  // recognised by the `kind` in its bytes and never by its name.
+  if (/\.(land)?cover\.json$/i.test(n)) {
     return `${short} is named like a cover plate but does not read as one. Cut a fresh one with scripts/embed-window.js.`
   }
   if (/\.(jpe?g|webp|gif|bmp|avif)$/i.test(n)) {

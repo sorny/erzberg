@@ -12,10 +12,10 @@ A cover plate adds one fact the heightmap does not contain: what each pixel *is*
 ## The pipeline
 
 ```
-                      ┌─ --dem your.tif ─→  <name>.cover.json ─┐
-AlphaEarth tiles  →───┤                                        ├─→  the app
-   64 bands, 10 m     └─ --place "…"   ─→  <name>.tif          │    masks, ink
-                                        +  <name>.cover.json ──┘
+                      ┌─ --dem your.tif ─→  <name>.landcover.json ─┐
+AlphaEarth tiles  →───┤                                            ├─→  the app
+   64 bands, 10 m     └─ --place "…"   ─→  <name>.tif              │    masks, ink
+                                        +  <name>.landcover.json ──┘
 ```
 
 Two ways in. `--dem` cuts the plate to a raster you already have. `--place`
@@ -66,7 +66,7 @@ in one run, so the two are aligned by construction for the same reason.
 
 ### 2. Load both
 
-With `--dem`, your raster is already loaded — just drop `<name>.cover.json` on
+With `--dem`, your raster is already loaded — just drop `<name>.landcover.json` on
 the window. Otherwise load `<name>.tif` as terrain first, then drop the plate.
 
 The panel does this arithmetic for you: open **Land Cover** with no plate loaded

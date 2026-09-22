@@ -18,5 +18,8 @@ tests/_visual.spec.js
 scripts/.ae-index/
 
 # Cover plates are generated output — cut one with scripts/embed-window.js
-# rather than committing it. They run to megabytes.
+# rather than committing it. They run to megabytes. Both spellings: the script
+# writes .landcover.json; .cover.json is what it wrote before the rename, and
+# those files still load, so they are still lying around in working copies.
 *.cover.json
+*.landcover.json
