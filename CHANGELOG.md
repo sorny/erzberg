@@ -7,6 +7,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.19.0] — 2026-09-22
+
+### Added
+
+- **A mask from features you have already loaded.** The shape of a forest, a
+  lake or a quarry is something OpenStreetMap and GeoJSON hold exactly, so the
+  Masks section now takes a vector layer and rasterises it directly. Areas fill
+  with their holes cut out, lines become corridors, points become discs, and
+  one distance field means buffer, half-width or radius depending on which is
+  picked — a negative buffer shrinks, which no other route to a mask offers.
+  Hidden features are left out. The buffer is an exact Euclidean distance
+  transform rather than iterated neighbour passes, which at a twenty-pixel
+  radius is the difference between a circle and a visible octagon.
+
+- **Edit Mode can clip the heightmap to a map feature.** Pick a loaded
+  OpenStreetMap or GeoJSON layer and press **Clip to this**, and the raster is
+  cut to a municipality, a district or a lake — previously only answerable by
+  tracing a border by hand with the lasso. A new `rings` shape kind carries it,
+  because a feature is not one ring: it has holes to cut and is sometimes
+  several disjoint pieces, and unlike the hand-drawn shapes it has no editable
+  vertices, having come from a survey rather than a pointer. Rings are
+  simplified at a third of a pixel on the way in, which is invisible and
+  removes about nine tenths of a boundary's nodes. Layers that enclose nothing
+  — a road network — are refused with a disabled button instead of producing an
+  empty raster. The feature picker is now shared with the Masks section rather
+  than duplicated.
+
+- **A boundary counts as an area, not a line.** A layer's `geom` says how it is
+  *drawn* — admin boundaries are `line` because you draw a border as a line —
+  so masks and clips ask the *geometry* whether it closes instead of asking the
+  layer what it is. That needed stitching first: a relation's rings arrive as
+  its member ways, and Graz's district Jakomini is seven open segments with not
+  one of them closed. `stitchRings` joins them by shared endpoint, in lon/lat
+  before projection, where the coordinates are bit-identical and no tolerance is
+  needed — a tolerance would weld two districts that merely pass close to one
+  another. A **Fill the enclosed area** switch appears for layers whose lines
+  close, on by default; off gives the corridor along the border. Multipolygon
+  *areas* split across member ways are stitched too, which was the same latent
+  bug sitting in `landuse=forest` relations.
+
+- **Particular features can be picked for a mask.** A layer is often not the
+  unit you mean — "Admin boundaries · City district" over Graz is seventeen
+  districts and a mask of Jakomini is one of them. The picker lists the layer's
+  features, filterable and sorted named-first, with all/none; only the ticked
+  ones go in, and a mask made from exactly one takes that feature's own name.
+  The pick is independent of the layer's hidden list, which only seeds it:
+  wanting a mask of one district must not mean hiding the other sixteen from
+  the drawing.
+
+- **The Mask Studio now works the way Edit Mode does.** The two are the same
+  kind of thing — a full-window direct-manipulation mode over the source raster
+  — and had drifted into two different interfaces. The Studio's controls move
+  from a floating bar across the picture into a right-hand panel built from the
+  same primitives as Edit Mode's, and the canvas gains **scroll to zoom** and
+  **alt-drag to pan** on the same gestures and the same clamps, with the same
+  bottom-left Fit button and hint bar. The Studio previously had no zoom at
+  all, which is the difference that stopped work: a boundary somebody is
+  willing to trace by hand is routinely a few raster pixels wide.
+
+- **The satellite exposure controls also appear in the Studio panel.** Aiming at
+  a boundary is when they are wanted, and the sidebar that otherwise carries
+  them is hidden while the Studio is open.
+
+- **Exposure controls for the satellite drape, and a correction that is on by
+  default.** Sentinel-2's `visual` asset is a fixed-gain product exposed for
+  cloud and snow, so ordinary ground sits near the floor — over Graz the median
+  pixel is 9–17% brightness, and draped under a hillshade it reads as black.
+  **Auto levels** stretches the fetched window's own histogram and solves a
+  gamma per scene so its median lands on mid-grey: 14.8% → 44.6% measured on
+  the real scene. A plain 2–98% stretch was tried first and reaches only 19.7%,
+  which is why the gamma is there. **Brightness**, **Contrast** and
+  **Saturation** apply on top; all four are render-side, so dragging them costs
+  no rebuild. The Mask Studio backdrop runs the identical pipeline, because a
+  boundary painted under one exposure and checked under another would move.
+
+### Fixed
+
+- **Admin boundaries missed the districts of a city.** The query asked for
+  `admin_level` 2, 4, 6 and 8, and Austria puts city districts at 9 — so
+  loading it over Graz returned the province, the city and the surrounding
+  municipalities, and none of Innere Stadt, Jakomini, Lend or Gries. Levels 9
+  and 10 are now asked for as well, under the general labels "City district"
+  and "Locality", since the meaning of each number is a national convention
+  rather than a standard. Measured over the whole of Styria this adds 676
+  relations to 642, so the category still needs no coarse tier.
+
+  Worth knowing for Graz specifically: the city boundary is at level **6**, not
+  8, because a Statutarstadt is its own Bezirk. Level 8 there is the ring of
+  neighbouring municipalities.
+
+- **`scripts/embed-window.js` could not see fifteen per cent of the archive.**
+  It located an export by probing `<hash>-0000000000-0000000000.tiff`, and 31 of
+  the 208 exports in zone 33N have no such tile — so those exports were silently
+  absent from the index and a window over one of them reported that AlphaEarth
+  does not cover that ground. The bucket listing states which tiles exist, so
+  the probe now targets one that does.
+
+- **An export's extent is no longer assumed.** Most are a 2 × 2 grid of
+  8192-pixel tiles and plenty are not: zone 33N holds 151 of four tiles, 50 of
+  two, six of one and one of three. Crediting an export with ground it does not
+  have is the same bug wearing the opposite face — the window is selected, the
+  read comes back empty, and the zone that really holds the data is never tried.
+  Extents are now the union of the tiles an export actually has, and the read
+  itself is what confirms a zone.
+
+- **Neighbouring UTM zones are tried.** A raster's zone is not always the one
+  its longitude names: Tre Cime sits eight hundredths of a degree inside zone
+  33's band and is distributed in ETRS89 / UTM 32N. The script tries the
+  raster's own zone first, then the zone the longitude names, then the
+  neighbours, and reports what it tried when none of them holds the ground.
+
+- **Class names that collide are parted properly.** Over the Dolomites four of
+  six classes come back "Bare rock" and two of those are both steep, which the
+  single slope qualifier could not separate. Collisions now widen in steps —
+  slope, then height, then the class letter — and the last step always works.
+
+- **Satellite imagery failed over Graz, and only over Graz.** A few Sentinel-2
+  items were never converted to COG, and the catalogue still lists them with
+  every asset pointing at the original ESA product on `s3://` in JPEG 2000 —
+  a scheme no browser fetches, in a format `geotiff.js` cannot decode. One such
+  scene covers Graz and its cloud cover is zero, so the sort by cloud put the
+  one unreadable scene in the archive first every time. Scenes are now kept only
+  when the `visual` asset is HTTPS and a TIFF.
+
+- **A raster finer than 10 m is no longer refused.** The plate was cut on the
+  raster's own grid, so a 4.2 m city raster asked for 9.7 million embedding
+  pixels and the script answered with a ceiling and told the user to crop. The
+  embeddings are 10 m — that much data never existed to read. The plate is now
+  cut at the embeddings' own resolution and the app upsamples it on load, which
+  is the path a plate cut for a different raster has always taken. Graz reads
+  2.4 million pixels and comes back with the same boundaries.
+
+- **Class names no longer collapse to one word over a fine raster.** The
+  OpenStreetMap polygons that name the classes are placed by an affine that
+  answers in the *raster's* pixels, so once the plate could be coarser than the
+  raster, every polygon landed in its top-left quadrant. It failed quietly, by
+  giving each class the same tally: six classes over Graz, each 40% forest and
+  26% built-up, each named "Forest". The paint is now scaled to the plate, and
+  the same window gives meadow, three grades of forest and two of built-up.
+
+- **Reset all clears the masks and the satellite drape.** The button's own label
+  says it returns everything to defaults, and a stack of painted stencils
+  surviving it is exactly the state it says it does not produce. A regression
+  test now fails without the fix.
+
+
 ## [1.18.0] — 2026-09-21
 
 ### Added
