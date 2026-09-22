@@ -54,7 +54,7 @@ import { deflateSync, inflateSync } from 'node:zlib'
 import path from 'node:path'
 import { fromArrayBuffer, fromUrl, writeArrayBuffer } from 'geotiff'
 
-import { projectWgs84, unprojectWgs84 } from '../src/utils/geoCoords.js'
+import { classifyCRS, projectWgs84, unprojectWgs84 } from '../src/utils/geoCoords.js'
 import { fillPolygon } from '../src/utils/heightmapEdit.js'
 import { MAX_CLASSES } from '../src/utils/coverPlate.js'
 
@@ -74,15 +74,14 @@ export const EMBEDDING_CREDIT =
   'by Google and Google DeepMind. Licensed CC-BY 4.0.'
 
 /**
- * The side of one export task, in metres.
+ * One tile, in pixels. Every object in the bucket is this square or smaller.
  *
- * Every export in the bucket is a 2 × 2 grid of 8192-pixel tiles at 10 m, so
- * one covers 163 840 m square. Used only to turn a probed origin into an
- * extent, never to *derive* an origin — the exports are laid out on a lattice
- * anchored at the UTM false easting of 500 000 rather than at zero, so
- * arithmetic that assumes a zero anchor picks the tile one column west.
+ * There is deliberately no constant for the size of an *export*. Most are a
+ * 2 × 2 grid of these and plenty are not — in zone 33N alone, 151 exports of
+ * four tiles, 50 of two, six of one and one of three — so an export's extent is
+ * the union of the tiles it actually has, which the bucket listing states
+ * outright. A constant here would be a guess that reads like a fact.
  */
-const EXPORT_SPAN = 163840
 const TILE_PX = 8192
 const PIXEL_M = 10
 
@@ -114,9 +113,10 @@ const USAGE = `
 Land cover for a window, from AlphaEarth Foundations.
 
   --dem   <file.tif>  Cut the plate to match a GeoTIFF you already have. The
-                      extent, the projection and the pixel grid all come from
-                      the file, so the plate lines up with it exactly and no
-                      terrain is fetched.
+                      extent and the projection come from the file, so the
+                      plate covers the same ground and no terrain is fetched.
+                      The plate is cut at the embeddings' own 10 m, which is
+                      the file's grid unless the file is finer than that.
   --place "<name>"    Or a place to centre on, resolved by OpenStreetMap.
   --bbox  a,b,c,d     Or an explicit lon,lat,lon,lat box.
   --km    <n>         Window side in kilometres. Default 4.
@@ -173,11 +173,42 @@ async function geocode(place) {
   return { lat: Number(hits[0].lat), lon: Number(hits[0].lon), label: hits[0].display_name }
 }
 
-/** The UTM CRS a longitude and latitude fall in. */
-function utmCrsFor(lon, lat) {
-  const zone = Math.floor((lon + 180) / 6) + 1
-  const code = (lat >= 0 ? 32600 : 32700) + zone
-  return { zone, code, crs: `EPSG:${code}`, name: `${zone}${lat >= 0 ? 'N' : 'S'}` }
+/** The UTM CRS for a zone number and a hemisphere. */
+function utmCrsForZone(zone, isSouth) {
+  const code = (isSouth ? 32700 : 32600) + zone
+  return { zone, code, crs: `EPSG:${code}`, name: `${zone}${isSouth ? 'S' : 'N'}` }
+}
+
+/**
+ * The zones worth asking, best first.
+ *
+ * A point does not always have its data in the zone its longitude names, and a
+ * raster near a zone boundary is the case that proves it. Tre Cime sits at
+ * 12.28°E — eight hundredths of a degree inside zone 33's band — and is stored
+ * in ETRS89 / UTM 32N, which is what a surveyor working in the Alps uses for
+ * the whole region. AlphaEarth publishes it in 32N too: at that latitude zone
+ * 33 simply has no export in its westernmost column, so asking 33 because the
+ * longitude said so came back with nothing at all and a message about the
+ * dataset rather than about the seam.
+ *
+ * So: the raster's own zone first when it has one, because a file georeferenced
+ * in a zone is evidence about where its data lives and it needs no reprojection
+ * either. Then the zone the longitude names. Then the neighbours, because a
+ * window can straddle a seam from either side.
+ */
+function candidateZones(centre, demCrs) {
+  const isSouth = centre.lat < 0
+  const byLon = Math.floor((centre.lon + 180) / 6) + 1
+  const order = []
+
+  const own = demCrs ? classifyCRS(demCrs) : null
+  if (own?.kind === 'utm' && own.zone) order.push(own.zone)
+  order.push(byLon, byLon - 1, byLon + 1)
+
+  const seen = new Set()
+  return order
+    .filter((z) => z >= 1 && z <= 60 && !seen.has(z) && seen.add(z))
+    .map((z) => utmCrsForZone(z, isSouth))
 }
 
 /**
@@ -256,43 +287,66 @@ function worldToPixel(af, x, y) {
  * Which export covers which ground, cached on disk.
  *
  * The object names carry an export-task hash and a pixel offset, and nothing
- * about where on Earth they sit. The only way to know is to open each export's
- * first tile and read its affine — 177 of them in a busy UTM zone, which is a
- * minute of HTTP the first time and nothing at all after that.
+ * about where on Earth they sit. The only way to know is to open a tile and
+ * read its affine — a few hundred of them in a busy UTM zone, which is a minute
+ * of HTTP the first time and nothing at all after that.
  *
- * The search stops as soon as every origin the window needs has been found, so
- * a typical run probes roughly half the zone. Every probe that *did* happen is
- * still written to the cache, so the next window in the same zone starts warmer
- * even when the first one exited early.
+ * ── Two things the naïve version got wrong ───────────────────────────────────
+ * It probed `<hash>-0000000000-0000000000.tiff` and skipped the export when
+ * that 404'd. **Thirty-one of 208 exports in zone 33N have no such tile**, so
+ * fifteen per cent of the archive was invisible — and invisible in the way that
+ * matters, since a window over one of them reported that the dataset does not
+ * cover that ground.
+ *
+ * It also took every export to be a 2 × 2 grid of 8192-pixel tiles. The real
+ * distribution in 33N is 151 exports of four tiles, 50 of two, six of one and
+ * one of three. An export credited with ground it does not have is the same
+ * failure wearing the opposite face: the window is selected, the read comes
+ * back empty, and the zone that really holds the data is never tried.
+ *
+ * Both are answered by the listing, which states exactly which tiles exist. So
+ * the probe targets a tile that is *there*, and the extent is the union of the
+ * tiles an export actually has.
  */
 async function exportIndex(year, zoneName, cacheDir) {
-  const cacheFile = path.join(cacheDir, `${year}-${zoneName}.json`)
+  // v2: the cached shape changed when tile lists arrived. A stale v1 file is
+  // ignored rather than migrated — it is a cache, and re-probing costs a minute.
+  const cacheFile = path.join(cacheDir, `${year}-${zoneName}-v2.json`)
   let cache = {}
   if (existsSync(cacheFile)) {
     try { cache = JSON.parse(await readFile(cacheFile, 'utf8')) } catch { cache = {} }
   }
 
   const keys = await listPrefix(`${PREFIX}/${year}/${zoneName}/`)
-  const hashes = [...new Set(
-    keys.filter((k) => k.endsWith('.tiff'))
-        .map((k) => path.basename(k).replace(/-\d+-\d+\.tiff$/, '')),
-  )]
-  const unknown = hashes.filter((hash) => !(hash in cache))
+  const tilesOf = new Map()
+  for (const key of keys) {
+    if (!key.endsWith('.tiff')) continue
+    const m = path.basename(key).match(/^(.+)-(\d{10})-(\d{10})\.tiff$/)
+    if (!m) continue
+    if (!tilesOf.has(m[1])) tilesOf.set(m[1], [])
+    tilesOf.get(m[1]).push([Number(m[2]), Number(m[3])])
+  }
 
+  const unknown = [...tilesOf.keys()].filter((hash) => !(hash in cache))
   let probed = 0
   await pooled(unknown, 16, async (hash) => {
-    const url = `${BUCKET}/${PREFIX}/${year}/${zoneName}/${hash}-0000000000-0000000000.tiff`
+    // A tile that exists, preferring the corner when there is one so the
+    // arithmetic below is a no-op in the common case.
+    const tiles = tilesOf.get(hash)
+    const pick = tiles.find(([r, c]) => r === 0 && c === 0) ?? tiles[0]
+    const [row, col] = pick
+    const name = `${hash}-${String(row).padStart(10, '0')}-${String(col).padStart(10, '0')}.tiff`
     try {
-      const image = await (await fromUrl(url)).getImage()
+      const image = await (await fromUrl(`${BUCKET}/${PREFIX}/${year}/${zoneName}/${name}`)).getImage()
       const af = affineOf(image)
-      // The affine names the corner raster row 0 sits on. On these south-up
-      // tiles that is the south-west corner, which is the export's origin.
-      cache[hash] = [af.d, af.h]
+      // The affine names the corner raster row 0 sits on. These tiles are
+      // south-up, so that is the south-west corner — and the export's own
+      // corner is that, less the tile's offset within the export.
+      cache[hash] = { o: [af.d - col * PIXEL_M, af.h - row * PIXEL_M], t: tiles }
       probed++
     } catch {
-      // A tile that will not open is not fatal: it is one export out of
-      // hundreds, and the window probably does not want it. Leave it unmapped
-      // so a later run tries again rather than caching a wrong answer.
+      // One export out of hundreds, and the window probably does not want it.
+      // Left unmapped so a later run tries again rather than caching a guess.
     }
   })
 
@@ -300,25 +354,37 @@ async function exportIndex(year, zoneName, cacheDir) {
     await mkdir(cacheDir, { recursive: true })
     await writeFile(cacheFile, JSON.stringify(cache), 'utf8')
   }
-  return { cache, cacheFile, probed, total: hashes.length }
+  return { cache, cacheFile, probed, total: tilesOf.size }
+}
+
+/** Every tile an export holds, as world boxes. */
+function tileBoxes(entry) {
+  const [ox, oy] = entry.o
+  const side = TILE_PX * PIXEL_M
+  return entry.t.map(([row, col]) => {
+    const x = ox + col * PIXEL_M
+    const y = oy + row * PIXEL_M
+    return [x, y, x + side, y + side]
+  })
 }
 
 /**
  * The exports a window actually touches.
  *
- * Selected by intersecting real extents rather than by computing which lattice
- * cell the window falls in, and the difference is not academic: the exports are
- * laid out on a grid anchored at the UTM *false easting* of 500 000, not at
- * zero, so every arithmetic shortcut that assumes a zero anchor picks the tile
- * one column to the west. Reading the origins and intersecting them cannot be
- * wrong in that way, and costs one cached listing.
+ * Intersected against the tiles each export really has, rather than against a
+ * lattice cell it is assumed to fill. Selected by real extents rather than by
+ * computing which cell the window falls in, and that difference is not
+ * academic either: the exports sit on a grid anchored at the UTM *false
+ * easting* of 500 000 rather than at zero, so every arithmetic shortcut that
+ * assumes a zero anchor picks the tile one column to the west.
  */
 function selectExports(index, win) {
   const out = []
-  for (const [hash, [ox, oy]] of Object.entries(index.cache)) {
-    if (ox >= win.maxX || ox + EXPORT_SPAN <= win.minX) continue
-    if (oy >= win.maxY || oy + EXPORT_SPAN <= win.minY) continue
-    out.push(hash)
+  for (const [hash, entry] of Object.entries(index.cache)) {
+    if (!entry?.o || !entry?.t) continue
+    const hit = tileBoxes(entry).some(([x0, y0, x1, y1]) =>
+      !(win.maxX <= x0 || win.minX >= x1 || win.maxY <= y0 || win.minY >= y1))
+    if (hit) out.push({ hash, tiles: entry.t })
   }
   return out
 }
@@ -335,14 +401,17 @@ function selectExports(index, win) {
  * Output is north-up, because everything downstream — the written GeoTIFF, the
  * cover plate, the app — assumes row 0 is north. The flip happens here, once.
  */
-async function readEmbeddings(year, zoneName, win, hashes) {
+async function readEmbeddings(year, zoneName, win, exports) {
   const out = new Int8Array(DIMS * win.width * win.height)
   const covered = new Uint8Array(win.width * win.height)
   const samples = Array.from({ length: DIMS }, (_, i) => i)
 
-  for (const hash of hashes) {
-    for (const rowOff of [0, TILE_PX]) {
-      for (const colOff of [0, TILE_PX]) {
+  for (const { hash, tiles } of exports) {
+    // Only the tiles that exist. The listing already said which those are, so
+    // nothing here asks for a file it has been told is absent — the old version
+    // walked a 2 × 2 grid on faith and spent most of its requests on 404s.
+    {
+      for (const [rowOff, colOff] of tiles) {
         const name = `${hash}-${String(rowOff).padStart(10, '0')}-${String(colOff).padStart(10, '0')}.tiff`
         const url = `${BUCKET}/${PREFIX}/${year}/${zoneName}/${name}`
         let image
@@ -442,6 +511,52 @@ async function readDemGrid(file) {
   }
 }
 
+/**
+ * The grid a plate should be cut on for a given raster.
+ *
+ * Not the raster's own grid, which is the obvious choice and usually the wrong
+ * one. The embeddings are 10 m; a raster finer than that — the Graz plate is
+ * about 4 m — would have every embedding pixel copied across several plate
+ * pixels, which is upsampling dressed as detail. It costs the reduction 64
+ * bands over nine million cells to say nothing a quarter of that could not.
+ *
+ * So the plate is cut at the data's own resolution, or the raster's where the
+ * raster is coarser, and `MAX_PLATE_PIXELS` is a backstop rather than the rule.
+ * `alignCover` in the app resamples a plate onto whatever raster it is laid
+ * over, so a coarser plate loses nothing but bytes.
+ */
+const MAX_PLATE_PIXELS = 4e6
+
+function plateGridFor(dem) {
+  // Ground metres per raster pixel, per axis. A geographic raster states its
+  // pixel in degrees, which is a different number on each axis and neither of
+  // them metres.
+  const [, midLat] = (() => {
+    const ll = unprojectWgs84(...demPixelToWorld(dem.af, dem.width / 2, dem.height / 2), dem.crs)
+    return ll ? [ll[1], ll[0]] : [0, 0]
+  })()
+  const geographic = classifyCRS(dem.crs).kind === 'geographic'
+  const spanX = Math.abs(dem.bbox[2] - dem.bbox[0]) / dem.width
+  const spanY = Math.abs(dem.bbox[3] - dem.bbox[1]) / dem.height
+  const groundX = geographic ? spanX * 111320 * Math.cos((midLat * Math.PI) / 180) : spanX
+  const groundY = geographic ? spanY * 110574 : spanY
+
+  let sx = Math.max(1, Math.round(PIXEL_M / Math.max(0.01, groundX)))
+  let sy = Math.max(1, Math.round(PIXEL_M / Math.max(0.01, groundY)))
+  let width = Math.max(1, Math.round(dem.width / sx))
+  let height = Math.max(1, Math.round(dem.height / sy))
+
+  // The backstop: a raster coarser than 10 m over a very large extent can still
+  // ask for more cells than the reduction will hold.
+  if (width * height > MAX_PLATE_PIXELS) {
+    const k = Math.sqrt((width * height) / MAX_PLATE_PIXELS)
+    sx *= k; sy *= k
+    width = Math.max(1, Math.round(dem.width / sx))
+    height = Math.max(1, Math.round(dem.height / sy))
+  }
+  return { width, height, groundX, groundY }
+}
+
 /** A DEM pixel centre, in the DEM's own world coordinates. */
 const demPixelToWorld = (af, col, row) => [
   af.d + af.a * (col + 0.5) + af.b * (row + 0.5),
@@ -497,15 +612,17 @@ function utmWindowCovering(dem, utmCrs) {
  * bilinear because the vectors are about to be classified — an interpolated
  * embedding is a point between two materials, which is not a third material.
  */
-function resampleToDem(cube, win, dem, utmCrs) {
-  const n = dem.width * dem.height
+function resampleToDem(cube, win, dem, utmCrs, plate) {
+  const n = plate.width * plate.height
   const out = new Int8Array(DIMS * n)
   const srcN = win.width * win.height
+  const sx = dem.width / plate.width, sy = dem.height / plate.height
   let outside = 0
 
-  for (let r = 0; r < dem.height; r++) {
-    for (let c = 0; c < dem.width; c++) {
-      const [wx, wy] = demPixelToWorld(dem.af, c, r)
+  for (let r = 0; r < plate.height; r++) {
+    for (let c = 0; c < plate.width; c++) {
+      // Plate cell to the raster pixel at its centre, then out to the world.
+      const [wx, wy] = demPixelToWorld(dem.af, (c + 0.5) * sx - 0.5, (r + 0.5) * sy - 0.5)
       const ll = unprojectWgs84(wx, wy, dem.crs)
       const xy = ll && projectWgs84(ll[0], ll[1], utmCrs)
       if (!xy) { outside++; continue }
@@ -513,7 +630,7 @@ function resampleToDem(cube, win, dem, utmCrs) {
       const sr = Math.floor((win.maxY - xy[1]) / PIXEL_M)
       if (sc < 0 || sc >= win.width || sr < 0 || sr >= win.height) { outside++; continue }
       const src = sr * win.width + sc
-      const dst = r * dem.width + c
+      const dst = r * plate.width + c
       for (let b = 0; b < DIMS; b++) out[b * n + dst] = cube[b * srcN + src]
     }
   }
@@ -736,12 +853,24 @@ function classColours(labels, rgb, k, n) {
 }
 
 /** The supplied raster's own elevation band, for describing classes by terrain. */
-async function readDemBand(file) {
+async function readDemBand(file, dem, grid) {
   const buf = await readFile(file)
   const tiff = await fromArrayBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength))
   const image = await tiff.getImage()
   const band = (await image.readRasters({ samples: [0] }))[0]
-  return Float32Array.from(band)
+  if (!grid || (grid.width === dem.width && grid.height === dem.height)) return Float32Array.from(band)
+
+  // Nearest, onto the plate's grid. This feeds a mean slope per class, which a
+  // sample per cell answers as well as an average would.
+  const out = new Float32Array(grid.width * grid.height)
+  const sx = dem.width / grid.width, sy = dem.height / grid.height
+  for (let r = 0; r < grid.height; r++) {
+    const sr = Math.min(dem.height - 1, Math.floor((r + 0.5) * sy))
+    for (let c = 0; c < grid.width; c++) {
+      out[r * grid.width + c] = band[sr * dem.width + Math.min(dem.width - 1, Math.floor((c + 0.5) * sx))]
+    }
+  }
+  return out
 }
 
 /** A grid's extent as [minLon, minLat, maxLon, maxLat], or null if it cannot be. */
@@ -775,11 +904,17 @@ function wgs84ToGridPixel(grid, dem) {
   if (dem) {
     const { a, b, d, e, f, h } = dem.af
     const det = a * f - b * e
+    // The affine answers in the *raster's* pixels, and the plate is cut on its
+    // own grid — coarser whenever the raster is finer than 10 m. Painting the
+    // polygons at raster scale onto a plate half its width put every one of
+    // them in the top-left quadrant, and the tally that came out of it was the
+    // same for every class, which is what a uniform answer usually means.
+    const sx = grid.width / dem.width, sy = grid.height / dem.height
     return (lat, lon) => {
       const xy = projectWgs84(lat, lon, grid.crs)
       if (!xy || !det) return null
       const dx = xy[0] - d, dy = xy[1] - h
-      return [(f * dx - b * dy) / det, (a * dy - e * dx) / det]
+      return [((f * dx - b * dy) / det) * sx, ((a * dy - e * dx) / det) * sy]
     }
   }
   const [x0, y0, x1, y1] = grid.bbox
@@ -1045,21 +1180,44 @@ function nameClasses(classes, labels, painted, tags, terrain) {
       return { ...c,
         name: titleCase(TAG_LABEL[tags[ranked[0][0]]]),
         qualifier: ground?.slope.toLowerCase() ?? null,
+        height: ground?.height ?? null,
         note: `OpenStreetMap: ${parts.join(', ')}` }
     }
     return { ...c,
       name: c.name,
       qualifier: null,
+      height: null,
       note: ground ? `${ground.slope} ground, ${ground.height} in the window · ${ground.degrees}°` : null }
   })
 
-  // Two classes called "Quarry" are two rows a reader cannot tell apart, which
-  // is the one thing a legend has to do.
-  const seen = new Map()
-  for (const c of named) seen.set(c.name, (seen.get(c.name) ?? 0) + 1)
-  return named.map((c) => (seen.get(c.name) > 1 && c.qualifier
-    ? { ...c, name: `${c.name} · ${c.qualifier}` }
-    : c))
+  /*
+   * Two rows a reader cannot tell apart are the one thing a legend must not
+   * have, so collisions are broken in widening steps and the last one always
+   * works.
+   *
+   * Over the Dolomites the first step is not enough on its own: four of six
+   * classes come back "Bare rock" and two of those are both steep, so the slope
+   * word parts them into two pairs and leaves one pair standing. Height parts
+   * that. Where even height ties — two classes genuinely alike in cover, slope
+   * and elevation, differing only in the embedding — the letter is what is left,
+   * and an honest "A" beats a duplicate.
+   */
+  const widen = [
+    (c) => c.name,
+    (c) => (c.qualifier ? `${c.name} · ${c.qualifier}` : c.name),
+    (c) => (c.height ? `${c.name} · ${c.qualifier ?? ''} ${c.height}`.replace(/ +/g, ' ').replace('· ', '· ') : c.name),
+    (c) => `${c.name} ${String.fromCharCode(65 + c.index)}`,
+  ]
+
+  let labelled = named.map((c) => ({ ...c, name: widen[0](c) }))
+  for (let step = 1; step < widen.length; step++) {
+    const count = new Map()
+    for (const c of labelled) count.set(c.name, (count.get(c.name) ?? 0) + 1)
+    if (![...count.values()].some((n) => n > 1)) break
+    labelled = labelled.map((c, i) =>
+      (count.get(c.name) > 1 ? { ...c, name: widen[step](named[i]) } : c))
+  }
+  return labelled
 }
 
 /**
@@ -1306,8 +1464,11 @@ async function main() {
     if (!existsSync(args.dem)) throw new Error(`No such file: ${args.dem}`)
     dem = await readDemGrid(args.dem)
     console.log(`Raster   ${args.dem}`)
+    // Degrees rounded to whole numbers read as a raster of zero height, which
+    // is how `15 47 16 47` came to describe a 16 km window over Graz.
+    const dp = classifyCRS(dem.crs).kind === 'geographic' ? 4 : 0
     console.log(`         ${dem.width} × ${dem.height} px · ${dem.crs} · ` +
-                `${dem.bbox.map((v) => Math.round(v)).join(' ')}`)
+                `${dem.bbox.map((v) => v.toFixed(dp)).join(' ')}`)
   }
 
   let centre, label, km = args.km
@@ -1336,38 +1497,69 @@ async function main() {
     console.log(`Place    ${label}`)
   }
 
-  const utm = utmCrsFor(centre.lon, centre.lat)
-  // With a raster to match, the window is whatever covers it in UTM; otherwise
-  // it is the square the place asked for.
-  const win = dem ? utmWindowCovering(dem, utm.crs) : windowFor(centre, km, utm.crs)
-  const n = win.width * win.height
+  const cacheDir = path.join(path.dirname(new URL(import.meta.url).pathname), '.ae-index')
+  const zones = candidateZones(centre, dem?.crs)
+
+  /*
+   * Each candidate is a whole question: its own window, its own index, its own
+   * coverage. The first that answers wins, and the rest are never asked — so
+   * the usual case still probes exactly one zone.
+   */
+  let utm = null, win = null, hashes = [], read = null
+  const tried = []
+  for (const candidate of zones) {
+    const w = dem ? utmWindowCovering(dem, candidate.crs) : windowFor(centre, km, candidate.crs)
+    // Only the *read* is capped here. A raster larger than this is not refused
+    // — `plateGridFor` cuts its plate coarser instead — but a window that needs
+    // more than this many embedding pixels is asking for more ground than one
+    // run should pull.
+    const count = w.width * w.height
+    if (count > MAX_PLATE_PIXELS) {
+      throw new Error(
+        dem
+          ? `That raster spans ${Math.round(Math.sqrt(count) * PIXEL_M / 1000)} km of ground, which ` +
+            `needs ${count.toLocaleString()} embedding pixels to cover. Crop it first.`
+          : `That window is ${count.toLocaleString()} pixels. Keep --km under ` +
+            `${Math.floor(Math.sqrt(MAX_PLATE_PIXELS) * PIXEL_M / 1000)} so the read stays reasonable.`)
+    }
+
+    console.log(`Index    locating exports for ${args.year} zone ${candidate.name}…`)
+    const idx = await exportIndex(args.year, candidate.name, cacheDir)
+    const found = selectExports(idx, w)
+    console.log(`         ${idx.total} export(s) in zone, ${idx.probed} newly probed, ` +
+                `${found.length} may cover this window`)
+    if (!found.length) { tried.push(`${candidate.name}: none on the lattice`); continue }
+
+    /*
+     * The read is the verification.
+     *
+     * `selectExports` only knows where an export *starts* — its extent comes
+     * from an upper bound, and not every export fills it. So the honest test of
+     * a zone is whether any pixel actually comes back, and a zone that fails it
+     * costs four header reads that mostly 404 immediately.
+     */
+    console.log(`Cover    reading 64 bands from ${candidate.name}…`)
+    const attempt = await readEmbeddings(args.year, candidate.name, w, found)
+    if (attempt.missing === count) {
+      console.log('         nothing in those exports reaches this window')
+      tried.push(`${candidate.name}: on the lattice, no pixels`)
+      continue
+    }
+    utm = candidate; win = w; hashes = found; read = attempt
+    break
+  }
+
+  if (!read) {
+    throw new Error(
+      `No AlphaEarth export covers ${centre.lat.toFixed(4)}, ${centre.lon.toFixed(4)} for ${args.year}.\n` +
+      tried.map((t) => `  ${t}`).join('\n') +
+      '\nThe ground may sit outside the dataset, or that year may not be published for it.')
+  }
+  void hashes
+
   console.log(`Window   ${win.width} × ${win.height} px at ${PIXEL_M} m · ${utm.crs} · ` +
               `${win.minX} ${win.minY} ${win.maxX} ${win.maxY}`)
 
-  if (n > 4e6 || (dem && dem.width * dem.height > 4e6)) {
-    throw new Error(
-      dem
-        ? `That raster needs ${Math.max(n, dem.width * dem.height).toLocaleString()} embedding pixels, ` +
-          'which is more than this script will read at once. Crop it first.'
-        : `That window is ${n.toLocaleString()} pixels. Keep --km under ` +
-          `${Math.floor(Math.sqrt(4e6) * PIXEL_M / 1000)} so the read stays reasonable.`)
-  }
-
-  const cacheDir = path.join(path.dirname(new URL(import.meta.url).pathname), '.ae-index')
-  console.log(`Index    locating exports for ${args.year} zone ${utm.name}…`)
-  const index = await exportIndex(args.year, utm.name, cacheDir)
-  const hashes = selectExports(index, win)
-  console.log(`         ${index.total} export(s) in zone, ${index.probed} newly probed, ` +
-              `${hashes.length} cover this window`)
-  if (!hashes.length) {
-    throw new Error(
-      `No AlphaEarth export covers ${win.minX}, ${win.minY} in zone ${utm.name} for ${args.year}. ` +
-      `The window may sit outside the dataset, or that year may not be published for this zone.`)
-  }
-
-  console.log('Cover    reading 64 bands…')
-  const read = await readEmbeddings(args.year, utm.name, win, hashes)
-  if (read.missing === n) throw new Error('The window read back empty. It is probably outside the dataset.')
   if (read.missing) console.log(`         ${read.missing} pixel(s) had no embedding and fall in class 0`)
 
   // With a raster to match, the cube is carried onto its grid before anything
@@ -1376,10 +1568,16 @@ async function main() {
   let grid = { width: win.width, height: win.height, crs: utm.crs,
                bbox: [win.minX, win.minY, win.maxX, win.maxY] }
   if (dem) {
-    const put = resampleToDem(read.data, win, dem, utm.crs)
+    const plate = plateGridFor(dem)
+    const put = resampleToDem(read.data, win, dem, utm.crs, plate)
     data = put.data
-    grid = { width: dem.width, height: dem.height, crs: dem.crs, bbox: dem.bbox }
-    console.log(`         resampled onto ${dem.width} × ${dem.height} at the raster's own grid`)
+    grid = { width: plate.width, height: plate.height, crs: dem.crs, bbox: dem.bbox }
+    const coarser = plate.width !== dem.width || plate.height !== dem.height
+    console.log(`         resampled onto ${plate.width} × ${plate.height}` +
+      (coarser
+        ? ` — the raster is ${plate.groundX.toFixed(1)} m a pixel and the embeddings are ` +
+          `${PIXEL_M} m, so the plate is cut at the data's own resolution`
+        : " at the raster's own grid"))
     if (put.outside) {
       console.log(`         ${put.outside} pixel(s) of the raster fall outside the embedding window`)
     }
@@ -1404,7 +1602,9 @@ async function main() {
   let terrainCredit = null
   let elev
   if (dem) {
-    elev = await readDemBand(args.dem)
+    // Subsampled to the plate's grid, because `terrainNotes` walks it cell for
+    // cell against the class labels.
+    elev = await readDemBand(args.dem, dem, grid)
   } else {
     console.log('Terrain  fetching ground…')
     const got = await fetchElevation(win, utm.crs, clamp(args.zoom, 1, MAX_ZOOM))

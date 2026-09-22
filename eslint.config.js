@@ -77,7 +77,7 @@ const noDuplicateProps = {
 }
 
 export default [
-  { ignores: ['dist/**', 'test-results/**'] },
+  { ignores: ['dist/**', 'test-results/**', 'ae.local/**'] },
 
   js.configs.recommended,
 

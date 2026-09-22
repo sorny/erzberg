@@ -27,10 +27,14 @@
  * value and a smoothed edge would show a boundary that is not there.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { stamp, stroke } from '../utils/maskLayers'
+import { fillAll, invert, stamp, stroke } from '../utils/maskLayers'
+import { MaskPanel } from './MaskPanel'
+import { BORDER, MUTED, SURF } from './panel/ui'
+import { applyTone } from '../utils/imageryTone'
 
-/** Tools, and the one letter each answers to. */
-export const STUDIO_TOOLS = [
+/** Tools, and the one letter each answers to. The panel draws the buttons;
+ *  this is only the keyboard map. */
+const STUDIO_TOOLS = [
   ['brush', 'Brush', 'B'],
   ['rect', 'Rectangle', 'R'],
   ['ellipse', 'Ellipse', 'O'],
@@ -63,7 +67,8 @@ function buildRelief(pixels, nodata, width, height) {
 
 export function MaskStudio({
   srcPixels, srcMask, srcWidth, srcHeight,
-  imagery, mask, onCommit, onClose, rightInset = 0,
+  imagery, tone, mask, onCommit, onClose, rightInset = 0,
+  style, ss,
 }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
@@ -86,10 +91,14 @@ export function MaskStudio({
     () => (srcPixels ? buildRelief(srcPixels, srcMask, srcWidth, srcHeight) : null),
     [srcPixels, srcMask, srcWidth, srcHeight],
   )
+  // The same exposure the terrain drape is under, and for a reason worth
+  // stating: a boundary is painted against what is on screen here and checked
+  // against what is on screen there. Two different exposures would move it.
   const photo = useMemo(() => {
     if (!imagery?.rgba) return null
-    return new ImageData(new Uint8ClampedArray(imagery.rgba), imagery.width, imagery.height)
-  }, [imagery])
+    const toned = applyTone(imagery.rgba, imagery.width, imagery.height, tone)
+    return new ImageData(toned, imagery.width, imagery.height)
+  }, [imagery, tone])
 
   const showPhoto = backdrop === 'imagery' || (backdrop === 'auto' && !!photo)
 
@@ -212,6 +221,14 @@ export function MaskStudio({
   const commit = () => { onCommit?.(); bump((n) => n + 1) }
 
   const onDown = (e) => {
+    // Alt is the pan modifier and outranks every tool, exactly as it does in
+    // Edit Mode. Middle-drag too, because a trackpad has no comfortable Alt.
+    if (e.altKey || e.button === 1) {
+      e.currentTarget.setPointerCapture?.(e.pointerId)
+      dragRef.current = { tool: 'pan', sx: e.clientX, sy: e.clientY,
+                          ox: viewRef.current.ox, oy: viewRef.current.oy }
+      return
+    }
     if (!dataRef.current || e.button !== 0) return
     const pt = toImage(e)
     e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -227,6 +244,13 @@ export function MaskStudio({
   }
 
   const onMove = (e) => {
+    const d0 = dragRef.current
+    if (d0?.tool === 'pan') {
+      viewRef.current = { ...viewRef.current,
+                          ox: d0.ox + (e.clientX - d0.sx), oy: d0.oy + (e.clientY - d0.sy) }
+      draw()
+      return
+    }
     const pt = toImage(e)
     hoverRef.current = pt
     const d = dragRef.current
@@ -249,9 +273,33 @@ export function MaskStudio({
   const onUp = () => {
     const d = dragRef.current
     dragRef.current = null
+    if (d?.tool === 'pan') { draw(); return }
     if (!d || !dataRef.current) { draw(); return }
     if (d.tool !== 'brush') fillShape(dataRef.current, srcWidth, srcHeight, d, erase)
     commit()
+    draw()
+  }
+
+  /**
+   * Zoom about the cursor: the image point under it must not move.
+   *
+   * The same curve and the same 0.02–64 clamp as Edit Mode. A mask is painted
+   * against a boundary in a photograph, and a boundary a person is willing to
+   * trace by hand is routinely a few raster pixels wide — fit-to-window is the
+   * one zoom at which that work cannot be done.
+   */
+  const onWheel = (e) => {
+    e.preventDefault()
+    const r = canvasRef.current.getBoundingClientRect()
+    const v = viewRef.current
+    const k = Math.exp(-e.deltaY * 0.0015)
+    const scale = Math.max(0.02, Math.min(64, v.scale * k))
+    const cx = e.clientX - r.left, cy = e.clientY - r.top
+    viewRef.current = {
+      scale,
+      ox: cx - (cx - v.ox) * (scale / v.scale),
+      oy: cy - (cy - v.oy) * (scale / v.scale),
+    }
     draw()
   }
 
@@ -281,83 +329,44 @@ export function MaskStudio({
         onPointerDown={onDown} onPointerMove={onMove}
         onPointerUp={onUp} onPointerCancel={onUp}
         onPointerLeave={() => { hoverRef.current = null; draw() }}
+        onWheel={onWheel}
+        onContextMenu={(e) => e.preventDefault()}
         style={{ display: 'block', cursor: tool === 'brush' ? 'none' : 'crosshair', touchAction: 'none' }} />
 
-      <StudioBar
+      {/* Hints + view controls, in the same corner and the same shape as Edit
+          Mode's. The two views are the same kind of thing and now say so. */}
+      <div style={{
+        position: 'absolute', left: 14, bottom: 14, display: 'flex', alignItems: 'center', gap: 8,
+        fontFamily: 'system-ui,sans-serif', fontSize: 11, color: MUTED,
+      }}>
+        <button onClick={fit} data-testid="studio-fit" style={{
+          background: SURF, color: '#d4d4d8', border: `1px solid ${BORDER}`,
+          borderRadius: 5, padding: '5px 10px', fontSize: 11, cursor: 'pointer',
+        }}>Fit</button>
+        <span style={{ background: 'rgba(0,0,0,.45)', padding: '5px 9px', borderRadius: 5 }}>
+          {srcWidth}×{srcHeight} px
+          {' · '}
+          {tool === 'brush'   && 'drag to paint · [ and ] resize'}
+          {tool === 'rect'    && 'drag a rectangle'}
+          {tool === 'ellipse' && 'drag an ellipse'}
+          {tool === 'lasso'   && 'drag to trace · it closes itself'}
+          {' · alt-drag to pan · scroll to zoom'}
+        </span>
+      </div>
+
+      <MaskPanel
+        mask={mask} srcWidth={srcWidth} srcHeight={srcHeight}
         tool={tool} setTool={setTool}
         brush={brush} setBrush={setBrush}
         erase={erase} setErase={setErase}
         backdrop={backdrop} setBackdrop={setBackdrop}
-        hasPhoto={!!photo} mask={mask} imagery={imagery}
-        onClose={onClose} onFit={fit}
+        hasPhoto={!!photo} imagery={imagery}
+        style={style} ss={ss}
+        onFill={() => { if (dataRef.current) { fillAll(dataRef.current, 1); commit(); draw() } }}
+        onInvert={() => { if (dataRef.current) { invert(dataRef.current); commit(); draw() } }}
+        onClear={() => { if (dataRef.current) { fillAll(dataRef.current, 0); commit(); draw() } }}
+        onDone={onClose}
       />
-    </div>
-  )
-}
-
-/** The floating bar. Kept out of the canvas so a stroke never lands on it. */
-function StudioBar({ tool, setTool, brush, setBrush, erase, setErase,
-                     backdrop, setBackdrop, hasPhoto, mask, imagery, onClose, onFit }) {
-  const chip = (on) => ({
-    padding: '4px 9px', fontSize: 11, borderRadius: 4, cursor: 'pointer',
-    background: on ? '#3b82f6' : 'rgba(255,255,255,0.06)',
-    color: on ? '#fff' : '#c8ced6',
-    border: `1px solid ${on ? '#3b82f6' : 'rgba(255,255,255,0.14)'}`,
-  })
-  return (
-    <div style={{
-      position: 'absolute', top: 12, left: 12, right: 12,
-      display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap',
-      background: 'rgba(14,17,20,0.92)', border: '1px solid rgba(255,255,255,0.12)',
-      borderRadius: 6, padding: '8px 10px', backdropFilter: 'blur(6px)',
-    }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#e8ebed' }}>
-        <span style={{ width: 12, height: 12, borderRadius: 3, background: mask?.color ?? '#888',
-                       border: '1px solid rgba(255,255,255,0.3)' }} />
-        {mask?.name ?? 'No mask'}
-      </span>
-
-      <span style={{ display: 'flex', gap: 3 }}>
-        {STUDIO_TOOLS.map(([id, label, key]) => (
-          <button key={id} type="button" onClick={() => setTool(id)}
-            title={`${label} (${key})`} data-testid={`studio-tool-${id}`}
-            style={chip(tool === id)}>{label}</button>
-        ))}
-      </span>
-
-      <button type="button" onClick={() => setErase(!erase)} data-testid="studio-erase"
-        title="Erase (E)" style={chip(erase)}>{erase ? 'Erasing' : 'Painting'}</button>
-
-      {tool === 'brush' && (
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#c8ced6' }}>
-          Size
-          <input type="range" min={MIN_BRUSH} max={MAX_BRUSH} value={brush}
-            aria-label="Brush size"
-            onChange={(e) => setBrush(Number(e.target.value))} style={{ width: 110 }} />
-          <span style={{ fontVariantNumeric: 'tabular-nums', minWidth: 28 }}>{brush}</span>
-        </label>
-      )}
-
-      <span style={{ display: 'flex', gap: 3 }}>
-        {[['auto', 'Auto'], ['imagery', 'Satellite'], ['relief', 'Relief']].map(([id, label]) => (
-          <button key={id} type="button" onClick={() => setBackdrop(id)}
-            disabled={id === 'imagery' && !hasPhoto}
-            title={id === 'imagery' && !hasPhoto ? 'Fetch satellite imagery first' : `Backdrop: ${label}`}
-            style={{ ...chip(backdrop === id), opacity: id === 'imagery' && !hasPhoto ? 0.4 : 1 }}>
-            {label}
-          </button>
-        ))}
-      </span>
-
-      <span style={{ flex: 1 }} />
-
-      {imagery && (
-        <span style={{ fontSize: 10, color: '#8b949c' }}>
-          {imagery.date} · {Math.round(imagery.cloud)}% cloud
-        </span>
-      )}
-      <button type="button" onClick={onFit} style={chip(false)}>Fit</button>
-      <button type="button" onClick={onClose} data-testid="studio-done" style={chip(false)}>Done</button>
     </div>
   )
 }

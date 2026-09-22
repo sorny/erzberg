@@ -1041,12 +1041,17 @@ and still looks deliberate, so it has to be caught at the door or not at all.
 
 Two routes, and the order matters:
 
-- **Same dimensions.** A plate cut for this very raster matches pixel for pixel,
-  and copying it is exact and free. No resampling error, no dependence on two
-  bounding boxes agreeing to the metre.
+- **Same dimensions.** A plate whose grid matches copies pixel for pixel, exact
+  and free. No resampling error, no dependence on two bounding boxes agreeing to
+  the metre.
 - **Through the extents**, nearest-neighbour, when the grids differ. Nearest and
   not bilinear because a class index has no meaningful average: halfway between
   water and forest is not a third thing.
+
+The second route is the ordinary one, not the fallback. The embeddings are 10 m,
+so a plate for a raster finer than that is cut coarser than the raster on
+purpose and arrives needing exactly this upsample — see
+[Land-Cover.md](Land-Cover.md#what-resolution-the-plate-is-cut-at).
 
 The alignment is **derived, not stored**. An Edit Mode crop changes both the
 dimensions and the extent of the raster, and a plate flattened onto the old ones
@@ -1055,7 +1060,9 @@ at load time would go quietly inert the moment that happened.
 `scripts/embed-window.js` goes the other way for `--dem`: it reads the UTM
 window covering your raster and carries the embeddings onto *your* grid,
 backwards per output pixel — your pixel, your projection, WGS84, UTM, nearest
-embedding. Any projection `unprojectWgs84` handles works, which is the same set
+embedding. "Your grid" means your extent and your projection at the embeddings'
+resolution, which is the raster's own grid whenever the raster is 10 m or
+coarser. Any projection `unprojectWgs84` handles works, which is the same set
 listed above. Anything else is refused rather than approximated, for the reason
 this whole document gives.
 

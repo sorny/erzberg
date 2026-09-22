@@ -6,10 +6,17 @@
  *
  *   { rect: {x,y,w,h}, shape: Shape|null, feather: px }
  *
- * where a Shape is either a ring of points or an ellipse:
+ * where a Shape is a ring of points, an ellipse, or a set of rings:
  *
  *   { type: 'lasso'|'polygon', points: [x0,y0,x1,y1,…] }
  *   { type: 'ellipse', cx, cy, rx, ry }
+ *   { type: 'rings', rings: [[x0,y0,…], …], name? }
+ *
+ * `rings` exists because a clip taken from a map feature is not one ring. A
+ * municipality has holes — enclaves, a lake that belongs to its neighbour — and
+ * some are several disjoint pieces. It is also not hand-drawn, so unlike the
+ * other two it carries no editable vertices: the outline came from a survey and
+ * nudging one of its four thousand points is not an operation anybody wants.
  *
  * The ellipse is kept as an ellipse rather than approximated by a ring: a
  * 128-gon shows visible flats once the raster is a few thousand pixels wide, and
@@ -41,7 +48,16 @@ function clampRect(rect, srcW, srcH) {
 export function isUsableShape(shape) {
   if (!shape) return false
   if (shape.type === 'ellipse') return shape.rx > 0.5 && shape.ry > 0.5
+  if (shape.type === 'rings') return !!shape.rings?.some((r) => r.length >= 6)
   return shape.points?.length >= 6   // fewer than 3 vertices is not an area
+}
+
+/** Every ring a shape is made of, as a list — one entry for the single-ring kinds. */
+export function shapeRings(shape) {
+  if (!shape) return []
+  if (shape.type === 'rings') return shape.rings.filter((r) => r.length >= 6)
+  if (shape.type === 'ellipse') return []
+  return shape.points?.length >= 6 ? [shape.points] : []
 }
 
 /** Bounding box of a shape, as a rect. */
@@ -50,15 +66,17 @@ export function shapeBounds(shape) {
   if (shape.type === 'ellipse') {
     return { x: shape.cx - shape.rx, y: shape.cy - shape.ry, w: shape.rx * 2, h: shape.ry * 2 }
   }
-  const points = shape.points
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-  for (let i = 0; i < points.length; i += 2) {
-    const x = points[i], y = points[i + 1]
-    if (x < minX) minX = x
-    if (x > maxX) maxX = x
-    if (y < minY) minY = y
-    if (y > maxY) maxY = y
+  for (const points of shapeRings(shape)) {
+    for (let i = 0; i < points.length; i += 2) {
+      const x = points[i], y = points[i + 1]
+      if (x < minX) minX = x
+      if (x > maxX) maxX = x
+      if (y < minY) minY = y
+      if (y > maxY) maxY = y
+    }
   }
+  if (!Number.isFinite(minX)) return null
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
 }
 
@@ -126,6 +144,47 @@ export function fillPolygon(out, points, b, value = 1) {
  * this touches only the pixels it sets — testing every pixel in the bounding box
  * would do 4/π times the work and get the same answer.
  */
+/**
+ * Even-odd scanline fill across *all* of a shape's rings at once.
+ *
+ * At once and not one at a time: that is what cuts the holes. A municipality
+ * with an enclave in it has two rings, and filling them separately and
+ * unioning the results paints the enclave solid — which looks right until you
+ * know the place.
+ *
+ * `fillPolygon` deliberately stays a separate single-ring function rather than
+ * being expressed in terms of this one: it is the hot path for a hand-drawn
+ * lasso, and it allocates one crossing buffer sized to the only ring there is.
+ */
+function fillRings(out, rings, b) {
+  let total = 0
+  for (const r of rings) total += r.length >> 1
+  const xs = new Float64Array(total)
+  for (let row = 0; row < b.h; row++) {
+    const yc = b.y + row + 0.5
+    let count = 0
+    for (const points of rings) {
+      const n = points.length >> 1
+      if (n < 3) continue
+      for (let i = 0, j = n - 1; i < n; j = i++) {
+        const yi = points[i * 2 + 1], yj = points[j * 2 + 1]
+        if ((yi > yc) === (yj > yc)) continue
+        const xi = points[i * 2], xj = points[j * 2]
+        xs[count++] = xi + ((yc - yi) / (yj - yi)) * (xj - xi)
+      }
+    }
+    if (count < 2) continue
+    const span = xs.subarray(0, count)
+    span.sort()
+    const off = row * b.w
+    for (let k = 0; k + 1 < count; k += 2) {
+      const a = Math.max(0, Math.ceil(span[k] - b.x - 0.5))
+      const z = Math.min(b.w - 1, Math.floor(span[k + 1] - b.x - 0.5))
+      for (let c = a; c <= z; c++) out[off + c] = 1
+    }
+  }
+}
+
 function fillEllipse(out, { cx, cy, rx, ry }, b) {
   const iry = 1 / Math.max(1e-6, ry)
   for (let row = 0; row < b.h; row++) {
@@ -207,6 +266,7 @@ export function buildEditMask(edit, srcMask, srcW, srcH) {
     mask = new Uint8Array(b.w * b.h)
     if (!shape) mask.fill(1)
     else if (shape.type === 'ellipse') fillEllipse(mask, shape, b)
+    else if (shape.type === 'rings') fillRings(mask, shape.rings, b)
     else fillPolygon(mask, shape.points, b)
     // The raster's own voids (GeoTIFF NoData, transparent PNG pixels) are not
     // selectable ground; folding them in here means the feather also softens the
@@ -320,7 +380,9 @@ export function describeEdit(edit, srcW, srcH) {
   const b = effectiveBounds(edit, srcW, srcH)
   if (!b) return null
   const parts = [`${b.w}×${b.h} of ${srcW}×${srcH}`]
-  if (isUsableShape(edit.shape)) parts.push(edit.shape.type)
+  if (isUsableShape(edit.shape)) {
+    parts.push(edit.shape.type === 'rings' ? (edit.shape.name ?? 'feature') : edit.shape.type)
+  }
   if (edit.feather > 0) parts.push(`feather ${Math.round(edit.feather)}px`)
   return parts.join(' · ')
 }

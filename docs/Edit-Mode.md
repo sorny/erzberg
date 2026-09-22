@@ -149,6 +149,54 @@ You cannot see the decimation on screen. It usually cuts the vertex count by 5
 to 10 times, and that matters twice over. The scanline fill has fewer edges to
 cross. What comes back also has few enough vertices to edit by hand.
 
+### Rings from a map feature
+
+A fourth way to make a selection, and the only one that is not hand-drawn: pick
+a loaded OpenStreetMap or GeoJSON layer and press **Clip to this**. The
+heightmap is then cut to the outline of a municipality, a district, a lake or a
+national park.
+
+It is stored as its own shape kind, because a map feature is not one ring:
+
+```
+{ type: 'rings', rings: [[x0,y0,…], …], name }
+```
+
+Three reasons for a separate kind rather than reusing `polygon`.
+
+**A feature has holes.** An enclave, or a lake that belongs to the neighbouring
+municipality. `fillRings` collects crossings from *every* ring into one scanline
+pass, so the even-odd rule cuts the hole. Filling each ring separately and
+unioning the results paints the enclave solid, and it looks deliberate.
+
+**A feature can be several pieces.** Some municipalities are disjoint. One
+`points` array cannot say that.
+
+**It has no editable vertices.** A lasso is yours to nudge; a boundary came from
+a survey, and dragging one of its four thousand points is not an operation
+anybody wants. `isPointShape` therefore excludes `rings`, and the editor draws
+the outline without handles.
+
+The rings are **simplified on the way in**, Douglas–Peucker at a third of a
+pixel. A district boundary is a few thousand nodes and at raster resolution
+almost all of them lie on the line between their neighbours — the simplification
+typically removes nine tenths of them and is invisible. It is iterative rather
+than recursive: a coastline or a river-following border is tens of thousands of
+nearly collinear points, which is precisely the input that recurses once per
+point and overflows the stack.
+
+Only layers whose features actually enclose something are offered. A road
+network has no inside, and the button says so rather than producing an empty
+raster. That test reads the *geometry*, not the layer's `geom` — an
+administrative boundary is drawn as a line and is unambiguously an area — and
+the rings are stitched from the relation's member ways first. See
+[Masks.md](Masks.md#a-boundary-is-an-area-wearing-a-lines-clothes) for why that
+stitching is needed at all.
+
+Clipping to a feature resets the crop rectangle to the whole raster. A crop left
+over from a previous selection would otherwise cut the municipality in half
+without saying so.
+
 ### Ellipses
 
 The app stores an ellipse as an ellipse, `{cx, cy, rx, ry}`. It does not store a
@@ -301,4 +349,8 @@ release. A lasso emits one point per pointer move, and a re-render of the panel
 | `src/store/useStore.js` | Source and derived split, mask memo, `setEdit`, the `keepEdit` rule, erosion scatter-back |
 | `src/components/HeightmapEditor.jsx` | The 2D canvas: preview, overlays, pointer tools |
 | `src/components/EditPanel.jsx` | The right-hand panel during an edit |
+| `src/components/panel/FeaturePicker.jsx` | `useFeaturePick` — choosing a layer and its features, shared with the Masks section |
+| `src/utils/maskFromVector.js` | `featureRings` and `simplifyRing`: a map feature as a clip outline, plus the ring stitching both consumers need |
 | `tests/edit.spec.js` | End-to-end clip, clear, cancel, lasso, polygon, ellipse, ring editing, soundscape and GeoTIFF coverage |
+| `tests/clip-to-feature.spec.js` | End-to-end clip to a boundary delivered as open member ways, and the refusal for a layer that encloses nothing |
+| `tests/unit/heightmapEdit.test.js` | The `rings` shape: bounds across rings, holes cut rather than filled, disjoint pieces |

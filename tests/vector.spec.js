@@ -101,6 +101,20 @@ function overpassFixture() {
   }
 }
 
+/**
+ * Wait for a layer row to appear in the panel, by name.
+ *
+ * Scoped to the Vector Layers section rather than matched anywhere on the page.
+ * A bare `text=Roads · Motorway` was always under-specified — it matches any
+ * element containing that string — and it became wrong the moment the Masks
+ * section grew a picker that lists the very same layer names as `<option>`s.
+ * Playwright takes the first match, and an option inside a closed `<select>` is
+ * never visible, so the wait timed out while the row it wanted was on screen.
+ */
+function layerRow(page, name, timeout = 20000) {
+  return page.waitForSelector(`[data-section="Vector Layers"] >> text=${name}`, { timeout })
+}
+
 /** Loads the fixture raster and opens the Vector Layers section. */
 async function openVectorPanel(page) {
   await page.goto('http://localhost:5173')
@@ -146,7 +160,7 @@ test.describe('vector layers', () => {
 
     // Buildings is heavy and starts unticked, so its way must not produce a row.
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway', { timeout: 20000 })
+    await layerRow(page, 'Roads · Motorway', 20000)
 
     const body = await page.innerText('body')
     // Category + subtype naming, and only for buckets with features in them.
@@ -166,7 +180,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
 
     const body = await page.innerText('body')
     expect(body).not.toContain('Motorway link')
@@ -184,7 +198,7 @@ test.describe('vector layers', () => {
     await openVectorPanel(page)
     await page.click('[data-testid="osm-cat-roads"]')     // untick
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Water · Stream', { timeout: 20000 })
+    await layerRow(page, 'Water · Stream', 20000)
 
     expect(query).not.toContain('highway')
     expect(query).toContain('waterway')
@@ -195,7 +209,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const withAll = await segments(page)
@@ -217,7 +231,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Water · Lake')
+    await layerRow(page, 'Water · Lake')
     await page.waitForTimeout(1500)
 
     // Water bodies default to filled, so the lake arrives with one: a lattice
@@ -247,7 +261,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Peaks' }).first()
@@ -279,7 +293,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Roads · Motorway' })
@@ -313,7 +327,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Roads · Motorway' })
@@ -349,7 +363,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openFeatures(page, 'Peaks')
@@ -377,7 +391,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openFeatures(page, 'Peaks')
@@ -404,7 +418,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Track')
+    await layerRow(page, 'Roads · Track')
     await page.waitForTimeout(1500)
 
     const id = await openFeatures(page, 'Roads · Track')
@@ -423,7 +437,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     // Everything but the motorway hidden, and that one drawn fat. Not to make
@@ -486,7 +500,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
     await isolateLayer(page, 'Peaks')
     await page.waitForTimeout(2000)
@@ -515,7 +529,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const roadId = await isolateLayer(page, 'Roads · Motorway')
@@ -566,7 +580,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(2000)
 
     const box = await page.locator('canvas[data-engine]').boundingBox()
@@ -586,7 +600,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(2000)
 
     await page.locator('input[type=checkbox][aria-label="Identify on hover"]').click()
@@ -609,7 +623,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     // Select from the panel rather than by sweeping the terrain: what is being
@@ -650,7 +664,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Peaks' }).first()
@@ -695,7 +709,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Peaks' }).first()
@@ -838,7 +852,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -871,7 +885,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Water · Lake')
+    await layerRow(page, 'Water · Lake')
     await page.waitForTimeout(1500)
 
     const id = await isolateLayer(page, 'Water · Lake')
@@ -984,7 +998,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1029,7 +1043,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1070,7 +1084,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1117,7 +1131,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1172,7 +1186,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1265,7 +1279,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     // One feature, lifted clear of the terrain: overlapping marks would have
@@ -1365,7 +1379,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1413,7 +1427,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1517,7 +1531,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1609,7 +1623,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1646,7 +1660,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1695,7 +1709,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     const id = await openIconPicker(page, 'Peaks')
@@ -1768,7 +1782,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Peaks')
+    await layerRow(page, 'Peaks')
     await page.waitForTimeout(1500)
 
     await isolateLayer(page, 'Peaks')
@@ -1920,7 +1934,7 @@ test.describe('vector layers', () => {
       name: 'ridge.geojson', mimeType: 'application/geo+json',
       buffer: Buffer.from(JSON.stringify(doc)),
     })
-    await page.waitForSelector('text=ridge.geojson', { timeout: 10000 })
+    await layerRow(page, 'ridge.geojson', 10000)
     // One geometry class in the file, so no "· Lines" suffix.
     expect(await page.innerText('body')).not.toContain('ridge.geojson · Lines')
   })
@@ -1962,11 +1976,11 @@ test.describe('vector layers', () => {
       name: 'route.gpx', mimeType: 'application/gpx+xml',
       buffer: Buffer.from(`<?xml version="1.0"?><gpx version="1.1"><trk><trkseg>${pts.join('')}</trkseg></trk></gpx>`),
     })
-    await page.waitForSelector('text=route.gpx', { timeout: 10000 })
+    await layerRow(page, 'route.gpx', 10000)
 
     // OSM layers alongside it, all with the ribbon switch off by default.
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(2500)
 
     const names = []
@@ -2027,7 +2041,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const names = () => page.locator('[data-testid^="vector-name-"]')
@@ -2082,7 +2096,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     let rebuilds = 0
@@ -2110,7 +2124,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Water · Lake')
+    await layerRow(page, 'Water · Lake')
     await page.waitForTimeout(1500)
 
     const rows = page.locator('[data-testid^="vector-layer-"]')
@@ -2173,7 +2187,7 @@ test.describe('vector layers', () => {
     await routeOverpass(page)
     await openVectorPanel(page)
     await page.click('[data-testid="osm-fetch"]')
-    await page.waitForSelector('text=Roads · Motorway')
+    await layerRow(page, 'Roads · Motorway')
     await page.waitForTimeout(1500)
 
     const row = page.locator('[data-testid^="vector-layer-"]').filter({ hasText: 'Roads · Track' })

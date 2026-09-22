@@ -112,6 +112,19 @@ describe('alignCover', () => {
     expect(out.labels[63]).toBe(1)
   })
 
+  it('keeps the class shares when a coarse plate meets a fine raster', async () => {
+    // Not a rare case any more, and that is why this is asserted separately.
+    // The embeddings are 10 m, so a raster finer than that gets a plate cut
+    // deliberately coarser than itself — a 4.2 m city raster comes back at
+    // half its width by design. Upsampling must not move the boundaries, or
+    // every share the script printed would be a share the app disagrees with.
+    const c = await decodeCover(plate({ w: 16, h: 16, n: 4, bbox: [0, 0, 160, 160] }))
+    const out = alignCover(c, { width: 64, height: 64, bbox: [0, 0, 160, 160], crs: 'EPSG:32633' })
+    const hist = [0, 0, 0, 0]
+    for (const v of out.labels) hist[v]++
+    expect(hist.map((h) => h / out.labels.length)).toEqual([0.25, 0.25, 0.25, 0.25])
+  })
+
   it('refuses ground it does not cover', async () => {
     const c = await decodeCover(plate({ bbox: [0, 0, 40, 40] }))
     expect(() => alignCover(c, { width: 8, height: 8, bbox: [1000, 1000, 1040, 1040], crs: 'EPSG:32633' }))

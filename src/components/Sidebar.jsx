@@ -12,6 +12,7 @@ import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, metresPerWorldU
 import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES, OSM_DETAIL_LABEL, detailTierFor } from '../utils/osmCategories'
 import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
 import { featureLabel, toggleHidden } from '../utils/vectorLayers'
+import { useFeaturePick } from './panel/FeaturePicker'
 import { CANCELLED } from '../utils/pacing'
 import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
@@ -1465,9 +1466,9 @@ function CoverMaskRow({ prefix, style, ss }) {
  *
  * Three cases, narrowing to the most precise one available:
  *
- *  · a georeferenced file on disk → `--dem`, which takes the extent, the
- *    projection *and* the pixel grid from the file, so the plate comes back
- *    matching it exactly;
+ *  · a georeferenced file on disk → `--dem`, which takes the extent *and* the
+ *    projection from the file, so the plate comes back over exactly this
+ *    ground;
  *  · georeferenced but not from a file the reader can name — a fetched
  *    terrain — → `--bbox`, in the lon/lat the flag wants;
  *  · no coordinates at all → the generic form, because there is nothing
@@ -1628,6 +1629,74 @@ function CoverRow({ children }) {
   return <div style={{ display: 'flex', gap: 4 }}>{children}</div>
 }
 
+/**
+ * A mask from features that are already loaded.
+ *
+ * Every geometry kind is offered, not areas alone. A line becomes a corridor
+ * and a point becomes a disc once either has a width, and "everything within
+ * fifty metres of the stream" is a mask people reach for constantly.
+ *
+ * The one control is therefore the same number with three meanings, and it is
+ * labelled for whichever is selected rather than given a neutral name that
+ * would be wrong twice out of three times. For an area — or a line that closes,
+ * which is what an administrative boundary is — it is a buffer and may be
+ * negative: "the forest, but not its first twenty metres".
+ */
+function FromFeatures({ layers = [], sources = [], masks = [], onMake }) {
+  const [dist, setDist] = useState(0)
+  const [fillClosed, setFillClosed] = useState(true)
+  const { usable, chosen, bucket, picked, closes, element } = useFeaturePick(layers, sources)
+  const full = masks.length >= MAX_MASKS
+  if (!usable.length) return null
+
+  const geom = chosen?.geom ?? 'area'
+  const filling = geom === 'area' || (closes && fillClosed)
+  const label = filling ? 'Buffer' : geom === 'line' ? 'Half-width' : 'Radius'
+  const floor = filling ? -500 : 0
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5,
+                  borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <CoverLabel>FROM FEATURES</CoverLabel>
+      {element}
+      {closes && (
+        <Tog label="Fill the enclosed area" checked={fillClosed} small
+          onChange={(v) => setFillClosed(v)} testId="mask-from-fill" />
+      )}
+      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+        <span style={{ fontSize: 9.5, color: MUTED, flex: 1 }}>{label}</span>
+        <input type="number" value={dist} step={10} min={floor} max={2000}
+          data-testid="mask-from-dist"
+          onChange={(e) => setDist(Number(e.target.value) || 0)}
+          style={{ width: 62, background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+                   borderRadius: 5, fontSize: 10, padding: '2px 4px', textAlign: 'right' }} />
+        <span style={{ fontSize: 9.5, color: MUTED }}>m</span>
+      </div>
+      <CoverRow>
+        <Btn block data-testid="mask-from-features" disabled={!chosen || full || !picked.size}
+          onClick={() => onMake?.(chosen.id, {
+            only: [...picked],
+            ...(closes ? { fill: fillClosed } : null),
+            ...(filling ? { grow: dist } : { widthM: Math.max(1, dist || 25) }),
+          })}>
+          Make a mask
+        </Btn>
+      </CoverRow>
+      <CoverProse caption>
+        {geom === 'point'
+          ? 'One disc of this radius per point.'
+          : filling
+            ? 'The area inside, with any holes cut out. A negative buffer eats the result back from its edge.'
+            : 'A corridor along the lines, this far to each side.'}
+        {closes && !fillClosed ? ' These lines close, so they can be filled instead.' : ''}
+        {bucket && bucket.count > 1
+          ? ' Only the ticked features go in. They start as whatever the layer draws.'
+          : ''}
+      </CoverProse>
+    </div>
+  )
+}
+
 // `showCover` keys off the prefix rather than off `showHypso`: several draw
 // modes switch hypsometric off because they ink from their own table, and every
 // one of them is still a draw mode built from the terrain grid and so still
@@ -1738,6 +1807,7 @@ export function Sidebar({
   cover, coverError, onLoadCover, onClearCover, onInkByClass,
   // Hand-drawn masks, the Studio that paints them, and the imagery behind it.
   masks = [], onAddMask, onPatchMask, onRemoveMask, onImportMask, onPaintMask,
+  onMaskFromLayer,
   imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
@@ -2643,6 +2713,26 @@ export function Sidebar({
                     <Sub>
                       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.imageryOpacity}
                         onChange={(v) => ss({ imageryOpacity: v })} fmt={(v) => `${Math.round(v * 100)}%`} />
+                      {/* Sentinel-2's `visual` asset is exposed for cloud and
+                          snow, so ordinary ground sits near the floor — over
+                          Graz the median pixel is 9–17% brightness. Auto levels
+                          stretches this window's own histogram and solves a
+                          gamma that puts its median on mid-grey. The three
+                          below are taste, applied after it. */}
+                      <Tog label="Auto levels" checked={style.imageryAutoLevels}
+                        onChange={(v) => ss({ imageryAutoLevels: v })} />
+                      <InlineSl label="Brightness" min={0.2} max={2.5} step={0.01} value={style.imageryBrightness}
+                        onChange={(v) => ss({ imageryBrightness: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      <InlineSl label="Contrast" min={0.4} max={2.2} step={0.01} value={style.imageryContrast}
+                        onChange={(v) => ss({ imageryContrast: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      <InlineSl label="Saturation" min={0} max={2} step={0.01} value={style.imagerySaturation}
+                        onChange={(v) => ss({ imagerySaturation: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      {imagery?.tone && style.imageryAutoLevels && (
+                        <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
+                          Levels {imagery.tone.lo.join('/')} → {imagery.tone.hi.join('/')}
+                          {' · '}gamma {imagery.tone.gamma.toFixed(2)}
+                        </div>
+                      )}
                     </Sub>
                   )}
                 </>
@@ -2707,6 +2797,11 @@ export function Sidebar({
                 imagery behind it when there is some. Import takes a black-and-white
                 PNG or JPG — white is inside, and transparent is outside.
               </CoverProse>
+              {/* The third route, and the one that needs no drawing at all: the
+                  shape of a forest or a lake is something the loaded features
+                  already hold exactly. */}
+              <FromFeatures layers={vectorLayers} sources={vectorSources}
+                masks={masks} onMake={onMaskFromLayer} />
             </div>
           </Section>
 
@@ -2737,7 +2832,7 @@ export function Sidebar({
                     <CommandLine cmd={cmd} />
                     <CoverProse caption>
                       {exact
-                        ? 'Cut for this raster exactly — the extent, the projection and the pixel grid all come from the file.'
+                        ? 'Cut for this raster exactly — the extent and the projection both come from the file.'
                         : 'The extent of what is on screen, in the lon/lat the flag wants.'}
                     </CoverProse>
                   </div>

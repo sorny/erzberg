@@ -190,7 +190,7 @@ setting, so they cannot disagree.
 | **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 | **Satellite** | True-colour Sentinel-2 over the extent of the raster, at 10 m, from AWS Open Data. It drapes on the terrain and backs the Mask Studio. No account, no key, and nothing happens until you press Fetch. |
-| **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one yourself. See [Masks](#masks). |
+| **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one, or cut one from loaded features. See [Masks](#masks). |
 | **Cover plate** | A `.cover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
 
 **Drag and drop.** Drop a file anywhere on the window and the app routes it by
@@ -289,8 +289,8 @@ every pixel a class, and a class is a fact the heightmap does not contain.
 DeepMind's satellite embedding: 64 numbers describing every 10 m of the planet,
 published for each year from 2017 to 2024.
 
-Already have a GeoTIFF? Point the script at it. The extent, the projection and
-the pixel grid all come from the file, and only the plate is written:
+Already have a GeoTIFF? Point the script at it. The extent and the projection
+come from the file, and only the plate is written:
 
 ```bash
 node scripts/embed-window.js --dem my-terrain.tif --classes 6
@@ -363,10 +363,24 @@ the valley the plate is actually about, everything except that one quarry.
 Both are spent through the same stencil, so a mask restricts a layer exactly the
 way a land cover class does — and a layer may carry both at once.
 
-**Draw one.** *Masks → + Draw a mask* opens the Studio over the viewport. Brush,
-rectangle, ellipse and lasso, with `E` to erase and `[` `]` to resize the brush.
-The backdrop is satellite imagery when you have fetched some, and the hillshade
-when you have not.
+**Draw one.** *Masks → + Draw a mask* opens the Studio over the viewport, with
+its own panel in place of the sidebar. Brush, rectangle, ellipse and lasso, with
+`E` to erase and `[` `]` to resize the brush. Scroll to zoom, alt-drag to pan,
+**Fit** to go back — the same view, the same gestures and the same panel layout
+as Edit Mode, because they are the same kind of thing. The backdrop is satellite
+imagery when you have fetched some, and the hillshade when you have not.
+
+**Or make one from features you already have.** *Masks → From features* takes
+any loaded OpenStreetMap or GeoJSON layer and rasterises it: areas fill with
+their holes cut out, lines become corridors, points become discs. One distance
+field means buffer, half-width or radius depending on the layer, and a negative
+buffer shrinks — "the forest, but not its first twenty metres". Tick the
+particular features you mean; a mask of one takes that feature's own name.
+
+A boundary counts as an area even though it is drawn as a line: pick a
+municipality or a city district and you get the ground inside it, not its
+outline. Switch **Fill the enclosed area** off for the corridor along the
+border instead.
 
 **Or bring one.** *↑ Import…* takes a PNG, JPG or WebP. White is inside, black
 is outside, and transparent is outside too — a cut-out PNG is the other common
@@ -382,6 +396,14 @@ The default search asks for the growing season of the last three years and sorts
 *that* by cloud. Cloud alone picks a snowy winter scene, which is a beautiful
 photograph and useless to draw a mask around.
 
+It also arrives far too dark to use, and that is the product rather than a bug:
+Sentinel-2's true-colour asset is exposed with one fixed gain for the whole
+planet, so ordinary vegetated ground lands near the floor — over Graz the median
+pixel is 9–17% brightness. **Auto levels** stretches the fetched window's own
+histogram and solves a gamma per scene so its median lands on mid-grey, with
+Brightness, Contrast and Saturation on top. All four sit in the Studio panel as
+well, which is where you need them.
+
 Copernicus data is free, full and open, commercial use included, against one
 line of attribution — which travels into any export that draws from it.
 → [Masks and satellite imagery](docs/Masks.md)
@@ -396,6 +418,11 @@ Press `E`. The viewport then becomes a flat picture of the raster. Crop it with
 a handled rectangle, which has aspect locks and numeric fields. Or draw an
 ellipse, and hold Shift for a perfect circle. Or cut out an arbitrary region
 with a lasso or a polygon.
+
+Or clip to a place. *From features* takes any loaded OpenStreetMap or GeoJSON
+layer and cuts the heightmap to a feature's own outline — a municipality, a
+district, a lake — holes and disjoint pieces included. It is the same picker the
+Masks section uses, spent on the raster instead of on a stencil.
 
 A lasso or a polygon stays editable after you close it. Drag a point to move it.
 Drag an edge to add a point. Right-click a point to remove it. Before you press,
@@ -808,7 +835,7 @@ The app idles quietly and stays responsive under load.
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
 | Audio | Web Audio `decodeAudioData` + an in-house radix-2 FFT with no dependency |
-| Tests | Vitest for the pure maths. Playwright against a live dev server in real Chrome |
+| Tests | Vitest for the pure maths. Playwright against a live dev server in headless Chrome, `HEADED=1` to watch |
 
 ---
 
@@ -835,7 +862,8 @@ npm run dev              # dev server at http://localhost:5173
 npm run build            # production build
 npm run lint             # ESLint — correctness rules only, no formatting
 npm run test:unit        # Vitest — the pure maths, ~0.3s
-npm run test             # Playwright end-to-end suite
+npm run test             # Playwright end-to-end suite, headless
+HEADED=1 npm run test    # …with the window, to watch it drive the app
 npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
 npm run update-presets   # round-trip all presets through the live app
@@ -880,27 +908,43 @@ every r3f app.
 There are two suites, and they do not overlap. `test:unit` is Vitest over the
 modules that are pure arithmetic: the box blur, area resampling, the bilinear
 tap, Douglas–Peucker and the projections. It also covers the parameter registry
-that decides when a rebuild happens. The unit tests run in Node in about a third
+that decides when a rebuild happens, the exposure curve a satellite drape runs
+under, and the ring stitching that turns a relation's member ways back into the
+loop they describe. The unit tests run in Node in about a third
 of a second, and they assert the maths directly. A deviation bound or a
 projection wants that, not an inference from a pixel eleven seconds into a spec.
 They live in `tests/unit/*.test.js`. Playwright is pinned to `*.spec.js`, so
 neither runner picks up the files of the other.
 
 Everything else is end-to-end, and that is not a gap. Tests run against a live
-dev server in non-headless Chrome with WebGL enabled. The things worth an
-assertion exist only in a real renderer: what the geometry worker produced, what
-the SVG exporter drew, and whether the drawing buffer was clamped. Some specs
-depend on fixtures that are gitignored for size. Those specs skip with a message
-rather than a failure. Read
-[tests/testdata/README.md](tests/testdata/README.md).
+dev server in headless Chrome with WebGL enabled. The things worth an assertion
+exist only in a real renderer: what the geometry worker produced, what the SVG
+exporter drew, and whether the drawing buffer was clamped. Some specs depend on
+fixtures that are gitignored for size. Those specs skip with a message rather
+than a failure. Read [tests/testdata/README.md](tests/testdata/README.md).
 
-They also run **one at a time**, and that is not a compromise for a slow
-machine. Headed Chrome foregrounds one window only. An occluded window has its
-`requestAnimationFrame` throttled and can stop the composite. A parallel run of
-a suite that mostly reads rendered pixels thus reports starvation as feature
-failure. The cost is about six seconds: 14 workers on one GPU spent their time
-in a queue rather than added throughput. `playwright.config.js` carries the
-measurements.
+`HEADED=1 npx playwright test` puts the window back when you want to watch a
+spec drive the app, which is the fastest way to understand a failure.
+
+The suite ran headed for a long time, because Chrome throttles
+`requestAnimationFrame` in a window it considers backgrounded and fifteen specs
+read rendered pixels or drive rAF. That made greenness depend on which window
+happened to be in front — and it took the machine hostage for the length of a
+run, since a headed Chrome holds the focus and the pointer.
+
+Headless has neither problem, and the measurement rather than the argument is
+the reason: **327 passed in 30.1 minutes with retries disabled**, against 31.2
+minutes headed that needed a retry and still finished red. The audio spec that
+went flaky twice in one afternoon headed passes headless in 719 ms. Nothing to
+drift behind is a stronger guarantee than three flags asking Chrome not to
+throttle a window that has.
+
+They still run **one at a time**, and that was re-measured after the move to
+headless rather than assumed to carry over. Four workers finish in 12.5 minutes
+against 30.1 serial — a real 2.4× — and finish with two failures that both pass
+alone, an audio spec and an export spec starved of frames. A suite that reports
+starvation as a feature regression is worth less than the eighteen minutes it
+saves. `playwright.config.js` carries the figures.
 
 ---
 

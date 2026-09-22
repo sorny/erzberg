@@ -42,6 +42,7 @@
  * costs a few hundred kilobytes of an otherwise 300 MB scene.
  */
 import { bboxToWgs84, classifyCRS, projectWgs84, unprojectWgs84 } from './geoCoords.js'
+import { autoTone } from './imageryTone.js'
 
 /** Scene discovery. Open, no key, and it answers CORS. */
 const STAC = 'https://earth-search.aws.element84.com/v1/search'
@@ -94,6 +95,34 @@ function seasonalRange(bboxWgs84, years = 3) {
   }
 }
 
+/**
+ * Whether a scene's `visual` asset is one this app can actually read.
+ *
+ * Present is not the same as readable, and the gap is not theoretical. A
+ * handful of items in the archive were never converted to COG, and the
+ * catalogue still describes them — every asset pointing at the original ESA
+ * product: `s3://sentinel-s2-l2a/.../TCI.jp2`. Two separate reasons that cannot
+ * be used here. The scheme is `s3:`, which no browser fetches, and the format
+ * is JPEG 2000, which `geotiff.js` does not decode even if it arrived.
+ *
+ * It failed in the worst available way. One Graz scene in forty is like this,
+ * and its cloud cover is **zero** — so sorting by cloud put the one unreadable
+ * scene in the archive at the front of the list every single time, and the
+ * feature looked broken over that city while working everywhere else.
+ *
+ * So both conditions are checked, rather than the scheme alone. A future item
+ * served over HTTPS in some other format would otherwise reach `fromUrl` and
+ * fail deeper down, where the message is about byte offsets.
+ */
+function readableVisual(feature) {
+  const asset = feature?.assets?.visual
+  if (!asset?.href) return false
+  if (!/^https:\/\//i.test(asset.href)) return false
+  // No `type` at all is taken as usable — the extension is the older signal
+  // and a missing field must not disqualify an otherwise fine COG.
+  return !asset.type || /tiff/i.test(asset.type)
+}
+
 export async function findScenes(bboxWgs84, { from, to, limit = 50, signal, seasonal = true } = {}) {
   const season = seasonal ? seasonalRange(bboxWgs84) : null
   const start = from ?? season?.from
@@ -117,7 +146,7 @@ export async function findScenes(bboxWgs84, { from, to, limit = 50, signal, seas
   const json = await res.json()
 
   const all = (json.features ?? [])
-    .filter((f) => f.assets?.visual?.href)
+    .filter((f) => readableVisual(f))
     .map((f) => ({
       id: f.id,
       href: f.assets.visual.href,
@@ -247,6 +276,10 @@ export async function fetchImagery(scene, raster, { onProgress, signal } = {}) {
 
   return {
     rgba, width: outW, height: outH,
+    // Measured here, once, on the pixels that were actually fetched rather
+    // than on the whole 10 980-square scene — the exposure that suits this
+    // window is not the exposure that suits the glacier at its far corner.
+    tone: autoTone(rgba, outW, outH),
     sceneId: scene.id, date: scene.date, cloud: scene.cloud,
     credit: IMAGERY_CREDIT,
   }

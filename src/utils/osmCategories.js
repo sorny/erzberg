@@ -47,7 +47,26 @@ const RAILWAY_VALUES = new Set([
   'rail', 'narrow_gauge', 'light_rail', 'tram', 'subway', 'funicular', 'monorail',
 ])
 const PEAK_VALUES = new Set(['peak', 'saddle', 'volcano'])
-const ADMIN_LEVELS = new Set(['2', '4', '6', '8'])
+/**
+ * Administrative levels worth asking for.
+ *
+ * 9 and 10 are here because stopping at 8 loses the thing people most often
+ * want from this category. Around Graz the levels fall out like this:
+ *
+ *   6  Graz itself — a Statutarstadt is its own Bezirk, so the city boundary
+ *      is *not* at level 8 the way a normal municipality's is
+ *   8  the surrounding municipalities: Thal, Hart bei Graz, Raaba-Grambach
+ *   9  the seventeen districts: Innere Stadt, Jakomini, Lend, Gries, Geidorf…
+ *   10 Katastralgemeinden
+ *
+ * The exact meaning of each number is a national convention rather than a
+ * standard, which is why the labels below stay general.
+ *
+ * Cost, measured over the whole of Styria: 642 relations for 2/4/6/8 and 676
+ * more for 9/10. That is still far inside any tier, so this category keeps its
+ * single selector list at every extent.
+ */
+const ADMIN_LEVELS = new Set(['2', '4', '6', '8', '9', '10'])
 
 /**
  * DETAIL TIERS — how much to ask for at what size.
@@ -372,10 +391,13 @@ export const OSM_CATEGORIES = [
     short: 'Boundary',
     geom: 'line',
     heavy: false,
-    selectors: ['relation["boundary"="administrative"]["admin_level"~"^(2|4|6|8)$"]'],
+    selectors: ['relation["boundary"="administrative"]["admin_level"~"^(2|4|6|8|9|10)$"]'],
     bucketOf: (t) => (t.boundary === 'administrative' && ADMIN_LEVELS.has(t.admin_level)
       ? `level${t.admin_level}` : null),
-    labels: { level2: 'Country', level4: 'State', level6: 'District', level8: 'Municipality' },
+    labels: {
+      level2: 'Country', level4: 'State', level6: 'District', level8: 'Municipality',
+      level9: 'City district', level10: 'Locality',
+    },
     style: { color: '#8a3a8a', weight: 1.5, dash: 'long-dash' },
   },
 ]

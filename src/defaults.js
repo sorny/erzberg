@@ -31,6 +31,9 @@ export const STYLE_DEF = {
   // raster, where a texture is an image the user brought and wants to scale and
   // shift. Sharing one slot would mean fetching imagery threw away their texture.
   showImagery: true, imageryOpacity: 0.85,
+  // Sentinel-2's `visual` asset is exposed for cloud and snow, so ordinary
+  // ground lands near the floor. See utils/imageryTone.js for the measurement.
+  imageryAutoLevels: true, imageryBrightness: 1, imageryContrast: 1, imagerySaturation: 1,
 
   // Texture overlay
   showTexture: false, textureScale: 1, textureShiftX: 0, textureShiftY: 0, textureBlendMode: 'normal', textureOpacity: 1,

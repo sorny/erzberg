@@ -119,6 +119,91 @@ test('a painted mask stencils an ordinary draw mode', async ({ page }) => {
   expect(after, 'and nowhere near as much as unmasked').toBeLessThan(before * 0.7)
 })
 
+test('the Studio works the way Edit Mode does', async ({ page }) => {
+  // The two views are the same kind of thing — a full-window direct
+  // manipulation mode over the source raster — and they had drifted into two
+  // different interfaces. What is checked here is the part a user would notice
+  // immediately if it regressed: the panel on the right instead of a bar over
+  // the picture, and a view that zooms and pans.
+  test.setTimeout(120_000)
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(1000)
+
+  // The panel replaces the sidebar, exactly as Edit Mode's does.
+  await expect(page.locator('[data-testid="mask-panel"]')).toBeVisible()
+  await expect(page.locator('[data-testid="studio-fit"]')).toBeVisible()
+  await expect(page.locator('[data-testid="panel-filter"]')).toBeHidden()
+
+  const canvas = page.locator('[data-testid="mask-studio"] canvas')
+  const box = await canvas.boundingBox()
+  const mid = { x: box.x + box.width / 2, y: box.y + box.height / 2 }
+
+  // Paint a small dot, then measure how many pixels of it are lit. Zooming in
+  // must make that same dot cover more of the screen.
+  await page.click('[data-testid="studio-tool-brush"]')
+  await page.mouse.move(mid.x, mid.y)
+  await page.mouse.down()
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+
+  const litPixels = async () => canvas.evaluate((el) => {
+    const ctx = el.getContext('2d')
+    const { data } = ctx.getImageData(0, 0, el.width, el.height)
+    // The mask wash is drawn in the mask's own colour over a grey hillshade,
+    // so a lit pixel is simply one whose channels are not equal.
+    let n = 0
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i] !== data[i + 1] || data[i + 1] !== data[i + 2]) n++
+    }
+    return n
+  })
+
+  const before = await litPixels()
+  expect(before, 'the brush has to have painted something').toBeGreaterThan(0)
+
+  await page.mouse.move(mid.x, mid.y)
+  await page.mouse.wheel(0, -600)
+  await page.waitForTimeout(500)
+  const zoomed = await litPixels()
+  expect(zoomed, 'scrolling up must magnify the view').toBeGreaterThan(before * 1.5)
+
+  // Fit puts it back where it started.
+  await page.click('[data-testid="studio-fit"]')
+  await page.waitForTimeout(500)
+  expect(Math.abs((await litPixels()) - before) / before,
+    'Fit returns to the framing it opened with').toBeLessThan(0.25)
+})
+
+test('alt-drag pans the Studio instead of painting', async ({ page }) => {
+  test.setTimeout(120_000)
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(1000)
+
+  const canvas = page.locator('[data-testid="mask-studio"] canvas')
+  const box = await canvas.boundingBox()
+  const coverage = async () => (await page.locator('[data-testid="studio-coverage"]').textContent()).trim()
+
+  expect(await coverage()).toBe('0%')
+
+  // Alt is the pan modifier and outranks the tool — the same rule Edit Mode
+  // uses. A drag with it held must move the view and paint nothing at all.
+  await page.keyboard.down('Alt')
+  await page.mouse.move(box.x + box.width * 0.4, box.y + box.height * 0.5)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.6, box.y + box.height * 0.5, { steps: 6 })
+  await page.mouse.up()
+  await page.keyboard.up('Alt')
+  await page.waitForTimeout(400)
+
+  expect(await coverage(), 'an alt-drag must not paint').toBe('0%')
+})
+
 test('unpicking the last mask puts the whole raster back', async ({ page }) => {
   test.setTimeout(180_000)
   await boot(page)

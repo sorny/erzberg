@@ -14,7 +14,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { simplifyFlat } from '../utils/geometryBuilders'
-import { effectiveBounds, isUsableShape } from '../utils/heightmapEdit'
+import { effectiveBounds, isUsableShape, shapeRings } from '../utils/heightmapEdit'
 // HEX for the canvas passes below — a 2D context cannot resolve var().
 import { ACCENT, BORDER, HEX, MUTED, SURF } from './panel/ui'
 
@@ -28,7 +28,9 @@ const VERTEX = 7          // vertex handle size, screen px
 const TAU = Math.PI * 2
 
 /** A ring of points, as opposed to an ellipse — the shapes whose vertices edit. */
-const isPointShape = (s) => !!s && s.type !== 'ellipse' && s.points?.length >= 6
+// Editable by vertex. A `rings` shape is not: it came from a survey, and
+// nudging one of its four thousand points is not an operation anybody wants.
+const isPointShape = (s) => !!s && s.type !== 'ellipse' && s.type !== 'rings' && s.points?.length >= 6
 
 /** Tools that draw and edit rings of points. */
 const POINT_TOOLS = new Set(['lasso', 'polygon'])
@@ -179,9 +181,12 @@ export function HeightmapEditor({
     const drawingPoly = !!drawingPts
     const shape = !drawingPoly && isUsableShape(ed?.shape) ? ed.shape : null
     const ellipse = shape?.type === 'ellipse' ? shape : null
-    const ring = shape && !ellipse ? shape.points : null
+    // Every ring the shape is made of. One for a hand-drawn lasso, several for
+    // a clip taken from a map feature that has holes or disjoint pieces.
+    const allRings = ellipse ? [] : shapeRings(shape)
+    const ring = isPointShape(shape) ? shape.points : null
     // The path being drawn right now, whichever kind it is.
-    const poly = drawingPts ?? ring
+    const poly = drawingPts ?? allRings[0] ?? null
 
     // Sub-path builders, deliberately *without* beginPath: the dim passes below
     // need the selection and a full-canvas rectangle in one path to fill the
@@ -195,9 +200,9 @@ export function HeightmapEditor({
     const addEllipse = (el) => ctx.ellipse(sx(el.cx), sy(el.cy), el.rx * scale, el.ry * scale, 0, 0, TAU)
     /** The committed shape if there is one, otherwise the crop rectangle. */
     const addSelection = () => {
-      if (ellipse)   addEllipse(ellipse)
-      else if (ring) addPoly(ring)
-      else           addRect()
+      if (ellipse) addEllipse(ellipse)
+      else if (allRings.length) for (const r of allRings) addPoly(r)
+      else addRect()
     }
 
     // Everything the clip throws away, dimmed. Two even-odd fills rather than a
@@ -217,7 +222,7 @@ export function HeightmapEditor({
       ctx.fillStyle = dim
       ctx.beginPath()
       ctx.rect(0, 0, width, height)
-      if (ellipse) addEllipse(ellipse); else addPoly(ring)
+      if (ellipse) addEllipse(ellipse); else for (const r of allRings) addPoly(r)
       ctx.fill('evenodd')
       ctx.restore()
     }
@@ -268,10 +273,13 @@ export function HeightmapEditor({
       ctx.strokeStyle = HEX.accent
       ctx.lineWidth = 1.5
       ctx.beginPath()
-      ctx.moveTo(sx(poly[0]), sy(poly[1]))
-      for (let i = 2; i < poly.length; i += 2) ctx.lineTo(sx(poly[i]), sy(poly[i + 1]))
+      const outlines = drawingPts ? [drawingPts] : allRings
+      for (const r of outlines) {
+        ctx.moveTo(sx(r[0]), sy(r[1]))
+        for (let i = 2; i < r.length; i += 2) ctx.lineTo(sx(r[i]), sy(r[i + 1]))
+        if (!drawingPoly) ctx.closePath()
+      }
       if (drawingPoly && hoverRef.current) ctx.lineTo(sx(hoverRef.current.x), sy(hoverRef.current.y))
-      if (!drawingPoly) ctx.closePath()
       ctx.stroke()
 
       if (drawingPoly) {

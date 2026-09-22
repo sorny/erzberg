@@ -36,6 +36,7 @@ import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
 import { layersFromSource, moveLayer, sourceRings } from './utils/vectorLayers'
+import { canMakeMask, maskFromFeatures } from './utils/maskFromVector'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
@@ -51,6 +52,7 @@ import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, parseCover, suggestInks } from './utils/coverPlate'
 import { createMask, MAX_MASKS, maskFromImageData } from './utils/maskLayers'
 import { fetchImagery, findScenes, searchBboxFor } from './utils/imageryFetch'
+import { toneFor } from './utils/imageryTone'
 import { MaskStudio } from './components/MaskStudio'
 import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
@@ -333,6 +335,11 @@ export default function App() {
   const geoTiffElevMax    = useStore((s) => s.geoTiffElevMax)
   const geoTiffBbox       = useStore((s) => s.geoTiffBbox)
   const geoTiffCRS        = useStore((s) => s.geoTiffCRS)
+  // The file's own extent, before any Edit Mode clip. Masks are authored
+  // against the source raster, so features have to be projected against the
+  // source extent too — the cropped one would put them in the wrong place the
+  // moment a clip existed.
+  const geoTiffBboxSrc    = useStore((s) => s.geoTiffBboxSrc)
   const geoTiffCRSName    = useStore((s) => s.geoTiffCRSName)
 
   const soundscape = useSoundscape()
@@ -842,6 +849,56 @@ export default function App() {
     setMasks(srcMasks.filter((m) => m.id !== id))
   }, [srcMasks, setMasks, studioMaskId])
 
+  /**
+   * A mask from features that are already loaded.
+   *
+   * The shape of a forest, a lake or a quarry is something OpenStreetMap and
+   * GeoJSON already hold exactly, and tracing it by hand in the Studio is
+   * copying an outline the app has in memory. This is the same stencil by the
+   * other route.
+   *
+   * Every geometry kind is offered, not only areas: a line becomes a corridor
+   * and a point becomes a disc once either is given a width, and those are two
+   * of the most useful masks over a valley.
+   */
+  const maskFromLayer = useCallback((layerId, opts = {}) => {
+    const layer = vectorLayers.find((l) => l.id === layerId)
+    const source = layer && vectorSources.find((s) => s.id === layer.sourceId)
+    const bucket = source?.buckets?.find((b) => b.key === layer.bucket)
+    if (!bucket) { showError('Those features are no longer loaded.'); return null }
+
+    const raster = { bbox: geoTiffBboxSrc, crs: geoTiffCRS, width: srcWidth, height: srcHeight }
+    if (!canMakeMask(bucket, raster)) {
+      showError('A mask from features needs a georeferenced raster and features with coordinates.')
+      return null
+    }
+    if (srcMasks.length >= MAX_MASKS) {
+      showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
+      return null
+    }
+
+    const data = maskFromFeatures(bucket, raster, {
+      geom: bucket.geom, hidden: layer.hidden, ...opts,
+    })
+    let on = 0
+    for (let i = 0; i < data.length; i++) on += data[i]
+    if (!on) {
+      showError(`Nothing from ${layer.name} falls inside this raster.`)
+      return null
+    }
+
+    // Named after the one feature when that is what was picked — "Jakomini"
+    // says far more in a mask list than "Boundary · City district" does.
+    const one = opts.only?.length === 1 ? bucket.names?.get(opts.only[0]) : null
+    const name = (one ?? layer.name).slice(0, 32)
+    const mask = createMask(srcWidth, srcHeight, srcMasks.length, name)
+    mask.data = data
+    setMasks([...srcMasks, mask])
+    notify(`${name} → mask, ${Math.round((100 * on) / data.length)}% of the raster`)
+    return mask
+  }, [vectorLayers, vectorSources, geoTiffBboxSrc, geoTiffCRS, srcWidth, srcHeight,
+      srcMasks, setMasks, notify, showError])
+
   /** A mask from an image file — a black-and-white stencil drawn anywhere else. */
   const importMask = useCallback(() => {
     if (!srcWidth || !srcHeight) { showError('Load a terrain raster before importing a mask.'); return }
@@ -916,6 +973,20 @@ export default function App() {
   }, [geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight, setImagery, notify, showError])
 
   const studioMask = studioMaskId ? srcMasks.find((m) => m.id === studioMaskId) ?? null : null
+
+  /**
+   * The exposure the drape and the Studio backdrop both run under.
+   *
+   * Resolved once here rather than inside each consumer, because the Studio's
+   * copy is a CPU pass over every pixel and a fresh object identity each render
+   * would re-run it on every unrelated state change.
+   */
+  const imageryTone = useMemo(
+    () => toneFor(imagery, style),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [imagery, style.imageryAutoLevels, style.imageryBrightness,
+     style.imageryContrast, style.imagerySaturation],
+  )
 
   /** Opens a plate through the file dialog, for people who do not drag files. */
   const loadCoverFromPicker = useCallback(() => {
@@ -1115,12 +1186,14 @@ export default function App() {
     /*
      * Everything, which used to mean six state objects.
      *
-     * The vectors, the free text and the cover plate were not among them, so a
-     * reset left a fetched province of roads, an uploaded track, a typed title
-     * and a loaded set of land cover classes sitting on top of bare defaults —
-     * the one state the button's own label says it does not produce. They are
-     * as much "settings" as a slider is: they came from the panel, they are
-     * what is on screen, and nothing else clears them.
+     * The vectors, the free text, the cover plate, the hand-drawn masks and the
+     * satellite drape were none of them among the six, so a reset left a fetched
+     * province of roads, an uploaded track, a typed title, a set of land cover
+     * classes, a stack of painted stencils and a photograph of the ground
+     * sitting on top of bare defaults — the one state the button's own label
+     * says it does not produce. They are as much "settings" as a slider is:
+     * they came from the panel, they are what is on screen, and nothing else
+     * clears them.
      *
      * The Overpass response cache is deliberately *not* cleared with them, which
      * is where this differs from `dropVectors`. That runs when a new raster is
@@ -1130,7 +1203,8 @@ export default function App() {
      */
     tagHistory('Reset all')
     const before = { terrain, style, points, view, gradientStops, bgGradientStops,
-                     vectorLayers, vectorSources, textLayers, cover }
+                     vectorLayers, vectorSources, textLayers, cover,
+                     masks: srcMasks, imagery }
     setTerrain({ ...TERRAIN_DEF, resolution: autoResolution(heightmapWidth, heightmapHeight) })
     setStyle(STYLE_DEF)
     setPoints(POINTS_DEF)
@@ -1141,11 +1215,14 @@ export default function App() {
     clearVectorSources()
     setVectorError(null)
     setTextLayers([])
-    // The cover plate goes with them, and for their reason rather than the
-    // raster's: it is optional data loaded from the panel, every `coverMask*`
-    // the reset just cleared pointed at it, and leaving it would put a live
-    // plate on top of bare defaults.
+    // The cover plate, the masks and the imagery go with them, and for their
+    // reason rather than the raster's: all three are optional data brought in
+    // from the panel, every `coverMask*` and `layerMask*` the reset just
+    // cleared pointed at the first two, and leaving any of them would put live
+    // data on top of bare defaults.
     setCover(null)
+    setMasks([])
+    setImagery(null)
     // Clearing alone did nothing: the six setState calls above re-run the save
     // effect, which wrote the defaults straight back 400 ms later. The skip is
     // what makes the clear real.
@@ -1169,11 +1246,13 @@ export default function App() {
         setVectorSources(before.vectorSources)
         setTextLayers(before.textLayers)
         setCover(before.cover)
+        setMasks(before.masks)
+        setImagery(before.imagery)
       },
     })
   }, [terrain, style, points, view, gradientStops, bgGradientStops,
       vectorLayers, vectorSources, textLayers, clearVectorSources, setVectorSources,
-      cover, setCover,
+      cover, setCover, srcMasks, setMasks, imagery, setImagery,
       heightmapWidth, heightmapHeight, baseZoom, notify, tagHistory])
 
   /**
@@ -2165,7 +2244,8 @@ export default function App() {
         <MaskStudio
           srcPixels={srcPixels} srcMask={srcMask}
           srcWidth={srcWidth}   srcHeight={srcHeight}
-          imagery={imagery}     mask={studioMask}
+          imagery={imagery}     tone={imageryTone}  mask={studioMask}
+          style={style}         ss={(v) => setStyle((prev) => ({ ...prev, ...v }))}
           onCommit={() => commitMask(studioMask.id)}
           onClose={() => setStudioMaskId(null)}
           rightInset={PANEL_W}
@@ -2193,6 +2273,8 @@ export default function App() {
           onApply={applyEditDraft}
           onCancel={() => setEditMode(false)}
           onReset={() => setEditDraft({ rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })}
+          vectorLayers={vectorLayers} vectorSources={vectorSources}
+          bboxSrc={geoTiffBboxSrc} crs={geoTiffCRS} onError={showError}
         />
       )}
 
@@ -2201,7 +2283,7 @@ export default function App() {
           state and the erosion settings live in Sidebar's own state, and
           unmounting silently reset all of them on the way back. `contents` keeps
           the wrapper out of the layout — the panel positions itself. */}
-      <div style={{ display: editMode ? 'none' : 'contents' }}>
+      <div style={{ display: (editMode || studioMask) ? 'none' : 'contents' }}>
       <Sidebar
         open={panelOpen} onOpenChange={setPanelOpen}
         onPristine={markPristine}
@@ -2249,6 +2331,7 @@ export default function App() {
         onClearCover={() => setCover(null)} onInkByClass={inkByClass}
         masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask}
         onRemoveMask={removeMask} onImportMask={importMask}
+        onMaskFromLayer={maskFromLayer}
         onPaintMask={(id) => setStudioMaskId(id)}
         imagery={imagery} imageryBusy={imageryBusy}
         onFetchImagery={fetchSatellite} onClearImagery={() => setImagery(null)}

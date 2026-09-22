@@ -49,6 +49,46 @@ test('a reset clears the text, and Undo brings it back', async ({ page }) => {
   await expect(page.locator('[data-testid^="text-body-"]').first()).toHaveValue('ERZBERG')
 })
 
+test('a reset clears the masks, and Undo brings them back', async ({ page }) => {
+  // The one that got away. "Reset all" grew from six state objects to nine, and
+  // each thing added since has had to be remembered here by hand — the vectors,
+  // the text, the cover plate, and then the masks, which were not. A stack of
+  // painted stencils surviving a reset is exactly the state the button's own
+  // label says it does not produce.
+  await boot(page)
+
+  await page.fill('[data-testid="panel-filter"]', 'Masks')
+  await page.waitForTimeout(500)
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(800)
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(600)
+  await page.fill('[data-testid="panel-filter"]', 'Masks')
+  await page.waitForTimeout(500)
+
+  const masksSection = page.locator('[data-section="Masks"]')
+  await expect(masksSection.locator('[data-testid^="paint-"]')).toHaveCount(1)
+
+  await page.fill('[data-testid="panel-filter"]', '')
+  await page.waitForTimeout(300)
+  await resetBtn(page).click()
+  await page.waitForTimeout(1200)
+  await page.fill('[data-testid="panel-filter"]', 'Masks')
+  await page.waitForTimeout(500)
+  await expect(masksSection.locator('[data-testid^="paint-"]'),
+    'a reset takes the masks with it').toHaveCount(0)
+
+  await page.fill('[data-testid="panel-filter"]', '')
+  await page.waitForTimeout(300)
+  await page.locator('[data-testid="toast-action"]').click()
+  await page.waitForTimeout(1200)
+  await page.fill('[data-testid="panel-filter"]', 'Masks')
+  await page.waitForTimeout(500)
+  await expect(masksSection.locator('[data-testid^="paint-"]'),
+    'Undo puts them back').toHaveCount(1)
+})
+
 test('a reset clears fetched layers, and Undo restores their geometry too', async ({ page }) => {
   test.skip(!existsSync(FIXTURE), `${FIXTURE} not present (gitignored) — see tests/testdata/README.md`)
 

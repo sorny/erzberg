@@ -101,7 +101,7 @@ Two details carry the design:
 
 | Where | What lives there | Why |
 |---|---|---|
-| **Zustand** (`store/useStore.js`) | The raster: source pixels, mask and dimensions. The Edit Mode clip. The derived raster, after the clip. GeoTIFF metadata, the overlay texture and the vector sources | These are large buffers that many unrelated components read. One selector per field. Thus a load of a texture does not re-render the terrain hook |
+| **Zustand** (`store/useStore.js`) | The raster: source pixels, mask and dimensions. The Edit Mode clip. The derived raster, after the clip. GeoTIFF metadata, the overlay texture, the vector sources, the painted masks, the land cover plate and any fetched satellite imagery | These are large buffers that many unrelated components read. One selector per field. Thus a load of a texture does not re-render the terrain hook |
 | **React state** (`App.jsx`) | Every parameter you can tune: `terrain`, `style`, `points` and `view`, seeded from `src/defaults.js` | They change constantly during a drag, and they belong to the render tree. Outside the store, they keep the store writes rare. The defaults live in their own module, so the preset randomiser can use them without an import of the root component |
 | **Refs** | Camera echoes, in-flight worker bookkeeping, the Edit Mode drag | These values change per frame. They must never trigger a render |
 
@@ -684,10 +684,11 @@ they all go through `pick(value, allowed)`.
 
 ## Testing
 
-The suite runs Playwright against a live dev server, in real Chrome with WebGL.
-The things worth an assertion exist only in a real renderer. These are those
-things: what the worker produced, what the SVG exporter drew, and whether the
-drawing buffer was clamped in silence.
+The suite runs Playwright against a live dev server, in headless Chrome with
+WebGL. The things worth an assertion exist only in a real renderer. These are
+those things: what the worker produced, what the SVG exporter drew, and whether
+the drawing buffer was clamped in silence. `HEADED=1` puts the window back when
+you want to watch a spec drive the app.
 
 The specs import the pure modules through the dev server with `page.evaluate`
 and test them directly. This is how the terrain, projection and clip maths get

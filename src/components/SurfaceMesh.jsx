@@ -5,6 +5,7 @@ import { useMemo, useEffect, useRef } from 'react'
 import * as THREE from 'three'
 import { hexToRgb, sampleGradient } from '../utils/colorUtils'
 import { hasFillLayer } from '../utils/geometryBuilders'
+import { TONE_GLSL, toneFor } from '../utils/imageryTone'
 import { useStore } from '../store/useStore'
 
 // ── Gradient texture ──────────────────────────────────────────────────────────
@@ -96,6 +97,12 @@ const SURFACE_FRAG = /* glsl */ `
   uniform bool      uShowImagery;
   uniform sampler2D uImageryTex;
   uniform float     uImageryOpacity;
+  uniform vec3      uImageryLo;
+  uniform vec3      uImageryHi;
+  uniform float     uImageryGamma;
+  uniform float     uImageryBrightness;
+  uniform float     uImageryContrast;
+  uniform float     uImagerySaturation;
   uniform bool      uShowTexture;
   uniform float     uTextureScale;
   uniform vec2      uTextureOffset;
@@ -155,6 +162,7 @@ const SURFACE_FRAG = /* glsl */ `
     vec3 rgb = hue2rgb(fract(h));
     return (rgb - 0.5) * (1.0 - abs(2.0 * l - 1.0)) + l;
   }
+${TONE_GLSL}
 
   float computeSVF(vec2 uv) {
     float h0 = texture2D(uHeightmapTex, uv).r;
@@ -252,7 +260,7 @@ const SURFACE_FRAG = /* glsl */ `
     // scale or offset of its own — plain vUv.
     if (uShowImagery) {
       vec4 sat = texture2D(uImageryTex, vUv);
-      base = mix(base, sat.rgb, sat.a * uImageryOpacity);
+      base = mix(base, toneImagery(sat.rgb), sat.a * uImageryOpacity);
     }
 
     if (uShowTexture) {
@@ -505,6 +513,12 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uShowImagery:         { value: false },
       uImageryTex:          { value: null },
       uImageryOpacity:      { value: 0.85 },
+      uImageryLo:           { value: new THREE.Vector3(0, 0, 0) },
+      uImageryHi:           { value: new THREE.Vector3(255, 255, 255) },
+      uImageryGamma:        { value: 1 },
+      uImageryBrightness:   { value: 1 },
+      uImageryContrast:     { value: 1 },
+      uImagerySaturation:   { value: 1 },
       uTextureScale:        { value: 1.0 },
       uTextureOffset:       { value: new THREE.Vector2(0, 0) },
       uTextureBlendMode:    { value: 0 },
@@ -578,6 +592,13 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uShowImagery.value = !!(p.showImagery && imageryTex)
     if (imageryTex) surfMat.uniforms.uImageryTex.value = imageryTex
     surfMat.uniforms.uImageryOpacity.value = p.imageryOpacity ?? 0.85
+    const tone = toneFor(p.imagery, p)
+    surfMat.uniforms.uImageryLo.value.set(...tone.lo)
+    surfMat.uniforms.uImageryHi.value.set(...tone.hi)
+    surfMat.uniforms.uImageryGamma.value = tone.gamma
+    surfMat.uniforms.uImageryBrightness.value = tone.brightness
+    surfMat.uniforms.uImageryContrast.value = tone.contrast
+    surfMat.uniforms.uImagerySaturation.value = tone.saturation
     surfMat.uniforms.uShowTexture.value = !!(p.showTexture && overlayTex)
     surfMat.uniforms.uOverlayTex.value = overlayTex
     surfMat.uniforms.uTextureScale.value = 1.0 / (p.textureScale || 1.0)

@@ -6,11 +6,16 @@
  * terrain that is not on screen while it is running.
  */
 import { useEffect, useState } from 'react'
-import { effectiveBounds } from '../utils/heightmapEdit'
+import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
+import { featureRings } from '../utils/maskFromVector'
+import { useFeaturePick } from './panel/FeaturePicker'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
   HelpBox, InlineSl, PanelStyles, SegRow,
 } from './panel/ui'
+
+/** Total vertices across every ring of a shape. */
+const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
 
 const TOOLS = [
   ['▣ Crop',    'crop'],
@@ -54,6 +59,7 @@ export function EditPanel({
   tool, setTool,
   aspect, setAspect,
   onApply, onCancel, onReset,
+  vectorLayers, vectorSources, bboxSrc, crs, onError,
 }) {
   const rect = edit?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
   const bounds = effectiveBounds(edit, srcWidth, srcHeight)
@@ -143,7 +149,13 @@ export function EditPanel({
               {!edit?.shape ? 'none'
                 : edit.shape.type === 'ellipse'
                   ? `ellipse · ${Math.round(edit.shape.rx * 2)}×${Math.round(edit.shape.ry * 2)}`
-                  : `${edit.shape.type} · ${edit.shape.points.length / 2} pts`}
+                  : edit.shape.type === 'rings'
+                    // Named, and counted across every ring — a feature with an
+                    // enclave in it has more than one and `points` is not there
+                    // at all. Reading `shape.points.length` here is what took
+                    // the whole panel down the first time a clip came from a map.
+                    ? `${edit.shape.name ?? 'feature'} · ${ringPoints(edit.shape)} pts`
+                    : `${edit.shape.type} · ${edit.shape.points.length / 2} pts`}
             </span>
           </div>
           {edit?.shape && (
@@ -152,6 +164,18 @@ export function EditPanel({
               border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 8,
             }}>Clear shape</button>
           )}
+          <ClipFromFeatures
+            layers={vectorLayers} sources={vectorSources}
+            bboxSrc={bboxSrc} crs={crs} srcWidth={srcWidth} srcHeight={srcHeight}
+            onShape={(shape) => onChange({
+              // The whole raster, so the clip is the feature and nothing else.
+              // A crop left over from a previous selection would silently cut
+              // a municipality in half.
+              rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape, feather,
+            })}
+            onError={onError}
+          />
+
           <InlineSl
             label="Feather" testId="edit-feather"
             help="Softens the cut: within this many pixels of the edge the terrain ramps down to its own lowest point instead of ending in a cliff. Also what makes a clipped STL sit flat."
@@ -182,6 +206,58 @@ export function EditPanel({
           <div style={{ fontSize: 10, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>
             Applying keeps the original raster — re-open Edit Mode any time to adjust or drop the clip.
           </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/**
+ * Clip the heightmap to a map feature.
+ *
+ * The same choosing the Masks section does, spent differently: there a feature
+ * becomes a stencil over the whole raster, here it becomes the raster's own
+ * outline. "Cut this to the municipality" is the request, and tracing a border
+ * by hand with the lasso was the only way to answer it.
+ *
+ * Only layers whose features enclose something are offered — a road network
+ * cannot clip anything — and the shape it produces is deliberately not
+ * vertex-editable. It came from a survey.
+ */
+function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, onShape, onError }) {
+  const { usable, chosen, bucket, picked, closes, label, element } =
+    useFeaturePick(layers ?? [], sources ?? [], 'edit-from')
+  if (!usable.length) return null
+
+  const areaLike = chosen?.geom === 'area' || closes
+  const ready = !!bboxSrc && !!crs && areaLike && picked.size > 0
+
+  const apply = () => {
+    const rings = featureRings(bucket, { bbox: bboxSrc, crs, width: srcWidth, height: srcHeight },
+      { only: [...picked] })
+    if (!rings.length) {
+      onError?.(`Nothing from ${label} encloses ground inside this raster.`)
+      return
+    }
+    onShape({ type: 'rings', rings, name: label })
+  }
+
+  return (
+    <>
+      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>
+        FROM FEATURES
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
+        {element}
+        <button onClick={apply} disabled={!ready} data-testid="edit-from-apply" style={{
+          width: '100%', padding: '6px 0', borderRadius: 5, fontSize: 10,
+          cursor: ready ? 'pointer' : 'not-allowed', opacity: ready ? 1 : 0.5,
+          background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+        }}>Clip to this</button>
+        <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
+          {!areaLike
+            ? 'These features do not enclose anything, so there is nothing to clip to.'
+            : 'The crop is reset to the whole raster and the outline becomes the selection. Feather still applies.'}
         </div>
       </div>
     </>

@@ -23,9 +23,9 @@ cuts the raster as well, for when you do not have one.
 
 ### 1. Cut a window
 
-**If you already have a GeoTIFF**, point the script at it. The extent, the
-projection and the pixel grid all come from the file, so the plate comes back
-matching it exactly and no terrain is fetched:
+**If you already have a GeoTIFF**, point the script at it. The extent and the
+projection come from the file, so the plate covers the same ground in the same
+projection and no terrain is fetched:
 
 ```bash
 node scripts/embed-window.js --dem my-terrain.tif --classes 6
@@ -307,9 +307,66 @@ panel already looks like the ground it stands for.
 
 ---
 
+## What resolution the plate is cut at
+
+The embeddings are 10 m and nothing makes them finer. So the plate is cut on its
+own grid — the raster's extent and projection, at the resolution the data
+actually has — and the app upsamples it back to the raster on load.
+
+For a 10 m raster that is 1:1 and nothing happens. For a finer one it is not:
+a 4.2 m city raster of Graz is 3804 × 2558 and its plate is 1902 × 1279.
+
+**This replaced a pixel cap that refused the work.** Cutting at the raster's own
+grid meant a fine raster asked for tens of millions of embedding pixels, so the
+script carried a ceiling and told the user to crop. That is a refusal to do
+arithmetic dressed as a limit: at 10 m there was never that much data to read.
+Graz needed 9.7 million pixels under the old rule and reads 2.4 million now,
+which is the same answer at the resolution it was always available in.
+
+Nothing is lost. Upsampling a nearest-neighbour class map restores every
+boundary exactly, and `alignCover` already did it — this is the same path a
+plate cut for a *different* raster has always taken.
+
+**The bug this opened.** OpenStreetMap polygons are painted to name the classes,
+and the projection that places them answers in the *raster's* pixels. Once the
+plate was allowed to be coarser, painting at raster scale put every polygon in
+the top-left quadrant of the plate.
+
+It did not fail loudly. It produced a tally, and the tally was *the same for
+every class*: six classes over Graz, each 40% forest and 26% built-up, each
+therefore named "Forest". Uniform output is the signature — a class that draws
+its name from a region uncorrelated with itself gets the window's average, and
+every class gets the same average. With the scale corrected the same window
+gives meadow, three grades of forest and two of built-up.
+
+---
+
 ## Traps in the source data
 
-Three of these cost real time, and all three are silent.
+Five of these cost real time, and all five are silent.
+
+**An export's name says nothing about where it is, and its corner tile may not
+exist.** The obvious index probes `<hash>-0000000000-0000000000.tiff` and skips
+the export when that 404s. Thirty-one of the 208 exports in zone 33N have no
+such tile, so fifteen per cent of the archive was invisible — and invisible in
+the way that matters, because a window over one of them reported that the
+dataset does not cover that ground. The bucket listing states exactly which
+tiles exist, so the probe targets one that is there.
+
+**Exports are not all the same size.** Most are a 2 × 2 grid of 8192-pixel
+tiles, and in zone 33N alone there are 50 of two tiles, six of one and one of
+three. Crediting an export with ground it does not have is the same failure
+wearing the opposite face: the window is selected, the read comes back empty,
+and the zone that really holds the data is never tried. An export's extent is
+the union of the tiles it actually has.
+
+**A raster's UTM zone is not always the zone its longitude names.** Tre Cime
+sits at 12.28°E — eight hundredths of a degree inside zone 33's band — and is
+distributed as ETRS89 / UTM 32N, which is what a surveyor working in the Alps
+uses for the whole region. The script therefore tries the raster's own zone
+first, then the zone the longitude names, then the neighbours, and the *read*
+decides: a zone whose exports reach the lattice cell but not the window itself
+reads back empty and the next candidate is tried.
 
 **The tiles are south-up.** Their `ModelTransformation` carries a *positive*
 north-south step, so raster row 0 is the southern edge and the row index climbs
