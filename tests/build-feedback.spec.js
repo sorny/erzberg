@@ -15,7 +15,7 @@
  * genuinely heavy mode to show at all.
  */
 import { expect, test } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { resetToDefaults, setMark, waitForApp } from './helpers.js'
 
 /** `Rebuild: 153 ms` → 153, `Rebuild: 1.8 s` → 1800. */
 const ms = (text) => {
@@ -23,12 +23,7 @@ const ms = (text) => {
   return m ? Number(m[1]) * (m[2] === 's' ? 1000 : 1) : NaN
 }
 
-async function enableMode(page, testId, title) {
-  const section = page.locator(`[data-testid="section-mode:-${testId}"]`)
-  await section.scrollIntoViewIfNeeded()
-  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
-  await page.locator(`[data-section="Mode: ${title}"] input[type=checkbox][aria-label="Enabled"]`).click()
-}
+
 
 test('the panel reports how long the last rebuild took', async ({ page }) => {
   test.setTimeout(240_000)
@@ -46,13 +41,13 @@ test('the panel reports how long the last rebuild took', async ({ page }) => {
   // A measurement, not a constant. An order of magnitude between the opening
   // plate and a year of sun is too much for a hard-coded string or a figure
   // captured once at startup to survive.
-  await enableMode(page, 'sun-hours', 'Sun Hours')
+  await setMark(page, 'sun-hours', true)
   await page.waitForTimeout(15_000)
   const heavy = ms(await readout.textContent())
   expect(heavy).toBeGreaterThan(before * 4)
 
   // And it comes back down, so it is tracking rather than latching high.
-  await enableMode(page, 'sun-hours', 'Sun Hours')
+  await setMark(page, 'sun-hours', false)
   await page.waitForTimeout(10_000)
   expect(ms(await readout.textContent())).toBeLessThan(heavy / 2)
 })
@@ -74,14 +69,14 @@ test('a slow rebuild says so, and a fast one stays quiet', async ({ page }) => {
    * strobe the whole screen on every slider drag, which is worse than the
    * silence it replaced. So the fast path must show nothing at all.
    */
-  await enableMode(page, 'lines', 'Lines')
+  await setMark(page, 'lines', false)
   await page.waitForTimeout(1200)
   await expect(pill).toHaveCount(0)
   await expect(page.locator('text=Computing geometry…')).toHaveCount(0)
 
   // The loud half. Sun Hours takes long enough to cross both thresholds.
   const appeared = page.waitForSelector('[data-testid="computing-pill"]', { timeout: 60_000 })
-  await enableMode(page, 'sun-hours', 'Sun Hours')
+  await setMark(page, 'sun-hours', true)
   await appeared
 
   // And it clears itself. A latched spinner is the failure this replaces, and

@@ -8,7 +8,8 @@
  * design system and nothing else.
  */
 import { useContext, useEffect, useId, useRef, useState } from 'react'
-import { SectionFilter, sectionMatches } from './filter'
+import { PanelStage, SectionFilter, sectionMatches } from './filter'
+import { STAGES } from './stages'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 /**
@@ -63,8 +64,23 @@ export const MUTED       = 'var(--hm-muted)'
 export const ACCENT      = 'var(--hm-accent)'
 export const ACCENT_DEEP = 'var(--hm-accent-deep)'
 export const GREEN       = 'var(--hm-green)'
-/** A number, not a colour — it is arithmetic (`right: open ? W : 0`). */
-export const W      = 272   // panel width px
+/*
+ * A number, not a colour — it is arithmetic (`right: open ? W : 0`).
+ *
+ * `W` is what the panel costs the drawing, and every consumer reads it: the
+ * canvas inset in App.jsx, the paper overlay's geometry, the collapse handle,
+ * the Edit panel that stands in the sidebar's place.
+ *
+ * It was 272 for the whole life of the panel, and 272 is still the width the
+ * *controls* get — `BODY_W` below. The extra 40 is the stage rail, which is
+ * navigation rather than control and so is paid for out of the window instead of
+ * out of the sliders. Taking it out of the body would have cost every slider in
+ * the panel 28% of its travel, across some 350 of them, to save 40 px of a
+ * roughly 1 900 px canvas.
+ */
+export const W      = 312   // panel width px, rail included
+export const RAIL_W = 40    // the stage rail
+export const BODY_W = 272   // what the controls get, unchanged
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
 export function PanelStyles() {
@@ -187,6 +203,39 @@ export function PanelStyles() {
          while the pointer is elsewhere. */
       .hmreset { opacity:0; transition:opacity .12s; }
       [data-section]:hover .hmreset, .hmreset:focus-visible { opacity:1; }
+
+      /*
+       * A tile on the mark sheet: a pip and a card.
+       *
+       * The tile carries two actions — switch the mark on, open its settings —
+       * and the first build gave them one look. People found the second by
+       * accident, which is not finding it.
+       *
+       * The fix is shape. The pip is round, small and lights green, which is
+       * what every other switch in this panel looks like. Everything else is a
+       * card with a chevron on it, and a chevron means it goes somewhere. Hover
+       * separates them again: the card lifts as one piece, and the pip lights
+       * its own 20 px target inside it. Nobody has to be told which is which,
+       * because they no longer look alike.
+       *
+       * Styles rather than inline hover handlers: this is thirty-four tiles with
+       * two targets each, so handlers would be sixty-eight closures rebuilt on
+       * every render of the sheet. A backtick in this comment would also end the
+       * template literal the whole stylesheet is written in.
+       */
+      .hmcard { transition:border-color .12s, background .12s; }
+      .hmcard:hover { border-color:${MUTED}; }
+      .hmcard:hover .hmchev { color:${TEXT}; }
+      .hmcardhit { -webkit-appearance:none; appearance:none; background:none;
+        border:none; font:inherit; color:inherit; text-align:left; width:100%;
+        display:block; padding:0; cursor:pointer; }
+      .hmcardhit:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
+      .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
+        padding:0; cursor:pointer; border-radius:4px; transition:background .12s; }
+      .hmpip:hover { background:rgba(255,255,255,.09); }
+      .hmpip:hover .hmpipdot { border-color:${TEXT}; }
+      .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
+      .hmpipdot { transition:background .12s, border-color .12s, box-shadow .12s; }
 
       /* Dual-handle range. Two native inputs stacked: the tracks are inert and
          only the thumbs take the pointer, which keeps keyboard control and the
@@ -604,9 +653,27 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
     console.warn(`[panel] Section "${title}" has no SECTION_TERMS entry — the filter will only match its title.`)
   }
   const matches = sectionMatches(title, ownTerms, q)
+  /*
+   * Marks is a sheet, so its thirty-five headers are behind it.
+   *
+   * The sheet stands in for the whole stage: with nothing drilled into, the only
+   * Marks section on screen is `Draw Modes`, which is what holds the sheet.
+   * Open one mode and the sheet's own section goes too, so the mode has the
+   * pane to itself — which is the point of drilling in at all.
+   *
+   * Hidden on the same terms as a filtered-out section, and for the same reason:
+   * these sections own local state and a click on a tile must not throw it away.
+   * One rule here rather than a prop on thirty-five call sites, and the rule is
+   * written from the titles because that is what the sheet is built from too.
+   */
+  const inMarks  = title === 'Draw Modes' || title.startsWith('Mode: ')
+  const drill    = ctx?.drill ?? null
+  // A search is flat and crosses every pane, so it outranks the sheet.
+  const sheetOut = !q && inMarks && (drill ? title !== drill : title !== 'Draw Modes')
   // While filtering, a surviving section is open: the point of finding it is to
   // reach the control inside, and a hit that still needs a click is half an answer.
-  const isOpen = q ? true : open
+  // A drilled-in mode is open for the same reason — you asked for its controls.
+  const isOpen = q || (drill && title === drill) ? true : open
   /**
    * The readout, and only while the section is shut.
    *
@@ -642,8 +709,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
      */
     <div data-section={title}
          style={{ position: 'relative', borderBottom: `1px solid ${BORDER}`,
-                  ...(matches ? null : { display: 'none' }) }}
-         data-filtered-out={matches ? undefined : 'true'}>
+                  ...(matches && !sheetOut ? null : { display: 'none' }) }}
+         data-filtered-out={matches ? undefined : 'true'}
+         data-sheet-out={sheetOut ? 'true' : undefined}>
       {/* A collapsed section is a zero-height grid row, so nothing inside it is
           clickable until it is opened — the header needs a handle a spec can
           find without matching on its uppercase-by-CSS title text. It is a
@@ -752,11 +820,27 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
  * carries an opaque background because it passes over content rather than
  * pushing it. Hidden while filtering: the filter is a flat list of hits, and a
  * stage heading over none of its own sections is furniture pointing nowhere.
+ *
+ * ── One pane at a time ───────────────────────────────────────────────────────
+ * The rail selects a stage and the other five hide. The rule they hide by is the
+ * filter's rule and not a new one: `display: none`, never an unmount. A
+ * collapsed section has always kept its children mounted so that a running
+ * Overpass fetch, its cancel controller and a half-set feature filter survive
+ * being shut, and a stage is five of those at once. Returning `null` here would
+ * throw all of it away on a click of the rail.
+ *
+ * The rule stays on screen above the sections even though the rail already names
+ * the stage. The rail has 40 px and carries `Mark`; this carries `MARKS`, and it
+ * is the only place the whole word appears.
  */
 export function Stage({ n, title, children }) {
   const q = useContext(SectionFilter)?.q ?? ''
+  const sel = useContext(PanelStage)
   // A fragment, not the bare children: the caller renders this among siblings.
+  // A search crosses all six panes, so while one is typed there are no panes.
   if (q) return <>{children}</>
+  // No rail mounted is the old panel: every stage at once, in pipeline order.
+  const shown = !sel || sel.stage === n
   return (
     /*
      * The wrapper is not decoration — it is the mechanism.
@@ -768,7 +852,8 @@ export function Stage({ n, title, children }) {
      * and Marks were pinned at y=0 together. Giving each stage its own block is
      * what makes the sixth push the fifth out of the way.
      */
-    <div>
+    <div data-stage={n} data-stage-hidden={shown ? undefined : 'true'}
+         style={shown ? undefined : { display:'none' }}>
       <div data-testid={`stage-${title.toLowerCase()}`} style={{
         position:'sticky', top:0, zIndex:2,
         display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
@@ -783,6 +868,105 @@ export function Stage({ n, title, children }) {
       </div>
       {children}
     </div>
+  )
+}
+
+/**
+ * The stage rail: six tabs down the panel's edge, one pane on screen.
+ *
+ * The six stages put the pipeline's *order* on screen and that worked. What they
+ * could not fix is its *proportion*. Marks is 35 of the 60 sections, so every
+ * trip from Terrain to Export crossed 1 500 px of draw modes, and the other five
+ * stages paid for a stage they were not using. The rail does not shorten Marks.
+ * It stops the rest of the panel paying for it: Source is 290 px, Surface 180,
+ * Overlay 145, Frame 180 and Output two sections.
+ *
+ * ── Why the badge is a count of lit sections ─────────────────────────────────
+ * A pane you cannot see is a pane whose green dots you cannot count, and
+ * "something is switched on somewhere I am not looking" is the one thing hiding
+ * five sixths of the panel could genuinely cost. The badge is that cost paid
+ * back: it reads the same `enabled` the dots read, so the rail and the dots
+ * cannot disagree, and a stage doing nothing carries no badge at all rather than
+ * a zero — for the reason a shut section says `—` and not the word.
+ *
+ * ── While the filter is typed ────────────────────────────────────────────────
+ * A search crosses all six panes, so the tabs stop being a selection and become
+ * a tally: each one says how many of its sections the query found, and the ones
+ * that found none go quiet. The pane selection is untouched underneath, so
+ * clearing the field puts the panel back exactly where it was.
+ *
+ * @param {object}   props
+ * @param {number}   props.stage    the selected stage number
+ * @param {Function} props.onStage  (n) => void
+ * @param {object}   props.live     stage number → count of lit sections
+ * @param {object}   [props.hits]   stage number → filter hits, while filtering
+ */
+export function StageRail({ stage, onStage, live, hits }) {
+  const filtering = !!hits
+  return (
+    <nav data-testid="stage-rail" aria-label="Pipeline stage"
+      style={{
+        width: RAIL_W, flexShrink:0, display:'flex', flexDirection:'column',
+        background:'rgba(0,0,0,0.25)', borderRight:`1px solid ${BORDER}`,
+        overflow:'hidden',
+      }}>
+      {STAGES.map(([n, title, short]) => {
+        const sel   = !filtering && stage === n
+        const count = filtering ? (hits[n] || 0) : (live[n] || 0)
+        // Two different numbers wear two different colours, because they answer
+        // two different questions. Lit sections are the panel's green, the same
+        // green as the dots they are counting. Filter hits are the accent, which
+        // is what every other "this is what you searched for" wears.
+        const badge = count > 0
+        return (
+          <button key={n} type="button"
+            data-testid={`stage-tab-${title.toLowerCase()}`}
+            onClick={() => onStage(n)}
+            aria-pressed={sel}
+            aria-label={`${title}${count > 0 ? `, ${count} ${filtering ? 'found' : 'on'}` : ''}`}
+            title={filtering
+              ? `${title} — ${count} match${count === 1 ? '' : 'es'}`
+              : `${title}${count > 0 ? ` — ${count} on` : ''}`}
+            style={{
+              position:'relative', padding:'11px 0 12px', border:'none',
+              borderBottom:`1px solid ${BORDER}`,
+              background: sel ? SURF : 'none',
+              // The selected tab is marked on the edge it shares with the body,
+              // so the rail reads as a set of tabs handing over to one pane
+              // rather than six buttons one of which is highlighted.
+              boxShadow: sel ? `inset -2px 0 0 ${ACCENT}` : 'none',
+              color: sel ? TEXT : MUTED,
+              cursor:'pointer', textAlign:'center', fontFamily:'inherit',
+              // A pane with nothing on, while the query found nothing in it, is
+              // not a place this search can take you.
+              opacity: filtering && !badge ? 0.35 : 1,
+            }}>
+            {/* The badge gets its own lane on the right, and the number and the
+                name centre in what is left. Centred across the whole 40 px they
+                ran under the badge — `02` and a green `2` on top of each other,
+                which is two counts pretending to be one. */}
+            <span style={{ display:'block', paddingRight:11 }}>
+              <span style={{ display:'block', fontSize:9, fontWeight:700, fontVariantNumeric:'tabular-nums' }}>
+                {String(n).padStart(2, '0')}
+              </span>
+              <span style={{ display:'block', fontSize:8, letterSpacing:'0.06em', textTransform:'uppercase', marginTop:3 }}>
+                {short}
+              </span>
+            </span>
+            {badge && (
+              <span aria-hidden="true" style={{
+                position:'absolute', top:6, right:4,
+                minWidth:13, height:13, borderRadius:7, padding:'0 3px',
+                background: filtering ? ACCENT : GREEN,
+                color: filtering ? '#fff' : '#08240f',
+                fontSize:8, fontWeight:700, lineHeight:'13px',
+                fontVariantNumeric:'tabular-nums',
+              }}>{count}</span>
+            )}
+          </button>
+        )
+      })}
+    </nav>
   )
 }
 

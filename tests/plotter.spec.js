@@ -14,12 +14,13 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
 async function openExport(page) {
+  await openStage(page, 'output')
   const section = page.locator('[data-testid="section-export"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
@@ -69,6 +70,7 @@ test('the numbers go stale rather than lie', async ({ page }) => {
   await preflight(page)
 
   // Move the camera and the measurement no longer describes what is on screen.
+  await openStage(page, 'frame')   // Tilt is in View
   const tilt = page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
   await tilt.fill('20')
   await page.waitForTimeout(600)

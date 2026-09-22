@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 /**
  * What "Reset all" is required to reset.
@@ -110,6 +110,7 @@ test('a reset clears fetched layers, and Undo restores their geometry too', asyn
   ])
   await chooser.setFiles(FIXTURE)
   await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30_000 })
+  await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.click('[data-testid="osm-fetch"]')
   await expect(vectorRows(page).first()).toBeVisible({ timeout: 30_000 })

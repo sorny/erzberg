@@ -13,13 +13,15 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
 async function openMarks(page) {
+  await openStage(page, 'frame')
   await page.locator('[data-testid="section-scale-and-north"]').scrollIntoViewIfNeeded()
+  await openStage(page, 'frame')
   await page.click('[data-testid="section-scale-and-north"]')
   await page.waitForTimeout(300)
 }

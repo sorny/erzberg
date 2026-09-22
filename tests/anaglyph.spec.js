@@ -15,12 +15,13 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
 async function openAnaglyph(page) {
+  await openStage(page, 'frame')
   const section = page.locator('[data-testid="section-anaglyph"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
@@ -231,6 +232,7 @@ test('the panel says when the camera cannot give it depth', async ({ page }) => 
   // screen than a far one. An orthographic camera shifts them equally, which is
   // a double image with no depth in it — so the panel says so rather than
   // leaving somebody wondering why the glasses do nothing.
+  await openStage(page, 'frame')
   const camera = page.locator('[data-testid="section-camera"]')
   await camera.scrollIntoViewIfNeeded()
   if ((await camera.getAttribute('aria-expanded')) !== 'true') {

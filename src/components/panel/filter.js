@@ -16,6 +16,20 @@ import { createContext } from 'react'
 export const SectionFilter = createContext(null)
 
 /**
+ * Which of the six stage panes is on screen, on the same terms.
+ *
+ * Carries `{ stage, setStage }`. A context rather than a prop, because the
+ * reader is `<Stage>` — six call sites — and the writers are the rail, the
+ * filter's jump links and the Presets shortcut, which sit in three different
+ * parts of the panel and share no parent below the `<aside>`.
+ *
+ * `null` means no rail is mounted, and every stage then renders at once. That is
+ * the old panel exactly, and it is what the specs that predate the rail see if
+ * they mount a `<Stage>` on its own.
+ */
+export const PanelStage = createContext(null)
+
+/**
  * The loaded land-cover plate, for the same reason and on the same terms.
  *
  * Every draw mode carries a class mask, and the control for it lives in the one

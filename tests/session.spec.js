@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { openStage, switchMarkOn } from './helpers.js'
 
 /**
  * Settings that survive a reload.
@@ -30,6 +31,8 @@ test('a change survives a reload', async ({ page }) => {
   await openApp(page)
   await page.locator('input.hmval[aria-label="Blur value"]').fill('6')
   await page.keyboard.press('Enter')
+  // Blur is in Terrain, in Source; Tilt is in View, in Frame.
+  await openStage(page, 'frame')
   await page.locator('input.hmval[aria-label="Tilt value"]').fill('22')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(1200)
@@ -45,8 +48,10 @@ test('auto-rotate does not starve the write', async ({ page }) => {
   // was ever stored. That is precisely the unattended hour this exists to keep.
   await openApp(page)
   await page.evaluate((k) => localStorage.removeItem(k), KEY)
+  await openStage(page, 'frame')   // Auto-rotate is in View
   await page.locator('input[type=checkbox][aria-label="Auto-rotate"]').click()
   await page.waitForTimeout(500)
+  await openStage(page, 'source')   // Blur is in Terrain
   await page.locator('input.hmval[aria-label="Blur value"]').fill('5')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(3000)
@@ -103,15 +108,23 @@ test('a restored mode comes back with its section open', async ({ page }) => {
   // toggling that one would be switching a mode *off* and asserting the section
   // opened for a mode that is not running.
   const section = page.locator('[data-testid="section-mode:-pillars"]')
-  await page.click('[data-testid="section-mode:-pillars"]')
-  await page.waitForTimeout(300)
-  await section.locator('xpath=following-sibling::div[1]')
-    .locator('input[type=checkbox]').first().click()
-  await page.waitForTimeout(2000)
-  await page.click('[data-testid="section-mode:-pillars"]')   // collapse it again
-  await page.waitForTimeout(400)
-  await expect(section).toHaveAttribute('aria-expanded', 'false')
+  await switchMarkOn(page, 'pillars')
 
+  /*
+   * The collapse step is gone, and the assertion is stronger without it.
+   *
+   * A mark's section is only on screen while it is drilled into, and drilling
+   * in forces it open — so there is no longer a way to collapse one by hand,
+   * and the state this guards cannot be set up through the UI any more.
+   *
+   * It does not need to be. `sec.modePillars` starts `false`, and nothing but
+   * `syncSectionsToStyle` at mount can make it `true` for a mode restored from
+   * the session. So a reload that comes back open is the sync having run, and a
+   * reload that comes back shut is the bug this test was written for. The
+   * attribute is read off the hidden section, which is exactly the state
+   * underneath the drill rather than the drill's own override of it.
+   */
   await reload(page)
+  await expect(page.locator('input.hmr[aria-label="Blur"]')).toBeVisible()
   await expect(section).toHaveAttribute('aria-expanded', 'true')
 })

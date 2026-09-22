@@ -132,24 +132,27 @@ a second. If nothing comes back for 1.2 seconds, the app covers the screen
 instead. Two thresholds rather than one: a modal dim flashing on every slider
 drag is worse than the silence it replaced.
 
-**Find a control.** The panel has more than thirty sections, which is a lot to
-remember the shape of. The field at the top of the panel narrows them. Type
-`azimuth`. Only Hillshade then remains, open, with the sun controls in it.
-Sections answer to their own vocabulary as well as to their titles, so the field
-also finds sections that are switched off. Clear the field. The panel then
-returns to exactly its previous state.
+**Find a control.** The panel has sixty sections, which is a lot to remember the
+shape of. The field at the top of the panel narrows them. Type `azimuth`. Only
+Hillshade then remains, open, with the sun controls in it. Sections answer to
+their own vocabulary as well as to their titles, so the field also finds
+sections that are switched off.
+
+A search crosses every stage, so the rail stops being a selection and becomes a
+tally: each tab says how many of its sections the query found, and the ones that
+found none go quiet. Clear the field. The panel returns to exactly the pane it
+was on.
 
 **A shut section says what it holds.** Every collapsed header carries its own
 setting on the right. Hillshade reads `315° · 60%`. Terrain Style reads
 `hypso · mesh`. A section that is switched off reads `—`, which the eye skips, and a section
 that is on carries a green dot beside its name.
-Close every section and the panel states the whole plate in one column of
-fifty-four rows, 2 725 px instead of the 5 037 px it opens at. Export, Analysis and
-Hydraulic Erosion stay blank on purpose. They are actions and hold no setting,
-and a dash there would claim that they were switched off. A draw mode shows its
-own dial as a bare number, because a title such as `MODE: ZERO CROSSINGS` fills
-most of a 272 px panel by itself. Rest the pointer on the number to read the name
-of the control that it comes from.
+Close every section in a stage and that stage states itself in one short column:
+Source is about 290 px, Surface 180, Overlay 145, Frame 180, and Output is two
+sections. Export, Analysis and Hydraulic Erosion stay blank on purpose. They are
+actions and hold no setting, and a dash there would claim that they were
+switched off. Rest the pointer on a readout to read the name of the control that
+it comes from.
 
 **The head counts what you composed.** One standing line under the wordmark:
 `4 marks · 3 inks · 2 layers`. The ink count is a count of pens. Two modes in
@@ -162,19 +165,45 @@ writes the full canvas*, or *SVG cuts at the frame ↑*. The export cuts at the
 paper frame rather than hiding what falls outside it, so a switch two stages
 away in Frame decides what you get.
 
-**The body is the pipeline.** Six stage rules divide it, and each one sticks to
-the top of the panel while you are inside it: *Source, Surface, Marks, Overlay,
-Frame, Output*. Every section belongs to one stage, and the order is the order
-the renderer runs. This is what makes a control findable before you know where
-it is. Jitter changes the source, so jitter is in Source. Hydraulic Erosion used
-to sit at position 48, immediately before Export.
+**The rail is the pipeline.** Six tabs run down the panel's edge — *Source,
+Surface, Marks, Overlay, Frame, Output* — and the body shows one of them at a
+time. Every section belongs to one stage, and the order is the order the
+renderer runs. This is what makes a control findable before you know where it
+is. Jitter changes the source, so jitter is in Source.
 
-**Thirty-four modes on one screen.** The Draw Modes index opens the Marks stage.
-It is a grid of the thirty-four marks themselves — the same glyphs the section
-headers carry. A lit tile is drawing. Click one to switch it on, and the panel
-opens its section and scrolls to it. Click a lit one to switch it off, and the
-panel stays where it is. The tile and the section switch are two views of one
-setting, so they cannot disagree.
+The rail exists because the six stages put the pipeline's *order* on screen but
+not its *proportion*. Marks is 35 of the 60 sections, so every trip from Terrain
+to Export crossed about 1 500 px of draw modes. The rail does not shorten Marks.
+It stops the other five stages paying for it.
+
+A tab carries a green count of the sections switched on inside it, because a
+pane you cannot see is a pane whose green dots you cannot count. A stage doing
+nothing carries no badge at all. Switching panes hides the other five rather
+than unmounting them, so a running OpenStreetMap fetch, its cancel button and a
+half-set feature filter all survive a click on the rail.
+
+The panel is 312 px wide: 40 for the rail and 272 for the controls, which is the
+width they have always had. The rail is navigation rather than control, so it is
+paid for out of the window instead of out of the sliders.
+
+**Thirty-four modes on one screen.** The Marks stage is a sheet of the
+thirty-four marks themselves — the same glyphs the section headers carry, three
+across, each with its name. It replaces the thirty-four headers that used to
+stand for them, and it is the way into any one of them.
+
+A tile carries two things, and they are shaped differently on purpose:
+
+- **The pip**, a small ring in the corner, switches the mark on. It fills green
+  while the mark is drawing. It is the only thing on the tile shaped like a
+  control, and it writes the same setting the section's own switch writes, so
+  the two cannot disagree.
+- **The card** — the glyph, the name, the space around them — opens the mark.
+  It carries a chevron, because an arrow is what says a thing goes somewhere.
+
+Switching a mark on leaves you on the sheet, so a second and a third are one
+click each. Opening one gives it the whole width of the panel, with a back bar
+above it. It is not a layer stack: nothing reorders, nothing is dragged, and a
+tile reads and writes one boolean and does nothing else.
 
 ---
 

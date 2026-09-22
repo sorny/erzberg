@@ -1,3 +1,5 @@
+import { PANEL_MODES } from '../src/components/panel/sectionSummary.js'
+
 /**
  * Shared test preconditions.
  *
@@ -51,6 +53,120 @@ export async function resetToDefaults(page) {
     await page.waitForTimeout(400)
   }
   await page.locator('#hm-panel-body').evaluate((el) => { el.scrollTop = 0 })
+}
+
+/**
+ * Brings a stage pane on screen.
+ *
+ * The panel shows one of six stages at a time, so a section in a pane you have
+ * not selected is in the DOM and hidden — `toHaveCount` and `toHaveAttribute`
+ * still see it, and `click` does not. Any spec that operates a control outside
+ * Source has to say which pane it is in.
+ *
+ * Named rather than numbered: `openStage(page, 'frame')` survives a stage being
+ * inserted in front of it, and the tab's own handle is its name.
+ */
+export async function openStage(page, name) {
+  const tab = page.locator(`[data-testid="stage-tab-${name}"]`)
+  await tab.waitFor({ state: 'visible', timeout: 15_000 })
+  await tab.click()
+  // A stage switch replaces the whole body — Marks alone is 34 tiles — and the
+  // rail resets the scroll to the top. Clicking into the new pane before that
+  // settles lands on whatever moved under the pointer: the run that found this
+  // hit the stats block at the foot of the panel. Wait for the layout, not for
+  // a guess at how long it takes.
+  await page.locator(`[data-testid="stage-${name}"]`).waitFor({ state: 'visible', timeout: 15_000 })
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))))
+  await page.waitForTimeout(250)
+}
+
+/**
+ * A mark, however a spec happens to name it.
+ *
+ * Specs identify a mark three ways and all three are reasonable: by the id the
+ * handles carry (`ShadowLine`), by its section slug (`mode:-shadow-line`), or by
+ * the tail of that slug (`shadow-line`). The two spellings differ because a
+ * mode's id comes from `enabled<Id>` while its slug comes from its title, and
+ * `Mode: Stipple Dots` is `Stipple`. Asked of `PANEL_MODES`, which is where both
+ * are already written down.
+ */
+const MARK_ID = new Map(PANEL_MODES.map(([title, key]) => [
+  title.toLowerCase().replace(/\s+/g, '-'), key.slice('enabled'.length),
+]))
+const markId = (mark) =>
+  MARK_ID.get(mark) ?? MARK_ID.get(`mode:-${mark}`) ?? mark
+
+/**
+ * Puts a mark into a definite state from the sheet, without going into it.
+ *
+ * The pip is the switch, and it is one click from the pane — which is what a
+ * spec that only wants the mark drawing, or not drawing, should use. Going in
+ * and finding the section's own Enabled switch is two more clicks to write the
+ * same boolean.
+ *
+ * A state and not a toggle. The helper this replaced switched a mark *on* and
+ * did nothing when it already was, which silently turned a spec that toggled
+ * Sun Hours twice into one that left it on — and the rebuild readout it was
+ * measuring never came back down.
+ */
+export async function setMark(page, mark, on = true) {
+  await openStage(page, 'marks')
+  const pip = page.locator(`[data-testid="mode-tile-${markId(mark)}"]`)
+  await pip.waitFor({ state: 'visible', timeout: 15_000 })
+  if ((await pip.getAttribute('aria-pressed')) === String(on)) return
+  await pip.scrollIntoViewIfNeeded()
+  await pip.click()
+  await page.waitForTimeout(900)
+}
+
+/** `setMark(page, mark, true)`, for the specs that only ever switch one on. */
+export const switchMarkOn = (page, mark) => setMark(page, mark, true)
+
+/**
+ * Opens one draw mode's section from the sheet.
+ *
+ * Marks is a sheet of thirty-four tiles, and a mode's own section is behind the
+ * tile's name. This is the two clicks that get to it: the pane, then the mark.
+ * `id` is the mode's id — `Contours`, `ZeroCross` — the same one `mode-tile-`
+ * and `enabled<Id>` use.
+ */
+export async function openMark(page, mark) {
+  const id = markId(mark)
+  await openStage(page, 'marks')
+  /*
+   * The sheet lives inside the `Draw Modes` section, so a shut one collapses
+   * all thirty-four tiles to a zero-height row. They stay in the tree and stay
+   * "visible" to a locator — the row is `0fr` and `overflow:hidden`, not
+   * `display:none` — so a click on a tile silently lands on the header above
+   * it instead. Open it first.
+   */
+  /*
+   * Come back out of whatever was open before.
+   *
+   * A drilled-in mark hides the sheet *and* the section that holds it, so a
+   * second call to this would wait on a tile inside a hidden sheet until the
+   * test timed out. Any spec that opens two marks in one run hits it.
+   */
+  const back = page.locator('[data-testid="mode-back"]')
+  if (await back.count()) {
+    await back.click()
+    await page.waitForTimeout(300)
+  }
+  const sheetSection = page.locator('[data-testid="section-draw-modes"]')
+  // Asked too early this returns null, which is not 'false', and the sheet then
+  // stays shut while the tile it holds is waited on until the test times out.
+  await sheetSection.waitFor({ state: 'visible', timeout: 15_000 })
+  if ((await sheetSection.getAttribute('aria-expanded')) === 'false') {
+    await sheetSection.click()
+    await page.waitForTimeout(350)
+  }
+  const open = page.locator(`[data-testid="mode-open-${id}"]`)
+  await open.waitFor({ state: 'visible', timeout: 15_000 })
+  // The sheet is twelve rows deep, so a mark near the bottom needs bringing up
+  // before it can be clicked at all.
+  await open.scrollIntoViewIfNeeded()
+  await open.click()
+  await page.waitForTimeout(300)
 }
 
 /**

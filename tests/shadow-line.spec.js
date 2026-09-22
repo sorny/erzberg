@@ -14,7 +14,7 @@
  */
 import { test, expect } from '@playwright/test'
 import path from 'path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /** The segment total the panel prints, which is how many marks are on the plate. */
 async function segments(page) {
@@ -23,6 +23,7 @@ async function segments(page) {
 }
 
 async function openMode(page) {
+  await openMark(page, 'shadow-line')
   const section = page.locator('[data-testid="section-mode:-shadow-line"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
@@ -33,6 +34,9 @@ async function openMode(page) {
 
 /** A georeferenced raster, so the sun comes off the ground rather than a slider. */
 async function loadGeoTiff(page) {
+  // The load buttons are at the top of Source, and a caller may be anywhere —
+  // `openMode` leaves the panel in Marks.
+  await openStage(page, 'source')
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.click('[data-testid="load-geotiff"]'),

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -8,6 +8,7 @@ async function openApp(page) {
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
   // The Camera section is closed by default.
+  await openStage(page, 'frame')
   await page.locator('[data-testid="section-camera"]').click()
   await page.waitForTimeout(400)
   await resetToDefaults(page)

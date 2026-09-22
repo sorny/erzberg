@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * STL export content, which nothing covered before.
@@ -138,6 +138,7 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
   // The Mirror section is collapsed by default and its wrapper swallows clicks
   // while closed, so it has to be opened rather than force-clicked through. The
   // header is a button now — that is what the testid is there for.
+  await openStage(page, 'frame')
   await page.click('[data-testid="section-mirror"]')
   await page.waitForTimeout(400)
 

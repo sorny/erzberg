@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 // The Soundscapes fixture: 6 s mono, a 120 Hz→8 kHz sweep over a 300 Hz drone
 // with 1.5 kHz bursts once a second — so it has bass, air and onsets.
@@ -156,6 +156,7 @@ test('murmuration mode animates on screen, and freezes when told to', async ({ p
   page.on('pageerror', (e) => errors.push(String(e)))
   await openApp(page)
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
@@ -464,6 +465,7 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
   const grid = page.locator('text=/Grid: \\d+×\\d+/')
   const gridBefore = await grid.textContent()
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
@@ -506,6 +508,7 @@ test('the flock track has a transport — restart, skip and scrub', async ({ pag
   page.on('pageerror', (e) => errors.push(String(e)))
   await openApp(page)
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
@@ -561,6 +564,7 @@ test('the audio meter shows what the flock is hearing', async ({ page }) => {
   page.on('pageerror', (e) => errors.push(String(e)))
   await openApp(page)
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
@@ -607,8 +611,10 @@ test('the beat is visible in the flock, not just present in the numbers', async 
   await openApp(page)
 
   // Lines off: the flock has to be measurable on its own.
+  await openMark(page, 'lines')
   await page.locator('[data-section="Mode: Lines"]')
     .locator('label').first().click({ force: true })
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
@@ -705,6 +711,7 @@ test('the beat is visible in the flock, not just present in the numbers', async 
 
 test('Space pauses and resumes the flock, and the button follows', async ({ page }) => {
   await openApp(page)
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
@@ -748,6 +755,7 @@ test('the particle field paints over the draw modes, not under them', async ({ p
   // Hologram, frozen: the home buffer is a pure function of the terrain and the
   // spacing, so this frame is bit-reproducible — unlike a flock, whose pose
   // depends on how many substeps happened to run before the screenshot.
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
@@ -786,6 +794,7 @@ test('the field survives switching modes back and forth', async ({ page }) => {
   page.on('pageerror', (e) => errors.push(String(e)))
   await openApp(page)
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-size"]').fill('9')
@@ -823,12 +832,16 @@ test('exported sprites are no bigger than the GPU will draw', async ({ page }) =
     return gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE)[1]
   })
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-spacing"]').fill('16')
   await page.locator('[data-testid="particle-size"]').fill('250')
   // Zoomed right in, a size-250 sprite wants to be thousands of pixels across —
   // which is where the viewport and the export used to part company.
+  // That range also matches Zoom, in View — which is the control this wants,
+  // and it is in the Frame pane.
+  await openStage(page, 'frame')
   await page.locator('input[type="range"][min="10"][max="400"]').first().fill('400')
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   await page.waitForTimeout(3000)
@@ -860,6 +873,7 @@ test('exported sprites are no bigger than the GPU will draw', async ({ page }) =
 test('SVG export carries the live flock, birds and streaks', async ({ page }) => {
   await openApp(page)
 
+  await openStage(page, 'overlay')
   await page.locator('[data-testid="section-particles"]').click()
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()

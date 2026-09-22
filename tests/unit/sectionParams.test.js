@@ -105,7 +105,7 @@ describe('the table against the panel source', () => {
   /** The parameter names each `<Section>`'s own JSX mentions. */
   const rendered = (() => {
     const files = ['src/components/Sidebar.jsx', 'src/components/panel/ErosionSection.jsx',
-      'src/components/panel/TextSection.jsx', 'src/components/panel/ModeIndex.jsx']
+      'src/components/panel/TextSection.jsx', 'src/components/panel/ModeSheet.jsx']
     const known = new Set(ALL)
     const out = {}
     for (const f of files) {

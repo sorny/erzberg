@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openMark, openStage, resetToDefaults, switchMarkOn } from './helpers.js'
 
 /**
  * Undo and redo.
@@ -34,6 +34,15 @@ async function boot(page) {
 
 /** A slider in the open Lines section, and the value it holds. */
 const spacing = (page) => page.getByRole('slider', { name: /^spacing$/i }).first()
+
+/**
+ * Brings Lines' Spacing on screen.
+ *
+ * Spacing belongs to a mark, and a mark's controls live behind the sheet now —
+ * the Marks pane, then the card on its tile. Lines is the mode the default
+ * baseline leaves drawing, which is why it is the one these tests reach for.
+ */
+const openSpacing = (page) => openMark(page, 'lines')
 const valueOf = (loc) => loc.inputValue()
 
 /** Drive a range input the way React sees it. */
@@ -47,6 +56,7 @@ async function setSlider(loc, v) {
 
 test('undo puts a value back, and redo takes it forward again', async ({ page }) => {
   await boot(page)
+  await openSpacing(page)
   const s = spacing(page)
   await expect(s).toBeVisible()
   const before = await valueOf(s)
@@ -66,6 +76,7 @@ test('undo puts a value back, and redo takes it forward again', async ({ page })
 
 test('a drag is one step, not one per frame', async ({ page }) => {
   await boot(page)
+  await openSpacing(page)
   const s = spacing(page)
   const before = await valueOf(s)
 
@@ -85,6 +96,7 @@ test('a drag is one step, not one per frame', async ({ page }) => {
 
 test('an edit after an undo abandons the redo branch', async ({ page }) => {
   await boot(page)
+  await openSpacing(page)
   const s = spacing(page)
 
   await setSlider(s, 9)
@@ -125,6 +137,7 @@ test('a fresh load has nothing to undo', async ({ page }) => {
 
 test('the keyboard shortcut works, and text fields keep their own', async ({ page }) => {
   await boot(page)
+  await openSpacing(page)
   const s = spacing(page)
   const before = await valueOf(s)
   await setSlider(s, 14)
@@ -140,6 +153,8 @@ test('the keyboard shortcut works, and text fields keep their own', async ({ pag
    * textarea, and stealing the chord there would make it impossible to take back
    * a typo without also taking back the last slider you touched.
    */
+  // The Text section is in Overlay, and the slider above left us in Marks.
+  await openStage(page, 'overlay')
   await page.getByText('Text', { exact: true }).first().click()
   await page.waitForTimeout(300)
   await page.locator('[data-testid="text-add"]').click()
@@ -173,11 +188,10 @@ async function openMenu(page) {
   await expect(menu(page)).toBeVisible()
 }
 
-async function enableMode(page, testId, title) {
-  const section = page.locator(`[data-testid="section-mode:-${testId}"]`)
-  await section.scrollIntoViewIfNeeded()
-  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
-  await page.locator(`[data-section="Mode: ${title}"] input[type=checkbox][aria-label="Enabled"]`).click()
+async function enableMode(page, testId) {
+  // The pip on the sheet is the switch. It writes the same `enabled<Id>` the
+  // section's own Enabled switch writes, so this is the same act in one click.
+  await switchMarkOn(page, testId)
   await page.waitForTimeout(900)
 }
 
@@ -185,8 +199,9 @@ test('the steps are named by what they changed', async ({ page }) => {
   test.setTimeout(240_000)
   await boot(page)
 
-  await enableMode(page, 'stipple-dots', 'Stipple Dots')
+  await enableMode(page, 'stipple-dots')
 
+  await openStage(page, 'surface')
   const section = page.locator('[data-testid="section-terrain-style"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
@@ -209,9 +224,9 @@ test('a step in the list is a jump, not a press repeated', async ({ page }) => {
   test.setTimeout(240_000)
   await boot(page)
 
-  await enableMode(page, 'stipple-dots', 'Stipple Dots')
-  await enableMode(page, 'flow', 'Flow')
-  await enableMode(page, 'contours', 'Contours')
+  await enableMode(page, 'stipple-dots')
+  await enableMode(page, 'flow')
+  await enableMode(page, 'contours')
 
   const stipple = page.locator('[data-section="Mode: Stipple Dots"] input[type=checkbox][aria-label="Enabled"]')
   const flow = page.locator('[data-section="Mode: Flow"] input[type=checkbox][aria-label="Enabled"]')

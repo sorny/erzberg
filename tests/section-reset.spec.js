@@ -11,7 +11,7 @@
  *  · and the toast's Undo brings the change back.
  */
 import { expect, test } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /** Write a colour input the way React will notice. */
 async function setColor(locator, value) {
@@ -23,7 +23,15 @@ async function setColor(locator, value) {
   }, value)
 }
 
-async function open(page, testId) {
+/**
+ * Opens a section, having first brought its pane on screen.
+ *
+ * Every section this spec touches is in Surface, so that is the default. A
+ * caller reaching into another pane passes its name — a section in a pane you
+ * are not on is in the DOM and hidden, and a click on it does nothing.
+ */
+async function open(page, testId, stage = 'surface') {
+  await openStage(page, stage)
   const section = page.locator(`[data-testid="${testId}"]`)
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {

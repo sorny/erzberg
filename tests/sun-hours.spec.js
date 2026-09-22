@@ -12,7 +12,7 @@
  */
 import { test, expect } from '@playwright/test'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openMark, resetToDefaults } from './helpers.js'
 
 /** The segment total the panel prints, which is how many marks are on the plate. */
 async function segments(page) {
@@ -21,6 +21,7 @@ async function segments(page) {
 }
 
 async function openMode(page) {
+  await openMark(page, 'sun-hours')
   const section = page.locator('[data-testid="section-mode:-sun-hours"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {

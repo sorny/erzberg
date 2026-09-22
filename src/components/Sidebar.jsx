@@ -33,14 +33,16 @@ import { plotEstimate } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { SpectrogramView } from './SpectrogramView'
 import {
-  ACCENT, ACCENT_DEEP, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
+  ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W,
   ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage,
-  GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
+  StageRail, GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
 } from './panel/ui'
+import { ALWAYS_VALUED, FIRST_STAGE, stageOf } from './panel/stages'
+import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { useStackDrag } from './panel/stackDrag'
 import { TextSection } from './panel/TextSection'
 import { CoverMap } from './panel/CoverMap'
-import { CoverPlate, PaintedMasks, SectionFilter, sectionMatches } from './panel/filter'
+import { CoverPlate, PaintedMasks, PanelStage, SectionFilter, sectionMatches } from './panel/filter'
 import { ALL_CLASSES, describeMask, maskHasClass, toggleClass } from '../utils/coverPlate'
 import { MAX_MASKS, NO_MASKS, describeSelection, maskCoverage, selectionHasMask, toggleMaskSelection } from '../utils/maskLayers'
 import { modifiedSections } from './panel/sectionParams'
@@ -50,7 +52,6 @@ const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { ModeMark } from './panel/modeMarks'
-import { ModeIndex } from './panel/ModeIndex'
 
 /**
  * Square-law mapping for the flock-size slider.
@@ -1959,9 +1960,77 @@ export function Sidebar({
     { ...terrain, ...style, ...points, ...view, gradientStops },
     paramDefaults, Object.keys(SECTION_TERMS), PARAM_KEYS,
   ), [terrain, style, points, view, gradientStops, paramDefaults])
+  /**
+   * Which stage pane is on screen, and which mark is drilled into.
+   *
+   * Two pieces of navigation state and nothing else — neither one is a setting,
+   * so neither belongs in the session with the parameters. A reload opens on
+   * Source with the sheet up, which is where a drawing starts.
+   */
+  const [stage, setStage] = useState(FIRST_STAGE)
+  const [drill, setDrill] = useState(null)
+  /**
+   * Leaving Marks closes whatever was drilled into.
+   *
+   * Otherwise the sheet is behind a mode nobody is looking at: come back to
+   * Marks from Frame and you land in `Mode: Contours` rather than on the sheet,
+   * with no memory of having opened it. The rail is the way out of a mode as
+   * much as the back bar is.
+   */
+  const goStage = useCallback((n) => {
+    setStage(n)
+    if (n !== 3) setDrill(null)
+    /*
+     * Landing on Marks opens the sheet if it was shut.
+     *
+     * The sheet is the whole pane now, so a shut `Draw Modes` leaves one header
+     * and nothing under it — a dead end that the old pane never had, because
+     * shutting the index there still left thirty-four section headers below it.
+     * Reopening on arrival keeps the disclosure and removes the dead end.
+     */
+    if (n === 3) setSec(prev => (prev.modeIndex ? prev : { ...prev, modeIndex: true }))
+    // A tab click while filtering is a request to go to that pane, and the panes
+    // do not exist while a query is typed. Clearing the field is what makes the
+    // hit counts on the rail somewhere you can actually go.
+    setFilter('')
+    document.getElementById('hm-panel-body')?.scrollTo({ top: 0 })
+  }, [])
+  const stageCtx = useMemo(() => ({ stage, setStage: goStage }), [stage, goStage])
+
+  /**
+   * What each rail tab counts.
+   *
+   * `live` is lit sections per stage, read off the same summaries the green dots
+   * are, so the rail and the dots cannot disagree. `hits` replaces it while a
+   * query is typed, because the question changes: not "what is on in there" but
+   * "did my search find anything in there".
+   */
+  const live = useMemo(() => {
+    const out = {}
+    for (const [title, value] of Object.entries(summaries)) {
+      // The same test the header's dot uses: a section states its setting, and
+      // an em dash is how it says it is doing nothing.
+      if (!value || value === '—' || value.text === '—') continue
+      if (ALWAYS_VALUED.has(title)) continue
+      const n = stageOf(title)
+      if (n) out[n] = (out[n] || 0) + 1
+    }
+    return out
+  }, [summaries])
+  const hits = useMemo(() => {
+    if (!q) return null
+    const out = {}
+    for (const [title, words] of Object.entries(SECTION_TERMS)) {
+      if (!sectionMatches(title, words, q)) continue
+      const n = stageOf(title)
+      if (n) out[n] = (out[n] || 0) + 1
+    }
+    return out
+  }, [q])
+
   const filterCtx = useMemo(
-    () => ({ q, terms: SECTION_TERMS, summaries, modified, onReset: onResetSection }),
-    [q, summaries, modified, onResetSection])
+    () => ({ q, terms: SECTION_TERMS, summaries, modified, drill, onReset: onResetSection }),
+    [q, summaries, modified, drill, onResetSection])
   /** The same reading one level up: the whole plate, for the standing line. */
   const plate = useMemo(
     () => buildPlateLine({ style, vectorLayers, textLayers, coverClasses: cover?.classes?.length ?? 0 }),
@@ -2206,28 +2275,37 @@ export function Sidebar({
   }
 
   /**
-   * A tile in the Draw Modes index.
+   * The glyph on a tile in the sheet.
    *
    * It writes the same `enabled<Id>` the section's own switch writes, and that
    * is deliberately all it writes — the tile and the switch are two views of one
    * boolean rather than two pieces of state to keep in step.
    *
-   * Switching a mode *on* also opens its section and scrolls to it, because
-   * turning one on is almost always the first half of tuning it. Switching one
-   * off does not: you are done with it, and the panel jumping to a section you
-   * just dismissed would be the tool arguing.
+   * It used to open the mode's section and scroll to it as well, because turning
+   * one on was almost always the first half of tuning it, and the index it lived
+   * in sat above thirty-four headers that were the real way in. The sheet *is*
+   * the way in, and opening a mode is now its own target on the same tile — so
+   * switching one on leaves you on the sheet, where switching on a second and a
+   * third is one click each. The section still opens underneath, so drilling in
+   * afterwards shows its controls rather than a shut header.
    */
-  const handleModeTile = (key, next, sectionId) => {
+  const handleModeTile = (key, next) => {
     ss({ [key]: next })
     if (!next) return
     setSec(prev => ({ ...prev, ['mode' + key.slice('enabled'.length)]: true }))
-    // After the section has been told to open, so the scroll lands on a box
-    // with a height rather than on a zero-height grid row.
-    requestAnimationFrame(() => {
-      document.querySelector(`[data-testid="${sectionId}"]`)
-        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-    })
   }
+
+  /**
+   * The name on a tile: open that mark, alone, with the whole panel.
+   *
+   * The scroll goes to the top rather than to the section, because the section
+   * is about to be the only thing in the pane — there is nothing to scroll past
+   * and a smooth scroll to y=0 from y=0 is a no-op that costs a frame.
+   */
+  const openMark = useCallback((title) => {
+    setDrill(title)
+    document.getElementById('hm-panel-body')?.scrollTo({ top: 0 })
+  }, [])
 
   const applyPreset = (preset, name = null) => {
     // Rolling a look or picking a tile is establishing one, so it spends the
@@ -2528,10 +2606,33 @@ export function Sidebar({
           )}
         </div>
 
-        <div id="hm-panel-body" style={{ flex:1, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
+        {/*
+          * The rail and the body are one row, below the head.
+          *
+          * The rail runs beside the sections and not beside the head: the head
+          * carries the wordmark, undo, Reset all and the standing line, and it
+          * was already the tightest row in the panel — "Reset all" wrapped to two
+          * lines once before. Letting the head keep the full 312 px gives it
+          * 40 px more than it has ever had, and the rail costs it nothing.
+          */}
+        <div style={{ flex:1, display:'flex', minHeight:0 }}>
+        <StageRail stage={stage} onStage={goStage} live={live} hits={hits} />
+        <div id="hm-panel-body" style={{ flex:1, minWidth:0, width: BODY_W, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
+          <PanelStage.Provider value={stageCtx}>
           <SectionFilter.Provider value={filterCtx}>
           <CoverPlate.Provider value={cover}>
           <PaintedMasks.Provider value={masks}>
+          {/*
+            * Source holds the load block and Presets now.
+            *
+            * Neither moved relative to anything else: they were the top of the
+            * body, and with one pane on screen at a time "the top of the body"
+            * had to become the top of *some* pane. Source is the one a drawing
+            * starts in and the one the panel opens on, so a first visit sees the
+            * same order it always saw — load, style, then the ground.
+            */}
+          <Stage n={1} title="Source">
+
           <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
@@ -2553,9 +2654,15 @@ export function Sidebar({
                 <span>Style</span>
                 <button data-testid="jump-to-presets"
                   onClick={() => {
+                    // Presets is in Source, so the jump has to land in Source —
+                    // from Marks or Frame the scroll would otherwise aim at a
+                    // section in a pane that is not on screen.
+                    goStage(1)
                     setSec(prev => ({ ...prev, presets: true }))
-                    document.querySelector('[data-testid="section-presets"]')
-                      ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                    requestAnimationFrame(() => {
+                      document.querySelector('[data-testid="section-presets"]')
+                        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                    })
                   }}
                   title="Show all 56 styles"
                   style={{ background:'none', border:'none', padding:0, cursor:'pointer',
@@ -2660,8 +2767,6 @@ export function Sidebar({
               })}
             </div>
           </Section>
-
-          <Stage n={1} title="Source">
 
           {/* ── Terrain by name ───────────────────────────────────────────
               The front door for anyone who does not already own a GeoTIFF,
@@ -3295,13 +3400,23 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The index, at the head of the thirty-four sections it stands for.
-              It is a Section like everything else so that it can be closed by
-              anyone who does not want it, found by the filter, and given the
-              same shut-state readout every other header carries. */}
+          {/* The sheet, standing in for the thirty-four sections below it.
+              It is still a Section so that it can be closed by anyone who does
+              not want it, found by the filter, and given the same shut-state
+              readout every other header carries — and so that the panel's four
+              indexes still describe every one of its sixty sections.
+
+              While a mark is drilled into, this goes with the rest of them: the
+              mode has the pane to itself, which is the point of opening it. See
+              the sheet rule in `Section`. */}
           <Section title="Draw Modes" open={sec.modeIndex} onToggle={() => tog('modeIndex')}>
-            <ModeIndex style={style} onToggle={handleModeTile} />
+            <ModeSheet style={style} onToggle={handleModeTile} onOpen={openMark} />
           </Section>
+
+          {/* The way back, above the one section that is on screen. Rendered
+              only while drilled in, because there is nothing to come back from
+              otherwise. */}
+          {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
             <Tog label="Enabled" checked={style.enabledLines} onChange={v => ss({ enabledLines: v })} />
@@ -4784,6 +4899,8 @@ export function Sidebar({
           </PaintedMasks.Provider>
           </CoverPlate.Provider>
           </SectionFilter.Provider>
+          </PanelStage.Provider>
+        </div>
         </div>
 
       </aside>

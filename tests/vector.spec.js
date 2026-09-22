@@ -13,7 +13,7 @@ import { unprojectWgs84 } from '../src/utils/geoCoords.js'
  * against colours measured off the running app, in unit/screen-ink.test.js.
  */
 import { screenInkHex } from '../src/utils/svgExport.js'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * Vector layers — OpenStreetMap, GeoJSON and GPX draped on the terrain.
@@ -126,6 +126,7 @@ async function openVectorPanel(page) {
   ])
   await chooser.setFiles(FIXTURE)
   await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30000 })
+  await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.waitForSelector('[data-testid="osm-fetch"]')
 }

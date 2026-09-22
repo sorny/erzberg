@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fromArrayBuffer } from 'geotiff'
 import { unprojectWgs84 } from '../src/utils/geoCoords.js'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * Clipping the heightmap to a map feature.
@@ -81,6 +81,7 @@ async function boot(page) {
   ])
   await chooser.setFiles(FIXTURE)
   await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30_000 })
+  await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.waitForSelector('[data-testid="osm-fetch"]')
   await page.click('[data-testid="osm-cat-boundaries"]')

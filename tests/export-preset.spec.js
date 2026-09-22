@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 import { readPngPreset, readSvgPreset } from '../src/utils/presetFile.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
@@ -36,6 +36,8 @@ const tiltSlider = (page) =>
  * test time out waiting for a download that was never asked for.
  */
 async function setTilt(page, deg) {
+  // Tilt is in View, which is in the Frame pane.
+  await openStage(page, 'frame')
   const tilt = tiltSlider(page)
   await expect(tilt).toBeVisible({ timeout: 15_000 })
   await tilt.fill(String(deg))
@@ -77,6 +79,7 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
 
   // Export opens by default, so the section is only clicked when something has
   // closed it — clicking an open one collapses it and hides the button below.
+  await openStage(page, 'output')
   const section = page.locator('[data-testid="section-export"]')
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
     await section.click()

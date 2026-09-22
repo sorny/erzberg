@@ -12,12 +12,13 @@
  */
 import { test, expect } from '@playwright/test'
 import path from 'path'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 async function openHillshade(page) {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=Grid:', { timeout: 30_000 })
   await resetToDefaults(page)
+  await openStage(page, 'surface')
   await page.click('[data-testid="section-hillshade"]')
   await page.waitForTimeout(300)
   await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
@@ -104,11 +105,14 @@ test('the lit side of the plate is the side the bearing names', async ({ page })
   await openHillshade(page)
   // Straight down, so east is screen-right and the test is about the compass
   // rather than about the camera.
+  await openStage(page, 'frame')   // Tilt is in View
   const tilt = page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
   await tilt.fill('1')
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   await page.waitForTimeout(1200)
 
+  // Back to Surface: the sun mode buttons are Hillshade's.
+  await openStage(page, 'surface')
   await page.click('[data-testid="sun-mode-almanac"]')
   await page.waitForTimeout(800)
 
@@ -180,6 +184,7 @@ test('a georeferenced raster answers the latitude itself', async ({ page }) => {
   await chooser.setFiles(path.join(process.cwd(), 'tests', 'testdata', 'benchmark.tif'))
   await page.waitForTimeout(6000)
 
+  await openStage(page, 'surface')
   await page.click('[data-testid="section-hillshade"]')
   await page.waitForTimeout(300)
   await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()

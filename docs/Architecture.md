@@ -573,10 +573,14 @@ carries onto the grid with the same subsample the elevation took.
 4. Add the params of the mode to `STYLE_DEF` in `src/defaults.js`.
 5. Add an entry in `src/utils/drawModes.js`. This entry is what teaches the
    randomiser that the mode exists.
-6. Add a `<Section>` in `Sidebar.jsx`.
+6. Add a `<Section>` in `Sidebar.jsx`, among the other modes in the Marks stage.
 7. Add a mark in `panel/modeMarks.jsx`. Draw it at 22×13. Draw the defining
-   gesture of the mode and not a picture of terrain.
+   gesture of the mode and not a picture of terrain. The mark appears twice: on
+   the tile in the sheet, and on the header of the section it opens.
 8. Add a line in `SECTION_TERMS`. See "A panel section" below.
+9. Add a line in `PANEL_MODES` in `panel/sectionSummary.js`, which is where the
+   order of the modes is written down. The sheet renders from it, and so does
+   the stage index, so a mode listed there needs no entry in `panel/stages.js`.
 
 **The rebuild dependency list is no longer a step.** It was a step once, and to
 forget it was the classic bug: the control moved and nothing happened.
@@ -639,6 +643,24 @@ does a section with no entry. Neither goes unnoticed.
 The index is stated and not scraped from the rendered tree. The parameters of a
 mode mount only once that mode is on. A section that you cannot find while it is
 switched off is unfindable exactly when you look for it.
+
+Then name the stage that holds it, in `STATED` in `panel/stages.js`. The panel
+shows one stage at a time, so this is what puts the section in a pane. A section
+left out of that index renders in no pane at all, which is a control that exists
+and cannot be reached. A draw mode needs no entry: `PANEL_MODES` already lists
+the modes, and every one of them is in Marks.
+
+Four indexes now describe the panel, and each answers a different question:
+
+| File | Answers |
+|---|---|
+| `panel/sectionTerms.js` | what the section answers to in the filter |
+| `panel/sectionSummary.js` | what it says while it is shut |
+| `panel/sectionParams.js` | what a reset of it puts back |
+| `panel/stages.js` | which of the six panes holds it |
+
+All four are leaf modules with no React import, so the specs can assert them
+against one another without pulling three.js in behind them.
 
 ### A surface overlay
 

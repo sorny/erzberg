@@ -7,7 +7,7 @@
  * the standalone SVG the popup writes.
  */
 import { test, expect } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
@@ -20,6 +20,7 @@ async function openApp(page) {
 
 /** Arms profile mode and clicks A then B on the terrain. */
 async function takeProfile(page) {
+  await openStage(page, 'output')
   await page.locator('[data-testid="section-analysis"]').click()
   await page.waitForTimeout(300)
   await page.locator('text=Elevation Profile').first().click()
@@ -39,11 +40,15 @@ test('the section and its anchors are drawn on the terrain, and cleared with the
   await openApp(page)
 
   // A band of the viewport holding the terrain and both pins, but neither the
-  // panel (which overlaps the canvas from x=1008 at this viewport) nor the chart
+  // panel (which overlaps the canvas from x=968 at this viewport) nor the chart
   // popup (bottom centre). An element screenshot of the canvas would include
   // both, and then every unrelated click on a section header reads as a changed
   // scene.
-  const PLATE = { clip: { x: 0, y: 60, width: 980, height: 420 } }
+  //
+  // The panel gained the 40 px stage rail, so its edge moved left from 1008 and
+  // the old 980 px band ran 12 px into it — which is a band that changes every
+  // time the panel does, and it read as the section failing to clear.
+  const PLATE = { clip: { x: 0, y: 60, width: 940, height: 420 } }
   const before = await page.screenshot(PLATE)
 
   const { afterA } = await takeProfile(page)

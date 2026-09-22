@@ -1,10 +1,21 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { openMark, openStage, resetToDefaults } from './helpers.js'
 import { SECTION_TERMS } from '../src/components/panel/sectionTerms.js'
 import { PANEL_MODES } from '../src/components/panel/sectionSummary.js'
+import { STAGE_OF } from '../src/components/panel/stages.js'
 
 /** Every section the filter index knows about should be on the panel. */
 const SECTION_COUNT = Object.keys(SECTION_TERMS).length
+
+/**
+ * How many sections are on screen when the panel is at rest.
+ *
+ * The panel shows one stage pane at a time, so this is Source's own count and
+ * not all sixty. Asked of the stage index rather than written down, for the
+ * reason the mode count is asked of `PANEL_MODES`: a section moved into Source
+ * would otherwise collect this number silently.
+ */
+const SOURCE_COUNT = [...STAGE_OF.values()].filter((n) => n === 1).length
 
 /**
  * How many draw modes there are, asked rather than remembered.
@@ -46,7 +57,9 @@ test.describe('panel', () => {
 
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(SECTION_COUNT)
+    // Back to one pane, not to all sixty sections: clearing the field returns
+    // the panel to the stage it was on, which is the one it opened on.
+    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(SOURCE_COUNT)
   })
 
   test('a filtered-out section is hidden, not unmounted', async ({ page }) => {
@@ -85,6 +98,7 @@ test.describe('panel', () => {
     // while the thumb — which cannot represent it — sat at 35: two controls for
     // one value, disagreeing on screen.
     await openApp(page)
+    await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
@@ -113,6 +127,7 @@ test.describe('panel', () => {
     // the exclusion only killed the shortcut until focus moved.
     await openApp(page)
     const toggle = page.locator('[data-testid="sidebar-toggle"]')
+    await openStage(page, 'frame')
     await page.click('[data-testid="section-camera"]')
     await page.waitForTimeout(300)
     await page.keyboard.press('Backslash')
@@ -138,6 +153,7 @@ test.describe('panel', () => {
     // reading "315°" was announced as "315" and one reading "100%" as "1" — the
     // value heard and the value beside it disagreed.
     await openApp(page)
+    await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
@@ -159,6 +175,7 @@ test.describe('panel', () => {
     // aria-label, so a screen reader was served but the pointer was not:
     // clicking the visible word did nothing, on 10px text.
     await openApp(page)
+    await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
@@ -179,6 +196,7 @@ test.describe('panel', () => {
     // <label> would have made every click on it flip the switch beside it, so
     // the association deliberately covers the text and nothing else.
     await openApp(page)
+    await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
     const enabled = page.locator('input[type=checkbox][aria-label="Enabled"]').first()
@@ -201,6 +219,7 @@ test.describe('panel', () => {
     // open: the controls are on screen saying the same thing in full, and a
     // second shorter copy would sit under the cursor on the way to the header.
     await openApp(page)
+    await openStage(page, 'surface')
     const header  = page.locator('[data-testid="section-hillshade"]')
     const readout = page.locator('[data-testid="summary-hillshade"]')
 
@@ -218,6 +237,7 @@ test.describe('panel', () => {
     // A string that survives moving the slider it claims to report is a string
     // that was written down twice.
     await openApp(page)
+    await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
@@ -273,11 +293,16 @@ test.describe('panel', () => {
     // SVG export cuts at the paper frame rather than hiding what falls outside
     // it, so a switch two stages away in Frame decides what you get.
     await openApp(page)
+    await openStage(page, 'output')
     const extent = page.locator('[data-testid="export-extent"]')
     await expect(extent).toHaveText('SVG writes the full canvas')
 
+    // The switch is in Frame and the readout is in Output, which is the whole
+    // point of the assertion — and now also two clicks of the rail.
+    await openStage(page, 'frame')
     await page.locator('input[type=checkbox][aria-label="Paper frame"]').click()
     await page.waitForTimeout(600)
+    await openStage(page, 'output')
     await expect(extent).toHaveText(/^SVG cuts at the frame/)
 
     // The segment total is the stats block's, and only the stats block's.
@@ -294,6 +319,7 @@ test.describe('panel', () => {
     const readout = page.locator(`${head} [data-testid="summary-terrain-style"]`)
     const lamp = page.locator(`${head} span[style*="border-radius: 50%"]`)
     await openApp(page)
+    await openStage(page, 'surface')
 
     // Terrain Style opens open, and an open section states nothing.
     await page.click(head)
@@ -338,7 +364,13 @@ test.describe('panel', () => {
     // ones were drawing was a question you answered by scrolling past the ones
     // that were not.
     await openApp(page)
+    await openStage(page, 'marks')
     await expect(page.locator('[data-testid^="mode-tile-"]')).toHaveCount(MODE_COUNT)
+    // Every tile carries its full name, because the sheet ellipsises the long
+    // ones — an abbreviated label must still be readable somewhere.
+    for (const open of await page.locator('[data-testid^="mode-open-"]').all()) {
+      expect(await open.getAttribute('title')).toBeTruthy()
+    }
     const lines = page.locator('[data-testid="mode-tile-Lines"]')
     await expect(lines).toHaveAttribute('aria-pressed', 'true')
     await expect(page.locator('[data-testid="mode-tile-Stipple"]')).toHaveAttribute('aria-pressed', 'false')
@@ -351,42 +383,36 @@ test.describe('panel', () => {
 
   test('no section header truncates its own name', async ({ page }) => {
     /*
-     * A header is at its tightest when the mode is **on** and the section is
-     * **shut**: that is when the green dot and the readout both appear and take
-     * their width out of the title. Neither state alone finds it, which is how
-     * three headers came to be silently clipped — `Mode: Zero Crossings` by
-     * 11 px, `Mode: Shadow Line` by 10, `Mode: Watershed` by 4.
+     * A header is at its tightest when the section is **shut**: that is when its
+     * readout appears and takes width out of the title. Three headers were
+     * silently clipped before this existed — `Mode: Zero Crossings` by 11 px,
+     * `Mode: Shadow Line` by 10, `Mode: Watershed` by 4.
      *
-     * The panel is 272 px and that is load-bearing: it insets the canvas and
-     * sets the paper overlay's geometry. So the fix is names and readouts that
-     * fit, and this is the thing that says when one stops fitting — the next
-     * mode with a long title fails here rather than in somebody's screenshot.
+     * ── What the sheet changed ───────────────────────────────────────────────
+     * The thirty-four mode headers used to be the tightest thing in the panel,
+     * because a lit mode showed a dot *and* a readout beside a long title. They
+     * are now behind the sheet, and a mark is only on screen while it is drilled
+     * into — which forces it open, so it carries no readout at all. The tight
+     * state those three failed in no longer exists for them.
+     *
+     * That does not retire the check, it moves it. The body is still 272 px, the
+     * twenty-six sections outside Marks still shut with readouts, and the marks'
+     * names moved to the sheet, where they ellipsise on purpose and must carry
+     * their full name somewhere — asserted with the sheet, above.
+     *
+     * Every pane is walked, because five of the six are hidden at any moment and
+     * a hidden header measures zero. The count is asserted first so that this
+     * cannot quietly pass by measuring nothing, which is exactly how hiding the
+     * mode sections would otherwise have defeated it.
      */
     test.setTimeout(300_000)
     await openApp(page)
 
-    const index = page.locator('[data-testid="section-draw-modes"]')
-    await index.scrollIntoViewIfNeeded()
-    if ((await index.getAttribute('aria-expanded')) !== 'true') {
-      await index.click()
-      await page.waitForTimeout(300)
-    }
-    for (const tile of await page.locator('[data-testid^="mode-tile-"]').all()) {
-      if ((await tile.getAttribute('aria-pressed')) !== 'true') await tile.click()
-    }
-    await page.waitForTimeout(8000)
-
-    // Every section shut, which is when a header carries its readout.
-    await page.evaluate(() => {
-      for (const b of document.querySelectorAll('[data-testid^="section-"]')) {
-        if (b.getAttribute('aria-expanded') === 'true') b.click()
-      }
-    })
-    await page.waitForTimeout(1500)
-
-    const clipped = await page.evaluate(() => {
+    const measure = () => page.evaluate(() => {
       const out = []
       for (const sec of document.querySelectorAll('[data-section]')) {
+        // Hidden panes measure zero, which is not the same as fitting.
+        if (sec.getBoundingClientRect().height === 0) continue
         const btn = sec.querySelector('button.hmsec')
         if (!btn) continue
         // The innermost span holding the title — the one with overflow:hidden.
@@ -396,12 +422,46 @@ test.describe('panel', () => {
           (el) => el.textContent.trim() === sec.dataset.section && !el.querySelector('span'))
         const t = all[all.length - 1]
         if (!t) continue
-        const over = Math.round(t.scrollWidth - t.clientWidth)
-        if (over > 0) out.push(`${sec.dataset.section} (cut by ${over}px)`)
+        out.push({
+          name: sec.dataset.section,
+          over: Math.round(t.scrollWidth - t.clientWidth),
+        })
       }
       return out
     })
+
+    const clipped = []
+    let measured = 0
+    for (const stage of ['source', 'surface', 'marks', 'overlay', 'frame', 'output']) {
+      await openStage(page, stage)
+      // Shut everything, which is the state a readout appears in.
+      await page.evaluate(() => {
+        for (const b of document.querySelectorAll('[data-testid^="section-"]')) {
+          if (b.getAttribute('aria-expanded') === 'true' && b.offsetParent !== null) b.click()
+        }
+      })
+      await page.waitForTimeout(700)
+      for (const row of await measure()) {
+        measured += 1
+        if (row.over > 0) clipped.push(`${row.name} (cut by ${row.over}px)`)
+      }
+    }
+
+    // Twenty-six sections outside Marks, plus Draw Modes. Anything far below
+    // that means the walk stopped finding headers rather than finding them fit.
+    expect(measured, 'the walk must actually measure headers').toBeGreaterThanOrEqual(25)
     expect(clipped, `headers clipping their own name: ${clipped.join(', ')}`).toEqual([])
+
+    // The one place a mark's own name is still set in a header: the back bar of
+    // a drilled-in mode, which carries the longest title in the panel.
+    await openMark(page, 'ZeroCross')
+    const back = page.locator('[data-testid="mode-back"]')
+    await expect(back).toBeVisible()
+    const backOver = await back.evaluate((el) => {
+      const t = el.querySelector('span:last-child')
+      return Math.round(t.scrollWidth - t.clientWidth)
+    })
+    expect(backOver, 'the back bar clips the mark it names').toBeLessThanOrEqual(0)
   })
 
   test('a tile and the section switch are two views of one boolean', async ({ page }) => {
@@ -409,17 +469,26 @@ test.describe('panel', () => {
     // the same `enabled<Id>` the section's own Enabled switch does, so there is
     // no second piece of state that can drift out of step with it.
     await openApp(page)
+    await openStage(page, 'marks')
     const tile = page.locator('[data-testid="mode-tile-Contours"]')
     await expect(tile).toHaveAttribute('aria-pressed', 'false')
 
+    // The pip, which is the only target on a tile that switches anything.
     await tile.click()
     await page.waitForTimeout(1500)
     await expect(tile).toHaveAttribute('aria-pressed', 'true')
-    // Switching one on opens its section, because that is the first half of
-    // tuning it.
+    // Switching one on leaves you on the sheet, so a second and a third are one
+    // click each. Its section opens underneath, ready for when you go in.
+    await expect(page.locator('[data-testid="mode-sheet"]')).toBeVisible()
     await expect(page.locator('[data-testid="section-mode:-contours"]'))
       .toHaveAttribute('aria-expanded', 'true')
     await expect(page.locator('[data-testid="standing-line"]')).toContainText('2 marks')
+
+    // The card is the other target: it opens the mark, alone, with a way back.
+    await page.click('[data-testid="mode-open-Contours"]')
+    await page.waitForTimeout(400)
+    await expect(page.locator('[data-testid="mode-back"]')).toBeVisible()
+    await expect(page.locator('[data-testid="mode-sheet"]')).toBeHidden()
 
     // And the section's own switch agrees, because there is only one switch.
     const enabled = page.locator('[data-testid="section-mode:-contours"] ~ div input[type=checkbox][aria-label="Enabled"]')
@@ -449,7 +518,12 @@ test.describe('panel', () => {
     ])
 
     const at = (t) => order.indexOf(t)
-    expect(at('section-presets')).toBeLessThan(at('stage-source'))
+    // Presets is inside Source now. The load block and the preset grid were the
+    // top of the body, and with one pane on screen at a time the top of the body
+    // had to become the top of some pane — Source, which is the one a drawing
+    // starts in and the one the panel opens on.
+    expect(at('section-presets')).toBeGreaterThan(at('stage-source'))
+    expect(at('section-presets')).toBeLessThan(at('stage-surface'))
     // Source: the two operations that were filed at the far end are in it.
     expect(at('section-hydraulic-erosion')).toBeGreaterThan(at('stage-source'))
     expect(at('section-soundscapes')).toBeLessThan(at('stage-surface'))
@@ -459,29 +533,41 @@ test.describe('panel', () => {
     expect(at('section-draw-modes')).toBeGreaterThan(at('stage-marks'))
   })
 
-  test('one stage rule is pinned at a time, and none while filtering', async ({ page }) => {
-    // Six stickies in one scroll container do not hand over to each other — each
-    // stays pinned until its containing block leaves, so all six piled up at the
-    // top. Each stage is its own block, which is what makes the next one push
-    // the last out of the way.
+  test('the rail shows one pane, and the filter crosses them all', async ({ page }) => {
+    // Six stickies in one scroll container never handed over to each other, and
+    // each stage got its own block to fix it. The rail makes that stronger: one
+    // pane is on screen, so one rule is, and the other five are hidden rather
+    // than unmounted — a click on the rail must not throw away a running fetch
+    // or a half-set feature filter.
     await openApp(page)
-    const pinned = async () => page.evaluate(() => {
-      const body = document.querySelector('#hm-panel-body').getBoundingClientRect()
-      return [...document.querySelectorAll('[data-testid^="stage-"]')]
-        .filter((n) => { const t = n.getBoundingClientRect().top - body.top; return t >= -1 && t < 40 })
-        .map((n) => n.dataset.testid)
-    })
-    await page.locator('#hm-panel-body').evaluate((el) => { el.scrollTop = 1500 })
-    await page.waitForTimeout(400)
-    expect(await pinned()).toHaveLength(1)
+    const shownStages = () => page.locator('[data-testid^="stage-tab-"] , [data-testid^="stage-"]')
+      .evaluateAll((els) => els
+        .filter((n) => n.dataset.testid.startsWith('stage-') &&
+                       !n.dataset.testid.startsWith('stage-tab') &&
+                        n.dataset.testid !== 'stage-rail' &&
+                        n.getBoundingClientRect().height > 0)
+        .map((n) => n.dataset.testid))
 
-    // The filter is a flat list of hits, so a stage heading over none of its own
-    // sections would be furniture pointing nowhere.
+    expect(await shownStages()).toEqual(['stage-source'])
+    await openStage(page, 'frame')
+    expect(await shownStages()).toEqual(['stage-frame'])
+
+    // Hidden, never unmounted: all six rules are still in the tree.
+    await expect(page.locator('[data-testid^="stage-"]'))
+      .toHaveCount(6 + 6 + 1)   // six rules, six tabs, the rail itself
+
+    // A search is flat and crosses every pane, so there are no rules at all
+    // while one is typed — a stage heading over none of its own sections is
+    // furniture pointing nowhere. The rail becomes a tally instead.
     await page.fill('[data-testid="panel-filter"]', 'azimuth')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid^="stage-"]')).toHaveCount(0)
+    expect(await shownStages()).toEqual([])
+    await expect(page.locator('[data-testid="stage-tab-surface"]')).toHaveAttribute('title', /1 match/)
+    await expect(page.locator('[data-testid="stage-tab-marks"]')).toHaveAttribute('title', /0 matches/)
+
+    // Clearing the field puts the panel back on the pane it was on.
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid^="stage-"]')).toHaveCount(6)
+    expect(await shownStages()).toEqual(['stage-frame'])
   })
 })

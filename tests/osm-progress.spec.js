@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 /**
  * What a fetch is able to say about how far along it is.
@@ -130,6 +130,7 @@ test('the panel draws the bar, and takes it away again', async ({ page }) => {
   ])
   await chooser.setFiles(FIXTURE)
   await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30_000 })
+  await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.waitForSelector('[data-testid="osm-fetch"]')
 
