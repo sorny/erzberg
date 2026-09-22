@@ -7,7 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] — 2026-09-22
+
+### Added
+
+- **A stage rail.** Six tabs down the panel's edge — Source, Surface, Marks,
+  Overlay, Frame, Output — and the body shows one of them at a time. The six
+  stages already put the pipeline's order on screen; what they could not fix was
+  its proportion. Marks is 35 of the 60 sections, so every trip from Terrain to
+  Export crossed about 1 500 px of draw modes. The rail does not shorten Marks.
+  It stops the other five stages paying for it: Source is about 290 px, Surface
+  180, Overlay 145, Frame 180, and Output is two sections.
+
+  A tab carries a green count of the sections switched on inside it, read off
+  the same state the green dots are, because a pane you cannot see is a pane
+  whose dots you cannot count. A stage doing nothing carries no badge at all.
+
+  A hidden pane is hidden and never unmounted, so a running OpenStreetMap fetch,
+  the controller that can cancel it and a half-set feature filter all survive a
+  click on the rail.
+
+- **A sheet of the thirty-four marks.** The Marks stage is now the marks
+  themselves — three across, each glyph with its name — in place of the
+  thirty-four headers that stood for them. A tile carries two things, shaped
+  differently on purpose. The **pip** in the corner switches the mark on and
+  fills green while it draws. The **card** — glyph, name, chevron — opens the
+  mark, alone, with the whole width of the panel and a back bar above it.
+
+  Switching a mark on leaves you on the sheet, so a second and a third are one
+  click each. It is still not a layer stack: nothing reorders, nothing is
+  dragged, and a tile reads and writes one boolean and does nothing else.
+
+- **`panel/stages.js`**, the fourth index over the panel. It answers which of
+  the six panes holds a section. The 34 draw modes are derived from
+  `PANEL_MODES`; the other 26 are stated. `panel.spec.js` holds the two
+  together, because a section missing from it would render in no pane at all.
+
 ### Changed
+
+- **The panel is 312 px wide**, up from 272. The extra 40 is the rail. The
+  controls still get 272, which is the width they have always had — the rail is
+  navigation rather than control, so it is paid for out of the window instead of
+  out of the sliders. Taking it out of the body would have cost every slider 28%
+  of its travel, across some 350 of them, to save 40 px of a roughly 1 900 px
+  canvas.
+
+- **The load block and Presets are in Source.** Neither moved relative to
+  anything else. They were the top of the body, and with one pane on screen at a
+  time the top of the body had to become the top of some pane. Source is the one
+  a drawing starts in and the one the panel opens on, so a first visit sees the
+  same order it always saw.
+
+- **Switching a mark on no longer scrolls to its section.** It used to, because
+  the index it lived in sat above thirty-four headers that were the real way in.
+  The sheet is the way in, and opening a mark is its own target on the same
+  tile.
 
 - **`scripts/embed-window.js` writes `<name>.landcover.json`** instead of
   `<name>.cover.json`. "Cover" on its own is ambiguous next to cloud cover,
