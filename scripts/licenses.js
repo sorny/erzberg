@@ -73,7 +73,38 @@ const closure = productionClosure()
 const packages = [...closure.keys()].sort().map(readPackage).filter(Boolean)
 
 /**
- * Canonical text per SPDX id, borrowed from the packages that do ship a file.
+ * A borrowed licence carries its lender's copyright line, and must not.
+ *
+ * This is the bug the "longest candidate" rule below used to have exactly
+ * backwards. An MIT file is a title, a copyright line, then the grant, so the
+ * longest candidate is the one that names *its own* holder — and the notice then
+ * printed, under `@react-three/fiber` by Paul Henschel:
+ *
+ *     Copyright (c) 2010-2012 Tween.js authors.
+ *
+ * which is `@tweenjs/tween.js`, the package the text was taken from. A notice
+ * file whose whole job is correct attribution asserted the wrong holder for four
+ * MIT packages.
+ *
+ * What is canonical about a licence is its *terms*; the copyright line is the
+ * one part that is never transferable. So the header block is stripped of
+ * copyright lines before the text is used or compared. Ten lines is the whole
+ * header of MIT, BSD and ISC, and stopping there leaves the Apache-2.0 appendix
+ * — whose `Copyright [yyyy] [name of copyright owner]` is an instructional
+ * template about 180 lines down — intact.
+ */
+const COPYRIGHT_LINE = /copyright\s*(\(c\)|©|\d{4})/i
+const HEADER_LINES = 10
+
+function stripHeaderCopyright(text) {
+  const lines = text.split('\n')
+  const head = lines.slice(0, HEADER_LINES).filter((l) => !COPYRIGHT_LINE.test(l))
+  return [...head, ...lines.slice(HEADER_LINES)].join('\n')
+    .replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
+ * Canonical terms per SPDX id, borrowed from the packages that do ship a file.
  *
  * Six packages here declare a licence and ship no copy of it, and for one of
  * them that is not merely untidy: `lerc` is Apache-2.0 and reaches the bundle,
@@ -81,14 +112,15 @@ const packages = [...closure.keys()].sort().map(readPackage).filter(Boolean)
  * An SPDX identifier is a reference, not a copy.
  *
  * Taking the text from a sibling that declares the same identifier keeps this
- * self-maintaining — no licence blobs inlined here to drift out of date — and
- * the longest candidate is preferred because a package that appends its own
- * copyright line to the licence is a worse source than one that ships it plain.
+ * self-maintaining — no licence blobs inlined here to drift out of date. The
+ * longest candidate still wins, but it is compared *after* stripping, so the
+ * winner is the fullest statement of the terms rather than the one with the most
+ * attribution attached to it.
  */
 const canonical = new Map()
 for (const p of packages) {
   if (!p.spdx || !p.texts.length) continue
-  const text = p.texts[0].text
+  const text = stripHeaderCopyright(p.texts[0].text)
   const held = canonical.get(p.spdx)
   if (!held || text.length > held.length) canonical.set(p.spdx, text)
 }
@@ -131,8 +163,10 @@ for (const p of packages) {
   if (p.texts.length) {
     for (const t of p.texts) out.push(`--- ${t.file} ---`, '', t.text, '')
   } else if (p.borrowed) {
-    out.push(`(This package ships no licence file of its own. The text of ${p.spdx},`,
-             ' which its manifest declares, follows.)', '', p.borrowed, '')
+    out.push(`(This package ships no licence file of its own. The terms of ${p.spdx},`,
+             ' which its manifest declares, follow. They carry no copyright line:',
+             ' the holder is this package\'s own, named above where its manifest',
+             ' states one.)', '', p.borrowed, '')
   } else {
     out.push('(This package ships no licence file. The SPDX identifier above is the',
              ' licence its manifest declares.)', '')

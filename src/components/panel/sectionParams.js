@@ -124,6 +124,29 @@ export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis']
 export const MODE_READS = ['gradientStops']
 
 /**
+ * Memo for `paramsForSection`, which is a pure function of two fixed values.
+ *
+ * `allKeys` is a module-level array in all three callers and the section titles
+ * are a fixed list, so the answer is a constant. It was rebuilt on every call,
+ * and `modifiedSections` calls it once per section.
+ *
+ * That put it on the camera's path. An orbit writes tilt, rotation and zoom into
+ * `view` at the throttled sync rate. The Sidebar's `modified` memo lists `view`
+ * among its dependencies, so every section was re-derived about seven times a
+ * second while the scene turned. Measured in a CPU profile of a 5 s auto-rotate:
+ * 92 ms here and 67 ms in `modifiedSections`, against a 16.7 ms frame budget.
+ *
+ * The inner loop is why it costs that much. For a mode section it tests every
+ * parameter key against every mode suffix to find the longest match, which is
+ * about 172 x 34 string comparisons per section.
+ *
+ * Keyed on the `allKeys` array by identity, so a caller with a different key
+ * list gets its own entry and nothing goes stale. The cached arrays are frozen
+ * because every caller reads and none writes.
+ */
+const SECTION_KEYS = new WeakMap()
+
+/**
  * Every parameter one section owns.
  *
  * The mode suffix and the table above, unioned — a mode can appear in both, and
@@ -132,6 +155,11 @@ export const MODE_READS = ['gradientStops']
  * are actions, and there is nothing there to put back.
  */
 export function paramsForSection(title, allKeys) {
+  let cached = SECTION_KEYS.get(allKeys)
+  if (!cached) { cached = new Map(); SECTION_KEYS.set(allKeys, cached) }
+  const hit = cached.get(title)
+  if (hit) return hit
+
   const out = new Set()
   const id = MODE_ID.get(title)
   if (id) {
@@ -152,7 +180,9 @@ export function paramsForSection(title, allKeys) {
       out.add(rule)
     }
   }
-  return [...out]
+  const result = Object.freeze([...out])
+  cached.set(title, result)
+  return result
 }
 
 /** Sections that hold no settings, so no reset control is drawn on them. */

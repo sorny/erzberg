@@ -297,6 +297,23 @@ export function Note({ children }) {
   )
 }
 
+/**
+ * The smallest button the panel has: a bare word, used in a row of two or three.
+ *
+ * It lives here rather than beside its one caller because `FeaturePicker` is a
+ * hook, and a file that exports a hook and declares a component cannot be
+ * hot-reloaded — Fast Refresh needs a module whose exports are all components or
+ * none. Its siblings are here anyway.
+ */
+export function MiniBtn({ onClick, testId, children }) {
+  return (
+    <button onClick={onClick} data-testid={testId} style={{
+      padding: '2px 4px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
+      background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
+    }}>{children}</button>
+  )
+}
+
 export function HelpBtn({ label, active, onClick }) {
   return (
     <button type="button" className={`hmi${active ? ' on' : ''}`} onClick={onClick}

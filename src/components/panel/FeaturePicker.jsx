@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'react'
 import { featureLabel } from '../../utils/vectorLayers'
 import { enclosesRegion } from '../../utils/maskFromVector'
-import { ACCENT, BORDER, DIM, MUTED, SURF, TEXT } from './ui'
+import { ACCENT, BORDER, DIM, MiniBtn, MUTED, SURF, TEXT } from './ui'
 
 const MAX_ROWS = 200
 
@@ -135,13 +135,4 @@ export function useFeaturePick(layers = [], sources = [], prefix = 'mask-from') 
   )
 
   return { usable, chosen, bucket, picked, closes, label, element }
-}
-
-function MiniBtn({ onClick, testId, children }) {
-  return (
-    <button onClick={onClick} data-testid={testId} style={{
-      padding: '2px 4px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
-      background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
-    }}>{children}</button>
-  )
 }

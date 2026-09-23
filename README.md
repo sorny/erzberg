@@ -834,6 +834,15 @@ The app idles quietly and stays responsive under load.
   loop alive only while they run.
 - **60 fps camera.** Orbit, pan and zoom move the camera on the fast path. React
   state follows on a throttled tick, so the sidebar never re-renders per frame.
+  Measured in a production build: **241 frames in four seconds, p95 17.6 ms**,
+  which puts every frame inside the 16.7 ms budget of a 60 Hz display.
+- **Nothing derives the panel from the camera.** The throttled tick above still
+  writes tilt, rotation and zoom into React state, so whatever the sidebar
+  computes from its parameters runs while the scene turns. The index that
+  decides which sections differ from their defaults is therefore memoised on its
+  inputs, which never change. Before that, an orbit re-derived all fifty-odd
+  sections about seven times a second, which a CPU profile put at 159 ms of a
+  five-second window.
 - **Off-thread geometry.** Rebuilds run in a long-lived worker over growable
   typed-array writers. The results come back zero-copy, and they include surface
   normals. Single-pass marching-squares contours are about 18 times faster than
@@ -877,7 +886,7 @@ The app idles quietly and stays responsive under load.
 | UI | Custom sidebar panel + Tailwind CSS |
 | Geometry | Web Workers (geometry, erosion, spectrogram) |
 | Audio | Web Audio `decodeAudioData` + an in-house radix-2 FFT with no dependency |
-| Tests | Vitest for the pure maths. Playwright against a live dev server in headless Chrome, `HEADED=1` to watch |
+| Tests | Vitest for the pure maths. Playwright against a live dev server in headless Chrome, split into a parallel half and a serial one, `HEADED=1` to watch |
 
 ---
 
@@ -904,7 +913,9 @@ npm run dev              # dev server at http://localhost:5173
 npm run build            # production build
 npm run lint             # ESLint — correctness rules only, no formatting
 npm run test:unit        # Vitest — the pure maths, ~0.3s
-npm run test             # Playwright end-to-end suite, headless
+npm run test             # Playwright end-to-end suite, headless — both halves
+npm run test:light       # the half that touches no GPU, 4 workers
+npm run test:heavy       # the half that does, one worker
 HEADED=1 npm run test    # …with the window, to watch it drive the app
 npm run test:ui          # Playwright interactive UI
 npx playwright test tests/lines.spec.js   # a single spec
@@ -981,12 +992,27 @@ went flaky twice in one afternoon headed passes headless in 719 ms. Nothing to
 drift behind is a stronger guarantee than three flags asking Chrome not to
 throttle a window that has.
 
-They still run **one at a time**, and that was re-measured after the move to
-headless rather than assumed to carry over. Four workers finish in 12.5 minutes
-against 30.1 serial — a real 2.4× — and finish with two failures that both pass
-alone, an audio spec and an export spec starved of frames. A suite that reports
-starvation as a feature regression is worth less than the eighteen minutes it
-saves. `playwright.config.js` carries the figures.
+They no longer all run **one at a time**, and the split is by evidence rather
+than by taste. A spec is `heavy` if it screenshots, reads a drawing buffer,
+waits on a download, presses an export hotkey, listens for `[Perf]`, drives rAF
+or plays audio. Everything else is `light`. Four workers over the light half
+finish 140 tests in 1.9 minutes against 7.1 serial, with the same 140 passing
+either way, because nothing in that half waits on the GPU. The heavy half keeps
+one worker and takes about half an hour: four workers over *those* specs bought
+eighteen minutes and cost two false regressions, an audio spec and an export
+spec starved of frames. A suite that reports starvation as a feature regression
+is worth less than the time it saves. `playwright.config.js` carries the
+figures and the list.
+
+`tests/render-perf.spec.js` is the one spec that watches the renderer rather
+than the app. It reaches the real `WebGLRenderer` through the
+`__THREE_DEVTOOLS__` hook and records draw calls, triangle counts, frame times
+under auto-rotate, and pointer-to-painted-frame latency on an orbit drag. The
+first two are machine-independent: an upgrade that submits more draw calls for
+the same scene says so identically on every machine, which is what a library
+upgrade needs to be judged on. Its header carries the recorded baseline, in two
+columns, because a development build of React and a production one differ
+four-fold on frame time and not at all on the counts.
 
 ---
 

@@ -651,7 +651,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     // No needsUpdate: only uniform values and render-state flags change here,
     // neither requires a program rebuild — and this effect runs on every render
     // (p is a fresh object), so flagging it would re-validate the program per frame.
-  }, [surfMat, p, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight])
+  }, [surfMat, p, imageryTex, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight])
 
   useEffect(() => {
     if (!surfMat) return

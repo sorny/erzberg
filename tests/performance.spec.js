@@ -39,7 +39,16 @@ test('rotation remains responsive during resolution change', async ({ page }) =>
   expect(duration).toBeLessThan(2000)
 })
 
-test('render-performance-baseline', async ({ page }) => {
+/*
+ * Named for what it measures.
+ *
+ * This was called `render-performance-baseline` and contains no rendering: it
+ * reads `[Perf] Terrain ready Main:`, which is the main-thread cost of taking
+ * the worker's buffers and building geometry from them. The name would have
+ * been quoted as cover for a React Three Fiber upgrade — see
+ * `render-perf.spec.js`, which measures the frame loop this one never touched.
+ */
+test('terrain build hands off to the main thread promptly', async ({ page }) => {
   let perfLog = null
   page.on('console', msg => {
     if (msg.text().includes('[Perf] Terrain ready')) {
