@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { openMark, openStage, resetToDefaults, setMark } from './helpers.js'
 
 /**
  * Where the contour levels sit.
@@ -135,11 +135,15 @@ test('an inverted terrain still draws contours on its cliffs', async ({ page }) 
 const GEOTIFF = 'tests/testdata/geotiff.tif'
 
 /** Switches a draw mode's section toggle, by the section's own title. */
+/**
+ * A mark on or off, by the pip on the sheet.
+ *
+ * It used to reach into the section's own checkbox. A mark's section is behind
+ * the sheet now, so that meant the Marks pane and a drill-in for every toggle —
+ * and the pip writes the same `enabled<Id>` in one click.
+ */
 async function setMode(page, title, on) {
-  const row = page.locator(`[data-section="${title}"]`)
-  const tog = row.locator('input[type=checkbox]').first()
-  await tog.scrollIntoViewIfNeeded()
-  if ((await tog.isChecked()) !== on) await tog.click({ force: true })
+  await setMark(page, title.replace(/^Mode:\s*/, '').toLowerCase(), on)
 }
 
 /** Exports an SVG and returns its text. */
@@ -180,10 +184,10 @@ test.describe('the interval slider says metres', () => {
     await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
 
     await setMode(page, 'Mode: Lines', false)
-    await page.getByText('Mode: Contours', { exact: true }).click()
     await setMode(page, 'Mode: Contours', true)
     await page.waitForTimeout(1500)
 
+    await openMark(page, 'contours')   // the interval is Contours' own control
     const slider = page.locator('[data-testid="contour-interval-m"]')
     await expect(slider, 'a GeoTIFF gets the metre slider').toBeVisible()
     await slider.fill('100')
@@ -235,16 +239,18 @@ test.describe('the interval slider says metres', () => {
     await chooser.setFiles(GEOTIFF)
     await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
 
-    await page.getByText('Mode: Contours', { exact: true }).click()
     await setMode(page, 'Mode: Contours', true)
     await page.waitForTimeout(1500)
 
+    await openMark(page, 'contours')   // the interval is Contours' own control
     const slider = page.locator('[data-testid="contour-interval-m"]')
     await slider.fill('100')
     await page.waitForTimeout(2000)
     const before = parseFloat(await slider.inputValue())
     expect(before, 'the slider holds what it was set to').toBeCloseTo(100, 0)
 
+    // Elev scale is Shape's, and the drill-in above left the panel in Marks.
+    await openStage(page, 'terrain')
     await page.locator('input[aria-label="Elev scale"]').fill('4')
     await page.waitForTimeout(3000)
     const after = parseFloat(await slider.inputValue())

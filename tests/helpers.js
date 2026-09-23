@@ -42,16 +42,21 @@ export async function resetToDefaults(page) {
     .click({ timeout: 3000 }).catch(() => {})
   await page.waitForTimeout(900)
 
-  // And collapse the Presets grid. Specs reach controls with force-clicks at
-  // measured coordinates, and 56 tiles add roughly 3 000 px to the panel — enough
-  // that a section which used to sit at y≈1000 is at y≈3800 and the click lands
-  // on whatever is at the old spot. Closing it restores the geometry these specs
-  // were written against, which is the rest of the baseline they assume.
-  const presets = page.locator('[data-testid="section-presets"]')
-  if ((await presets.getAttribute('aria-expanded')) === 'true') {
-    await presets.click()
-    await page.waitForTimeout(400)
-  }
+  /*
+   * The Presets grid used to be collapsed here, and no longer needs to be.
+   *
+   * Specs reach controls with force-clicks at measured coordinates, and 56
+   * tiles added roughly 3 000 px to the panel — enough that a section at y≈1000
+   * was at y≈3800 and the click landed on whatever sat at the old spot. So the
+   * baseline shut it.
+   *
+   * The grid has a pane to itself now and shares it with nothing, so it adds no
+   * height to any pane a spec works in. Worse than unnecessary: it was actively
+   * breaking every spec that called this. Presets opens expanded, so the
+   * `aria-expanded` test passed and the click went to a button in a pane nobody
+   * had selected — hidden, unclickable, sixty seconds to time out, and it took
+   * most of the suite with it.
+   */
   await page.locator('#hm-panel-body').evaluate((el) => { el.scrollTop = 0 })
 }
 
@@ -93,8 +98,27 @@ export async function openStage(page, name) {
 const MARK_ID = new Map(PANEL_MODES.map(([title, key]) => [
   title.toLowerCase().replace(/\s+/g, '-'), key.slice('enabled'.length),
 ]))
-const markId = (mark) =>
-  MARK_ID.get(mark) ?? MARK_ID.get(`mode:-${mark}`) ?? mark
+/** The ids themselves — `ZeroCross`, `Stipple` — which callers also pass. */
+const MARK_IDS = new Set(PANEL_MODES.map(([, key]) => key.slice('enabled'.length)))
+const markId = (mark) => {
+  // An id passes through unchanged. Checking the id set rather than returning
+  // the name untouched is the whole point: `ZeroCross` is real and `stipple
+  // dots` is a typo, and the old fallback could not tell them apart.
+  if (MARK_IDS.has(mark)) return mark
+  const id = MARK_ID.get(mark) ?? MARK_ID.get(`mode:-${mark}`)
+  if (id) return id
+  /*
+   * An unknown name fails here, not fifteen seconds later.
+   *
+   * Returning the name unchanged built `mode-tile-stipple dots` — a selector
+   * that matches nothing — and the caller waited out its timeout on a locator
+   * that could never resolve. The failure said "not visible", which sends you
+   * looking at panes and hidden elements rather than at the typo.
+   */
+  throw new Error(
+    `Unknown mark "${mark}". Use a mode id (Stipple), a section slug ` +
+    `(mode:-stipple-dots) or its tail (stipple-dots).`)
+}
 
 /**
  * Puts a mark into a definite state from the sheet, without going into it.

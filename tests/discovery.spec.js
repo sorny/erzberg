@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * Play & discovery — preset thumbnails and the randomiser.
@@ -24,6 +24,9 @@ async function boot(page) {
 }
 
 async function openPresets(page) {
+  // Presets is its own destination now, so reaching the grid means going there
+  // first. A whole configuration applied at once is not a step in the pipeline.
+  await openStage(page, 'presets')
   // Idempotent: the section ships open, and clicking it unconditionally used to
   // close it — leaving every tile inside a zero-height row and unclickable.
   const header = page.locator('[data-testid="section-presets"]')
@@ -31,7 +34,12 @@ async function openPresets(page) {
   await page.waitForTimeout(300)
 }
 
-const bgColor = (page) => page.locator('[data-testid="bg-color"]').inputValue()
+// The background is Terrain Style's, in Surface. A read works on a hidden
+// element, but going there keeps the rule simple: touch a control, open its pane.
+const bgColor = async (page) => {
+  await openStage(page, 'surface')
+  return page.locator('[data-testid="bg-color"]').inputValue()
+}
 
 /**
  * Every slider and colour well in the panel, as one string.
@@ -203,22 +211,29 @@ test('the app opens on a style, not on bare defaults', async ({ page }) => {
    * all covering what a first-time visitor actually meets.
    */
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('[data-testid="section-presets"]', { timeout: 30000 })
+  // Terrain is the opening pane, so a section in it is the readiness sentinel.
+  // Presets used to serve — it is in Looks now, and hidden until you go there.
+  await page.waitForSelector('[data-testid="section-shape"]', { timeout: 30000 })
   await page.waitForTimeout(4000)
 
-  // The panel names the look. It does not open the grid to do it: Presets is
-  // the first section and it is shut, because 2 346 px of thumbnails between
-  // the head and everything else is a high price for a label. The label is the
-  // link, and the link opens the grid.
+  // The panel names the look without going to get it. Presets is a destination
+  // of its own and the grid is shut inside it, because 2 346 px of thumbnails
+  // is a high price for a label. The label is the link, and the link is in the
+  // load block where the opening state is — one click from anywhere.
   await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveText('Alpine Survey')
   await expect(page.locator('[data-testid="preset-edited"]')).toHaveCount(0)
-  await expect(page.locator('[data-testid="section-presets"]'))
-    .toHaveAttribute('aria-expanded', 'false')
-
-  await page.click('[data-testid="jump-to-presets"]')
-  await page.waitForTimeout(500)
+  // Hidden, because Presets is a destination of its own and the panel opens on
+  // Terrain. The grid inside it is expanded — it shares its pane with nothing,
+  // so the 2 346 px of thumbnails that once justified shutting it cost nobody
+  // any scrolling now.
+  await expect(page.locator('[data-testid="section-presets"]')).toBeHidden()
   await expect(page.locator('[data-testid="section-presets"]'))
     .toHaveAttribute('aria-expanded', 'true')
+
+  // And the link goes there. One click from anywhere in the panel.
+  await page.click('[data-testid="jump-to-presets"]')
+  await page.waitForTimeout(500)
+  await expect(page.locator('[data-testid="section-presets"]')).toBeVisible()
   await expect(page.locator('[data-testid="surprise-me"]')).toBeVisible()
 
   // And it is an opening state, not a new baseline: Reset all still goes to the

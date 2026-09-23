@@ -542,13 +542,27 @@ test.describe('vector layers', () => {
     const box = await page.locator('canvas[data-engine]').boundingBox()
     const tip = page.locator('[data-testid="feature-tooltip"]')
 
+    /*
+     * The sweep is clamped to the canvas, and it wants the *named* motorway.
+     *
+     * It used to run to a fixed `box.x + 460`. The panel is 312 px wide now, so
+     * at this 700 px viewport the canvas ends at 388 and the last third of that
+     * sweep was over the panel — it found an unnamed way and reported
+     * `Motorway #2`, which is the fallback label rather than a name at all.
+     *
+     * Derived from the box and filtered to A9: the assertions below are about
+     * a long name being shown in full, so a tooltip with no name in it is not
+     * the specimen, whatever else it proves.
+     */
     const seen = []
+    const xEnd = Math.min(box.x + 460, box.x + box.width - 8)
     outer:
     for (let y = box.y + 120; y < box.y + box.height - 90; y += 22) {
-      for (let x = box.x + 200; x < box.x + 460; x += 22) {
+      for (let x = box.x + 40; x < xEnd; x += 22) {
         await page.mouse.move(x, y)
         await page.waitForTimeout(165)
         if (!(await tip.count())) continue
+        if (!(await tip.innerText()).includes('A9')) continue
         seen.push(await tip.evaluate((el, cursorX) => {
           const r = el.getBoundingClientRect()
           return {
@@ -1877,6 +1891,8 @@ test.describe('vector layers', () => {
     await page.waitForTimeout(1000)
 
     await page.evaluate(() => document.activeElement?.blur())
+    // Preset ⬇ is the Export section's, in Output.
+    await openStage(page, 'output')
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),
       page.click('button:has-text("Preset ⬇")'),
@@ -2025,12 +2041,17 @@ test.describe('vector layers', () => {
   /** The pen layers of an SVG export, in document order. */
   async function exportedPenLayers(page) {
     await page.evaluate(() => document.activeElement?.blur())
+    // The export buttons are in Output, and this spec works in Overlay. Going
+    // there is half the job: every caller carries on with the layer list
+    // afterwards, so this has to hand the panel back the way it found it.
+    await openStage(page, 'output')
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60000 }),
       page.click('[data-testid="export-svg"]'),
     ])
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
+    await openStage(page, 'overlay')
     return [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
   }
 
@@ -2196,6 +2217,7 @@ test.describe('vector layers', () => {
     await page.click(`[data-testid="vector-vis-${id}"]`)   // hide Roads · Track
     await page.waitForTimeout(1500)
 
+    await openStage(page, 'output')   // the export buttons are in Output
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60000 }),
       page.click('[data-testid="export-svg"]'),

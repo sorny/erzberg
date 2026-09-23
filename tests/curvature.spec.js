@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, resetToDefaults, setMark, waitForApp } from './helpers.js'
 
 // Section roots are direct children of #hm-panel-body, which disambiguates the
 // many identically-labelled "Enabled" toggles.
@@ -19,16 +19,18 @@ const segments = async (page) =>
 
 test('curvature mode renders and both direction modes differ', async ({ page }) => {
   await openApp(page)
-  // Mode: Lines is open by default — clicking its header would collapse it.
-  await section(page, 'Mode: Lines').locator('label').first().click({ force: true })
+  // The pips on the sheet: Lines off so the plate is empty, Curvature on.
+  await setMark(page, 'lines', false)
   await page.waitForTimeout(1200)
   expect(await segments(page)).toBe(0)
 
-  await page.locator('text=MODE: CURVATURE').click(); await page.waitForTimeout(400)
-  await section(page, 'Mode: Curvature').locator('label').first().click({ force: true })
+  await setMark(page, 'curvature', true)
   await page.waitForTimeout(2500)
   const across = await segments(page)
 
+  // Its own controls, which means going in: `setMark` works the pip and stays
+  // on the sheet, which is the point of the pip.
+  await openMark(page, 'curvature')
   await section(page, 'Mode: Curvature').locator('text=ALONG FORM').click()
   await page.waitForTimeout(2500)
   const along = await segments(page)

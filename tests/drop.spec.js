@@ -12,7 +12,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'fs'
 import path from 'path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 /**
  * A `DataTransfer` in the page, holding one file read from disk.
@@ -72,6 +72,7 @@ test('a dropped preset is applied', async ({ page }) => {
   await page.waitForSelector('text=Grid:', { timeout: 30_000 })
   await resetToDefaults(page)
 
+  await openStage(page, 'surface')   // the background is Terrain Style's
   const bg = page.locator('[data-testid="bg-color"]')
   const before = await bg.inputValue()
 

@@ -36,7 +36,7 @@ async function openMode(page) {
 async function loadGeoTiff(page) {
   // The load buttons are at the top of Source, and a caller may be anywhere —
   // `openMode` leaves the panel in Marks.
-  await openStage(page, 'source')
+  await openStage(page, 'terrain')
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.click('[data-testid="load-geotiff"]'),

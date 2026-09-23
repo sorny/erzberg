@@ -7,10 +7,14 @@ async function openApp(page) {
   const t = page.locator('[data-testid="sidebar-toggle"]')
   if ((await t.innerText()) === '◀') { await t.click(); await page.waitForTimeout(400) }
   await page.waitForTimeout(1500)
-  // The Camera section is closed by default.
+  // Camera opens by default now: it absorbed `View`, which did. Open it only if
+  // something has shut it — an unconditional click would close it instead.
   await openStage(page, 'frame')
-  await page.locator('[data-testid="section-camera"]').click()
-  await page.waitForTimeout(400)
+  const camera = page.locator('[data-testid="section-camera"]')
+  if ((await camera.getAttribute('aria-expanded')) !== 'true') {
+    await camera.click()
+    await page.waitForTimeout(400)
+  }
   await resetToDefaults(page)
 }
 

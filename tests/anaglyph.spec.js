@@ -177,7 +177,11 @@ test('the filters change how they combine when the ground goes dark', async ({ p
   }, bgLuma)
   const onPaper = await inkRange(255)
 
-  // Now a black ground. The Terrain Style section owns the background colour.
+  // Now a black ground. Terrain Style owns the background colour, in Surface.
+  // The write below goes straight at the DOM and would reach a hidden input —
+  // but the rule is the same for every spec, and a control reached in a pane
+  // nobody selected is one panel change away from being reached by nothing.
+  await openStage(page, 'surface')
   await page.evaluate(() => {
     const el = document.querySelector('input.hmc[aria-label="Background"]')
       || [...document.querySelectorAll('input[type=color]')].find((i) => i.value === '#ffffff')

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 // The switch itself, by the name it carries. This used to walk
 // `//span[text()="X"]/following-sibling::label` because the text was a bare
@@ -81,6 +81,10 @@ test('raw terrain view shows the heightmap as a flat greyscale plane', async ({ 
   // Nothing else may be drawn — so a draw mode going on or off cannot move a
   // single pixel. A weaker "are lines dark?" check would pass even with lines
   // visible, since most of them are dark against a dark plane anyway.
+  // A mark's section is behind the sheet, so reaching its own switch means the
+  // Marks pane and a drill-in. The assertion below is about that switch and not
+  // about the pip, so it opens the section rather than using `setMark`.
+  await openMark(page, 'lines')
   const lines = page.locator('[data-section="Mode: Lines"]')
     .locator('label').first()
   const wasOn = await lines.isChecked()
@@ -140,6 +144,7 @@ test.describe('large retina window', () => {
       }
     })
 
+    await openStage(page, 'frame')   // Supersampling is Camera's
     for (const v of ['1', '1.5', '2']) {
       await page.locator('input[type="range"][min="1"][max="2"][step="0.5"]').fill(v)
       await page.waitForTimeout(2000)

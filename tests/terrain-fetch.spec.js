@@ -106,7 +106,7 @@ async function stubTheWorld(page) {
 }
 
 async function openFetch(page) {
-  const section = page.locator('[data-testid="section-fetch-terrain"]')
+  const section = page.locator('[data-testid="section-fetch"]')
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
     await section.click()

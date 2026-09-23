@@ -6,7 +6,7 @@ import {
   suggestElevScale, unprojectWgs84, wgs84ExtentKm,
 } from '../src/utils/geoCoords.js'
 import { areaResample } from '../src/utils/terrain.js'
-import { waitForApp } from './helpers.js'
+import { openStage, waitForApp } from './helpers.js'
 
 /**
  * GeoTIFF CRS handling, which nothing covered before.
@@ -615,6 +615,9 @@ test.describe('GeoTIFF load path', () => {
     // By test id, not by title text: Section uppercases its title in CSS and
     // innerText reports what is rendered.
     await expect(page.locator('[data-testid="section-vector-layers"]')).toHaveCount(1)
+    // `innerText` reports what is *rendered*, so the section has to be on
+    // screen — it is in Overlay, and the panel opens on Terrain.
+    await openStage(page, 'overlay')
     const body = await page.innerText('body')
     expect(body).toContain('Fetch from OpenStreetMap')
     expect(body).not.toContain('carries no georeferencing')

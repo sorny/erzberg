@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'zlib'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 /**
  * Drawing from what the ground *is* rather than from its shape.
@@ -94,6 +94,9 @@ async function setSwitch(page, term, label, on) {
 }
 
 async function exportSvg(page) {
+  // The export buttons are in Output, and a spec that has been switching
+  // modes is on another pane. Nothing in a hidden pane is clickable.
+  await openStage(page, 'output')
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 180_000 }),
     page.click('[data-testid="export-svg"]'),

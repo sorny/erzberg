@@ -133,14 +133,19 @@ describe('the readouts follow the params', () => {
   })
 
   it('reports the view as the panel itself displays it', () => {
-    expect(atDefaults()['View']).toBe('50° · 75%')
-    expect(atDefaults({ view: { ...VIEW_DEF, showFrame: true } })['View']).toBe('50° · 75% · frame')
+    // `View` split: aiming the camera is Camera's line, and the sheet is
+    // Paper's. Paper takes a dash until the frame is drawn, like any other
+    // section that can be switched off.
+    expect(atDefaults()['Camera']).toBe('50° · 75%')
+    expect(atDefaults()['Paper']).toBe('—')
+    expect(atDefaults({ view: { ...VIEW_DEF, showFrame: true } })['Paper']).toBe('ISO A port')
+    expect(atDefaults({ view: { ...VIEW_DEF, orthographic: true } })['Camera']).toBe('50° · 75% · ortho')
   })
 
   it('drops the resolution when raw terrain replaces every draw mode', () => {
-    expect(atDefaults()['Terrain']).toBe('res 2')
-    expect(atDefaults({ view: { ...VIEW_DEF, showRawTerrain: true } })['Terrain']).toBe('raw')
-    expect(atDefaults({ terrain: { ...TERRAIN_DEF, elevScale: 1.5 } })['Terrain']).toBe('res 2 · +1.5')
+    expect(atDefaults()['Shape']).toBe('res 2')
+    expect(atDefaults({ view: { ...VIEW_DEF, showRawTerrain: true } })['Shape']).toBe('raw')
+    expect(atDefaults({ terrain: { ...TERRAIN_DEF, elevScale: 1.5 } })['Shape']).toBe('res 2 · +1.5')
   })
 
   it('names the mirrored sides rather than counting them', () => {

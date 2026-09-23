@@ -10,12 +10,12 @@ const SECTION_COUNT = Object.keys(SECTION_TERMS).length
 /**
  * How many sections are on screen when the panel is at rest.
  *
- * The panel shows one stage pane at a time, so this is Source's own count and
- * not all sixty. Asked of the stage index rather than written down, for the
- * reason the mode count is asked of `PANEL_MODES`: a section moved into Source
- * would otherwise collect this number silently.
+ * The panel shows one pane at a time, so this is Terrain's own count and not all
+ * sixty. Asked of the stage index rather than written down, for the reason the
+ * mode count is asked of `PANEL_MODES`: a section moved into Terrain would
+ * otherwise collect this number silently.
  */
-const SOURCE_COUNT = [...STAGE_OF.values()].filter((n) => n === 1).length
+const TERRAIN_COUNT = [...STAGE_OF.values()].filter((n) => n === 1).length
 
 /**
  * How many draw modes there are, asked rather than remembered.
@@ -37,7 +37,7 @@ const MODE_COUNT = PANEL_MODES.length
  */
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('[data-testid="section-terrain"]', { timeout: 30000 })
+  await page.waitForSelector('[data-testid="section-shape"]', { timeout: 30000 })
   await page.waitForTimeout(2500)
   await resetToDefaults(page)
 }
@@ -59,7 +59,7 @@ test.describe('panel', () => {
     await page.waitForTimeout(400)
     // Back to one pane, not to all sixty sections: clearing the field returns
     // the panel to the stage it was on, which is the one it opened on.
-    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(SOURCE_COUNT)
+    await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(TERRAIN_COUNT)
   })
 
   test('a filtered-out section is hidden, not unmounted', async ({ page }) => {
@@ -270,10 +270,17 @@ test.describe('panel', () => {
     // they were switched off, which is a different thing from having nothing
     // to report.
     await openApp(page)
+    await openStage(page, 'output')
     await expect(page.locator('[data-testid="summary-analysis"]')).toHaveCount(0)
     await expect(page.locator('[data-testid="summary-export"]')).toHaveCount(0)
-    // Against a section that is shut at defaults and does have something to
-    // say — silence has to mean "nothing to report", not "readouts are broken".
+
+    // Against a section that is shut and does have something to say — silence
+    // has to mean "nothing to report", not "readouts are broken". Levels is the
+    // control, and it has to be shut first: it opens at defaults now, beside
+    // Shape, because a black point means little without its histogram.
+    await openStage(page, 'terrain')
+    await page.click('[data-testid="section-levels"]')
+    await page.waitForTimeout(300)
     await expect(page.locator('[data-testid="summary-levels"]')).toHaveText('0 – 255')
   })
 
@@ -300,6 +307,10 @@ test.describe('panel', () => {
     // The switch is in Frame and the readout is in Output, which is the whole
     // point of the assertion — and now also two clicks of the rail.
     await openStage(page, 'frame')
+    // Paper is shut at defaults: it was the second half of `View`, which opened
+    // because its camera half is the one you reach for. A sheet is not.
+    await page.click('[data-testid="section-paper"]')
+    await page.waitForTimeout(300)
     await page.locator('input[type=checkbox][aria-label="Paper frame"]').click()
     await page.waitForTimeout(600)
     await openStage(page, 'output')
@@ -432,7 +443,7 @@ test.describe('panel', () => {
 
     const clipped = []
     let measured = 0
-    for (const stage of ['source', 'surface', 'marks', 'overlay', 'frame', 'output']) {
+    for (const stage of ['presets', 'terrain', 'surface', 'marks', 'overlay', 'frame', 'output']) {
       await openStage(page, stage)
       // Shut everything, which is the state a readout appears in.
       await page.evaluate(() => {
@@ -513,23 +524,27 @@ test.describe('panel', () => {
 
     const stages = order.filter((t) => t.startsWith('stage-'))
     expect(stages).toEqual([
-      'stage-source', 'stage-surface', 'stage-marks',
+      'stage-presets', 'stage-terrain', 'stage-surface', 'stage-marks',
       'stage-overlay', 'stage-frame', 'stage-output',
     ])
 
     const at = (t) => order.indexOf(t)
-    // Presets is inside Source now. The load block and the preset grid were the
-    // top of the body, and with one pane on screen at a time the top of the body
-    // had to become the top of some pane — Source, which is the one a drawing
-    // starts in and the one the panel opens on.
-    expect(at('section-presets')).toBeGreaterThan(at('stage-source'))
-    expect(at('section-presets')).toBeLessThan(at('stage-surface'))
+    // Presets has a destination of its own, named for the one section it holds.
+    // It writes style, particles and view in one act, so it belongs to every
+    // pane downstream and to none of them.
+    expect(at('section-presets')).toBeGreaterThan(at('stage-presets'))
+    expect(at('section-presets')).toBeLessThan(at('stage-terrain'))
     // Source: the two operations that were filed at the far end are in it.
-    expect(at('section-hydraulic-erosion')).toBeGreaterThan(at('stage-source'))
+    expect(at('section-hydraulic-erosion')).toBeGreaterThan(at('stage-terrain'))
     expect(at('section-soundscapes')).toBeLessThan(at('stage-surface'))
     // Frame: the camera and the mirror, together, after the thing they frame.
-    expect(at('section-view')).toBeGreaterThan(at('stage-frame'))
+    // `View` split: the camera half joined Camera, the page half became Paper.
+    expect(at('section-camera')).toBeGreaterThan(at('stage-frame'))
+    expect(at('section-paper')).toBeGreaterThan(at('section-camera'))
     expect(at('section-mirror')).toBeLessThan(at('stage-output'))
+    // Satellite is a drape, so it sits in Surface with the other surface tones.
+    expect(at('section-satellite')).toBeGreaterThan(at('stage-surface'))
+    expect(at('section-satellite')).toBeLessThan(at('stage-marks'))
     expect(at('section-draw-modes')).toBeGreaterThan(at('stage-marks'))
   })
 
@@ -548,13 +563,13 @@ test.describe('panel', () => {
                         n.getBoundingClientRect().height > 0)
         .map((n) => n.dataset.testid))
 
-    expect(await shownStages()).toEqual(['stage-source'])
+    expect(await shownStages()).toEqual(['stage-terrain'])
     await openStage(page, 'frame')
     expect(await shownStages()).toEqual(['stage-frame'])
 
     // Hidden, never unmounted: all six rules are still in the tree.
     await expect(page.locator('[data-testid^="stage-"]'))
-      .toHaveCount(6 + 6 + 1)   // six rules, six tabs, the rail itself
+      .toHaveCount(7 + 7 + 1)   // seven rules, seven tabs, the rail itself
 
     // A search is flat and crosses every pane, so there are no rules at all
     // while one is typed — a stage heading over none of its own sections is

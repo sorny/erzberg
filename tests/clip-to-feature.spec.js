@@ -88,6 +88,9 @@ async function boot(page) {
   await page.click('[data-testid="osm-fetch"]')
   await page.waitForSelector('[data-section="Vector Layers"] >> text=Boundary', { timeout: 20_000 })
   await page.fill('[data-testid="panel-filter"]', '')
+  // Back to Terrain: the load block, and Edit heightmap with it, is at the top
+  // of that pane and hidden while Overlay is on screen.
+  await openStage(page, 'terrain')
   await page.click('[data-testid="edit-heightmap"]')
   await expect(page.locator('[data-testid="edit-panel"]')).toBeVisible()
 }

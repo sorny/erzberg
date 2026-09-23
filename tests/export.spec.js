@@ -17,7 +17,7 @@
 import { test, expect } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, setMark, waitForApp } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 
@@ -43,11 +43,11 @@ test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 const TILT_DEG = 50
 
 /**
- * The Tilt slider lives in the View section, which is open by default.
- * min/max alone would also match the two hatch-angle sliders; the 0.1 step is
- * what makes this selector unambiguous.
+ * Tilt is Camera's, in the Frame pane. min/max alone would also match the two
+ * hatch-angle sliders; the 0.1 step is what makes this selector unambiguous.
  */
 async function setTilt(page, deg = TILT_DEG) {
+  await openStage(page, 'frame')
   const tilt = page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
   await expect(tilt).toBeVisible({ timeout: 15_000 })
   await tilt.fill(String(deg))
@@ -183,31 +183,12 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
   await resetToDefaults(page)
   await page.waitForTimeout(2500)
 
-  /**
-   * Flips the "Enabled" switch of a sidebar section.
-   *
-   * `openFirst` is passed explicitly rather than detected: a collapsed Section
-   * keeps its children in the DOM at full height, clipped by the parent's
-   * `grid-template-rows: 0fr` and scrolled far below the fold, so the toggle
-   * reports a perfectly normal 18px box and every "is it visible" heuristic says
-   * yes while a click at those coordinates does nothing. On a fresh page the
-   * open state is known, so there is nothing to detect.
-   */
-  const setEnabled = async (title, on, openFirst) => {
-    if (openFirst) {
-      await page.getByText(title, { exact: true }).click()
-      await page.waitForTimeout(500)
-    }
-    const tog = page.locator(`[data-section="${title}"]`)
-      .locator('input[type=checkbox]').first()
-    await tog.scrollIntoViewIfNeeded()
-    await tog.click({ force: true })
-    await expect(tog).toBeChecked({ checked: on })
-  }
-
-  // Stipple only. Mode: Lines is the one draw-mode section open by default.
-  await setEnabled('Mode: Lines', false, false)
-  await setEnabled('Mode: Stipple Dots', true, true)
+  // Stipple only. The pips on the sheet write the same `enabled<Id>` the
+  // sections' own switches do, in one click each and with no drill-in — which
+  // is what this test wanted from `setEnabled`, before a mark's section moved
+  // behind the sheet and reaching that switch became two more clicks.
+  await setMark(page, 'lines', false)
+  await setMark(page, 'stipple-dots', true)
   // A tilt where there is genuinely something behind the mountain to hide.
   await setTilt(page)
   await page.waitForTimeout(3000)
@@ -232,7 +213,16 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
 
   const withoutFill = await dotCount()
 
-  await setEnabled('Hillshade', true, true)
+  // Hillshade is a Surface section, not a mark, so it keeps the section switch —
+  // and the pane has to be on screen for the header click to land.
+  await openStage(page, 'surface')
+  await page.getByText('Hillshade', { exact: true }).click()
+  await page.waitForTimeout(500)
+  const hillshadeTog = page.locator('[data-section="Hillshade"]')
+    .locator('input[type=checkbox]').first()
+  await hillshadeTog.scrollIntoViewIfNeeded()
+  await hillshadeTog.click({ force: true })
+  await expect(hillshadeTog).toBeChecked()
   await page.waitForTimeout(3000)
   const withHillshade = await dotCount()
 
@@ -419,7 +409,9 @@ test('a dashed layer still exports as separate pieces', async ({ page }) => {
   await resetToDefaults(page)
   await setTilt(page)
 
-  // Mode: Lines is the one draw-mode section open by default.
+  // Lines is the mark the baseline leaves drawing, and a mark's controls are
+  // behind the sheet — the Marks pane, then the card on its tile.
+  await openMark(page, 'lines')
   const lines = page.locator('[data-section="Mode: Lines"]')
   await lines.getByRole('button', { name: 'dashed', exact: true }).click()
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())

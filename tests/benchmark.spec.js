@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import path from 'path'
-import { waitForApp } from './helpers.js'
+import { openStage, waitForApp } from './helpers.js'
 
 /**
  * Performance Benchmark — full GeoTIFF workflow:
@@ -104,6 +104,10 @@ test('performance benchmark', async ({ page }) => {
   // ─── PHASE 2: Rotation to 51° ─────────────────────────────────────────────
   console.log('--- Phase 2: Rotation to 51° ---')
 
+  // Rotation belongs to Camera, in the Frame pane. The panel shows one pane at
+  // a time, so the slider is in the DOM and hidden until we go there.
+  await openStage(page, 'frame')
+
   // Target the rotation slider by its unique min="-180" attribute
   const rotSlider = page.locator('input[type="range"][min="-180"]')
   await expect(rotSlider).toBeVisible({ timeout: 15000 })
@@ -125,6 +129,9 @@ test('performance benchmark', async ({ page }) => {
   console.log('--- Phase 3: Fill Enable & Color Update ---')
 
   await page.locator('#hm-panel-body').waitFor({ state: 'visible', timeout: 30000 })
+
+  // Terrain Style is in Surface.
+  await openStage(page, 'surface')
 
   // Ensure "Terrain Style" section is open
   const styleHeader = page.locator('div:has-text("Terrain Style")').last()
@@ -200,5 +207,32 @@ test('performance benchmark', async ({ page }) => {
   console.log(`Rotation 51°:     ${rotTime}ms`)
   console.log(`Color Reactivity: ${reactivityTime}ms`)
   console.log(`Full Reset:       ${resetTime}ms`)
-  expect(resetTime).toBeLessThan(10000)
+
+  /*
+   * A smoke gate, not a performance budget — and the difference matters.
+   *
+   * Four of these five numbers were measured and thrown away: the spec printed
+   * them and asserted nothing, so anything short of a ten-second reset shipped
+   * silently. The ceilings below are what they are because this runs on
+   * whatever machine happens to have it, and an absolute figure is the only
+   * thing that survives that. They catch "this became unusable". They will not
+   * catch "this got 30% slower".
+   *
+   * Measured on a 2026 laptop, under load, against the 8 MB benchmark.tif:
+   *
+   *     parse 69–119 ms · display 226–268 ms · rotation 44 ms
+   *     colour 76 ms    · reset 66 ms
+   *
+   * Keep that list current when you change any of them. A ceiling with no
+   * recorded baseline beside it is a number nobody can ever justify moving.
+   *
+   * Rotation and colour are render-side parameters: they change a uniform and
+   * must never wait on a geometry rebuild. A second is the point where a drag
+   * stops feeling attached to the mouse, so that is where their line sits.
+   */
+  expect(parseTime,      'parsing an 8 MB GeoTIFF').toBeLessThan(2000)
+  expect(totalDisplayTime, 'GeoTIFF to first pixels').toBeLessThan(4000)
+  expect(rotTime,        'rotation is render-side and must not rebuild').toBeLessThan(1000)
+  expect(reactivityTime, 'a colour change is render-side too').toBeLessThan(1500)
+  expect(resetTime,      'Reset all, which may rebuild the geometry').toBeLessThan(10000)
 })

@@ -30,8 +30,8 @@ async function setColor(locator, value) {
  * caller reaching into another pane passes its name — a section in a pane you
  * are not on is in the DOM and hidden, and a click on it does nothing.
  */
-async function open(page, testId, stage = 'surface') {
-  await openStage(page, stage)
+async function open(page, testId, stage) {
+  await openStage(page, stage ?? 'surface')
   const section = page.locator(`[data-testid="${testId}"]`)
   await section.scrollIntoViewIfNeeded()
   if ((await section.getAttribute('aria-expanded')) !== 'true') {

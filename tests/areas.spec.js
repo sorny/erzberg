@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 /**
  * What the three blocking colour modes put in an SVG.
@@ -36,6 +36,7 @@ async function boot(page) {
   await page.waitForSelector('text=Grid:', { timeout: 30_000 })
   await resetToDefaults(page)
   // A tilt, so the depth buffer has something to hide.
+  await openStage(page, 'frame')   // Tilt is Camera's
   await page.locator('input[type="range"][min="0"][max="180"][step="0.1"]').first()
     .evaluate((el) => {
       const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
@@ -46,6 +47,9 @@ async function boot(page) {
 }
 
 async function exportSvg(page) {
+  // The export buttons are in Output, and a spec that has been switching
+  // modes is on another pane. Nothing in a hidden pane is clickable.
+  await openStage(page, 'output')
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 180_000 }),
     page.click('[data-testid="export-svg"]'),

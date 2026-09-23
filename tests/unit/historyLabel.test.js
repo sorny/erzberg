@@ -29,7 +29,7 @@ const label = (over) => describeChange(snap(), snap(over), KEYS)
 describe('describeChange', () => {
   it('names the section a single change belongs to', () => {
     expect(label({ style: { hillshadeAzimuth: 120 } })).toBe('Hillshade')
-    expect(label({ terrain: { blurRadius: 9 } })).toBe('Terrain')
+    expect(label({ terrain: { blurRadius: 9 } })).toBe('Shape')
     expect(label({ view: { fov: 30 } })).toBe('Camera')
   })
 

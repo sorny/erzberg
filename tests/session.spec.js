@@ -17,13 +17,13 @@ const session = (page) => page.evaluate((k) => localStorage.getItem(k), KEY)
 
 async function openApp(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('[data-testid="section-terrain"]', { timeout: 30000 })
+  await page.waitForSelector('[data-testid="section-shape"]', { timeout: 30000 })
   await page.waitForTimeout(2500)
 }
 
 async function reload(page) {
   await page.reload()
-  await page.waitForSelector('[data-testid="section-terrain"]', { timeout: 30000 })
+  await page.waitForSelector('[data-testid="section-shape"]', { timeout: 30000 })
   await page.waitForTimeout(2500)
 }
 
@@ -51,7 +51,7 @@ test('auto-rotate does not starve the write', async ({ page }) => {
   await openStage(page, 'frame')   // Auto-rotate is in View
   await page.locator('input[type=checkbox][aria-label="Auto-rotate"]').click()
   await page.waitForTimeout(500)
-  await openStage(page, 'source')   // Blur is in Terrain
+  await openStage(page, 'terrain')   // Blur is in Terrain
   await page.locator('input.hmval[aria-label="Blur value"]').fill('5')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(3000)

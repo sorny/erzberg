@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { waitForApp } from './helpers.js'
+import { openStage, waitForApp } from './helpers.js'
 
 test('rotation remains responsive during resolution change', async ({ page }) => {
   await page.goto('http://localhost:5173')
@@ -22,6 +22,11 @@ test('rotation remains responsive during resolution change', async ({ page }) =>
   console.log('Resolution changed to 1. Heavy worker task triggered.')
 
   await page.waitForTimeout(200)
+
+  // Resolution is Shape's, in the pane the panel opens on. Rotation is
+  // Camera's, in Frame — and the point of this test is that the rail click and
+  // the fill happen while the worker is still busy with that resolution.
+  await openStage(page, 'frame')
 
   const start = Date.now()
   await rotSlider.fill('-71')

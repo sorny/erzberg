@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { resetToDefaults } from './helpers.js'
+import { openMark, resetToDefaults, setMark } from './helpers.js'
 import { screenInkHex } from '../src/utils/svgExport.js'
 
 /**
@@ -21,19 +21,15 @@ async function contoursOnly(page) {
   await page.goto(PAGE)
   await page.waitForSelector('text=Grid:', { timeout: 30_000 })
   await resetToDefaults(page)
-  const setMode = async (title, on) => {
-    const row = page.locator(`[data-section="${title}"]`)
-    // The section's own enable switch. Named as the checkbox rather than as
-    // "the first label in the row": the first label is now the toggle's text,
-    // which no longer wraps the input.
-    const tog = row.locator('input[type=checkbox]').first()
-    await tog.scrollIntoViewIfNeeded()
-    if ((await tog.isChecked()) !== on) await tog.click({ force: true })
-  }
-  await setMode('Mode: Lines', false)
-  await page.getByText('Mode: Contours', { exact: true }).click()
-  await page.waitForTimeout(400)
-  await setMode('Mode: Contours', true)
+  // The pip on the sheet, which writes the same `enabled<Id>` the section's own
+  // switch does. A mark's section is behind the sheet now, so reaching in for
+  // that checkbox means the Marks pane and a drill-in for every toggle.
+  await setMark(page, 'lines', false)
+  await setMark(page, 'contours', true)
+  // Every test here then works Contours' own controls — the label switch, the
+  // face, the ink — so the helper drills in rather than leaving each of them
+  // to remember. `setMark` works the pip and stays on the sheet by design.
+  await openMark(page, 'contours')
   await page.waitForTimeout(2000)
 }
 
@@ -268,6 +264,9 @@ test('labels carry their own ink, and follow the contours until they do', async 
   expect(inkOf(await exportSvg(page), 'Contours-Labels'),
     'the numbers start out in the contour colour').toBe('#000000')
 
+  // The label colour is Contours' own control, and a mark's controls are
+  // behind the sheet — the Marks pane, then the card on its tile.
+  await openMark(page, 'contours')
   const well = page.locator('[data-testid="contour-label-color"]')
   await expect(well).toBeVisible()
   await well.fill('#cc0000')

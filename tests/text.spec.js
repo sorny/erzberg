@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { readFileSync } from 'node:fs'
-import { resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults } from './helpers.js'
 
 /**
  * Free text placed in the scene.
@@ -17,6 +17,7 @@ async function boot(page) {
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=Grid:', { timeout: 30000 })
   await resetToDefaults(page)
+  await openStage(page, 'overlay')   // the Text section is in Overlay
   await page.getByText('Text', { exact: true }).first().click()
   await page.waitForTimeout(400)
 }

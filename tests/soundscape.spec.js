@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
-import { resetToDefaults, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, waitForApp } from './helpers.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 // 6 s mono MP3: exponential 120 Hz→8 kHz sweep + steady 300 Hz drone + 1.5 kHz
@@ -22,11 +22,22 @@ async function openSoundscapes(page) {
 // The Presets section ships collapsed, and a collapsed Section keeps its
 // children mounted inside a 0fr grid row — so the buttons exist but have no
 // height and are unclickable until the header is toggled.
-async function openPresets(page) {
+/**
+ * Applies a preset, and leaves the panel where it found it.
+ *
+ * Presets is a destination of its own above the pipeline, so applying one means
+ * going there. Every caller here then carries on with the transport, which is
+ * Soundscapes' and lives in Terrain — so this hands the panel back rather than
+ * leaving each test to remember.
+ */
+async function applyPreset(page, name) {
+  await openStage(page, 'presets')
   // Idempotent — the section ships open, so an unconditional click closes it.
   const header = page.locator('[data-testid="section-presets"]')
   if ((await header.getAttribute('aria-expanded')) !== 'true') await header.click()
   await page.waitForTimeout(300)
+  await page.click(`[data-testid="preset-${name}"]`)
+  await openStage(page, 'terrain')
 }
 
 async function uploadTrack(page) {
@@ -139,8 +150,7 @@ test('heavy preset streams without latching the computing overlay', async ({ pag
 
   // Ink Atlas is the heaviest bundled preset: contours at interval 1 plus
   // sub-cell stipple, ~450k segments per rebuild at the 512×512 default.
-  await openPresets(page)
-  await page.click('[data-testid="preset-Ink Atlas"]')
+  await applyPreset(page, 'Ink Atlas')
   await page.waitForTimeout(2000)
 
   const overlay = page.locator('[data-testid="loading-overlay"]')
@@ -180,10 +190,11 @@ test('contours with close-rings and smoothing keep streaming', async ({ page }) 
   // Ink Atlas already enables Contours (at interval 1), so only the two
   // chain-path options need toggling. Both used to stringify a Map key per
   // endpoint and unshift() chains into quadratic time.
-  await openPresets(page)
-  await page.click('[data-testid="preset-Ink Atlas"]')
+  await applyPreset(page, 'Ink Atlas')
   await page.waitForTimeout(1500)
-  await page.locator('text=MODE: CONTOURS').click()
+  // Contours' own controls, which are behind the sheet: the Marks pane, then
+  // the card on its tile.
+  await openMark(page, 'contours')
   await page.waitForTimeout(500)
 
   // "Close contours" is a unique label; Tog renders <span>label</span> next to
@@ -194,6 +205,10 @@ test('contours with close-rings and smoothing keep streaming', async ({ page }) 
   // Smoothing is the only 0..4 step-1 slider in the panel.
   await page.locator('input[type="range"][min="0"][max="4"][step="1"]').fill('3')
   await page.waitForTimeout(2000)
+
+  // Back to Terrain: the transport is Soundscapes', and the drill-in above left
+  // the panel in Marks.
+  await openStage(page, 'terrain')
 
   const overlay = page.locator('[data-testid="loading-overlay"]')
   times.length = 0

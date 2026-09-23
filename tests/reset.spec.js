@@ -30,6 +30,7 @@ async function boot(page) {
 
 test('a reset clears the text, and Undo brings it back', async ({ page }) => {
   await boot(page)
+  await openStage(page, 'overlay')   // the Text section is in Overlay
   await page.getByText('Text', { exact: true }).first().click()
   await page.waitForTimeout(300)
   await page.locator('[data-testid="text-add"]').click()
@@ -44,6 +45,7 @@ test('a reset clears the text, and Undo brings it back', async ({ page }) => {
   await page.locator('[data-testid="toast-action"]').click()
   await page.waitForTimeout(900)
   await expect(textRows(page), 'Undo puts it back').toHaveCount(1)
+  await openStage(page, 'overlay')   // the Text section is in Overlay
   await page.getByText('Text', { exact: true }).first().click()
   await page.waitForTimeout(300)
   await expect(page.locator('[data-testid^="text-body-"]').first()).toHaveValue('ERZBERG')
