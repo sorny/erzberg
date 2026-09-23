@@ -30,6 +30,7 @@
  */
 
 import { formatClock } from '../../utils/solar'
+import { PAPERS } from '../../utils/frame'
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 /** The panel writes 4 as `4` and 0.5 as `0.5`, never as `4.0`. */
@@ -40,6 +41,16 @@ const OFF = '—'
 
 /** `on ? value : OFF`, so the call sites below read as one line each. */
 const when = (on, value) => (on ? value : OFF)
+
+/**
+ * A sheet's name, short enough for a header.
+ *
+ * Derived from the one table rather than copied: `ISO A / B / C` is the picker's
+ * label and every A size draws the same rectangle, so the first term names the
+ * shape and the rest is the picker explaining itself. A second table of short
+ * names here would be a copy that drifts the first time a paper is added.
+ */
+const paperName = (id) => (PAPERS[id]?.label ?? 'custom').split('/')[0].trim()
 
 /**
  * The draw modes, in panel order.
@@ -166,7 +177,7 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [],
 /**
  * The sections that say nothing, and why each one is silent.
  *
- * Export, Analysis, Hydraulic Erosion and Fetch Terrain are actions rather than
+ * Export, Analysis, Hydraulic Erosion and Fetch are actions rather than
  * settings: they hold nothing that survives being closed. Presets is the one deliberate
  * omission — the applied style already has a permanent line at the top of the
  * panel, above the filter, and a header that repeats it costs a row and adds no
@@ -176,7 +187,7 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [],
  * both directions. Without the list, "every section has a summary" could only be
  * asserted by hard-coding a number, which is what went stale last time.
  */
-export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis', 'Fetch Terrain']
+export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis', 'Fetch']
 
 /**
  * Build the whole map, keyed by section title.
@@ -210,7 +221,7 @@ export function buildSectionSummaries({
   // Raw terrain view replaces the resolution rather than joining it: it bypasses
   // every draw mode, so the stride it would have used is not what you are
   // looking at.
-  out['Terrain'] = view.showRawTerrain
+  out['Shape'] = view.showRawTerrain
     ? 'raw'
     : `res ${num(terrain.resolution ?? 1)}` +
       (terrain.elevScale ? ` · ${terrain.elevScale > 0 ? '+' : ''}${terrain.elevScale.toFixed(1)}` : '')
@@ -275,10 +286,16 @@ export function buildSectionSummaries({
   out['Texture'] = when(style.showTexture, pct(style.textureOpacity))
 
   // ── Frame ─────────────────────────────────────────────────────────────────
-  out['View'] = `${deg(view.tilt)} · ${Math.round(zoomPercent)}%` +
-    (view.showFrame ? ' · frame' : '')
-  out['Camera'] = (view.orthographic ? 'ortho' : `${Math.round(view.fov ?? 60)} mm`) +
+  // The camera in one line: where it is pointing, and what lens it is using.
+  // Tilt and zoom first because they are what a hand moves; the lens follows
+  // only when it is not the default perspective.
+  out['Camera'] = `${deg(view.tilt)} · ${Math.round(zoomPercent)}%` +
+    (view.orthographic ? ' · ortho' : '') +
     (view.panX || view.panY || view.panZ ? ' · panned' : '')
+  // Paper is off until the frame is drawn, so it takes the dash like any other
+  // switchable section. The sheet's own name is the fact worth carrying.
+  out['Paper'] = when(view.showFrame,
+    `${paperName(view.framePaper ?? 'iso')} ${view.frameLandscape ? 'land' : 'port'}`)
   // The three plus axes are the terrain as loaded, so only a minus axis is a
   // mirror. Naming them beats counting them — which side it was thrown to is the
   // whole question.

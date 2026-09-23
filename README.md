@@ -41,7 +41,7 @@ origin.
 
 Three features contact a server, and only when you press their button. *Vector
 Layers* asks OpenStreetMap for roads and rivers inside the raster's extent.
-*Fetch Terrain* asks a geocoder for a place, then asks a tile host for the ground
+*Fetch* asks a geocoder for a place, then asks a tile host for the ground
 under it. *Satellite* asks an open archive for a Sentinel-2 scene over that same
 extent. Each sends a place name or a bounding box. None sends a file, and none
 needs an account or a key. If you use none of them, the app opens no connection
@@ -148,7 +148,7 @@ setting on the right. Hillshade reads `315° · 60%`. Terrain Style reads
 `hypso · mesh`. A section that is switched off reads `—`, which the eye skips, and a section
 that is on carries a green dot beside its name.
 Close every section in a stage and that stage states itself in one short column:
-Source is about 290 px, Surface 180, Overlay 145, Frame 180, and Output is two
+Terrain is about 330 px, Surface 215, Overlay 145, Frame 215, and Output is two
 sections. Export, Analysis and Hydraulic Erosion stay blank on purpose. They are
 actions and hold no setting, and a dash there would claim that they were
 switched off. Rest the pointer on a readout to read the name of the control that
@@ -165,11 +165,16 @@ writes the full canvas*, or *SVG cuts at the frame ↑*. The export cuts at the
 paper frame rather than hiding what falls outside it, so a switch two stages
 away in Frame decides what you get.
 
-**The rail is the pipeline.** Six tabs run down the panel's edge — *Source,
+**The rail is the pipeline.** Six tabs run down the panel's edge — *Terrain,
 Surface, Marks, Overlay, Frame, Output* — and the body shows one of them at a
 time. Every section belongs to one stage, and the order is the order the
 renderer runs. This is what makes a control findable before you know where it
-is. Jitter changes the source, so jitter is in Source.
+is. Jitter changes the ground, so jitter is in Terrain.
+
+Above them, set apart by a heavier rule, is a seventh slot: **Presets**. It
+writes style, particles and view in one act, so it belongs to every pane
+downstream and to none of them. A lozenge rather than a number, because it is
+somewhere you go and not a step the renderer runs.
 
 The rail exists because the six stages put the pipeline's *order* on screen but
 not its *proportion*. Marks is 35 of the 60 sections, so every trip from Terrain
@@ -186,10 +191,18 @@ The panel is 312 px wide: 40 for the rail and 272 for the controls, which is the
 width they have always had. The rail is navigation rather than control, so it is
 paid for out of the window instead of out of the sliders.
 
-**Thirty-four modes on one screen.** The Marks stage is a sheet of the
-thirty-four marks themselves — the same glyphs the section headers carry, three
-across, each with its name. It replaces the thirty-four headers that used to
-stand for them, and it is the way into any one of them.
+**Thirty-four modes on one screen, in six families.** The Marks stage is a sheet
+of the thirty-four marks themselves — the same glyphs the section headers carry,
+three across, each with its name. It replaces the thirty-four headers that used
+to stand for them, and it is the way into any one of them.
+
+The families are the ideas already in the marks, named at last: **Line**, where
+the pen leaves the paper and comes back. **Tone**, where many small marks add up
+to a grey. **Relief**, the ground given thickness. **Plate**, colour rather than
+mark-making. **Light**, a lamp or a sun or a year of one. And **Momentum**,
+where something with mass went down the slope — Fall Line, Berms, Air and Race
+Line are one idea, and they used to sit among thirty-three unrelated
+neighbours.
 
 A tile carries two things, and they are shaped differently on purpose:
 
@@ -216,7 +229,7 @@ tile reads and writes one boolean and does nothing else.
 | **Audio** | MP3, WAV, OGG or M4A. The app analyses the file into a spectrogram that drives the terrain. |
 | **GPX** | The app drapes the track line over a georeferenced raster. |
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
-| **Fetch Terrain** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
+| **Fetch** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 | **Satellite** | True-colour Sentinel-2 over the extent of the raster, at 10 m, from AWS Open Data. It drapes on the terrain and backs the Mask Studio. No account, no key, and nothing happens until you press Fetch. |
 | **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one, or cut one from loaded features. See [Masks](#masks). |
@@ -419,7 +432,7 @@ way one of these arrives.
 Sentinel-2 for the extent on screen, at 10 m. It drapes on the terrain and backs
 the Studio. Unlike the cover plates this one is a button rather than a script,
 because Sentinel-2 on AWS answers CORS where AlphaEarth's bucket does not — same
-terms as Fetch Terrain: no key, no account, nothing until you press it.
+terms as Fetch: no key, no account, nothing until you press it.
 
 The default search asks for the growing season of the last three years and sorts
 *that* by cloud. Cloud alone picks a snowy winter scene, which is a beautiful

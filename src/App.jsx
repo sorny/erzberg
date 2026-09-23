@@ -939,7 +939,7 @@ export default function App() {
    */
   const fetchSatellite = useCallback(async () => {
     if (!geoTiffBbox || !geoTiffCRS) {
-      showError('Satellite imagery needs a georeferenced raster — a GeoTIFF, or Fetch Terrain.')
+      showError('Satellite imagery needs a georeferenced raster — a GeoTIFF, or one from Terrain → Fetch.')
       return
     }
     const wgs = searchBboxFor(geoTiffBbox, geoTiffCRS)

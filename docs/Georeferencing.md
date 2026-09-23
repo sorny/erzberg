@@ -680,7 +680,7 @@ Every session used to begin with a problem the app did not help with: finding a
 heightmap. The app would fetch roads, rivers, rail and peaks for an extent. It
 would not fetch the ground under them.
 
-*Fetch Terrain*, in the Source stage, closes that gap with two requests.
+*Fetch*, in the Terrain stage, closes that gap with two requests.
 
 **The place.** OpenStreetMap's Nominatim geocoder turns a typed name into a
 bounding box. The request runs on submit, never on a keystroke. The usage policy

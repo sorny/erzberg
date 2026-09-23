@@ -46,7 +46,7 @@ export const MODE_ID = new Map(PANEL_MODES.map(([title, enabled]) => [title, ena
  * so it is a prefix rule and not a search.
  */
 export const SECTION_PARAMS = {
-  'Terrain': ['resolution', 'elevScale', 'blurRadius', 'gridOffsetX', 'gridOffsetY',
+  'Shape': ['resolution', 'elevScale', 'blurRadius', 'gridOffsetX', 'gridOffsetY',
     'elevMinCut', 'elevMaxCut', 'jitterAmt', 'showRawTerrain'],
   'Levels': ['blackPoint', 'whitePoint'],
   'Terrain Style': ['showFill', 'fillColor', 'fillHypsometric', 'fillBanded',
@@ -63,10 +63,13 @@ export const SECTION_PARAMS = {
   'Mirror': [/^showMirror/],
   'Particles': ['showPoints', 'pointColor', 'pointSize', 'pointOpacity',
     'particleMode', 'particleSpacing', 'animateParticles', /^holo/, /^flock/],
-  'View': ['tilt', 'rotation', 'zoom', 'renderScale', 'showGuides',
-    /^autoRotate/, 'showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
+  // `View` split in two. Everything that aims the camera is Camera's, and
+  // everything that describes the sheet is Paper's — the two subjects the one
+  // section used to carry between them.
+  'Camera': ['tilt', 'rotation', 'zoom', 'renderScale', 'showGuides', /^autoRotate/,
+    'fov', 'orthographic', 'panX', 'panY', 'panZ'],
+  'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
-  'Camera': ['fov', 'orthographic', 'panX', 'panY', 'panZ'],
   'Anaglyph': [/^anaglyph/],
   'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
   'Export': ['plotWidthMm', 'plotPenOrder'],
@@ -94,7 +97,7 @@ export const ALSO_READS = {
   'Scale and North': ['orthographic', 'plotWidthMm', 'tilt'],
   'Texture': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],
-  'View': ['resolution'],
+  'Camera': ['resolution'],
   'Text': ['fillColor', 'resolution', 'tilt'],
   'Particles': ['hillshadeAzimuth', 'hillshadeAltitude'],
   'Mode: Sun Hours': ['elevScale', 'resolution'],
@@ -125,7 +128,7 @@ export const MODE_READS = ['gradientStops']
  *
  * The mode suffix and the table above, unioned — a mode can appear in both, and
  * Pillars, Stipple and Contours do. Returns an empty array for a section with no
- * settings of its own: Presets, Analysis, Fetch Terrain and Hydraulic Erosion
+ * settings of its own: Presets, Analysis, Fetch and Hydraulic Erosion
  * are actions, and there is nothing there to put back.
  */
 export function paramsForSection(title, allKeys) {

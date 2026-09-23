@@ -648,19 +648,44 @@ Then name the stage that holds it, in `STATED` in `panel/stages.js`. The panel
 shows one stage at a time, so this is what puts the section in a pane. A section
 left out of that index renders in no pane at all, which is a control that exists
 and cannot be reached. A draw mode needs no entry: `PANEL_MODES` already lists
-the modes, and every one of them is in Marks.
+the modes, and every one of them is in Marks — but it does need a family, in
+`panel/markFamilies.js`, or it vanishes from the sheet.
 
-Four indexes now describe the panel, and each answers a different question:
+Five indexes now describe the panel, and each answers a different question:
 
 | File | Answers |
 |---|---|
 | `panel/sectionTerms.js` | what the section answers to in the filter |
 | `panel/sectionSummary.js` | what it says while it is shut |
 | `panel/sectionParams.js` | what a reset of it puts back |
-| `panel/stages.js` | which of the six panes holds it |
+| `panel/stages.js` | which of the seven destinations holds it |
+| `panel/markFamilies.js` | what kind of mark it is |
 
-All four are leaf modules with no React import, so the specs can assert them
-against one another without pulling three.js in behind them.
+All five are leaf modules with no React import, so the specs can assert them
+against one another without pulling three.js in behind them. The last one is the
+only judgement in the set: nothing in the code knows that Berms and Air are the
+same idea, so the unit suite checks the one thing it can — that the families
+cover every mark exactly once.
+
+**Keep parameter names out of a comment above a `<Section>` tag.**
+`sectionParams.test.js` scopes a section from its own tag to the next one, so a
+comment written above a header is credited to the section before it. A comment
+introducing the Camera section used the words `zoom` and `orthographic` and
+failed the drift check for Texture, four hundred lines away.
+
+### A spec that reaches a control
+
+The panel shows one pane at a time, so a control outside the opening pane is in
+the DOM and hidden. `tests/helpers.js` carries `openStage(page, name)`,
+`openMark(page, mark)` and `setMark(page, mark, on)`.
+
+Grepping the specs for `section-…` finds only the ones that navigate by section.
+A spec that reaches a control by its own test id — `export-svg`, `surprise-me` —
+is invisible to that search, and five spec files stayed red for a release
+because of it. The reliable check reads the test id → section map out of
+`Sidebar.jsx`, joins it to `stages.js` and reports any spec touching a control in
+a pane it never selects. Exclude the load block and the stats line: both sit
+outside every section and are always on screen.
 
 ### A surface overlay
 

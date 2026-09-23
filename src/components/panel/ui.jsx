@@ -9,7 +9,7 @@
  */
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { PanelStage, SectionFilter, sectionMatches } from './filter'
-import { STAGES } from './stages'
+import { PRESETS_STAGE, STAGES } from './stages'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 /**
@@ -859,8 +859,11 @@ export function Stage({ n, title, children }) {
         display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
         background: BG, borderTop:`1px solid ${BORDER}`, borderBottom:`2px solid ${BORDER}`,
       }}>
+        {/* The lozenge again, for the reason the rail carries one: Presets is a
+            destination and not a step, and `00` in the pipeline's own column
+            would say it was the step before Ground. */}
         <span style={{ fontSize:9, fontWeight:700, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
-          {String(n).padStart(2, '0')}
+          {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
         </span>
         <span style={{ fontSize:10, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: DIM }}>
           {title}
@@ -929,7 +932,9 @@ export function StageRail({ stage, onStage, live, hits }) {
               : `${title}${count > 0 ? ` — ${count} on` : ''}`}
             style={{
               position:'relative', padding:'11px 0 12px', border:'none',
-              borderBottom:`1px solid ${BORDER}`,
+              // The heavier rule under Presets is the one piece of furniture
+              // that says the pipeline starts below it.
+              borderBottom: n === PRESETS_STAGE ? `2px solid ${BORDER}` : `1px solid ${BORDER}`,
               background: sel ? SURF : 'none',
               // The selected tab is marked on the edge it shares with the body,
               // so the rail reads as a set of tabs handing over to one pane
@@ -946,8 +951,11 @@ export function StageRail({ stage, onStage, live, hits }) {
                 ran under the badge — `02` and a green `2` on top of each other,
                 which is two counts pretending to be one. */}
             <span style={{ display:'block', paddingRight:11 }}>
+              {/* A lozenge, not `00`. Presets is a destination and not a step
+                  the renderer runs, and a digit in the pipeline's own column
+                  would claim it was one. */}
               <span style={{ display:'block', fontSize:9, fontWeight:700, fontVariantNumeric:'tabular-nums' }}>
-                {String(n).padStart(2, '0')}
+                {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
               </span>
               <span style={{ display:'block', fontSize:8, letterSpacing:'0.06em', textTransform:'uppercase', marginTop:3 }}>
                 {short}

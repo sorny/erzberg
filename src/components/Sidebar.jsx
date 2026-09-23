@@ -1,20 +1,17 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useContext, Fragment } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import { HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
-import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, metresPerWorldUnit, wgs84ExtentKm } from '../utils/geoCoords'
-import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES, OSM_DETAIL_LABEL, detailTierFor } from '../utils/osmCategories'
-import { OSM_ATTRIBUTION, fetchOsm } from '../utils/osmFetch'
-import { featureLabel, toggleHidden } from '../utils/vectorLayers'
+import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '../utils/geoCoords'
+
 import { useFeaturePick } from './panel/FeaturePicker'
-import { CANCELLED } from '../utils/pacing'
-import { iconUrl, loadIconManifest } from '../utils/iconCatalogue'
+
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
 import { GROUP_OF } from '../params'
@@ -32,20 +29,18 @@ import { isDarkBackground } from '../utils/colorUtils'
 import { plotEstimate } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { SpectrogramView } from './SpectrogramView'
-import {
-  ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W,
-  ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage,
-  StageRail, GripIcon, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn,
-} from './panel/ui'
-import { ALWAYS_VALUED, FIRST_STAGE, stageOf } from './panel/stages'
+import { ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W, ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage, StageRail, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn } from './panel/ui'
+import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
-import { useStackDrag } from './panel/stackDrag'
+
 import { TextSection } from './panel/TextSection'
 import { CoverMap } from './panel/CoverMap'
 import { CoverPlate, PaintedMasks, PanelStage, SectionFilter, sectionMatches } from './panel/filter'
-import { ALL_CLASSES, describeMask, maskHasClass, toggleClass } from '../utils/coverPlate'
-import { MAX_MASKS, NO_MASKS, describeSelection, maskCoverage, selectionHasMask, toggleMaskSelection } from '../utils/maskLayers'
+
+import { MAX_MASKS, maskCoverage } from '../utils/maskLayers'
 import { modifiedSections } from './panel/sectionParams'
+import { ModeStyleOverride } from './panel/ModeStyleOverride'
+import { VectorLayersPanel } from './panel/VectorLayersPanel'
 
 /** Every tweakable key, from the one index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
@@ -100,637 +95,6 @@ function fmtTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/**
- * Why the vector layers are not on the terrain, when they are not.
- *
- * Everything this reports used to look identical on screen: an unsupported
- * projection, a track from another valley and a raster with no georeferencing at
- * all each ended as points silently dropped for being out of bounds. They need
- * different fixes, so they get different sentences — and the ones the user can
- * fix by reprojecting get the command that does it.
- */
-function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploadsOnly }) {
-  const c = classifyCRS(crs)
-  const status = coverage?.status ?? 'empty'
-
-  const note = (color, children) => (
-    <div style={{
-      fontSize: 10, color, lineHeight: 1.5, marginBottom: 4,
-      background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
-      borderRadius: 5, padding: '4px 8px',
-    }}>{children}</div>
-  )
-  const warn = '#f97316'
-  const fix = <><br />Reproject it first: <code style={{ color: DIM }}>gdalwarp -t_srs EPSG:4326 in.tif out.tif</code></>
-
-  if (error) return note('#ef4444', error)
-
-  if (c.kind === 'none')
-    return note(warn, <>This GeoTIFF carries no georeferencing, so features cannot be placed on it.</>)
-
-  if (!c.supported)
-    return note(warn, <>
-      Projection <b>{crsDisplayName(crs, crsName)}</b> is not one this tool can place WGS84 features in.{fix}
-    </>)
-
-  // The asymmetry worth stating: uploads only need the forward projection, but
-  // asking OpenStreetMap what is inside the extent needs the inverse, and the
-  // inverse is the narrower of the two.
-  if (!isInvertible(crs))
-    return note(MUTED, <>
-      This GeoTIFF does not record its projection, so its extent cannot be turned into an
-      OpenStreetMap query. GeoJSON and GPX uploads still work.
-    </>)
-
-  if (!hasFeatures) return null
-
-  if (status === 'outside')
-    return note(warn, <>
-      None of the {coverage.total.toLocaleString()} loaded vertices fall inside this GeoTIFF — the
-      features and the raster cover different areas{c.accuracy === 'guess' ? ', or the assumed UTM zone is wrong' : ''}.
-    </>)
-
-  // Partial coverage means something different depending on where the features
-  // came from. An upload landing half off the raster is a mismatch worth
-  // flagging. An OSM fetch is *defined* by the raster's extent, and Overpass
-  // returns whole ways that cross its edge — so partial is the normal outcome
-  // there, and warning about it would cry wolf on every single fetch.
-  if (status === 'partial' && uploadsOnly)
-    return note(warn, <>
-      {coverage.inside.toLocaleString()} of {coverage.total.toLocaleString()} vertices fall inside
-      the GeoTIFF; the rest are clipped.
-    </>)
-
-  // Placed, but on an assumption worth stating — an inferred zone or an
-  // unapplied datum shift both put the lines tens to hundreds of metres out.
-  if (status === 'ok' && c.accuracy === 'guess')
-    return note(MUTED, <>This GeoTIFF does not record its projection. The UTM zone is inferred, so alignment is approximate.</>)
-  if (status === 'ok' && c.accuracy === 'approx')
-    return note(MUTED, <>{crsDisplayName(crs, crsName)} uses a datum this tool does not shift for; features may sit up to a few hundred metres off.</>)
-
-  return null
-}
-
-/**
- * Choosing an SVG icon for a point layer, and orienting it in 3D.
- *
- * The picker previews each icon with an ordinary `<img>` pointed at the file in
- * `public/icons/` — the same trick the preset tiles use for their thumbnails,
- * and the reason the icons are shipped as files rather than generated into a
- * module.
- *
- * Everything here is render-side: the worker never learns that icons exist, so
- * dragging Size or Tilt is a frame, not a rebuild.
- */
-/**
- * Open eye, or struck through when the layer is hidden.
- *
- * Inline rather than one of the files in `public/icons/` — those are data the
- * user draws *with*, fetched at runtime and flattened into terrain geometry.
- * A control in the panel is not that, and routing it through the icon catalogue
- * would make the chrome depend on the content.
- */
-function EyeIcon({ off }) {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
-      <circle cx="12" cy="12" r="2.6" />
-      {off && <path d="M3.5 3.5 20.5 20.5" />}
-    </svg>
-  )
-}
-
-
-
-/**
- * One mark's ink: stroke colour, width and opacity, then fill colour and
- * opacity behind its own switch.
- *
- * The same block serves the icon and the labels, because they want the same six
- * numbers and want them *separately* — a summit triangle is not the road that
- * shares its colour, and lettering is neither. `prefix` picks which set of
- * fields it writes; `layerStyle` reads them back with the matching cascade.
- *
- * Everything but the width shows the value in force rather than the value
- * stored: a colour left at `null` displays the layer's, so the swatch is never
- * blank and never lies. Touching it writes the field and parts company, which
- * is what **Match layer** undoes.
- */
-/**
- * `noFill` is the single-line label case. A stroke face has no interior — its
- * glyphs are centre lines, not contours — so a fill would triangulate an open
- * path into a smear. The setting is kept on the layer rather than cleared, so
- * switching back to an outline face restores what it was.
- */
-function Ink({ layer, set, prefix, help = {}, noFill = false }) {
-  const id = layer.id
-  const F = (k) => layer[prefix + k]
-  const color = F('Color') ?? layer.color
-  const opacity = F('Opacity') ?? layer.opacity
-  const inherited = ['Color', 'Opacity', 'FillColor', 'FillOpacity'].every((k) => F(k) == null)
-
-  return (
-    <>
-      <ColorRow label="Colour" value={color} testId={`${prefix}-color-${id}`}
-                onChange={(v) => set({ [`${prefix}Color`]: v })} />
-      <InlineSl label="Width" min={0.25} max={8} step={0.25} value={F('Weight')}
-        onChange={(v) => set({ [`${prefix}Weight`]: v })} testId={`${prefix}-weight-${id}`}
-        help={help.weight} />
-      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={opacity}
-        fmt={(v) => Math.round(v * 100) + '%'} testId={`${prefix}-opacity-${id}`}
-        onChange={(v) => set({ [`${prefix}Opacity`]: v })} help={help.opacity} />
-
-      {!noFill && (
-        <div data-testid={`${prefix}-fill-${id}`}>
-          <Tog label="Fill" small checked={F('Fill')}
-            onChange={(v) => set({ [`${prefix}Fill`]: v })} help={help.fill} />
-        </div>
-      )}
-      {F('Fill') && !noFill && (
-        <Sub>
-          {/* Falls back through this mark's *own* stroke colour before the
-              layer's, so colouring the mark colours all of it. */}
-          <ColorRow label="Fill Colour" value={F('FillColor') ?? color}
-                    testId={`${prefix}-fill-color-${id}`}
-                    onChange={(v) => set({ [`${prefix}FillColor`]: v })} />
-          <InlineSl label="Fill Op." min={0} max={1} step={0.01}
-            value={F('FillOpacity') ?? opacity} fmt={(v) => Math.round(v * 100) + '%'}
-            testId={`${prefix}-fill-opacity-${id}`}
-            onChange={(v) => set({ [`${prefix}FillOpacity`]: v })} />
-
-          {/* Only offered with a fill, because that is what makes the
-              difference: a stroke with no shape behind it has no inside to
-              sit in. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
-            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Stroke</span>
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
-                <Btn key={text} block variant="toggle" on={!!F('StrokeOutside') === v}
-                  onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
-                  data-testid={`${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
-                  style={{ padding: '4px 0', fontSize: 10 }}>{text}</Btn>
-              ))}
-            </div>
-          </div>
-        </Sub>
-      )}
-
-      {!inherited && (
-        <button data-testid={`${prefix}-match-${id}`}
-          onClick={() => set({
-            [`${prefix}Color`]: null, [`${prefix}Opacity`]: null,
-            [`${prefix}FillColor`]: null, [`${prefix}FillOpacity`]: null,
-          })}
-          style={{
-            width: '100%', padding: 4, margin: '2px 0 4px', fontSize: 10, borderRadius: 3,
-            cursor: 'pointer', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-          }}>Match layer</button>
-      )}
-    </>
-  )
-}
-
-/**
- * Which way a layer's icon and its labels face.
- *
- * One block for both, because they are one mark: a name lying flat beside an
- * upright summit triangle reads as a bug. It appears under whichever of the two
- * is switched on, and only once.
- */
-function Orientation({ layer, set, viewTilt, viewSpin }) {
-  return (
-    <>
-      <Tog label="Face camera" small checked={layer.iconFaceCamera}
-        onChange={(v) => set({ iconFaceCamera: v })}
-        help="Keeps the icon and its labels square to the view as you orbit. Switch it off to aim them by hand — useful when you are composing one particular frame to export." />
-      {!layer.iconFaceCamera && (
-        <Sub>
-          <InlineSl label="Tilt" min={0} max={90} step={1} value={layer.iconTilt}
-            fmt={(v) => `${Math.round(v)}°`} onChange={(v) => set({ iconTilt: v })}
-            testId={`icon-tilt-${layer.id}`} />
-          <InlineSl label="Spin" min={-180} max={180} step={1} value={layer.iconSpin}
-            fmt={(v) => `${Math.round(v)}°`} onChange={(v) => set({ iconSpin: v })}
-            testId={`icon-spin-${layer.id}`} />
-          <Btn size="xs" onClick={() => set({ iconTilt: viewTilt, iconSpin: viewSpin })}
-            data-testid={`icon-match-${layer.id}`}
-            style={{ width: '100%', padding: 4, marginTop: 2, color: DIM }}>Match view</Btn>
-        </Sub>
-      )}
-    </>
-  )
-}
-
-function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }) {
-  const [manifest, setManifest] = useState(null)
-
-  useEffect(() => { loadIconManifest().then(setManifest) }, [])
-
-  // Stable identity, or the `useMemo` below it re-runs on every render.
-  const icons = useMemo(() => manifest?.icons ?? [], [manifest])
-
-  /**
-   * The whole set, with the category's own suggestion first — a peak layer
-   * should be one click from a triangle rather than a hunt across the grid.
-   */
-  const shown = useMemo(() => {
-    const want = layer.suggestedIcon
-    const head = want ? icons.filter((i) => i.id === want) : []
-    return head.length ? [...head, ...icons.filter((i) => i.id !== want)] : icons
-  }, [icons, layer.suggestedIcon])
-
-  const set = (patch) => onPatch(layer.id, patch)
-
-  /**
-   * Choosing an icon changes nothing but the icon.
-   *
-   * It used to thin the layer's weight and claim its fill colour and opacity on
-   * the first pick, because the glyph was drawn with the *layer's* ink and that
-   * ink is a dot's diameter and a lake's blue. The icon now carries its own —
-   * see `Ink` — so there is nothing left to borrow and nothing to overwrite.
-   */
-  const choose = (id) => set({ icon: id })
-
-  const custom = layer.iconCustom
-
-  return (
-    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>ICON</div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, marginBottom: 8 }}>
-        {/* Back to a plain dot. */}
-        <button onClick={() => set({ icon: null })} title="No icon — draw a dot"
-          data-testid={`icon-none-${layer.id}`}
-          style={{
-            aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-            fontSize: 11, background: layer.icon ? SURF : ACCENT, color: layer.icon ? MUTED : '#fff',
-            border: `1px solid ${layer.icon ? BORDER : ACCENT}`,
-          }}>•</button>
-
-        {shown.map((ic) => {
-          const on = layer.icon === ic.id
-          return (
-            <button key={ic.id} onClick={() => choose(ic.id)} title={`${ic.label} — ${ic.id}`}
-              data-testid={`icon-${layer.id}-${ic.id}`}
-              style={{
-                aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-                background: on ? ACCENT_DEEP : SURF, border: `1px solid ${on ? ACCENT_DEEP : BORDER}`, padding: 2,
-              }}>
-              <img src={iconUrl(ic.id)} alt={ic.label} loading="lazy"
-                style={{ width: '100%', height: '100%', filter: on ? 'invert(1)' : 'invert(0.72)' }} />
-            </button>
-          )
-        })}
-
-        {custom && (
-          <button onClick={() => set({ icon: 'custom' })} title={custom.name}
-            data-testid={`icon-${layer.id}-custom`}
-            style={{
-              aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-              fontSize: 10, background: layer.icon === 'custom' ? ACCENT_DEEP : SURF,
-              color: layer.icon === 'custom' ? '#fff' : MUTED,
-              border: `1px solid ${layer.icon === 'custom' ? ACCENT_DEEP : BORDER}`,
-            }}>SVG</button>
-        )}
-      </div>
-
-      <div style={{ fontSize: 10, color: MUTED, marginBottom: 8, lineHeight: 1.5 }}>
-        Map &amp; terrain marks. Anything else is an SVG away.
-      </div>
-
-      <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
-        style={{
-          width: '100%', padding: 4, marginBottom: 8, background: SURF, color: '#a1a1aa',
-          border: `1px dashed ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10,
-        }}>↑ Custom SVG</button>
-
-      {overflowed && (
-        <div style={{ fontSize: 10, color: '#f97316', marginBottom: 4, lineHeight: 1.5 }}>
-          Too many features to draw as icons — this layer is still showing dots.
-        </div>
-      )}
-
-      {layer.icon && (
-        <>
-          <InlineSl label="Size" min={2} max={80} step={1} value={layer.iconSize}
-            onChange={(v) => set({ iconSize: v })} testId={`icon-size-${layer.id}`} />
-          <InlineSl label="Lift" min={0} max={120} step={1} value={layer.iconLift}
-            onChange={(v) => set({ iconLift: v })} testId={`icon-lift-${layer.id}`}
-            help="Raises the icon off the ground and draws a thin leader line down to the exact point. On steep relief it is what stops a summit marker being half-buried in the slope behind it." />
-          <Ink layer={layer} set={set} prefix="icon" help={{
-            weight: "The icon's own line width. It is not the layer's, because a point layer's weight is its dot's *diameter* — five for a peak — and five pixels of stroke on a 25-pixel mountain is a blob.",
-            opacity: "The icon's own opacity, so a marker can sit back from the lines it shares a layer with, or stand out from them.",
-            fill: "Draws the glyph solid, the way the icon was designed, with its holes cut out — the skull's eye sockets and the pin's dot stay open. Switch it off for the hollow outline, which is what a pen plotter draws. It shows in the viewport and in the PNG and video exports, but not in the SVG: that is a line-art format and a fill is triangles.",
-          }} />
-          <Orientation layer={layer} set={set} viewTilt={viewTilt} viewSpin={viewSpin} />
-        </>
-      )}
-    </div>
-  )
-}
-
-/**
- * A point layer's features labelled with their own name and height.
- *
- * Both lines come from what the fetch already parsed — a peak's `name` tag and
- * its `ele`, the same two strings the feature list below shows — so a label is
- * never invented. A feature with no name simply goes unlabelled, which is why
- * the counts are on screen: "18 of 29 named" is the difference between a plot
- * that is missing labels and one whose data never had them.
- *
- * The text is Space Mono Bold, the face the erzberg logo is set in, flattened
- * to line geometry like everything else here — so it takes the layer's colour
- * and weight, and lands in the SVG as strokes a plotter can draw.
- */
-function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin }) {
-  const set = (patch) => onPatch(layer.id, patch)
-  // The bundled stroke faces, fetched once for the whole app and only when a
-  // label section is open — the manifest is names, not glyphs.
-  const [singleLineFonts, setSingleLineFonts] = useState([])
-  useEffect(() => { loadSingleLineManifest().then(setSingleLineFonts) }, [])
-  const on = layer.labelName || layer.labelHeight
-
-  const named = bucket?.names.size ?? 0
-  const noted = bucket?.notes.size ?? 0
-  const total = bucket?.count ?? 0
-
-  /**
-   * Bold and italic as two switches rather than a list of four faces: regular
-   * is neither, and bold-italic — which is a real file, not a slanted bold —
-   * falls out of both without a fourth button.
-   */
-  const face = (which, label, active) => (
-    <button key={which}
-      onClick={() => set(which === 'bold' ? { labelBold: !active } : { labelItalic: !active })}
-      data-testid={`label-${which}-${layer.id}`}
-      style={{
-        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-        fontWeight: which === 'bold' ? 700 : 400,
-        fontStyle: which === 'italic' ? 'italic' : 'normal',
-        background: active ? ACCENT_DEEP : SURF,
-        color: active ? '#fff' : DIM,
-        border: `1px solid ${active ? ACCENT_DEEP : BORDER}`,
-      }}>{label}</button>
-  )
-
-  const align = (value, label) => (
-    <button key={value} onClick={() => set({ labelAlign: value })}
-      data-testid={`label-align-${value}-${layer.id}`}
-      style={{
-        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-        background: layer.labelAlign === value ? ACCENT_DEEP : SURF,
-        color: layer.labelAlign === value ? '#fff' : DIM,
-        border: `1px solid ${layer.labelAlign === value ? ACCENT_DEEP : BORDER}`,
-      }}>{label}</button>
-  )
-
-  return (
-    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>LABELS</div>
-
-      <div data-testid={`label-name-${layer.id}`}>
-        <Tog label="Name" small checked={layer.labelName}
-          onChange={(v) => set({ labelName: v })}
-          help="Draws each feature's name beside it. A feature with no name in the data is left unlabelled rather than given a number — a plot of twenty-nine summits with nine of them called “#12” is worse than nine unlabelled ones." />
-      </div>
-      <div data-testid={`label-height-${layer.id}`}>
-        <Tog label="Height" small checked={layer.labelHeight}
-          onChange={(v) => set({ labelHeight: v })}
-          help="Draws the feature's elevation, as OpenStreetMap has it — the same “1910m” the feature list shows. It goes on its own line under the name, or on its own if the name is off." />
-      </div>
-
-      <div style={{ fontSize: 10, color: MUTED, margin: '4px 0 8px', lineHeight: 1.5 }}>
-        {total ? `${named} of ${total} named · ${noted} with a height` : 'Nothing to label here.'}
-      </div>
-
-      {on && (
-        <>
-          <Tog label="Use single-line font" small checked={!!layer.labelSingleLine}
-            onChange={(v) => set({ labelSingleLine: v })}
-            help="Letters drawn as a single stroke down the middle of each stem, the way plotter fonts have worked since the 1960s. The faces the app otherwise letters in are outline fonts, so a plotted letter is the *edge* of the letter and the pen goes round every glyph twice. A single-line face is the skeleton instead: one pass, half the pen-down distance, and no double line where two strokes meet. It looks thinner on screen for the same reason it plots better." />
-
-          {layer.labelSingleLine ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
-              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-              <select value={layer.labelFont ?? 'HersheySans1'}
-                onChange={(e) => set({ labelFont: e.target.value })}
-                data-testid={`label-font-${layer.id}`}
-                style={{
-                  flex: 1, minWidth: 0, background: SURF, color: DIM,
-                  border: `1px solid ${BORDER}`, borderRadius: 3,
-                  fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                {Object.entries(singleLineFonts.reduce((g, f) => {
-                  (g[f.group] ??= []).push(f); return g
-                }, {})).map(([group, faces]) => (
-                  <optgroup key={group} label={group}>
-                    {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-          ) : (
-            /* Bold and italic as two switches rather than a list of four faces:
-               regular is neither, and bold-italic — a real file, not a slanted
-               bold — falls out of both without a fourth button. They are hidden
-               for a stroke face because that is a different typeface with no
-               bold to offer; showing them would mean inventing one. */
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
-              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
-              <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                {face('bold', 'Bold', layer.labelBold)}
-                {face('italic', 'Italic', layer.labelItalic)}
-              </div>
-            </div>
-          )}
-
-          <InlineSl label="Size" min={2} max={40} step={0.5} value={layer.labelSize}
-            onChange={(v) => set({ labelSize: v })} testId={`label-size-${layer.id}`} />
-          <InlineSl label="Offset ↔" min={-120} max={120} step={1} value={layer.labelDx}
-            onChange={(v) => set({ labelDx: v })} testId={`label-dx-${layer.id}`}
-            help="Moves the label across its own plane, so it can sit beside a marker rather than on it." />
-          <InlineSl label="Offset ↕" min={-120} max={200} step={1} value={layer.labelDy}
-            onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
-            help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '4px 0 4px' }}>
-            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {align('left', 'Left')}{align('center', 'Centre')}{align('right', 'Right')}
-            </div>
-          </div>
-
-          <Ink layer={layer} set={set} prefix="label" noFill={!!layer.labelSingleLine} help={{
-            weight: "The lettering's own line width — the stroke that draws a summit triangle well is the stroke that closes up the counters of small type.",
-            opacity: "The lettering's own opacity. Type sitting on a dense contour field often wants to be quieter than the mark it labels — or louder than a layer you have faded back.",
-            fill: "Draws the lettering solid, with the counters of the letters cut out. Switch it off for outlined type, which is what a pen plotter draws and what the SVG export carries either way.",
-          }} />
-
-          {/* Orientation lives with the icon when there is one; a layer that
-              labels without a marker still needs to aim its text. */}
-          {!layer.icon && (
-            <Orientation layer={layer} set={set} viewTilt={viewTilt} viewSpin={viewSpin} />
-          )}
-
-          {overflowed && (
-            <div style={{ fontSize: 10, color: '#f97316', marginTop: 4, lineHeight: 1.5 }}>
-              Too many features to letter — this layer is drawing no labels. Hide
-              some features, or label fewer layers.
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  )
-}
-
-/**
- * The features inside one layer, with a checkbox each.
- *
- * A layer used to be the smallest thing that existed: you could hide all 29
- * peaks or none. Per-feature visibility is the same concept one level down, live
- * and with no apply step, which is why the checkbox *is* the state rather than a
- * selection waiting to be committed.
- *
- * Two facts about real data shape this list. Most features are unnamed — a live
- * alpine fetch had names on 52 of 621 tracks and on none of 245 scrub polygons —
- * so named ones sort first and the rest get a stable `Track #118` to point at.
- * And a layer can hold hundreds, so there is a filter box and a hard cap on
- * rendered rows: 621 DOM rows inside a scrolling panel is a jank nobody asked
- * for, and a virtualisation library would be a dependency for one list.
- */
-const MAX_FEATURE_ROWS = 200
-
-function FeatureList({ layer, bucket, onPatch }) {
-  const [filter, setFilter] = useState('')
-  const hover = useStore((s) => s.vectorHover)
-  const selected = useStore((s) => s.vectorSelected)
-  const setHover = useStore((s) => s.setVectorHover)
-  const setSelected = useStore((s) => s.setVectorSelected)
-  const rowRef = useRef(null)
-
-  const hidden = useMemo(() => new Set(layer.hidden ?? []), [layer.hidden])
-
-  // Sorted named-first once per bucket, then filtered per keystroke — the sort
-  // is over every feature and has no business re-running as you type.
-  const ordered = useMemo(() => {
-    const idx = Array.from({ length: bucket.count }, (_, i) => i)
-    idx.sort((a, b) => {
-      const na = bucket.names.get(a), nb = bucket.names.get(b)
-      if (!!na !== !!nb) return na ? -1 : 1
-      if (na && nb) return na.localeCompare(nb)
-      return a - b
-    })
-    return idx
-  }, [bucket])
-
-  const matches = useMemo(() => {
-    const q = filter.trim().toLowerCase()
-    if (!q) return ordered
-    return ordered.filter((i) => featureLabel(bucket, i).toLowerCase().includes(q))
-  }, [ordered, filter, bucket])
-
-  // A feature picked on the terrain has to be findable in a list of hundreds.
-  useEffect(() => {
-    if (selected?.layerId === layer.id) rowRef.current?.scrollIntoView({ block: 'nearest' })
-  }, [selected, layer.id])
-
-  const shown = matches.slice(0, MAX_FEATURE_ROWS)
-  const visible = bucket.count - hidden.size
-
-  const bulk = (label, next, testId) => (
-    <Btn onClick={() => onPatch(layer.id, { hidden: next() })} data-testid={testId}
-      style={{ padding: '2px 4px' }}>{label}</Btn>
-  )
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, color: MUTED }} data-testid={`feature-count-${layer.id}`}>
-          Showing {visible} of {bucket.count}
-        </span>
-        <span style={{ display: 'flex', gap: 2 }}>
-          {bulk('all', () => [], `feature-all-${layer.id}`)}
-          {bulk('none', () => Array.from({ length: bucket.count }, (_, i) => i), `feature-none-${layer.id}`)}
-        </span>
-      </div>
-
-      {bucket.count > 8 && (
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter…"
-          data-testid={`feature-filter-${layer.id}`}
-          style={{
-            width: '100%', boxSizing: 'border-box', marginBottom: 4, padding: '2px 4px',
-            fontSize: 10, background: SURF, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3,
-          }} />
-      )}
-
-      <div style={{ maxHeight: 220, overflowY: 'auto' }}>
-        {shown.map((i) => {
-          const isHover = hover?.layerId === layer.id && hover.feature === i
-          const isSel = selected?.layerId === layer.id && selected.feature === i
-          const note = bucket.notes.get(i)
-          return (
-            <div key={i} ref={isSel ? rowRef : null}
-              data-testid={`feature-${layer.id}-${i}`}
-              data-selected={isSel ? 'true' : undefined}
-              // Hovering a row is the other direction of the same question the
-              // picker answers: it writes the very same state, so the feature
-              // lights up on the terrain without this knowing how.
-              // No x/y: the highlight wants the hover, the tooltip does not —
-              // the row already says the name, and a floating label over the
-              // panel would just cover the next row.
-              onMouseEnter={() => setHover({ layerId: layer.id, feature: i, x: null, y: null })}
-              onMouseLeave={() => setHover(null)}
-              // Clicking the selected row again clears it. The terrain's own way
-              // out of a selection is a click on empty ground, which is not
-              // available while Identify on hover is off — and a row click is
-              // how you make one in that state, so it has to be how you undo one.
-              onClick={() => setSelected(isSel ? null : { layerId: layer.id, feature: i })}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 4, padding: '2px 2px', borderRadius: 3,
-                cursor: 'pointer',
-                background: isSel ? 'rgba(249,115,22,0.18)' : isHover ? 'rgba(59,130,246,0.18)' : 'transparent',
-              }}>
-              <input type="checkbox" checked={!hidden.has(i)}
-                data-testid={`feature-check-${layer.id}-${i}`}
-                onClick={(e) => e.stopPropagation()}
-                onChange={() => onPatch(layer.id, { hidden: toggleHidden(layer.hidden, i) })}
-                style={{ width: 11, height: 11, accentColor: ACCENT, cursor: 'pointer' }} />
-              <span style={{
-                flex: 1, fontSize: 10, color: hidden.has(i) ? MUTED : DIM,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>{featureLabel(bucket, i)}</span>
-              {note && <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{note}</span>}
-            </div>
-          )
-        })}
-      </div>
-
-      {matches.length > shown.length && (
-        <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>
-          …and {matches.length - shown.length} more. Filter to narrow.
-        </div>
-      )}
-      {filter && matches.length === 0 && (
-        <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>Nothing matches “{filter}”.</div>
-      )}
-    </div>
-  )
-}
-
-/**
- * Terrain by name.
- *
- * Modelled on `VectorLayersPanel` below, and deliberately: it is the same shape
- * of thing — a request to somebody else's server, on demand, with a cancel and a
- * credit — so it owns its own query, its own candidates and its own progress
- * rather than putting seven more fields into App state. The app hears about it
- * once, when a raster is ready.
- *
- * Nothing is sent until Search is pressed. Not a prefetch, not an autocomplete:
- * Nominatim's usage policy asks that nobody attach it to a keystroke, and this
- * app has no business sending one request per letter either way.
- */
 function TerrainFetchPanel({ onFetched }) {
   const [query, setQuery] = useState('')
   const [places, setPlaces] = useState(null)
@@ -845,371 +209,6 @@ function TerrainFetchPanel({ onFetched }) {
           {credit.sources.length > 0 && (
             <div style={{ wordBreak:'break-word' }}>{`This ground: ${credit.sources.join(', ')}`}</div>
           )}
-        </div>
-      )}
-    </>
-  )
-}
-
-/**
- * The Vector Layers panel — sources at the top, one editable row per layer below.
- *
- * Deliberately additive: it replaces the old GPX Track section in place and
- * leaves the draw-mode sections exactly as they are. The rows here are
- * a list of *data* layers, which is a different thing from the draw modes and is
- * why it does not try to be a unified layer stack.
- */
-function VectorLayersPanel({
-  crs, crsName, bbox, coverage, error,
-  sources, layers,
-  onLoadGpx, onLoadGeoJson, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
-  identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, viewTilt, viewSpin,
-}) {
-  const [expanded, setExpanded] = useState(null)
-  const [featuresOpen, setFeaturesOpen] = useState(null)
-  const pickedFeature = useStore((s) => s.vectorSelected)
-  const drag = useStackDrag(layers ?? [], onReorder)
-
-  // Picking a feature on the terrain has to *show* you the feature. Without
-  // this the click sets the selection and lights the line up, but its row lives
-  // behind two collapsed disclosures — you would have to guess which of forty
-  // layers owns it and open them by hand, which is the work the click was
-  // supposed to save.
-  useEffect(() => {
-    if (!pickedFeature) return
-    setExpanded(pickedFeature.layerId)
-    setFeaturesOpen(pickedFeature.layerId)
-  }, [pickedFeature])
-  const [picked, setPicked] = useState(DEFAULT_OSM_CATEGORIES)
-  const [fetching, setFetching] = useState(false)
-  const [status, setStatus] = useState(null)
-  // `null` while a phase has no percentage to report — see makeReporter.
-  const [progress, setProgress] = useState(null)
-  const abortRef = useRef(null)
-
-  const wgs = useMemo(() => bboxToWgs84(bbox, crs), [bbox, crs])
-  const size = useMemo(() => wgs84ExtentKm(wgs), [wgs])
-  const canQuery = !!wgs
-  const hasOsm = sources?.some((s) => s.kind === 'osm')
-
-  /*
-   * HOW MUCH OF OPENSTREETMAP TO ASK FOR.
-   *
-   * The extent decides, because it is the thing that makes the answer
-   * unmanageable: a province asked for at full detail is over a million
-   * elements and a gigabyte of geometry, and no timeout is long enough for
-   * that. The same extent asked for at its own tier arrives in under a minute
-   * and draws a better sheet — see `OSM_DETAIL_TIERS`.
-   *
-   * The tier is shown rather than applied silently, because a user who wanted
-   * every footpath and got the trunk roads needs to know which happened, and
-   * the override is one click away when the extent really is worth the wait.
-   */
-  const autoTier = detailTierFor(size ? size.w * size.h : 0)
-  const [fullDetail, setFullDetail] = useState(false)
-  const detail = fullDetail ? 'full' : autoTier
-
-  const toggleCat = (id) =>
-    setPicked((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
-
-  const runFetch = async () => {
-    if (!wgs || !picked.length) return
-    const ctrl = new AbortController()
-    abortRef.current = ctrl
-    setFetching(true)
-    setProgress(null)
-    setStatus('Querying OpenStreetMap…')
-    onError(null)
-    try {
-      const { source, cached } = await fetchOsm(wgs, picked, {
-        detail,
-        signal: ctrl.signal,
-        onProgress: (f, label) => { setProgress(f); if (label) setStatus(label) },
-        shouldCancel: () => ctrl.signal.aborted,
-      })
-      if (ctrl.signal.aborted) return
-      if (!source.buckets.length) {
-        onError('OpenStreetMap has nothing of the selected kinds inside this extent.')
-      } else {
-        onAdopt(source)
-        setStatus(cached ? 'From cache.' : null)
-      }
-    } catch (err) {
-      // An abort is the user's own decision and needs no error box.
-      if (err?.name !== 'AbortError' && err !== CANCELLED) {
-        console.error('[OSM] Fetch failed:', err)
-        onError(err?.message || 'Could not reach OpenStreetMap.')
-      }
-    } finally {
-      abortRef.current = null
-      setFetching(false)
-      setProgress(null)
-      if (!fetching) setStatus(null)
-    }
-  }
-
-  const btn = {
-    padding: 8, background: SURF, color: '#a1a1aa', border: `1px dashed ${BORDER}`,
-    borderRadius: 5, cursor: 'pointer', fontSize: 11,
-  }
-
-  return (
-    <>
-      {layers?.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <Tog label="Identify on hover" small checked={identify} onChange={onIdentify}
-               help="Rest the pointer on a feature to see its name and light it up; click to select it in the list. Each pick walks every drawn segment, so on a very dense fetch this is the switch to reach for." />
-        </div>
-      )}
-
-      <VectorDiagnostics crs={crs} crsName={crsName} coverage={coverage} error={error}
-                         hasFeatures={layers?.length > 0}
-                         uploadsOnly={sources?.some((s) => s.kind !== 'osm')} />
-
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-        <button className="hmload" onClick={onLoadGeoJson} style={{ ...btn, flex: 1 }}
-                data-testid="load-geojson">↑ GeoJSON</button>
-        <button className="hmload" onClick={onLoadGpx} style={{ ...btn, flex: 1 }}
-                data-testid="load-gpx">↑ GPX</button>
-      </div>
-
-      {/* ── OpenStreetMap ───────────────────────────────────────────────── */}
-      <div style={{ border: `1px solid ${BORDER}`, borderRadius: 5, padding: 8, marginBottom: 8 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-          <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
-          {size && (
-            <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }} data-testid="osm-extent">
-              {size.w.toFixed(1)} × {size.h.toFixed(1)} km
-            </span>
-          )}
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, marginBottom: 8 }}>
-          {OSM_CATEGORIES.map((c) => {
-            const on = picked.includes(c.id)
-            return (
-              <button key={c.id} onClick={() => toggleCat(c.id)} disabled={!canQuery || fetching}
-                data-testid={`osm-cat-${c.id}`}
-                title={c.heavy ? 'Large in a populated extent' : undefined}
-                style={{
-                  fontSize: 10, padding: '4px 2px', borderRadius: 3, textAlign: 'left',
-                  cursor: canQuery && !fetching ? 'pointer' : 'default',
-                  opacity: canQuery ? 1 : 0.4,
-                  background: on ? ACCENT_DEEP : SURF, color: on ? '#fff' : MUTED,
-                  border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
-                }}>
-                {c.label}{c.heavy ? ' ⚠' : ''}
-              </button>
-            )
-          })}
-        </div>
-
-        {autoTier !== 'full' && (
-          <div style={{ marginBottom: 8 }} data-testid="osm-detail">
-            <Tog label={`Detail: ${OSM_DETAIL_LABEL[detail]}`} small checked={fullDetail}
-                 onChange={setFullDetail}
-                 help={`An extent this size holds more than a browser can hold, so it is asked for at a coarser detail: fewer road and water classes, and only the larger woods and lakes. Switch this on to ask for everything anyway — on a province that is upwards of a million features, and the fetch will say so before it tries.`} />
-          </div>
-        )}
-
-        <button onClick={fetching ? () => abortRef.current?.abort() : runFetch}
-          disabled={!canQuery || !picked.length}
-          data-testid="osm-fetch"
-          style={{
-            width: '100%', padding: 8, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
-            background: fetching ? SURF : ACCENT, color: fetching ? MUTED : '#fff',
-            border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
-          }}>
-          {fetching ? '✕ Cancel' : 'Fetch from OpenStreetMap'}
-        </button>
-
-        {fetching && (
-          <>
-            {/* Determinate only where there is something to be determinate
-                about. Overpass sends no headers until the query has finished
-                running, so the stripe travels during that wait rather than
-                filling — a bar stuck at 0% for ninety seconds and then racing to
-                the end says the wrong thing about which part is slow. */}
-            <div data-testid="osm-progress" data-pct={progress == null ? '' : Math.round(progress * 100)}
-              style={{
-                height: 3, marginTop: 6, borderRadius: 2, background: SURF,
-                overflow: 'hidden', position: 'relative',
-              }}>
-              {progress == null ? (
-                <div className="hm-indet" style={{
-                  position: 'absolute', inset: 0, width: '40%',
-                  background: ACCENT, borderRadius: 2,
-                }} />
-              ) : (
-                <div style={{
-                  height: '100%', width: `${Math.round(progress * 100)}%`,
-                  background: ACCENT, borderRadius: 2, transition: 'width 120ms linear',
-                }} />
-              )}
-            </div>
-            {status && (
-              <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{status}</div>
-            )}
-          </>
-        )}
-        {hasOsm && (
-          <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: 'center' }}>{OSM_ATTRIBUTION}</div>
-        )}
-      </div>
-
-      {/* ── Layers ──────────────────────────────────────────────────────── */}
-      {!layers?.length && (
-        <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
-          Nothing loaded yet. Fetch the extent from OpenStreetMap, or upload a GeoJSON or GPX file —
-          features are draped on the terrain and carried into the SVG, PNG and video exports.
-        </div>
-      )}
-
-      {layers?.map((l, i) => {
-        const isOpen = expanded === l.id
-        const held = drag.dragging === l.id
-        return (
-          <div key={l.id} data-testid={`vector-layer-${l.id}`} ref={drag.bindRow(l.id)}
-               style={{
-                 borderTop: `1px solid ${BORDER}`, paddingTop: 4, marginBottom: 4,
-                 // The row being dragged is dimmed rather than lifted out of the
-                 // list: the reorder is committed as the cursor crosses, so what
-                 // you are dragging is the real row in its real new place, and a
-                 // floating copy of it would be a second, lying one.
-                 opacity: held ? 0.55 : 1,
-                 background: held ? SURF : 'transparent',
-               }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              {/* Top of the list is the front of the scene, so this is also the
-                  control for what covers what. Arrow keys move it one step,
-                  which is the only way to do this without a pointer. */}
-              <button data-testid={`vector-grip-${l.id}`}
-                title={`Drag to reorder — ${i === 0 ? 'top of the stack, drawn in front' : `#${i + 1} of ${layers.length}`}`}
-                aria-label={`Reorder ${l.name}`}
-                onPointerDown={(e) => drag.start(e, l.id)}
-                onPointerMove={drag.move}
-                onPointerUp={drag.end}
-                onPointerCancel={drag.end}
-                onKeyDown={(e) => {
-                  const step = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0
-                  if (!step) return
-                  e.preventDefault()
-                  onReorder(l.id, i + step)
-                }}
-                style={{
-                  background: 'none', border: 'none', padding: 0, display: 'flex',
-                  color: held ? TEXT : BORDER, cursor: held ? 'grabbing' : 'grab',
-                  touchAction: 'none', flexShrink: 0,
-                }}><GripIcon /></button>
-              {/* A colour chip, not a control. It used to double as the
-                  visibility toggle, which put "hide" and "delete" at opposite
-                  ends of the row and left the swatch doing two jobs — the eye
-                  below is the one that says what it does. */}
-              <span data-testid={`vector-swatch-${l.id}`} aria-hidden="true"
-                style={{
-                  width: 12, height: 12, borderRadius: 3, flexShrink: 0,
-                  background: l.color, opacity: l.visible ? 1 : 0.35,
-                  border: `1px solid ${BORDER}`,
-                }} />
-              <button onClick={() => setExpanded(isOpen ? null : l.id)}
-                data-testid={`vector-name-${l.id}`}
-                style={{
-                  flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
-                  color: l.visible ? TEXT : MUTED, fontSize: 10, padding: 0,
-                }}>
-                {isOpen ? '▾' : '▸'} {l.name}
-              </button>
-              <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{l.count}</span>
-              <button onClick={() => onPatch(l.id, { visible: !l.visible })}
-                title={l.visible ? 'Hide this layer' : 'Show this layer'}
-                aria-pressed={!l.visible} data-testid={`vector-vis-${l.id}`}
-                style={{
-                  background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex',
-                  color: l.visible ? DIM : MUTED,
-                }}><EyeIcon off={!l.visible} /></button>
-              <button onClick={() => onRemove(l.id)} title="Remove this layer"
-                data-testid={`vector-remove-${l.id}`}
-                style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
-            </div>
-
-            {isOpen && (
-              <Sub>
-                {/* The very same control block every draw mode uses. A
-                    layer record's field names are the mode params minus their
-                    suffix, so an empty prefix addresses them unchanged. */}
-                <ModeStyleOverride prefix="" style={l} ss={(patch) => onPatch(l.id, patch)} showHypso={false} />
-                {l.geom === 'area' && (
-                  <div style={{ marginTop: 8 }} data-testid={`vector-fill-${l.id}`}>
-                    <Tog label="Fill" small checked={l.fill} onChange={(v) => onPatch(l.id, { fill: v })} />
-                    {l.fill && (
-                      <Sub>
-                        <ColorRow label="Fill Colour" value={l.fillColor}
-                                  onChange={(v) => onPatch(l.id, { fillColor: v })} />
-                        <InlineSl label="Fill Op." min={0} max={1} step={0.01} value={l.fillOpacity}
-                                  fmt={(v) => Math.round(v * 100) + '%'}
-                                  onChange={(v) => onPatch(l.id, { fillOpacity: v })} />
-                      </Sub>
-                    )}
-                  </div>
-                )}
-                {l.geom !== 'point' && (
-                  <div style={{ marginTop: 8 }}>
-                    <Tog label="STL ribbon" small checked={l.stlRibbon}
-                         onChange={(v) => onPatch(l.id, { stlRibbon: v })} />
-                  </div>
-                )}
-
-                {l.geom === 'point' && (
-                  <IconPicker layer={l} onPatch={onPatch} onCustom={onCustomIcon}
-                              overflowed={iconOverflow?.has(l.id)}
-                              viewTilt={viewTilt} viewSpin={viewSpin} />
-                )}
-
-                {(() => {
-                  const bucket = sources
-                    ?.find((src) => src.id === l.sourceId)
-                    ?.buckets.find((b) => b.key === l.bucket)
-                  if (!bucket) return null
-                  return l.geom === 'point' ? (
-                    <LabelPicker layer={l} bucket={bucket} onPatch={onPatch}
-                                 overflowed={labelOverflow?.has(l.id)}
-                                 viewTilt={viewTilt} viewSpin={viewSpin} />
-                  ) : null
-                })()}
-
-                {(() => {
-                  const bucket = sources
-                    ?.find((src) => src.id === l.sourceId)
-                    ?.buckets.find((b) => b.key === l.bucket)
-                  if (!bucket) return null
-                  const open = featuresOpen === l.id
-                  return (
-                    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-                      <button onClick={() => setFeaturesOpen(open ? null : l.id)}
-                        data-testid={`features-toggle-${l.id}`}
-                        style={{
-                          width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                          cursor: 'pointer', color: MUTED, fontSize: 10, fontWeight: 700,
-                          letterSpacing: 1, padding: 0,
-                        }}>
-                        {open ? '▾' : '▸'} FEATURES ({bucket.count})
-                      </button>
-                      {open && <FeatureList layer={l} bucket={bucket} onPatch={onPatch} />}
-                    </div>
-                  )
-                })()}
-              </Sub>
-            )}
-          </div>
-        )
-      })}
-
-      {sources?.length > 1 && (
-        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {sources.map((src) => (
-            <Btn key={src.id} onClick={() => onRemoveSource(src.id)}
-              title={`Remove every layer from ${src.label}`}>✕ {src.label}</Btn>
-          ))}
         </div>
       )}
     </>
@@ -1401,80 +400,6 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
   )
 }
 
-/**
- * Which land-cover classes this layer is allowed to mark.
- *
- * Absent entirely until a plate is loaded, rather than present and disabled: a
- * control that cannot do anything is worse than no control, and the Land Cover
- * section three rows up is where the app explains what a plate is.
- *
- * The swatches are the classes' own colours, taken from the imagery rather than
- * from a palette, so the row reads as the ground it stands for — which is the
- * only way to tell six unnamed classes apart at a glance.
- */
-function CoverMaskRow({ prefix, style, ss }) {
-  const cover = useContext(CoverPlate)
-  if (!cover?.classes?.length) return null
-  const key = `coverMask${prefix}`
-  const mask = style[key] ?? ALL_CLASSES
-  const classes = cover.classes
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>LAND COVER</span>
-        <span style={{ fontSize: 10, color: mask === ALL_CLASSES ? DIM : ACCENT_DEEP }}>
-          {describeMask(mask, classes)}
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {classes.map((c) => {
-          const on = maskHasClass(mask, c.index)
-          return (
-            <button key={c.index} type="button"
-              title={`${c.name} · ${Math.round(c.share * 100)}%`}
-              aria-label={`${c.name}, ${on ? 'drawn' : 'skipped'}`}
-              aria-pressed={on}
-              onClick={() => ss({ [key]: toggleClass(mask, c.index, classes.length) })}
-              style={{
-                // The same chip as the legend in the Land Cover section, because
-                // it stands for the same thing — 3 px, not the 2 px the dash row
-                // beside it uses, which is a button rather than a swatch.
-                width: 22, height: 20, borderRadius: 3, padding: 0, cursor: 'pointer',
-                background: c.color,
-                opacity: on ? 1 : 0.25,
-                border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
-              }} />
-          )
-        })}
-        {mask !== ALL_CLASSES && (
-          <Btn size="xs" onClick={() => ss({ [key]: ALL_CLASSES })}
-            style={{ padding: '0 6px', fontSize: 10 }}>All</Btn>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/**
- * The command that would cut a plate for what is on screen.
- *
- * The extent is already stated — in the loaded file, or in the bounding box a
- * fetch came back with — so asking the reader to type a place name back in is
- * asking them to restate something the app knows, and to get it slightly wrong.
- * A plate cut for ground a few hundred metres off still renders and still looks
- * deliberate, which is the failure this exists to avoid.
- *
- * Three cases, narrowing to the most precise one available:
- *
- *  · a georeferenced file on disk → `--dem`, which takes the extent *and* the
- *    projection from the file, so the plate comes back over exactly this
- *    ground;
- *  · georeferenced but not from a file the reader can name — a fetched
- *    terrain — → `--bbox`, in the lon/lat the flag wants;
- *  · no coordinates at all → the generic form, because there is nothing
- *    truthful to fill in.
- */
 function plateCommand({ filename, bbox, crs }) {
   const base = 'node scripts/embed-window.js'
   const wgs = bboxToWgs84(bbox, crs)
@@ -1533,55 +458,6 @@ function CommandLine({ cmd }) {
   )
 }
 
-/**
- * Which hand-drawn masks this layer is restricted to.
- *
- * The same shape as the cover row above it and a separate control, because the
- * two stencils answer different questions and a layer may carry both: cover
- * says what the ground *is*, a mask says which part of the picture you meant.
- * A cell has to satisfy both to be marked.
- */
-function PaintedMaskRow({ prefix, style, ss }) {
-  const masks = useContext(PaintedMasks)
-  if (!masks?.length) return null
-  const key = `layerMask${prefix}`
-  const selection = style[key] ?? NO_MASKS
-
-  return (
-    <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>MASKS</span>
-        <span style={{ fontSize: 10, color: selection ? ACCENT_DEEP : DIM }}>
-          {describeSelection(selection, masks)}
-        </span>
-      </div>
-      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-        {masks.map((m, i) => {
-          const on = selectionHasMask(selection, i)
-          return (
-            <button key={m.id} type="button"
-              title={m.name}
-              aria-label={`${m.name}, ${on ? 'drawn' : 'skipped'}`}
-              aria-pressed={on}
-              onClick={() => ss({ [key]: toggleMaskSelection(selection, i) })}
-              style={{
-                width: 22, height: 20, borderRadius: 3, padding: 0, cursor: 'pointer',
-                background: m.color,
-                opacity: on ? 1 : 0.25,
-                border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
-              }} />
-          )
-        })}
-        {selection !== NO_MASKS && (
-          <Btn size="xs" onClick={() => ss({ [key]: NO_MASKS })}
-            style={{ padding: '0 6px', fontSize: 10 }}>All</Btn>
-        )}
-      </div>
-    </div>
-  )
-}
-
-/** One stated fact about the loaded plate. Label left, value right. */
 function CoverFact({ label, value }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
@@ -1698,84 +574,6 @@ function FromFeatures({ layers = [], sources = [], masks = [], onMake }) {
   )
 }
 
-// `showCover` keys off the prefix rather than off `showHypso`: several draw
-// modes switch hypsometric off because they ink from their own table, and every
-// one of them is still a draw mode built from the terrain grid and so still
-// maskable. The empty prefix is the vector-layer call, and only that one.
-function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', gradientStops, setGradientStops }) {
-  const isHypso = style[`hypso${prefix}`]
-  return (
-    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>{label}</div>
-      {/* A mode that inks every mark from its own table has no base colour to
-          show: Riso's three separations each carry their own, and a swatch here
-          would be a control that changes nothing. */}
-      {showColor && (
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
-          <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
-        </div>
-      )}
-      <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
-      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
-
-      {showDash && (
-        <div style={{ marginTop: 8, display:'flex', gap:2 }}>
-          {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
-            <Btn key={d} block variant="toggle" on={style[`dash${prefix}`] === d}
-              onClick={() => ss({ [`dash${prefix}`]: d })}
-              style={{ fontSize:10, padding:'2px 0', borderRadius:2, textTransform:'uppercase' }}>
-              {d.replace('-dash','')}</Btn>
-          ))}
-        </div>
-      )}
-
-      {/* Off the table for vector layers for a sharper version of the same
-          reason hypsometric is: masking works by thinning the terrain grid the
-          layer is built from, and a road is not built from that grid. */}
-      {showCover && <CoverMaskRow prefix={prefix} style={style} ss={ss} />}
-      {showCover && <PaintedMaskRow prefix={prefix} style={style} ss={ss} />}
-
-      {/* Hypsometric is off the table for vector layers: a road has no elevation
-          of its own, so the tint would have to read the ground under it, which
-          is a different thing from what the draw modes mean by it. */}
-      {showHypso && <div style={{ marginTop: 8 }}>
-        <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
-        {isHypso && (
-          <Sub>
-            <div style={{ display:'flex', gap:2, marginBottom:4 }}>
-              {['Elevation', 'Slope', 'Aspect', 'Speed'].map(m => (
-                <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
-                  style={{ 
-                    flex:1, fontSize:10, padding:'2px 0', borderRadius:2, 
-                    background: style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : SURF, 
-                    color: style[`hypsoMode${prefix}`] === m.toLowerCase() ? '#fff' : MUTED, 
-                    border:`1px solid ${style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : BORDER}` 
-                  }}>{m}</button>
-              ))}
-            </div>
-            <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
-            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
-            {/* The gradient is global (shared by every hypsometric layer + fill),
-                but it must be editable right where hypso is switched on — not
-                hidden behind enabling fill in Terrain Style. */}
-            {gradientStops && setGradientStops && (
-              <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
-                  {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
-                </div>
-                <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-              </div>
-            )}
-          </Sub>
-        )}
-      </div>}
-    </div>
-  )
-}
-
-// ── Main Sidebar component ────────────────────────────────────────────────────
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -2047,12 +845,15 @@ export function Sidebar({
     // Presets open, Levels closed: the grid of 56 looks is the most persuasive
     // thing in the panel and it used to be the tenth section down, collapsed,
     // below four surface overlays. A histogram is not what anyone needs first.
-    // Presets closed, and first. It is the front door, so it used to open by
-    // default from tenth place — 2 346 px of thumbnails that everything after
-    // it had to be scrolled past. Now the style it applied has a permanent line
-    // in the head, which buys the same discoverability for sixteen pixels, and
-    // the grid is one click from the top rather than a wall in the middle.
-    terrain: true, levels: false, view: true, camera: false, presets: false, style: true,
+    // Levels open, beside Shape. Both are the raster's own conditioning and
+    // they are read together — a black point means nothing without the
+    // histogram beside it.
+    // Presets open again. It was shut because the grid is 2 346 px of
+    // thumbnails and everything after it had to be scrolled past — a real cost
+    // when it was the tenth section of sixty in one column. It has a pane of
+    // its own now and nothing shares it, so there is nothing left to scroll
+    // past and a shut header is one click between you and the only thing there.
+    shape: true, levels: true, camera: true, paper: false, presets: true, style: true,
     modeLines: true, modeCross: false, modePillars: false, modeContours: false,
     modeHachure: false, modeFlow: false, modeDag: false, modePencil: false,
     modeRidge: false, modeValley: false, modeStipple: false,
@@ -2070,7 +871,6 @@ export function Sidebar({
     soundscapes: false, landCover: false, modeCover: false,
     satellite: false, masks: false,
   })
-
 
   // --- Discovery State ---
   const [lastPreset,  setLastPreset]  = useState(null)   // name of the last applied preset
@@ -2631,75 +1431,12 @@ export function Sidebar({
             * starts in and the one the panel opens on, so a first visit sees the
             * same order it always saw — load, style, then the ground.
             */}
-          <Stage n={1} title="Source">
+          <Stage n={0} title="Presets">
 
-          <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
-              <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
-            </div>
-            {heightmapFilename && (
-              <div style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                {heightmapFilename}
-              </div>
-            )}
-
-            {/* Which look is on, and a way to the other 55.
-                Opening the Presets section is not enough on its own: it is the
-                tenth section down, so the grid is still a scroll away from the
-                thing it is meant to be discovered from. This is the one line in
-                the panel that always says what you are looking at. */}
-            {lastPreset && (
-              <div style={{ marginTop:4, display:'flex', alignItems:'baseline', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
-                <span>Style</span>
-                <button data-testid="jump-to-presets"
-                  onClick={() => {
-                    // Presets is in Source, so the jump has to land in Source —
-                    // from Marks or Frame the scroll would otherwise aim at a
-                    // section in a pane that is not on screen.
-                    goStage(1)
-                    setSec(prev => ({ ...prev, presets: true }))
-                    requestAnimationFrame(() => {
-                      document.querySelector('[data-testid="section-presets"]')
-                        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-                    })
-                  }}
-                  title="Show all 56 styles"
-                  style={{ background:'none', border:'none', padding:0, cursor:'pointer',
-                           color: DIM, fontSize:10, fontFamily:'inherit',
-                           borderBottom:`1px solid ${BORDER}` }}>
-                  {lastPreset}{presetEdited ? ' · edited' : ''}
-                </button>
-              </div>
-            )}
-
-            {/* Settings now survive a reload, which is only reassuring if it is
-                said out loud — otherwise the app looks like it opened on someone
-                else's defaults. */}
-            {sessionRestored && (
-              <div data-testid="session-restored" style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', lineHeight:1.5 }}>
-                Settings restored from your last session.
-              </div>
-            )}
-
-            {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
-            <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
-              disabled={!heightmapPixels}
-              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
-                border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
-                cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
-              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
-            </button>
-            {editSummary && (
-              <div style={{ marginTop:4, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
-                <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
-                <button data-testid="edit-clear" onClick={onClearEdit} style={{
-                  background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
-                  fontSize:10, padding:'2px 4px', cursor:'pointer', flexShrink:0,
-                }}>clear</button>
-              </div>
-            )}
-          </div>
+          {/* A whole configuration, applied at once — style, particles and
+              view together. That is why it belongs to every pane downstream
+              and to none of them, and why it is a destination rather than a
+              step in the pipeline. */}
 
           <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
             {/* Roll a look. The seed is shown because it *is* the look — note it
@@ -2768,89 +1505,112 @@ export function Sidebar({
             </div>
           </Section>
 
+          </Stage>
+
+          <Stage n={1} title="Terrain">
+
+          <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+              <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
+              <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
+            </div>
+            {heightmapFilename && (
+              <div style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {heightmapFilename}
+              </div>
+            )}
+
+            {/* Which look is on, and a way to the other 55.
+                Opening the Presets section is not enough on its own: it is the
+                tenth section down, so the grid is still a scroll away from the
+                thing it is meant to be discovered from. This is the one line in
+                the panel that always says what you are looking at. */}
+            {lastPreset && (
+              <div style={{ marginTop:4, display:'flex', alignItems:'baseline', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
+                <span>Style</span>
+                <button data-testid="jump-to-presets"
+                  onClick={() => {
+                    // Presets has a destination of its own, so the jump has to
+                    // land there — from any other pane the scroll would aim at
+                    // a section that is not on screen.
+                    goStage(PRESETS_STAGE)
+                    setSec(prev => ({ ...prev, presets: true }))
+                    requestAnimationFrame(() => {
+                      document.querySelector('[data-testid="section-presets"]')
+                        ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                    })
+                  }}
+                  title="Show all 56 styles"
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer',
+                           color: DIM, fontSize:10, fontFamily:'inherit',
+                           borderBottom:`1px solid ${BORDER}` }}>
+                  {lastPreset}{presetEdited ? ' · edited' : ''}
+                </button>
+              </div>
+            )}
+
+            {/* Settings now survive a reload, which is only reassuring if it is
+                said out loud — otherwise the app looks like it opened on someone
+                else's defaults. */}
+            {sessionRestored && (
+              <div data-testid="session-restored" style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', lineHeight:1.5 }}>
+                Settings restored from your last session.
+              </div>
+            )}
+
+            {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
+            <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
+              disabled={!heightmapPixels}
+              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
+                border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
+                cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
+              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
+            </button>
+            {editSummary && (
+              <div style={{ marginTop:4, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
+                <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
+                <button data-testid="edit-clear" onClick={onClearEdit} style={{
+                  background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
+                  fontSize:10, padding:'2px 4px', cursor:'pointer', flexShrink:0,
+                }}>clear</button>
+              </div>
+            )}
+          </div>
+
           {/* ── Terrain by name ───────────────────────────────────────────
               The front door for anyone who does not already own a GeoTIFF,
               which until now was everyone on their first visit. It is the one
               part of this app that talks to a server, so it says so, it does
               nothing until pressed, and it credits what it got. See
               utils/demFetch.js. */}
-          <Section title="Fetch Terrain" open={sec.fetchTerrain} onToggle={() => tog('fetchTerrain')}>
+          <Section title="Fetch" open={sec.fetchTerrain} onToggle={() => tog('fetchTerrain')}>
             <TerrainFetchPanel onFetched={onFetchTerrain} />
           </Section>
 
-          {/* ── Satellite ─────────────────────────────────────────────────
-              Unlike the cover plates, this one can be a button: Sentinel-2 on
-              AWS answers CORS where AlphaEarth's bucket does not. Same terms as
-              Fetch Terrain — no key, no account, nothing until it is pressed. */}
-          <Section title="Satellite" open={sec.satellite} onToggle={() => tog('satellite')} enabled={Boolean(imagery)}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
-              {!imagery && (
-                <CoverProse>
-                  True-colour Sentinel-2 over this extent, at 10 m. It drapes on the
-                  terrain and backs the Mask Studio, where you are drawing around
-                  ground you need to be able to see.
-                </CoverProse>
-              )}
-              {imagery && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <CoverFact label="Scene" value={imagery.date} />
-                  <CoverFact label="Cloud" value={`${Math.round(imagery.cloud)}%`} />
-                  <CoverFact label="Size" value={`${imagery.width} × ${imagery.height}`} />
-                </div>
-              )}
-              {imageryBusy && (
-                <div style={{ fontSize: 10, color: MUTED }}>
-                  <div style={{ marginBottom: 4 }}>
-                    {imageryBusy.phase === 'search' ? 'Finding a clear scene…'
-                      : `Fetching imagery… ${Math.round((imageryBusy.progress ?? 0) * 100)}%`}
-                  </div>
-                  <div style={{ height: 3, background: BORDER, borderRadius: 2, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: ACCENT,
-                                  width: `${Math.round((imageryBusy.progress ?? 0) * 100)}%` }} />
-                  </div>
-                </div>
-              )}
-              {imagery && (
-                <>
-                  <Tog label="Drape on terrain" checked={style.showImagery}
-                    onChange={(v) => ss({ showImagery: v })} />
-                  {style.showImagery && (
-                    <Sub>
-                      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.imageryOpacity}
-                        onChange={(v) => ss({ imageryOpacity: v })} fmt={(v) => `${Math.round(v * 100)}%`} />
-                      {/* Sentinel-2's `visual` asset is exposed for cloud and
-                          snow, so ordinary ground sits near the floor — over
-                          Graz the median pixel is 9–17% brightness. Auto levels
-                          stretches this window's own histogram and solves a
-                          gamma that puts its median on mid-grey. The three
-                          below are taste, applied after it. */}
-                      <Tog label="Auto levels" checked={style.imageryAutoLevels}
-                        onChange={(v) => ss({ imageryAutoLevels: v })} />
-                      <InlineSl label="Brightness" min={0.2} max={2.5} step={0.01} value={style.imageryBrightness}
-                        onChange={(v) => ss({ imageryBrightness: v })} fmt={(v) => `${v.toFixed(2)}×`} />
-                      <InlineSl label="Contrast" min={0.4} max={2.2} step={0.01} value={style.imageryContrast}
-                        onChange={(v) => ss({ imageryContrast: v })} fmt={(v) => `${v.toFixed(2)}×`} />
-                      <InlineSl label="Saturation" min={0} max={2} step={0.01} value={style.imagerySaturation}
-                        onChange={(v) => ss({ imagerySaturation: v })} fmt={(v) => `${v.toFixed(2)}×`} />
-                      {imagery?.tone && style.imageryAutoLevels && (
-                        <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
-                          Levels {imagery.tone.lo.join('/')} → {imagery.tone.hi.join('/')}
-                          {' · '}gamma {imagery.tone.gamma.toFixed(2)}
-                        </div>
-                      )}
-                    </Sub>
-                  )}
-                </>
-              )}
-              <CoverRow>
-                <Btn block onClick={onFetchImagery} disabled={!!imageryBusy} data-testid="fetch-imagery">
-                  {imagery ? 'Fetch again' : '↓ Fetch imagery'}
-                </Btn>
-                {imagery && <Btn block onClick={onClearImagery}>Clear</Btn>}
-              </CoverRow>
-              {imagery?.credit && (
-                <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
-              )}
+          <Section title="Shape" open={sec.shape} onToggle={() => tog('shape')}>
+            {hypsometricIntegral != null && (
+              <HypsometricRow value={hypsometricIntegral} />
+            )}
+            <Tog label="Raw terrain view"
+              help="Shows the loaded heightmap itself: a flat greyscale plane with everything else hidden, lowest point black and highest white, stretched to fill the range. It reflects Resolution, Blur, Levels and the elevation cuts, so it doubles as a preview while tuning them. Exports are unaffected — this is a way of looking, not a change to the terrain."
+              checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
+              <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
+              <Sl label="Elev scale" min={-10} max={10} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
+              <Sl label="Blur" min={0} max={10} step={0.1} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
+              <Sl label="Jitter" min={0} max={20} step={0.1} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
+            </div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
+              <Sl label="Elev min cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
+              <Sl label="Elev max cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
+            </div>
+          </Section>
+
+          <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
+            <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint} onBlackChange={v => st({ blackPoint: v })} onWhiteChange={v => st({ whitePoint: v })} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px', marginTop:4 }}>
+              <Sl label="Shadows" min={0} max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
+              <Sl label="Highlights" min={1} max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
             </div>
           </Section>
 
@@ -3037,38 +1797,10 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Terrain" open={sec.terrain} onToggle={() => tog('terrain')}>
-            {hypsometricIntegral != null && (
-              <HypsometricRow value={hypsometricIntegral} />
-            )}
-            <Tog label="Raw terrain view"
-              help="Shows the loaded heightmap itself: a flat greyscale plane with everything else hidden, lowest point black and highest white, stretched to fill the range. It reflects Resolution, Blur, Levels and the elevation cuts, so it doubles as a preview while tuning them. Exports are unaffected — this is a way of looking, not a change to the terrain."
-              checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
-              <Sl label="Elev scale" min={-10} max={10} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
-              <Sl label="Blur" min={0} max={10} step={0.1} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
-              <Sl label="Jitter" min={0} max={20} step={0.1} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Elev min cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
-            </div>
-          </Section>
-
-          <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
-            <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint} onBlackChange={v => st({ blackPoint: v })} onWhiteChange={v => st({ whitePoint: v })} />
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px', marginTop:4 }}>
-              <Sl label="Shadows" min={0} max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
-              <Sl label="Highlights" min={1} max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
-            </div>
-          </Section>
-
-
-
           {/* ── Global Style ───────────────────────────────────────────────── */}
 
           <ErosionSection open={sec.erosion} onToggle={() => tog('erosion')} />
+
           <Section title="Soundscapes" open={sec.soundscapes} onToggle={() => tog('soundscapes')} enabled={snd.active}>
             <button
               className="hmload"
@@ -3204,6 +1936,7 @@ export function Sidebar({
               </>
             )}
           </Section>
+
           </Stage>
 
           <Stage n={2} title="Surface">
@@ -3257,6 +1990,131 @@ export function Sidebar({
               {style.bgGradient && <GradientPicker stops={bgGradientStops} onChange={sbg} isSimple />}
             </Sub>
           </Section>
+
+          {/* ── Satellite ─────────────────────────────────────────────────
+              Unlike the cover plates, this one can be a button: Sentinel-2 on
+              AWS answers CORS where AlphaEarth's bucket does not. Same terms as
+              Fetch — no key, no account, nothing until it is pressed. */}
+          <Section title="Satellite" open={sec.satellite} onToggle={() => tog('satellite')} enabled={Boolean(imagery)}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
+              {!imagery && (
+                <CoverProse>
+                  True-colour Sentinel-2 over this extent, at 10 m. It drapes on the
+                  terrain and backs the Mask Studio, where you are drawing around
+                  ground you need to be able to see.
+                </CoverProse>
+              )}
+              {imagery && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <CoverFact label="Scene" value={imagery.date} />
+                  <CoverFact label="Cloud" value={`${Math.round(imagery.cloud)}%`} />
+                  <CoverFact label="Size" value={`${imagery.width} × ${imagery.height}`} />
+                </div>
+              )}
+              {imageryBusy && (
+                <div style={{ fontSize: 10, color: MUTED }}>
+                  <div style={{ marginBottom: 4 }}>
+                    {imageryBusy.phase === 'search' ? 'Finding a clear scene…'
+                      : `Fetching imagery… ${Math.round((imageryBusy.progress ?? 0) * 100)}%`}
+                  </div>
+                  <div style={{ height: 3, background: BORDER, borderRadius: 2, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', background: ACCENT,
+                                  width: `${Math.round((imageryBusy.progress ?? 0) * 100)}%` }} />
+                  </div>
+                </div>
+              )}
+              {imagery && (
+                <>
+                  <Tog label="Drape on terrain" checked={style.showImagery}
+                    onChange={(v) => ss({ showImagery: v })} />
+                  {style.showImagery && (
+                    <Sub>
+                      <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.imageryOpacity}
+                        onChange={(v) => ss({ imageryOpacity: v })} fmt={(v) => `${Math.round(v * 100)}%`} />
+                      {/* Sentinel-2's `visual` asset is exposed for cloud and
+                          snow, so ordinary ground sits near the floor — over
+                          Graz the median pixel is 9–17% brightness. Auto levels
+                          stretches this window's own histogram and solves a
+                          gamma that puts its median on mid-grey. The three
+                          below are taste, applied after it. */}
+                      <Tog label="Auto levels" checked={style.imageryAutoLevels}
+                        onChange={(v) => ss({ imageryAutoLevels: v })} />
+                      <InlineSl label="Brightness" min={0.2} max={2.5} step={0.01} value={style.imageryBrightness}
+                        onChange={(v) => ss({ imageryBrightness: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      <InlineSl label="Contrast" min={0.4} max={2.2} step={0.01} value={style.imageryContrast}
+                        onChange={(v) => ss({ imageryContrast: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      <InlineSl label="Saturation" min={0} max={2} step={0.01} value={style.imagerySaturation}
+                        onChange={(v) => ss({ imagerySaturation: v })} fmt={(v) => `${v.toFixed(2)}×`} />
+                      {imagery?.tone && style.imageryAutoLevels && (
+                        <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
+                          Levels {imagery.tone.lo.join('/')} → {imagery.tone.hi.join('/')}
+                          {' · '}gamma {imagery.tone.gamma.toFixed(2)}
+                        </div>
+                      )}
+                    </Sub>
+                  )}
+                </>
+              )}
+              <CoverRow>
+                <Btn block onClick={onFetchImagery} disabled={!!imageryBusy} data-testid="fetch-imagery">
+                  {imagery ? 'Fetch again' : '↓ Fetch imagery'}
+                </Btn>
+                {imagery && <Btn block onClick={onClearImagery}>Clear</Btn>}
+              </CoverRow>
+              {imagery?.credit && (
+                <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}
+                   enabled={summaries['Texture'] !== '—'}>
+            <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
+            {style.showTexture && !style.showFill && (
+              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
+                Fill is disabled — texture will not appear until Fill is enabled.
+              </div>
+            )}
+            {style.showTexture && (
+              <Sub>
+                <button className="hmload" onClick={handleTexturePicker} style={{ 
+                  width:'100%', padding:8, marginBottom:8, background: SURF, color: DIM, 
+                  border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
+                }}>
+                  {textureImage ? 'Change Texture' : '↑ Load Image'}
+                </button>
+                {textureImage && (
+                  <>
+                    <InlineSl label="Scale" min={0.01} max={10} step={0.01} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
+                    <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
+                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                      <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
+                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
+                        <option value="normal">Normal</option>
+                        <option value="multiply">Multiply</option>
+                        <option value="screen">Screen</option>
+                        <option value="overlay">Overlay</option>
+                        <option value="softlight">Soft Light</option>
+                        <option value="add">Add</option>
+                      </select>
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
+                      <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
+                      <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
+                    </div>
+                    <button onClick={() => setTextureImage(null)} style={{ 
+                      width:'100%', padding:'8px 0', background: SURF, color: DIM, 
+                      border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
+                    }}>Clear Texture</button>
+                  </>
+                )}
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Soundscapes ─────────────────────────────────────────────────
+              Streams an audio spectrogram into the heightmap slot, so every
+              draw mode / overlay / export works on it like any other terrain. */}
 
           {/* ── Hillshade ──────────────────────────────────────────────────── */}
 
@@ -3394,6 +2252,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Presets ────────────────────────────────────────────────────── */}
+
           </Stage>
 
           <Stage n={3} title="Marks">
@@ -3756,7 +2615,6 @@ export function Sidebar({
               </>
             )}
           </Section>
-
 
           <Section title="Mode: Indexed" icon={<ModeMark kind="indexed" />} open={sec.modeIndexed} onToggle={() => tog('modeIndexed')} enabled={style.enabledIndexed}>
             <Tog label="Enabled" checked={style.enabledIndexed} onChange={v => ss({ enabledIndexed: v })} />
@@ -4243,6 +3101,7 @@ export function Sidebar({
               OpenStreetMap, GPX, GeoJSON, labels, icons — was simply absent from
               the default session, which reads as "this tool doesn't do that"
               rather than "this tool needs a different file first". */}
+
           </Stage>
 
           <Stage n={4} title="Overlay">
@@ -4285,13 +3144,13 @@ export function Sidebar({
             )}
           </Section>
 
-
           <TextSection
             open={sec.text} onToggle={() => tog('text')}
             layers={textLayers} setLayers={setTextLayers} overflowed={textOverflow}
             singleLineFonts={singleLineFonts}
             viewTilt={view.tilt} viewSpin={view.rotation}
           />
+
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
@@ -4474,64 +3333,22 @@ export function Sidebar({
               </Sub>
             )}
           </Section>
-
-          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}
-                   enabled={summaries['Texture'] !== '—'}>
-            <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
-            {style.showTexture && !style.showFill && (
-              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
-                Fill is disabled — texture will not appear until Fill is enabled.
-              </div>
-            )}
-            {style.showTexture && (
-              <Sub>
-                <button className="hmload" onClick={handleTexturePicker} style={{ 
-                  width:'100%', padding:8, marginBottom:8, background: SURF, color: DIM, 
-                  border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
-                }}>
-                  {textureImage ? 'Change Texture' : '↑ Load Image'}
-                </button>
-                {textureImage && (
-                  <>
-                    <InlineSl label="Scale" min={0.01} max={10} step={0.01} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
-                    <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                      <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
-                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
-                        <option value="normal">Normal</option>
-                        <option value="multiply">Multiply</option>
-                        <option value="screen">Screen</option>
-                        <option value="overlay">Overlay</option>
-                        <option value="softlight">Soft Light</option>
-                        <option value="add">Add</option>
-                      </select>
-                    </div>
-                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-                      <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
-                      <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
-                    </div>
-                    <button onClick={() => setTextureImage(null)} style={{ 
-                      width:'100%', padding:'8px 0', background: SURF, color: DIM, 
-                      border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
-                    }}>Clear Texture</button>
-                  </>
-                )}
-              </Sub>
-            )}
-          </Section>
-
-
-          {/* ── Soundscapes ─────────────────────────────────────────────────
-              Streams an audio spectrogram into the heightmap slot, so every
-              draw mode / overlay / export works on it like any other terrain. */}
-
-
-
           </Stage>
 
           <Stage n={5} title="Frame">
 
-          <Section title="View" open={sec.view} onToggle={() => tog('view')}>
+          {/* ── The camera ────────────────────────────────────────────────
+              `View` and `Camera` were two sections holding one subject: aiming
+              the camera was in the first, choosing its lens and sliding its
+              target were in the second, four rows below. Framing a shot meant
+              working in two places that were never adjacent.
+
+              Keep parameter names out of a comment that sits *above* a section
+              header. `sectionParams.test.js` scopes a section from its own
+              `<Section>` tag to the next one, so anything written here is
+              credited to the section before it — this comment named two and
+              failed the drift check for Texture, four hundred lines away. */}
+          <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               {/* Four camera presets. The last one is the *view* Reset, which is
                   not the panel header's "Reset all" — the label is short because
@@ -4570,43 +3387,53 @@ export function Sidebar({
               </Sub>
             )}
             <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
-            <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
-              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
-            {view.showFrame && (
-              <Sub>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
-                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
-                    onChange={e => sv({ framePaper: e.target.value })}
-                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
-                    {['ISO','US','Ratio'].map(group => (
-                      <optgroup key={group} label={group}>
-                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
-                          <option key={id} value={id}>
-                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
-                {(view.framePaper ?? 'iso') === 'custom' && (
-                  <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
-                    help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
-                )}
-                <SegRow label="Format" testIdPrefix="frame-orient"
-                  options={[['Portrait', false],['Landscape', true]]}
-                  value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
-                  help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
-                <InlineSl label="Scale" min={0.1} max={1} step={0.01} value={view.frameScale ?? 0.85} onChange={v => sv({ frameScale: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-scale"
-                  help="How much of the viewport the sheet covers. Smaller crops tighter; at 100% the sheet touches whichever pair of edges its shape reaches first." />
-                <InlineSl label="Offset X" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetX ?? 0} onChange={v => sv({ frameOffsetX: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-x"
-                  help="Slides the sheet across the viewport, as a fraction of its width. The canvas fills the window and this panel floats over it, so a centred frame sits a little left of the free space — nudge it right to compose against what you can actually see." />
-                <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
-                <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
-                  help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
-              </Sub>
-            )}
+            <Sub>
+              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
+              {!view.orthographic && (
+                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+              )}
+              {/* fmt is not decoration: these mirror the orbit target, which a
+                  mouse pan moves continuously, and without it a drag left the
+                  field reading `-247.38194837`. Scene.jsx rounds at the source
+                  now; this keeps any stray float legible if one ever arrives. */}
+              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
+              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
+              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
+                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
+            </Sub>
+          </Section>
+
+          <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
+                   enabled={summaries['Mirror'] !== '—'}>
+            <div style={{ fontSize:10, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
+              <div />
+              <button title="Mirror Up (+Y)" className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<div className="sym-label">+Y</div></button>
+              <div />
+
+              <button title="Mirror Left (-X)" className={`sym-btn${style.showMirrorMinusX ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusX: !style.showMirrorMinusX })}>◀<div className="sym-label">-X</div></button>
+              <button title="Mirror Back (-Z)" className={`sym-btn${style.showMirrorMinusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusZ: !style.showMirrorMinusZ })}>↗<div className="sym-label">-Z</div></button>
+              <button title="Mirror Right (+X)" className={`sym-btn${style.showMirrorPlusX ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusX: !style.showMirrorPlusX })}>▶<div className="sym-label">+X</div></button>
+
+              <div />
+              <button title="Mirror Down (-Y)" className={`sym-btn${style.showMirrorMinusY ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusY: !style.showMirrorMinusY })}>▼<div className="sym-label">-Y</div></button>
+              <div />
+
+              <div />
+              <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
+              <div />
+            </div>
+            <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:12, opacity:0.7, lineHeight:1.4, marginBottom:8 }}>
+              Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
+            </div>
+            <button onClick={() => ss({ 
+              showMirrorPlusX:true, showMirrorMinusX:false,
+              showMirrorPlusY:true, showMirrorMinusY:false,
+              showMirrorPlusZ:true, showMirrorMinusZ:false
+            })} style={{ 
+              width:'100%', padding:'4px 0', background: SURF, color: DIM, 
+              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
+            }}>Reset Symmetry</button>
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
@@ -4645,6 +3472,50 @@ export function Sidebar({
                   </div>
                   <div>SVG runs the whole export twice — once per eye</div>
                 </div>
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── The page ──────────────────────────────────────────────────
+              The other half of what `View` carried. A sheet is not a camera: it
+              has a shape, a scale and a margin, and none of them move the eye.
+              It takes a dot, because it is off until the frame is drawn. */}
+          <Section title="Paper" open={sec.paper} onToggle={() => tog('paper')} enabled={!!view.showFrame}>
+            <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
+              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
+            {view.showFrame && (
+              <Sub>
+                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
+                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
+                    onChange={e => sv({ framePaper: e.target.value })}
+                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
+                    {['ISO','US','Ratio'].map(group => (
+                      <optgroup key={group} label={group}>
+                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
+                          <option key={id} value={id}>
+                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                {(view.framePaper ?? 'iso') === 'custom' && (
+                  <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
+                    help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
+                )}
+                <SegRow label="Format" testIdPrefix="frame-orient"
+                  options={[['Portrait', false],['Landscape', true]]}
+                  value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
+                  help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
+                <InlineSl label="Scale" min={0.1} max={1} step={0.01} value={view.frameScale ?? 0.85} onChange={v => sv({ frameScale: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-scale"
+                  help="How much of the viewport the sheet covers. Smaller crops tighter; at 100% the sheet touches whichever pair of edges its shape reaches first." />
+                <InlineSl label="Offset X" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetX ?? 0} onChange={v => sv({ frameOffsetX: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-x"
+                  help="Slides the sheet across the viewport, as a fraction of its width. The canvas fills the window and this panel floats over it, so a centred frame sits a little left of the free space — nudge it right to compose against what you can actually see." />
+                <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
+                <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
+                  help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
               </Sub>
             )}
           </Section>
@@ -4700,54 +3571,6 @@ export function Sidebar({
             )}
           </Section>
 
-          <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
-            <Sub>
-              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
-              {!view.orthographic && (
-                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
-              )}
-              {/* fmt is not decoration: these mirror the orbit target, which a
-                  mouse pan moves continuously, and without it a drag left the
-                  field reading `-247.38194837`. Scene.jsx rounds at the source
-                  now; this keeps any stray float legible if one ever arrives. */}
-              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
-              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
-              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
-                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
-            </Sub>
-          </Section>
-          <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
-                   enabled={summaries['Mirror'] !== '—'}>
-            <div style={{ fontSize:10, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
-              <div />
-              <button title="Mirror Up (+Y)" className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<div className="sym-label">+Y</div></button>
-              <div />
-
-              <button title="Mirror Left (-X)" className={`sym-btn${style.showMirrorMinusX ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusX: !style.showMirrorMinusX })}>◀<div className="sym-label">-X</div></button>
-              <button title="Mirror Back (-Z)" className={`sym-btn${style.showMirrorMinusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusZ: !style.showMirrorMinusZ })}>↗<div className="sym-label">-Z</div></button>
-              <button title="Mirror Right (+X)" className={`sym-btn${style.showMirrorPlusX ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusX: !style.showMirrorPlusX })}>▶<div className="sym-label">+X</div></button>
-
-              <div />
-              <button title="Mirror Down (-Y)" className={`sym-btn${style.showMirrorMinusY ? ' on' : ''}`} onClick={() => ss({ showMirrorMinusY: !style.showMirrorMinusY })}>▼<div className="sym-label">-Y</div></button>
-              <div />
-
-              <div />
-              <button title="Mirror Front (+Z)" className={`sym-btn${style.showMirrorPlusZ ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusZ: !style.showMirrorPlusZ })}>↙<div className="sym-label">+Z</div></button>
-              <div />
-            </div>
-            <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:12, opacity:0.7, lineHeight:1.4, marginBottom:8 }}>
-              Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
-            </div>
-            <button onClick={() => ss({ 
-              showMirrorPlusX:true, showMirrorMinusX:false,
-              showMirrorPlusY:true, showMirrorMinusY:false,
-              showMirrorPlusZ:true, showMirrorMinusZ:false
-            })} style={{ 
-              width:'100%', padding:'4px 0', background: SURF, color: DIM, 
-              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
-            }}>Reset Symmetry</button>
-          </Section>
           </Stage>
 
           <Stage n={6} title="Output">
@@ -4859,6 +3682,7 @@ export function Sidebar({
                 : 'Elevation Profile'}
             </button>
           </Section>
+
           </Stage>
 
           {/* ── Stats ─────────────────────────────────────────────────────── */}

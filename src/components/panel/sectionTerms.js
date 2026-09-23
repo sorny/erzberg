@@ -18,10 +18,10 @@
  * in one direction — and then went stale the next time a mode was added.
  */
 export const SECTION_TERMS = {
-  'Terrain':          'resolution elevation scale blur jitter min max cut hypsometric integral raw greyscale heightmap',
+  'Shape':            'resolution elevation scale blur jitter min max cut hypsometric integral raw greyscale heightmap',
   'Levels':           'shadows highlights histogram black white point contrast',
-  'View':             'tilt zoom rotation supersampling auto-rotate spin guides paper frame page sheet margin aspect portrait landscape a4 letter',
-  'Camera':           'orthographic perspective focal length lens pan dolly',
+  'Camera':           'tilt zoom rotation supersampling auto-rotate spin guides orthographic perspective focal length lens pan dolly view angle',
+  'Paper':            'paper frame page sheet margin scale offset aspect ratio portrait landscape a3 a4 letter mount border',
   'Terrain Style':    'fill mesh occlusion ghost x-ray background gradient sky paper colour color',
   'Hillshade':        'sun azimuth altitude shadows relief lambert penumbra softness multidirectional light almanac ephemeris date time clock solstice equinox sunrise sunset latitude longitude timezone solar',
   'Slope Shading':    'steepness gradient two-colour incline',
@@ -71,7 +71,7 @@ export const SECTION_TERMS = {
   'Soundscapes':      'audio mp3 wav spectrogram fft playback freeze disc similarity weave strata noise gate music',
   'Hydraulic Erosion':'droplets rain simulation inertia capacity deposition evaporation weathering',
   'Export':           'svg png stl webm plotter print heightmap preset save load download video recording metadata reopen embedded settings project file preflight pen order route travel ink sheet width millimetres estimate',
-  'Fetch Terrain':    'download dem elevation place name search geocode nominatim openstreetmap mountain summit valley town tiles terrarium aws online',
+  'Fetch':            'fetch download dem terrain elevation place name search geocode nominatim openstreetmap mountain summit valley town tiles terrarium aws online',
   'Satellite':        'satellite imagery aerial photo sentinel copernicus true colour drape backdrop scene cloud esa',
   'Masks':            'mask masks paint brush draw stencil region select restrict layer studio import png jpg',
   'Land Cover':       'landcover land use class classes mask stencil vegetation forest water rock alphaearth embedding satellite plate ink by class',

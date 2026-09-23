@@ -584,7 +584,22 @@ export function Scene({
           and minDistance keeps free scroll-zoom clear of the near plane. */}
       <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
       <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
-      {!webmRecording && (
+      {/*
+        * The orientation gizmo, and the two things that take the corner from it.
+        *
+        * It is chrome: a viewport aid for orbiting that never reaches an export.
+        * It already stood down for a recording, because it would have been in
+        * the video. The scale bar is the same situation on screen — `SheetMarks`
+        * is *ink*, it draws at the frame's bottom-left corner, and the gizmo sits
+        * 72 px into the same corner. Two things in one place, and only one of
+        * them is part of the drawing.
+        *
+        * So it stands down for the sheet marks too. The north arrow also does
+        * the gizmo's own job, and does it more precisely — it names true north
+        * rather than the world axes — so turning that on is already a statement
+        * that you are composing a plate rather than orbiting one.
+        */}
+      {!webmRecording && !p.frameScaleBar && !p.frameNorth && (
         <GizmoHelper alignment="bottom-left" margin={[72, 72]}>
           <GizmoViewport axisColors={['#e05555', '#55bb55', '#5588dd']} labelColor="#ffffff" />
         </GizmoHelper>

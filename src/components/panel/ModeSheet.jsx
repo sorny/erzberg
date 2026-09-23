@@ -46,6 +46,7 @@
 import { DRAW_MODES } from '../../utils/drawModes'
 import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
+import { FAMILIES } from './markFamilies'
 import { ACCENT, ACCENT_DEEP, BORDER, DIM, GREEN, MUTED, SURF, TEXT } from './ui'
 
 /** id → the glyph that shows what it draws. One lookup, built once. */
@@ -53,6 +54,9 @@ const MARK_FOR = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.mark]))
 
 /** `Mode: Stipple Dots` → `Stipple Dots`. The tile needs the half that names the mark. */
 const markName = (title) => title.replace(/^Mode:\s*/, '')
+
+/** `Contours` → its `PANEL_MODES` row. One lookup, built once. */
+const ROW_BY_NAME = new Map(PANEL_MODES.map((row) => [markName(row[0]), row]))
 
 /**
  * The sheet.
@@ -70,13 +74,30 @@ const markName = (title) => title.replace(/^Mode:\s*/, '')
 export function ModeSheet({ style, onToggle, onOpen }) {
   return (
     <>
-    <div data-testid="mode-sheet" style={{
-      display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4,
-    }}>
-      {PANEL_MODES.map(([title, key]) => {
-        const id   = key.slice('enabled'.length)
-        const on   = !!style[key]
-        const name = markName(title)
+    <div data-testid="mode-sheet">
+    {FAMILIES.map(([family, gloss, names]) => (
+      <div key={family}>
+        {/* A heading over its own marks, with the count that says how big the
+            idea is. `title` carries the gloss, because a 272 px pane has room
+            for the name and not for the sentence. */}
+        <div data-testid={`family-${family.toLowerCase()}`} title={gloss} style={{
+          display:'flex', alignItems:'baseline', gap:8,
+          margin:'12px 0 6px', paddingBottom:3, borderBottom:`1px solid ${BORDER}`,
+        }}>
+          <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.6px',
+            textTransform:'uppercase', color: DIM }}>{family}</span>
+          <span style={{ flex:1 }} />
+          <span style={{ fontSize:9, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+            {names.length}
+          </span>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4 }}>
+      {names.map((name) => {
+        // `name` is already the display name — the family lists carry it, and
+        // `ROW_BY_NAME` turns it back into the section title and the boolean.
+        const [title, key] = ROW_BY_NAME.get(name)
+        const id = key.slice('enabled'.length)
+        const on = !!style[key]
         return (
           /*
            * A group, not a button. A button inside a button is invalid markup
@@ -151,6 +172,9 @@ export function ModeSheet({ style, onToggle, onOpen }) {
           </div>
         )
       })}
+        </div>
+      </div>
+    ))}
     </div>
     {/*
       * One line, because a tile with two targets has to say so once.
