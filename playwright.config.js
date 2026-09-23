@@ -1,5 +1,31 @@
 import { defineConfig } from '@playwright/test'
 
+/**
+ * The specs that touch no pixels, no drawing buffer and no audio clock.
+ *
+ * Stated rather than detected, because being wrong here is expensive in a way
+ * that is hard to read: a GPU-bound spec in the parallel half does not fail
+ * honestly, it reports the *unoccluded* mark count or an empty depth buffer and
+ * looks exactly like a feature regression. That is the trap the note above
+ * describes, and it cost four false failures the first time.
+ *
+ * So the rule is conservative: anything that screenshots, reads pixels, waits
+ * on a download, presses an export hotkey, listens for `[Perf]`, drives rAF or
+ * plays audio belongs in the other half. When in doubt, leave it out — the
+ * serial half is correct, only slower.
+ */
+const LIGHT = [
+  'audio-fixes.spec.js', 'bitplane.spec.js', 'build-feedback.spec.js',
+  'camera.spec.js', 'clip-to-feature.spec.js', 'crop-edges.spec.js',
+  'descent.spec.js', 'discovery.spec.js', 'erosion.spec.js',
+  'export-attribution.spec.js', 'flashbulb.spec.js', 'grid.spec.js',
+  'halation.spec.js', 'history.spec.js', 'isophotes.spec.js',
+  'no-third-party.spec.js', 'opening-preset.spec.js', 'osm-detail.spec.js',
+  'osm-progress.spec.js', 'projection.spec.js', 'retro.spec.js',
+  'runtime.spec.js', 'section-reset.spec.js', 'section.spec.js',
+  'session.spec.js', 'terrain-fetch.spec.js', 'zero-crossings.spec.js',
+]
+
 export default defineConfig({
   testDir: './tests',
   /*
@@ -81,11 +107,46 @@ export default defineConfig({
    * the same objection: a suite that reports starvation as a feature
    * regression is worth less than the eighteen minutes it saves.
    *
-   * So this stays at one. If it is ever raised, raise it for the specs that do
-   * not read pixels or drive rAF and leave the rest serial, rather than for the
-   * whole suite — the figures above say which half is which.
+   * ── The split, 2026-09-23 ────────────────────────────────────────────────
+   * That last paragraph used to end "if it is ever raised, raise it for the
+   * specs that do not read pixels or drive rAF and leave the rest serial". The
+   * two projects below are that, and the criterion is evidence rather than
+   * taste: a spec is `heavy` if it screenshots, reads a drawing buffer, waits
+   * on a download, presses an export hotkey, listens for `[Perf]`, drives rAF,
+   * or plays audio. Everything else is `light`.
+   *
+   * The light half is not "the easy tests". Several of them — bitplane, retro,
+   * flashbulb — import `geometryBuilders.js` into the page and run it over a
+   * synthetic grid. They are algorithm tests that happen to need a browser,
+   * they never touch the GPU, and nothing about them contends.
+   *
+   * `workers: 1` stays as the default, so a bare `npx playwright test` behaves
+   * exactly as it did. The parallelism is asked for explicitly, per project,
+   * by `npm test` — Playwright has no per-project worker count, so the two
+   * halves are two invocations rather than one.
+   *
+   * Measured, because the note above says to measure rather than assume. The
+   * light half, 140 tests in 27 files, on this machine:
+   *
+   *     1 worker    7.1 min    140 passed
+   *     4 workers   1.8 min    140 passed
+   *
+   * A real 3.8×, and the same 140 both ways — no starvation, because nothing in
+   * this half waits on the GPU. That is the whole difference from the earlier
+   * attempt, which parallelised the specs that do.
    */
   workers: 1,
+  projects: [
+    {
+      name: 'light',
+      testMatch: LIGHT,
+      fullyParallel: true,
+    },
+    {
+      name: 'heavy',
+      testIgnore: LIGHT,
+    },
+  ],
   use: {
     // `HEADED=1 npx playwright test` to watch it drive the app, which is the
     // fastest way to understand a failure. Everything else about the run is
