@@ -1,0 +1,57 @@
+name: Check
+
+# Lint and the unit suite, on every push and every pull request.
+#
+# ── Why this exists ──────────────────────────────────────────────────────────
+# `deploy.yml` builds `main` and publishes it. It never ran a test, so a push
+# that compiled was a push that shipped. v1.20.0 went out with five spec files
+# red and stayed that way through a release, and nothing but a person running
+# the suite by hand was ever going to notice.
+#
+# ── Why it stops at the unit suite ───────────────────────────────────────────
+# The end-to-end suite drives a real browser against real WebGL, serially — see
+# the worker note in `playwright.config.js` for why serially — and takes about
+# an hour and a half. That is not a per-push gate.
+#
+# What runs here takes seconds and covers the things that go wrong quietly: the
+# four panel indexes agreeing with each other and with the panel's own source,
+# every mark having a family, and no spec reaching a control in a pane it never
+# opens. Each of those guards was written after something slipped through.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+# A second push supersedes the first. Nothing here writes anything, so there is
+# no reason to finish a run whose commit is already history.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # Kept separate from the build so a red suite and a broken build are told
+      # apart at a glance in the checks list.
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Build
+        run: npm run build
