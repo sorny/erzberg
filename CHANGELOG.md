@@ -7,6 +7,119 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] — 2026-09-23
+
+1.22.0 said React 19 was "a migration of its own, not a version bump". This is
+that migration, and it needed no application code at all. What it did turn up is
+a cost that had been on the camera's path for a long time, hidden by a
+development build that was fast enough to hide it.
+
+### Changed — behind the panel
+
+- **React 19, and the three libraries that had to move with it.** `react` and
+  `react-dom` 18.3.1 → 19.3.0, `@react-three/fiber` 8.18.0 → 9.8.0,
+  `@react-three/drei` 9.122.0 → 10.7.8, `three` 0.184.0 → 0.186.0, `vitest`
+  4.1.11 → 5.0.1, and the React 19 types. Every direct dependency now sits on
+  its latest release. No vulnerabilities.
+
+  `@react-three/fiber@8` pinned `react >=18 <19`, which is why all four had to
+  land in one commit. Not one source file needed a change for the upgrade. Of
+  341 tests, 340 passed untouched; the one failure was a ceiling inside
+  `render-perf.spec.js` itself, and it is re-recorded below.
+
+  The counts that decide whether a renderer upgrade cost anything are identical
+  to the sample: **12 draw calls and 2 618 928 triangles** for the opening
+  plate, **24 and 9 108 010** with three mark layers on. Those are facts about
+  what the library submitted rather than about this GPU, so they reproduce
+  anywhere. Nothing stopped batching, and drei 10 added no render pass.
+
+- **The development server is about 20% slower, and that is React's own dev
+  build.** The same scene holds 241 frames in four seconds in production and
+  204 on `npm run dev`. A CPU profile over a 5 s auto-rotate puts 956 ms of
+  5 130 ms inside `jsxDEV`, the development JSX runtime React 19 gave
+  owner-stack tracking. A production bundle does not contain it. This is a
+  slower `npm run dev`, not a slower app.
+
+- **`stats-gl` and `fflate` each resolve to two copies in `node_modules`, and
+  neither second copy ships.** `stats-gl` declares `three: "*"` as a dependency
+  rather than a peer, so it carries its own `three@0.170.0`. A source-map read
+  of the built bundle lists one `three`, and neither `stats-gl` nor `fflate` at
+  all. Recorded because a second `three` is exactly the kind of duplicate that
+  breaks `instanceof` if it ever does reach a bundle.
+
+### Removed
+
+- **`three-mesh-bvh` is no longer a direct dependency.** It arrived with the
+  water simulation and outlived it. Nothing under `src/`, `tests/`, `scripts/`
+  or any config imports `mesh-bvh`, `MeshBVH`, `boundsTree`,
+  `acceleratedRaycast` or `StaticGeometryGenerator`, and the built bundle never
+  contained it. drei keeps its own `three-mesh-bvh@0.8.3` for `<Bvh>`, which is
+  drei's business and reaches nothing here. The bundle is unchanged by the
+  removal — the same 19 packages before and after — and the notice file lists
+  71 packages rather than 72.
+
+### Fixed
+
+- **An orbit re-derived every panel section about seven times a second.**
+  `paramsForSection` is a pure function of a fixed section list and a
+  module-level key array, so its answer never changes. It was rebuilt on every
+  call, and `modifiedSections` calls it once per section.
+
+  That put it on the camera's path. An orbit writes tilt, rotation and zoom into
+  `view` at the throttled sync rate, and the Sidebar's `modified` memo depends on
+  `view`. For a mark section the inner loop tests every parameter key against
+  every mode suffix to find the longest match — about 172 × 34 string
+  comparisons, fifty-odd times a second.
+
+  A `WeakMap` keyed on the key array fixes it. Both functions are now absent
+  from the profile. In production the worst frame in four seconds fell from
+  **37.1 ms to 17.9 ms** and p95 from **28.1 ms to 17.6 ms**, so every frame
+  lands inside the 16.7 ms budget. The gain is not React's. React 19's
+  development build is only what made the cost visible.
+
+- **The notice file credited four MIT packages to the wrong copyright holder.**
+  Six packages in the production closure declare a licence and ship no copy of
+  it, so `scripts/licenses.js` borrows the text from a sibling that declares the
+  same SPDX id. It preferred the longest candidate, on the reasoning that a
+  package appending its own copyright line is a worse source than one that ships
+  the licence plain — but an MIT file is a title, a copyright line, then the
+  grant, so the longest candidate is precisely the one that names its own
+  holder. `dist/THIRD-PARTY-NOTICES.txt` therefore printed, under
+  `@react-three/fiber` by Paul Henschel:
+
+      Copyright (c) 2010-2012 Tween.js authors.
+
+  A file whose whole job is correct attribution asserted the wrong holder.
+
+  What is canonical about a licence is its terms, and the copyright line is the
+  one part that never transfers. The header block is now stripped of copyright
+  lines before the text is borrowed or compared, so the winner is the fullest
+  statement of the terms rather than the one with the most attribution attached.
+  Ten lines covers the whole header of MIT, BSD and ISC and stops well short of
+  the Apache-2.0 appendix, whose `Copyright [yyyy] [name of copyright owner]` is
+  an instructional template and stays. Verified: all 215 lines of Apache-2.0
+  still reach `lerc`, and no borrowed block carries another package's copyright.
+
+- **Two lint warnings, both real.** The surface material's uniform effect read
+  `imageryTex` and did not declare it — harmless only because `p` is a fresh
+  object every render and the effect therefore always re-ran. And `MiniBtn`
+  moved from `panel/FeaturePicker.jsx` to `panel/ui.jsx`: a module that exports
+  a hook and declares a component cannot be hot-reloaded, and the panel's other
+  small buttons were already there. `npm run lint` is now silent.
+
+### Changed — the suite
+
+- **`render-perf.spec.js` bounds each build on its own terms.** It measures
+  whatever `playwright.config.js` started, which is the development server, and
+  a single frame-time ceiling cannot cover two builds that differ four-fold. It
+  now detects which one answered — a vite dev server injects its own client
+  shim — and asserts 33 ms for production against 120 ms for a dev server. Every
+  run prints which build it measured.
+
+  Its baseline block is re-recorded for the new stack, in two columns, with the
+  three draw-call and triangle counts left in one because they do not have a
+  second.
+
 ## [1.22.0] — 2026-09-22
 
 The rail gave the panel seven destinations. This fills them in: six sections
