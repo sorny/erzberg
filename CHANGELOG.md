@@ -7,6 +7,160 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] — 2026-09-22
+
+The rail gave the panel seven destinations. This fills them in: six sections
+move to the pane they belong in, one section that was doing two jobs splits in
+two, and the mark sheet gains the six families that were always in the marks.
+
+A heading level inside a pane was built and taken out again before release —
+three headings in Terrain, two in Frame. A pane is already one screen, and a
+second level inside it read as structure where there was only a list.
+
+### Added
+
+- **A Presets slot on the rail**, above the pipeline and set apart by a heavier
+  rule. It writes style, particles and view in one act, so it belongs to every
+  pane downstream and to none of them. It sat in Source only because the load
+  block did. Numbered with a lozenge rather than a digit, because a digit in the
+  pipeline's own column would claim it was a step, and abbreviated `PRST`
+  because the rail has about 29 px once the badge lane is taken out.
+
+  It opens expanded, which it could not afford when 2 346 px of thumbnails sat
+  between it and the other fifty-nine sections. Nothing shares its pane now.
+
+- **Six families on the mark sheet.** Line, Tone, Relief, Plate, Light and
+  Momentum, each with its own count. The families were always in the marks and
+  nothing said so: Fall Line, Berms, Air and Race Line are one idea, and they
+  sat among thirty-three unrelated neighbours. Stated in `panel/markFamilies.js`
+  — the fifth index over the panel and the only one that is a judgement rather
+  than a fact, so a unit suite holds it to covering every mark exactly once.
+
+- **A `Paper` section**, the half of `View` that was about the page.
+
+### Changed
+
+- **`View` split, and `Camera` absorbed its other half.** Fourteen controls
+  covered two subjects: tilt, zoom, rotation, auto-rotate and supersampling aim
+  the camera, while the paper frame, ratio, format, scale, offsets and margin
+  describe the sheet. Orthographic, focal length and pan were in a separate
+  `Camera` section four rows below, so framing a shot meant working in two
+  places that were never adjacent. Camera is open at defaults, as `View` was;
+  Paper is shut, because a sheet is not what you reach for first.
+
+- **Satellite moved from Source to Surface, and Texture from Overlay to
+  Surface.** Both composite inside the surface shader, one line apart: the
+  satellite drape mixes into the ground's own colour, and a texture mixes on top
+  of that, both under every draw mode. Overlay is now what its name says —
+  separate geometry drawn after the surface finishes, which is Vector Layers,
+  Text and Particles.
+
+  Satellite had three controls that fetch a scene and six that paint it. A drape
+  is a surface treatment, whatever fetched it.
+
+- **Masks and Land Cover moved into Terrain.** Neither is elevation. Every draw
+  mode reads them to decide where it draws, which is the ground's description
+  rather than its shape.
+
+- **Terrain reads in working order**: Fetch, Shape, Levels, Masks, Land Cover,
+  Hydraulic Erosion, Soundscapes. Shape and Levels open at defaults, because
+  they are the raster's own conditioning and a black point means little without
+  the histogram beside it.
+
+- **Three things are renamed.** *Source* is called **Terrain**, which is what it
+  holds. The *Terrain* section inside it is **Shape** — resolution, elevation
+  scale, blur, jitter and the two cuts all change the shape of the ground before
+  anything draws it. And *Fetch Terrain* is **Fetch**, because the stage already
+  supplies the noun. `dem`, `terrain` and `fetch` are all search words on it, so
+  the filter finds it however you think of it.
+
+  The error message that names it followed: *"Satellite imagery needs a
+  georeferenced raster — a GeoTIFF, or one from Terrain → Fetch."* A bare "or
+  Fetch" would have read as a verb.
+
+### Added — behind the panel
+
+- **CI runs the checks.** `deploy.yml` built `main` and published it, and never
+  ran lint or a test — a push that compiled was a push that shipped. v1.20.0
+  went out with five spec files red and stayed that way through a release,
+  because nothing but a person running the suite by hand was ever going to
+  notice.
+
+  `check.yml` runs lint, the unit suite and the build on every push and pull
+  request. It takes seconds, and it covers what goes wrong quietly: the panel's
+  indexes agreeing with each other and with the panel's own source, every mark
+  having a family, and no spec reaching a control in a pane it never opens.
+
+  The end-to-end suite stays out of it. It drives a real browser against real
+  WebGL, serially, and takes about an hour and a half — that is not a per-push
+  gate.
+
+### Changed — behind the panel
+
+- **Fourteen dependencies updated**, none of them breaking: Playwright 1.59 →
+  1.63, Vite 8.0 → 8.3, ESLint 10.8 → 10.11, Tailwind 4.2 → 4.3,
+  `three-mesh-bvh` 0.9.9 → 0.9.15, plus zustand, PostCSS, autoprefixer and the
+  React 18 types. No vulnerabilities. The declared floors in `package.json` were
+  raised to match, because a lockfile that pins 1.63 beside a range that still
+  says `^1.59.1` tells the next person nothing about what was tested.
+
+  React 19 is deliberately not among them. `@react-three/fiber@8` pins
+  `react >=18 <19`, so React 19 means fiber 9 and drei 10 in the same commit —
+  a migration of its own, not a version bump.
+
+- **`Sidebar.jsx` lost a third of its length**, 5 004 lines to 3 733. What came
+  out was never sections: seven components behind Vector Layers went to
+  `panel/VectorLayersPanel.jsx`, and `ModeStyleOverride` took its two mask rows
+  to a file of its own. Nothing was rewritten — every one already took props and
+  closed over nothing, so this is a move.
+
+  `ModeStyleOverride` earned the file: thirty-four mode sections render it and
+  so does every vector layer. It lived in `Sidebar.jsx` because that is where
+  its first caller was.
+
+### Fixed
+
+- **Every spec that calls `resetToDefaults` was timing out.** The shared helper
+  collapsed the Presets grid — a step that existed because 56 tiles added some
+  3 000 px to the panel and specs reach controls at measured coordinates. With
+  Presets in a pane of its own that height is gone, but the helper still clicked
+  the header, now in a pane nobody had selected: hidden, unclickable, sixty
+  seconds of timeout on nearly every spec in the project.
+
+  The step is gone, and the guard that watches for this now reads `helpers.js`
+  alongside the specs. A shared helper must open what it touches, and when one
+  does not, it fails the whole suite rather than one test.
+
+- **The performance benchmark measured five things and asserted one.** Four
+  numbers were printed and thrown away, so anything short of a ten-second reset
+  shipped in silence. All five have ceilings now, with the measured baselines
+  recorded beside them — a smoke gate rather than a budget, and the comment says
+  so. It catches "this became unusable", not "this got 30% slower".
+
+  Running it also showed it had been failing since the stage rail: it reaches
+  the rotation slider by `aria-label`, and Rotation is in Frame. So the guard
+  that watches for this now reads `aria-label` as well as test ids, for labels
+  unique to one section — `Opacity` and `Size` appear in a dozen places and name
+  no single pane. That found two more specs reaching a pane they never selected.
+
+- **The scale bar and the orientation gizmo shared a corner.** `SheetMarks` is
+  ink — it draws at the frame's bottom-left and it reaches an export — and the
+  gizmo sits 72 px into the same corner. The gizmo is chrome, so it stands down
+  for the sheet marks, exactly as it already stood down for a recording. The
+  north arrow does its job anyway, and more precisely: true north rather than
+  the world axes.
+
+- **The style link under the load block jumped to the wrong pane.** It moved the
+  panel to Ground while Presets had moved to a slot of its own, so the scroll
+  aimed at a section that was not on screen.
+
+- **Five spec files had been failing since v1.20.0.** `areas`, `land-cover`,
+  `mask-from-features`, `masks` and `vector` reach the export buttons by test id
+  rather than through a section, so the grep that scoped the v1.20.0 migration
+  never saw them. They are green, and the guesswork is replaced: a check reads
+  the test id → section map out of `Sidebar.jsx`, joins it to `stages.js`, and
+  reports any spec that touches a control in a pane it never selects.
+
 ## [1.20.0] — 2026-09-22
 
 ### Added
