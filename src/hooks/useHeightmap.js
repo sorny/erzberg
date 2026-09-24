@@ -474,6 +474,7 @@ function friendlyError(err) {
 export function useHeightmap() {
   const setHeightmap    = useStore((s) => s.setHeightmap)
   const setGeoTiffMeta  = useStore((s) => s.setGeoTiffMeta)
+  const setTerrainProvenance = useStore((s) => s.setTerrainProvenance)
   const clearGeoTiffMeta = useStore((s) => s.clearGeoTiffMeta)
   const [isLoading,  setIsLoading]  = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
@@ -523,6 +524,7 @@ export function useHeightmap() {
       .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs, crsName }) => {
         console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
         setGeoTiffMeta(realElevMin, realElevMax, bbox, crs, crsName)
+        setTerrainProvenance(`${file.name} · opened from this machine`)
         setHeightmap(pixels, nodataMask, width, height, file.name)
         setIsLoading(false); setLoadingMsg('')
         return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }
@@ -533,7 +535,7 @@ export function useHeightmap() {
         console.error(err)
         return null   // signals failure to callers; see loadGeoTiffFromPicker
       })
-  }, [setHeightmap, setGeoTiffMeta])
+  }, [setHeightmap, setGeoTiffMeta, setTerrainProvenance])
 
   /**
    * Take a DEM the app fetched rather than one somebody opened.
@@ -551,6 +553,11 @@ export function useHeightmap() {
   const loadDem = useCallback((dem, name) => {
     const { pixels, nodataMask, width, height } = demToHeightmap(dem)
     setGeoTiffMeta(dem.elevMin, dem.elevMax, dem.bbox, dem.crs, 'Web Mercator')
+    // The tiles name the survey they came from, which is better provenance
+    // than any fixed line — and it is what has to travel with the plate.
+    setTerrainProvenance(dem.sources?.length
+      ? `Terrain Tiles · ${dem.sources.join(', ')}`
+      : 'Terrain Tiles on AWS Open Data')
     setHeightmap(pixels, nodataMask, width, height, name)
     return {
       width, height, dataWidth: width, dataHeight: height,
@@ -560,7 +567,7 @@ export function useHeightmap() {
       suggestedElevScale: suggestElevScale(
         dem.elevMax - dem.elevMin, dem.groundMetres, dem.crs, dem.bbox),
     }
-  }, [setHeightmap, setGeoTiffMeta])
+  }, [setHeightmap, setGeoTiffMeta, setTerrainProvenance])
 
   const loadGeoTiffFromPicker = useCallback((onLoaded) => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.tif,.tiff,.geotiff,image/tiff' })

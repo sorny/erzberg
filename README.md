@@ -229,11 +229,23 @@ tile reads and writes one boolean and does nothing else.
 | **Audio** | MP3, WAV, OGG or M4A. The app analyses the file into a spectrogram that drives the terrain. |
 | **GPX** | The app drapes the track line over a georeferenced raster. |
 | **GeoJSON** | Points, lines and polygons, draped the same way. |
-| **Fetch** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, then downloads elevation tiles from Terrain Tiles on AWS Open Data. The result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
+| **Fetch** | Type a place. The app resolves the name with OpenStreetMap's Nominatim geocoder, draws the ground around it, and lets you place the box before you download it — with the zoom, the tile cost, the raster size and the metres per pixel stated first. The tiles come from Terrain Tiles on AWS Open Data, and the result is a georeferenced raster with real metres, exactly like a GeoTIFF. No account, no key, and nothing happens until you press Search. |
 | **OpenStreetMap** | The app queries the extent of the raster live for roads, water, rail, landuse, buildings, lifts and peaks. A fetch reports its progress, and says so honestly: the stretch where Overpass has sent nothing yet is indeterminate with an elapsed count, and the download that follows is a real percentage. |
 | **Satellite** | True-colour Sentinel-2 over the extent of the raster, at 10 m, from AWS Open Data. It drapes on the terrain and backs the Mask Studio. No account, no key, and nothing happens until you press Fetch. |
 | **Mask** | A PNG, JPG or WebP as a stencil: white is inside, transparent is outside. Or draw one, or cut one from loaded features. See [Masks](#masks). |
 | **Cover plate** | A `.landcover.json` from `scripts/embed-window.js`: one land-cover class per pixel over the same ground as the raster. It states its own extent and projection and is refused if it does not match. See [Land cover](#land-cover). |
+
+**Place the box before you download it.** Picking a search result aims an extent
+rather than fetching one. The ground around it is drawn from the same elevation
+tiles the fetch itself will use — so the map cannot lie about coverage, because
+it *is* the coverage — and the box on it is yours to move and resize. The zoom,
+the tile cost, the raster size and the metres per pixel are stated first.
+
+A smaller box is not a smaller file. It is a sharper one: the zoom is always the
+finest that fits the budget, so shrinking the box spends the same thirty-six
+tiles on less ground.
+
+<img src="docs/images/fetch-window.png" alt="The Fetch section: a shaded-relief map of the Eiger with a draggable selection box, above a readout of zoom 13, 20 of 36 tiles, a 915 by 921 pixel raster and 13 metres per pixel" width="312">
 
 **Drag and drop.** Drop a file anywhere on the window and the app routes it by
 what it is. A GeoTIFF becomes the terrain. A GPX or GeoJSON becomes an overlay.
@@ -317,6 +329,25 @@ If features do not appear, the panel gives the reason. Four cases otherwise look
 the same: not projectable, not georeferenced, projected but somewhere else, and
 drawable but not queryable. The last case applies to the OSM query alone,
 because that query needs the *inverse* projection.
+
+---
+
+## What a plate is made of
+
+The app fetches three things and each has its own button in its own stage —
+terrain in Source, imagery in Surface, map features in Overlay. Nothing said
+that all three describe the same patch of ground, which is the one fact they
+have in common and the reason any of them align.
+
+*Source → Extent* says it. The place, the degrees, the size in kilometres, the
+projection and the metres per pixel, then one row per layer with its state and
+where it came from. The elevation row names the survey the tile host reported —
+`eudem/eudem_dem_5deg_n45e005.tif` — rather than a fixed credit line, and the
+rows that hold nothing say which section would fill them.
+
+It reads and never writes. Moving the extent and having imagery and vectors
+follow is a different feature with different consequences; this one states what
+is already true. See [Georeferencing](docs/Georeferencing.md).
 
 ---
 
@@ -411,6 +442,10 @@ its own panel in place of the sidebar. Brush, rectangle, ellipse and lasso, with
 **Fit** to go back — the same view, the same gestures and the same panel layout
 as Edit Mode, because they are the same kind of thing. The backdrop is satellite
 imagery when you have fetched some, and the hillshade when you have not.
+
+**Copy one.** The **⧉** beside *Edit* duplicates a mask, pixels and all, and
+drops the copy under the one it came from. The copy gets its own colour, because
+colour is how you tell two masks apart while you are drawing.
 
 **Or make one from features you already have.** *Masks → From features* takes
 any loaded OpenStreetMap or GeoJSON layer and rasterises it: areas fill with

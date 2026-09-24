@@ -91,6 +91,7 @@ const STATED = {
   // jitter and the two cuts all change the shape of the ground before anything
   // draws it. `Fetch` needs no noun — the stage supplies it.
   'Fetch': 1,
+  'Extent': 1,
   'Soundscapes': 1,
   'Shape': 1,
   'Levels': 1,

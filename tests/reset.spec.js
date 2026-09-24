@@ -70,7 +70,7 @@ test('a reset clears the masks, and Undo brings them back', async ({ page }) => 
   await page.waitForTimeout(500)
 
   const masksSection = page.locator('[data-section="Masks"]')
-  await expect(masksSection.locator('[data-testid^="paint-"]')).toHaveCount(1)
+  await expect(masksSection.locator('[data-testid^="mask-edit-"]')).toHaveCount(1)
 
   await page.fill('[data-testid="panel-filter"]', '')
   await page.waitForTimeout(300)
@@ -78,7 +78,7 @@ test('a reset clears the masks, and Undo brings them back', async ({ page }) => 
   await page.waitForTimeout(1200)
   await page.fill('[data-testid="panel-filter"]', 'Masks')
   await page.waitForTimeout(500)
-  await expect(masksSection.locator('[data-testid^="paint-"]'),
+  await expect(masksSection.locator('[data-testid^="mask-edit-"]'),
     'a reset takes the masks with it').toHaveCount(0)
 
   await page.fill('[data-testid="panel-filter"]', '')
@@ -87,7 +87,7 @@ test('a reset clears the masks, and Undo brings them back', async ({ page }) => 
   await page.waitForTimeout(1200)
   await page.fill('[data-testid="panel-filter"]', 'Masks')
   await page.waitForTimeout(500)
-  await expect(masksSection.locator('[data-testid^="paint-"]'),
+  await expect(masksSection.locator('[data-testid^="mask-edit-"]'),
     'Undo puts them back').toHaveCount(1)
 })
 

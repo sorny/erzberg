@@ -43,7 +43,7 @@ const NOMINATIM = 'https://nominatim.openstreetmap.org/search'
 const TERRARIUM = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium'
 
 /** Tiles are 256 px square, which fixes every raster size this module returns. */
-const TILE = 256
+export const TILE = 256
 
 /**
  * The most tiles one press may pull.
@@ -169,7 +169,7 @@ export function padBbox([minLon, minLat, maxLon, maxLat], km = 6) {
  * big-endian across the three colour channels with the blue byte carrying the
  * fractional part. Ocean is not a hole — it carries real bathymetry.
  */
-async function fetchTile(z, x, y, signal) {
+export async function fetchTerrariumTile(z, x, y, signal) {
   const res = await fetch(`${TERRARIUM}/${z}/${x}/${y}.png`, { signal })
   if (!res.ok) throw new Error(`Tile ${z}/${x}/${y} failed (${res.status}).`)
   // Exposed by the bucket's CORS policy, and it names the actual survey this
@@ -186,6 +186,41 @@ async function fetchTile(z, x, y, signal) {
     out[i] = data[p] * 256 + data[p + 1] + data[p + 2] / 256 - 32768
   }
   return { pixels: out, source }
+}
+
+/**
+ * What a fetch of this box would cost and produce, without fetching it.
+ *
+ * Every number here was already computed inside `fetchDem`, one line before the
+ * download began, and thrown away — so the panel could only ever report the
+ * resolution *after* paying for it. This is the same arithmetic hoisted out, and
+ * it is deliberately the one the fetch itself then uses: a readout that is
+ * derived separately is a readout that will eventually disagree.
+ *
+ * Returns null for an extent no zoom can cover inside the budget.
+ */
+export function describeFetch(bboxWgs84, maxTiles = MAX_TILES) {
+  const z = zoomForExtent(bboxWgs84, maxTiles)
+  if (z == null) return null
+  const { x0, x1, y0, y1, count } = tileRange(bboxWgs84, z)
+
+  // The crop `fetchDem` performs, to the pixel. Its own comment explains why the
+  // box lands inside the stitched sheet rather than on its edge.
+  const fx0 = (lonToTileX(bboxWgs84[0], z) - x0) * TILE
+  const fx1 = (lonToTileX(bboxWgs84[2], z) - x0) * TILE
+  const fy0 = (latToTileY(bboxWgs84[3], z) - y0) * TILE
+  const fy1 = (latToTileY(bboxWgs84[1], z) - y0) * TILE
+  const width = Math.max(1, Math.min((x1 - x0 + 1) * TILE, Math.ceil(fx1)) - Math.max(0, Math.floor(fx0)))
+  const height = Math.max(1, Math.min((y1 - y0 + 1) * TILE, Math.ceil(fy1)) - Math.max(0, Math.floor(fy0)))
+
+  const mercPerPx = (2 * EARTH_HALF) / (2 ** z * TILE)
+  const midLat = (bboxWgs84[1] + bboxWgs84[3]) / 2
+  return {
+    zoom: z, tiles: count, maxTiles, width, height,
+    // Web Mercator overstates ground distance by 1/cos(lat) — the same
+    // correction `fetchDem` applies to the figure it reports afterwards.
+    groundMetres: mercPerPx * Math.cos((midLat * Math.PI) / 180),
+  }
 }
 
 /**
@@ -218,7 +253,7 @@ export async function fetchDem(bboxWgs84, { signal, onProgress, maxTiles = MAX_T
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       if (signal?.aborted) throw new DOMException('Aborted', 'AbortError')
-      const { pixels, source } = await fetchTile(z, tx, ty, signal)
+      const { pixels, source } = await fetchTerrariumTile(z, tx, ty, signal)
       if (source) sources.add(source)
       const ox = (tx - x0) * TILE, oy = (ty - y0) * TILE
       for (let r = 0; r < TILE; r++) {

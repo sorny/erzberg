@@ -72,6 +72,7 @@ export const SECTION_TERMS = {
   'Hydraulic Erosion':'droplets rain simulation inertia capacity deposition evaporation weathering',
   'Export':           'svg png stl webm plotter print heightmap preset save load download video recording metadata reopen embedded settings project file preflight pen order route travel ink sheet width millimetres estimate',
   'Fetch':            'fetch download dem terrain elevation place name search geocode nominatim openstreetmap mountain summit valley town tiles terrarium aws online',
+  'Extent':           'extent bbox bounding box provenance source layers coverage where place latitude longitude crs projection credit imagery land cover map features size km',
   'Satellite':        'satellite imagery aerial photo sentinel copernicus true colour drape backdrop scene cloud esa',
   'Masks':            'mask masks paint brush draw stencil region select restrict layer studio import png jpg',
   'Land Cover':       'landcover land use class classes mask stencil vegetation forest water rock alphaearth embedding satellite plate ink by class',

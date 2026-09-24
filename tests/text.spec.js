@@ -79,6 +79,20 @@ test('each text exports as real <text> in its own pen layer', async ({ page }) =
   await page.locator('[data-testid^="text-body-"]').first().fill('NORTH FACE')
   await page.waitForTimeout(1200)
 
+  /*
+   * Off, because the default is now a stroke face.
+   *
+   * `textLayers.js` opens a text on Relief SingleLine Pendot, which letters with
+   * polylines — the pen draws the skeleton of each glyph once instead of going
+   * round its edge twice. That is the right default for a plotter and it is the
+   * opposite of what this test is about, so the toggle comes off here and the
+   * test below owns the other half.
+   */
+  for (const tog of await page.locator('input[type=checkbox][aria-label="Use single-line font"]').all()) {
+    if (await tog.isChecked()) await tog.click()
+  }
+  await page.waitForTimeout(1200)
+
   await page.locator('canvas').first().click({ position: { x: 700, y: 600 }, force: true })
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 90_000 }),
@@ -99,4 +113,40 @@ test('each text exports as real <text> in its own pen layer', async ({ page }) =
   const labels = [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
   expect(labels).toContain('ERZBERG')
   expect(labels).toContain('NORTH FACE')
+})
+
+test('a text opens on a stroke face, and plots as strokes', async ({ page }) => {
+  /*
+   * The other half of the export test above, and the reason the default moved.
+   *
+   * An outline face plots the *edge* of a letter, so a pen traces every glyph
+   * twice and the counters fill in at small sizes. Relief SingleLine Pendot
+   * draws the skeleton, which is what a plotter has done since the 1960s. The
+   * cost is that the SVG carries polylines rather than editable <text>, and
+   * that is a real trade rather than a free win — hence two tests.
+   */
+  await boot(page)
+  await page.locator('[data-testid="text-add"]').click()
+  await page.locator('[data-testid^="text-body-"]').first().fill('ERZBERG')
+  await page.waitForTimeout(900)
+
+  // The face it opened on, by name rather than by id, because the name is what
+  // the panel shows and what the request was written in.
+  const sel = page.locator('[data-testid^="text-font-"]').first()
+  await expect(sel).toHaveValue('ReliefPendot')
+  expect(await sel.evaluate((el) => el.options[el.selectedIndex]?.text))
+    .toBe('Relief SingleLine Pendot')
+
+  await page.locator('canvas').first().click({ position: { x: 700, y: 600 }, force: true })
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 90_000 }),
+    page.keyboard.press('1'),
+  ])
+  const svg = readFileSync(await download.path(), 'utf8')
+
+  // Strokes, and the layer still named after what it says so a plot can be
+  // separated by pen.
+  expect(svg).not.toContain('<text')
+  expect([...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])).toContain('ERZBERG')
+  expect(svg).toMatch(/<(polyline|path)/)
 })

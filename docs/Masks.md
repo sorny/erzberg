@@ -180,8 +180,13 @@ is built with and has to reach the worker.
 
 ## The Studio
 
-Press **Paint** on a mask, or **+ Draw a mask**. It opens over the viewport and
+Press **Edit** on a mask, or **+ Draw a mask**. It opens over the viewport and
 its panel replaces the sidebar for the duration.
+
+The button said *Paint* until 1.24.0, and it undersold what is behind it. The
+Studio erases, fills, inverts, imports and crops as well as painting, so naming
+it after one of its tools described neither the panel nor what the button does
+to a mask that already has pixels.
 
 | Tool | Key | |
 |---|---|---|
@@ -337,6 +342,35 @@ two-pass parabola envelope, linear in the number of pixels.
 bounding box in metres and a geographic one in degrees. Reading a degree as a
 metre does not throw; it produces a corridor a hundred thousand times too wide,
 which is a filled rectangle and looks like a broken fill.
+
+---
+
+## Copying a mask
+
+The **⧉** button beside *Edit* duplicates a mask. The copy lands directly under
+the one it came from, because a duplicate is nearly always the start of a
+variation on its neighbour and a list of thirty-two would otherwise make you
+scroll to find what you just made.
+
+Two decisions inside `duplicateMask` are worth stating, because both are
+invisible when they are right and hard to diagnose when they are wrong.
+
+**The pixels are copied, not shared.** Two masks pointing at one `Uint8Array`
+would look correct in the list and stay correct until the Studio painted into
+either of them — and then both would change together, which shows up on the
+plate and nowhere in the panel.
+
+**The copy takes the next colour in the run, not its source's.** Colour is how
+you tell two masks apart in the Studio, and a duplicate is exactly the case
+where that matters most.
+
+It does not open the Studio, where **+ Draw a mask** does. An empty mask is
+useless until it is painted; a copy already has everything its source had.
+
+The name gets a ` copy` suffix, and a number after that if it is taken —
+`uniqueMaskName` checks the list. The panel identifies a mask by its name
+everywhere except the Studio, so two rows reading *Ridge copy* would be two rows
+nobody can separate.
 
 ---
 

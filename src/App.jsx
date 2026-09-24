@@ -50,7 +50,7 @@ const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, readPresetFile } from './utils/presetFile'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, parseCover, suggestInks } from './utils/coverPlate'
-import { createMask, MAX_MASKS, maskFromImageData } from './utils/maskLayers'
+import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, uniqueMaskName } from './utils/maskLayers'
 import { fetchImagery, findScenes, searchBboxFor } from './utils/imageryFetch'
 import { toneFor } from './utils/imageryTone'
 import { MaskStudio } from './components/MaskStudio'
@@ -839,6 +839,29 @@ export default function App() {
   const commitMask = useCallback((id) => {
     setMasks(srcMasks.map((m) => (m.id === id ? { ...m, data: m.data } : m)))
   }, [srcMasks, setMasks])
+
+  /**
+   * A copy of a mask, placed under the one it came from.
+   *
+   * Next to it rather than at the end, because a duplicate is nearly always the
+   * start of a variation on its neighbour — and a list of thirty-two would
+   * otherwise make you scroll to find what you just made.
+   *
+   * It does not open the Studio. `addMask` does, because an empty mask is
+   * useless until painted; a copy already has everything its source had.
+   */
+  const copyMask = useCallback((id) => {
+    if (srcMasks.length >= MAX_MASKS) {
+      showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
+      return null
+    }
+    const at = srcMasks.findIndex((m) => m.id === id)
+    if (at < 0) return null
+    const copy = duplicateMask(srcMasks[at], srcMasks.length,
+      uniqueMaskName(`${srcMasks[at].name} copy`, srcMasks))
+    setMasks([...srcMasks.slice(0, at + 1), copy, ...srcMasks.slice(at + 1)])
+    return copy
+  }, [srcMasks, setMasks, showError])
 
   const patchMask = useCallback((id, patch) => {
     setMasks(srcMasks.map((m) => (m.id === id ? { ...m, ...patch } : m)))
@@ -2329,10 +2352,10 @@ export default function App() {
         onAdoptVectorSource={adoptVectorSource}
         cover={cover} coverError={coverError} onLoadCover={loadCoverFromPicker}
         onClearCover={() => setCover(null)} onInkByClass={inkByClass}
-        masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask}
+        masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask} onCopyMask={copyMask}
         onRemoveMask={removeMask} onImportMask={importMask}
         onMaskFromLayer={maskFromLayer}
-        onPaintMask={(id) => setStudioMaskId(id)}
+        onEditMask={(id) => setStudioMaskId(id)}
         imagery={imagery} imageryBusy={imageryBusy}
         onFetchImagery={fetchSatellite} onClearImagery={() => setImagery(null)}
         onVectorError={setVectorError}

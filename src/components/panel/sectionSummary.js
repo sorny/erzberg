@@ -187,7 +187,12 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [],
  * both directions. Without the list, "every section has a summary" could only be
  * asserted by hard-coding a number, which is what went stale last time.
  */
-export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis', 'Fetch']
+export const SECTIONS_WITHOUT_SUMMARY = ['Presets', 'Hydraulic Erosion', 'Export', 'Analysis', 'Fetch',
+  // Extent is the one that is silent for the opposite reason to the rest.
+  // They hold actions and so have no state worth a line; it is nothing but
+  // state, and every word of it is already on screen when the section is
+  // open. A summary would repeat the section.
+  'Extent']
 
 /**
  * Build the whole map, keyed by section title.

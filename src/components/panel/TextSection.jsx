@@ -168,7 +168,7 @@ export function TextSection({
                 {l.singleLine ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
                     <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-                    <select value={l.font ?? 'HersheySans1'}
+                    <select value={l.font ?? 'ReliefPendot'}
                       onChange={(e) => set({ font: e.target.value })}
                       data-testid={`text-font-${l.id}`}
                       style={{

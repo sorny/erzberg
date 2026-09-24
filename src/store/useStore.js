@@ -148,6 +148,15 @@ export const useStore = create((set) => ({
   // classifyCRS() in utils/geoCoords.js is the only thing that interprets these.
   geoTiffCRS: null,
   geoTiffCRSName: null,   // the CRS name the file states about itself, if any
+  /**
+   * Where the ground on screen came from, in one line.
+   *
+   * A GeoTIFF knows its own file name and a fetched DEM knows which national
+   * surveys answered — and both were thrown away the moment the raster landed,
+   * so the panel could name the projection but never the survey. The Extent
+   * section is the first thing that asks.
+   */
+  terrainProvenance: null,
 
   /**
    * Replaces the source raster.
@@ -302,6 +311,8 @@ export const useStore = create((set) => ({
   setVectorHover: (h) => set({ vectorHover: h }),
   setVectorSelected: (v) => set({ vectorSelected: v }),
 
+  setTerrainProvenance: (text) => set({ terrainProvenance: text ?? null }),
+
   setGeoTiffMeta: (elevMin, elevMax, bbox, crs, crsName) =>
     set((s) => {
       const next = { geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBboxSrc: bbox ?? null,
@@ -311,5 +322,5 @@ export const useStore = create((set) => ({
 
   clearGeoTiffMeta: () =>
     set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBboxSrc: null, geoTiffBbox: null,
-          geoTiffCRS: null, geoTiffCRSName: null }),
+          geoTiffCRS: null, geoTiffCRSName: null, terrainProvenance: null }),
 }))

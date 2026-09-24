@@ -499,7 +499,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           {layer.labelSingleLine ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
               <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-              <select value={layer.labelFont ?? 'HersheySans1'}
+              <select value={layer.labelFont ?? 'ReliefPendot'}
                 onChange={(e) => set({ labelFont: e.target.value })}
                 data-testid={`label-font-${layer.id}`}
                 style={{

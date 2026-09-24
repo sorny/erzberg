@@ -75,6 +75,49 @@ export function createMask(width, height, index, name) {
   }
 }
 
+/**
+ * A copy of a mask, with its own identity.
+ *
+ * The pixels are copied rather than shared. Two masks pointing at one
+ * `Uint8Array` would look right until the Studio painted into either of them,
+ * and then both would change — the kind of bug that is invisible in a list and
+ * obvious on the plate.
+ *
+ * It takes the next colour in the run rather than its source's, because the
+ * colour is how you tell two masks apart in the Studio, and a duplicate is
+ * exactly the case where that matters most.
+ *
+ * `visible` is deliberately not carried over: a copy is made to be edited, and
+ * `createMask` starts a mask hidden for the same reason.
+ */
+export function duplicateMask(mask, index, name) {
+  return {
+    ...mask,
+    id: `mask-${nextId++}`,
+    name: name ?? `${mask.name} copy`,
+    color: maskColorFor(index),
+    data: new Uint8Array(mask.data),
+    visible: false,
+  }
+}
+
+/**
+ * A name no other mask in the list is using.
+ *
+ * Duplicating twice is a normal thing to do and two rows reading "Ridge copy"
+ * are two rows you cannot tell apart — the panel identifies a mask by its name
+ * everywhere except the Studio.
+ */
+export function uniqueMaskName(base, masks) {
+  const taken = new Set((masks ?? []).map((m) => m.name))
+  if (!taken.has(base)) return base
+  for (let n = 2; n < 1000; n++) {
+    const tryName = `${base} ${n}`
+    if (!taken.has(tryName)) return tryName
+  }
+  return base
+}
+
 /** How much of the raster a mask covers, as a fraction. */
 export function maskCoverage(mask) {
   if (!mask?.data?.length) return 0

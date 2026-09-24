@@ -39,6 +39,9 @@ const TITLES = Object.keys(SECTION_TERMS)
 const ACTIONS = [
   'Presets', 'Draw Modes', 'Analysis', 'Fetch', 'Hydraulic Erosion',
   'Soundscapes', 'Vector Layers', 'Text',
+  // Extent reads the store and writes nothing — there is no setting on it to
+  // put back, which is what this list means.
+  'Extent',
   // Land Cover holds a loaded file and the action that deals marks from it, the
   // same shape as Vector Layers. The per-layer `coverMask*` keys it gives
   // meaning to are parameters, but they belong to the mode sections that render

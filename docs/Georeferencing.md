@@ -700,6 +700,63 @@ a fetched raster arrives georeferenced exactly like a GeoTIFF and needs no
 special case anywhere downstream. The ocean is not a hole: terrarium carries real
 bathymetry, so every cell is data.
 
+### The window you draw the box on
+
+Until 1.24.0 the extent was whatever envelope Nominatim returned for the name
+you typed. You could not see it, move it, or resize it, and you learned what
+resolution you had bought after the download rather than before it.
+
+Picking a result now *aims* a box instead of fetching one. A map appears under
+the search field with the selection drawn on it: drag the middle to move it,
+drag a corner to resize it, **Wider** and **Closer** zoom the window.
+
+**The preview is not a basemap, and that is deliberate.** An OpenStreetMap
+raster basemap was the obvious choice and is wrong here on three counts. It
+would be a fourth network service and the first one that fetches while you
+*pan* rather than when you press something, which is the promise
+`tests/no-third-party.spec.js` exists to keep. It would put this app inside
+OpenStreetMap's tile usage policy, which asks that heavy use go elsewhere. And
+it would show you roads and labels when the question on screen is *where is the
+ground interesting*.
+
+So `utils/extentPreview.js` draws the window from the same terrarium tiles the
+fetch itself uses, shaded with a hillshade at 315°/45° over a muted hypsometric
+tint. No new host, no new CORS question, no new policy — and the map is
+literally the dataset you are about to download, so it cannot lie about
+coverage. What it costs is labels. You arrive through the geocoder and adjust
+against visible relief, which for a tool whose whole subject is relief is the
+right way round.
+
+A preview is capped at nine tiles against the fetch's thirty-six. Four was the
+first guess and it was visibly wrong: tile cover is a step function of the zoom,
+and a window straddling two boundaries costs an extra row and column, so a 31 km
+window around the Erzberg needed 3 × 3 at zoom 11 and fell all the way to zoom 9
+— half the Eastern Alps with the selection a speck in the middle of it.
+
+### What the box costs, before you pay it
+
+Four figures sit under the map, and none of them is new arithmetic.
+`zoomForExtent` and `tileRange` already computed every one of them inside
+`fetchDem`, one line before the download began, and threw the answer away:
+
+```
+Zoom     14 · deepest
+Tiles    12 / 36
+Raster   1024 × 768 px
+Ground   6.4 m / px
+```
+
+`describeFetch` is that arithmetic hoisted out, and it is deliberately the same
+function the fetch then runs — a readout derived separately is a readout that
+will eventually disagree with what arrives.
+
+**A smaller box is not a smaller file. It is a sharper one.** This is the thing
+the readout exists to make legible, and it is the opposite of what most people
+expect. The zoom is always the finest that fits the budget, so shrinking the box
+spends the same thirty-six tiles on less ground. Measured on one drag:
+931 × 937 at 13 m/px became 1 230 × 821 at 6.4 m/px. Bigger raster, half the
+ground per pixel.
+
 ### The budget
 
 One press may pull at most 36 tiles, which is a 1 536 px raster and a couple of
@@ -727,6 +784,49 @@ header, which the bucket exposes to script through
 actually produced the ground on screen — `eudem/eudem_dem_5deg_n45e010.tif` —
 which is better provenance than the full list of everything the dataset might
 contain.
+
+### One extent, four layers
+
+The app fetches three things — ground, imagery, map features — and each has its
+own button in its own stage: terrain in Source, imagery in Surface, features in
+Overlay. Nothing in the interface said that all three describe the *same patch
+of ground*, which is the one fact they have in common and the reason any of them
+align.
+
+The **Extent** section in Source says it. It is a readout and nothing else: the
+place, the degrees unprojected back out of the raster through `bboxToWgs84`, the
+size through `wgs84ExtentKm`, the CRS through `crsDisplayName`, and the ground
+resolution through `groundPixelMetres`. Then one row per layer, each with its
+state and its provenance.
+
+```
+Eiger
+7.927° E – 8.084° E · 46.523° N – 46.632° N
+12.0 × 12.0 km · Web Mercator (EPSG:3857) · 13 m/px
+
+● Elevation      915 × 921
+  Terrain Tiles · eudem/eudem_dem_5deg_n45e005.tif
+○ Imagery        none    Not fetched · Surface › Imagery
+○ Map features   none    Not fetched · Overlay › Vector Layers
+○ Land cover     offline only
+```
+
+The elevation line needed one new piece of state. A GeoTIFF knew its own file
+name and a fetched DEM knew which surveys answered, and both were discarded the
+moment the raster landed — so the panel could name the projection but never the
+survey. `terrainProvenance` is set by both loaders and read here.
+
+**It is deliberately not an extent you can move.** Re-aiming the window and
+having imagery and vectors follow is a real feature with real consequences: a
+moved extent has to invalidate or re-align two datasets that are currently
+independent of the raster. Saying out loud what is already true is a different
+change, and this is that one. The rows name where each control lives instead.
+
+**The fourth row is the honest one.** Land cover can never be a button, and the
+row says so rather than leaving a gap where one should be — AlphaEarth's bucket
+serves anonymous ranged reads to anyone and sends no `access-control-*` header,
+so a browser is refused where a terminal is not. A user staring at a missing
+button would never guess that. See [Land-Cover.md](Land-Cover.md).
 
 ### Web Mercator overstates distance
 

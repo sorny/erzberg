@@ -46,8 +46,18 @@ export const TEXT_LAYER_DEF = {
   dy: 0,
   bold: false,
   italic: false,
-  singleLine: false,
-  font: null,
+  // Relief SingleLine Pendot, and single-line on to reach it.
+  //
+  // The tool draws for a pen, and an outline face plots the *edge* of every
+  // letter — the pen goes round each glyph twice and the counters fill in at
+  // small sizes. A stroke face draws the skeleton, which is what a plotter has
+  // done since the 1960s and what this default now matches.
+  //
+  // `font` holds the bare manifest id; `singleLineKey` puts it in the shared key
+  // space at read time. Switch the toggle off and the outline face returns
+  // unchanged — nothing here removes that path.
+  singleLine: true,
+  font: 'ReliefPendot',
 
   // The plane it stands in. Face camera is the useful default for a title: it
   // stays readable while the scene orbits.

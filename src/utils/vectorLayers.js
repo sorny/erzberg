@@ -117,8 +117,19 @@ export const VECTOR_LAYER_DEF = {
   // so a plotter follows one stroke per stem instead of going round each glyph
   // twice. Off by default: the outline faces are what the app has always
   // lettered in, and this changes how every existing label plots.
+  // Relief SingleLine Pendot, waiting behind the toggle.
+  //
+  // `labelFont` is the face you get the moment single-line is switched on, and
+  // Pendot is the better answer there than HersheySans1: it is the one designed
+  // for a pen rather than digitised from a 1960s plotter table.
+  //
+  // The toggle itself stays *off*, and that is the deliberate half. Turning it on
+  // by default would change every exported plate rather than the font picker's
+  // opening value — labels would leave the SVG as polylines instead of editable
+  // `<text>`, and the Fill control would withdraw, because a centre line encloses
+  // nothing. That is a decision about what a plate is, not about a default.
   labelSingleLine: false,
-  labelFont: 'HersheySans1',
+  labelFont: 'ReliefPendot',
   // Only 'gpx' sources default this on: the STL plate has always been shipped
   // with a track ribbon beside it, and OSM layers have no business there.
   stlRibbon: false,

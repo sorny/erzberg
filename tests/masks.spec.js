@@ -226,3 +226,59 @@ test('unpicking the last mask puts the whole raster back', async ({ page }) => {
   await page.waitForTimeout(800)
   await expect(section).toContainText('Whole raster')
 })
+
+test('a mask can be copied, pixels and all', async ({ page }) => {
+  /*
+   * The copy has to be a copy, not a second name for the same pixels.
+   *
+   * Two masks sharing one `Uint8Array` would look right in the list and stay
+   * right until the Studio painted into either of them — and then both would
+   * change together, which is invisible in the panel and obvious on the plate.
+   * The coverage figure is what proves they are separate: it is computed per
+   * mask from its own data, so two rows reading the same non-zero percentage
+   * after one of them was painted is exactly the bug.
+   */
+  await boot(page)
+  await filter(page, 'Masks')
+
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(800)
+  // Paint something, so the copy has pixels to carry rather than an empty plane.
+  const canvas = page.locator('[data-testid="mask-studio"] canvas').first()
+  const box = await canvas.boundingBox()
+  await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.4)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.6, { steps: 12 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(600)
+  await filter(page, 'Masks')
+
+  const section = page.locator('[data-section="Masks"]')
+  const names = () => section.locator('input[aria-label^="Name of"]').evaluateAll((els) => els.map((e) => e.value))
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(1)
+  const painted = (await section.innerText()).match(/(\d+)%/)?.[1]
+  expect(Number(painted), 'the brush must have left something to copy').toBeGreaterThan(0)
+
+  await section.locator('[data-testid^="copy-"]').first().click()
+  await page.waitForTimeout(500)
+
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(2)
+  expect(await names()).toEqual(['Mask 1', 'Mask 1 copy'])
+
+  // Both carry the same coverage, which is what "pixels and all" means.
+  const pcts = (await section.innerText()).match(/(\d+)%/g)
+  expect(pcts).toHaveLength(2)
+  expect(pcts[1]).toBe(pcts[0])
+
+  // A second copy does not collide with the first. The panel identifies a mask
+  // by its name everywhere except the Studio, so two rows reading "Mask 1 copy"
+  // would be two rows nobody can tell apart.
+  await section.locator('[data-testid^="copy-"]').first().click()
+  await page.waitForTimeout(500)
+  const after = await names()
+  expect(new Set(after).size, `names must stay unique: ${after.join(', ')}`).toBe(3)
+  expect(after).toContain('Mask 1 copy 2')
+})

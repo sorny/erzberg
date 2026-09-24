@@ -27,7 +27,10 @@ import { formatDistance, niceDistance } from '../utils/sheetMarks'
 import { shadowSun } from '../utils/sunHours'
 import { isDarkBackground } from '../utils/colorUtils'
 import { plotEstimate } from '../utils/penRoute'
-import { DEM_CREDIT, GEOCODER_CREDIT, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
+import { DEM_CREDIT, GEOCODER_CREDIT, describeFetch, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
+import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
+import { ExtentMap } from './panel/ExtentMap'
+import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
 import { ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W, ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage, StageRail, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
@@ -95,6 +98,10 @@ function fmtTime(sec) {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+// The preview canvas. 240 is what a 272 px panel body leaves once the section
+// keeps its padding, and the height is that on a 3:2 sheet.
+const MAP_W = 240, MAP_H = 156
+
 function TerrainFetchPanel({ onFetched }) {
   const [query, setQuery] = useState('')
   const [places, setPlaces] = useState(null)
@@ -107,6 +114,36 @@ function TerrainFetchPanel({ onFetched }) {
   const [error, setError] = useState(null)
   const abortRef = useRef(null)
   const onError = setError
+  /**
+   * The box being aimed, and the ground it is drawn on.
+   *
+   * `null` until a place is picked. Holding the place alongside the box matters
+   * for the export name — a plate fetched for the Erzberg writes `Erzberg.svg`,
+   * and that has to survive the box being dragged somewhere the geocoder never
+   * mentioned.
+   */
+  const [aim, setAim] = useState(null)   // { place, box, span, preview }
+  const previewAbort = useRef(null)
+
+  /**
+   * Draw the ground around a box, at `span` times its size.
+   *
+   * Its own AbortController: a preview that is superseded by a wider one must
+   * stop, and it must not cancel the terrain fetch that shares `abortRef`.
+   */
+  const loadPreview = async (place, box, span) => {
+    previewAbort.current?.abort()
+    const ctrl = new AbortController()
+    previewAbort.current = ctrl
+    setAim({ place, box, span, preview: null })
+    try {
+      const preview = await fetchPreview(windowFor(box, span, MAP_W / MAP_H), { signal: ctrl.signal })
+      if (ctrl.signal.aborted) return
+      setAim((a) => (a && a.place === place ? { ...a, preview } : a))
+    } catch (err) {
+      if (err?.name !== 'AbortError') onError(`Could not draw that area: ${err.message}`)
+    }
+  }
 
   const search = async (e) => {
     e?.preventDefault?.()
@@ -127,19 +164,13 @@ function TerrainFetchPanel({ onFetched }) {
     }
   }
 
-  const take = async (place) => {
+  const runFetch = async (place, box) => {
     if (busy) return
     const ctrl = new AbortController()
     abortRef.current = ctrl
     setBusy('fetch'); setProgress(0); onError(null)
     try {
-      // A summit resolves to a bounding box a few metres across — the node
-      // itself. Everything this tool does needs an area, so a named point
-      // becomes the ground around it.
-      const dem = await fetchDem(padBbox(place.bbox), {
-        signal: ctrl.signal,
-        onProgress: setProgress,
-      })
+      const dem = await fetchDem(box, { signal: ctrl.signal, onProgress: setProgress })
       if (ctrl.signal.aborted) return
       onFetched(dem, place.name)
       setPlaces(null)
@@ -181,10 +212,11 @@ function TerrainFetchPanel({ onFetched }) {
           </div>
           <Btn block onClick={() => abortRef.current?.abort()} style={{ marginTop:6 }}>Cancel</Btn>
         </div>
-      ) : places?.length ? (
+      ) : places?.length && !aim ? (
         <div data-testid="place-results" style={{ marginBottom:6 }}>
           {places.map((pl, i) => (
-            <button key={i} type="button" onClick={() => take(pl)} data-testid={`place-result-${i}`}
+            <button key={i} type="button" data-testid={`place-result-${i}`}
+              onClick={() => loadPreview(pl, padBbox(pl.bbox), DEFAULT_SPAN)}
               style={{ display:'block', width:'100%', textAlign:'left', marginBottom:3, cursor:'pointer',
                        background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4,
                        padding:'5px 7px', fontSize:11 }}>
@@ -196,6 +228,62 @@ function TerrainFetchPanel({ onFetched }) {
           ))}
         </div>
       ) : null}
+
+      {aim && busy !== 'fetch' && (() => {
+        const plan = describeFetch(aim.box)
+        return (
+          <div data-testid="extent-panel" style={{ marginBottom:6 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline',
+                 fontSize:10, color:DIM, marginBottom:4 }}>
+              <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{aim.place.name}</span>
+              <button type="button" data-testid="extent-clear" onClick={() => { previewAbort.current?.abort(); setAim(null) }}
+                style={{ background:'none', border:'none', color:MUTED, cursor:'pointer', fontSize:10, padding:0 }}>
+                back
+              </button>
+            </div>
+
+            {aim.preview
+              ? <ExtentMap preview={aim.preview} box={aim.box} busy={!!busy} width={MAP_W} height={MAP_H}
+                  onChange={(box) => setAim((a) => (a ? { ...a, box } : a))} />
+              : <div data-testid="extent-map-loading" style={{ height:MAP_H, marginBottom:6, borderRadius:4,
+                     border:`1px solid ${BORDER}`, background:SURF, display:'flex', alignItems:'center',
+                     justifyContent:'center', fontSize:10, color:MUTED }}>Drawing the ground…</div>}
+
+            {/* What this box costs and produces, before a byte of it is fetched.
+                Every figure comes from `describeFetch`, which is the same
+                arithmetic the fetch itself runs. */}
+            <div data-testid="extent-plan" style={{ fontSize:9.5, color:MUTED, lineHeight:1.7,
+                 border:`1px solid ${BORDER}`, borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+              {plan ? (<>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span>Zoom</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                    {plan.zoom}{plan.zoom === 14 ? ' · deepest' : ''}</span></div>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span>Tiles</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                    {`${plan.tiles} / ${plan.maxTiles}`}</span></div>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span>Raster</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                    {`${plan.width} × ${plan.height} px`}</span></div>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span>Ground</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                    {`${plan.groundMetres < 10 ? plan.groundMetres.toFixed(1) : Math.round(plan.groundMetres)} m / px`}</span></div>
+              </>) : <div>That extent is larger than the tile budget allows.</div>}
+            </div>
+
+            <div style={{ display:'flex', gap:4, marginBottom:6 }}>
+              <Btn data-testid="extent-wider" disabled={!aim.preview || aim.span >= 12}
+                onClick={() => loadPreview(aim.place, aim.box, Math.min(12, aim.span * 2))}>Wider</Btn>
+              <Btn data-testid="extent-closer" disabled={!aim.preview || aim.span <= 1.3}
+                onClick={() => loadPreview(aim.place, aim.box, Math.max(1.3, aim.span / 2))}>Closer</Btn>
+            </div>
+            {/* `block` is `flex:1`, so it spans only inside a flex row. */}
+            <div style={{ display:'flex' }}>
+              <Btn block variant="primary" data-testid="extent-fetch" disabled={!plan || !aim.preview}
+                onClick={() => runFetch(aim.place, aim.box)}>Fetch this ground</Btn>
+            </div>
+          </div>
+        )
+      })()}
 
       {credit && (
         <div data-testid="dem-credit" style={{ fontSize:9.5, color:MUTED, lineHeight:1.7, marginBottom:6 }}>
@@ -605,7 +693,7 @@ export function Sidebar({
   // deals a mark to each of its classes.
   cover, coverError, onLoadCover, onClearCover, onInkByClass,
   // Hand-drawn masks, the Studio that paints them, and the imagery behind it.
-  masks = [], onAddMask, onPatchMask, onRemoveMask, onImportMask, onPaintMask,
+  masks = [], onAddMask, onPatchMask, onCopyMask, onRemoveMask, onImportMask, onEditMask,
   onMaskFromLayer,
   imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
@@ -867,7 +955,7 @@ export function Sidebar({
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
-    sheetMarks: false, fetchTerrain: false, modeShadowLine: false, anaglyph: false,
+    sheetMarks: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
     satellite: false, masks: false,
   })
@@ -1587,6 +1675,12 @@ export function Sidebar({
             <TerrainFetchPanel onFetched={onFetchTerrain} />
           </Section>
 
+          {/* A readout, not a control. Three fetches live in three stages and
+              nothing said they describe the same ground — see panel/ExtentSection.jsx. */}
+          <Section title="Extent" open={sec.extent} onToggle={() => tog('extent')}>
+            <ExtentSection />
+          </Section>
+
           <Section title="Shape" open={sec.shape} onToggle={() => tog('shape')}>
             {hypsometricIntegral != null && (
               <HypsometricRow value={hypsometricIntegral} />
@@ -1606,11 +1700,27 @@ export function Sidebar({
             </div>
           </Section>
 
+          {/* ── Levels ────────────────────────────────────────────────────
+              Shadows and Highlights are the two ends of one range, and they may
+              not cross. `buildTerrain` already survives a crossed pair — it
+              divides by `max(1e-6, wp - bp)` — but surviving is not the same as
+              being usable: past the crossing every cell clamps to one end and
+              the plate goes flat with no control saying why.
+
+              Held two ways on purpose. The sliders' own bounds move, so the
+              constraint is something you feel at the end of the track rather
+              than a value that snaps back under the thumb; and both writes
+              clamp, because the histogram's handles are a second way in and a
+              restored session is a third. */}
           <Section title="Levels" open={sec.levels} onToggle={() => tog('levels')}>
-            <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint} onBlackChange={v => st({ blackPoint: v })} onWhiteChange={v => st({ whitePoint: v })} />
+            <Histogram pixels={heightmapPixels} blackPoint={terrain.blackPoint} whitePoint={terrain.whitePoint}
+              onBlackChange={v => st({ blackPoint: Math.min(v, terrain.whitePoint - 1) })}
+              onWhiteChange={v => st({ whitePoint: Math.max(v, terrain.blackPoint + 1) })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px', marginTop:4 }}>
-              <Sl label="Shadows" min={0} max={254} value={terrain.blackPoint} onChange={v => st({ blackPoint: v })} />
-              <Sl label="Highlights" min={1} max={255} value={terrain.whitePoint} onChange={v => st({ whitePoint: v })} />
+              <Sl label="Shadows" min={0} max={terrain.whitePoint - 1} value={terrain.blackPoint}
+                onChange={v => st({ blackPoint: Math.min(v, terrain.whitePoint - 1) })} />
+              <Sl label="Highlights" min={terrain.blackPoint + 1} max={255} value={terrain.whitePoint}
+                onChange={v => st({ whitePoint: Math.max(v, terrain.blackPoint + 1) })} />
             </div>
           </Section>
 
@@ -1642,8 +1752,19 @@ export function Sidebar({
                                      minWidth: 30, textAlign: 'right' }}>
                         {(maskCoverage(m) * 100).toFixed(0)}%
                       </span>
-                      <Btn size="xs" onClick={() => onPaintMask(m.id)} data-testid={`paint-${m.id}`}
-                        style={{ padding: '0 6px', fontSize: 10 }}>Paint</Btn>
+                      {/* "Edit", not "Paint". The Studio does more than a brush —
+                          it erases, fills, inverts, imports and crops — so naming
+                          it after one of its tools undersold it and misdescribed
+                          what the button does to a mask that already has pixels. */}
+                      <Btn size="xs" onClick={() => onEditMask(m.id)} data-testid={`mask-edit-${m.id}`}
+                        style={{ padding: '0 6px', fontSize: 10 }}>Edit</Btn>
+                      {/* A glyph rather than a word: the row already carries a
+                          swatch, a name field, a coverage figure and two buttons
+                          in 272 px, and `Copy` would squeeze the name it is
+                          named after. */}
+                      <Btn size="xs" onClick={() => onCopyMask?.(m.id)} data-testid={`copy-${m.id}`}
+                        aria-label={`Duplicate ${m.name}`} disabled={masks.length >= MAX_MASKS}
+                        style={{ padding: '0 6px', fontSize: 10 }}>⧉</Btn>
                       <Btn size="xs" onClick={() => onRemoveMask(m.id)} aria-label={`Delete ${m.name}`}
                         style={{ padding: '0 6px', fontSize: 10 }}>✕</Btn>
                     </div>
@@ -1652,7 +1773,7 @@ export function Sidebar({
               )}
               <CoverRow>
                 <Btn block data-testid="add-mask" disabled={masks.length >= MAX_MASKS}
-                  onClick={() => { const m = onAddMask?.(); if (m) onPaintMask(m.id) }}>
+                  onClick={() => { const m = onAddMask?.(); if (m) onEditMask(m.id) }}>
                   + Draw a mask
                 </Btn>
                 <Btn block onClick={onImportMask} disabled={masks.length >= MAX_MASKS}>↑ Import…</Btn>

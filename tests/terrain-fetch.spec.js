@@ -155,7 +155,21 @@ test('a typed place becomes ground you can draw', async ({ page }) => {
   await expect(first).toContainText('Erzberg')
   await expect(first).toContainText('Eisenerz')
 
+  // Picking a result aims the box; it does not fetch. The map that then appears
+  // is drawn from the same terrarium tiles the fetch uses, so this is the first
+  // moment the tile host is contacted — and it is still a press, not a keystroke.
   await first.click()
+  await expect(page.locator('[data-testid="extent-map"]')).toBeVisible({ timeout: 60_000 })
+
+  // The plan is stated before a byte of terrain is downloaded, which is the
+  // whole point of the map: you crop first and pay second.
+  const plan = page.locator('[data-testid="extent-plan"]')
+  await expect(plan).toContainText('Zoom')
+  await expect(plan).toContainText('/ 36')
+  await expect(plan).toContainText('px')
+  await expect(plan).toContainText('m / px')
+
+  await page.locator('[data-testid="extent-fetch"]').click()
   await expect(page.locator('[data-testid="dem-credit"]')).toBeVisible({ timeout: 60_000 })
 
   // The raster is named after the place, which is what the exports get named
@@ -178,4 +192,108 @@ test('a typed place becomes ground you can draw', async ({ page }) => {
   await expect(credit).toContainText('Nominatim')
   await expect(credit).toContainText('Terrain Tiles on AWS Open Data')
   await expect(credit).toContainText('eudem')
+})
+
+test('the box can be dragged, and the plan follows it', async ({ page }) => {
+  test.setTimeout(180_000)
+  await stubTheWorld(page)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  await openFetch(page)
+
+  await page.locator('[data-testid="place-query"]').fill('Erzberg')
+  await page.locator('[data-testid="place-search"]').click()
+  await page.locator('[data-testid="place-result-0"]').click()
+  await expect(page.locator('[data-testid="extent-map"]')).toBeVisible({ timeout: 60_000 })
+
+  const plan = page.locator('[data-testid="extent-plan"]')
+  const raster = () => plan.innerText()
+  const before = await raster()
+
+  // Drag the south-east handle inward. A smaller box is a smaller raster, and
+  // the readout has to say so before the fetch rather than after it.
+  const handle = page.locator('[data-testid="extent-handle-se"]')
+  const b = await handle.boundingBox()
+  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(b.x - 40, b.y - 30, { steps: 8 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+
+  const after = await raster()
+  expect(after, 'dragging a handle must change the plan').not.toBe(before)
+
+  /*
+   * A smaller box is not a smaller file. It is a sharper one.
+   *
+   * This assertion started out as "fewer pixels" and was wrong, which is worth
+   * writing down because the readout exists to make exactly this legible:
+   * `zoomForExtent` spends the whole 36-tile budget every time, so shrinking the
+   * box buys zoom rather than saving bytes. Measured on the drag above —
+   * 931 × 937 at 13 m/px became 1 230 × 821 at 6.4 m/px. Bigger raster, half the
+   * ground per pixel.
+   */
+  const ground = (t) => Number(t.match(/([\d.]+)\s*m\s*\/\s*px/)?.[1] ?? 0)
+  expect(ground(before), 'the before reading must parse').toBeGreaterThan(0)
+  expect(ground(after), 'a smaller box resolves finer ground').toBeLessThan(ground(before))
+})
+
+test('the extent names the ground, and what is on it', async ({ page }) => {
+  /*
+   * The Extent section is a readout over state the app already held, and the
+   * thing worth asserting is that it is *true* — the degrees come from the
+   * raster's own bbox through `bboxToWgs84`, and the provenance line is the
+   * survey the tile host named in a response header, not a fixed string.
+   */
+  test.setTimeout(180_000)
+  await stubTheWorld(page)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+
+  const open = async (id) => {
+    const sec = page.locator(`[data-testid="${id}"]`)
+    await sec.scrollIntoViewIfNeeded()
+    if ((await sec.getAttribute('aria-expanded')) !== 'true') {
+      await sec.click()
+      await page.waitForTimeout(300)
+    }
+  }
+
+  // The app opens on a PNG heightmap, which is ground with no place on Earth.
+  // Saying "0.000° N" about it would be worse than saying nothing, so it says
+  // nothing — and this is the branch that keeps it that way.
+  await open('section-extent')
+  const card0 = page.locator('[data-testid="extent-section"]')
+  await expect(card0).toContainText('Not georeferenced')
+  await expect(page.locator('[data-testid="extent-degrees"]')).toHaveCount(0)
+
+  await open('section-fetch')
+  await page.locator('[data-testid="place-query"]').fill('Erzberg')
+  await page.locator('[data-testid="place-search"]').click()
+  await page.locator('[data-testid="place-result-0"]').click()
+  await expect(page.locator('[data-testid="extent-map"]')).toBeVisible({ timeout: 60_000 })
+  await page.locator('[data-testid="extent-fetch"]').click()
+  await expect(page.locator('[data-testid="dem-credit"]')).toBeVisible({ timeout: 60_000 })
+
+  await open('section-extent')
+  const card = page.locator('[data-testid="extent-section"]')
+  await expect(card).toContainText('Erzberg')
+
+  // The stub places the Erzberg at 14.9° E, 47.5° N, and the degrees are
+  // unprojected back out of the EPSG:3857 raster rather than remembered from
+  // the search — which is what makes this an assertion about the raster.
+  const degrees = await page.locator('[data-testid="extent-degrees"]').innerText()
+  expect(degrees).toMatch(/14\.\d+° E/)
+  expect(degrees).toMatch(/47\.\d+° N/)
+
+  // Provenance is the survey the tile host reported, not a fixed line.
+  await expect(page.locator('[data-testid="extent-layer-elevation"]')).toContainText('eudem')
+
+  // And the three that were never fetched say so, each naming where its
+  // control lives rather than leaving a gap.
+  await expect(page.locator('[data-testid="extent-layer-imagery"]')).toContainText('Surface')
+  await expect(page.locator('[data-testid="extent-layer-map-features"]')).toContainText('Overlay')
+  await expect(page.locator('[data-testid="extent-layer-land-cover"]')).toContainText('CORS')
 })
