@@ -7,6 +7,132 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] — 2026-09-24
+
+A brief arrived describing erzberg as "limited to local GeoTIFF/DEM files that
+the user has to source, crop, and project manually", and proposing a global data
+gateway. Three quarters of that gateway shipped in 1.13.0 and 1.19.0. What was
+missing was never the fetching: it was **the box**. You could not see the extent
+you were about to ask for, and you learned what resolution you had bought after
+the download.
+
+### Added
+
+- **A window you draw the box on.** Picking a search result now aims an extent
+  rather than fetching one. A map of the surrounding ground appears under the
+  search field with the selection drawn on it — drag the middle to move, drag a
+  corner to resize, *Wider* and *Closer* zoom the window, and *Fetch this
+  ground* downloads exactly the box you placed.
+
+  **The preview is not a basemap, and that is the load-bearing decision.** An
+  OpenStreetMap raster basemap is the obvious choice and is wrong three times
+  over: it is a fourth network service and the first one that fetches while you
+  *pan* rather than when you press something, which is the promise
+  `tests/no-third-party.spec.js` exists to keep; it puts this app inside
+  OpenStreetMap's tile usage policy, which asks that heavy use go elsewhere; and
+  it shows roads and labels when the question on screen is *where is the ground
+  interesting*. `utils/extentPreview.js` draws the window from the same terrarium
+  tiles the fetch itself uses. No new host, no new CORS question, no new policy —
+  and the map is literally the dataset you are about to download, so it cannot
+  lie about coverage. It costs labels, which for a tool whose subject is relief
+  is the right way to pay.
+
+- **What the box costs, stated before you pay it.** Zoom, tiles against the
+  budget, the raster in pixels, and the ground each pixel covers.
+  `zoomForExtent` and `tileRange` computed every one of those inside `fetchDem`,
+  one line before the download began, and threw the answer away. `describeFetch`
+  is that arithmetic hoisted out, and deliberately the same function the fetch
+  then runs — a readout derived separately is one that will eventually disagree
+  with what arrives.
+
+  It makes one thing legible that was always true and always invisible: **a
+  smaller box is not a smaller file, it is a sharper one.** The zoom is always
+  the finest that fits the budget, so shrinking the box spends the same 36 tiles
+  on less ground. Measured on one drag: 931 × 937 at 13 m/px became
+  1 230 × 821 at 6.4 m/px.
+
+- **An `Extent` section in Source, which says what the plate is made of.** The
+  place, the degrees unprojected back out of the raster, the size, the
+  projection, the metres per pixel — then one row per layer with its state and
+  its provenance. The elevation row names the survey the tile host reported
+  rather than a fixed credit line, and the rows that hold nothing name the
+  section that would fill them.
+
+  It reads and never writes. Moving the extent and having imagery and vectors
+  follow is a real feature with real consequences — a moved extent has to
+  invalidate or re-align two datasets currently independent of the raster — and
+  saying out loud what is already true is a different change. The land cover row
+  is the honest one: that plate can never be a button, because its bucket sends
+  no `access-control-*` header, and a user staring at a missing button would
+  never guess it.
+
+  One new piece of state was needed. `terrainProvenance` is set by both loaders,
+  because a GeoTIFF knew its file name and a fetched DEM knew its surveys, and
+  both were discarded the moment the raster landed.
+
+- **Masks can be copied.** A **⧉** beside *Edit* duplicates one and drops the
+  copy under the mask it came from — a duplicate is nearly always a variation on
+  its neighbour, and a list of thirty-two would otherwise make you scroll to
+  find what you just made. The pixels are copied rather than shared, because two
+  masks pointing at one `Uint8Array` look correct in the list and stay correct
+  until the Studio paints into either of them. The copy takes the next colour in
+  the run rather than its source's, since colour is how two masks are told apart
+  while drawing.
+
+### Changed
+
+- **Shadows and Highlights can no longer cross.** They are the two ends of one
+  range. `buildTerrain` already survived a crossed pair — it divides by
+  `max(1e-6, wp − bp)` — but surviving is not the same as being usable: past the
+  crossing every cell clamps to one end, the plate goes flat, and no control says
+  why. Set Shadows to 40 and the floor under Highlights is 41.
+
+  Held two ways on purpose. The sliders' own bounds move, so the limit is
+  something felt at the end of the track rather than a value that snaps back
+  under the thumb; and both writes clamp, because the histogram's handles are a
+  second way in and a restored session is a third.
+
+- **Relief SingleLine Pendot is the default face for lettering.** It was
+  designed for a pen, where HersheySans1 was digitised from a 1960s plotter
+  table.
+
+  The two places take it differently, and the difference is deliberate. A **text
+  overlay** opens on it with single-line *on*, so a new text letters as strokes:
+  an outline face plots the edge of every glyph, so the pen goes round twice and
+  the counters fill in at small sizes. **Vector layer labels** get it as the
+  face waiting behind the toggle, with single-line left *off* — turning it on by
+  default would change every exported plate rather than a picker's opening
+  value, since labels would leave the SVG as polylines instead of editable
+  `<text>` and the Fill control would withdraw. That is a decision about what a
+  plate is, not about a default. Contour labels are untouched.
+
+- **The mask Studio is opened by a button called `Edit`, not `Paint`.** The
+  Studio erases, fills, inverts, imports and crops as well as painting, so naming
+  it after one of its tools undersold the panel and misdescribed what the button
+  does to a mask that already has pixels. The test handle moved with it, to
+  `mask-edit-*` rather than `edit-*`, because `edit-panel` and `edit-tool-*`
+  already belong to Edit Mode and two editors sharing a prefix is a trap for the
+  next spec.
+
+### Fixed
+
+- **A drag on the extent box moved it by the wrong amount.** The overlay is an
+  SVG whose viewBox is stretched to whatever width the panel gives it, so a raw
+  `clientX − left` is in CSS pixels while the box is in viewBox units. The
+  handles were reachable and the drag was wrong, which is the worst shape a bug
+  can take: it looks like it works.
+
+### Tests
+
+- `tests/levels.spec.js` (light) holds the pair apart in both directions.
+- `masks.spec.js` paints before copying, so "pixels and all" is a real claim,
+  and checks a second copy does not collide with the first.
+- `text.spec.js` gained a second test for the stroke face, and the `<text>` test
+  now states which face it exercises rather than leaning on a default.
+- `terrain-fetch.spec.js` covers the drawn box, the plan that follows it, and
+  the extent readout — including that a PNG heightmap reports no position rather
+  than a fabricated one.
+
 ## [1.23.0] — 2026-09-23
 
 1.22.0 said React 19 was "a migration of its own, not a version bump". This is
