@@ -107,12 +107,13 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
   const pct = progress == null ? null : Math.round(Math.min(1, Math.max(0, progress)) * 100)
   return (
     <div data-testid="loading-overlay" style={{
-      position:'fixed', inset:0, background:'rgba(0,0,0,0.6)',
+      position:'fixed', inset:0, background:'rgba(8,8,10,0.45)',
+      backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)',
       display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000,
     }}>
       <div style={{
         display:'flex', flexDirection:'column', alignItems:'center', gap:14,
-        background:'#18181b', border:'1px solid #3f3f46', borderRadius:10, padding:'28px 40px',
+        ...GLASS, background:'rgba(24,24,28,.92)', borderRadius:14, padding:'28px 40px',
         minWidth: pct == null ? 0 : 260,
       }}>
         <div style={{
@@ -172,6 +173,32 @@ function autoResolution(width, height) {
   return Math.min(20, Math.max(1, Math.ceil(Math.max(width, height) / 1024)))
 }
 
+// ── Floating chrome ───────────────────────────────────────────────────────────
+/*
+ * One material for everything that floats over the scene: the hint, the toast,
+ * the computing pill, the loading card. Frosted rather than opaque, so the plate
+ * stays the subject, and one border, radius and shadow so they read as a set.
+ */
+const GLASS = {
+  background:'rgba(22,22,26,.78)',
+  backdropFilter:'blur(14px) saturate(1.4)', WebkitBackdropFilter:'blur(14px) saturate(1.4)',
+  border:'1px solid rgba(255,255,255,.09)',
+  boxShadow:'0 8px 28px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.04) inset',
+  fontFamily:'system-ui,-apple-system,sans-serif',
+}
+
+/** A key, drawn as a key. */
+function Kbd({ children }) {
+  return (
+    <kbd style={{
+      display:'inline-block', minWidth:16, padding:'1px 5px', borderRadius:4,
+      background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.12)',
+      borderBottomWidth:2, fontFamily:'inherit', fontSize:10, lineHeight:'14px',
+      color:'#e4e4e7', textAlign:'center',
+    }}>{children}</kbd>
+  )
+}
+
 // ── Toast ─────────────────────────────────────────────────────────────────────
 /**
  * One line at the foot of the screen, optionally with something to click.
@@ -192,22 +219,24 @@ function Toast({ toast, onDismiss }) {
   return (
     <div data-testid="toast" role="status" aria-live="polite" style={{
       position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
-      background:'#27272a', border:'1px solid #52525b', borderRadius:8,
-      padding:'10px 14px', zIndex:4500, display:'flex', alignItems:'center', gap:14,
-      maxWidth:460, boxShadow:'0 4px 24px rgba(0,0,0,0.5)',
-      fontFamily:'system-ui,sans-serif', fontSize:13, color:'#e4e4e7',
+      ...GLASS, background:'rgba(24,24,28,.9)', borderRadius:10,
+      padding:'9px 10px 9px 16px', zIndex:4500, display:'flex', alignItems:'center', gap:12,
+      maxWidth:480, fontSize:13, color:'#e4e4e7',
+      animation:'hm-rise .28s cubic-bezier(.2,.8,.2,1)',
     }}>
+      <style>{`@keyframes hm-rise { from { opacity:0; transform:translate(-50%, 8px) } to { opacity:1; transform:translate(-50%, 0) } }
+        @media (prefers-reduced-motion: reduce) { [data-testid="toast"] { animation:none !important } }`}</style>
       <span style={{ flex:1 }}>{toast.msg}</span>
       {toast.action && (
         <button data-testid="toast-action" onClick={() => { toast.onAction?.(); onDismiss() }} style={{
-          background:'none', border:'1px solid #71717a', borderRadius:5, cursor:'pointer',
-          color:'#e4e4e7', fontSize:12, padding:'3px 10px', fontFamily:'system-ui,sans-serif',
+          background:'#2f6fe0', border:'none', borderRadius:6, cursor:'pointer',
+          color:'#fff', fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
           whiteSpace:'nowrap',
         }}>{toast.action}</button>
       )}
       <button onClick={onDismiss} aria-label="Dismiss" style={{
         background:'none', border:'none', color:'#8f8f99', cursor:'pointer',
-        fontSize:15, lineHeight:1, padding:'0 2px',
+        fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:6,
       }}>✕</button>
     </div>
   )
@@ -233,24 +262,33 @@ function ViewportHint({ onDismiss, onKeys }) {
       // Top-left, not bottom-left where Edit Mode puts its bar: the axis gizmo
       // lives down there, and the toast and the error banner both come up the
       // middle. Nothing else claims this corner.
-      position:'fixed', left:14, top:14, zIndex:600,
-      display:'flex', alignItems:'center', gap:8,
-      fontFamily:'system-ui,sans-serif', fontSize:11, color:'#e4e4e7',
+      position:'fixed', left:16, top:16, zIndex:600,
+      display:'flex', alignItems:'center', gap:2, padding:3,
+      ...GLASS, borderRadius:10, fontSize:11.5, color:'#d4d4d8',
     }}>
-      <span style={{ background:'rgba(0,0,0,.55)', padding:'5px 9px', borderRadius:5 }}>
-        drag to orbit · scroll to zoom · right-drag to pan
+      <span style={{ padding:'4px 9px', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
+        <span style={{ color:'#e4e4e7' }}>Drag</span> to orbit
+        <span style={{ color:'rgba(255,255,255,.35)' }}>·</span>
+        <span style={{ color:'#e4e4e7' }}>Scroll</span> to zoom
+        <span style={{ color:'rgba(255,255,255,.35)' }}>·</span>
+        <span style={{ color:'#e4e4e7' }}>Right-drag</span> to pan
       </span>
+      <span aria-hidden="true" style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
       {/* The way in to the rest of them. A `?` card nobody can find is a card
           that does not exist, and this hint is already the one place in the app
           that talks about input at all. */}
-      <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts" style={{
-        background:'rgba(0,0,0,.55)', border:'none', borderRadius:5, cursor:'pointer',
-        color:'#c4c4cc', fontSize:11, lineHeight:1, padding:'6px 8px',
-      }}>? keys</button>
-      <button onClick={onDismiss} aria-label="Dismiss the viewport hint" style={{
-        background:'rgba(0,0,0,.55)', border:'none', borderRadius:5, cursor:'pointer',
+      <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts"
+        className="hm-glassbtn" style={{
+          background:'none', border:'none', borderRadius:7, cursor:'pointer',
+          color:'#c4c4cc', fontSize:11.5, padding:'3px 8px', fontFamily:'inherit',
+          display:'flex', alignItems:'center', gap:6,
+        }}><Kbd>?</Kbd> Shortcuts</button>
+      <button onClick={onDismiss} aria-label="Dismiss the viewport hint" className="hm-glassbtn" style={{
+        background:'none', border:'none', borderRadius:7, cursor:'pointer',
         color:'#8f8f99', fontSize:12, lineHeight:1, padding:'6px 8px',
       }}>✕</button>
+      <style>{`.hm-glassbtn { transition:background .15s, color .15s }
+        .hm-glassbtn:hover { background:rgba(255,255,255,.08) !important; color:#fafafa !important }`}</style>
     </div>
   )
 }
@@ -300,10 +338,8 @@ function ComputingPill() {
     <div data-testid="computing-pill" style={{
       position:'fixed', right:14, bottom:14, zIndex:3600, pointerEvents:'none',
       display:'flex', alignItems:'center', gap:7,
-      background:'rgba(20,20,24,0.82)', backdropFilter:'blur(6px)',
-      border:'1px solid rgba(255,255,255,0.08)', borderRadius:14,
-      padding:'5px 12px 5px 9px',
-      fontFamily:'system-ui,sans-serif', fontSize:11, color:'#a1a1aa',
+      ...GLASS, borderRadius:999,
+      padding:'6px 13px 6px 10px', fontSize:11.5, color:'#a1a1aa',
     }}>
       <span style={{
         width:10, height:10, border:'2px solid rgba(255,255,255,.14)',

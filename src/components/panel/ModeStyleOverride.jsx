@@ -12,7 +12,7 @@ import { CoverPlate, PaintedMasks } from './filter'
 import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
 import { GradientPicker } from '../GradientPicker'
-import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, MUTED, SURF, Sub, Tog } from './ui'
+import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, MUTED, SegGroup, Sub, Tog } from './ui'
 
 /**
  * Which land-cover classes this layer is allowed to mark.
@@ -162,14 +162,10 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', sho
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
 
       {showDash && (
-        <div style={{ marginTop: 8, display:'flex', gap:2 }}>
-          {['solid', 'dashed', 'dotted', 'long-dash'].map(d => (
-            <Btn key={d} block variant="toggle" on={style[`dash${prefix}`] === d}
-              onClick={() => ss({ [`dash${prefix}`]: d })}
-              style={{ fontSize:10, padding:'2px 0', borderRadius:2, textTransform:'uppercase' }}>
-              {d.replace('-dash','')}</Btn>
-          ))}
-        </div>
+        <SegGroup label="Dash" uppercase
+          options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
+          value={style[`dash${prefix}`]} onChange={(d) => ss({ [`dash${prefix}`]: d })}
+          style={{ marginTop: 8 }} />
       )}
 
       {/* Off the table for vector layers for a sharper version of the same
@@ -185,17 +181,10 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', sho
         <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
         {isHypso && (
           <Sub>
-            <div style={{ display:'flex', gap:2, marginBottom:4 }}>
-              {['Elevation', 'Slope', 'Aspect', 'Speed'].map(m => (
-                <button key={m} onClick={() => ss({ [`hypsoMode${prefix}`]: m.toLowerCase() })} 
-                  style={{ 
-                    flex:1, fontSize:10, padding:'2px 0', borderRadius:2, 
-                    background: style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : SURF, 
-                    color: style[`hypsoMode${prefix}`] === m.toLowerCase() ? '#fff' : MUTED, 
-                    border:`1px solid ${style[`hypsoMode${prefix}`] === m.toLowerCase() ? ACCENT_DEEP : BORDER}` 
-                  }}>{m}</button>
-              ))}
-            </div>
+            <SegGroup label="Hypsometric source"
+              options={[['Elevation', 'elevation'], ['Slope', 'slope'], ['Aspect', 'aspect'], ['Speed', 'speed']]}
+              value={style[`hypsoMode${prefix}`]} onChange={(m) => ss({ [`hypsoMode${prefix}`]: m })}
+              style={{ marginBottom: 4 }} />
             <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
             {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
             {/* The gradient is global (shared by every hypsometric layer + fill),

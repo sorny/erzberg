@@ -130,42 +130,63 @@ export function PanelStyles() {
         /* Derived, because a custom property cannot carry a hex-alpha suffix. */
         --hm-accent-ring: ${RAW.accent}80;
         --hm-green-glow: ${RAW.green}88;
+        /* Finish tokens: a lifted surface, a hairline that separates without
+           boxing, and one easing curve for every state change in the panel. */
+        --hm-surf-hi: #303036;
+        --hm-hairline: rgba(255,255,255,.06);
+        --hm-ease: cubic-bezier(.2,.8,.2,1);
       }
+
+      /* A focus ring on everything the keyboard can reach, at zero specificity
+         so a control with its own ring keeps it. */
+      :where(#hm-panel, [data-testid="edit-panel"], [data-testid="mask-panel"]) :is(button, a, input[type=search], input[type=text], select):focus-visible {
+        outline:2px solid var(--hm-accent); outline-offset:1px; }
 
       /* The element is 19 px tall and transparent; the 3 px track is drawn by the
          track pseudo-element inside it. Same hairline as before, in a band a
          pointer can actually land on — the old 3 px box left the thumb's 13 px
          of overflow as the entire target. */
-      .hmr { -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:0;
-        height:19px; padding:0; background:none; outline:none; cursor:pointer; }
-      .hmr::-webkit-slider-runnable-track { height:3px; background:${BORDER}; border-radius:2px; }
-      .hmr::-moz-range-track { height:3px; background:${BORDER}; border-radius:2px; }
-      .hmr::-webkit-slider-thumb { -webkit-appearance:none; width:13px; height:13px;
-        margin-top:-5px; border-radius:50%; background:${ACCENT}; cursor:pointer;
-        transition:transform .1s; }
-      .hmr:hover::-webkit-slider-thumb { transform:scale(1.2); }
-      .hmr::-moz-range-thumb { width:13px; height:13px; border-radius:50%;
-        background:${ACCENT}; border:none; }
+      /* The filled part of the track is the value, readable at a glance down a
+         column of sliders. \`--p\` is set per slider (0–100%); the thumb is a
+         white disc on a hairline shadow, which reads on any accent. */
+      .hmr { --p:0%; -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:0;
+        height:20px; padding:0; background:none; outline:none; cursor:pointer; }
+      .hmr::-webkit-slider-runnable-track { height:4px; border-radius:999px;
+        background:linear-gradient(to right, var(--hm-accent) 0 var(--p), var(--hm-border) var(--p) 100%); }
+      .hmr::-moz-range-track { height:4px; background:${BORDER}; border-radius:999px; }
+      .hmr::-moz-range-progress { height:4px; background:${ACCENT}; border-radius:999px; }
+      .hmr::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
+        margin-top:-5px; border-radius:50%; background:#fafafa; border:none; cursor:grab;
+        box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5);
+        transition:transform .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
+      .hmr:hover::-webkit-slider-thumb { transform:scale(1.12); }
+      .hmr:active::-webkit-slider-thumb { transform:scale(1.2); cursor:grabbing; }
+      .hmr::-moz-range-thumb { width:14px; height:14px; border-radius:50%;
+        background:#fafafa; border:none; box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5); }
       /* :focus, not :focus-visible.
          Clicking a slider arms it for the arrow keys, so the state is real from
          the click — and :focus-visible withholds the ring until the first
          keypress, which hides it for exactly as long as it is the only thing
          telling you which of thirty-one sliders an arrow key will move. */
-      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
-      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 0 4px var(--hm-accent-ring); }
+      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 0 4px var(--hm-accent-ring); }
       .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
-        border:1px solid ${BORDER}; border-radius:3px; cursor:pointer;
-        padding:2px; background:${SURF}; }
+        border:1px solid ${BORDER}; border-radius:5px; cursor:pointer;
+        padding:2px; background:${SURF}; transition:border-color .15s var(--hm-ease); }
+      .hmc:hover { border-color:${MUTED}; }
       .hmc::-webkit-color-swatch-wrapper { padding:0; }
-      .hmc::-webkit-color-swatch { border:none; border-radius:2px; }
+      .hmc::-webkit-color-swatch { border:none; border-radius:3px; }
       .hmc:focus-visible { outline:2px solid ${ACCENT}; outline-offset:1px; }
       .hmeb:hover { background:${ACCENT_DEEP} !important; border-color:${ACCENT_DEEP} !important; color:#fff !important; }
       .hmeb:hover .hmeh { color:rgba(255,255,255,.75) !important; }
       .hmsb.on { background:${ACCENT_DEEP} !important; color:#fff !important; border-color:${ACCENT_DEEP} !important; }
       .hmsb:hover:not(.on) { background:${BORDER} !important; color:${DIM} !important; }
       .hmload:hover { background:${SURF} !important; color:${TEXT} !important; }
-      #hm-panel-body::-webkit-scrollbar { width:4px; }
-      #hm-panel-body::-webkit-scrollbar-thumb { background:${BORDER}; border-radius:2px; }
+      /* A 10 px gutter a pointer can find, drawing a 4 px thumb inside it. */
+      #hm-panel-body::-webkit-scrollbar { width:10px; }
+      #hm-panel-body::-webkit-scrollbar-thumb { background:${BORDER}; border-radius:999px;
+        border:3px solid transparent; background-clip:content-box; }
+      #hm-panel-body::-webkit-scrollbar-thumb:hover { background-color:${MUTED}; }
       /* A 20 px hit box around a 12 px ring: the padding is transparent, so the
          mark keeps its size and only the target grows. */
       .hmi { -webkit-appearance:none; appearance:none; background:none; border:none;
@@ -193,7 +214,36 @@ export function PanelStyles() {
          control in a collapsed one is otherwise unreachable. */
       .hmsec { -webkit-appearance:none; appearance:none; background:none; border:none;
         font:inherit; color:inherit; text-align:left; }
+      .hmsec { transition:background .15s var(--hm-ease); }
       .hmsec:hover { background:rgba(255,255,255,.03); }
+      .hmsec .hmsectitle, .hmsec .hmchevron { transition:color .15s var(--hm-ease), transform .2s var(--hm-ease); }
+      .hmsec:hover .hmsectitle, .hmsec:hover .hmchevron { color:${DIM}; }
+
+      /* Stage tabs: a quiet hover, and the selected tab joined to its pane. */
+      .hmtab { transition:background .15s var(--hm-ease), color .15s var(--hm-ease); }
+      .hmtab:hover:not([aria-pressed="true"]) { background:rgba(255,255,255,.04); color:${DIM} !important; }
+
+      /* Switch: the input is the hit target, the two spans are the picture. */
+      .hmsw .hmswtrack { transition:background .2s var(--hm-ease), box-shadow .2s var(--hm-ease); }
+      .hmsw .hmswknob { transition:transform .22s var(--hm-ease); }
+      .hmsw:hover .hmswtrack { filter:brightness(1.12); }
+      .hmsw input:focus-visible + .hmswtrack { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+
+      /* Segmented control: one well, the choice a raised pill inside it. */
+      .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
+      .hmseg:hover:not([aria-pressed="true"]) { color:${DIM} !important; background:rgba(255,255,255,.05) !important; }
+      .hmseg:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
+
+      /* Buttons: one response to hover and press, whatever their colours. */
+      .hmbtn { transition:filter .12s var(--hm-ease), transform .08s var(--hm-ease), border-color .15s, color .15s; }
+      .hmbtn:not(:disabled):hover { filter:brightness(1.2); }
+      .hmbtn:not(:disabled):active { transform:translateY(.5px) scale(.985); }
+      .hmeb, .hmsb, .sym-btn, .hmload { transition:background .15s var(--hm-ease), border-color .15s var(--hm-ease), color .15s var(--hm-ease), transform .08s; }
+      .hmeb:active, .hmsb:active, .sym-btn:active { transform:scale(.97); }
+
+      @media (prefers-reduced-motion: reduce) {
+        .hmsec, .hmtab, .hmsw *, .hmseg, .hmbtn, .hmeb, .hmsb, .hmr::-webkit-slider-thumb { transition:none !important; }
+      }
       .hmsec:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
       /* The per-section reset. Revealed on hover rather than drawn outright,
          and that is a width decision rather than a taste one: a header is at
@@ -223,8 +273,8 @@ export function PanelStyles() {
        * every render of the sheet. A backtick in this comment would also end the
        * template literal the whole stylesheet is written in.
        */
-      .hmcard { transition:border-color .12s, background .12s; }
-      .hmcard:hover { border-color:${MUTED}; }
+      .hmcard { transition:border-color .15s var(--hm-ease), background .15s var(--hm-ease), transform .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
+      .hmcard:hover { border-color:${MUTED}; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.35); }
       .hmcard:hover .hmchev { color:${TEXT}; }
       .hmcardhit { -webkit-appearance:none; appearance:none; background:none;
         border:none; font:inherit; color:inherit; text-align:left; width:100%;
@@ -242,12 +292,13 @@ export function PanelStyles() {
          native feel that a hand-rolled two-thumb widget throws away. */
       .hmrr { -webkit-appearance:none; appearance:none; position:absolute; left:0; top:0;
         width:100%; height:13px; margin:0; background:none; pointer-events:none; outline:none; }
-      .hmrr::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:11px;
-        height:11px; border-radius:50%; background:${ACCENT}; border:2px solid ${BG};
-        cursor:pointer; transition:transform .1s; }
-      .hmrr:hover::-webkit-slider-thumb { transform:scale(1.15); }
-      .hmrr::-moz-range-thumb { pointer-events:auto; width:11px; height:11px; border-radius:50%;
-        background:${ACCENT}; border:2px solid ${BG}; cursor:pointer; }
+      .hmrr::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:13px;
+        height:13px; border-radius:50%; background:#fafafa; border:none; cursor:grab;
+        box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5);
+        transition:transform .15s var(--hm-ease); }
+      .hmrr:hover::-webkit-slider-thumb { transform:scale(1.12); }
+      .hmrr::-moz-range-thumb { pointer-events:auto; width:13px; height:13px; border-radius:50%;
+        background:#fafafa; border:none; cursor:grab; box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5); }
       .hmrr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmrr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
       .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
@@ -388,6 +439,12 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
   )
 }
 
+/** How far along its track a slider sits, for the filled part of the track. */
+function fillOf(value, min, max) {
+  const p = max > min ? ((value - min) / (max - min)) * 100 : 0
+  return { '--p': `${Math.max(0, Math.min(100, p))}%` }
+}
+
 export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2, testId }) {
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
@@ -411,7 +468,7 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
             already in scope. */}
         <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
           aria-valuetext={fmt ? String(fmt(value)) : undefined}
-          min={min} max={max} step={step} value={value}
+          min={min} max={max} step={step} value={value} style={fillOf(value, min, max)}
           onChange={e => onChange(parsed(e.target.value))} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
           min={min} max={max} step={step} width={36} />
@@ -442,14 +499,19 @@ export function Tog({ label, hint, help, checked, onChange, small, testId }) {
 
 export function Switch({ id, label, checked, onChange, testId }) {
   return (
-    <label style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
+    <label className="hmsw" style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
       <input type="checkbox" id={id} checked={checked} aria-label={label} data-testid={testId}
         onChange={e => onChange(e.target.checked)}
-        style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer' }} />
-      <span style={{ position:'absolute', inset:0, background: checked ? ACCENT : BORDER, borderRadius:9, transition:'background .15s', pointerEvents:'none' }}>
-        <span style={{
-          position:'absolute', width:14, height:14, borderRadius:'50%', background:'#fff',
-          top: 2, left: checked ? 18 : 2, transition:'left .15s', boxShadow:'0 1px 3px rgba(0,0,0,.4)',
+        style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
+      <span className="hmswtrack" style={{
+        position:'absolute', inset:0, borderRadius:9, pointerEvents:'none',
+        background: checked ? ACCENT : BORDER,
+        boxShadow: checked ? 'none' : 'inset 0 1px 2px rgba(0,0,0,.35)',
+      }}>
+        <span className="hmswknob" style={{
+          position:'absolute', width:14, height:14, borderRadius:7, background:'#fff',
+          top: 2, left: 2, transform: checked ? 'translateX(16px)' : 'none',
+          boxShadow:'0 1px 2px rgba(0,0,0,.35), 0 0 0 .5px rgba(0,0,0,.2)',
         }} />
       </span>
     </label>
@@ -548,7 +610,7 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
             already in scope. */}
         <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
           aria-valuetext={fmt ? String(fmt(value)) : undefined}
-          min={min} max={max} step={step} value={value}
+          min={min} max={max} step={step} value={value} style={fillOf(value, min, max)}
           onChange={e => onChange(parsed(e.target.value))} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
           min={min} max={max} step={step} width={32} />
@@ -583,8 +645,8 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <div style={{ position:'relative', flex:1, height:13, minWidth:0 }}>
-          <div style={{ position:'absolute', top:5, left:0, right:0, height:3, background: BORDER, borderRadius:2 }} />
-          <div style={{ position:'absolute', top:5, height:3, borderRadius:2, background: ACCENT,
+          <div style={{ position:'absolute', top:4.5, left:0, right:0, height:4, background: BORDER, borderRadius:999 }} />
+          <div style={{ position:'absolute', top:4.5, height:4, borderRadius:999, background: ACCENT,
                         left:`${pct(lo)}%`, width:`${Math.max(0, pct(hi) - pct(lo))}%` }} />
           <input type="range" className="hmrr" data-testid={testId && `${testId}-lo`}
             aria-label={`${label} lower bound`} aria-valuetext={String(f(lo))}
@@ -614,21 +676,48 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
           {label}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <div style={{ display:'flex', gap: 2, flex: 1 }} role="group" aria-label={label}>
-          {options.map(([lbl, v]) => (
-            <button key={String(v)} onClick={() => onChange(v)} type="button"
-              data-testid={testIdPrefix ? `${testIdPrefix}-${v}` : undefined}
-              aria-label={`${label}: ${lbl}`} aria-pressed={value === v}
-              style={{
-                flex: 1, fontSize: 10, padding:'4px 0', borderRadius: 2, textTransform:'uppercase', cursor:'pointer',
-                background: value === v ? ACCENT_DEEP : SURF,
-                color: value === v ? '#fff' : MUTED,
-                border: `1px solid ${value === v ? ACCENT_DEEP : BORDER}`,
-              }}>{lbl}</button>
-          ))}
-        </div>
+        <SegGroup label={label} options={options} value={value} onChange={onChange}
+          uppercase nameButtons testIdOf={testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined}
+          style={{ flex: 1 }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
+    </div>
+  )
+}
+
+/**
+ * One exclusive choice, drawn as a well with the chosen option raised in it.
+ *
+ * The panel had sixteen hand-built rows of this, each with its own padding,
+ * radius and border. This is the one shape they share. `columns` lays the
+ * options out as a grid instead of one row, for sets too long to fit.
+ */
+export function SegGroup({ options, value, onChange, label, uppercase = false, columns, testIdOf, style, nameButtons = false }) {
+  return (
+    <div role="group" aria-label={label} style={{
+      display: columns ? 'grid' : 'flex',
+      ...(columns && { gridTemplateColumns: `repeat(${columns}, 1fr)` }),
+      gap: 2, padding: 2, borderRadius: 6,
+      background:'rgba(0,0,0,.25)', border:`1px solid ${BORDER}`,
+      ...style,
+    }}>
+      {options.map(([lbl, v]) => {
+        const on = value === v
+        return (
+          <button key={String(v)} onClick={() => onChange(v)} type="button" className="hmseg"
+            data-testid={testIdOf ? testIdOf(v) : undefined}
+            aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
+            style={{
+              flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 4, border:'none',
+              cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+              ...(uppercase && { textTransform:'uppercase', letterSpacing:'.04em' }),
+              fontWeight: on ? 600 : 500,
+              background: on ? ACCENT_DEEP : 'transparent',
+              color: on ? '#fff' : MUTED,
+              boxShadow: on ? '0 1px 2px rgba(0,0,0,.4)' : 'none',
+            }}>{lbl}</button>
+        )
+      })}
     </div>
   )
 }
@@ -749,7 +838,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           // already made inert.
           cursor: q ? 'default' : 'pointer',
         }}>
-        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'1.8px', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
+        <span className="hmsectitle" style={{ fontSize:10, fontWeight:650, letterSpacing:'.13em', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
           {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
@@ -767,10 +856,15 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
                 maxWidth:104, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
               }}>{readout.text}</span>
           )}
-          <span aria-hidden="true" style={{
-            fontSize:22, fontWeight:700, color: MUTED, lineHeight:1, display:'inline-block', flexShrink:0,
-            transform: isOpen ? 'none' : 'rotate(-90deg)', transition:'transform .18s'
-          }}>▾</span>
+          {/* A drawn chevron in a 22 px box: the header's height and the reset
+              button beside it are both measured from that box. */}
+          <span aria-hidden="true" className="hmchevron" style={{
+            width:14, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center',
+            color: MUTED, flexShrink:0, transform: isOpen ? 'none' : 'rotate(-90deg)',
+          }}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
+              strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
+          </span>
         </span>
       </button>
       {/* Two marks, both siblings of the header rather than children of it. The
@@ -874,7 +968,9 @@ export function Stage({ n, title, children }) {
       <div data-testid={`stage-${title.toLowerCase()}`} style={{
         position:'sticky', top:0, zIndex:2,
         display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
-        background: BG, borderTop:`1px solid ${BORDER}`, borderBottom:`2px solid ${BORDER}`,
+        background:'rgba(24,24,27,.86)', backdropFilter:'blur(10px) saturate(1.2)',
+        WebkitBackdropFilter:'blur(10px) saturate(1.2)',
+        borderTop:`1px solid ${BORDER}`, borderBottom:`1px solid ${BORDER}`,
       }}>
         {/* The lozenge again, for the reason the rail carries one: Presets is a
             destination and not a step, and `00` in the pipeline's own column
@@ -939,7 +1035,7 @@ export function StageRail({ stage, onStage, live, hits }) {
         // is what every other "this is what you searched for" wears.
         const badge = count > 0
         return (
-          <button key={n} type="button"
+          <button key={n} type="button" className="hmtab"
             data-testid={`stage-tab-${title.toLowerCase()}`}
             onClick={() => onStage(n)}
             aria-pressed={sel}
@@ -1037,7 +1133,7 @@ export function Btn({
         : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` }
 
   return (
-    <button type="button" {...rest} style={{
+    <button type="button" {...rest} className={`hmbtn${rest.className ? ` ${rest.className}` : ''}`} style={{
       ...BTN_SIZES[size], ...look,
       cursor: rest.disabled ? 'default' : 'pointer',
       fontFamily: 'inherit',

@@ -29,7 +29,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fillAll, invert, stamp, stroke } from '../utils/maskLayers'
 import { MaskPanel } from './MaskPanel'
-import { BORDER, MUTED, SURF } from './panel/ui'
 import { useBackdrop } from '../hooks/useBackdrop'
 
 /** Tools, and the one letter each answers to. The panel draws the buttons;
@@ -358,21 +357,26 @@ export function MaskStudio({
         style={{ display: 'block', cursor: tool === 'brush' ? 'none' : 'crosshair', touchAction: 'none' }} />
       <div ref={ringRef} aria-hidden="true" style={{
         position: 'absolute', left: 0, top: 0, display: 'none', pointerEvents: 'none',
-        border: '1.2px solid #ffffff', borderRadius: '50%', boxSizing: 'border-box',
+        border: '1.5px solid #ffffff', borderRadius: '50%', boxSizing: 'border-box',
+        // A dark halo either side, so the ring reads on snow and on forest alike.
+        boxShadow: '0 0 0 1px rgba(0,0,0,.45), inset 0 0 0 1px rgba(0,0,0,.35)',
         willChange: 'transform',
       }} />
 
       {/* Hints + view controls, in the same corner and the same shape as Edit
           Mode's. The two views are the same kind of thing and now say so. */}
       <div style={{
-        position: 'absolute', left: 14, bottom: 14, display: 'flex', alignItems: 'center', gap: 8,
-        fontFamily: 'system-ui,sans-serif', fontSize: 11, color: MUTED,
+        position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 2,
+        padding: 3, borderRadius: 10, fontFamily: 'system-ui,-apple-system,sans-serif', fontSize: 11.5, color: '#a1a1aa',
+        background: 'rgba(22,22,26,.78)', border: '1px solid rgba(255,255,255,.09)',
+        backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
+        boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
         <button onClick={fit} data-testid="studio-fit" style={{
-          background: SURF, color: '#d4d4d8', border: `1px solid ${BORDER}`,
-          borderRadius: 5, padding: '5px 10px', fontSize: 11, cursor: 'pointer',
+          background: 'rgba(255,255,255,.08)', color: '#e4e4e7', border: '1px solid rgba(255,255,255,.1)',
+          borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
-        <span style={{ background: 'rgba(0,0,0,.45)', padding: '5px 9px', borderRadius: 5 }}>
+        <span style={{ padding: '3px 9px' }}>
           {srcWidth}×{srcHeight} px
           {' · '}
           {tool === 'brush'   && 'drag to paint · [ and ] resize'}

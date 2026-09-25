@@ -181,7 +181,7 @@ export function MaskPanel({
           </div>
           <div style={{ fontSize: 10, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>
             Strokes are kept as you make them — Done just closes the view. Re-open
-            it from the mask's Paint button any time.
+            it with the mask's Edit button any time.
           </div>
         </div>
       </div>

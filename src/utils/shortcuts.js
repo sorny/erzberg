@@ -39,6 +39,8 @@ export const SHORTCUTS = [
     group: 'The panel',
     rows: [
       { keys: ['\\'], codes: ['Backslash'], label: 'Show or hide the panel' },
+      /* No `codes`, for the reason `?` has none: keyed on the character. */
+      { keys: ['/'],  label: 'Find a control' },
       { keys: ['⌘Z'], codes: ['KeyZ'],      label: 'Undo' },
       { keys: ['⌘⇧Z'], codes: ['KeyY'],     label: 'Redo', note: '⌘Y as well' },
       /* No `codes`: this one is keyed on the character rather than the physical

@@ -91,7 +91,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
             {names.length}
           </span>
         </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:4 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:4 }}>
       {names.map((name) => {
         // `name` is already the display name — the family lists carry it, and
         // `ROW_BY_NAME` turns it back into the section title and the boolean.
@@ -109,7 +109,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
            * targets nest visually without nesting in the markup.
            */
           <div key={key} role="group" aria-label={name} className="hmcard" style={{
-            position:'relative', borderRadius:4,
+            position:'relative', borderRadius:6,
             background: on ? 'rgba(59,130,246,0.16)' : SURF,
             border:`1px solid ${on ? ACCENT_DEEP : BORDER}`,
           }}>
@@ -127,10 +127,10 @@ export function ModeSheet({ style, onToggle, onOpen }) {
                 <ModeMark kind={MARK_FOR[id]} />
               </span>
               <span style={{
-                display:'flex', alignItems:'center', gap:3,
-                padding:'3px 4px 4px', borderTop:`1px solid ${BORDER}`,
-                fontSize:8, letterSpacing:'0.04em', textTransform:'uppercase',
-                color: on ? DIM : MUTED, minWidth:0,
+                display:'flex', alignItems:'center', gap:1,
+                padding:'3px 2px 4px 5px', borderTop:`1px solid ${BORDER}`,
+                fontSize:9, letterSpacing:0,
+                color: on ? DIM : MUTED, minWidth:0, fontWeight: on ? 600 : 500,
               }}>
                 <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                   {name}

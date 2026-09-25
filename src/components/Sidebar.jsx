@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W, ColorRow, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage, StageRail, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W, ColorRow, SegGroup, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage, StageRail, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 
@@ -733,6 +733,7 @@ export function Sidebar({
     onOpenChange?.(value)
   }, [onOpenChange])
   const [filter, setFilter] = useState('')
+  const filterRef = useRef(null)
   // Which cover class the pointer is over, shared by the class map and the
   // legend so that pointing at either lights up the other.
   const [hoveredClass, setHoveredClass] = useState(null)
@@ -1001,6 +1002,12 @@ export function Sidebar({
       // stayed dead until focus moved. Backslash activates nothing.
       if (tag === 'INPUT' || tag === 'TEXTAREA') return
       if (e.code === 'Backslash') { e.preventDefault(); setOpen(o => !o) }
+      // Keyed on the character, like `?`: `/` is Shift+7 on a German layout.
+      if (e.key === '/') {
+        e.preventDefault()
+        setOpen(true)
+        requestAnimationFrame(() => filterRef.current?.focus())
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -1348,22 +1355,27 @@ export function Sidebar({
         aria-label={open ? 'Hide the panel' : 'Show the panel'}
         style={{
           position:'fixed', right: open ? W : 0, top:'50%', transform:'translateY(-50%)',
-          width:22, height:64, background: BG, border:`1px solid ${BORDER}`, borderRight:'none',
-          borderRadius:'6px 0 0 6px',
+          width:18, height:56, background:'rgba(24,24,27,.92)',
+          backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
+          border:'1px solid rgba(255,255,255,.08)', borderRight:'none',
+          borderRadius:'8px 0 0 8px',
           cursor:'pointer', zIndex:1001, userSelect:'none',
           display:'flex', alignItems:'center', justifyContent:'center',
-          color: MUTED, fontSize:11, boxShadow:'-2px 0 8px rgba(0,0,0,.35)',
-          transition:'right .22s cubic-bezier(.4,0,.2,1)',
-        }}>{open ? '▶' : '◀'}</button>
+          color: MUTED, fontSize:8, boxShadow:'-4px 0 14px rgba(0,0,0,.25)',
+          transition:'right .26s cubic-bezier(.2,.8,.2,1), color .15s',
+        }}
+        onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
+        onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>{open ? '▶' : '◀'}</button>
 
       <aside id="hm-panel" aria-label="Controls" style={{
         position:'fixed', right:0, top:0, width:W, height:'100%',
         background: BG, color: TEXT, zIndex:1000,
         display:'flex', flexDirection:'column',
         transform: open ? 'none' : `translateX(${W}px)`,
-        transition:'transform .22s cubic-bezier(.4,0,.2,1)',
-        boxShadow:'-3px 0 16px rgba(0,0,0,.4)',
+        transition:'transform .26s cubic-bezier(.2,.8,.2,1)',
+        boxShadow:'-1px 0 0 rgba(255,255,255,.04), -12px 0 32px rgba(0,0,0,.28)',
         fontFamily:'system-ui,-apple-system,sans-serif',
+        WebkitFontSmoothing:'antialiased', MozOsxFontSmoothing:'grayscale',
       }}>
         {/*
           * Identity on one line, actions on the next.
@@ -1436,8 +1448,8 @@ export function Sidebar({
                 stops it breaking across two lines again if the row ever tightens.
                 It sits apart from undo because it is a different magnitude of
                 undoing — one step back against everything at once. */}
-            <button onClick={handleResetAll} title="Return every setting to its default"
-              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5,
+            <button onClick={handleResetAll} title="Return every setting to its default" className="hmbtn"
+              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:6,
                        color: MUTED, fontSize:10, lineHeight:1, padding:'5px 9px',
                        whiteSpace:'nowrap', cursor:'pointer' }}
               onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
@@ -1475,17 +1487,39 @@ export function Sidebar({
             list, its order and its behaviour are untouched — clearing the field
             puts the panel back exactly as it was. */}
         <div style={{ padding:'8px 12px', borderBottom:`1px solid ${BORDER}`, flexShrink:0, position:'relative' }}>
+          <svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none"
+            stroke={MUTED} strokeWidth="1.5" strokeLinecap="round"
+            style={{ position:'absolute', left:21, top:16, pointerEvents:'none' }}>
+            <circle cx="5.2" cy="5.2" r="3.7" /><path d="M8 8l2.6 2.6" />
+          </svg>
           <input
-            type="search" value={filter} data-testid="panel-filter"
+            ref={filterRef}
+            type="search" value={filter} data-testid="panel-filter" className="hmfind"
             onChange={(e) => setFilter(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setFilter('') } }}
-            placeholder="Find a control…" aria-label="Find a control"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { e.stopPropagation(); if (filter) setFilter(''); else e.currentTarget.blur() }
+            }}
+            placeholder="Find a control…" aria-label="Find a control" aria-keyshortcuts="/"
             style={{
-              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:5,
-              color: TEXT, fontSize:11, padding:'4px 8px', outline:'none',
+              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:6,
+              color: TEXT, fontSize:11.5, padding:'6px 28px 6px 26px', outline:'none',
               fontFamily:'inherit',
             }}
           />
+          {/* The shortcut, shown where it applies and only while it would help. */}
+          {!filter && (
+            <kbd aria-hidden="true" className="hmfindkbd" style={{
+              position:'absolute', right:20, top:14, pointerEvents:'none',
+              minWidth:15, padding:'0 4px', borderRadius:4, textAlign:'center',
+              border:`1px solid ${BORDER}`, borderBottomWidth:2, color: MUTED,
+              fontFamily:'inherit', fontSize:10, lineHeight:'13px',
+            }}>/</kbd>
+          )}
+          <style>{`.hmfind { transition:border-color .15s, box-shadow .15s, background .15s }
+            .hmfind:hover { border-color:${MUTED} }
+            .hmfind:focus { border-color:${ACCENT}; box-shadow:0 0 0 3px var(--hm-accent-ring); background:${BG} }
+            .hmfind:focus + .hmfindkbd { opacity:0 }
+            .hmfind::-webkit-search-cancel-button { -webkit-appearance:none }`}</style>
           {q && (
             <div style={{ fontSize:10, color: MUTED, marginTop:4, display:'flex', justifyContent:'space-between' }}>
               <span data-testid="filter-count">{matchCount === 0 ? 'No section matches' : `${matchCount} section${matchCount === 1 ? '' : 's'}`}</span>
@@ -1980,24 +2014,12 @@ export function Sidebar({
 
                 <Sub>
                   <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>ANALYSIS</div>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[1024, 2048, 4096].map(n => (
-                      <button key={n} onClick={() => snd.setOpts({ fftSize: n })}
-                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2,
-                          background: snd.opts.fftSize === n ? ACCENT_DEEP : SURF,
-                          color: snd.opts.fftSize === n ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.fftSize === n ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{n}</button>
-                    ))}
-                  </div>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['Log', true], ['Linear', false]].map(([lbl, v]) => (
-                      <button key={lbl} onClick={() => snd.setOpts({ logFreq: v })}
-                        style={{ flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase',
-                          background: snd.opts.logFreq === v ? ACCENT_DEEP : SURF,
-                          color: snd.opts.logFreq === v ? '#fff' : MUTED,
-                          border:`1px solid ${snd.opts.logFreq === v ? ACCENT_DEEP : BORDER}`, cursor:'pointer' }}>{lbl} freq</button>
-                    ))}
-                  </div>
+                  <SegGroup label="FFT size" options={[[1024, 1024], [2048, 2048], [4096, 4096]]}
+                    value={snd.opts.fftSize} onChange={(n) => snd.setOpts({ fftSize: n })}
+                    style={{ marginBottom: 8 }} />
+                  <SegGroup label="Frequency axis" uppercase options={[['Log freq', true], ['Linear freq', false]]}
+                    value={snd.opts.logFreq} onChange={(v) => snd.setOpts({ logFreq: v })}
+                    style={{ marginBottom: 8 }} />
                   <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
                     min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
 
@@ -2017,16 +2039,10 @@ export function Sidebar({
                     its structure — repeats, sections, groove — becomes relief. */}
                 <Sub>
                   <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>WHOLE TRACK</div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:2, marginBottom:4 }}>
-                    {TRACK_PROJECTIONS.map(pj => (
-                      <button key={pj.id} data-testid={`projection-${pj.id}`}
-                        onClick={() => snd.setOpts({ projection: pj.id })}
-                        style={{ fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
-                          background: projection.id === pj.id ? ACCENT_DEEP : SURF,
-                          color: projection.id === pj.id ? '#fff' : MUTED,
-                          border:`1px solid ${projection.id === pj.id ? ACCENT_DEEP : BORDER}` }}>{pj.label}</button>
-                    ))}
-                  </div>
+                  <SegGroup label="Projection" uppercase columns={3}
+                    options={TRACK_PROJECTIONS.map((pj) => [pj.label, pj.id])}
+                    value={projection.id} onChange={(id) => snd.setOpts({ projection: id })}
+                    testIdOf={(id) => `projection-${id}`} style={{ marginBottom: 4 }} />
                   <div style={{ fontSize:10, color: MUTED, lineHeight:1.4, marginBottom:8 }}>{projection.blurb}</div>
 
                   {projection.id === 'weave' && (
@@ -2074,9 +2090,9 @@ export function Sidebar({
                 <Tog label="Hypsometric fill" small checked={style.fillHypsometric} onChange={v => ss({ fillHypsometric: v })} />
                 {style.fillHypsometric && (
                   <Sub>
-                    <div style={{ display:'flex', gap:2, marginBottom:4 }}>
-                      {['Elevation', 'Slope', 'Aspect'].map(m => <button key={m} onClick={() => ss({ fillHypsoMode: m.toLowerCase() })} style={{ flex:1, fontSize:10, padding:'2px 0', borderRadius:2, background: style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : SURF, color: style.fillHypsoMode === m.toLowerCase() ? '#fff' : MUTED, border:`1px solid ${style.fillHypsoMode === m.toLowerCase() ? ACCENT_DEEP : BORDER}` }}>{m}</button>)}
-                    </div>
+                    <SegGroup label="Fill source" options={[['Elevation', 'elevation'], ['Slope', 'slope'], ['Aspect', 'aspect']]}
+                      value={style.fillHypsoMode} onChange={(m) => ss({ fillHypsoMode: m })}
+                      style={{ marginBottom: 4 }} />
                     <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
                     {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
                   </Sub>
@@ -2435,17 +2451,8 @@ export function Sidebar({
                   <InlineSl label="Depth" min={0} max={100} step={1} value={style.pillarDepth} onChange={v => ss({ pillarDepth: v })} />
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Shape</span>
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']].map(([label, val]) => (
-                        <button key={val} onClick={() => ss({ pillarStyle: val })} style={{
-                          flex: 1, fontSize: 10, padding: '2px 0', borderRadius: 2,
-                          background: (style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : SURF,
-                          color: (style.pillarStyle ?? 'line') === val ? '#fff' : MUTED,
-                          border: `1px solid ${(style.pillarStyle ?? 'line') === val ? ACCENT_DEEP : BORDER}`,
-                          cursor: 'pointer',
-                        }}>{label}</button>
-                      ))}
-                    </div>
+                    <SegGroup label="Pillar shape" options={[['Line', 'line'], ['Cuboid', 'cuboid'], ['Cylinder', 'cylinder']]}
+                      value={style.pillarStyle ?? 'line'} onChange={(v) => ss({ pillarStyle: v })} />
                   </div>
                   {(style.pillarStyle === 'cuboid' || style.pillarStyle === 'cylinder') && (
                     <InlineSl label="Size" help="Cross-section as a fraction of spacing. 1.0 = pillars touch, 0.5 = half-width." min={0.05} max={1} step={0.05} value={style.pillarSize ?? 0.8} onChange={v => ss({ pillarSize: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2626,17 +2633,8 @@ export function Sidebar({
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical dot pattern." min={1} max={999} step={1} value={style.seedStipple ?? 42} onChange={v => ss({ seedStipple: v })} />
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']].map(([label, val]) => (
-                        <button key={val} onClick={() => ss({ stippleDensityMode: val })} style={{
-                          flex: 1, fontSize: 10, padding: '2px 0', borderRadius: 2,
-                          background: style.stippleDensityMode === val ? ACCENT_DEEP : SURF,
-                          color: style.stippleDensityMode === val ? '#fff' : MUTED,
-                          border: `1px solid ${style.stippleDensityMode === val ? ACCENT_DEEP : BORDER}`,
-                          cursor: 'pointer',
-                        }}>{label}</button>
-                      ))}
-                    </div>
+                    <SegGroup label="Density from" options={[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']]}
+                      value={style.stippleDensityMode} onChange={(v) => ss({ stippleDensityMode: v })} />
                   </div>
                 </Sub>
                 <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
@@ -2682,17 +2680,9 @@ export function Sidebar({
               <>
                 <HelpBox text="Copperplate engraving that follows the form rather than the light: strokes trace the principal-curvature field, so the lines themselves wrap around ridges and hollows." />
                 <Sub>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['Across form', 'max'], ['Along form', 'min']].map(([lbl, v]) => (
-                      <button key={v} onClick={() => ss({ dirModeCurv: v })}
-                        style={{
-                          flex:1, fontSize:10, padding:'4px 0', borderRadius:2, textTransform:'uppercase', cursor:'pointer',
-                          background: style.dirModeCurv === v ? ACCENT_DEEP : SURF,
-                          color: style.dirModeCurv === v ? '#fff' : MUTED,
-                          border:`1px solid ${style.dirModeCurv === v ? ACCENT_DEEP : BORDER}`,
-                        }}>{lbl}</button>
-                    ))}
-                  </div>
+                  <SegGroup label="Stroke direction" uppercase options={[['Across form', 'max'], ['Along form', 'min']]}
+                    value={style.dirModeCurv} onChange={(v) => ss({ dirModeCurv: v })}
+                    style={{ marginBottom: 8 }} />
                   <InlineSl label="Spacing" help="Separation between strokes. Each line claims territory as it advances and stops on reaching another's, so strokes stay evenly spread instead of clumping." min={1} max={20} step={0.5} value={style.spacingCurv} onChange={v => ss({ spacingCurv: v })} />
                   <InlineSl label="Length" help="Maximum steps per stroke. Short values give a broken, sketched texture; long values give sweeping continuous lines." min={5} max={400} step={5} value={style.lengthCurv} onChange={v => ss({ lengthCurv: v })} />
                   <InlineSl label="Step" help="Integration step in grid cells. Smaller follows the curvature field more faithfully at more segments." min={0.25} max={3} step={0.25} value={style.stepCurv} onChange={v => ss({ stepCurv: v })} fmt={v => v.toFixed(2)} />
@@ -3492,18 +3482,10 @@ export function Sidebar({
             {view.autoRotate && (
               <Sub>
                 <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
-                <div style={{ display:'flex', gap:4 }}>
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
-                  {[['CW', 1],['CCW', -1]].map(([label, dir]) => (
-                    <button key={label} onClick={() => sv({ autoRotateDir: dir })} 
-                      style={{ 
-                        fontSize:10, padding:'2px 8px', border:`1px solid ${BORDER}`, borderRadius:3, 
-                        background: (view.autoRotateDir ?? 1) === dir ? ACCENT_DEEP : SURF, 
-                        color: (view.autoRotateDir ?? 1) === dir ? '#fff' : MUTED 
-                      }}>
-                      {label}
-                    </button>
-                  ))}
+                  <SegGroup label="Direction" options={[['CW', 1], ['CCW', -1]]}
+                    value={view.autoRotateDir ?? 1} onChange={(dir) => sv({ autoRotateDir: dir })} />
                 </div>
               </Sub>
             )}

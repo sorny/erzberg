@@ -17,7 +17,7 @@ import { simplifyFlat } from '../utils/geometryBuilders'
 import { useBackdrop } from '../hooks/useBackdrop'
 import { effectiveBounds, isUsableShape, shapeRings } from '../utils/heightmapEdit'
 // HEX for the canvas passes below — a 2D context cannot resolve var().
-import { ACCENT, BORDER, HEX, MUTED, SURF } from './panel/ui'
+import { ACCENT, HEX } from './panel/ui'
 
 const HANDLE = 8          // handle hit radius / half-size, screen px
 const MIN_RECT = 4        // smallest crop, source px
@@ -774,14 +774,17 @@ export function HeightmapEditor({
 
       {/* Hints + view controls */}
       <div style={{
-        position: 'absolute', left: 14, bottom: 14, display: 'flex', alignItems: 'center', gap: 8,
-        fontFamily: 'system-ui,sans-serif', fontSize: 11, color: MUTED,
+        position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 2,
+        padding: 3, borderRadius: 10, fontFamily: 'system-ui,-apple-system,sans-serif', fontSize: 11.5, color: '#a1a1aa',
+        background: 'rgba(22,22,26,.78)', border: '1px solid rgba(255,255,255,.09)',
+        backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
+        boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
         <button onClick={fit} style={{
-          background: SURF, color: '#d4d4d8', border: `1px solid ${BORDER}`,
-          borderRadius: 5, padding: '5px 10px', fontSize: 11, cursor: 'pointer',
+          background: 'rgba(255,255,255,.08)', color: '#e4e4e7', border: '1px solid rgba(255,255,255,.1)',
+          borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
-        <span style={{ background: 'rgba(0,0,0,.45)', padding: '5px 9px', borderRadius: 5 }}>
+        <span style={{ padding: '3px 9px' }}>
           {bounds ? `${bounds.w}×${bounds.h} px` : 'empty selection'}
           {' · '}
           {tool === 'crop'    && 'drag to crop · handles to resize'}
