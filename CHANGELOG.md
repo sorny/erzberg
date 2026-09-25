@@ -7,6 +7,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] — 2026-09-25
+
+A cleanup release. The Mask Studio cursor keeps up with the pointer again, Edit
+Mode and the Studio draw the same ground, rebuilds cost the main thread about
+half of what they did, and the docs are a third of their old length.
+
+### Changed
+
+- **Edit Mode and the Mask Studio share one backdrop.** Edit Mode showed the
+  height as grey. The Studio showed a shaded relief or the satellite scene, at
+  full source resolution with no cap. Both now draw from
+  `utils/rasterBackdrop.js`, capped at 2048 px, and offer the same choice: Auto,
+  Sat, Relief or Height. The choice is shared between the two views.
+- The preset *Moss & Granite* is now *Moss and Granite*.
+
+### Fixed
+
+- **The Mask Studio cursor lagged.** In brush mode the cursor is the brush ring
+  drawn on the canvas, and every pointer move, hover included, rebuilt the mask
+  wash from the whole plane: a new raster-sized canvas, a full loop and an
+  upload. On a 3804 × 2558 raster that was about 20 ms and 39 MB per move. The
+  wash is now one cached canvas, and a stroke repaints only the brush's
+  bounding box. Redraws are batched to one per frame, and the ring is a DOM
+  circle moved by a transform, so a hover does no canvas work at all.
+- **The session was read on every render.** `useRef(loadSession(…))` evaluates
+  its argument each time App renders, so every slider step and orbit sync parsed
+  `localStorage` and stringified all defaults. It is now lazy state and runs once.
+
+### Performance
+
+- **Bounding spheres come from the worker.** three.js computed a sphere over
+  every vertex on the main thread for the first frustum test after each rebuild,
+  and `LineSegmentsGeometry.setPositions` computed a box and a sphere eagerly. The
+  worker now measures one sphere per mesh (`sphereOf`) and the main thread sets
+  it directly. Main-thread busy time for a 40-step Jitter drag on a production
+  build fell from about 690 ms to about 325 ms.
+
+### Removed
+
+- `StatsOverlay`, `modeKeys`, `cacheIconGeometry`, `sourceVertexCount`,
+  `visibleVectorLayers`, `isFeatureHidden` and `rasterAcceptsVectors`: nothing
+  called them.
+- `autoprefixer` and `postcss`: Tailwind 4 runs through its Vite plugin.
+
+### Documentation
+
+- The README and every guide in `docs/` are about a third of their old length.
+  The design history they retold stays in this changelog.
+- `docs/Draw-Modes.md`: Shadow Line and Sun Hours pointed at each other's
+  section numbers.
+- `docs/Murmurations.md`: the shadow direction used the light vector from
+  before v1.14.0.
+- `docs/Architecture.md`: the session also stores text layers.
+
 ## [1.24.0] — 2026-09-24
 
 A brief arrived describing erzberg as "limited to local GeoTIFF/DEM files that
