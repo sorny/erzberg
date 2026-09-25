@@ -40,7 +40,7 @@ import * as THREE from 'three'
 import { DASH_SEGMENT_SIZES, dotSpacing } from './stylePresets'
 import { chainSegments } from './chainSegments'
 import { clipSegment, insideRect } from './frame'
-import { hexToRgb } from './colorUtils'
+import { hexToRgb, isDarkBackground } from './colorUtils'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 import { orderRuns, routeStats } from './penRoute'
@@ -456,19 +456,24 @@ async function runAnaglyph(opts, pacer) {
   if (typeof right === 'string') return right
 
   const { vw, vh } = left
+  // The eyes combine the way the viewport combines them: multiplied on paper,
+  // added on a dark ground. Painted normally, the second eye covered the first
+  // wherever they crossed and the pair averaged out to grey.
+  const blend = isDarkBackground(opts.bgColor) ? 'screen' : 'multiply'
   const tag = (name, groups) =>
-    `<g id="anaglyph-${name}" inkscape:groupmode="layer" inkscape:label="Anaglyph · ${name}">${groups.join('')}</g>`
+    `<g id="anaglyph-${name}" inkscape:groupmode="layer" inkscape:label="Anaglyph · ${name}" style="mix-blend-mode:${blend}">${groups.join('')}</g>`
 
   const svg = [
     `<?xml version="1.0" encoding="UTF-8"?>`,
     `<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="${vw.toFixed(1)}" height="${vh.toFixed(1)}" viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
     ...(opts.attribution ? [`<!-- ${xmlAttr(opts.attribution)} -->`] : []),
     ...(opts.preset ? [opts.preset] : []),
-    `<rect width="100%" height="100%" fill="${opts.bgColor}"/>`,
+    ...left.background,
     // One outer layer per eye, so the plot is two pen changes rather than
     // sixty-six interleaved ones.
     tag('left', left.parts),
     tag('right', right.parts),
+    ...left.extras,
     ...sheetMarkGroup(opts.sheetMarks, opts.sheetMarkColor ?? '#000000', left.vx, left.vy),
     `</svg>`,
   ].join('\n')
@@ -817,8 +822,11 @@ async function runExport({
       // every such area is here as lines, so nothing goes missing.
       // One filter colour for the whole eye when an anaglyph is being written.
       // A per-vertex ramp underneath would be seen by one eye and not the other,
-      // which is not a colour a stereo pair can carry.
-      const flatStroke = eyeInk ? screenInkHex(eyeInk) : screenInkHex(color)
+      // which is not a colour a stereo pair can carry. Written raw, not through
+      // `screenInkHex`: the file is for glasses and a two-pen plotter, and the
+      // tone curve turned #ff2020 into a salmon #f37870 that the red filter
+      // leaks, which is what made an exported anaglyph read as a grey drawing.
+      const flatStroke = eyeInk ? eyeInk : screenInkHex(color)
 
       // ── Area layers (Indexed, Mineral, Watershed) ────────────────────────
       //
@@ -853,7 +861,7 @@ async function runExport({
           const [sx, sy, lineZ] = project(cx3, cy3, cz3)
           if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           if (!dotInside(sx, sy)) continue
-          const fill = (colors && colors.length > i + 2)
+          const fill = (!eyeInk && colors && colors.length > i + 2)
             ? screenInk(colors[i], colors[i+1], colors[i+2])
             : flatStroke
           let visible = true
@@ -1526,7 +1534,17 @@ async function runExport({
   // there is exactly one `<svg>` element and one background in the result.
   if (partsOnly) {
     onStats?.({ ...plot, bytes: 0, width: vw, height: vh })
-    return { parts: layerGroups, vx, vy, vw, vh }
+    return {
+      parts: layerGroups, vx, vy, vw, vh,
+      // What a plain export draws after the line layers. The anaglyph writes it
+      // once, from the left pass: particles are not doubled on screen either.
+      extras: [...shadowGroup, ...trailGroup,
+        ...(circleEls.length > 0 ? [`<g stroke="none">${circleEls.join('')}</g>`] : [])],
+      background: useBgGrad
+        ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`,
+           `<rect width="100%" height="100%" fill="url(#bg-grad)"/>`]
+        : [`<rect width="100%" height="100%" fill="${bgColor}"/>`],
+    }
   }
 
   const svg = [

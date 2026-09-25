@@ -109,6 +109,14 @@ test('the SVG carries two eyes as two pen layers', async ({ page }) => {
   // ramp under an anaglyph is a colour only one eye would ever see.
   const inks = new Set([...svg.matchAll(/stroke="(#[0-9a-f]{6})"/gi)].map((m) => m[1].toLowerCase()))
   expect(inks.size).toBeLessThanOrEqual(2)
+  // The filter colours themselves, not their tone-mapped screen values: the
+  // curve turned #ff2020 into a salmon that the red filter leaks, and the file
+  // read as a grey drawing through the glasses.
+  expect([...inks].sort()).toEqual(['#20e0ff', '#ff2020'])
+
+  // And they combine as the viewport combines them. Painted normally, the
+  // second eye covered the first wherever the two crossed.
+  expect((svg.match(/mix-blend-mode:multiply/g) ?? []).length).toBe(2)
 
   // And the two eyes are genuinely different drawings. Equal geometry would mean
   // the offset never reached the projection and the file is a doubled copy.
