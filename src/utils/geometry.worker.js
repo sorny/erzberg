@@ -105,6 +105,33 @@ function blurredSource(p) {
   return result
 }
 
+/**
+ * A bounding sphere as `[cx, cy, cz, r]`, the way three computes one: centred
+ * on the box, radius to the farthest point.
+ *
+ * three computes it lazily on the first frustum test after each rebuild, on the
+ * main thread, over every vertex — about 25 ms for the opening plate. Here it is
+ * one more pass in a thread that already owns the data.
+ */
+function sphereOf(pos) {
+  if (!pos?.length) return null
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = pos[i], y = pos[i + 1], z = pos[i + 2]
+    if (x < x0) x0 = x; if (x > x1) x1 = x
+    if (y < y0) y0 = y; if (y > y1) y1 = y
+    if (z < z0) z0 = z; if (z > z1) z1 = z
+  }
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2
+  let r2 = 0
+  for (let i = 0; i < pos.length; i += 3) {
+    const dx = pos[i] - cx, dy = pos[i + 1] - cy, dz = pos[i + 2] - cz
+    const d = dx * dx + dy * dy + dz * dz
+    if (d > r2) r2 = d
+  }
+  return [cx, cy, cz, Math.sqrt(r2)]
+}
+
 self.onmessage = (e) => {
   const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, coverData, maskData, p, _gen } = e.data
 
@@ -159,6 +186,8 @@ self.onmessage = (e) => {
     // 1. Line layers — including the curtain/lid meshes, which are the largest
     //    arrays in the payload and were previously structured-cloned every rebuild.
     for (const L of [...(Array.isArray(lineGeo) ? lineGeo : []), ...(vectorGeo ?? [])]) {
+      L.sphere = sphereOf(L.positions)
+      for (const part of [L.curtains, L.lids, L.fills]) if (part) part.sphere = sphereOf(part.positions)
       xfer(L.positions)
       xfer(L.colors)
       xfer(L.curtains?.positions)
@@ -175,6 +204,7 @@ self.onmessage = (e) => {
     }
 
     // 2. Surface
+    surfaceGeo.sphere = sphereOf(surfaceGeo.positions)
     xfer(surfaceGeo.positions)
     xfer(surfaceGeo.brightnessBuf)
     xfer(surfaceGeo.indices)

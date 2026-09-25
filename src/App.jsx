@@ -538,19 +538,20 @@ export default function App() {
   /**
    * Read once, at mount, before the first render.
    *
-   * A ref rather than state because nothing re-reads it: it seeds the initial
-   * values below and then only answers "was there a session?" for the note in
-   * the panel. Re-reading storage later would fight the effect that writes it.
+   * Lazy state, not `useRef(loadSession(…))`: a ref's argument is evaluated on
+   * every render and thrown away, which parsed storage and stringified every
+   * default on each slider step and orbit sync. Nothing re-reads it: it seeds
+   * the values below and answers "was there a session?" for the panel note.
    */
-  const restored = useRef(loadSession({
+  const [restored] = useState(() => loadSession({
     terrain: TERRAIN_DEF, style: STYLE_DEF, points: POINTS_DEF, view: VIEW_DEF,
     gradientStops: GRADIENT_PRESETS['Jet'],
     bgGradientStops: [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }],
   }))
-  const [terrain, setTerrain] = useState(() => withDefaults(TERRAIN_DEF, restored.current?.terrain))
-  const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored.current?.style))
-  const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored.current?.points))
-  const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored.current?.view))
+  const [terrain, setTerrain] = useState(() => withDefaults(TERRAIN_DEF, restored?.terrain))
+  const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored?.style))
+  const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored?.points))
+  const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored?.view))
   /*
    * Free text placed in the scene.
    *
@@ -561,11 +562,11 @@ export default function App() {
    * handed an id the session is already using — two layers sharing one would
    * collide in `layerStyle` and in React's keys at once.
    */
-  const [textLayers, setTextLayers] = useState(() => adoptTextLayers(restored.current?.textLayers ?? []))
+  const [textLayers, setTextLayers] = useState(() => adoptTextLayers(restored?.textLayers ?? []))
   // Cleared by the first Reset all, so the note stops claiming a session that
   // is no longer what is on screen.
 
-  const [sessionRestored, setSessionRestored] = useState(() => restored.current != null)
+  const [sessionRestored, setSessionRestored] = useState(() => restored != null)
   // Largest drawing buffer this context has been observed to actually deliver.
   // Infinity until DprGuard catches a clamp; only ever ratchets downward.
   const [maxBufferPx, setMaxBufferPx] = useState(Infinity)
@@ -580,8 +581,8 @@ export default function App() {
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
   }, [])
-  const [gradientStops,   setGradientStops]   = useState(() => restored.current?.gradientStops ?? GRADIENT_PRESETS['Jet'])
-  const [bgGradientStops, setBgGradientStops] = useState(() => restored.current?.bgGradientStops
+  const [gradientStops,   setGradientStops]   = useState(() => restored?.gradientStops ?? GRADIENT_PRESETS['Jet'])
+  const [bgGradientStops, setBgGradientStops] = useState(() => restored?.bgGradientStops
     ?? [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }])
 
   /*

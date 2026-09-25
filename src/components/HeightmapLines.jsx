@@ -13,6 +13,9 @@ import { layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 
+/** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
+const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
+
 /**
  * Where the parts of one layer sit inside its own slot in the paint order.
  *
@@ -98,7 +101,7 @@ const BLEND_MODES = {
 }
 
 function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift }) {
-  const { positions, colors } = layer
+  const { positions, colors, sphere } = layer
   const base = (layerIndex ?? 0) + 1
   /**
    * A layer either carries per-vertex colour (every draw mode) or takes a flat
@@ -146,12 +149,23 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   const geometry = useMemo(() => {
     if (!positions || positions.length === 0) return null
     const geo = new LineSegmentsGeometry()
-    geo.setPositions(positions)
+    if (sphere) {
+      // setPositions, minus the box and sphere it computes over every vertex on
+      // the main thread: the worker measured the sphere already, and a raycast
+      // computes the box lazily if it ever needs one.
+      const buf = new THREE.InstancedInterleavedBuffer(positions, 6, 1)
+      geo.setAttribute('instanceStart', new THREE.InterleavedBufferAttribute(buf, 3, 0))
+      geo.setAttribute('instanceEnd', new THREE.InterleavedBufferAttribute(buf, 3, 3))
+      geo.instanceCount = geo.attributes.instanceStart.count
+      geo.boundingSphere = toSphere(sphere)
+    } else {
+      geo.setPositions(positions)
+    }
     if (colors && colors.length === positions.length) {
       geo.setColors(colors)
     }
     return geo
-  }, [positions, colors])
+  }, [positions, colors, sphere])
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
@@ -162,6 +176,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!layer.fills || layer.fills.positions.length === 0) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(layer.fills.positions, 3))
+    if (layer.fills.sphere) geo.boundingSphere = toSphere(layer.fills.sphere)
     geo.setIndex(new THREE.BufferAttribute(layer.fills.indices, 1))
     return geo
   }, [layer.fills])
@@ -226,6 +241,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!layer.curtains || layer.curtains.positions.length === 0) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(layer.curtains.positions, 3))
+    if (layer.curtains.sphere) geo.boundingSphere = toSphere(layer.curtains.sphere)
     geo.setIndex(new THREE.BufferAttribute(layer.curtains.indices, 1))
     return geo
   }, [layer.curtains])
@@ -245,6 +261,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!layer.lids || layer.lids.positions.length === 0) return null
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(layer.lids.positions, 3))
+    if (layer.lids.sphere) geo.boundingSphere = toSphere(layer.lids.sphere)
     geo.setAttribute('color',    new THREE.BufferAttribute(layer.lids.colors, 3))
     geo.setIndex(new THREE.BufferAttribute(layer.lids.indices, 1))
     return geo

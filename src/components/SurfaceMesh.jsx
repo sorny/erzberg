@@ -8,6 +8,9 @@ import { hasFillLayer } from '../utils/geometryBuilders'
 import { TONE_GLSL, toneFor } from '../utils/imageryTone'
 import { useStore } from '../store/useStore'
 
+/** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
+const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
+
 // ── Gradient texture ──────────────────────────────────────────────────────────
 
 const GRAD_TEX_SIZE = 256
@@ -410,6 +413,8 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     if (surfaceGeo.normals?.length) geo.setAttribute('normal', new THREE.BufferAttribute(surfaceGeo.normals, 3))
     if (surfaceGeo.uvs?.length)     geo.setAttribute('uv',     new THREE.BufferAttribute(surfaceGeo.uvs,     2))
     geo.setIndex(new THREE.BufferAttribute(surfaceGeo.indices, 1))
+    // Measured in the worker — see sphereOf in geometry.worker.js.
+    if (surfaceGeo.sphere) geo.boundingSphere = toSphere(surfaceGeo.sphere)
     return geo
   }, [surfaceGeo])
 
