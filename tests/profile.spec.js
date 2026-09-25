@@ -48,7 +48,12 @@ test('the section and its anchors are drawn on the terrain, and cleared with the
   // The panel gained the 40 px stage rail, so its edge moved left from 1008 and
   // the old 980 px band ran 12 px into it — which is a band that changes every
   // time the panel does, and it read as the section failing to clear.
-  const PLATE = { clip: { x: 0, y: 60, width: 940, height: 420 } }
+  //
+  // It starts at y=100, below the floating viewport hint and its shadow. The
+  // hint leaves for good on the first orbit, and a click on the terrain is one,
+  // so a band that reached it compared a frame with the hint's shadow against a
+  // frame without it.
+  const PLATE = { clip: { x: 0, y: 100, width: 940, height: 380 } }
   const before = await page.screenshot(PLATE)
 
   const { afterA } = await takeProfile(page)
