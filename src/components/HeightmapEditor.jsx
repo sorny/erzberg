@@ -12,16 +12,13 @@
  * pointermove, and re-rendering the panel 60×/s to show a half-finished path is
  * work nobody sees.
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { simplifyFlat } from '../utils/geometryBuilders'
+import { useBackdrop } from '../hooks/useBackdrop'
 import { effectiveBounds, isUsableShape, shapeRings } from '../utils/heightmapEdit'
 // HEX for the canvas passes below — a 2D context cannot resolve var().
 import { ACCENT, BORDER, HEX, MUTED, SURF } from './panel/ui'
 
-// Cap on the cached preview bitmap's long side. An 8k DEM downscaled to this is
-// still far past what any screen shows, and holding the full raster as RGBA
-// would be 256 MB for a picture nothing can resolve.
-const MAX_PREVIEW = 2048
 const HANDLE = 8          // handle hit radius / half-size, screen px
 const MIN_RECT = 4        // smallest crop, source px
 const VERTEX = 7          // vertex handle size, screen px
@@ -71,47 +68,13 @@ function cursorFor(hit, dragging) {
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v }
 
-/** Greyscale preview bitmap of the source raster, stretched to its own range. */
-function buildPreview(pixels, mask, w, h) {
-  if (!pixels || !w || !h) return null
-  const step = Math.max(1, Math.ceil(Math.max(w, h) / MAX_PREVIEW))
-  const pw = Math.max(1, Math.floor(w / step))
-  const ph = Math.max(1, Math.floor(h / step))
-
-  let min = Infinity, max = -Infinity
-  for (let i = 0; i < pixels.length; i++) {
-    if (mask && !mask[i]) continue
-    const v = pixels[i]
-    if (v < min) min = v
-    if (v > max) max = v
-  }
-  if (!isFinite(min) || max <= min) { min = 0; max = 1 }
-  const inv = 255 / (max - min)
-
-  const cv = document.createElement('canvas')
-  cv.width = pw; cv.height = ph
-  const ctx = cv.getContext('2d')
-  const img = ctx.createImageData(pw, ph)
-  for (let y = 0; y < ph; y++) {
-    const sy = Math.min(h - 1, y * step)
-    for (let x = 0; x < pw; x++) {
-      const si = sy * w + Math.min(w - 1, x * step)
-      const o = (y * pw + x) * 4
-      if (mask && !mask[si]) { img.data[o + 3] = 0; continue }
-      const g = clamp(Math.round((pixels[si] - min) * inv), 0, 255)
-      img.data[o] = g; img.data[o + 1] = g; img.data[o + 2] = g; img.data[o + 3] = 255
-    }
-  }
-  ctx.putImageData(img, 0, 0)
-  return cv
-}
-
 export function HeightmapEditor({
   srcPixels, srcMask, srcWidth, srcHeight,
   edit, onChange,
   tool, aspect,
   rightInset = 0,
   keysRef,
+  imagery, tone, backdrop = 'auto',
 }) {
   const wrapRef   = useRef(null)
   const canvasRef = useRef(null)
@@ -124,10 +87,10 @@ export function HeightmapEditor({
 
   editRef.current = edit
 
-  const preview = useMemo(
-    () => buildPreview(srcPixels, srcMask, srcWidth, srcHeight),
-    [srcPixels, srcMask, srcWidth, srcHeight],
-  )
+  // Shared with the Mask Studio, capped at 2048 px — see utils/rasterBackdrop.js.
+  const { canvas: preview } = useBackdrop({
+    srcPixels, srcMask, srcWidth, srcHeight, imagery, tone, choice: backdrop,
+  })
 
   // ── View transform ─────────────────────────────────────────────────────────
   const fit = useCallback(() => {

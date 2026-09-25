@@ -26,11 +26,11 @@
  * stays pixelated for the mask overlay, because a mask has no intermediate
  * value and a smoothed edge would show a boundary that is not there.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fillAll, invert, stamp, stroke } from '../utils/maskLayers'
 import { MaskPanel } from './MaskPanel'
 import { BORDER, MUTED, SURF } from './panel/ui'
-import { applyTone } from '../utils/imageryTone'
+import { useBackdrop } from '../hooks/useBackdrop'
 
 /** Tools, and the one letter each answers to. The panel draws the buttons;
  *  this is only the keyboard map. */
@@ -44,30 +44,10 @@ const STUDIO_TOOLS = [
 const MIN_BRUSH = 1
 const MAX_BRUSH = 400
 
-/** The hillshade shown when there is no imagery to show instead. */
-function buildRelief(pixels, nodata, width, height) {
-  const out = new Uint8ClampedArray(width * height * 4)
-  for (let r = 0; r < height; r++) {
-    for (let c = 0; c < width; c++) {
-      const i = r * width + c
-      const o = i * 4
-      if (nodata && !nodata[i]) { out[o + 3] = 0; continue }
-      const l = c > 0 ? pixels[i - 1] : pixels[i]
-      const u = r > 0 ? pixels[i - width] : pixels[i]
-      // A plain north-west lamp on the normalised raster. This is a backdrop to
-      // aim at, not a render — the app has a real hillshade for that.
-      const shade = Math.max(0, Math.min(1, 0.5 + (pixels[i] - l) * 6 + (pixels[i] - u) * 6))
-      const v = Math.round(40 + 150 * pixels[i] * 0.55 + 60 * shade)
-      out[o] = out[o + 1] = out[o + 2] = Math.min(255, v)
-      out[o + 3] = 255
-    }
-  }
-  return new ImageData(out, width, height)
-}
-
 export function MaskStudio({
   srcPixels, srcMask, srcWidth, srcHeight,
   imagery, tone, mask, onCommit, onClose, rightInset = 0,
+  backdrop = 'auto', setBackdrop,
   style, ss,
 }) {
   const wrapRef = useRef(null)
@@ -75,37 +55,61 @@ export function MaskStudio({
   const viewRef = useRef({ scale: 1, ox: 0, oy: 0 })
   const dragRef = useRef(null)
   const hoverRef = useRef(null)
+  const ringRef = useRef(null)
   const drawRef = useRef(() => {})
+  const frameRef = useRef(0)
+  const overlayRef = useRef(null)
   const dataRef = useRef(mask?.data ?? null)
 
   const [tool, setTool] = useState('brush')
   const [brush, setBrush] = useState(24)
   const [erase, setErase] = useState(false)
-  const [backdrop, setBackdrop] = useState('auto')
   const [, bump] = useState(0)
 
   dataRef.current = mask?.data ?? null
 
-  // The two possible backdrops, each built once for the raster it belongs to.
-  const relief = useMemo(
-    () => (srcPixels ? buildRelief(srcPixels, srcMask, srcWidth, srcHeight) : null),
-    [srcPixels, srcMask, srcWidth, srcHeight],
-  )
-  // The same exposure the terrain drape is under, and for a reason worth
-  // stating: a boundary is painted against what is on screen here and checked
-  // against what is on screen there. Two different exposures would move it.
-  const photo = useMemo(() => {
-    if (!imagery?.rgba) return null
-    const toned = applyTone(imagery.rgba, imagery.width, imagery.height, tone)
-    return new ImageData(toned, imagery.width, imagery.height)
-  }, [imagery, tone])
+  // The same backdrop builder as Edit Mode, and the same choice. The imagery
+  // is under the drape's own exposure: a boundary painted against one
+  // exposure and checked against another would move.
+  const { canvas: bg, hasPhoto } = useBackdrop({
+    srcPixels, srcMask, srcWidth, srcHeight, imagery, tone, choice: backdrop,
+  })
 
-  const showPhoto = backdrop === 'imagery' || (backdrop === 'auto' && !!photo)
+  /*
+   * The mask wash, kept as one canvas and patched in place.
+   *
+   * It used to be rebuilt from the whole plane on every draw, and a draw ran on
+   * every pointer move — hover included. On a 3804 × 2558 raster that was a
+   * 39 MB allocation and a full-raster loop per move, about 20 ms, and the brush
+   * ring (which is the cursor here) trailed the pointer. Now a stroke rewrites
+   * only the brush's bounding box.
+   */
+  const rebuildOverlay = useCallback(() => {
+    const plane = dataRef.current
+    if (!plane || !srcWidth || !srcHeight) { overlayRef.current = null; return }
+    let o = overlayRef.current
+    if (!o || o.canvas.width !== srcWidth || o.canvas.height !== srcHeight) {
+      const canvas = document.createElement('canvas')
+      canvas.width = srcWidth; canvas.height = srcHeight
+      const ctx = canvas.getContext('2d')
+      o = { canvas, ctx, img: ctx.createImageData(srcWidth, srcHeight) }
+      overlayRef.current = o
+    }
+    o.rgb = hexRgb(mask?.color)
+    paintOverlay(o, plane, srcWidth, 0, 0, srcWidth - 1, srcHeight - 1)
+  }, [srcWidth, srcHeight, mask?.color])
 
-  // Offscreen canvases, so the per-frame draw is three blits rather than three
-  // full raster loops. Rebuilt only when their source does.
-  const reliefCanvas = useMemo(() => canvasOf(relief), [relief])
-  const photoCanvas = useMemo(() => canvasOf(photo), [photo])
+  // A new plane (import, copy, another mask) or a new colour repaints it all.
+  useEffect(() => { rebuildOverlay(); drawRef.current() }, [rebuildOverlay, mask?.data])
+
+  /** Repaint the overlay inside a box of image pixels, after a brush stamp. */
+  const patchOverlay = (x0, y0, x1, y1) => {
+    const o = overlayRef.current, plane = dataRef.current
+    if (!o || !plane) return
+    const ax = Math.max(0, Math.floor(Math.min(x0, x1))), bx = Math.min(srcWidth - 1, Math.ceil(Math.max(x0, x1)))
+    const ay = Math.max(0, Math.floor(Math.min(y0, y1))), by = Math.min(srcHeight - 1, Math.ceil(Math.max(y0, y1)))
+    if (bx >= ax && by >= ay) paintOverlay(o, plane, srcWidth, ax, ay, bx, by)
+  }
 
   // ── View transform ─────────────────────────────────────────────────────────
   const fit = useCallback(() => {
@@ -150,17 +154,15 @@ export function MaskStudio({
     ctx.translate(ox, oy)
     ctx.scale(scale, scale)
 
-    const bg = showPhoto ? photoCanvas : reliefCanvas
     if (bg) ctx.drawImage(bg, 0, 0, srcWidth, srcHeight)
 
     // The mask itself, as a wash in its own colour. Composited rather than
     // drawn opaque so the ground stays readable underneath it — you are aiming
     // at what is in the picture, not at the paint.
-    const plane = dataRef.current
-    if (plane) {
-      const overlay = maskCanvas(plane, srcWidth, srcHeight, mask.color)
+    const overlay = overlayRef.current
+    if (overlay && dataRef.current) {
       ctx.globalAlpha = 0.45
-      ctx.drawImage(overlay, 0, 0, srcWidth, srcHeight)
+      ctx.drawImage(overlay.canvas, 0, 0, srcWidth, srcHeight)
       ctx.globalAlpha = 1
     }
     ctx.restore()
@@ -190,24 +192,41 @@ export function MaskStudio({
       ctx.setLineDash([])
     }
 
-    // The brush, where the pointer is. Drawn at the size it will actually
-    // paint, which is the only honest way to show a radius.
-    if (tool === 'brush' && hoverRef.current) {
-      const s = toScreen(hoverRef.current)
-      ctx.beginPath()
-      ctx.arc(s.x, s.y, brush * scale, 0, Math.PI * 2)
-      ctx.strokeStyle = erase ? '#ff6b6b' : '#ffffff'
-      ctx.lineWidth = 1.2
-      ctx.stroke()
-    }
+    placeRing()
 
     function toScreen(pt) {
       const v = viewRef.current
       return { x: pt.x * v.scale + v.ox, y: pt.y * v.scale + v.oy }
     }
-  }, [srcWidth, srcHeight, showPhoto, photoCanvas, reliefCanvas, mask, tool, brush, erase])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [srcWidth, srcHeight, bg, mask, tool, brush, erase])
 
   drawRef.current = draw
+
+  /** At most one full redraw per frame, however many pointer events arrive. */
+  const requestDraw = () => {
+    if (frameRef.current) return
+    frameRef.current = requestAnimationFrame(() => { frameRef.current = 0; drawRef.current() })
+  }
+  useEffect(() => () => cancelAnimationFrame(frameRef.current), [])
+
+  /*
+   * The brush ring is the cursor in brush mode, so it must never wait for a
+   * canvas redraw. It is a DOM circle moved by a transform, which the
+   * compositor handles on its own.
+   */
+  function placeRing() {
+    const el = ringRef.current
+    if (!el) return
+    const pt = hoverRef.current
+    if (tool !== 'brush' || !pt) { el.style.display = 'none'; return }
+    const v = viewRef.current
+    const r = brush * v.scale
+    el.style.display = 'block'
+    el.style.width = el.style.height = `${2 * r}px`
+    el.style.transform = `translate(${pt.x * v.scale + v.ox - r}px, ${pt.y * v.scale + v.oy - r}px)`
+    el.style.borderColor = erase ? '#ff6b6b' : '#ffffff'
+  }
 
   useEffect(() => { fit() }, [fit])
   useEffect(() => { draw() })
@@ -235,7 +254,8 @@ export function MaskStudio({
     if (tool === 'brush') {
       dragRef.current = { tool, last: pt }
       stamp(dataRef.current, srcWidth, srcHeight, pt.x, pt.y, brush, erase)
-      draw()
+      patchOverlay(pt.x - brush, pt.y - brush, pt.x + brush, pt.y + brush)
+      requestDraw()
     } else if (tool === 'lasso') {
       dragRef.current = { tool, points: [pt], preview: true }
     } else {
@@ -248,15 +268,19 @@ export function MaskStudio({
     if (d0?.tool === 'pan') {
       viewRef.current = { ...viewRef.current,
                           ox: d0.ox + (e.clientX - d0.sx), oy: d0.oy + (e.clientY - d0.sy) }
-      draw()
+      requestDraw()
       return
     }
     const pt = toImage(e)
     hoverRef.current = pt
+    placeRing()
     const d = dragRef.current
-    if (d && dataRef.current) {
+    if (!d) return   // a hover moves the ring and nothing else
+    if (dataRef.current) {
       if (d.tool === 'brush') {
         stroke(dataRef.current, srcWidth, srcHeight, d.last.x, d.last.y, pt.x, pt.y, brush, erase)
+        patchOverlay(Math.min(d.last.x, pt.x) - brush, Math.min(d.last.y, pt.y) - brush,
+                     Math.max(d.last.x, pt.x) + brush, Math.max(d.last.y, pt.y) + brush)
         d.last = pt
       } else if (d.tool === 'lasso') {
         const prev = d.points[d.points.length - 1]
@@ -267,7 +291,7 @@ export function MaskStudio({
         d.to = pt
       }
     }
-    draw()
+    requestDraw()
   }
 
   const onUp = () => {
@@ -275,7 +299,7 @@ export function MaskStudio({
     dragRef.current = null
     if (d?.tool === 'pan') { draw(); return }
     if (!d || !dataRef.current) { draw(); return }
-    if (d.tool !== 'brush') fillShape(dataRef.current, srcWidth, srcHeight, d, erase)
+    if (d.tool !== 'brush') { fillShape(dataRef.current, srcWidth, srcHeight, d, erase); rebuildOverlay() }
     commit()
     draw()
   }
@@ -300,7 +324,7 @@ export function MaskStudio({
       ox: cx - (cx - v.ox) * (scale / v.scale),
       oy: cy - (cy - v.oy) * (scale / v.scale),
     }
-    draw()
+    requestDraw()
   }
 
   // ── Keys ───────────────────────────────────────────────────────────────────
@@ -328,10 +352,15 @@ export function MaskStudio({
       <canvas ref={canvasRef}
         onPointerDown={onDown} onPointerMove={onMove}
         onPointerUp={onUp} onPointerCancel={onUp}
-        onPointerLeave={() => { hoverRef.current = null; draw() }}
+        onPointerLeave={() => { hoverRef.current = null; placeRing() }}
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
         style={{ display: 'block', cursor: tool === 'brush' ? 'none' : 'crosshair', touchAction: 'none' }} />
+      <div ref={ringRef} aria-hidden="true" style={{
+        position: 'absolute', left: 0, top: 0, display: 'none', pointerEvents: 'none',
+        border: '1.2px solid #ffffff', borderRadius: '50%', boxSizing: 'border-box',
+        willChange: 'transform',
+      }} />
 
       {/* Hints + view controls, in the same corner and the same shape as Edit
           Mode's. The two views are the same kind of thing and now say so. */}
@@ -360,11 +389,11 @@ export function MaskStudio({
         brush={brush} setBrush={setBrush}
         erase={erase} setErase={setErase}
         backdrop={backdrop} setBackdrop={setBackdrop}
-        hasPhoto={!!photo} imagery={imagery}
+        hasPhoto={hasPhoto} imagery={imagery}
         style={style} ss={ss}
-        onFill={() => { if (dataRef.current) { fillAll(dataRef.current, 1); commit(); draw() } }}
-        onInvert={() => { if (dataRef.current) { invert(dataRef.current); commit(); draw() } }}
-        onClear={() => { if (dataRef.current) { fillAll(dataRef.current, 0); commit(); draw() } }}
+        onFill={() => { if (dataRef.current) { fillAll(dataRef.current, 1); rebuildOverlay(); commit(); draw() } }}
+        onInvert={() => { if (dataRef.current) { invert(dataRef.current); rebuildOverlay(); commit(); draw() } }}
+        onClear={() => { if (dataRef.current) { fillAll(dataRef.current, 0); rebuildOverlay(); commit(); draw() } }}
         onDone={onClose}
       />
     </div>
@@ -373,31 +402,22 @@ export function MaskStudio({
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-function canvasOf(imageData) {
-  if (!imageData) return null
-  const c = document.createElement('canvas')
-  c.width = imageData.width
-  c.height = imageData.height
-  c.getContext('2d').putImageData(imageData, 0, 0)
-  return c
+function hexRgb(color) {
+  const n = parseInt((color ?? '#ffffff').slice(1), 16)
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff]
 }
 
-/** The mask as a flat wash of its own colour, transparent where it is off. */
-function maskCanvas(plane, width, height, color) {
-  const c = document.createElement('canvas')
-  c.width = width
-  c.height = height
-  const ctx = c.getContext('2d')
-  const img = ctx.createImageData(width, height)
-  const n = parseInt((color ?? '#ffffff').slice(1), 16)
-  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff
-  for (let i = 0; i < plane.length; i++) {
-    const o = i * 4
-    if (!plane[i]) continue
-    img.data[o] = r; img.data[o + 1] = g; img.data[o + 2] = b; img.data[o + 3] = 255
+/** Write the plane into the overlay inside [x0..x1] × [y0..y1] and upload that box. */
+function paintOverlay(o, plane, width, x0, y0, x1, y1) {
+  const d = o.img.data
+  const [r, g, b] = o.rgb
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0, i = y * width + x0; x <= x1; x++, i++) {
+      const k = i * 4
+      if (plane[i]) { d[k] = r; d[k + 1] = g; d[k + 2] = b; d[k + 3] = 255 } else d[k + 3] = 0
+    }
   }
-  ctx.putImageData(img, 0, 0)
-  return c
+  o.ctx.putImageData(o.img, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1)
 }
 
 /** Rasterise a finished rect, ellipse or lasso into the plane. */

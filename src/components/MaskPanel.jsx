@@ -13,6 +13,7 @@
  * two hold different controls and will keep diverging in content; what has to
  * stay identical is the frame, and that is what `panel/ui` already provides.
  */
+import { BACKDROP_OPTIONS } from '../utils/rasterBackdrop'
 import { maskCoverage } from '../utils/maskLayers'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
@@ -113,8 +114,8 @@ export function MaskPanel({
           <SegRow
             label="Show"
             testIdPrefix="studio-backdrop"
-            help="What you aim at. Satellite is a photograph and shows the boundary between worked ground and forest, which shaded relief cannot. Auto takes it when there is some."
-            options={[['Auto', 'auto'], ['Sat', 'imagery'], ['Relief', 'relief']]}
+            help="What you aim at. Satellite is a photograph and shows the boundary between worked ground and forest, which shaded relief cannot. Auto takes it when there is some. The same choice as Edit Mode's."
+            options={BACKDROP_OPTIONS}
             value={backdrop}
             onChange={setBackdrop}
           />
@@ -124,7 +125,7 @@ export function MaskPanel({
             </div>
           ) : (
             <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
-              No imagery fetched — the backdrop is the hillshade.
+              No imagery fetched. Auto shows the relief.
             </div>
           )}
           {!hasPhoto && backdrop === 'imagery' && (

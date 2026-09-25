@@ -1512,6 +1512,9 @@ export default function App() {
   const [editMode,  setEditMode]  = useState(false)
   const [editDraft, setEditDraft] = useState(null)
   const [editTool,  setEditTool]  = useState('crop')
+  // What Edit Mode and the Mask Studio are drawn over. One choice for both, so
+  // the two views show the same ground — see utils/rasterBackdrop.js.
+  const [backdrop, setBackdrop] = useState('auto')
   const [aspectKey, setAspectKey] = useState('free')
   // The editor publishes its key handling here: Escape and Enter mean "cancel
   // the half-drawn shape" / "close it" while one is in progress, and only
@@ -2273,6 +2276,7 @@ export default function App() {
           onCommit={() => commitMask(studioMask.id)}
           onClose={() => setStudioMaskId(null)}
           rightInset={PANEL_W}
+          backdrop={backdrop}   setBackdrop={setBackdrop}
         />
       )}
 
@@ -2284,6 +2288,7 @@ export default function App() {
           edit={editDraft}      onChange={setEditDraft}
           tool={editTool}       aspect={aspect}
           rightInset={PANEL_W}  keysRef={editKeysRef}
+          imagery={imagery}     tone={imageryTone}  backdrop={backdrop}
         />
       )}
 
@@ -2293,6 +2298,7 @@ export default function App() {
           srcWidth={srcWidth} srcHeight={srcHeight}
           edit={editDraft}    onChange={setEditDraft}
           tool={editTool}     setTool={setEditTool}
+          backdrop={backdrop} setBackdrop={setBackdrop} hasImagery={!!imagery?.rgba}
           aspect={aspectKey}  setAspect={setAspectKey}
           onApply={applyEditDraft}
           onCancel={() => setEditMode(false)}

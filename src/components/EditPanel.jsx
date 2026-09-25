@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
+import { BACKDROP_OPTIONS } from '../utils/rasterBackdrop'
 import { useFeaturePick } from './panel/FeaturePicker'
 import {
   ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
@@ -60,6 +61,7 @@ export function EditPanel({
   aspect, setAspect,
   onApply, onCancel, onReset,
   vectorLayers, vectorSources, bboxSrc, crs, onError,
+  backdrop = 'auto', setBackdrop, hasImagery = false,
 }) {
   const rect = edit?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
   const bounds = effectiveBounds(edit, srcWidth, srcHeight)
@@ -183,6 +185,21 @@ export function EditPanel({
             onChange={(v) => onChange({ rect, shape: edit?.shape ?? null, feather: v })}
             fmt={(v) => v + 'px'}
           />
+
+          {setBackdrop && (
+            <SegRow
+              label="Show" testIdPrefix="edit-backdrop"
+              help="What the raster is drawn as while you cut it. The same choice as the Mask Studio's. Auto shows the satellite scene when one is fetched, and the relief when not."
+              options={BACKDROP_OPTIONS}
+              value={backdrop}
+              onChange={setBackdrop}
+            />
+          )}
+          {backdrop === 'imagery' && !hasImagery && (
+            <div style={{ fontSize: 10, color: '#ef4444', lineHeight: 1.6 }}>
+              Nothing to show. Fetch imagery in the Satellite section first.
+            </div>
+          )}
 
           <div style={{
             marginTop: 12, padding: '8px 8px', background: 'rgba(0,0,0,0.2)',
