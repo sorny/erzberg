@@ -63,8 +63,3 @@ export function getIconGeometry(id, onLoaded) {
     })
   return null
 }
-
-/** For tests and for the custom-upload path, which already has the source. */
-export function cacheIconGeometry(id, geo) {
-  cache.set(id, { geo })
-}

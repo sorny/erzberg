@@ -35,7 +35,6 @@
  * the draping and fill loops want to read anyway.
  */
 
-import { classifyCRS } from './geoCoords'
 
 // ── Layer defaults ────────────────────────────────────────────────────────────
 
@@ -275,13 +274,6 @@ export function sourceRings(source) {
   return out
 }
 
-/** Total vertex count across a source — the figure the panel reports. */
-export function sourceVertexCount(source) {
-  let n = 0
-  for (const b of source.buckets) n += b.coords.length >> 1
-  return n
-}
-
 // ── Layers ────────────────────────────────────────────────────────────────────
 
 /**
@@ -358,11 +350,6 @@ export function vectorBuildSignature(layers) {
   return (layers ?? []).map(layerBuildKey).sort().join(';')
 }
 
-/** The layers whose geometry the worker has to build at all. */
-export function visibleVectorLayers(layers) {
-  return (layers ?? []).filter((l) => l.visible)
-}
-
 /**
  * How one feature of a bucket should read in the panel.
  *
@@ -379,11 +366,6 @@ export function featureLabel(bucket, i) {
   return `${leaf} #${i + 1}`
 }
 
-/** Whether feature `i` of a layer is drawn. */
-export function isFeatureHidden(layer, i) {
-  return !!layer.hidden?.includes(i)
-}
-
 /**
  * Toggle one feature's visibility, keeping `hidden` sorted so `layerBuildKey`
  * is stable — an unsorted list would spell the same state two ways and cost a
@@ -396,17 +378,3 @@ export function toggleHidden(hidden, i) {
   return [...set].sort((a, b) => a - b)
 }
 
-/**
- * Whether vector layers can be placed on this raster, phrased for the panel.
- *
- * Returns { ok, reason } where `reason` is one of 'none' | 'unsupported' | null.
- * Deliberately not merged into `featureCoverage`: this answers "can anything be
- * drawn here at all", which the panel needs *before* a source exists.
- */
-export function rasterAcceptsVectors(crs, bbox) {
-  const c = classifyCRS(crs)
-  if (c.kind === 'none') return { ok: false, reason: 'none' }
-  if (!c.supported) return { ok: false, reason: 'unsupported' }
-  if (!bbox || bbox.length !== 4) return { ok: false, reason: 'none' }
-  return { ok: true, reason: null }
-}

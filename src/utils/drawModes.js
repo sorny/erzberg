@@ -259,8 +259,3 @@ export const DRAW_MODE_IDS = DRAW_MODES.map((m) => m.id)
  * there is no fixed set of them to name here.
  */
 export const HYPSO_LAYER_IDS = [...DRAW_MODE_IDS]
-
-/** Style keys belonging to one mode, used for block-level crossover. */
-export function modeKeys(id, style) {
-  return Object.keys(style).filter((k) => k.endsWith(id))
-}
