@@ -37,7 +37,8 @@
  * does not.
  */
 import * as THREE from 'three'
-import { DASH_SEGMENT_SIZES } from './stylePresets'
+import { DASH_SEGMENT_SIZES, dotSpacing } from './stylePresets'
+import { chainSegments } from './chainSegments'
 import { clipSegment, insideRect } from './frame'
 import { hexToRgb } from './colorUtils'
 import { traceAreaRings } from './areaRings'
@@ -1435,6 +1436,38 @@ async function runExport({
       // strings here, and re-measuring them would mean parsing back what was
       // just written.
       plot.dashed = true
+      /*
+       * Round dots: a filled circle at every spacing step along the stroke,
+       * phased by the same running offset the dashes use, so they flow evenly
+       * across the joints between segments. The diameter is the stroke width
+       * this layer writes; the spacing keeps the viewport's ratio to it.
+       */
+      if (dashSizes.dots) {
+        const r = (layer.weight * 0.25).toFixed(2)
+        const step = dotSpacing(layer.weight) * 0.5
+        // Walked stroke by stroke rather than in list order: builders emit
+        // segments in scan order, and a phase reset at every non-neighbour
+        // put a dot at the start of each one. Endpoints agree to 0.1 px.
+        const flat = new Float64Array(segs.length * 4)
+        segs.forEach((g, i) => { flat[i * 4] = g.x0; flat[i * 4 + 1] = g.y0; flat[i * 4 + 2] = g.x1; flat[i * 4 + 3] = g.y1 })
+        const { order, flip, start } = chainSegments(flat, 2, 10)
+        const els = []
+        let carry = 0
+        for (let k = 0; k < order.length; k++) {
+          if ((k & STRIDE) === 0 && pacer.due()) await pacer.yield()
+          const g = segs[order[k]]
+          const [ax, ay, bx, by] = flip[k] ? [g.x1, g.y1, g.x0, g.y0] : [g.x0, g.y0, g.x1, g.y1]
+          const len = Math.hypot(bx - ax, by - ay)
+          if (start[k]) carry = 0
+          let t = carry
+          for (; t <= len; t += step) {
+            const u = len > 0 ? t / len : 0
+            els.push(`<circle cx="${(ax + (bx - ax) * u - vx).toFixed(1)}" cy="${(ay + (by - ay) * u - vy).toFixed(1)}" r="${r}" fill="${g.stroke}" stroke="none"/>`)
+          }
+          carry = t - len
+        }
+        return els
+      }
       const { dashPx, gapPx } = dashSizes
       const perSeg = await mapPaced(segs, ({ x0, y0, x1, y1, stroke, dashOffset }) =>
         splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx).map((s) =>

@@ -238,8 +238,8 @@ at the cut. → [Edit Mode](docs/Edit-Mode.md)
 
 ## Draw modes
 
-Every mode runs independently, with its own colour, weight, dash and
-hypsometric tint. → [Draw mode mathematics](docs/Draw-Modes.md)
+Every mode runs independently, with its own colour, weight, line style (solid,
+dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathematics](docs/Draw-Modes.md)
 
 | Mode | Technique |
 |---|---|
@@ -384,6 +384,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `Q` | Toggle auto-rotate |
 | `Space` | Freeze the particle field |
 | `\` | Show or hide the panel |
+| `/` | Find a control |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⌘⇧Z` / `Ctrl+Y` | Redo |

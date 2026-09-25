@@ -8,10 +8,59 @@ import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeome
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { useThree } from '@react-three/fiber'
 import { SurfaceMesh } from './SurfaceMesh'
-import { DASH_CONFIGS } from '../utils/stylePresets'
+import { DASH_CONFIGS, dotSpacing } from '../utils/stylePresets'
+import { chainSegments } from '../utils/chainSegments'
 import { layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
+
+/**
+ * A line layer as round dots: one near-zero segment per dot, spaced `spacing`
+ * world units apart along each stroke (see utils/chainSegments.js), with the phase
+ * carried across every joint. Colours are interpolated where a dot falls, and
+ * `features` keeps the picker's segment → feature map true for the new indices.
+ */
+function dotsAlong(pos, col, feat, chains, spacing) {
+  const { order, flip, start } = chains
+  const walk = (emit) => {
+    let carry = 0
+    for (let k = 0; k < order.length; k++) {
+      const i = order[k], o = i * 6
+      const a = flip[k] ? 3 : 0, b = flip[k] ? 0 : 3
+      const x0 = pos[o + a], y0 = pos[o + a + 1], z0 = pos[o + a + 2]
+      const dx = pos[o + b] - x0, dy = pos[o + b + 1] - y0, dz = pos[o + b + 2] - z0
+      const len = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      if (start[k]) carry = 0
+      let t = carry
+      for (; t <= len; t += spacing) emit(i, a, b, len > 0 ? t / len : 0, x0, y0, z0, dx, dy, dz, len)
+      carry = t - len
+    }
+  }
+  let n = 0
+  walk(() => { n++ })
+  const out = new Float32Array(n * 6)
+  const outCol = col && col.length === pos.length ? new Float32Array(n * 6) : null
+  const features = feat ? new Int32Array(n) : null
+  let k = 0
+  walk((i, a, b, u, x0, y0, z0, dx, dy, dz, len) => {
+    const o = i * 6, w = k * 6
+    const x = x0 + dx * u, y = y0 + dy * u, z = z0 + dz * u
+    // A tenth of a unit along the stroke: enough for a direction, far below
+    // anything a round cap of even a 1 px line would show.
+    const s = len > 0 ? 0.1 / len : 0
+    out[w] = x; out[w + 1] = y; out[w + 2] = z
+    out[w + 3] = x + dx * s; out[w + 4] = y + dy * s; out[w + 5] = z + dz * s
+    if (outCol) {
+      for (let c = 0; c < 3; c++) {
+        const v = col[o + a + c] + (col[o + b + c] - col[o + a + c]) * u
+        outCol[w + c] = v; outCol[w + 3 + c] = v
+      }
+    }
+    if (features) features[k] = feat[i]
+    k++
+  })
+  return { positions: out, colors: outCol, features }
+}
 
 /** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
 const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
@@ -101,7 +150,20 @@ const BLEND_MODES = {
 }
 
 function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift }) {
-  const { positions, colors, sphere } = layer
+  const { positions: srcPositions, colors: srcColors, sphere } = layer
+  // Round dots replace the stroke's own segments. Rebuilt with the weight,
+  // because the spacing grows with it; cheap next to a worker rebuild.
+  // Chained once per geometry; only the spacing follows the weight slider.
+  const chains = useMemo(
+    () => (dash === 'dots' && srcPositions?.length ? chainSegments(srcPositions) : null),
+    [dash, srcPositions],
+  )
+  const dots = useMemo(() => (
+    chains ? dotsAlong(srcPositions, srcColors, layer.featureOfSegment, chains, dotSpacing(weight)) : null
+  ), [chains, srcPositions, srcColors, layer.featureOfSegment, weight])
+  const positions = dots ? dots.positions : srcPositions
+  const colors = dots ? dots.colors : srcColors
+  const featureOfSegment = dots ? dots.features : layer.featureOfSegment
   const base = (layerIndex ?? 0) + 1
   /**
    * A layer either carries per-vertex colour (every draw mode) or takes a flat
@@ -337,16 +399,16 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     // somewhere keeps the picker a pure reader of the scene graph, and keeps
     // these objects out of R3F's own interaction list — which would otherwise
     // raycast every one of them on every pointer move.
-    if (layer.featureOfSegment) {
+    if (featureOfSegment) {
       l.userData.vectorLayerId = layer.id
-      l.userData.featureOfSegment = layer.featureOfSegment
+      l.userData.featureOfSegment = featureOfSegment
       // Points are picked with a wider radius and win ties — see VectorPicker.
       // An icon inherits that: it is the same deliberate mark on the same
       // feature, only drawn properly.
       l.userData.vectorIsPoints = !!layer.isPoints || !!layer.isIcon
     }
     return l
-  }, [geometry, material, layer.id, layer.featureOfSegment, layer.isPoints, layer.isIcon])
+  }, [geometry, material, layer.id, featureOfSegment, layer.isPoints, layer.isIcon])
 
   // ── Ghost (Hidden) Pass ───────────────────────────────────────────────────
   // Same build-once-then-sync split as the visible pass above.
