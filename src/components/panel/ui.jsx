@@ -10,48 +10,21 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { PanelStage, SectionFilter, sectionMatches } from './filter'
 import { PRESETS_STAGE, STAGES } from './stages'
+import { HEX, PALETTES } from '../../utils/theme'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 /**
- * One palette, published twice.
+ * Ore and Paper, published twice.
  *
- * `RAW` is the source of truth and the only place a colour is written down.
- * `PanelStyles` publishes it as custom properties on `:root`, and the exports
- * below are `var()` references — so every existing `style={{ background: SURF }}`
- * keeps working unchanged while the values become editable from CSS, which is
- * what makes a retune a token edit rather than four hundred inline ones.
+ * The palettes live in `utils/theme.js`, which is the only place a panel colour
+ * is written down. `PanelStyles` publishes the active one as custom properties,
+ * and the exports below are `var()` references — so every inline
+ * `style={{ background: SURF }}` follows the theme without knowing there is one.
  *
- * `HEX` is the same palette as literal colours, for the few consumers a custom
- * property cannot reach: a 2D canvas resolves nothing, and hex-alpha suffixes
- * (`#22c55e` + `88`) are string surgery. Six sites in the app, all marked.
+ * `HEX` is the live palette as literal colours, for a 2D canvas, which resolves
+ * nothing. It changes in place with the theme; read it at draw time.
  */
-const RAW = {
-  bg:     '#18181b',
-  surf:   '#27272a',
-  border: '#3f3f46',
-  text:   '#e4e4e7',
-  dim:    '#d4d4d8',
-  /**
-   * Secondary text. This carries section titles, every hint and every slider
-   * readout, at 9–11 px — so it is a text colour before it is anything else, and
-   * the old #71717a measured 3.67:1 on BG and 3.08:1 on SURF, both under AA at
-   * those sizes. #8f8f99 reads 5.53 and 4.65 and is still clearly secondary
-   * against DIM. Structural work (borders, tracks) belongs to BORDER, not here.
-   */
-  muted:  '#8f8f99',
-  accent: '#3b82f6',
-  /**
-   * The accent as a *fill under white text*. White on ACCENT is 3.68:1, which is
-   * fine for a 34 px toggle and not fine for a 10 px uppercase label. This is the
-   * same hue two steps down: 4.7:1 under white, and still 3.77:1 against the panel
-   * so the button's own edge stays visible.
-   */
-  accentDeep: '#2f6fe0',
-  green:  '#22c55e',
-}
-
-/** The palette as literal colours, for canvas contexts and colour arithmetic. */
-export const HEX = RAW
+export { HEX }
 
 // Written out rather than generated: fast refresh only carries a module whose
 // non-component exports are literal constants, and `v('bg')` is a call.
@@ -63,7 +36,31 @@ export const DIM         = 'var(--hm-dim)'
 export const MUTED       = 'var(--hm-muted)'
 export const ACCENT      = 'var(--hm-accent)'
 export const ACCENT_DEEP = 'var(--hm-accent-deep)'
-export const GREEN       = 'var(--hm-green)'
+/** Text on an accent fill. Ink, not white: white on ore is 2.7 : 1. */
+export const ON_ACCENT   = 'var(--hm-on-accent)'
+/** The accent as a text colour, which on light paper has to be deeper than the fill. */
+export const ACCENT_TEXT = 'var(--hm-accent-text)'
+/** "Switched on". Ore, like every other on-state: one colour means on. */
+export const GREEN       = 'var(--hm-on)'
+/** The wordmark and anything else set in the strongest ink. */
+export const STRONG      = 'var(--hm-strong)'
+/** A well sunk into the panel: segmented choices, the rail, help boxes. */
+export const SUNK        = 'var(--hm-sunk)'
+/** A hover wash over whatever is underneath. */
+export const VEIL        = 'var(--hm-veil)'
+export const DESK        = 'var(--hm-desk)'
+export const DANGER      = 'var(--hm-danger)'
+export const DANGER_TEXT = 'var(--hm-danger-text)'
+export const DANGER_BG   = 'var(--hm-danger-bg)'
+export const DANGER_BORDER = 'var(--hm-danger-border)'
+export const WARN        = 'var(--hm-warn)'
+export const WARN_BG     = 'var(--hm-warn-bg)'
+export const WARN_BORDER = 'var(--hm-warn-border)'
+export const GLASS_BG    = 'var(--hm-glass-bg)'
+export const GLASS_BORDER = 'var(--hm-glass-border)'
+export const GLASS_TEXT  = 'var(--hm-glass-text)'
+export const FONT        = 'var(--hm-font)'
+export const MONO        = 'var(--hm-mono)'
 /*
  * A number, not a colour — it is arithmetic (`right: open ? W : 0`).
  *
@@ -83,6 +80,13 @@ export const RAIL_W = 40    // the stage rail
 export const BODY_W = 272   // what the controls get, unchanged
 
 // ── Injected styles (pseudo-elements can't be set inline) ─────────────────────
+/** One palette as custom-property declarations. */
+function themeVars(P) {
+  const kebab = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+  return Object.entries(P).map(([k, v]) => `--hm-${kebab(k)}: ${v};`).join(' ') +
+    ` --hm-accent-ring: ${P.accent}80; --hm-green-glow: ${P.on}88;`
+}
+
 export function PanelStyles() {
   return (
     <style>{`
@@ -117,25 +121,22 @@ export function PanelStyles() {
         src: url('${import.meta.env.BASE_URL}fonts/space-mono-700-latin.woff2') format('woff2');
       }
 
+      ${['dark', 'light'].map((m) => `${m === 'dark' ? ':root' : ':root[data-hm-theme="light"]'} {
+        color-scheme: ${m};
+        ${themeVars(PALETTES[m])}
+      }`).join('\n')}
       :root {
-        --hm-bg: ${RAW.bg};
-        --hm-surf: ${RAW.surf};
-        --hm-border: ${RAW.border};
-        --hm-text: ${RAW.text};
-        --hm-dim: ${RAW.dim};
-        --hm-muted: ${RAW.muted};
-        --hm-accent: ${RAW.accent};
-        --hm-accent-deep: ${RAW.accentDeep};
-        --hm-green: ${RAW.green};
-        /* Derived, because a custom property cannot carry a hex-alpha suffix. */
-        --hm-accent-ring: ${RAW.accent}80;
-        --hm-green-glow: ${RAW.green}88;
-        /* Finish tokens: a lifted surface, a hairline that separates without
-           boxing, and one easing curve for every state change in the panel. */
-        --hm-surf-hi: #303036;
-        --hm-hairline: rgba(255,255,255,.06);
+        /* Overpass carries the lettering of road signs, so the vernacular of maps;
+           Overpass Mono sets every number, so digits hold their width while a
+           slider moves. Both self-hosted, like Space Mono: no request on load. */
+        --hm-font: 'Overpass', system-ui, -apple-system, sans-serif;
+        --hm-mono: 'Overpass Mono', ui-monospace, 'SF Mono', Menlo, monospace;
         --hm-ease: cubic-bezier(.2,.8,.2,1);
       }
+      @font-face { font-family:'Overpass'; font-style:normal; font-weight:300 800; font-display:swap;
+        src:url('${import.meta.env.BASE_URL}fonts/overpass-latin.woff2') format('woff2'); }
+      @font-face { font-family:'Overpass Mono'; font-style:normal; font-weight:300 700; font-display:swap;
+        src:url('${import.meta.env.BASE_URL}fonts/overpass-mono-latin.woff2') format('woff2'); }
 
       /* A focus ring on everything the keyboard can reach, at zero specificity
          so a control with its own ring keeps it. */
@@ -156,20 +157,20 @@ export function PanelStyles() {
       .hmr::-moz-range-track { height:4px; background:${BORDER}; border-radius:999px; }
       .hmr::-moz-range-progress { height:4px; background:${ACCENT}; border-radius:999px; }
       .hmr::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
-        margin-top:-5px; border-radius:50%; background:#fafafa; border:none; cursor:grab;
-        box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5);
+        margin-top:-5px; border-radius:50%; background:var(--hm-thumb); border:none; cursor:grab;
+        box-shadow:0 0 0 1px var(--hm-shadow), 0 1px 3px var(--hm-shadow);
         transition:transform .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
       .hmr:hover::-webkit-slider-thumb { transform:scale(1.12); }
       .hmr:active::-webkit-slider-thumb { transform:scale(1.2); cursor:grabbing; }
       .hmr::-moz-range-thumb { width:14px; height:14px; border-radius:50%;
-        background:#fafafa; border:none; box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5); }
+        background:var(--hm-thumb); border:none; box-shadow:0 0 0 1px var(--hm-shadow), 0 1px 3px var(--hm-shadow); }
       /* :focus, not :focus-visible.
          Clicking a slider arms it for the arrow keys, so the state is real from
          the click — and :focus-visible withholds the ring until the first
          keypress, which hides it for exactly as long as it is the only thing
          telling you which of thirty-one sliders an arrow key will move. */
-      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 0 4px var(--hm-accent-ring); }
-      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 0 0 4px var(--hm-accent-ring); }
+      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-accent-ring); }
+      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-accent-ring); }
       .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
         border:1px solid ${BORDER}; border-radius:5px; cursor:pointer;
         padding:2px; background:${SURF}; transition:border-color .15s var(--hm-ease); }
@@ -177,9 +178,9 @@ export function PanelStyles() {
       .hmc::-webkit-color-swatch-wrapper { padding:0; }
       .hmc::-webkit-color-swatch { border:none; border-radius:3px; }
       .hmc:focus-visible { outline:2px solid ${ACCENT}; outline-offset:1px; }
-      .hmeb:hover { background:${ACCENT_DEEP} !important; border-color:${ACCENT_DEEP} !important; color:#fff !important; }
-      .hmeb:hover .hmeh { color:rgba(255,255,255,.75) !important; }
-      .hmsb.on { background:${ACCENT_DEEP} !important; color:#fff !important; border-color:${ACCENT_DEEP} !important; }
+      .hmeb:hover { background:${ACCENT_DEEP} !important; border-color:${ACCENT_DEEP} !important; color:${ON_ACCENT} !important; }
+      .hmeb:hover .hmeh { color:${ON_ACCENT} !important; opacity:.75; }
+      .hmsb.on { background:${ACCENT_DEEP} !important; color:${ON_ACCENT} !important; border-color:${ACCENT_DEEP} !important; }
       .hmsb:hover:not(.on) { background:${BORDER} !important; color:${DIM} !important; }
       .hmload:hover { background:${SURF} !important; color:${TEXT} !important; }
       /* A 10 px gutter a pointer can find, drawing a 4 px thumb inside it. */
@@ -199,7 +200,7 @@ export function PanelStyles() {
       .hmi.on > span { background:${BORDER}; color:${TEXT}; }
       .hmnum { background:${SURF}; border:1px solid ${BORDER}; color:${DIM}; border-radius:3px;
                font-size:10px; padding:3px 5px; width:100%; outline:none;
-               font-variant-numeric:tabular-nums; }
+               font-family:var(--hm-mono); font-variant-numeric:tabular-nums; }
       .hmnum:focus { border-color:${ACCENT}; }
       /* The readout beside a slider, once it accepts a typed value. Reads as a
          label until it is hovered or focused — the panel would be a wall of
@@ -207,7 +208,7 @@ export function PanelStyles() {
       .hmval { -webkit-appearance:none; appearance:none; background:none;
         border:1px solid transparent; border-radius:3px; padding:1px 3px; margin:-1px -3px;
         color:${MUTED}; cursor:text; text-align:right;
-        font:inherit; font-variant-numeric:tabular-nums; outline:none; }
+        font:inherit; font-family:var(--hm-mono); font-variant-numeric:tabular-nums; outline:none; }
       .hmval:hover { border-color:${BORDER}; }
       .hmval:focus { border-color:${ACCENT}; color:${TEXT}; background:${SURF}; }
       /* Disclosure header. A button, so the keyboard can open a section — every
@@ -215,13 +216,13 @@ export function PanelStyles() {
       .hmsec { -webkit-appearance:none; appearance:none; background:none; border:none;
         font:inherit; color:inherit; text-align:left; }
       .hmsec { transition:background .15s var(--hm-ease); }
-      .hmsec:hover { background:rgba(255,255,255,.03); }
+      .hmsec:hover { background:${VEIL}; }
       .hmsec .hmsectitle, .hmsec .hmchevron { transition:color .15s var(--hm-ease), transform .2s var(--hm-ease); }
       .hmsec:hover .hmsectitle, .hmsec:hover .hmchevron { color:${DIM}; }
 
       /* Stage tabs: a quiet hover, and the selected tab joined to its pane. */
       .hmtab { transition:background .15s var(--hm-ease), color .15s var(--hm-ease); }
-      .hmtab:hover:not([aria-pressed="true"]) { background:rgba(255,255,255,.04); color:${DIM} !important; }
+      .hmtab:hover:not([aria-pressed="true"]) { background:${VEIL}; color:${DIM} !important; }
 
       /* Switch: the input is the hit target, the two spans are the picture. */
       .hmsw .hmswtrack { transition:background .2s var(--hm-ease), box-shadow .2s var(--hm-ease); }
@@ -231,7 +232,7 @@ export function PanelStyles() {
 
       /* Segmented control: one well, the choice a raised pill inside it. */
       .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
-      .hmseg:hover:not([aria-pressed="true"]) { color:${DIM} !important; background:rgba(255,255,255,.05) !important; }
+      .hmseg:hover:not([aria-pressed="true"]) { color:${DIM} !important; background:${VEIL} !important; }
       .hmseg:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
 
       /* Buttons: one response to hover and press, whatever their colours. */
@@ -274,7 +275,7 @@ export function PanelStyles() {
        * template literal the whole stylesheet is written in.
        */
       .hmcard { transition:border-color .15s var(--hm-ease), background .15s var(--hm-ease), transform .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
-      .hmcard:hover { border-color:${MUTED}; transform:translateY(-1px); box-shadow:0 4px 12px rgba(0,0,0,.35); }
+      .hmcard:hover { border-color:${MUTED}; }
       .hmcard:hover .hmchev { color:${TEXT}; }
       .hmcardhit { -webkit-appearance:none; appearance:none; background:none;
         border:none; font:inherit; color:inherit; text-align:left; width:100%;
@@ -282,7 +283,7 @@ export function PanelStyles() {
       .hmcardhit:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
       .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
         padding:0; cursor:pointer; border-radius:4px; transition:background .12s; }
-      .hmpip:hover { background:rgba(255,255,255,.09); }
+      .hmpip:hover { background:var(--hm-veil-strong); }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
       .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
       .hmpipdot { transition:background .12s, border-color .12s, box-shadow .12s; }
@@ -293,8 +294,8 @@ export function PanelStyles() {
       .hmrr { -webkit-appearance:none; appearance:none; position:absolute; left:0; top:0;
         width:100%; height:13px; margin:0; background:none; pointer-events:none; outline:none; }
       .hmrr::-webkit-slider-thumb { -webkit-appearance:none; pointer-events:auto; width:13px;
-        height:13px; border-radius:50%; background:#fafafa; border:none; cursor:grab;
-        box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5);
+        height:13px; border-radius:50%; background:var(--hm-thumb); border:none; cursor:grab;
+        box-shadow:0 0 0 1px var(--hm-shadow), 0 1px 3px var(--hm-shadow);
         transition:transform .15s var(--hm-ease); }
       .hmrr:hover::-webkit-slider-thumb { transform:scale(1.12); }
       .hmrr::-moz-range-thumb { pointer-events:auto; width:13px; height:13px; border-radius:50%;
@@ -307,7 +308,7 @@ export function PanelStyles() {
       .sym-btn { background:${SURF}; border:1px solid ${BORDER}; color:${MUTED}; border-radius:5px;
                  cursor:pointer; display:flex; flex-direction:column; align-items:center;
                  justify-content:center; font-size:12px; font-weight:700; transition:all 0.1s; aspect-ratio:1/1; }
-      .sym-btn.on { background:${ACCENT_DEEP}; color:#fff; border-color:${ACCENT_DEEP}; }
+      .sym-btn.on { background:${ACCENT_DEEP}; color:${ON_ACCENT}; border-color:${ACCENT_DEEP}; }
       .sym-btn:hover:not(.on) { border-color:${MUTED}; color:${DIM}; }
       .sym-label { font-size:9px; margin-top:2px; opacity:0.9; }
     `}</style>
@@ -319,7 +320,7 @@ export function PanelStyles() {
 export function HelpBox({ text }) {
   return (
     <div style={{
-      fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
+      fontSize: 10, color: MUTED, background: SUNK,
       padding: '6px 8px', borderRadius: 5, marginBottom: 8,
       border: `1px solid ${BORDER}`, lineHeight: 1.45
     }}>
@@ -506,12 +507,12 @@ export function Switch({ id, label, checked, onChange, testId }) {
       <span className="hmswtrack" style={{
         position:'absolute', inset:0, borderRadius:9, pointerEvents:'none',
         background: checked ? ACCENT : BORDER,
-        boxShadow: checked ? 'none' : 'inset 0 1px 2px rgba(0,0,0,.35)',
+        boxShadow: checked ? 'none' : 'inset 0 1px 2px var(--hm-shadow)',
       }}>
         <span className="hmswknob" style={{
-          position:'absolute', width:14, height:14, borderRadius:7, background:'#fff',
+          position:'absolute', width:14, height:14, borderRadius:7, background: checked ? ON_ACCENT : 'var(--hm-thumb)',
           top: 2, left: 2, transform: checked ? 'translateX(16px)' : 'none',
-          boxShadow:'0 1px 2px rgba(0,0,0,.35), 0 0 0 .5px rgba(0,0,0,.2)',
+          boxShadow:'0 1px 2px var(--hm-shadow)',
         }} />
       </span>
     </label>
@@ -564,7 +565,7 @@ export function DateRow({ label, help, value, onChange, testId }) {
           style={{
             flex: 1, minWidth: 0, fontSize: 11, padding:'3px 5px', borderRadius: 3,
             background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-            colorScheme: 'dark', fontFamily: 'inherit',
+            fontFamily: 'inherit',
           }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
@@ -657,7 +658,7 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
             min={min} max={max} step={step} value={hi}
             onChange={(e) => onChange(lo, Math.max(parseFloat(e.target.value), lo + GAP))} />
         </div>
-        <span style={{ minWidth: 52, textAlign:'right', fontSize: 10, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+        <span style={{ minWidth: 52, textAlign:'right', fontSize: 10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {f(lo)}–{f(hi)}
         </span>
       </div>
@@ -677,7 +678,7 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <SegGroup label={label} options={options} value={value} onChange={onChange}
-          uppercase nameButtons testIdOf={testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined}
+          nameButtons testIdOf={testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined}
           style={{ flex: 1 }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
@@ -692,13 +693,13 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
  * radius and border. This is the one shape they share. `columns` lays the
  * options out as a grid instead of one row, for sets too long to fit.
  */
-export function SegGroup({ options, value, onChange, label, uppercase = false, columns, testIdOf, style, nameButtons = false }) {
+export function SegGroup({ options, value, onChange, label, capitalize = false, columns, testIdOf, style, nameButtons = false }) {
   return (
     <div role="group" aria-label={label} style={{
       display: columns ? 'grid' : 'flex',
       ...(columns && { gridTemplateColumns: `repeat(${columns}, 1fr)` }),
       gap: 2, padding: 2, borderRadius: 6,
-      background:'rgba(0,0,0,.25)', border:`1px solid ${BORDER}`,
+      background: SUNK, border:`1px solid ${BORDER}`,
       ...style,
     }}>
       {options.map(([lbl, v]) => {
@@ -710,11 +711,11 @@ export function SegGroup({ options, value, onChange, label, uppercase = false, c
             style={{
               flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 4, border:'none',
               cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
-              ...(uppercase && { textTransform:'uppercase', letterSpacing:'.04em' }),
+              ...(capitalize && { textTransform:'capitalize' }),
               fontWeight: on ? 600 : 500,
               background: on ? ACCENT_DEEP : 'transparent',
-              color: on ? '#fff' : MUTED,
-              boxShadow: on ? '0 1px 2px rgba(0,0,0,.4)' : 'none',
+              color: on ? ON_ACCENT : MUTED,
+              boxShadow: on ? '0 1px 2px var(--hm-shadow)' : 'none',
             }}>{lbl}</button>
         )
       })}
@@ -838,7 +839,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           // already made inert.
           cursor: q ? 'default' : 'pointer',
         }}>
-        <span className="hmsectitle" style={{ fontSize:10, fontWeight:650, letterSpacing:'.13em', textTransform:'uppercase', color: MUTED, display:'flex', alignItems:'center', minWidth:0 }}>
+        <span className="hmsectitle" style={{ fontSize:12, fontWeight:600, color: DIM, display:'flex', alignItems:'center', minWidth:0 }}>
           {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
@@ -852,7 +853,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           {readout && (
             <span data-testid={`summary-${title.toLowerCase().replace(/\s+/g, '-')}`}
               title={readout.hint} style={{
-                fontSize:10, fontWeight:400, color: MUTED, fontVariantNumeric:'tabular-nums',
+                fontSize:10, fontWeight:400, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
                 maxWidth:104, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
               }}>{readout.text}</span>
           )}
@@ -968,17 +969,17 @@ export function Stage({ n, title, children }) {
       <div data-testid={`stage-${title.toLowerCase()}`} style={{
         position:'sticky', top:0, zIndex:2,
         display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
-        background:'rgba(24,24,27,.86)', backdropFilter:'blur(10px) saturate(1.2)',
+        background:'var(--hm-stage-bg)', backdropFilter:'blur(10px) saturate(1.2)',
         WebkitBackdropFilter:'blur(10px) saturate(1.2)',
         borderTop:`1px solid ${BORDER}`, borderBottom:`1px solid ${BORDER}`,
       }}>
         {/* The lozenge again, for the reason the rail carries one: Presets is a
             destination and not a step, and `00` in the pipeline's own column
             would say it was the step before Ground. */}
-        <span style={{ fontSize:9, fontWeight:700, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+        <span style={{ fontSize:10, fontWeight:600, color: ACCENT_TEXT, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
         </span>
-        <span style={{ fontSize:10, fontWeight:700, letterSpacing:'2px', textTransform:'uppercase', color: DIM }}>
+        <span style={{ fontSize:13, fontWeight:600, color: TEXT }}>
           {title}
         </span>
       </div>
@@ -1023,7 +1024,7 @@ export function StageRail({ stage, onStage, live, hits }) {
     <nav data-testid="stage-rail" aria-label="Pipeline stage"
       style={{
         width: RAIL_W, flexShrink:0, display:'flex', flexDirection:'column',
-        background:'rgba(0,0,0,0.25)', borderRight:`1px solid ${BORDER}`,
+        background: SUNK, borderRight:`1px solid ${BORDER}`,
         overflow:'hidden',
       }}>
       {STAGES.map(([n, title, short]) => {
@@ -1067,10 +1068,10 @@ export function StageRail({ stage, onStage, live, hits }) {
               {/* A lozenge, not `00`. Presets is a destination and not a step
                   the renderer runs, and a digit in the pipeline's own column
                   would claim it was one. */}
-              <span style={{ display:'block', fontSize:9, fontWeight:700, fontVariantNumeric:'tabular-nums' }}>
+              <span style={{ display:'block', fontSize:9.5, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
                 {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
               </span>
-              <span style={{ display:'block', fontSize:8, letterSpacing:'0.06em', textTransform:'uppercase', marginTop:3 }}>
+              <span style={{ display:'block', fontSize:8.5, fontWeight:600, marginTop:3 }}>
                 {short}
               </span>
             </span>
@@ -1079,8 +1080,8 @@ export function StageRail({ stage, onStage, live, hits }) {
                 position:'absolute', top:6, right:4,
                 minWidth:13, height:13, borderRadius:7, padding:'0 3px',
                 background: filtering ? ACCENT : GREEN,
-                color: filtering ? '#fff' : '#08240f',
-                fontSize:8, fontWeight:700, lineHeight:'13px',
+                color: ON_ACCENT,
+                fontSize:8, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
                 fontVariantNumeric:'tabular-nums',
               }}>{count}</span>
             )}
@@ -1124,10 +1125,10 @@ export function Btn({
   // uppercase. The deeper fill reads 4.7:1 under white and still 3.77:1 against
   // the panel, so the button's own edge stays visible.
   const look = variant === 'toggle'
-    ? (on ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
+    ? (on ? { background: ACCENT_DEEP, color: ON_ACCENT, border: `1px solid ${ACCENT_DEEP}` }
           : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` })
     : variant === 'primary'
-      ? { background: ACCENT_DEEP, color: '#fff', border: `1px solid ${ACCENT_DEEP}` }
+      ? { background: ACCENT_DEEP, color: ON_ACCENT, border: `1px solid ${ACCENT_DEEP}` }
       : variant === 'ghost'
         ? { background: 'none', color: MUTED, border: 'none' }
         : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` }
@@ -1174,7 +1175,7 @@ export function Sub({ label, children }) {
   return (
     <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
       {label && (
-        <div style={{ fontSize: 9, color: MUTED, fontWeight: 700, letterSpacing: 1, marginBottom: 5 }}>
+        <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 5 }}>
           {label}
         </div>
       )}
@@ -1188,12 +1189,12 @@ export function ExpBtn({ label, hint, onClick, active, testId }) {
     <button className="hmeb" onClick={onClick} data-testid={testId} type="button" style={{
       flex:1, padding:'8px 0', textAlign:'center',
       background: active ? ACCENT_DEEP : SURF,
-      color: active ? '#fff' : DIM,
+      color: active ? ON_ACCENT : DIM,
       border:`1px solid ${active ? ACCENT_DEEP : BORDER}`, borderRadius:5,
       cursor:'pointer', fontSize:11, fontWeight:600,
     }}>
       {label}
-      {hint && <span className="hmeh" style={{ display:'block', fontSize:10, color: active ? 'rgba(255,255,255,.75)' : MUTED, fontWeight:400, marginTop:2 }}>{hint}</span>}
+      {hint && <span className="hmeh" style={{ display:'block', fontSize:10, color: active ? ON_ACCENT : MUTED, opacity: active ? .75 : 1, fontWeight:400, marginTop:2, fontFamily: MONO }}>{hint}</span>}
     </button>
   )
 }

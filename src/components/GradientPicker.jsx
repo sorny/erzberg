@@ -8,6 +8,7 @@
  * - ✕ button removes non-anchor stops (stops at pos=0 and pos=1 are protected).
  */
 import { useRef, useCallback } from 'react'
+import { BORDER, DIM, MONO, MUTED, SURF } from './panel/ui'
 
 function cssGradient(stops) {
   const sorted = [...stops].sort((a, b) => a.pos - b.pos)
@@ -167,8 +168,8 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               key={sortedIdx}
               style={{
                 display: 'flex', alignItems: 'center', gap: 2,
-                background: '#2a2a30', borderRadius: 3, padding: '2px 4px',
-                fontSize: 10, color: '#aaa',
+                background: SURF, border: `1px solid ${BORDER}`, borderRadius: 4, padding: '2px 4px',
+                fontSize: 10, color: DIM, fontFamily: MONO,
               }}
             >
               {/* Swatch with overlaid in-place color input */}
@@ -195,7 +196,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               {!isAnchor && !isSimple && (
                 <span
                   onClick={(e) => removeStop(e, origIdx)}
-                  style={{ cursor: 'pointer', color: '#666', lineHeight: 1 }}
+                  style={{ cursor: 'pointer', color: MUTED, lineHeight: 1 }}
                   title="Remove stop"
                 >✕</span>
               )}

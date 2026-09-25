@@ -41,7 +41,7 @@ import { PANEL_MODES } from './sectionSummary'
  * form, and the stage rule at the top of the pane carries the whole word.
  */
 export const STAGES = [
-  [0, 'Presets', 'PRST'],
+  [0, 'Presets', 'Pre'],
   [1, 'Terrain', 'Terr'],
   [2, 'Surface', 'Surf'],
   [3, 'Marks',   'Mark'],
@@ -59,7 +59,7 @@ export const STAGES = [
  * lozenge rather than a digit, says plainly that it is somewhere you go rather
  * than a stage the renderer runs.
  *
- * Named for the one section it holds, and abbreviated `PRST` because the rail
+ * Named for the one section it holds, and abbreviated `Pre` because the rail
  * has about 29 px once the badge lane is taken out. The alternative was a
  * second word for the same thing, and the panel already carries two — the line
  * under the load block reads `Style  Alpine Survey`, and the grid inside says

@@ -78,6 +78,9 @@ different style from the grid, then tune it.
 
 ## The panel
 
+- **Dark and light.** The sun or moon in the panel head switches the theme. The
+  choice is remembered per browser. Both themes use the brand's own colours:
+  iron, paper and ore. Ore is the one accent, and it means "on".
 - **Stages.** A rail on the panel edge holds six stages in pipeline order:
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
@@ -420,7 +423,7 @@ Inside a text box, `⌘Z` belongs to the browser. A slider drag is one undo step
 | State | Zustand (raster data) + React state (parameters), saved to `localStorage` |
 | GIS | GeoTIFF.js, plus in-house GeoJSON, GPX and Overpass readers |
 | Icons | Maki (CC0) |
-| Fonts | Space Mono (SIL OFL 1.1), self-hosted. 49 stroke faces from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine), ISO 3098 and three plotter faces |
+| Fonts | Space Mono for the wordmark and labels, Overpass and Overpass Mono for the panel (all SIL OFL 1.1), self-hosted. 49 stroke faces from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine), ISO 3098 and three plotter faces |
 | Map data | OpenStreetMap through Overpass and Nominatim (ODbL) |
 | Elevation | Terrain Tiles on AWS Open Data (SRTM, GMTED2010, EU-DEM, 3DEP) |
 | Solar position | NOAA polynomials, in-house |
@@ -493,6 +496,7 @@ The code is MIT. Bundled assets keep their own licences:
 | npm packages | MIT, Apache-2.0, ISC and BSD, collected into `dist/THIRD-PARTY-NOTICES.txt` |
 | Maki icons | CC0 1.0 — [`public/icons/LICENSE`](public/icons/LICENSE) |
 | Space Mono | SIL OFL 1.1 — `public/fonts/OFL.txt` |
+| Overpass, Overpass Mono | SIL OFL 1.1 — `public/fonts/Overpass-OFL.txt` |
 | Single-line faces | Per face — `public/fonts/single-line/LICENSE.txt` |
 | OpenStreetMap data | ODbL 1.0. The credit goes into the panel and into every export that can carry it |
 

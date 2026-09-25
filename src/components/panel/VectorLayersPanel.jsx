@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, DIM, MUTED, SURF, TEXT, ColorRow, InlineSl, GripIcon, Sub, Tog, Btn } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, ON_ACCENT, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -72,11 +72,11 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
   const note = (color, children) => (
     <div style={{
       fontSize: 10, color, lineHeight: 1.5, marginBottom: 4,
-      background: 'rgba(0,0,0,0.2)', border: `1px solid ${BORDER}`,
+      background: SUNK, border: `1px solid ${BORDER}`,
       borderRadius: 5, padding: '4px 8px',
     }}>{children}</div>
   )
-  const warn = '#f97316'
+  const warn = WARN
   const fix = <><br />Reproject it first: <code style={{ color: DIM }}>gdalwarp -t_srs EPSG:4326 in.tif out.tif</code></>
 
   if (error) return note('#ef4444', error)
@@ -328,7 +328,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>ICON</div>
+      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Icon</div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, marginBottom: 8 }}>
         {/* Back to a plain dot. */}
@@ -336,7 +336,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
           data-testid={`icon-none-${layer.id}`}
           style={{
             aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
-            fontSize: 11, background: layer.icon ? SURF : ACCENT, color: layer.icon ? MUTED : '#fff',
+            fontSize: 11, background: layer.icon ? SURF : ACCENT, color: layer.icon ? MUTED : ON_ACCENT,
             border: `1px solid ${layer.icon ? BORDER : ACCENT}`,
           }}>•</button>
 
@@ -361,7 +361,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
             style={{
               aspectRatio: '1/1', display: 'grid', placeItems: 'center', borderRadius: 3, cursor: 'pointer',
               fontSize: 10, background: layer.icon === 'custom' ? ACCENT_DEEP : SURF,
-              color: layer.icon === 'custom' ? '#fff' : MUTED,
+              color: layer.icon === 'custom' ? ON_ACCENT : MUTED,
               border: `1px solid ${layer.icon === 'custom' ? ACCENT_DEEP : BORDER}`,
             }}>SVG</button>
         )}
@@ -373,12 +373,12 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
 
       <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
         style={{
-          width: '100%', padding: 4, marginBottom: 8, background: SURF, color: '#a1a1aa',
+          width: '100%', padding: 4, marginBottom: 8, background: SURF, color: MUTED,
           border: `1px dashed ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10,
         }}>↑ Custom SVG</button>
 
       {overflowed && (
-        <div style={{ fontSize: 10, color: '#f97316', marginBottom: 4, lineHeight: 1.5 }}>
+        <div style={{ fontSize: 10, color: WARN, marginBottom: 4, lineHeight: 1.5 }}>
           Too many features to draw as icons — this layer is still showing dots.
         </div>
       )}
@@ -455,7 +455,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
         fontWeight: which === 'bold' ? 700 : 400,
         fontStyle: which === 'italic' ? 'italic' : 'normal',
         background: active ? ACCENT_DEEP : SURF,
-        color: active ? '#fff' : DIM,
+        color: active ? ON_ACCENT : DIM,
         border: `1px solid ${active ? ACCENT_DEEP : BORDER}`,
       }}>{label}</button>
   )
@@ -466,14 +466,14 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
       style={{
         flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
         background: layer.labelAlign === value ? ACCENT_DEEP : SURF,
-        color: layer.labelAlign === value ? '#fff' : DIM,
+        color: layer.labelAlign === value ? ON_ACCENT : DIM,
         border: `1px solid ${layer.labelAlign === value ? ACCENT_DEEP : BORDER}`,
       }}>{label}</button>
   )
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>LABELS</div>
+      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Labels</div>
 
       <div data-testid={`label-name-${layer.id}`}>
         <Tog label="Name" small checked={layer.labelName}
@@ -560,7 +560,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           )}
 
           {overflowed && (
-            <div style={{ fontSize: 10, color: '#f97316', marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 10, color: WARN, marginTop: 4, lineHeight: 1.5 }}>
               Too many features to letter — this layer is drawing no labels. Hide
               some features, or label fewer layers.
             </div>
@@ -675,7 +675,7 @@ function FeatureList({ layer, bucket, onPatch }) {
               style={{
                 display: 'flex', alignItems: 'center', gap: 4, padding: '2px 2px', borderRadius: 3,
                 cursor: 'pointer',
-                background: isSel ? 'rgba(249,115,22,0.18)' : isHover ? 'rgba(59,130,246,0.18)' : 'transparent',
+                background: isSel ? 'color-mix(in srgb, var(--hm-accent) 16%, transparent)' : isHover ? 'var(--hm-veil-strong)' : 'transparent',
               }}>
               <input type="checkbox" checked={!hidden.has(i)}
                 data-testid={`feature-check-${layer.id}-${i}`}
@@ -816,7 +816,7 @@ export function VectorLayersPanel({
   }
 
   const btn = {
-    padding: 8, background: SURF, color: '#a1a1aa', border: `1px dashed ${BORDER}`,
+    padding: 8, background: SURF, color: MUTED, border: `1px dashed ${BORDER}`,
     borderRadius: 5, cursor: 'pointer', fontSize: 11,
   }
 
@@ -862,7 +862,7 @@ export function VectorLayersPanel({
                   fontSize: 10, padding: '4px 2px', borderRadius: 3, textAlign: 'left',
                   cursor: canQuery && !fetching ? 'pointer' : 'default',
                   opacity: canQuery ? 1 : 0.4,
-                  background: on ? ACCENT_DEEP : SURF, color: on ? '#fff' : MUTED,
+                  background: on ? ACCENT_DEEP : SURF, color: on ? ON_ACCENT : MUTED,
                   border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
                 }}>
                 {c.label}{c.heavy ? ' ⚠' : ''}
@@ -884,7 +884,7 @@ export function VectorLayersPanel({
           data-testid="osm-fetch"
           style={{
             width: '100%', padding: 8, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
-            background: fetching ? SURF : ACCENT, color: fetching ? MUTED : '#fff',
+            background: fetching ? SURF : ACCENT, color: fetching ? MUTED : ON_ACCENT,
             border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
           }}>
           {fetching ? '✕ Cancel' : 'Fetch from OpenStreetMap'}

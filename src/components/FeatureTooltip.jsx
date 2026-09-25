@@ -13,6 +13,7 @@
  */
 import { useStore } from '../store/useStore'
 import { featureLabel } from '../utils/vectorLayers'
+import { MUTED, TEXT } from './panel/ui'
 
 // Enough for a long name to wrap into two or three lines rather than be cut.
 // `Steinfeldspitze-Südwest-Gipfel` is a real peak in the test extent and does
@@ -65,7 +66,7 @@ export function FeatureTooltip({ layers, rightInset = 0 }) {
         fontFamily: 'system-ui, sans-serif',
         fontSize: 13,
         lineHeight: 1.4,
-        color: '#e4e4e7',
+        color: TEXT,
         // Wrap, never truncate. A name is the whole reason this exists.
         whiteSpace: 'normal',
         overflowWrap: 'anywhere',
@@ -74,7 +75,7 @@ export function FeatureTooltip({ layers, rightInset = 0 }) {
     >
       <div style={{ fontWeight: 600 }}>{name}</div>
       {(note || layer?.name) && (
-        <div style={{ fontSize: 11, color: '#a1a1aa', marginTop: 2 }}>
+        <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>
           {[note, layer?.name].filter(Boolean).join(' · ')}
         </div>
       )}

@@ -47,7 +47,7 @@ import { DRAW_MODES } from '../../utils/drawModes'
 import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
 import { FAMILIES } from './markFamilies'
-import { ACCENT, ACCENT_DEEP, BORDER, DIM, GREEN, MUTED, SURF, TEXT } from './ui'
+import { ACCENT_DEEP, ACCENT_TEXT, BORDER, DIM, GREEN, MONO, MUTED, SURF, TEXT } from './ui'
 
 /** id → the glyph that shows what it draws. One lookup, built once. */
 const MARK_FOR = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.mark]))
@@ -84,10 +84,9 @@ export function ModeSheet({ style, onToggle, onOpen }) {
           display:'flex', alignItems:'baseline', gap:8,
           margin:'12px 0 6px', paddingBottom:3, borderBottom:`1px solid ${BORDER}`,
         }}>
-          <span style={{ fontSize:9, fontWeight:700, letterSpacing:'1.6px',
-            textTransform:'uppercase', color: DIM }}>{family}</span>
+          <span style={{ fontSize:11.5, fontWeight:600, color: DIM }}>{family}</span>
           <span style={{ flex:1 }} />
-          <span style={{ fontSize:9, color: MUTED, fontVariantNumeric:'tabular-nums' }}>
+          <span style={{ fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
             {names.length}
           </span>
         </div>
@@ -110,7 +109,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
            */
           <div key={key} role="group" aria-label={name} className="hmcard" style={{
             position:'relative', borderRadius:6,
-            background: on ? 'rgba(59,130,246,0.16)' : SURF,
+            background: on ? 'color-mix(in srgb, var(--hm-accent) 16%, transparent)' : SURF,
             border:`1px solid ${on ? ACCENT_DEEP : BORDER}`,
           }}>
             <button
@@ -216,18 +215,18 @@ export function ModeBack({ title, onBack }) {
         display:'flex', alignItems:'center', gap:7, width:'100%',
         padding:'9px 12px', border:'none', borderBottom:`1px solid ${BORDER}`,
         background: SURF, color: DIM, cursor:'pointer', fontFamily:'inherit',
-        fontSize:10, letterSpacing:'0.12em', textTransform:'uppercase',
+        fontSize:11.5, fontWeight:500,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.color = TEXT }}
       onMouseLeave={(e) => { e.currentTarget.style.color = DIM }}>
-      <span aria-hidden="true" style={{ fontSize:12, lineHeight:1, color: ACCENT }}>‹</span>
+      <span aria-hidden="true" style={{ fontSize:13, lineHeight:1, color: ACCENT_TEXT }}>‹</span>
       <span>All 34 marks</span>
       <span style={{ flex:1 }} />
       {/* Capped and ellipsised, so the longest mark name cannot push "All 34
           marks" off the bar. The full name comes back on hover, the way a
           truncated readout on a section header does. */}
       <span title={markName(title)} style={{
-        fontSize:10, letterSpacing:0, textTransform:'none', color: MUTED,
+        fontSize:11, color: MUTED,
         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:120,
       }}>{markName(title)}</span>
     </button>

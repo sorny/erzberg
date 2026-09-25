@@ -21,7 +21,7 @@
  * of the window instead, which is always at least a few hundred metres across.
  */
 import { useEffect, useRef, useState } from 'react'
-import { BORDER, MUTED, SURF } from './ui'
+import { ACCENT, BORDER, MUTED, STRONG, SURF } from './ui'
 
 const HANDLE = 9          // corner hit box, in canvas pixels
 const MIN_FRAC = 0.1      // smallest box, as a fraction of the window
@@ -165,15 +165,15 @@ export function ExtentMap({ preview, box, onChange, width = 240, height = 156, b
           <rect x={rect.x1} y={rect.y0} width={Math.max(0, width - rect.x1)} height={Math.max(0, rect.y1 - rect.y0)} />
         </g>
         <rect x={rect.x0} y={rect.y0} width={Math.max(0, rect.x1 - rect.x0)}
-          height={Math.max(0, rect.y1 - rect.y0)} fill="none" stroke="#60a5fa" strokeWidth="1.5" />
+          height={Math.max(0, rect.y1 - rect.y0)} fill="none" style={{ stroke: ACCENT }} strokeWidth="1.5" />
         {[['nw', rect.x0, rect.y0], ['ne', rect.x1, rect.y0],
           ['sw', rect.x0, rect.y1], ['se', rect.x1, rect.y1]].map(([k, x, y]) => (
           <rect key={k} data-testid={`extent-handle-${k}`} x={x - 3.5} y={y - 3.5} width="7" height="7"
-            fill={hover === k ? '#bfdbfe' : '#60a5fa'} />
+            style={{ fill: hover === k ? STRONG : ACCENT }} />
         ))}
       </svg>
-      <div style={{ position:'absolute', left:5, bottom:4, fontSize:8, letterSpacing:'.06em',
-           color:MUTED, textTransform:'uppercase', pointerEvents:'none' }}>
+      <div style={{ position:'absolute', left:5, bottom:4, fontSize:9,
+           color:MUTED, pointerEvents:'none' }}>
         Terrain Tiles · AWS Open Data
       </div>
     </div>

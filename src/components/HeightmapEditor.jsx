@@ -17,7 +17,8 @@ import { simplifyFlat } from '../utils/geometryBuilders'
 import { useBackdrop } from '../hooks/useBackdrop'
 import { effectiveBounds, isUsableShape, shapeRings } from '../utils/heightmapEdit'
 // HEX for the canvas passes below — a 2D context cannot resolve var().
-import { ACCENT, HEX } from './panel/ui'
+import { DESK, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, HEX, TEXT, VEIL } from './panel/ui'
+import { THEME_EVENT } from '../utils/theme'
 
 const HANDLE = 8          // handle hit radius / half-size, screen px
 const MIN_RECT = 4        // smallest crop, source px
@@ -131,7 +132,7 @@ export function HeightmapEditor({
     const sy = (iy) => oy + iy * scale
 
     // Raster
-    ctx.fillStyle = '#0b0b0d'
+    ctx.fillStyle = HEX.desk
     ctx.fillRect(sx(0), sy(0), srcWidth * scale, srcHeight * scale)
     if (preview) {
       ctx.imageSmoothingEnabled = scale < 1
@@ -171,7 +172,7 @@ export function HeightmapEditor({
     // Everything the clip throws away, dimmed. Two even-odd fills rather than a
     // real intersection: outside the crop first, then — inside the crop only —
     // outside the shape.
-    const dim = 'rgba(9,9,11,0.72)'
+    const dim = HEX.scrim
     const hasShape = !!shape
     ctx.fillStyle = dim
     ctx.beginPath()
@@ -195,7 +196,7 @@ export function HeightmapEditor({
     if (feather > 0) {
       ctx.save()
       ctx.beginPath(); addSelection(); ctx.clip()
-      ctx.strokeStyle = 'rgba(59,130,246,0.30)'
+      ctx.strokeStyle = HEX.accent + '4d'
       ctx.lineWidth = feather * 2 * scale
       ctx.beginPath(); addSelection()
       ctx.stroke()
@@ -265,7 +266,7 @@ export function HeightmapEditor({
       const active = dragRef.current?.mode === 'vertex' ? dragRef.current.index : -1
       for (let i = 0; i < ring.length; i += 2) {
         const hx = sx(ring[i]), hy = sy(ring[i + 1])
-        ctx.fillStyle = (i / 2) === active ? ACCENT : '#ffffff'
+        ctx.fillStyle = (i / 2) === active ? HEX.accent : '#ffffff'
         ctx.fillRect(hx - VERTEX / 2, hy - VERTEX / 2, VERTEX, VERTEX)
         ctx.strokeStyle = 'rgba(0,0,0,.55)'
         ctx.lineWidth = 1
@@ -291,6 +292,11 @@ export function HeightmapEditor({
   }, [preview, srcWidth, srcHeight, tool])
 
   drawRef.current = draw
+  useEffect(() => {
+    const redraw = () => drawRef.current()
+    window.addEventListener(THEME_EVENT, redraw)
+    return () => window.removeEventListener(THEME_EVENT, redraw)
+  }, [])
 
   // Redraw whenever anything React-side changes.
   useEffect(() => { draw() }, [draw, edit])
@@ -753,7 +759,7 @@ export function HeightmapEditor({
       data-testid="heightmap-editor"
       style={{
         position: 'fixed', top: 0, left: 0, bottom: 0, right: rightInset,
-        background: '#101013', zIndex: 900, overflow: 'hidden', touchAction: 'none',
+        background: DESK, zIndex: 900, overflow: 'hidden', touchAction: 'none',
       }}
     >
       <canvas
@@ -775,13 +781,13 @@ export function HeightmapEditor({
       {/* Hints + view controls */}
       <div style={{
         position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 2,
-        padding: 3, borderRadius: 10, fontFamily: 'system-ui,-apple-system,sans-serif', fontSize: 11.5, color: '#a1a1aa',
-        background: 'rgba(22,22,26,.78)', border: '1px solid rgba(255,255,255,.09)',
+        padding: 3, borderRadius: 10, fontFamily: FONT, fontSize: 11.5, color: GLASS_TEXT,
+        background: GLASS_BG, border: `1px solid ${GLASS_BORDER}`,
         backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
         boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
         <button onClick={fit} style={{
-          background: 'rgba(255,255,255,.08)', color: '#e4e4e7', border: '1px solid rgba(255,255,255,.1)',
+          background: VEIL, color: TEXT, border: `1px solid ${GLASS_BORDER}`,
           borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
         <span style={{ padding: '3px 9px' }}>

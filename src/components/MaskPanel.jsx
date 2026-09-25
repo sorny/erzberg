@@ -15,10 +15,7 @@
  */
 import { BACKDROP_OPTIONS } from '../utils/rasterBackdrop'
 import { maskCoverage } from '../utils/maskLayers'
-import {
-  ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
-  HelpBox, InlineSl, PanelStyles, SegRow,
-} from './panel/ui'
+import { ACCENT, BG, BORDER, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
 
 const TOOLS = [
   ['✎ Brush',   'brush'],
@@ -49,7 +46,7 @@ export function MaskPanel({
       flex: 1, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
       fontSize: 11, fontWeight: 600,
       background: kind === 'primary' ? ACCENT : SURF,
-      color: kind === 'primary' ? '#fff' : DIM,
+      color: kind === 'primary' ? ON_ACCENT : DIM,
       border: `1px solid ${kind === 'primary' ? ACCENT : BORDER}`,
     }}>{label}</button>
   )
@@ -66,8 +63,8 @@ export function MaskPanel({
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#F0EBE3' }}>mask</span>
-            <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>PAINT A STENCIL</span>
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: STRONG }}>mask</span>
+            <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>Paint a stencil</span>
           </div>
           {mask && (
             <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6,
@@ -85,7 +82,7 @@ export function MaskPanel({
               <button key={id} data-testid={`studio-tool-${id}`} onClick={() => setTool(id)} style={{
                 fontSize: 10, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
                 background: tool === id ? ACCENT : SURF,
-                color: tool === id ? '#fff' : MUTED,
+                color: tool === id ? ON_ACCENT : MUTED,
                 border: `1px solid ${tool === id ? ACCENT : BORDER}`,
               }}>{label}</button>
             ))}
@@ -93,7 +90,7 @@ export function MaskPanel({
 
           <HelpBox text={HINTS[tool]} />
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>PAINT</div>
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Paint</div>
           <SegRow
             label="Mode"
             testIdPrefix="studio-mode"
@@ -110,7 +107,7 @@ export function MaskPanel({
             />
           )}
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>BACKDROP</div>
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Backdrop</div>
           <SegRow
             label="Show"
             testIdPrefix="studio-backdrop"
@@ -157,7 +154,7 @@ export function MaskPanel({
             </div>
           )}
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>WHOLE MASK</div>
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Whole mask</div>
           <div style={{ display: 'flex', gap: 4 }}>
             {btn('Fill', onFill, 'ghost', 'studio-fill')}
             {btn('Invert', onInvert, 'ghost', 'studio-invert')}
@@ -165,7 +162,7 @@ export function MaskPanel({
           </div>
 
           <div style={{
-            marginTop: 12, padding: '8px 8px', background: 'rgba(0,0,0,0.2)',
+            marginTop: 12, padding: '8px 8px', background: SUNK,
             border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>

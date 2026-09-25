@@ -8,6 +8,7 @@
  * cost a single drawImage.
  */
 import { useEffect, useMemo, useRef } from 'react'
+import { BG, HEX } from './panel/ui'
 
 const VIEW_H = 96
 // The panel is ~244px wide, so more columns than this cannot be resolved.
@@ -90,7 +91,7 @@ export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbF
 
     ctx.clearRect(0, 0, w, h)
     if (!cached) {
-      ctx.fillStyle = '#111114'
+      ctx.fillStyle = HEX.bg
       ctx.fillRect(0, 0, w, h)
       return
     }
@@ -159,7 +160,7 @@ export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbF
       onPointerMove={(e) => { if (e.buttons === 1) seekFromEvent(e) }}
       style={{
         width: '100%', height: VIEW_H, borderRadius: 4, overflow: 'hidden',
-        border: '1px solid #3f3f46', background: '#111114',
+        border: '1px solid #3f3f46', background: BG,
         cursor: duration ? 'ew-resize' : 'default', marginBottom: 8,
         touchAction: 'none',
       }}

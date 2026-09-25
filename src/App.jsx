@@ -11,7 +11,7 @@ import { ElevationProfile } from './components/ElevationProfile'
 import { HeightmapEditor } from './components/HeightmapEditor'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
-import { W as PANEL_W } from './components/panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -113,30 +113,30 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
     }}>
       <div style={{
         display:'flex', flexDirection:'column', alignItems:'center', gap:14,
-        ...GLASS, background:'rgba(24,24,28,.92)', borderRadius:14, padding:'28px 40px',
+        ...GLASS, borderRadius:14, padding:'28px 40px',
         minWidth: pct == null ? 0 : 260,
       }}>
         <div style={{
-          width:32, height:32, border:'3px solid rgba(255,255,255,.12)',
-          borderTopColor:'#3b82f6', borderRadius:'50%',
+          width:32, height:32, border:`3px solid ${BORDER}`,
+          borderTopColor:ACCENT, borderRadius:'50%',
           animation:'hm-spin .7s linear infinite',
         }} />
-        <span style={{ fontSize:14, color:'#e4e4e7', fontFamily:'system-ui,sans-serif' }}>{msg}</span>
+        <span style={{ fontSize:14, color:TEXT, fontFamily:'system-ui,sans-serif' }}>{msg}</span>
         {pct != null && (
           <>
             {/* Same shape as the spectrogram analyser's bar in the panel. */}
-            <div style={{ width:'100%', height:4, background:'#3f3f46', borderRadius:2, overflow:'hidden' }}>
+            <div style={{ width:'100%', height:4, background:BORDER, borderRadius:2, overflow:'hidden' }}>
               <div data-testid="export-progress-fill"
-                   style={{ height:'100%', width:`${pct}%`, background:'#3b82f6', transition:'width .1s' }} />
+                   style={{ height:'100%', width:`${pct}%`, background:ACCENT, transition:'width .1s' }} />
             </div>
             <span data-testid="export-progress" data-pct={pct}
-                  style={{ fontSize:11, color:'#71717a', fontFamily:'system-ui,sans-serif' }}>{pct}%</span>
+                  style={{ fontSize:11, color:MUTED, fontFamily:'system-ui,sans-serif' }}>{pct}%</span>
           </>
         )}
         {onCancel && (
           <button data-testid="export-cancel" onClick={onCancel} style={{
             background:'none', border:'1px solid #3f3f46', borderRadius:5, cursor:'pointer',
-            color:'#d4d4d8', fontSize:11, padding:'4px 14px', fontFamily:'system-ui,sans-serif',
+            color:DIM, fontSize:11, padding:'4px 14px', fontFamily:'system-ui,sans-serif',
           }}>Cancel</button>
         )}
       </div>
@@ -180,11 +180,11 @@ function autoResolution(width, height) {
  * stays the subject, and one border, radius and shadow so they read as a set.
  */
 const GLASS = {
-  background:'rgba(22,22,26,.78)',
+  background: GLASS_BG,
   backdropFilter:'blur(14px) saturate(1.4)', WebkitBackdropFilter:'blur(14px) saturate(1.4)',
-  border:'1px solid rgba(255,255,255,.09)',
-  boxShadow:'0 8px 28px rgba(0,0,0,.28), 0 1px 0 rgba(255,255,255,.04) inset',
-  fontFamily:'system-ui,-apple-system,sans-serif',
+  border:`1px solid ${GLASS_BORDER}`,
+  boxShadow:'0 8px 28px var(--hm-shadow)',
+  fontFamily: FONT, color: GLASS_TEXT,
 }
 
 /** A key, drawn as a key. */
@@ -192,9 +192,9 @@ function Kbd({ children }) {
   return (
     <kbd style={{
       display:'inline-block', minWidth:16, padding:'1px 5px', borderRadius:4,
-      background:'rgba(255,255,255,.08)', border:'1px solid rgba(255,255,255,.12)',
+      background: VEIL, border:`1px solid ${GLASS_BORDER}`,
       borderBottomWidth:2, fontFamily:'inherit', fontSize:10, lineHeight:'14px',
-      color:'#e4e4e7', textAlign:'center',
+      color:TEXT, textAlign:'center',
     }}>{children}</kbd>
   )
 }
@@ -219,9 +219,9 @@ function Toast({ toast, onDismiss }) {
   return (
     <div data-testid="toast" role="status" aria-live="polite" style={{
       position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
-      ...GLASS, background:'rgba(24,24,28,.9)', borderRadius:10,
+      ...GLASS, borderRadius:10,
       padding:'9px 10px 9px 16px', zIndex:4500, display:'flex', alignItems:'center', gap:12,
-      maxWidth:480, fontSize:13, color:'#e4e4e7',
+      maxWidth:480, fontSize:13, color:TEXT,
       animation:'hm-rise .28s cubic-bezier(.2,.8,.2,1)',
     }}>
       <style>{`@keyframes hm-rise { from { opacity:0; transform:translate(-50%, 8px) } to { opacity:1; transform:translate(-50%, 0) } }
@@ -229,13 +229,13 @@ function Toast({ toast, onDismiss }) {
       <span style={{ flex:1 }}>{toast.msg}</span>
       {toast.action && (
         <button data-testid="toast-action" onClick={() => { toast.onAction?.(); onDismiss() }} style={{
-          background:'#2f6fe0', border:'none', borderRadius:6, cursor:'pointer',
-          color:'#fff', fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
+          background:ACCENT_DEEP, border:'none', borderRadius:6, cursor:'pointer',
+          color: ON_ACCENT, fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
           whiteSpace:'nowrap',
         }}>{toast.action}</button>
       )}
       <button onClick={onDismiss} aria-label="Dismiss" style={{
-        background:'none', border:'none', color:'#8f8f99', cursor:'pointer',
+        background:'none', border:'none', color:MUTED, cursor:'pointer',
         fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:6,
       }}>✕</button>
     </div>
@@ -264,31 +264,31 @@ function ViewportHint({ onDismiss, onKeys }) {
       // middle. Nothing else claims this corner.
       position:'fixed', left:16, top:16, zIndex:600,
       display:'flex', alignItems:'center', gap:2, padding:3,
-      ...GLASS, borderRadius:10, fontSize:11.5, color:'#d4d4d8',
+      ...GLASS, borderRadius:10, fontSize:11.5, color:DIM,
     }}>
       <span style={{ padding:'4px 9px', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
-        <span style={{ color:'#e4e4e7' }}>Drag</span> to orbit
-        <span style={{ color:'rgba(255,255,255,.35)' }}>·</span>
-        <span style={{ color:'#e4e4e7' }}>Scroll</span> to zoom
-        <span style={{ color:'rgba(255,255,255,.35)' }}>·</span>
-        <span style={{ color:'#e4e4e7' }}>Right-drag</span> to pan
+        <span style={{ color:TEXT }}>Drag</span> to orbit
+        <span style={{ color: MUTED }}>·</span>
+        <span style={{ color:TEXT }}>Scroll</span> to zoom
+        <span style={{ color: MUTED }}>·</span>
+        <span style={{ color:TEXT }}>Right-drag</span> to pan
       </span>
-      <span aria-hidden="true" style={{ width:1, height:16, background:'rgba(255,255,255,.1)', margin:'0 2px' }} />
+      <span aria-hidden="true" style={{ width:1, height:16, background: GLASS_BORDER, margin:'0 2px' }} />
       {/* The way in to the rest of them. A `?` card nobody can find is a card
           that does not exist, and this hint is already the one place in the app
           that talks about input at all. */}
       <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts"
         className="hm-glassbtn" style={{
           background:'none', border:'none', borderRadius:7, cursor:'pointer',
-          color:'#c4c4cc', fontSize:11.5, padding:'3px 8px', fontFamily:'inherit',
+          color:MUTED, fontSize:11.5, padding:'3px 8px', fontFamily:'inherit',
           display:'flex', alignItems:'center', gap:6,
         }}><Kbd>?</Kbd> Shortcuts</button>
       <button onClick={onDismiss} aria-label="Dismiss the viewport hint" className="hm-glassbtn" style={{
         background:'none', border:'none', borderRadius:7, cursor:'pointer',
-        color:'#8f8f99', fontSize:12, lineHeight:1, padding:'6px 8px',
+        color:MUTED, fontSize:12, lineHeight:1, padding:'6px 8px',
       }}>✕</button>
       <style>{`.hm-glassbtn { transition:background .15s, color .15s }
-        .hm-glassbtn:hover { background:rgba(255,255,255,.08) !important; color:#fafafa !important }`}</style>
+        .hm-glassbtn:hover { background:var(--hm-veil-strong) !important; color:var(--hm-strong) !important }`}</style>
     </div>
   )
 }
@@ -316,8 +316,8 @@ function DropTarget() {
         border:'2px dashed rgba(255,255,255,0.28)', borderRadius:12,
         padding:'26px 38px', textAlign:'center', background:'rgba(20,20,24,0.85)',
       }}>
-        <div style={{ fontSize:14, color:'#e4e4e7', marginBottom:8 }}>Drop to open</div>
-        <div style={{ fontSize:11.5, color:'#8f8f99', lineHeight:1.7 }}>
+        <div style={{ fontSize:14, color:TEXT, marginBottom:8 }}>Drop to open</div>
+        <div style={{ fontSize:11.5, color:MUTED, lineHeight:1.7 }}>
           PNG or GeoTIFF heightmap · GPX or GeoJSON overlay<br />
           a preset, or any plate this app exported
         </div>
@@ -339,11 +339,11 @@ function ComputingPill() {
       position:'fixed', right:14, bottom:14, zIndex:3600, pointerEvents:'none',
       display:'flex', alignItems:'center', gap:7,
       ...GLASS, borderRadius:999,
-      padding:'6px 13px 6px 10px', fontSize:11.5, color:'#a1a1aa',
+      padding:'6px 13px 6px 10px', fontSize:11.5, color:MUTED,
     }}>
       <span style={{
-        width:10, height:10, border:'2px solid rgba(255,255,255,.14)',
-        borderTopColor:'#3b82f6', borderRadius:'50%',
+        width:10, height:10, border:`2px solid ${BORDER}`,
+        borderTopColor:ACCENT, borderRadius:'50%',
         animation:'hm-spin .7s linear infinite',
       }} />
       Computing
@@ -2500,15 +2500,15 @@ export default function App() {
       {loadError && (
         <div style={{
           position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
-          background:'#450a0a', border:'1px solid #991b1b', borderRadius:8,
+          background: BG, border:`1px solid ${DANGER_BORDER}`, borderRadius:8,
           padding:'12px 16px', zIndex:5000, display:'flex', alignItems:'center', gap:12,
-          maxWidth:480, boxShadow:'0 4px 24px rgba(0,0,0,0.5)',
-          fontFamily:'system-ui,sans-serif', fontSize:13, color:'#fca5a5',
+          maxWidth:480, boxShadow:'0 8px 28px var(--hm-shadow)',
+          fontFamily: FONT, fontSize:13, color:DANGER_TEXT,
         }}>
           <span style={{ fontSize:16 }}>⚠</span>
           <span style={{ flex:1 }}>{loadError}</span>
           <button onClick={clearError} style={{
-            background:'none', border:'none', color:'#fca5a5', cursor:'pointer',
+            background:'none', border:'none', color:DANGER_TEXT, cursor:'pointer',
             fontSize:16, lineHeight:1, padding:'0 2px', opacity:0.7,
           }}>✕</button>
         </div>
@@ -2546,7 +2546,7 @@ export default function App() {
 // ── UI helper components ──────────────────────────────────────────────────────
 
 function CenterGuides({ bgColor }) {
-  const lc = isDarkBackground(bgColor) ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.25)'
+  const lc = isDarkBackground(bgColor) ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)'
   return (
     <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:500 }}>
       <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:1, background:lc }} />
@@ -2560,24 +2560,24 @@ function EmptyState({ onLoad, onLoadGeoTiff }) {
     <div style={{
       position:'fixed', inset:0, zIndex:3000,
       display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-      background:'rgba(255,255,255,0.92)', backdropFilter:'blur(8px)',
+      background: GLASS_BG, backdropFilter:'blur(8px)', fontFamily: FONT,
     }}>
       <div style={{ fontSize:56, marginBottom:16, lineHeight:1 }}>⛰</div>
-      <div style={{ fontSize:22, fontWeight:700, color:'#111', marginBottom:8 }}>No heightmap loaded</div>
-      <div style={{ fontSize:14, color:'#666', marginBottom:28, textAlign:'center', maxWidth:340 }}>
+      <div style={{ fontSize:22, fontWeight:700, color: STRONG, marginBottom:8 }}>No heightmap loaded</div>
+      <div style={{ fontSize:14, color: MUTED, marginBottom:28, textAlign:'center', maxWidth:340 }}>
         Load a greyscale PNG or a GeoTIFF with real elevation data.<br/>
         <a href="https://tangrams.github.io/heightmapper" target="_blank" rel="noreferrer"
-          style={{ color:'#444' }}>Tangrams Heightmapper</a> exports OSM-based heightmaps.
+          style={{ color: ACCENT_TEXT }}>Tangrams Heightmapper</a> exports OSM-based heightmaps.
       </div>
       <div style={{ display:'flex', gap:12 }}>
         <button onClick={onLoad} style={{
-          background:'#111', color:'#fff', border:'none', borderRadius:10,
+          background: SURF, color: TEXT, border:`1px solid ${BORDER}`, borderRadius:10,
           padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
         }}>
           PNG / Image
         </button>
         <button onClick={onLoadGeoTiff} style={{
-          background:'#2563eb', color:'#fff', border:'none', borderRadius:10,
+          background: ACCENT, color: ON_ACCENT, border:'none', borderRadius:10,
           padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
         }}>
           GeoTIFF

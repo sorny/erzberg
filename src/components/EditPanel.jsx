@@ -10,10 +10,7 @@ import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
 import { BACKDROP_OPTIONS } from '../utils/rasterBackdrop'
 import { useFeaturePick } from './panel/FeaturePicker'
-import {
-  ACCENT, BG, BORDER, DIM, MUTED, SURF, TEXT, W,
-  HelpBox, InlineSl, PanelStyles, SegRow,
-} from './panel/ui'
+import { ACCENT, BG, BORDER, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
@@ -83,7 +80,7 @@ export function EditPanel({
       flex: 1, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
       fontSize: 11, fontWeight: 600,
       background: kind === 'primary' ? ACCENT : SURF,
-      color: kind === 'primary' ? '#fff' : DIM,
+      color: kind === 'primary' ? ON_ACCENT : DIM,
       border: `1px solid ${kind === 'primary' ? ACCENT : BORDER}`,
     }}>{label}</button>
   )
@@ -100,8 +97,8 @@ export function EditPanel({
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: '#F0EBE3' }}>edit</span>
-            <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>CLIP HEIGHTMAP</span>
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: STRONG }}>edit</span>
+            <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>Clip heightmap</span>
           </div>
           {filename && (
             <div style={{ marginTop: 4, fontSize: 10, color: MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -116,7 +113,7 @@ export function EditPanel({
               <button key={id} data-testid={`edit-tool-${id}`} onClick={() => setTool(id)} style={{
                 fontSize: 10, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
                 background: tool === id ? ACCENT : SURF,
-                color: tool === id ? '#fff' : MUTED,
+                color: tool === id ? ON_ACCENT : MUTED,
                 border: `1px solid ${tool === id ? ACCENT : BORDER}`,
               }}>{label}</button>
             ))}
@@ -124,7 +121,7 @@ export function EditPanel({
 
           <HelpBox text={HINTS[tool]} />
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>CROP</div>
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Crop</div>
           <SegRow
             label="Aspect"
             testIdPrefix="edit-aspect"
@@ -144,7 +141,7 @@ export function EditPanel({
             border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 12,
           }}>Full extent</button>
 
-          <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>SELECTION</div>
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Selection</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
             <span>Shape</span>
             <span style={{ color: edit?.shape ? DIM : MUTED }}>
@@ -202,7 +199,7 @@ export function EditPanel({
           )}
 
           <div style={{
-            marginTop: 12, padding: '8px 8px', background: 'rgba(0,0,0,0.2)',
+            marginTop: 12, padding: '8px 8px', background: SUNK,
             border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>

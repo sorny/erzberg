@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, BG, BODY_W, BORDER, DIM, MUTED, SURF, TEXT, W, ColorRow, SegGroup, DateRow, ExpBtn, HelpBox, HelpBtn, InlineSl, PanelStyles, Section, SegRow, Stage, StageRail, Note, RangeSl, Sl, Sub, Tog, TogColor, Btn } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBox, HelpBtn, InlineSl, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 
@@ -50,6 +50,7 @@ const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { ModeMark } from './panel/modeMarks'
+import { applyTheme, storedTheme } from '../utils/theme'
 
 /**
  * Square-law mapping for the flock-size slider.
@@ -190,7 +191,7 @@ function TerrainFetchPanel({ onFetched }) {
     <>
       {error && (
         <div data-testid="fetch-error" style={{ marginBottom:6, fontSize:10, lineHeight:1.6,
-             color:'#f97316', background:'rgba(249,115,22,0.08)', border:'1px solid rgba(249,115,22,0.35)',
+             color:WARN, background:WARN_BG, border:'1px solid rgba(249,115,22,0.35)',
              borderRadius:4, padding:'5px 7px' }}>{error}</div>
       )}
       <form onSubmit={search} style={{ display:'flex', gap:4, marginBottom:6 }}>
@@ -312,19 +313,19 @@ function HypsometricRow({ value }) {
           Hypso. Integral
           <HelpBtn active={show} onClick={() => setShow(s => !s)} />
         </span>
-        <span style={{ color:'#a1a1aa', fontFamily:'monospace' }}>{value.toFixed(3)}</span>
+        <span style={{ color:MUTED, fontFamily:'monospace' }}>{value.toFixed(3)}</span>
       </div>
       {show && (
         <div style={{
-          fontSize: 10, color: MUTED, background: 'rgba(0,0,0,0.2)',
+          fontSize: 10, color: MUTED, background: SUNK,
           padding: '4px 8px', borderRadius: 5, marginBottom: 8,
           border: `1px solid ${BORDER}`, lineHeight: 1.6
         }}>
           <div style={{ marginBottom: 4 }}>HI = (mean − min) / (max − min)</div>
           <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', columnGap: 8, rowGap: 2 }}>
-            <span style={{ color:'#a1a1aa' }}>&gt; 0.6</span><span>young / rugged — most area is high</span>
-            <span style={{ color:'#a1a1aa' }}>≈ 0.5</span><span>equilibrium</span>
-            <span style={{ color:'#a1a1aa' }}>&lt; 0.4</span><span>mature / eroded — few peaks remain</span>
+            <span style={{ color:MUTED }}>&gt; 0.6</span><span>young / rugged — most area is high</span>
+            <span style={{ color:MUTED }}>≈ 0.5</span><span>equilibrium</span>
+            <span style={{ color:MUTED }}>&lt; 0.4</span><span>mature / eroded — few peaks remain</span>
           </div>
         </div>
       )}
@@ -360,7 +361,7 @@ function ProjectionParams({ params, values, onChange }) {
               return (
                 <Btn key={c.key} variant="toggle" on={on} title={c.help} data-testid={`proj-${c.key}`}
                   onClick={() => onChange(c.key, !on)}
-                  style={{ padding:'4px 0', textTransform:'uppercase' }}>{c.label}</Btn>
+                  style={{ padding:'4px 0' }}>{c.label}</Btn>
               )
             })}
           </div>
@@ -408,7 +409,7 @@ function HeaderIconBtn({ onClick, disabled, testId, title, label, icon }) {
         opacity: disabled ? 0.3 : 1,
         cursor: disabled ? 'default' : 'pointer',
       }}
-      onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = '#F0EBE3' }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = STRONG }}
       onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>
       <svg width="16" height="16" viewBox="0 0 16 17" fill="none" stroke="currentColor"
         strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -440,9 +441,9 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
     <button type="button" onClick={onClick} data-testid={testId} style={{
       display:'block', width:'100%', textAlign:'left', background:'none',
       border:'none', cursor:'pointer', padding:'5px 10px',
-      fontSize:11, color: dim ? DIM : '#c4c4cc', borderRadius:4,
+      fontSize:11, color: dim ? DIM : MUTED, borderRadius:4,
     }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = VEIL }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}>
       {children}
     </button>
@@ -456,8 +457,8 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
       <div data-testid="history-menu" style={{
         position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:901,
         minWidth:210, maxWidth:260, maxHeight:320, overflowY:'auto',
-        background:'#18181b', border:`1px solid ${BORDER}`, borderRadius:6,
-        boxShadow:'0 12px 32px rgba(0,0,0,.45)', padding:4,
+        background:BG, border:`1px solid ${BORDER}`, borderRadius:6,
+        boxShadow:'0 12px 32px var(--hm-shadow)', padding:4,
       }}>
         {/* Newest redo nearest `now`, so the column is chronological throughout
             rather than two lists that happen to touch. */}
@@ -469,7 +470,7 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
         ))}
         <div style={{
           display:'flex', alignItems:'center', gap:8, padding:'4px 10px',
-          fontSize:9.5, letterSpacing:'1.2px', textTransform:'uppercase', color: MUTED,
+          fontSize:10, fontFamily: MONO, color: ACCENT_TEXT,
         }}>
           now
           <span style={{ flex:1, height:1, background: BORDER }} />
@@ -579,7 +580,7 @@ function CoverProse({ caption = false, children }) {
 /** The small uppercase label the mode sections use for a group, without a rail. */
 function CoverLabel({ children }) {
   return (
-    <div style={{ fontSize: 9, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>{children}</div>
+    <div style={{ fontSize: 11, color: DIM, fontWeight: 600 }}>{children}</div>
   )
 }
 
@@ -622,7 +623,7 @@ function FromFeatures({ layers = [], sources = [], masks = [], onMake }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 5,
                   borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <CoverLabel>FROM FEATURES</CoverLabel>
+      <CoverLabel>From features</CoverLabel>
       {element}
       {closes && (
         <Tog label="Fill the enclosed area" checked={fillClosed} small
@@ -733,6 +734,7 @@ export function Sidebar({
     onOpenChange?.(value)
   }, [onOpenChange])
   const [filter, setFilter] = useState('')
+  const [theme, setTheme] = useState(storedTheme)
   const filterRef = useRef(null)
   // Which cover class the pointer is over, shared by the class map and the
   // legend so that pointing at either lights up the other.
@@ -1355,16 +1357,16 @@ export function Sidebar({
         aria-label={open ? 'Hide the panel' : 'Show the panel'}
         style={{
           position:'fixed', right: open ? W : 0, top:'50%', transform:'translateY(-50%)',
-          width:18, height:56, background:'rgba(24,24,27,.92)',
+          width:18, height:56, background: GLASS_BG,
           backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
-          border:'1px solid rgba(255,255,255,.08)', borderRight:'none',
+          border:`1px solid ${GLASS_BORDER}`, borderRight:'none',
           borderRadius:'8px 0 0 8px',
           cursor:'pointer', zIndex:1001, userSelect:'none',
           display:'flex', alignItems:'center', justifyContent:'center',
-          color: MUTED, fontSize:8, boxShadow:'-4px 0 14px rgba(0,0,0,.25)',
+          color: MUTED, fontSize:8, boxShadow:'-4px 0 14px var(--hm-shadow)',
           transition:'right .26s cubic-bezier(.2,.8,.2,1), color .15s',
         }}
-        onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
+        onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
         onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>{open ? '▶' : '◀'}</button>
 
       <aside id="hm-panel" aria-label="Controls" style={{
@@ -1373,8 +1375,8 @@ export function Sidebar({
         display:'flex', flexDirection:'column',
         transform: open ? 'none' : `translateX(${W}px)`,
         transition:'transform .26s cubic-bezier(.2,.8,.2,1)',
-        boxShadow:'-1px 0 0 rgba(255,255,255,.04), -12px 0 32px rgba(0,0,0,.28)',
-        fontFamily:'system-ui,-apple-system,sans-serif',
+        boxShadow:'-1px 0 0 var(--hm-veil), -12px 0 32px var(--hm-shadow)',
+        fontFamily: FONT,
         WebkitFontSmoothing:'antialiased', MozOsxFontSmoothing:'grayscale',
       }}>
         {/*
@@ -1394,16 +1396,31 @@ export function Sidebar({
           */}
         <div style={{ padding:'11px 12px 9px', borderBottom:`1px solid ${BORDER}`, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:'#F0EBE3', margin:0 }}>erzberg</h1>
-            <span style={{ fontSize:10, color: MUTED, fontWeight:600, opacity:0.8, letterSpacing:'0.01em' }}>v{version}</span>
+            <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:STRONG, margin:0 }}>erzberg</h1>
+            <span style={{ fontSize:10, color: MUTED, fontFamily: MONO }}>v{version}</span>
             <div style={{ flex:1 }} />
+            {/* Dark and light. Remembered per browser; the panel has always been
+                dark, so dark is where a first visit starts. */}
+            <button type="button" data-testid="theme-toggle" className="hmbtn"
+              onClick={() => setTheme((t) => applyTheme(t === 'light' ? 'dark' : 'light'))}
+              title={theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+              aria-label={theme === 'light' ? 'Switch to dark' : 'Switch to light'}
+              style={{ background:'none', border:'none', padding:2, cursor:'pointer', color: MUTED,
+                       display:'flex', alignItems:'center', marginRight:4 }}>
+              {theme === 'light'
+                ? <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M6 .3a.7.7 0 0 1 .2.8A6.3 6.3 0 0 0 14.9 9.8a.7.7 0 0 1 1 .8A8 8 0 1 1 5.3.1.7.7 0 0 1 6 .3z" /></svg>
+                : <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                    <circle cx="8" cy="8" r="3" />
+                    <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3 3l1.1 1.1M11.9 11.9 13 13M3 13l1.1-1.1M11.9 4.1 13 3" /></svg>}
+            </button>
             <a
               href="https://github.com/sorny/erzberg"
               target="_blank"
               rel="noopener noreferrer"
               title="View on GitHub"
               style={{ display:'flex', alignItems:'center', color: MUTED, opacity:0.75, textDecoration:'none' }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#F0EBE3' }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = STRONG }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.color = MUTED }}
             >
               <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
@@ -1433,7 +1450,7 @@ export function Sidebar({
                 aria-expanded={historyOpen}
                 style={{
                   background:'none', border:'none', padding:'4px 6px', cursor: (canUndo || canRedo) ? 'pointer' : 'default',
-                  color: historyOpen ? '#F0EBE3' : MUTED, fontSize:10, lineHeight:1,
+                  color: historyOpen ? STRONG : MUTED, fontSize:10, lineHeight:1,
                   opacity: (canUndo || canRedo) ? 1 : 0.3,
                 }}>▾</button>
               {historyOpen && (
@@ -1452,7 +1469,7 @@ export function Sidebar({
               style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:6,
                        color: MUTED, fontSize:10, lineHeight:1, padding:'5px 9px',
                        whiteSpace:'nowrap', cursor:'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.color = '#F0EBE3' }}
+              onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
               onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>Reset all</button>
           </div>
 
@@ -1470,7 +1487,7 @@ export function Sidebar({
             * where you are.
             */}
           <div data-testid="standing-line" style={{
-            marginTop:8, fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums',
+            marginTop:8, fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>
             {[
@@ -1478,7 +1495,7 @@ export function Sidebar({
               `${plate.inks} ink${plate.inks === 1 ? '' : 's'}`,
               plate.layers && `${plate.layers} layer${plate.layers === 1 ? '' : 's'}`,
               plate.text && `${plate.text} text`,
-            ].filter(Boolean).join(' · ')}
+            ].filter(Boolean).join(', ')}
           </div>
         </div>
 
@@ -1565,7 +1582,7 @@ export function Sidebar({
                 down and the same roll comes back. */}
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               <button data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise} style={{
-                flex:1, padding:'8px 0', background: ACCENT, color:'#fff', border:`1px solid ${ACCENT}`,
+                flex:1, padding:'8px 0', background: ACCENT, color:ON_ACCENT, border:`1px solid ${ACCENT}`,
                 borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
               }}>🎲 Surprise me</button>
               <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
@@ -1582,8 +1599,8 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>
-              STYLES <span style={{ opacity:0.7, fontWeight:400 }}>({presetNames.length})</span>
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'8px 0 4px' }}>
+              Styles <span style={{ color: MUTED, fontWeight:400, fontFamily: MONO }}>{presetNames.length}</span>
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               {Object.entries(externalPresets || {}).map(([name, preset]) => {
@@ -1633,8 +1650,8 @@ export function Sidebar({
 
           <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
-              <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
+              <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
+              <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
             </div>
             {heightmapFilename && (
               <div style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -1683,7 +1700,7 @@ export function Sidebar({
             {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
             <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
               disabled={!heightmapPixels}
-              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : '#a1a1aa',
+              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : MUTED,
                 border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
                 cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
               ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
@@ -1848,7 +1865,7 @@ export function Sidebar({
                     contacts a server: cut a plate first, then load it.
                   </CoverProse>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <CoverLabel>CUT ONE</CoverLabel>
+                    <CoverLabel>Cut one</CoverLabel>
                     <CommandLine cmd={cmd} />
                     <CoverProse caption>
                       {exact
@@ -1863,7 +1880,7 @@ export function Sidebar({
             {cover && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 2 }}>
                 {coverError && (
-                  <div style={{ fontSize: 10, color: '#fca5a5', lineHeight: 1.5 }}>{coverError}</div>
+                  <div style={{ fontSize: 10, color: DANGER_TEXT, lineHeight: 1.5 }}>{coverError}</div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   {/* The file keeps the geocoder's full answer — "Erzberg,
@@ -1884,7 +1901,7 @@ export function Sidebar({
                     than as a fact of its own, beside what it counts. */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <CoverLabel>CLASSES</CoverLabel>
+                    <CoverLabel>Classes</CoverLabel>
                     <span style={{ fontSize: 9.5, color: DIM }}>{cover.classes.length}</span>
                   </div>
                   {/* The legend says what the classes are; this says where they
@@ -1960,11 +1977,11 @@ export function Sidebar({
             <button
               className="hmload"
               onClick={() => snd.loadFromPicker(onSoundscapeFit)}
-              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
+              style={{ width:'100%', padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
             >↑ Audio (MP3 / WAV / OGG / M4A)</button>
 
             {snd.error && (
-              <div style={{ fontSize:10, color:'#fca5a5', background:'rgba(153,27,27,.18)', border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
+              <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
                 {snd.error}
               </div>
             )}
@@ -2001,7 +2018,7 @@ export function Sidebar({
                   <button
                     data-testid="soundscape-play"
                     onClick={snd.toggle}
-                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : '#fff', border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : ON_ACCENT, border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
                   >{snd.isPlaying ? '❙❙ Pause' : '▶ Play'}</button>
                   <button
                     onClick={snd.stop}
@@ -2013,17 +2030,17 @@ export function Sidebar({
                 </div>
 
                 <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>ANALYSIS</div>
+                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, marginBottom:4 }}>Analysis</div>
                   <SegGroup label="FFT size" options={[[1024, 1024], [2048, 2048], [4096, 4096]]}
                     value={snd.opts.fftSize} onChange={(n) => snd.setOpts({ fftSize: n })}
                     style={{ marginBottom: 8 }} />
-                  <SegGroup label="Frequency axis" uppercase options={[['Log freq', true], ['Linear freq', false]]}
+                  <SegGroup label="Frequency axis" options={[['Log freq', true], ['Linear freq', false]]}
                     value={snd.opts.logFreq} onChange={(v) => snd.setOpts({ logFreq: v })}
                     style={{ marginBottom: 8 }} />
                   <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
                     min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
 
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, margin:'8px 0 4px', letterSpacing:1 }}>STREAM</div>
+                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, margin:'8px 0 4px' }}>Stream</div>
                   <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
                     min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
                   <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
@@ -2038,8 +2055,8 @@ export function Sidebar({
                     spectrogram is only one answer; the others fold the track so
                     its structure — repeats, sections, groove — becomes relief. */}
                 <Sub>
-                  <div style={{ fontSize:10, color: MUTED, fontWeight:700, marginBottom:4, letterSpacing:1 }}>WHOLE TRACK</div>
-                  <SegGroup label="Projection" uppercase columns={3}
+                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, marginBottom:4 }}>Whole track</div>
+                  <SegGroup label="Projection" columns={3}
                     options={TRACK_PROJECTIONS.map((pj) => [pj.label, pj.id])}
                     value={projection.id} onChange={(id) => snd.setOpts({ projection: id })}
                     testIdOf={(id) => `projection-${id}`} style={{ marginBottom: 4 }} />
@@ -2047,7 +2064,7 @@ export function Sidebar({
 
                   {projection.id === 'weave' && (
                     <div style={{ fontSize:10, color: MUTED, marginBottom:8 }}>
-                      Detected tempo: <span style={{ color:'#a1a1aa', fontVariantNumeric:'tabular-nums' }}>
+                      Detected tempo: <span style={{ color:MUTED, fontVariantNumeric:'tabular-nums' }}>
                         {detectedBpm ? `${Math.round(detectedBpm)} BPM` : '—'}
                       </span>
                     </div>
@@ -2063,7 +2080,7 @@ export function Sidebar({
                 <button
                   data-testid="soundscape-freeze"
                   onClick={() => { const r = snd.freezeFullTrack(); if (r) onSoundscapeFit?.(r) }}
-                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? '#fff' : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
+                  style={{ width:'100%', padding:'8px 0', background: snd.frozen ? ACCENT_DEEP : SURF, color: snd.frozen ? ON_ACCENT : DIM, border:`1px solid ${snd.frozen ? ACCENT_DEEP : BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
                 >{snd.frozen ? '❄ Whole Track Frozen' : 'Freeze Whole Track'}</button>
                 <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.4 }}>
                   {snd.frozen
@@ -2208,7 +2225,7 @@ export function Sidebar({
                    enabled={summaries['Texture'] !== '—'}>
             <Tog label="Texture overlay" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && !style.showFill && (
-              <div style={{ fontSize: 10, color: '#f59e0b', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
+              <div style={{ fontSize: 10, color: WARN, background: WARN_BG, border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
                 Fill is disabled — texture will not appear until Fill is enabled.
               </div>
             )}
@@ -2306,7 +2323,7 @@ export function Sidebar({
                   </>)}
                   {sun && (
                     <div data-testid="sun-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.7, marginBottom:6 }}>
-                      <div style={{ color: sun.altitude > 0 ? DIM : '#f97316' }}>
+                      <div style={{ color: sun.altitude > 0 ? DIM : WARN }}>
                         {sun.altitude > 0
                           ? `${Math.round(sun.azimuth)}° · ${Math.round(sun.altitude)}° above`
                           : `${Math.round(sun.azimuth)}° · below the horizon`}
@@ -2637,7 +2654,7 @@ export function Sidebar({
                       value={style.stippleDensityMode} onChange={(v) => ss({ stippleDensityMode: v })} />
                   </div>
                 </Sub>
-                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+                <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
             )}
           </Section>
@@ -2680,7 +2697,7 @@ export function Sidebar({
               <>
                 <HelpBox text="Copperplate engraving that follows the form rather than the light: strokes trace the principal-curvature field, so the lines themselves wrap around ridges and hollows." />
                 <Sub>
-                  <SegGroup label="Stroke direction" uppercase options={[['Across form', 'max'], ['Along form', 'min']]}
+                  <SegGroup label="Stroke direction" options={[['Across form', 'max'], ['Along form', 'min']]}
                     value={style.dirModeCurv} onChange={(v) => ss({ dirModeCurv: v })}
                     style={{ marginBottom: 8 }} />
                   <InlineSl label="Spacing" help="Separation between strokes. Each line claims territory as it advances and stops on reaching another's, so strokes stay evenly spread instead of clumping." min={1} max={20} step={0.5} value={style.spacingCurv} onChange={v => ss({ spacingCurv: v })} />
@@ -2782,7 +2799,7 @@ export function Sidebar({
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRiso} onChange={v => ss({ seedRiso: v })} />
                 </Sub>
                 <Note>Multiply blending, so it wants paper. On a dark background three light inks go to mud.</Note>
-                <ModeStyleOverride prefix="Riso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} showColor={false} label="DOT SIZE" />
+                <ModeStyleOverride prefix="Riso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} showColor={false} label="Dot size" />
               </>
             )}
           </Section>
@@ -2805,7 +2822,7 @@ export function Sidebar({
                   <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
-                <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
+                <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
               </>
             )}
           </Section>
@@ -2817,7 +2834,7 @@ export function Sidebar({
             )}
             {style.enabledCover && cover && (
               <>
-                <Sub label="INK">
+                <Sub label="Ink">
                   <div style={{ display: 'flex', gap: 2, marginBottom: 4 }}>
                     {[['Plate', 'plate'], ['Class', 'class']].map(([label, val]) => (
                       <Btn key={val} block variant="toggle" on={style.sourceCover === val}
@@ -2833,7 +2850,7 @@ export function Sidebar({
                   <InlineSl label="Grain" help="A per-cell tooth, seeded by class, so two materials that share a tone still read as two surfaces." min={0} max={1} step={0.02} value={style.grainCover} onChange={v => ss({ grainCover: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingCover} onChange={v => ss({ spacingCover: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
-                <ModeStyleOverride prefix="Cover" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
+                <ModeStyleOverride prefix="Cover" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
               </>
             )}
           </Section>
@@ -2851,7 +2868,7 @@ export function Sidebar({
                   <InlineSl label="Seed" help="Which ink each basin is dealt." min={1} max={999} step={1} value={style.seedShed} onChange={v => ss({ seedShed: v })} />
                 </Sub>
                 <Note>The divides are ridgelines, which is why they look drawn rather than imposed.</Note>
-                <ModeStyleOverride prefix="Shed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="OUTLINE" />
+                <ModeStyleOverride prefix="Shed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
               </>
             )}
           </Section>
@@ -2881,7 +2898,7 @@ export function Sidebar({
                   <Tog label="Cast shadows" small help="Marches a ray from each sample toward the bulb. The expensive part of the mode — skipped wherever it cannot change the answer." checked={style.shadowFlashbulb} onChange={v => ss({ shadowFlashbulb: v })} />
                   {style.shadowFlashbulb && <InlineSl label="Steps" min={4} max={64} step={4} value={style.shadowStepsFlashbulb} onChange={v => ss({ shadowStepsFlashbulb: v })} />}
                 </Sub>
-                <ModeStyleOverride prefix="Flashbulb" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+                <ModeStyleOverride prefix="Flashbulb" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
             )}
           </Section>
@@ -2913,7 +2930,7 @@ export function Sidebar({
                   <InlineSl label="Pitch" min={0.5} max={12} step={0.5} value={style.spacingHalation} onChange={v => ss({ spacingHalation: v })} fmt={v => v.toFixed(1)} />
                   <Tog label="Cast shadows" small checked={style.shadowHalation} onChange={v => ss({ shadowHalation: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Halation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="GRAIN STYLE" showDash={false} />
+                <ModeStyleOverride prefix="Halation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Grain style" showDash={false} />
               </>
             )}
           </Section>
@@ -3019,7 +3036,7 @@ export function Sidebar({
                   <InlineSl label="Line pitch" help="The ground above the plane, drawn in outline so the section reads as standing in a landscape." min={1} max={40} step={1} value={style.beyondSection} onChange={v => ss({ beyondSection: v })} />
                   <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.beyondWeightSection} onChange={v => ss({ beyondWeightSection: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
-                <ModeStyleOverride prefix="Section" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="INK" />
+                <ModeStyleOverride prefix="Section" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Ink" />
               </>
             )}
           </Section>
@@ -3057,7 +3074,7 @@ export function Sidebar({
                   <InlineSl label="Smoothing" help="Chaikin passes over the finished line, rounding the staircase left by tracing a level set across grid cells." min={0} max={25} step={1} value={style.smoothingShadowLine ?? 2} onChange={v => ss({ smoothingShadowLine: Math.round(v) })} />
                   {shadowLineSun && (
                     <div data-testid="shadowline-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
-                      <div style={{ color: shadowLineSun.altitude > 0 ? DIM : '#f97316' }}>
+                      <div style={{ color: shadowLineSun.altitude > 0 ? DIM : WARN }}>
                         {shadowLineSun.altitude > 0
                           ? `${Math.round(shadowLineSun.azimuth)}° · ${Math.round(shadowLineSun.altitude)}° above`
                           : 'Below the horizon — there is no shadow edge at night'}
@@ -3126,7 +3143,7 @@ export function Sidebar({
                         a thousand shadow sweeps over the whole grid — long
                         enough on a large raster to read as a hang rather than
                         as work. The count is the honest way to say so. */}
-                    <div style={{ color: sunHoursSeconds > 2 ? '#f97316' : MUTED }}>
+                    <div style={{ color: sunHoursSeconds > 2 ? WARN : MUTED }}>
                       {`${sunHoursSweeps.toLocaleString()} sun positions`}
                       {sunHoursSeconds >= 0.1
                         ? ` · about ${sunHoursSeconds < 1 ? sunHoursSeconds.toFixed(1) : Math.round(sunHoursSeconds)}s a rebuild`
@@ -3136,7 +3153,7 @@ export function Sidebar({
                       ? 'Latitude from the raster · true north from its rows'
                       : 'No georeference — the latitude is the one above'}</div>
                     <div>Shadows follow the terrain as exaggerated, not as surveyed</div>
-                    <div style={{ color: (terrain.elevScale ?? 0) !== 0 ? '#f97316' : MUTED }}>
+                    <div style={{ color: (terrain.elevScale ?? 0) !== 0 ? WARN : MUTED }}>
                       {(terrain.elevScale ?? 0) !== 0
                         ? `Exaggeration is ${terrain.elevScale > 0 ? '+' : ''}${terrain.elevScale.toFixed(1)} — set it to 0 for true hours`
                         : 'Exaggeration is 0 — the hours are the ground’s own'}
@@ -3159,11 +3176,11 @@ export function Sidebar({
                     {['rows', 'both'].map(m => (
                       <Btn key={m} block variant="toggle" on={style.axesZeroCross === m}
                         onClick={() => ss({ axesZeroCross: m })}
-                        style={{ fontSize:10, padding:'3px 0', borderRadius:2, textTransform:'uppercase' }}>{m}</Btn>
+                        style={{ fontSize:10.5, padding:'3px 0', borderRadius:4, textTransform:'capitalize' }}>{m}</Btn>
                     ))}
                   </div>
                 </Sub>
-                <ModeStyleOverride prefix="ZeroCross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+                <ModeStyleOverride prefix="ZeroCross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
             )}
           </Section>
@@ -3202,7 +3219,7 @@ export function Sidebar({
                   </div>
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRetic} onChange={v => ss({ seedRetic: v })} />
                 </Sub>
-                <ModeStyleOverride prefix="Retic" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="DOT STYLE" showDash={false} />
+                <ModeStyleOverride prefix="Retic" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
             )}
           </Section>
@@ -3228,7 +3245,7 @@ export function Sidebar({
                   earth the terrain is — so it needs a georeferenced raster.
                 </div>
                 <button className="hmload" data-testid="vector-load-geotiff" onClick={loadGeoTiffFromPicker}
-                  style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa',
+                  style={{ width:'100%', padding:8, background: SURF, color:MUTED,
                            border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
                   ↑ GeoTIFF
                 </button>
@@ -3314,7 +3331,7 @@ export function Sidebar({
                         {fa.isAnalyzing ? (
                           <div style={{ fontSize:10, color:MUTED, marginBottom:8 }}>Analysing… {fa.progress}%</div>
                         ) : fa.error ? (
-                          <div style={{ fontSize:10, color:'#f87171', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
+                          <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
                             {fa.error}
                           </div>
                         ) : null}
@@ -3327,12 +3344,12 @@ export function Sidebar({
                                 Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
                               </div>
                             ) : (
-                              <div style={{ fontSize:10, color:'#f59e0b', background:'rgba(245,158,11,0.1)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
+                              <div style={{ fontSize:10, color:WARN, background:WARN_BG, border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
                                 No track loaded — the flock has nothing to listen to.
                               </div>
                             )}
                             <button className="hmload" onClick={fa.loadFromPicker} disabled={fa.isAnalyzing}
-                              style={{ width:'100%', padding:8, background: SURF, color:'#a1a1aa', border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}>
+                              style={{ width:'100%', padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}>
                               ↑ Load audio
                             </button>
                           </>
@@ -3508,7 +3525,7 @@ export function Sidebar({
 
           <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
                    enabled={summaries['Mirror'] !== '—'}>
-            <div style={{ fontSize:10, color:MUTED, fontWeight:700, marginBottom:12, letterSpacing:1, textAlign:'center' }}>3D SYMMETRY (6-WAY)</div>
+            <div style={{ fontSize:11, color:DIM, fontWeight:600, marginBottom:12, textAlign:'center' }}>3D symmetry, six ways</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />
               <button title="Mirror Up (+Y)" className={`sym-btn${style.showMirrorPlusY ? ' on' : ''}`} onClick={() => ss({ showMirrorPlusY: !style.showMirrorPlusY })}>▲<div className="sym-label">+Y</div></button>
@@ -3562,7 +3579,7 @@ export function Sidebar({
                     further across the screen than a far one — so an orthographic
                     camera gives a rigid double image with no depth in it. */}
                 <div data-testid="anaglyph-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
-                  <div style={{ color: view.orthographic ? '#f97316' : MUTED }}>
+                  <div style={{ color: view.orthographic ? WARN : MUTED }}>
                     {view.orthographic
                       ? 'Orthographic — no depth. Switch the camera to perspective.'
                       : 'Depth comes from the perspective camera'}
@@ -3650,12 +3667,12 @@ export function Sidebar({
                     already uses for `assumed UTM`. */}
                 <div data-testid="mark-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
                   {!mapScale ? (
-                    <span style={{ color:'#f97316' }}>
+                    <span style={{ color:WARN }}>
                       No georeference — load a GeoTIFF and the bar can be measured.
                     </span>
                   ) : (<>
                     <div>{`${formatDistance(niceDistance(barTargetMetres) ?? 0)} bar · ${mapScale.metresPerPixel.toFixed(2)} m per pixel`}</div>
-                    <div style={{ color: (view.tilt ?? 0) < 6 ? MUTED : '#f97316' }}>
+                    <div style={{ color: (view.tilt ?? 0) < 6 ? MUTED : WARN }}>
                       {(view.tilt ?? 0) < 6
                         ? 'plan view — the bar is exact'
                         : `tilted ${Math.round(view.tilt)}° — measured at the centre, approximate elsewhere`}
@@ -3775,9 +3792,9 @@ export function Sidebar({
               onClick={() => onProfileMode?.(!profileMode)}
               style={{
                 width:'100%', padding:'8px 0', borderRadius:5, cursor:'pointer', fontSize:11,
-                background: profileMode ? '#1d4ed8' : SURF,
-                color: profileMode ? '#fff' : '#a1a1aa',
-                border: `1px solid ${profileMode ? '#3b82f6' : BORDER}`,
+                background: profileMode ? ACCENT_DEEP : SURF,
+                color: profileMode ? ON_ACCENT : MUTED,
+                border: `1px solid ${profileMode ? ACCENT : BORDER}`,
               }}
             >
               {profileMode
@@ -3815,7 +3832,7 @@ export function Sidebar({
                 frozen soundscape both clear geoTiffCRS, so this line stays absent
                 for them rather than claiming a CRS they do not have. */}
             {geoTiffCRS && (
-              <div style={{ marginTop:2, color: crsInfo.supported ? MUTED : '#f97316', wordBreak:'break-word' }}>
+              <div style={{ marginTop:2, color: crsInfo.supported ? MUTED : WARN, wordBreak:'break-word' }}>
                 Projection: {crsDisplayName(geoTiffCRS, geoTiffCRSName)}
                 {crsInfo.accuracy === 'guess'   && ' · assumed UTM'}
                 {crsInfo.accuracy === 'approx'  && ' · datum shift not applied'}

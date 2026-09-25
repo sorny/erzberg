@@ -12,7 +12,7 @@ import { CoverPlate, PaintedMasks } from './filter'
 import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
 import { GradientPicker } from '../GradientPicker'
-import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, MUTED, SegGroup, Sub, Tog } from './ui'
+import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, SegGroup, Sub, Tog } from './ui'
 
 /**
  * Which land-cover classes this layer is allowed to mark.
@@ -35,7 +35,7 @@ function CoverMaskRow({ prefix, style, ss }) {
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>LAND COVER</span>
+        <span style={{ fontSize: 11, color: DIM, fontWeight: 600 }}>Land cover</span>
         <span style={{ fontSize: 10, color: mask === ALL_CLASSES ? DIM : ACCENT_DEEP }}>
           {describeMask(mask, classes)}
         </span>
@@ -106,7 +106,7 @@ function PaintedMaskRow({ prefix, style, ss }) {
   return (
     <div style={{ marginTop: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-        <span style={{ fontSize: 10, color: MUTED, fontWeight: 700, letterSpacing: 1 }}>MASKS</span>
+        <span style={{ fontSize: 11, color: DIM, fontWeight: 600 }}>Masks</span>
         <span style={{ fontSize: 10, color: selection ? ACCENT_DEEP : DIM }}>
           {describeSelection(selection, masks)}
         </span>
@@ -144,11 +144,11 @@ function PaintedMaskRow({ prefix, style, ss }) {
 // modes switch hypsometric off because they ink from their own table, and every
 // one of them is still a draw mode built from the terrain grid and so still
 // maskable. The empty prefix is the vector-layer call, and only that one.
-export function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', gradientStops, setGradientStops }) {
+export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>{label}</div>
+      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>{label}</div>
       {/* A mode that inks every mark from its own table has no base colour to
           show: Riso's three separations each carry their own, and a swatch here
           would be a control that changes nothing. */}
@@ -162,7 +162,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', sho
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
 
       {showDash && (
-        <SegGroup label="Dash" uppercase
+        <SegGroup label="Dash" capitalize
           options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
           value={style[`dash${prefix}`]} onChange={(d) => ss({ [`dash${prefix}`]: d })}
           style={{ marginTop: 8 }} />
@@ -192,7 +192,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'LINE STYLE', sho
                 hidden behind enabling fill in Terrain Style. */}
             {gradientStops && setGradientStops && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, marginBottom: 4, letterSpacing: 1 }}>GRADIENT · SHARED BY ALL HYPSO LAYERS</div>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Gradient, shared by every hypsometric layer</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>

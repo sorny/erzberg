@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import ErosionWorker from '../../utils/erosion.worker?worker'
-import { ACCENT, BORDER, DIM, InlineSl, Section, SURF, Sub } from './ui'
+import { ACCENT, BORDER, DANGER_BG, DANGER_TEXT, DIM, InlineSl, ON_ACCENT, SURF, Section, Sub } from './ui'
 
 export function ErosionSection({ open, onToggle }) {
   const [eIters,     setEIters]     = useState(50000)
@@ -141,7 +141,7 @@ export function ErosionSection({ open, onToggle }) {
         <InlineSl label="Evaporation" help="Droplet shrinkage rate." min={0.001} max={0.1} step={0.001} value={eEvap} onChange={v => setEEvap(v)} fmt={v => v.toFixed(3)} />
       </Sub>
       <div style={{ display:'flex', gap:4 }}>
-        <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:'#fff', border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
+        <button onClick={handleRunErosion} disabled={!heightmapPixels || isEroding} style={{ flex:2, padding:'8px 0', background: ACCENT, color:ON_ACCENT, border:'none', borderRadius:5, cursor: (heightmapPixels && !isEroding) ? 'pointer' : 'default', fontSize:11, fontWeight:600, opacity: (heightmapPixels && !isEroding) ? 1 : 0.5 }}>{isEroding ? `Eroding… ${erosionProgress}%` : 'Run Erosion'}</button>
         {/* Cancel takes Undo's place while a run is live — the two are never
             useful at the same moment, and the row keeps its shape. */}
         {isEroding ? (
@@ -153,8 +153,8 @@ export function ErosionSection({ open, onToggle }) {
       </div>
       {erosionError && (
         <div data-testid="erosion-error" role="status" style={{
-          marginTop: 6, fontSize: 10, lineHeight: 1.45, color: '#fca5a5',
-          background: 'rgba(153,27,27,0.18)', border: '1px solid #7f1d1d',
+          marginTop: 6, fontSize: 10, lineHeight: 1.45, color: DANGER_TEXT,
+          background: DANGER_BG, border: '1px solid #7f1d1d',
           borderRadius: 4, padding: '5px 7px',
         }}>Erosion failed — {erosionError}</div>
       )}

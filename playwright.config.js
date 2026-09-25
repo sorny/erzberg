@@ -23,7 +23,7 @@ const LIGHT = [
   'no-third-party.spec.js', 'opening-preset.spec.js', 'osm-detail.spec.js',
   'osm-progress.spec.js', 'projection.spec.js', 'retro.spec.js',
   'runtime.spec.js', 'section-reset.spec.js', 'section.spec.js',
-  'session.spec.js', 'terrain-fetch.spec.js', 'zero-crossings.spec.js',
+  'session.spec.js', 'terrain-fetch.spec.js', 'theme.spec.js', 'zero-crossings.spec.js',
 ]
 
 export default defineConfig({

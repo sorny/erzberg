@@ -30,6 +30,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { fillAll, invert, stamp, stroke } from '../utils/maskLayers'
 import { MaskPanel } from './MaskPanel'
 import { useBackdrop } from '../hooks/useBackdrop'
+import { DESK, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, TEXT, VEIL } from './panel/ui'
+import { THEME_EVENT } from '../utils/theme'
 
 /** Tools, and the one letter each answers to. The panel draws the buttons;
  *  this is only the keyboard map. */
@@ -230,6 +232,11 @@ export function MaskStudio({
   useEffect(() => { fit() }, [fit])
   useEffect(() => { draw() })
   useEffect(() => {
+    const redraw = () => drawRef.current()
+    window.addEventListener(THEME_EVENT, redraw)
+    return () => window.removeEventListener(THEME_EVENT, redraw)
+  }, [])
+  useEffect(() => {
     const onResize = () => fit()
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
@@ -346,7 +353,7 @@ export function MaskStudio({
     <div ref={wrapRef} data-testid="mask-studio"
       style={{
         position: 'absolute', inset: 0, right: rightInset,
-        background: '#0b0d10', overflow: 'hidden', zIndex: 20,
+        background: DESK, overflow: 'hidden', zIndex: 20,
       }}>
       <canvas ref={canvasRef}
         onPointerDown={onDown} onPointerMove={onMove}
@@ -367,13 +374,13 @@ export function MaskStudio({
           Mode's. The two views are the same kind of thing and now say so. */}
       <div style={{
         position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 2,
-        padding: 3, borderRadius: 10, fontFamily: 'system-ui,-apple-system,sans-serif', fontSize: 11.5, color: '#a1a1aa',
-        background: 'rgba(22,22,26,.78)', border: '1px solid rgba(255,255,255,.09)',
+        padding: 3, borderRadius: 10, fontFamily: FONT, fontSize: 11.5, color: GLASS_TEXT,
+        background: GLASS_BG, border: `1px solid ${GLASS_BORDER}`,
         backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
         boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
         <button onClick={fit} data-testid="studio-fit" style={{
-          background: 'rgba(255,255,255,.08)', color: '#e4e4e7', border: '1px solid rgba(255,255,255,.1)',
+          background: VEIL, color: TEXT, border: `1px solid ${GLASS_BORDER}`,
           borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
         <span style={{ padding: '3px 9px' }}>

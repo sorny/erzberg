@@ -10,6 +10,7 @@
  * with the handlers.
  */
 import { SHORTCUTS } from '../utils/shortcuts'
+import { DIM, MUTED, TEXT } from './panel/ui'
 
 const CARD   = 'rgba(20,20,24,0.94)'
 const BORDER = 'rgba(255,255,255,0.10)'
@@ -19,14 +20,14 @@ function Cap({ children }) {
   // The mouse rows are words rather than keys — "right-drag" in a keycap would
   // be claiming there is a button on the keyboard with that written on it.
   const isWord = /[a-z]{3,}/.test(children) && children !== 'Enter' && children !== 'Space'
-  if (isWord) return <span style={{ color: '#8f8f99', fontStyle: 'italic' }}>{children}</span>
+  if (isWord) return <span style={{ color: MUTED, fontStyle: 'italic' }}>{children}</span>
   return (
     <kbd style={{
       display: 'inline-block', minWidth: 20, textAlign: 'center',
       background: 'rgba(255,255,255,0.07)', border: `1px solid ${BORDER}`,
       borderRadius: 4, padding: '2px 6px',
       fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-      fontSize: 11, lineHeight: 1.4, color: '#e4e4e7',
+      fontSize: 11, lineHeight: 1.4, color: TEXT,
     }}>{children}</kbd>
   )
 }
@@ -53,11 +54,11 @@ export function ShortcutsOverlay({ onDismiss }) {
           display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
           gap: 24, marginBottom: 14,
         }}>
-          <span style={{ fontSize: 13, color: '#e4e4e7', letterSpacing: 0.3 }}>Keyboard</span>
+          <span style={{ fontSize: 13, color: TEXT, letterSpacing: 0.3 }}>Keyboard</span>
           <button onClick={onDismiss} data-testid="shortcuts-close" aria-label="Close"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
-              color: '#8f8f99', fontSize: 13, lineHeight: 1, padding: 2,
+              color: MUTED, fontSize: 13, lineHeight: 1, padding: 2,
             }}>✕</button>
         </div>
 
@@ -70,8 +71,8 @@ export function ShortcutsOverlay({ onDismiss }) {
           {SHORTCUTS.map((g) => (
             <div key={g.group}>
               <div style={{
-                fontSize: 10, textTransform: 'uppercase', letterSpacing: 0.8,
-                color: '#5a5a63', marginBottom: 7,
+                fontSize: 11.5, fontWeight: 600,
+                color: DIM, marginBottom: 7,
               }}>{g.group}</div>
               <table style={{ borderCollapse: 'separate', borderSpacing: '0 4px' }}>
                 <tbody>
@@ -80,7 +81,7 @@ export function ShortcutsOverlay({ onDismiss }) {
                       <td style={{ paddingRight: 12, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
                         {r.keys.map((k) => <Cap key={k}>{k}</Cap>)}
                       </td>
-                      <td style={{ fontSize: 11.5, color: '#c4c4cc', lineHeight: 1.5 }}>
+                      <td style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5 }}>
                         {r.label}
                         {r.note && (
                           <span style={{ color: '#6f6f78' }}>{` — ${r.note}`}</span>
@@ -94,7 +95,7 @@ export function ShortcutsOverlay({ onDismiss }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 16, fontSize: 10.5, color: '#5a5a63' }}>
+        <div style={{ marginTop: 16, fontSize: 10.5, color: MUTED }}>
           Keys are ignored while the cursor is in a text field.
         </div>
       </div>

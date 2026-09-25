@@ -42,7 +42,9 @@ records where they came from anyway.
 
 ## `fonts/` — one licence per face
 
-Space Mono is under the SIL Open Font License 1.1. See `fonts/OFL.txt`. The 49
+Space Mono is under the SIL Open Font License 1.1. See `fonts/OFL.txt`.
+Overpass and Overpass Mono, the panel's text and number faces, are under the
+SIL Open Font License 1.1 too. See `fonts/Overpass-OFL.txt`. The 49
 single-line faces are under the OFL, the Hershey licence, the public domain, the
 WTFPL or MIT. The licence depends on the face. See
 `fonts/single-line/LICENSE.txt`, which carries the full OFL text as the OFL

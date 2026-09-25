@@ -121,7 +121,7 @@ export function AudioMeter({ liveRef, points }) {
         ctx.fillRect(i0 * bw, 0, (i1 - i0) * bw, H_SPECTRUM)
       })
 
-      ctx.fillStyle = '#3f3f46'
+      ctx.fillStyle = HEX.border
       for (let b = 0; b < bins; b++) {
         const v = playing ? data[row + b] : 0
         const h = v * (H_SPECTRUM - 2)
@@ -153,7 +153,7 @@ export function AudioMeter({ liveRef, points }) {
 
       // Overall level, across the full width.
       const ly = yOf(f.level)
-      ctx.strokeStyle = '#e4e4e7'
+      ctx.strokeStyle = HEX.text
       ctx.globalAlpha = 0.5
       ctx.setLineDash([2, 3])
       ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(W, ly); ctx.stroke()
@@ -195,7 +195,7 @@ export function AudioMeter({ liveRef, points }) {
       ctx.textAlign = 'center'
       CHANNELS.forEach(([label, colour], i) => {
         const x = i * (cw + gap)
-        ctx.fillStyle = '#27272a'
+        ctx.fillStyle = HEX.surf
         ctx.fillRect(x, top, cw, barH)
         const v = Math.max(0, Math.min(1, values[i] || 0))
         ctx.fillStyle = colour

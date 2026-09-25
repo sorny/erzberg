@@ -28,12 +28,12 @@
  */
 import { useStore } from '../../store/useStore'
 import { bboxToWgs84, crsDisplayName, groundPixelMetres, wgs84ExtentKm } from '../../utils/geoCoords'
-import { BORDER, DIM, MUTED, SURF } from './ui'
+import { BORDER, DIM, GREEN, MUTED, SURF } from './ui'
 
 /** A lon/lat pair, at the precision a four-kilometre window actually has. */
 const deg = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`
 
-const DOT = { ok: '#22c55e', busy: '#eab308', off: '#52525b' }
+const DOT = { ok: GREEN, busy: '#eab308', off: BORDER }
 
 function Row({ state, name, value, detail, where }) {
   return (
@@ -111,8 +111,7 @@ export function ExtentSection() {
         </div>
       </div>
 
-      <div style={{ fontSize:9, letterSpacing:'.14em', textTransform:'uppercase',
-                    color:MUTED, marginBottom:5 }}>Layers on this extent</div>
+      <div style={{ fontSize:11, fontWeight:600, color: DIM, marginBottom:5 }}>Layers on this extent</div>
 
       <Row state="ok" name="Elevation" value={`${width} × ${height}`}
         detail={provenance || 'Loaded from this machine'} />

@@ -6,7 +6,8 @@
  * - Regions outside the handles are dimmed to show what gets clipped.
  * - Uses pointer capture so dragging outside the canvas still works.
  */
-import { useRef, useMemo, useEffect, useCallback } from 'react'
+import { useRef, useMemo, useEffect, useCallback, useState } from 'react'
+import { HEX, THEME_EVENT } from '../utils/theme'
 
 const W = 256
 const H = 72
@@ -14,6 +15,13 @@ const H = 72
 export function Histogram({ pixels, blackPoint, whitePoint, onBlackChange, onWhiteChange }) {
   const canvasRef = useRef()
   const dragging  = useRef(null)   // 'black' | 'white' | null
+  // A canvas reads colours at draw time, so a theme change has to cause one.
+  const [theme, setTheme] = useState(0)
+  useEffect(() => {
+    const bump = () => setTheme((t) => t + 1)
+    window.addEventListener(THEME_EVENT, bump)
+    return () => window.removeEventListener(THEME_EVENT, bump)
+  }, [])
 
   // Compute 256-bin histogram from raw pixel brightness
   const bins = useMemo(() => {
@@ -37,46 +45,46 @@ export function Histogram({ pixels, blackPoint, whitePoint, onBlackChange, onWhi
     ctx.clearRect(0, 0, W, H)
 
     // Background
-    ctx.fillStyle = '#1a1a1e'
+    ctx.fillStyle = HEX.surf
     ctx.fillRect(0, 0, W, H)
 
     // Histogram bars — colour the clipped regions darker
     for (let i = 0; i < 256; i++) {
       const barH = bins[i] * H
       const clipped = i < blackPoint || i > whitePoint
-      ctx.fillStyle = clipped ? '#383840' : '#7c7caa'
+      ctx.fillStyle = clipped ? HEX.border : HEX.muted
       ctx.fillRect(i, H - barH, 1, barH)
     }
 
     // Dim overlay on clipped regions
-    ctx.fillStyle = 'rgba(0,0,0,0.4)'
+    ctx.fillStyle = HEX.shadow
     ctx.fillRect(0, 0, (blackPoint / 255) * W, H)
     ctx.fillRect((whitePoint / 255) * W, 0, W - (whitePoint / 255) * W, H)
 
     // Shadow handle
     const bx = (blackPoint / 255) * W
-    ctx.strokeStyle = '#bbbbcc'
+    ctx.strokeStyle = HEX.dim
     ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(bx, 0); ctx.lineTo(bx, H); ctx.stroke()
 
     // Triangle marker ▼ for shadow handle
-    ctx.fillStyle = '#bbbbcc'
+    ctx.fillStyle = HEX.dim
     ctx.beginPath()
     ctx.moveTo(bx - 5, 0); ctx.lineTo(bx + 5, 0); ctx.lineTo(bx, 7); ctx.closePath()
     ctx.fill()
 
     // Highlight handle
     const wx = (whitePoint / 255) * W
-    ctx.strokeStyle = '#ffffff'
+    ctx.strokeStyle = HEX.strong
     ctx.lineWidth = 1.5
     ctx.beginPath(); ctx.moveTo(wx, 0); ctx.lineTo(wx, H); ctx.stroke()
 
     // Triangle marker ▼ for highlight handle
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = HEX.strong
     ctx.beginPath()
     ctx.moveTo(wx - 5, 0); ctx.lineTo(wx + 5, 0); ctx.lineTo(wx, 7); ctx.closePath()
     ctx.fill()
-  }, [bins, blackPoint, whitePoint])
+  }, [bins, blackPoint, whitePoint, theme])
 
   // Pointer event helpers
   const xToValue = useCallback((e) => {

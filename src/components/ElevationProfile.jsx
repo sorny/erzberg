@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { PROFILE_A, PROFILE_B } from './ProfileOverlay'
+import { ACCENT, DIM, MUTED } from './panel/ui'
 
 /**
  * Popup chart size. Module scope rather than render scope on purpose: declared
@@ -111,11 +112,11 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
       boxShadow: '0 4px 24px rgba(0,0,0,0.6)', zIndex: 100, userSelect: 'none',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 8 }}>
-        <span style={{ color: '#aaa', fontSize: 11, letterSpacing: 1, textTransform: 'uppercase' }}>Elevation Profile</span>
+        <span style={{ color: DIM, fontSize: 12, fontWeight: 600 }}>Elevation profile</span>
         <button onClick={exportSvg} data-testid="profile-export-svg" title="Save this section as an SVG file"
           style={{
             marginLeft: 'auto', background: 'none', border: '1px solid #3f3f46', borderRadius: 4,
-            color: '#a1a1aa', cursor: 'pointer', fontSize: 10, padding: '3px 8px', letterSpacing: 0.5,
+            color: MUTED, cursor: 'pointer', fontSize: 10, padding: '3px 8px', letterSpacing: 0.5,
           }}>SVG</button>
         <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
       </div>
@@ -126,9 +127,9 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
             stroke="#333" strokeWidth={0.5} />
         ))}
         {/* Fill area */}
-        <path d={fillD} fill="rgba(59,130,246,0.18)" />
+        <path d={fillD} style={{ fill: 'color-mix(in srgb, var(--hm-accent) 18%, transparent)' }} />
         {/* Profile line */}
-        <path d={pathD} fill="none" stroke="#3b82f6" strokeWidth={1.5} />
+        <path d={pathD} fill="none" style={{ stroke: ACCENT }} strokeWidth={1.5} />
         {/* Y-axis labels */}
         {ticks.map(({ y, label }, i) => (
           <text key={i} x={PAD.left - 6} y={y + 4} textAnchor="end"
