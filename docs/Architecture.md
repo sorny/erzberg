@@ -1,7 +1,6 @@
 # Architecture
 
-How a file becomes a picture. Also, which changes are allowed to cost anything,
-which matters as much.
+How a file becomes a picture, and which changes are allowed to cost anything.
 
 ---
 
@@ -35,290 +34,171 @@ which matters as much.
                                    boids flock)
 ```
 
-Everything above the worker line is React. Everything inside the worker is plain
+Everything above the worker is React. Everything inside the worker is plain
 functions over typed arrays, with no framework and no DOM.
 
 ### Lettering, on the main thread
 
-Four passes sit between the worker and the renderer. Every one of them adds
-geometry that the worker cannot make:
+Four passes add geometry that the worker cannot make:
 
 ```
   worker output ──> useVectorIcons   ──> useVectorLabels ──>
                     useContourLabels ──> useTextLayers    ──> lineGeo
 ```
 
-They run here for one reason. A face is *fetched*, not computed, and the worker
-has no fonts. `useVectorIcons` has a second reason: it flattens an SVG through
-the geometry API of the browser, which needs a rendered document.
+They run on the main thread because fonts are fetched and the worker has none.
+`useVectorIcons` also flattens SVG through the browser's geometry API. As a
+result, size, lift and orientation cost a frame, not a rebuild.
 
-That placement is also what makes size, lift and orientation cost a frame rather
-than a worker rebuild. It is what lets a mark follow the camera at all.
+The four passes differ only in where the string and the anchor come from:
 
-The four differ only in where the string and the anchor come from. An icon
-*substitutes* for the dot it is drawn from. A vector label is appended beside the
-mark, and reads its string from the feature. A contour label reads its string
-from the elevation range, and its place from gaps that the worker left. A text
-layer is told both. Free text is appended last, so it draws in front of the plate
-that it annotates.
-
-That split is deliberate. The builders are the part worth a direct test. Several
-specs import them straight from the dev server. Those specs do not infer the
-output of a builder from pixels.
+- An icon replaces the dot it is drawn from.
+- A vector label reads its string from the feature.
+- A contour label reads its value from the elevation, and its place from gaps
+  that the worker left.
+- A text layer is given both. It is appended last, so it draws in front.
 
 ---
 
 ## Undo
 
-`hooks/useHistory.js` snapshots rather than records commands.
+`hooks/useHistory.js` stores snapshots, not commands. A command history needs
+every one of several hundred controls to describe itself, and a forgotten one is
+silently un-undoable. A snapshot is taken from state, so no control can opt out.
+It is cheap because all tracked state is immutable: a snapshot is a list of
+references.
 
-A command history wants every mutation site to describe itself, and there are
-several hundred of them here: every slider, every colour well, every toggle in a
-three-thousand-line panel. Nothing keeps that honest, and the first control that
-somebody forgets to annotate is silently un-undoable.
+Tracked: the four parameter objects, both gradients, the text layers, the
+vector layers and the vector sources.
 
-A snapshot comes from the state itself, so a control cannot opt out of it by
-being written carelessly. It is affordable because everything tracked is already
-immutable. The panel replaces `style` rather than mutating it, so a snapshot is a
-list of references and not a copy. The tracked list is the four parameter
-objects, both gradients, the text layers, the vector layers and the vector
-sources.
+- **A drag is one step.** Changes within `coalesceMs` of the last one belong to
+  the same gesture and do not push again.
+- **A restore is recognised by identity, not by a flag.** The effect compares
+  incoming values with the snapshot the last undo applied. A flag has timing
+  problems in both ways of clearing it.
 
-Two details carry the design:
+## State: three homes
 
-- **A drag is one step.** Changes that arrive within `coalesceMs` of the last one
-  belong to the same gesture and do not push again. The entry already on the
-  stack is the state from before the gesture began, which is the one to go back
-  to.
-- **A restore is recognised by identity, not by a flag.** The effect compares the
-  incoming values against the snapshot that the last undo applied. A flag has
-  timing in it, and both ways of clearing one are wrong: cleared on a microtask
-  it is gone before React runs the effect, so the restore records as a fresh edit
-  and clears the redo stack. Cleared by the effect, it never clears at all when a
-  restore happens to change nothing.
-
-## State: three homes, on purpose
-
-| Where | What lives there | Why |
+| Where | What | Why |
 |---|---|---|
-| **Zustand** (`store/useStore.js`) | The raster: source pixels, mask and dimensions. The Edit Mode clip. The derived raster, after the clip. GeoTIFF metadata, the overlay texture, the vector sources, the painted masks, the land cover plate and any fetched satellite imagery | These are large buffers that many unrelated components read. One selector per field. Thus a load of a texture does not re-render the terrain hook |
-| **React state** (`App.jsx`) | Every parameter you can tune: `terrain`, `style`, `points` and `view`, seeded from `src/defaults.js` | They change constantly during a drag, and they belong to the render tree. Outside the store, they keep the store writes rare. The defaults live in their own module, so the preset randomiser can use them without an import of the root component |
-| **Refs** | Camera echoes, in-flight worker bookkeeping, the Edit Mode drag | These values change per frame. They must never trigger a render |
+| **Zustand** (`store/useStore.js`) | The source raster, the Edit Mode clip, the derived raster, GeoTIFF metadata, the overlay texture, vector sources, painted masks, the cover plate and satellite imagery | Large buffers read by many components. One selector per field, so one load does not re-render unrelated hooks |
+| **React state** (`App.jsx`) | Every tunable parameter: `terrain`, `style`, `points`, `view`, seeded from `src/defaults.js` | They change constantly during a drag and belong to the render tree |
+| **Refs** | Camera echoes, worker bookkeeping, Edit Mode drags | They change per frame and must never render |
 
-The store holds the raster twice. `src*` holds it as loaded. The derived raster
-is what everything downstream reads. See [Edit Mode](Edit-Mode.md) for the
-reason.
+The store holds the raster twice: `src*` as loaded, and the derived raster that
+everything downstream reads. See [Edit Mode](Edit-Mode.md).
 
 ---
 
 ## What costs what
 
-One rule governs this: use the *cheapest mechanism that can express a change*.
-There are three tiers, from the most expensive to the least.
+Use the cheapest mechanism that can express a change. There are three tiers.
 
-**Tier 1. Geometry rebuild, with a worker round-trip.** This covers anything
-that moves a vertex. Resolution, blur and levels do this. So do the elevation
-scale, the elevation cuts, the jitter and the mirroring. So does the spacing,
-angle or threshold of every draw mode. The gradient stops also do, because the
-app bakes them into the vertex colours of a line.
+**Tier 1. Geometry rebuild, with a worker round-trip.** Anything that moves a
+vertex: resolution, blur, levels, elevation scale and cuts, jitter, mirroring,
+the spacing, angle or threshold of every mode, and the gradient stops (baked
+into vertex colours).
 
-`GEOMETRY_KEYS` in `src/params.js` states this set. It is the authority. It
-comes from `defaults.js` and nobody writes it out. Thus it cannot fall behind
-the parameter space that it describes.
+`GEOMETRY_KEYS` in `src/params.js` is the authority for this set. It is derived
+from `defaults.js`, so it cannot fall behind. Vector layers enter this tier only
+through `layerBuildKey`: visibility, area fill and hidden features.
 
-Vector layers sit in this tier only for what moves their geometry, through
-`layerBuildKey`. That covers the visibility of a layer, the area fill, and which
-features are hidden. Their colour, weight, opacity and dash sit in tier 2. This
-is the whole reason the layer panel feels live. You recolour a list of twenty
-OSM layers constantly, and each recolour must not rebuild every draw mode.
+**Tier 2. Re-render only, through uniforms.** Line weight, opacity and dash,
+vector layer colours and fills, the feature highlight, the terrain fill colour,
+and all surface shading (hillshade, slope, water, aspect, AO, raw view).
+`layerStyle(id, p)` resolves these per layer at render time.
 
-**Tier 2. Re-render only, through GPU uniforms.** This tier covers:
+Two exceptions are argued at `RENDER_SIDE` in `src/params.js`:
+`needsSurfaceShading` (no normals or UVs without a fill layer) and
+`depthOcclusion` (the curtains are geometry).
 
-- The weight, opacity and dash pattern of a line.
-- The colour of a vector layer, and the colour and opacity of its area fill.
-- The feature highlight and the terrain fill colour.
-- Hillshade, slope shading, water, aspect, AO and the raw terrain view.
+**Tier 3. Nothing.** The canvas uses `frameloop="demand"`. A camera drag moves
+the camera directly and mirrors into React state on a throttled trailing tick.
 
-`layerStyle(id, p)` resolves these per layer at render time, and the surface
-shader resolves the rest. Thus a drag of any of them never enters the worker.
-
-There are two deliberate exceptions, argued at `RENDER_SIDE` in `src/params.js`.
-`needsSurfaceShading` is one: the app builds no normals and no UVs when no fill
-layer will use them. `depthOcclusion` is the other, because the occlusion
-curtains are geometry.
-
-**Tier 3. Nothing at all.** The renderer uses `frameloop="demand"`. It draws a
-frame only when something invalidates it. A camera interaction moves the camera
-directly and mirrors into React state on a throttled trailing tick. Thus an
-orbit does not re-render the sidebar 60 times a second.
-
-One thing runs per frame on purpose: the murmuration
-([docs](Murmurations.md)). It is a CPU flock, stepped in `useFrame`, which then
-calls `invalidate()` to keep the demand loop alive. `showPoints` gates it, for
-the same reason that it gates the hologram clock. A field that is hidden and
-still animated keeps asking for frames. It pins the renderer at 60 fps to draw
-nothing.
+The murmuration is the one thing that runs per frame on purpose. It steps in
+`useFrame` and calls `invalidate()`. `showPoints` gates it, so a hidden flock
+does not keep the renderer at 60 fps.
 
 ---
 
 ## The worker contract
 
-- **The worker caches the raster.** The raster is by far the largest thing in
-  the payload. An 8k GeoTIFF is a `Float32Array` of 256 MB. It also does not
-  change when a slider moves. Thus the main thread sends the pixels only when
-  the loaded file changes, or when the clip changes. Every other build carries
-  the params object alone.
-- **The worker caches the vector sources the same way.** The reason is sharper
-  here: an OSM fetch over an alpine tile is millions of coordinates. The worker
-  caches their *output* as well, keyed on the params that affect the drape. On a
-  cache hit the reply omits `vectorGeo` completely. The main thread then keeps
-  the arrays that it already holds. It must keep them, because the worker
-  transferred them out and no longer owns them. A `null` value cannot be told
-  apart from "this raster has no vector layers", so the key is absent instead.
-- **The worker caches the cover plate too**, for the raster's reason rather than
-  the vectors': it is a byte per source pixel, and a style slider does not change
-  what the ground is. `null` is a meaningful value on this key — it is how the
-  main thread says the plate was unloaded — so the message carries the key
-  explicitly and `undefined` is what means "unchanged". A new raster orphans the
-  plate, and the worker drops it without being told.
-
-  The *alignment* happens on the main thread, not here, because it depends on
-  the extent and the dimensions rather than on any parameter. It is derived
-  rather than stored: an Edit Mode crop changes the raster under the plate, and
-  a plate flattened onto the old dimensions at load time would go quietly inert
-  the moment that happened — the picture stays plausible and is simply no longer
-  stencilled, which is the worst way for it to fail.
-- **And the mask planes**, on the same terms again: a byte per source pixel
-  each, replaced only when one is painted, imported or removed. They are cropped
-  in `derive()` alongside the pixels rather than re-authored when the clip moves,
-  because they are drawn against the *source* raster — a clip can be cleared at
-  any time and a mask authored against one would be the wrong size the moment it
-  was.
-- **Results come back as transferables.** Thus the main thread never copies the
-  output of a rebuild. This includes the surface normals.
-- **The app coalesces requests. It does not cancel them.** When builds arrive
-  faster than they complete, the app queues the newest request and drops the
-  rest.
-
-  A cancel of each superseded build was catastrophic under a continuous stream.
-  Soundscapes streamed at 30/s into builds of 44 ms and completed 0.2 builds per
-  second. A terminate is the only way to interrupt a synchronous worker, and it
-  also destroys the cached raster. The app now terminates a build only when that
-  build is an outlier against the *measured* recent cadence.
-- **Generation counters** (`_gen`) discard a result whose request is superseded.
-  Thus a slow build cannot overwrite a newer one.
+- **The worker caches the raster.** An 8k GeoTIFF is 256 MB. The main thread
+  sends pixels only when the file or the clip changes.
+- **It caches vector sources**, and their draped output, keyed on the params
+  that affect the drape. On a cache hit the reply omits `vectorGeo`. The key is
+  absent, not `null`, because `null` means "no vector layers".
+- **It caches the cover plate.** Here `null` means "unloaded", so `undefined`
+  means "unchanged". A new raster drops the plate. The alignment runs on the main
+  thread, derived on each change, so an Edit Mode crop cannot leave a stale plate.
+- **It caches the mask planes.** They are cropped in `derive()` with the pixels,
+  because they are drawn against the source raster.
+- **Results come back as transferables**, including normals and a bounding
+  sphere per mesh (`sphereOf`). Without the sphere, three.js walks every vertex
+  on the main thread for the first frustum test after each rebuild.
+- **Requests coalesce. They are not cancelled.** When builds arrive faster than
+  they finish, the newest request waits and the rest are dropped. Cancelling
+  each one meant nothing finished under a continuous stream, and terminating the
+  worker loses its caches. A build is terminated only if it is an outlier
+  against the measured cadence.
+- **Generation counters** (`_gen`) discard stale results.
 
 ---
 
 ## Rendering
 
-`HeightmapLines` draws one `Line2` or `LineSegments2` per layer. With
-hypsometric tinting on, it uses per-vertex colours.
+`HeightmapLines` draws one `Line2` or `LineSegments2` per layer, with
+per-vertex colours when hypsometric tinting is on.
 
-`SurfaceMesh` carries all the fill and overlay work in one shader. The
-hypsometric ramp, hillshade, slope, aspect, sky-view-factor AO, water and the
-raw terrain view are branches inside that shader. They are not separate passes.
-Hillshade can also ray-march its cast shadows.
+`SurfaceMesh` does all fill and overlay work in one shader. Hypsometric ramp,
+hillshade (with optional ray-marched shadows), slope, aspect, AO, water and the
+raw view are branches, not passes.
 
-**Ghost occlusion** is why the line art reads as three-dimensional. Each segment
-also generates an invisible curtain mesh that writes depth. Thus a line is
-occluded by other lines and by the terrain. It does not float over them. The app
-can draw the hidden segments in their own colour, which gives an X-ray effect.
+**Ghost occlusion.** Each segment also makes an invisible curtain that writes
+depth, so lines hide other lines. Hidden segments can draw in their own colour.
 
-**Viewport aids** are the elevation-profile section and its pins, in
-`ProfileOverlay`. They live in the scene graph and not in the DOM, because they
-must sit on the terrain in three dimensions.
-
-That puts them in front of one exporter. SVG and STL read worker geometry and
-cannot see them. The PNG capture renders the scene itself and can. The aids
-carry `userData.viewportOnly`, and that pass hides them. The DOM-based frame
-overlay gets the same bargain for free.
-
-`ProfileOverlay` also owns `uvToWorld`, the inverse of the UV mapping of the
-surface mesh. It is the one place that turns a raycast hit back into a grid
-position and an elevation.
+**Viewport aids** (the profile line and pins in `ProfileOverlay`) live in the
+scene graph. SVG and STL cannot see them. The PNG capture hides them through
+`userData.viewportOnly`. `ProfileOverlay` also owns `uvToWorld`, which turns a
+raycast hit into a grid position and elevation.
 
 ---
 
 ## Presets
 
-A preset is a JSON blob of `{ style, points, gradientStops, bgGradientStops }`.
-Presets live in `public/presets/` and `manifest.json` lists them. The app
-fetches them at startup.
+A preset is `{ style, points, gradientStops, bgGradientStops }`. Presets live in
+`public/presets/`, listed in `manifest.json`.
 
-The *session* is those four fields plus `terrain` and `view`.
-`utils/session.js` writes all six to `localStorage` on a debounce. It seeds
-React state from them at mount.
+The **session** (`utils/session.js`) is those fields plus `terrain`, `view` and
+`textLayers`. It is written to `localStorage` on a debounce with a ceiling, and
+read once at mount. A stored set equal to the defaults reads as no session. The
+raster, `zoom`, the pans and `terrain.resolution` are not stored, because they
+describe the loaded image, not the look.
 
-The debounce has a ceiling as well as a delay. Auto-rotate syncs the camera into
-`view` every 150 ms, and a plain trailing debounce reschedules for ever against
-that. A stored set that matches the defaults reads as no session. A load of the
-sample plate sets `terrain.resolution`, and without that rule the app writes a
-session on every untouched visit.
-
-The raster is not in the session. It can be a typed array of 256 MB against a
-synchronous string store of about 5 MB. `zoom`, the pans and
-`terrain.resolution` are not in it either. All of those describe the loaded
-image and not the look. The app applies them to a raster that they were never
-measured against, which is wrong.
-
-`applyPreset` in `Sidebar.jsx` spreads a preset over the current state. It
-leaves out `terrain` and `view` on purpose. Resolution, zoom and pan describe
-the loaded raster and not the look.
-
-A saved preset also carries `vectorStyles`. That field holds the styling of the
-vector layers and nothing else.
-
-The app strips `hidden` along with the identity fields. `hidden` holds feature
-*indices*, and those mean nothing against a different fetch of the same area. To
-re-apply them hides five arbitrary peaks and not the five that somebody chose. A
-preset is a look and not a data set, so the coordinates stay out of it.
-
-Re-application matches on `bucket` and not on a layer id. Thus the palette of
-last week lands on a fresh fetch of the same valley today. A preset written
-before vector layers existed carries the old flat `*Gpx` params. The app still
-honours those for GPX layers.
+`applyPreset` in `Sidebar.jsx` leaves out `terrain` and `view` for the same
+reason. A preset also carries `vectorStyles`, matched on `bucket`, so last
+week's palette lands on a new fetch of the same valley. `hidden` is stripped,
+because feature indices mean nothing against a different fetch.
 
 ### A preset in every plate
 
-Every PNG and every SVG the app exports carries the whole parameter set inside
-it. `utils/presetFile.js` owns the shape, so the JSON file and the two containers
-cannot drift into carrying different things.
+`utils/presetFile.js` owns the shape.
 
-- **PNG** — a `tEXt` chunk under the keyword `erzberg:preset`, spliced in after
-  `IHDR` beside the OpenStreetMap credit that was already there.
-- **SVG** — a comment above the first mark. An editor shows it, and a plotter
-  never draws it.
+- **PNG**: a `tEXt` chunk `erzberg:preset` after `IHDR`.
+- **SVG**: a comment above the first mark.
 
-The payload is escaped to printable ASCII first. `tEXt` is Latin-1 and drops
-anything it cannot represent, so a layer named in Greek would cost the whole
-preset without a word. An XML comment ends at the first `-->`, so every `-` that
-is followed by another becomes `\u002d` — in valid JSON two minus signs in a row
-can only occur inside a string, where that escape is legal and the parser undoes
-it.
+The payload is escaped to printable ASCII, because `tEXt` is Latin-1. Each `-`
+followed by another becomes `-`, because `-->` ends an XML comment. The
+payload has no field for the raster or its file name. `format: 1` marks the
+shape. `parsePreset` tests for a parameter group, so older files still load.
 
-The raster is not in it, and neither is the *name* of the raster. The promise at
-the top of the README is that your files stay on your machine, and a plate posted
-to a forum is that file leaving by another route. The payload has no field for a
-filename, which is a stronger guarantee than remembering to strip one.
+Two things come from the preset set and are not written by hand:
 
-`format: 1` says what shape it is. A preset written before this existed has no
-such field and is still a preset, so `parsePreset` tests for a parameter group
-rather than for the announcement.
-
-The app generates two things from that set. Nobody writes them by hand:
-
-- **Thumbnails**, from `npm run thumbs`. There is one WebP per preset in
-  `public/presets/thumbs/`. The app's own PNG exporter renders them, so no panel
-  and no gizmo is in frame. A missing thumbnail falls back to a text button.
-  Thus the sidebar never shows a broken image.
-- **Rolled looks**, from `src/utils/presetGenetics.js`. `randomPreset(seed)`
-  builds the same shape from a seeded RNG. It is a recipe and not a shuffle. It
-  picks the surface first. It then draws modes against the `cost` budget in
-  `drawModes.js`, then a palette, then one surface overlay at most. It checks
-  the ink against the luminance of the background. The seed is what makes a roll
-  reproducible, and that is why the history behind the ↩ button is a list of
-  integers.
+- **Thumbnails** from `npm run thumbs`, one WebP per preset, rendered by the PNG
+  exporter. A missing one falls back to a text button.
+- **Rolled looks** from `randomPreset(seed)` in `presetGenetics.js`: surface
+  first, then modes against the `cost` budget in `drawModes.js`, then a palette
+  and at most one overlay, with an ink contrast check.
 
 ---
 
@@ -326,206 +206,93 @@ The app generates two things from that set. Nobody writes them by hand:
 
 | Exporter | Reads | Note |
 |---|---|---|
-| SVG | `lineGeo` and `surfaceGeo` | Projects on the CPU with its own software Z-buffer. Thus the occlusion matches the viewport without a GPU readback. An area mode also ships `areas`, and exports as filled polygons |
-| PNG / PNG α | The scene | Rendered offscreen into a 4× render target, then trimmed to the content through the alpha channel |
-| STL | `surfaceGeo` | Computes its own facet normals. It must skip vertices parked at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
-| Heightmap PNG | `terrain.grid` | The processed raster, after resolution and levels |
-| WebM | The live canvas | `MediaRecorder` on the canvas stream, with the ODbL credit spliced into the Matroska container |
-| Profile SVG | `profileData` | Written from the same `chartGeometry()` that the popup draws, at export size and in an ink-on-paper palette |
+| SVG | `lineGeo`, `surfaceGeo` | CPU projection with a software Z-buffer, so occlusion matches the viewport without a GPU readback. Area modes export filled polygons |
+| PNG / PNG α | The scene | Offscreen 4× render target, trimmed by alpha |
+| STL | `surfaceGeo` | Own facet normals. Skips vertices at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
+| Heightmap PNG | `terrain.grid` | After resolution and levels |
+| WebM | The live canvas | `MediaRecorder`, with the ODbL credit spliced into the Matroska header |
+| Profile SVG | `profileData` | The same `chartGeometry()` as the popup |
 
-Every exporter reads the *derived* terrain. Thus the features upstream of it
-need no support in any exporter. Edit Mode clips, erosion, the mirror and
-soundscapes are all upstream of it.
+Every exporter reads the derived terrain, so upstream features (clip, erosion,
+mirror, soundscapes) need no exporter support.
 
-### Preflight is the export
-
-The stated audience of this tool is a pen plotter, and until v1.13 nothing said
-what a plot would cost. Two numbers decide whether a plot takes twenty minutes
-or ninety: the ink laid down, which the drawing fixes, and the distance the
-carriage covers between strokes with the pen in the air.
+### Preflight
 
 *Preflight* runs `exportSVG` with `measureOnly: true`. It builds the whole file
-and writes none of it.
-
-That is deliberate and it is not wasteful. The only way to know what a plot costs
-is to measure the file the plotter will be given — after the occlusion walk has
-cut the strokes and the paper frame has clipped them, and after `joinRuns` has
-folded the two-point pieces back into whole pen strokes. Anything cheaper is a
-guess about a different drawing.
-
-The numbers are cleared whenever `lineGeo` or `view` changes identity. A figure
-that describes a plate you are no longer looking at is worse than no figure,
-because it looks exactly like one that does.
+after occlusion, frame clip and `joinRuns`, and writes nothing. Anything cheaper
+measures a different drawing. The figures clear when `lineGeo` or `view`
+changes.
 
 ### Pen order
 
-`utils/penRoute.js` re-orders the strokes inside a pen layer by greedy nearest
-neighbour over their endpoints, against a uniform grid sized for about one
-endpoint per cell. Each step takes the nearest unvisited endpoint and draws that
-stroke from it, so a stroke whose tail is nearer is drawn backwards.
+`utils/penRoute.js` orders strokes inside a pen layer by greedy nearest
+neighbour on a uniform grid. A stroke whose far end is nearer is drawn
+backwards. The ring search stops one ring after the first candidate, which
+makes it near-linear: 40 000 strokes in 37 ms. On the sample plate, pen-up
+travel falls from 52.4 m to 1.4 m.
 
-The ring search stops one ring after it has a candidate: a ring at Chebyshev
-distance $k$ cannot hold anything closer than $(k-1)\cdot\text{cell}$. That is
-what makes it near-linear. Measured on 40 000 synthetic strokes, the travel falls
-from 26.6 M px to 67 k px in 37 ms. On the sample plate the pen-up travel falls
-from 52.4 m to 1.4 m.
+- Filled areas are never re-ordered. Their paint order decides what covers what.
+- The switch is off by default. Where two inks cross, order decides which is on
+  top.
 
-Two limits are structural rather than cautious:
+### Area modes export filled polygons
 
-- **Filled areas are never re-ordered.** An area layer's paint order decides what
-  covers what, and re-ordering it puts a lake on top of the contours that should
-  cross it.
-- **The switch is off by default.** Where two strokes of *different* colours
-  cross, the order decides which ink is on top — on screen and on paper alike. It
-  is the user's decision, and the preflight prints what it would save so the
-  decision is informed.
+Indexed, Mineral, Land cover and Watershed paint blocks of colour. `fillCells`
+ships the lattice it painted (ink and height per cell), and
+`utils/areaRings.js` walks it into closed rings. The exporter writes one
+`<path>` per ink in its own pen layer, and drops the mode's line layer.
 
-### The area modes export filled polygons
+- The lattice is built in the worker, next to the fills.
+- The ring walk is in the exporter, because the depth test needs the camera.
+- The clip is a polygon clip. A segment clip leaves shapes open.
 
-Indexed, Mineral and Watershed paint blocks of colour, and a fill is not a
-stroke. They used to leave as unordered boundary edges: enough to look at, and
-nothing to plot, because an editor had no closed shape to select.
+Vector layer area fills are not exported. They are triangles with no ring
+topology.
 
-The `lids` mesh is the wrong input, because a triangle soup has no outline. So
-`fillCells` also ships the lattice it painted. That is one entry per cell, with
-the ink and the height. `utils/areaRings.js` then walks it into closed rings by
-boundary following. The exporter writes one `<path>` per ink, each in its own
-Inkscape pen layer, and drops that mode's line layer: a traced ring is the same
-boundary edges in order, so writing both puts the geometry in the file twice.
+### Screen ink
 
-Three parts of this live where they do for a reason:
+The R3F canvas applies ACES filmic tone mapping and an sRGB encode. `screenInk`
+in `utils/svgExport.js` applies the same two steps, so SVG colours match the
+screen: Jet's `#800000` renders as `#ca0006`. Two facts were measured:
 
-- **The lattice is built in the worker**, beside the fills it describes, and its
-  arrays ride the same transfer list.
-- **The ring walk is in the exporter**, not in the worker, because the depth test
-  that decides which cells to hand it needs the camera.
-- **The clip is a polygon clip**, not the segment clip the lines use. Cutting a
-  filled area edge by edge leaves the shape open and the paint runs out of it.
+- Per-vertex and material colours come out the same.
+- The background is not tone mapped (`setClearColor`), so `bgColor` and the
+  gradient stops are written raw.
 
-The vector layers' own area fills are still not exported. Those arrive as
-triangles with no ring topology, which is the problem this solves for the draw
-modes and does not solve for them.
+`tests/unit/screen-ink.test.js` pins four pairs read from the running app.
 
-### An ink is not the number it was written as
+### Credits
 
-The `<Canvas>` comes from React Three Fiber, which gives it ACES filmic tone
-mapping and an sRGB output encode. `App.jsx` overrides neither, so every fragment
-the renderer draws passes through both on its way to a pixel.
+`workAttribution()` in `attribution.js` decides which credits a file owes, for
+every exporter. OSM counts when a layer with OSM features is visible. A cover
+plate counts when the Land cover mode inks it or a layer carries a class mask.
 
-The SVG exporter wrote the raw number, so the file and the viewport disagreed.
-They disagreed most where a colour was bright and saturated, because that is
-where the tone curve does the most work. Jet's top stop is `#800000`, and the
-screen shows it as `#ca0006` — a deep red on screen, a brown in the file. Black
-line art was never affected, because the curve maps 0 to 0, which is why this
-stood for so long.
+| Format | Where the credit goes |
+|---|---|
+| SVG | XML comment |
+| PNG | `tEXt` chunk after `IHDR` |
+| STL | 80-byte header, ribbons file only, when an OSM layer made a ribbon |
+| WebM | Matroska `Tags` before the first Cluster, plus a spoken notice |
 
-`screenInk` in `utils/svgExport.js` applies the same two steps. Two things were
-measured rather than assumed, and both changed the answer:
+Nothing is drawn into the picture. The WebM tag must precede the first Cluster:
+Chrome writes the Segment with unknown size, so demuxers stop parsing headers
+there, and a tag at the end is never read.
 
-- **A per-vertex colour and a flat material colour come out the same.** Under
-  colour management a material colour arrives converted from sRGB, and the
-  exporter then needs two transforms. That is not what happens here.
-- **The background is not tone mapped.** It arrives through `setClearColor`
-  rather than through a fragment shader. White paper stays `#ffffff` while white
-  *geometry* renders `#e2e2e2`, so `bgColor` and the gradient stops are written
-  raw.
+### Pacing
 
-`tests/unit/screen-ink.test.js` pins four pairs read off the running app, not
-off the shader source.
+The SVG and STL exporters are long CPU jobs. Both yield about every 24 ms
+through `utils/pacing.js`, report progress and check for cancel. On the default
+plate the longest stall fell from 242 ms to 39 ms (SVG) and from 122 ms to
+47 ms (STL).
 
-### Every credit goes wherever its data does
+- `scheduler.yield()` resumes before rendering, so the frame never lands. A
+  `MessageChannel` task boundary lets the browser paint.
+- `due()` is cheap and synchronous, so check it nearly every iteration. A clock
+  check every 256 items gave 122 ms stalls.
 
-OpenStreetMap data is ODbL. Section 4.3 attaches the notice to the *Produced
-Work* and not to the application. A cover plate is CC-BY, which binds the same
-way. Thus the question is never "is this loaded". The question is "is this in
-the file".
-
-`workAttribution()` in `attribution.js` answers that for every exporter, and it
-is one module rather than a line at each export site because `osmFetch.js`
-records how it went the other way: four exporters asked in four ways, and three
-of them came to answer differently — the SVG credited while PNG, STL and WebM
-silently did not.
-
-It asks two things. OpenStreetMap features count when a layer carrying them is
-*visible*. A cover plate counts when the Land cover mode inks it, or when any
-other layer carries a class mask — a masked layer is shaped by the plate, its
-marks stop where a class stops, and that is derivation just as surely. A loaded
-plate that nothing draws from earns no credit, for the same reason a hidden
-layer does not.
-
-Each format takes the credit where the format provides for one:
-
-- The SVG takes an XML comment.
-- The PNG takes a `tEXt` chunk after `IHDR`.
-- The binary STL takes its 80-byte header.
-- The WebM takes a Matroska `Tags` element.
-
-The app draws nothing into the picture. A credit burned into the pixels is a
-change to the artwork. A licence obligation does not get to make that change for
-the user.
-
-Two of the four are narrower than the rest, on purpose.
-
-The STL **plate** is the terrain surface and never contains OSM data. Thus only
-the ribbons file gets the credit. It gets the credit only when a layer that
-contributed a ribbon came from OpenStreetMap. That is not the same as an OSM
-layer being visible. Ribbons default to GPX, and they reach an OSM layer only
-when somebody switches one on.
-
-The WebM carries a spoken notice as well as a written one. `ffprobe` reads a
-Matroska tag. Very little that a viewer opens reads one.
-
-The WebM credit needed measurement. Chrome writes the Segment with an unknown
-size, as live recording requires. Thus nothing records a length that an
-insertion invalidates.
-
-That also means a demuxer has no length to seek against and no SeekHead to
-consult. It parses header elements only until the first Cluster. A `Tags`
-element appended to the end of the file is well-formed Matroska that **nothing
-reads**. ffprobe reported no tag at all until the element moved ahead of the
-first Cluster. A notice that nothing reads is worse than no notice, because it
-looks like somebody met the obligation.
-
-### The SVG and STL exporters pace themselves
-
-These two run long enough to matter, and both are pure CPU. The SVG exporter
-runs a software Z-buffer plus an occlusion walk that samples each segment up to
-64 times. The STL exporter writes a few hundred thousand triangles, one float at
-a time. As a single block, either one gives the browser a tab to offer to kill.
-
-Both now hand the main thread back about every 24 ms, through the shared pacer
-in `utils/pacing.js`. They report how far along they are. They also ask whether
-the user has given up.
-
-These are the measured times on the default plate. Neither exporter is slower
-overall:
-
-| Exporter | Before | After |
-|---|---|---|
-| SVG | 242 ms | 39 ms |
-| STL, at the finest resolution | 122 ms | 47 ms |
-
-They share one overlay and one export slot. They claim the slot through a ref
-and not through state. A state updater runs on the next render. Thus two
-triggers in the same tick both find the slot empty and both start.
-
-Two things about the pacing are easy to get wrong, and both were wrong first:
-
-- **`scheduler.yield()` is not the right primitive**, although it is the modern
-  one. It resumes the caller as a continuation, *ahead of rendering*. Thus the
-  work interleaves but the frame never lands. Measured: an export paced only
-  through it still froze the page for 121 ms at a stretch. A `MessageChannel`
-  message is an ordinary task boundary, and the browser paints across it. That
-  gives 39 ms.
-- **A time budget is kept only as finely as you check it.** A check of the clock
-  on every 256th item sounds thrifty. Then 256 segments at 64 samples each turn
-  out to be 100 ms, and a budget of 24 ms produces stalls of 122 ms. Thus the
-  pacer splits in two. `due()` is cheap and synchronous, and you can ask it on
-  nearly every iteration. `yield()` is async and allocates only when it yields.
-
-The flock loops stay unpaced, on purpose. They read the *live* particle buffers.
-A pause mid-pass splices two different moments of the animation into one
-picture.
+The two exporters share one slot, claimed through a ref, so two triggers in one
+tick cannot both start. The flock export is not paced, because it reads live
+buffers.
 
 ---
 
@@ -533,213 +300,120 @@ picture.
 
 ### A stencil
 
-Both of them are already wired. `maskedTerrain` in `geometryBuilders.js` folds
-two sources of thinning into a layer's `gridMask` — the cover class selection
-and the union of its painted masks — and every builder already gates on that
-mask, because a GeoTIFF with a void in it has always been possible.
-
-A third source would be a third `continue` in the same loop and nothing else.
-
-### A surface overlay that is not a fill
-
-`hasFillLayer` decides whether the surface mesh is *drawn* and
-`needsSurfaceShading` whether it is built with normals and UVs. Anything painted
-by the surface shader has to appear in both, and the satellite drape is the case
-that proves why: with neither flag set it put a texture on a mesh nobody could
-see, and with only the first it would have sampled `vUv` on a mesh that had
-none — one flat colour over the whole terrain.
-
-### A draw mode that reads land cover
-
-Nothing. Every builder already gates on `gridMask`, because a GeoTIFF with a
-void in it has always been possible, so a class filter is the same question
-asked of a mask with more zeros in it. `maskedTerrain` in `geometryBuilders.js`
-shallow-clones the terrain with a thinned mask and hands that to the builder;
-the builder never learns land cover exists. See
-[docs/Land-Cover.md](Land-Cover.md#how-masking-works) for why only `gridMask` is
-rebuilt and the frame — `halfW`, `minElev`, `maxSlope` — is not.
-
-A mode that wants to *ink* from the plate rather than be stencilled by it reads
-`terrain.gridClass` and `terrain.classColors`, both of which `buildTerrain`
-carries onto the grid with the same subsample the elevation took.
-
-### A draw mode
-
-1. Write a builder in `geometryBuilders.js`. It returns `{ positions, colors }`.
-   For separate pens, return an object of *sub-layers* instead. Contours ship
-   their major and minor lines this way.
-2. Register the builder in `MODES_CONFIG`, inside `buildLineGeometry`.
-3. Add a `layerStyle` case for each sub-layer.
-4. Add the params of the mode to `STYLE_DEF` in `src/defaults.js`.
-5. Add an entry in `src/utils/drawModes.js`. This entry is what teaches the
-   randomiser that the mode exists.
-6. Add a `<Section>` in `Sidebar.jsx`, among the other modes in the Marks stage.
-7. Add a mark in `panel/modeMarks.jsx`. Draw it at 22×13. Draw the defining
-   gesture of the mode and not a picture of terrain. The mark appears twice: on
-   the tile in the sheet, and on the header of the section it opens.
-8. Add a line in `SECTION_TERMS`. See "A panel section" below.
-9. Add a line in `PANEL_MODES` in `panel/sectionSummary.js`, which is where the
-   order of the modes is written down. The sheet renders from it, and so does
-   the stage index, so a mode listed there needs no entry in `panel/stages.js`.
-
-**The rebuild dependency list is no longer a step.** It was a step once, and to
-forget it was the classic bug: the control moved and nothing happened.
-`src/params.js` now derives the rebuild key from `defaults.js`. Thus the params
-of a new mode are covered the moment that they exist.
-
-Two quieter traps replaced that one step. Both now fail at module load, so
-nobody has to discover them:
-
-- The app builds the key by *excluding* the render-side params by regex. Several
-  of those patterns are unanchored prefixes: `fill`, `point`, `pan`, `rotation`,
-  `frame` and `texture`. A geometry param named `fillTruss` or `rotationBitplane`
-  matches one, gets classified as render-side, and never enters the key.
-  `params.js` now cross-checks every mode-suffixed key against the registry in
-  `drawModes.js`. It throws at import and names the offender.
-- `geometryKey` builds a *string*. Thus a non-scalar default stringifies to
-  `[object Object]`, and the key goes blind to every edit inside it. An array of
-  band gains does this. So does a list of light positions. This is why
-  `gradientStops` sits in `GEOMETRY_NON_SCALAR`, where the app depends on it by
-  identity. A non-scalar default that is not declared there now throws at import
-  too. Give the array flat names, such as `gain0Bandsplit` to `gain5Bandsplit`,
-  or declare it.
-
-### A button
-
-Use `Btn` from `panel/ui.jsx`. `variant` carries the look: `quiet`, `ghost`,
-`primary` or `toggle`. `style` carries the geometry, which is genuinely per row.
-
-Do not re-specify the background, the colour and the border by hand. That is how
-the panel came to hold four button radii.
-
-### A label face
-
-An outline face comes from `scripts/build-font.js`. The app samples it at
-runtime.
-
-A single-line face comes from `scripts/build-single-line-fonts.js`. The app does
-*not* sample it. These faces arrive pre-flattened. Every `M` in a stroke font is
-the pen that lifts, and a sampler must guess at what the data states outright.
-
-Both kinds live in one key space. A stroke face sits behind an `sl:` prefix.
-Thus "which faces does this scene need" stays one set.
-
-### A colour
-
-1. Add the colour to `RAW` in `panel/ui.jsx`.
-2. Publish it in the `:root` block beside the others.
-3. Export it as a `var()` reference.
-
-Use `HEX` only for a consumer that a custom property cannot serve. A 2D canvas
-is one such consumer. A value that needs an alpha suffix appended is another.
-
-### A panel section
-
-Add the title of the section, and the words that it must answer to, in
-`SECTION_TERMS` in `panel/sectionTerms.js`. `panel.spec.js` counts the rendered
-sections against that index. Thus an entry with no section fails there, and so
-does a section with no entry. Neither goes unnoticed.
-
-The index is stated and not scraped from the rendered tree. The parameters of a
-mode mount only once that mode is on. A section that you cannot find while it is
-switched off is unfindable exactly when you look for it.
-
-Then name the stage that holds it, in `STATED` in `panel/stages.js`. The panel
-shows one stage at a time, so this is what puts the section in a pane. A section
-left out of that index renders in no pane at all, which is a control that exists
-and cannot be reached. A draw mode needs no entry: `PANEL_MODES` already lists
-the modes, and every one of them is in Marks — but it does need a family, in
-`panel/markFamilies.js`, or it vanishes from the sheet.
-
-Five indexes now describe the panel, and each answers a different question:
-
-| File | Answers |
-|---|---|
-| `panel/sectionTerms.js` | what the section answers to in the filter |
-| `panel/sectionSummary.js` | what it says while it is shut |
-| `panel/sectionParams.js` | what a reset of it puts back |
-| `panel/stages.js` | which of the seven destinations holds it |
-| `panel/markFamilies.js` | what kind of mark it is |
-
-All five are leaf modules with no React import, so the specs can assert them
-against one another without pulling three.js in behind them. The last one is the
-only judgement in the set: nothing in the code knows that Berms and Air are the
-same idea, so the unit suite checks the one thing it can — that the families
-cover every mark exactly once.
-
-**Keep parameter names out of a comment above a `<Section>` tag.**
-`sectionParams.test.js` scopes a section from its own tag to the next one, so a
-comment written above a header is credited to the section before it. A comment
-introducing the Camera section used the words `zoom` and `orthographic` and
-failed the drift check for Texture, four hundred lines away.
-
-### A spec that reaches a control
-
-The panel shows one pane at a time, so a control outside the opening pane is in
-the DOM and hidden. `tests/helpers.js` carries `openStage(page, name)`,
-`openMark(page, mark)` and `setMark(page, mark, on)`.
-
-Grepping the specs for `section-…` finds only the ones that navigate by section.
-A spec that reaches a control by its own test id — `export-svg`, `surprise-me` —
-is invisible to that search, and five spec files stayed red for a release
-because of it. The reliable check reads the test id → section map out of
-`Sidebar.jsx`, joins it to `stages.js` and reports any spec touching a control in
-a pane it never selects. Exclude the load block and the stats line: both sit
-outside every section and are always on screen.
+`maskedTerrain` in `geometryBuilders.js` folds the cover class selection and the
+layer's painted masks into its `gridMask`. Every builder already gates on that
+mask. A third source is one more `continue` in the same loop.
 
 ### A surface overlay
 
-An overlay is a branch in the `SurfaceMesh` shader plus a uniform. Name it in
-`RENDER_SIDE` in `src/params.js`. The app builds the rebuild key by exclusion
-now. Thus an overlay left out of that list rebuilds all the geometry every time
-its colour moves.
+An overlay is a shader branch plus a uniform in `SurfaceMesh`. Name its keys in
+`RENDER_SIDE` in `src/params.js`, or its colour will rebuild all geometry.
+
+If the shader paints it, it must appear in both `hasFillLayer` (is the mesh
+drawn) and `needsSurfaceShading` (is it built with normals and UVs).
+
+### A draw mode that reads land cover
+
+Nothing to do for a stencil: `maskedTerrain` hands the builder a thinned mask.
+To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
+[Land cover](Land-Cover.md#how-masking-works).
+
+### A draw mode
+
+1. Write a builder in `geometryBuilders.js` that returns `{ positions, colors }`,
+   or an object of sub-layers for separate pens.
+2. Register it in `MODES_CONFIG` in `buildLineGeometry`.
+3. Add a `layerStyle` case for each sub-layer.
+4. Add its params to `STYLE_DEF` in `src/defaults.js`.
+5. Add an entry in `src/utils/drawModes.js`, so the randomiser knows it.
+6. Add a `<Section>` in `Sidebar.jsx` in the Marks stage.
+7. Add a 22×13 mark in `panel/modeMarks.jsx` that shows the mode's gesture.
+8. Add a line in `SECTION_TERMS`.
+9. Add a line in `PANEL_MODES` in `panel/sectionSummary.js`, and a family in
+   `panel/markFamilies.js`.
+
+The rebuild key is derived, so it is not a step. Two traps fail at module load:
+
+- Render-side params are excluded by regex, and some patterns are prefixes
+  (`fill`, `point`, `pan`, `rotation`, `frame`, `texture`). `params.js`
+  cross-checks mode-suffixed keys against `drawModes.js` and throws on a clash.
+- `geometryKey` is a string, so a non-scalar default would read as
+  `[object Object]`. Declare it in `GEOMETRY_NON_SCALAR` or use flat names such
+  as `gain0Bandsplit`. An undeclared one throws.
+
+### A panel section
+
+Add it to these indexes:
+
+| File | Answers |
+|---|---|
+| `panel/sectionTerms.js` | what the filter matches |
+| `panel/sectionSummary.js` | what it says while shut |
+| `panel/sectionParams.js` | what a reset puts back |
+| `panel/stages.js` | which pane holds it (`STATED`) |
+| `panel/markFamilies.js` | which family a mark is in |
+
+All five are leaf modules with no React, so specs can check them against each
+other. `panel.spec.js` counts rendered sections against `SECTION_TERMS`. A
+section missing from `stages.js` renders in no pane. A draw mode needs no
+`stages.js` entry, because `PANEL_MODES` puts it in Marks.
+
+Keep parameter names out of comments above a `<Section>` tag.
+`sectionParams.test.js` scopes a section from its tag to the next one, so such a
+comment is credited to the section before it.
+
+### A spec that reaches a control
+
+The panel shows one pane at a time. Use `openStage`, `openMark` and `setMark`
+from `tests/helpers.js`. A spec that finds a control by its own test id (for
+example `export-svg`) must still open its stage.
+
+### A button
+
+Use `Btn` from `panel/ui.jsx`. `variant` sets the look (`quiet`, `ghost`,
+`primary`, `toggle`). `style` sets only geometry.
+
+### A colour
+
+Add it to `RAW` in `panel/ui.jsx`, publish it in `:root`, and export it as a
+`var()` reference. Use `HEX` only where a custom property cannot work, for
+example a 2D canvas.
+
+### A label face
+
+Outline faces come from `scripts/build-font.js` and are sampled at runtime.
+Single-line faces come from `scripts/build-single-line-fonts.js`, already
+flattened. Both share one key space. Stroke faces use an `sl:` prefix.
 
 ### A CRS
 
-Add one entry to the table in `geoCoords.js`. That entry reaches the renderer,
-the STL exporter and the sidebar together, because all three ask the same
-classifier. See [Georeferencing](Georeferencing.md).
+Add one entry to the table in `geoCoords.js`. See
+[Georeferencing](Georeferencing.md).
 
 ### A whole-track projection
 
 Add a descriptor in `trackProjections.js` with a `build()` that returns
-`{ pixels, width, height }`. The sidebar renders its parameter schema by itself.
-See [Soundscapes](Soundscapes.md).
+`{ pixels, width, height }`. See [Soundscapes](Soundscapes.md).
 
 ### A preset
 
 1. Save a preset from the app.
-2. Put the JSON in `public/presets/`.
-3. Add the filename to `manifest.json`.
-4. Run `npm run thumbs "Your Preset"`. The preset then arrives with a picture
-   and not with a fallback label.
+2. Put the JSON in `public/presets/` and add it to `manifest.json`.
+3. Run `npm run thumbs "Your Preset"`.
 
 ### An OSM category
 
-Add an entry to `OSM_CATEGORIES` in `utils/osmCategories.js`. The entry holds
-the Overpass selectors, a `bucketOf`, the labels and the default styles. The
-`bucketOf` must claim *only* the tag values that the category lists.
-
-Nothing else changes. The checklist, the layer naming, the drape and every
-exporter read the catalogue.
-
-A `bucketOf` that claims too much steals from the categories after it. It does
-this in silence, and it gives the layer a name that looks correct. This is why
-they all go through `pick(value, allowed)`.
+Add an entry to `OSM_CATEGORIES` in `utils/osmCategories.js`: Overpass
+selectors, a `bucketOf`, labels and default styles. The `bucketOf` must claim
+only the listed tag values, through `pick(value, allowed)`. A greedy one steals
+from later categories without an error.
 
 ---
 
 ## Testing
 
-The suite runs Playwright against a live dev server, in headless Chrome with
-WebGL. The things worth an assertion exist only in a real renderer. These are
-those things: what the worker produced, what the SVG exporter drew, and whether
-the drawing buffer was clamped in silence. `HEADED=1` puts the window back when
-you want to watch a spec drive the app.
-
-The specs import the pure modules through the dev server with `page.evaluate`
-and test them directly. This is how the terrain, projection and clip maths get
-checked without an inference from pixels.
-
-Several specs also parse the `[Benchmark]` and `[Perf]` console lines. Those log
-statements are load-bearing. They are not debug leftovers.
+Playwright runs against a live dev server in headless Chrome with WebGL,
+because the worker output, the SVG and the drawing buffer exist only in a real
+renderer. Specs import pure modules through the dev server with
+`page.evaluate`. Several specs parse `[Benchmark]` and `[Perf]` console lines,
+so those logs are load-bearing.
