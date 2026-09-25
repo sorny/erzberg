@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.27.0] — 2026-09-25
+
+The panel wears the brand: iron, paper and ore, in the dark and now in the
+light. And an anaglyph SVG finally reads through the glasses.
+
+### Changed
+
+- **Ore and Paper.** The panel now wears the brand's own colours instead of
+  Tailwind grey and blue: iron `#151412`, slag `#221F1C`, paper `#F0EBE3`,
+  taupe `#9A8F85`, and ore `#E8823A` as the one accent. Ore means *on*: a lit
+  section, a stage badge, a selected choice, a slider's filled track. Blue and
+  green are retired. Text on ore is ink, because white on ore is 2.7 : 1.
+  Warnings move to brass, so they cannot read as "on". Nothing moved: every
+  control is where it was.
+- **Type.** Overpass for the panel's words and Overpass Mono for every number,
+  both self-hosted (61 kB). Section, stage and sub-section labels are in
+  sentence case instead of tracked capitals. The standing line reads
+  "2 marks, 2 inks".
+- Hovered mark tiles no longer lift. Hover changes the border only.
+
+### Fixed
+
+- **An anaglyph SVG looked like a faint grey drawing.** Both eyes were in the
+  file, but each was written in its tone-mapped screen colour (`#ff2020` became
+  a salmon `#f37870`, which the red filter leaks), and the second eye was
+  painted over the first instead of combining with it. The eyes are now
+  written in their pure filter inks and combine as they do on screen: multiplied
+  on paper, screened on a dark ground. Stipple dots take the eye ink too, and
+  the background gradient, particles and flock are no longer dropped from an
+  anaglyph export.
+
+### Added
+
+- **Light mode.** The toggle in the panel head switches between dark and light,
+  and the choice is remembered. The palettes live in `utils/theme.js`. The DOM
+  reads them as custom properties, and canvases read `HEX`, which changes in
+  place with the theme. The light ore is deeper (`#C8641F`) so a fill clears
+  3 : 1 against near-white.
+
 ## [1.26.0] — 2026-09-25
 
 A finishing pass on how the panel looks and answers, with nothing moved, and a
