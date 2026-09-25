@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] — 2026-09-25
+
+A finishing pass on how the panel looks and answers, with nothing moved, and a
+dotted line style that draws dots.
+
+### Changed
+
+- **A finishing pass on the panel's look.** Nothing moved. Every control is where
+  it was and does what it did.
+  - Sliders fill their track up to the value, with a white thumb that grows on
+    hover and press.
+  - Segmented choices are one well with the chosen option raised in it. Sixteen
+    hand-built rows now share one primitive, `SegGroup`.
+  - Switches slide with one easing curve and show a focus ring.
+  - Section headers use a drawn chevron and lighter tracking.
+  - Buttons, tabs and tiles respond to hover and press.
+  - Floating chrome over the viewport (the hint, the toast, the computing pill,
+    the loading card and the Fit bars) shares one frosted material.
+  - Motion stays off under `prefers-reduced-motion`.
+- The mark sheet's three columns are equal. Long names such as *Rock & Scree*
+  used to widen their column past the panel edge.
+- Mark tiles name their mode in normal case, so every name fits.
+
+### Added
+
+- **A real dotted line.** *Dotted* now draws round dots whose diameter is the
+  line weight, spaced so a gap stays at any weight. The style that was called
+  dotted — short dashes — keeps its look under the name *short*, beside
+  *long*. Its stored value is still `dotted`, so presets, OSM path defaults and
+  Fall Line's run-in look exactly as before; the new style is stored as `dots`.
+  - Builders emit segments in scan order, so the dots walk each stroke end to
+    end after `utils/chainSegments.js` joins the pieces by shared endpoints.
+    Without that, every grid cell restarted the pattern.
+  - The SVG writes each dot as a filled `<circle>`, the way Stipple does.
+- `/` focuses *Find a control*, and the field shows the key. Esc clears it, then
+  leaves it.
+
 ## [1.25.0] — 2026-09-25
 
 A cleanup release. The Mask Studio cursor keeps up with the pointer again, Edit
