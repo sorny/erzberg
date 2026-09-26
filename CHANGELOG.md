@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.28.0] — 2026-09-26
+
+Three new marks and two new ways to draw old ones: one unbroken line, hatching
+that knows where the shadow falls, and a net as rough as the ground.
+
 ### Added
 
 - **Single Line.** The whole plate as one unbroken stroke: a weighted stipple
