@@ -121,6 +121,9 @@ export const PANEL_MODES = [
   ['Mode: Crossings',      'enabledZeroCross', 'Spacing',   (s) => num(s.spacingZeroCross)],
   ['Mode: Sprite Blocks',  'enabledSprite',    'Tiers',     (s) => num(s.tiersSprite)],
   ['Mode: Reticulation',   'enabledRetic',     'Cells',     (s) => num(s.cellRetic)],
+  ['Mode: Single Line',    'enabledTsp',       'Points',    (s) => num(s.countTsp)],
+  ['Mode: Shadow Hatch',   'enabledShadowHatch', 'Sun',     (s) => deg(s.altitudeShadowHatch)],
+  ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
 ]
 
 /**
@@ -269,7 +272,7 @@ export function buildSectionSummaries({
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
 
   // ── Marks ─────────────────────────────────────────────────────────────────
-  // The index says how many of the thirty-four are drawing. It is the one header
+  // The index says how many of the thirty-seven are drawing. It is the one header
   // whose readout is about the sections under it rather than about itself.
   out['Draw Modes'] = `${PANEL_MODES.filter(([, k]) => style[k]).length} of ${PANEL_MODES.length}`
   for (const [title, key, label, fact] of PANEL_MODES) {

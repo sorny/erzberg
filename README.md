@@ -18,7 +18,7 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 34 independent draw modes: surveyor's
+The app renders it as 3D line art with 37 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, and
 tracks that something with mass laid down a face. Contours letter their own
 heights.
@@ -85,7 +85,7 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 34 modes as tiles in six families:
+- **Marks sheet.** The Marks stage shows the 37 modes as tiles in six families:
   Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you three things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 34 modes.
+  classes you pick. This works for all 37 modes.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.
@@ -250,9 +250,9 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Crosshatch | Two perpendicular line sets at a set angle |
 | Pillars | Vertical extrusion per cell (line, cuboid or cylinder) |
 | Contours | Marching Squares isolines, with optional ring closing and Chaikin smoothing |
-| Hachure | Slope-directed short strokes |
+| Hachure | Slope-directed short strokes, or Lehmann downslope strokes between contours |
 | Flow Lines | Euler-integrated drainage paths |
-| Stream Network | Strahler-order flow accumulation |
+| Stream Network | Strahler-order network, optionally weighted by flow accumulation |
 | Pencil Shading | Laplacian curvature |
 | Ridge Detection | Hessian eigenvalue crests |
 | Valley Detection | Topographic Position Index troughs |
@@ -280,6 +280,9 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Mineral | Five materials by slope and curvature, each with its own grain |
 | Land cover | The classes of a loaded cover plate |
 | Watershed | One flat ink per catchment |
+| Single Line | One travelling-salesman tour through a weighted stipple |
+| Shadow Hatch | Cross-hatching only inside cast and attached shadow |
+| Roughness Mesh | Delaunay or Voronoi net, dense where the ground is rugged |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink, ready for a hatch fill.
@@ -297,8 +300,8 @@ is its own layer and pen, and follows the ground under it.
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. The seed is shown, so you can return to a look.
 
-**Seeds.** Stipple, Rock & Scree, Flashbulb, Halation and Reticulation carry a
-seed. The same seed gives the same pattern.
+**Seeds.** Stipple, Rock & Scree, Flashbulb, Halation, Reticulation, Single Line
+and Roughness Mesh carry a seed. The same seed gives the same pattern.
 
 ---
 

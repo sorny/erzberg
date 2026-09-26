@@ -598,7 +598,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
         /*
          * An anaglyph draws every layer twice, and that is the whole of it.
          *
-         * A modifier rather than a mode: it takes whatever the thirty-four
+         * A modifier rather than a mode: it takes whatever the thirty-seven
          * modes happen to be drawing and makes it stereo, so it costs one loop
          * here instead of a builder of its own. Two eyes, two filter colours,
          * and the marks between them are the parallax.

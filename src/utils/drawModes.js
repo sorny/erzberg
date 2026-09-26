@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-four at once.
+ * does the index that shows all thirty-seven at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -185,6 +185,20 @@ export const DRAW_MODES = [
   {
     id: 'Shed', label: 'Watershed', cost: 3, mark: 'shed',
     pick: { spacing: [1.5, 5], inks: [5, 16], minBasin: [0.1, 1.5], shade: [0.1, 0.55] },
+  },
+  {
+    // A nearest-neighbour tour and 2-opt over a few thousand points, capped at
+    // two seconds. Priced as what it is.
+    id: 'Tsp', label: 'Single line', cost: 4, mark: 'tsp',
+    pick: { gamma: [0.9, 2.2] },
+  },
+  {
+    id: 'ShadowHatch', label: 'Shadow hatch', cost: 2, mark: 'shadowhatch',
+    pick: { spacing: [2, 6], angle: [20, 70], radius: [0, 2] },
+  },
+  {
+    id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
+    pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
 ]
 

@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Thirty-four
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Thirty-seven
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Thirty-three modes read $H$ only. [Land cover](#land-cover) reads a second
+Thirty-six modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -74,6 +74,15 @@ The gradient $\nabla H$ from central differences. A stroke from each cell
 centre along $-\nabla H$, with length proportional to $|\nabla H|$. Cells below
 a slope threshold are skipped.
 
+**Lehmann.** The second style draws downslope hachures confined to contour
+bands. Each stroke is traced from its seed uphill to the top of its band and
+downhill to the bottom, and stops 8% short of both. The gap marks the contour.
+Seeds run steepest first. A seed is refused inside a clearance of
+$p\,(1 + 3(1 - s^{1/\gamma}))$ around another stroke, where $p$ is the spacing
+and $s$ is the slope against its 95th percentile. Steep ground is dense and
+gentle ground opens out. A stroke also ends where the fall line turns by more
+than 45°.
+
 ## 6. Flow Lines
 
 Forward Euler through the gradient field:
@@ -93,6 +102,14 @@ bounded by $\text{rows} \times \text{cols}$.
 Each cell drains to its lowest neighbour. A topological sort accumulates the
 upstream counts. Cells above `threshold` draw as stream segments, which
 approximates a Strahler network.
+
+**Weight by flow.** The same sweep sums the flow accumulation $A$, the number of
+cells that drain through each one. A line layer has one weight, so a heavier
+channel is drawn as $k$ parallel passes, `gap` cells apart:
+
+$$k = 1 + \operatorname{round}\left((k_{\max} - 1)\,\frac{\ln(A / A_{\min})}{\ln(A_{\max} / A_{\min})}\right)$$
+
+The log is necessary because $A$ grows by orders of magnitude towards the outlet.
 
 ## 8. Pencil Shading
 
@@ -481,6 +498,44 @@ highest in `drawModes.js`.
 - **Levels** use a 1-2-5 hour step fitted to the field's range. One extra level
   at 0.5 h traces the ground that never sees the sun.
 - **NoData is a hole.**
+
+## 35. Single Line
+
+A weighted stipple, joined by one travelling-salesman tour.
+
+1. **Points.** Rejection sampling against a density field (slope, shade,
+   elevation or its inverse, raised to $\gamma$). One point per cell at most.
+2. **Tour.** Nearest neighbour through a bucket grid, then 2-opt. The first
+   2-opt phase tries only the 8 nearest neighbours of each point. The second
+   phase tries every pair. In the plane, two crossing edges can always be
+   uncrossed by a shorter 2-opt move. Thus a tour that no pair can improve has
+   no crossings.
+3. **Open.** Unless *Closed loop* is on, the tour is cut at its longest edge.
+
+Each edge is draped one cell at a time. Both phases stop after 2 s, so a very
+large point count can keep a few crossings.
+
+## 36. Shadow Hatch
+
+Parallel strokes at `angle`, and at `angle + 90°` for cross-hatch, drawn only
+through cells where `litField` is below 0.5. The mask is the Sun Hours sweep at
+one sun position, so it holds cast shadow as well as ground that faces away.
+*Outline* adds the Shadow Line terminator at the same sun. Engraving hatches by
+$1 - \mathbf{n}\cdot\mathbf{l}$ and cannot see what stands between the ground and
+the sun.
+
+## 37. Roughness Mesh
+
+The Terrain Ruggedness Index is the mean absolute height difference to the
+eight neighbours:
+
+$$\text{TRI}_i = \frac{1}{8}\sum_{j \in N_8(i)} |H_j - H_i|$$
+
+Point density is $f + (1 - f)\,\min(1, \text{TRI}/\text{TRI}_{98})^{\gamma}$,
+where $f$ is the floor. The points are triangulated with Delaunator. *Delaunay*
+draws each triangle edge once. *Voronoi* joins the circumcentres of adjacent
+triangles. Hull cells stay open, and an edge with an end off the raster is
+dropped.
 
 ---
 

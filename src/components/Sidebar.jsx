@@ -874,7 +874,7 @@ export function Sidebar({
      *
      * The sheet is the whole pane now, so a shut `Draw Modes` leaves one header
      * and nothing under it — a dead end that the old pane never had, because
-     * shutting the index there still left thirty-four section headers below it.
+     * shutting the index there still left thirty-seven section headers below it.
      * Reopening on arrival keeps the disclosure and removes the dead end.
      */
     if (n === 3) setSec(prev => (prev.modeIndex ? prev : { ...prev, modeIndex: true }))
@@ -952,7 +952,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeSection: false, modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1163,6 +1163,9 @@ export function Sidebar({
       modeZeroCross: !!newStyle.enabledZeroCross,
       modeSprite:   !!newStyle.enabledSprite,
       modeRetic:    !!newStyle.enabledRetic,
+      modeTsp:      !!newStyle.enabledTsp,
+      modeShadowHatch: !!newStyle.enabledShadowHatch,
+      modeRugged:   !!newStyle.enabledRugged,
       modeIndexed:  !!newStyle.enabledIndexed,
       modeOutrun:   !!newStyle.enabledOutrun,
       modeRiso:     !!newStyle.enabledRiso,
@@ -1180,7 +1183,7 @@ export function Sidebar({
    *
    * It used to open the mode's section and scroll to it as well, because turning
    * one on was almost always the first half of tuning it, and the index it lived
-   * in sat above thirty-four headers that were the real way in. The sheet *is*
+   * in sat above thirty-seven headers that were the real way in. The sheet *is*
    * the way in, and opening a mode is now its own target on the same tile — so
    * switching one on leaves you on the sheet, where switching on a second and a
    * third is one click each. The section still opens underneath, so drilling in
@@ -1477,7 +1480,7 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-four draw
+            * they add up to, which nothing on screen ever did: thirty-seven draw
             * modes compose freely, and counting the lit ones meant scrolling
             * 2 282 px past the thirty-two that were off.
             *
@@ -2413,7 +2416,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The sheet, standing in for the thirty-four sections below it.
+          {/* The sheet, standing in for the thirty-seven sections below it.
               It is still a Section so that it can be closed by anyone who does
               not want it, found by the filter, and given the same shut-state
               readout every other header carries — and so that the panel's four
@@ -2564,8 +2567,22 @@ export function Sidebar({
             {style.enabledHachure && (
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingHachure} onChange={v => ss({ spacingHachure: v })} />
-                  <InlineSl label="Length" min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['tick','TICKS'],['lehmann','LEHMANN']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={(style.styleHachure ?? 'tick') === m} data-testid={`hachure-style-${m}`}
+                        onClick={() => ss({ styleHachure: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Spacing" help={style.styleHachure === 'lehmann' ? 'Gap between strokes on the steepest ground. Gentle ground gets up to four times this.' : undefined} min={1} max={100} value={style.spacingHachure} onChange={v => ss({ spacingHachure: v })} />
+                  {style.styleHachure === 'lehmann' ? (
+                    <>
+                      <InlineSl label="Bands" help="Contour bands. Each stroke runs downhill and stops short of the next band, which leaves a thin gap along every contour." min={2} max={60} step={1} value={style.bandsHachure ?? 14} onChange={v => ss({ bandsHachure: Math.round(v) })} />
+                      <InlineSl label="Gamma" help="How fast the spacing opens out as the ground gets gentler. Above 1, only the steepest ground stays dense." min={0.2} max={3} step={0.05} value={style.gammaHachure ?? 1} onChange={v => ss({ gammaHachure: v })} fmt={v => v.toFixed(2)} />
+                    </>
+                  ) : (
+                    <InlineSl label="Length" min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Hachure" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -2592,6 +2609,13 @@ export function Sidebar({
               <>
                 <Sub>
                   <InlineSl label="Threshold" min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
+                  <Tog label="Weight by flow" testId="dag-accum" checked={!!style.accumDag} onChange={v => ss({ accumDag: v })} />
+                  {style.accumDag && (
+                    <>
+                      <InlineSl label="Passes" help="Parallel strokes on the main channel. Each channel gets more passes as more ground drains through it, so the trunk draws heaviest." min={2} max={8} step={1} value={style.passesDag ?? 4} onChange={v => ss({ passesDag: Math.round(v) })} />
+                      <InlineSl label="Pass gap" help="Distance between the passes, in cells. Match it to the pen width for a solid line." min={0.05} max={1.5} step={0.05} value={style.gapDag ?? 0.35} onChange={v => ss({ gapDag: v })} fmt={v => v.toFixed(2)} />
+                    </>
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Dag" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -3224,6 +3248,72 @@ export function Sidebar({
             )}
           </Section>
 
+          <Section title="Mode: Single Line" icon={<ModeMark kind="tsp" />} open={sec.modeTsp} onToggle={() => tog('modeTsp')} enabled={style.enabledTsp}>
+            <Tog label="Enabled" testId="mode-tsp" checked={style.enabledTsp} onChange={v => ss({ enabledTsp: v })} />
+            {style.enabledTsp && (
+              <>
+                <Sub>
+                  <InlineSl label="Points" help="Dots the line must visit. The tour gets two seconds, so very high counts can keep a few crossings." min={100} max={8000} step={100} value={style.countTsp} onChange={v => ss({ countTsp: Math.round(v) })} />
+                  <InlineSl label="Gamma" help="Above 1, the dots crowd into the densest part of the field and the line coils tighter there." min={0.3} max={4} step={0.05} value={style.gammaTsp} onChange={v => ss({ gammaTsp: v })} fmt={v => v.toFixed(2)} />
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['slope','STEEP'],['shade','SHADE'],['invElev','LOW'],['elevation','HIGH']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.densityModeTsp === m}
+                        onClick={() => ss({ densityModeTsp: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  {style.densityModeTsp === 'shade' && (
+                    <InlineSl label="Sun" help="Compass bearing of the light that sets the tone." min={0} max={360} step={1} value={style.azimuthTsp} onChange={v => ss({ azimuthTsp: v })} fmt={v => `${Math.round(v)}°`} />
+                  )}
+                  <Tog label="Closed loop" checked={!!style.closedTsp} onChange={v => ss({ closedTsp: v })} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTsp} onChange={v => ss({ seedTsp: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Tsp" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Shadow Hatch" icon={<ModeMark kind="shadowhatch" />} open={sec.modeShadowHatch} onToggle={() => tog('modeShadowHatch')} enabled={style.enabledShadowHatch}>
+            <Tog label="Enabled" testId="mode-shadowhatch" checked={style.enabledShadowHatch} onChange={v => ss({ enabledShadowHatch: v })} />
+            {style.enabledShadowHatch && (
+              <>
+                <Sub>
+                  <InlineSl label="Sun bearing" min={0} max={360} step={1} value={style.azimuthShadowHatch} onChange={v => ss({ azimuthShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Sun height" help="Degrees above the horizon. A low sun throws long shadows across the valleys. At 0 or below nothing is drawn." min={-5} max={85} step={0.5} value={style.altitudeShadowHatch} onChange={v => ss({ altitudeShadowHatch: v })} fmt={v => `${v.toFixed(1)}°`} />
+                  <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingShadowHatch} onChange={v => ss({ spacingShadowHatch: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleShadowHatch} onChange={v => ss({ angleShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Detail" help="How much the shadow mask is smoothed. At 0 the hatching stops at every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowHatch} onChange={v => ss({ radiusShadowHatch: v })} fmt={v => v.toFixed(1)} />
+                  <Tog label="Cross-hatch" checked={!!style.crossShadowHatch} onChange={v => ss({ crossShadowHatch: v })} />
+                  <Tog label="Outline" checked={!!style.outlineShadowHatch} onChange={v => ss({ outlineShadowHatch: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="ShadowHatch" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged}>
+            <Tog label="Enabled" testId="mode-rugged" checked={style.enabledRugged} onChange={v => ss({ enabledRugged: v })} />
+            {style.enabledRugged && (
+              <>
+                <Sub>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['delaunay','DELAUNAY'],['voronoi','VORONOI'],['both','BOTH']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.kindRugged === m}
+                        onClick={() => ss({ kindRugged: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Points" min={50} max={12000} step={50} value={style.countRugged} onChange={v => ss({ countRugged: Math.round(v) })} />
+                  <InlineSl label="Gamma" help="Above 1, only the roughest ground gets small facets." min={0.2} max={3} step={0.05} value={style.gammaRugged} onChange={v => ss({ gammaRugged: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Floor" help="Point density on smooth ground, as a fraction of the roughest. At 0 the flats get almost no points and a few long triangles span them." min={0} max={1} step={0.01} value={style.floorRugged} onChange={v => ss({ floorRugged: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Smoothing" help="Blur before the ruggedness is measured, so sensor grain does not count as rough ground." min={0} max={8} step={1} value={style.radiusRugged} onChange={v => ss({ radiusRugged: Math.round(v) })} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRugged} onChange={v => ss({ seedRugged: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Rugged" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —
               OpenStreetMap, GPX, GeoJSON, labels, icons — was simply absent from
@@ -3557,7 +3647,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the thirty-four modes
+              A modifier, not a mode: it takes whatever the thirty-seven modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

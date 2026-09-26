@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Single Line.** The whole plate as one unbroken stroke: a weighted stipple
+  joined by a travelling-salesman tour (nearest neighbour, then 2-opt). The line
+  does not cross itself. One pen-down for a plotter.
+- **Shadow Hatch.** Cross-hatching only where the sun cannot reach. The mask is
+  the Sun Hours shadow sweep, so valleys under a ridge are hatched too. An
+  optional outline draws the shadow edge.
+- **Roughness Mesh.** A Delaunay or Voronoi net whose points follow the Terrain
+  Ruggedness Index. Scree and crags get small facets, meadows get large ones.
+  Triangulation by `delaunator` (ISC).
+- **Hachure: Lehmann style.** Downslope strokes confined to contour bands,
+  denser on steep ground.
+- **Stream Network: weight by flow.** Channels are drawn in more parallel passes
+  as more ground drains through them.
+
 ## [1.27.0] — 2026-09-25
 
 The panel wears the brand: iron, paper and ore, in the dark and now in the

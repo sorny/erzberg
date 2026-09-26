@@ -2,6 +2,7 @@
  * CPU-side geometry builders.
  */
 
+import Delaunator from 'delaunator'
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
@@ -474,9 +475,12 @@ export function buildLineGeometry(terrain, p) {
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross, p.angleCross) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
     { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours) },
-    { id:'Hachure', builder: (t, ctx) => buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
+    { id:'Hachure', builder: (t, ctx) => p.styleHachure === 'lehmann'
+        ? buildLehmannHachure(t, ctx, p.spacingHachure, p.bandsHachure, p.gammaHachure)
+        : buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
-    { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag) },
+    { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag, {
+        accum: p.accumDag, passes: p.passesDag, gap: p.gapDag }) },
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
@@ -555,6 +559,16 @@ export function buildLineGeometry(terrain, p) {
         contrast: p.contrastFlashbulb, grain: p.grainFlashbulb, spacing: p.spacingFlashbulb,
         shadow: p.shadowFlashbulb, shadowSteps: p.shadowStepsFlashbulb,
         fold: p.foldFlashbulb, seed: p.seedFlashbulb }) },
+    { id:'Tsp',     builder: (t, ctx) => buildTsp(t, ctx, {
+        count: p.countTsp, densityMode: p.densityModeTsp, gamma: p.gammaTsp,
+        azimuth: p.azimuthTsp, seed: p.seedTsp, closed: p.closedTsp }) },
+    { id:'ShadowHatch', builder: (t, ctx) => buildShadowHatch(t, ctx, {
+        azimuth: p.azimuthShadowHatch, altitude: p.altitudeShadowHatch,
+        spacing: p.spacingShadowHatch, angle: p.angleShadowHatch, cross: p.crossShadowHatch,
+        radius: p.radiusShadowHatch, outline: p.outlineShadowHatch }) },
+    { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
+        count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
+        radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },
   ]
 
   const finalLayers = []
@@ -886,6 +900,138 @@ function buildHachure(terrain, p, spacing, length) {
       positions.push6(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
       const col = computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
       colors.pushRgb2(col)
+    }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/**
+ * Lehmann hachures: downslope strokes, each confined to one contour band.
+ *
+ * Lehmann's 1799 rule was that a hachure runs the way water runs and stops at
+ * the next contour, so the plate reads as rows of strokes between invisible
+ * level lines. Each stroke here is traced through its seed both ways — uphill
+ * to the top of its band, downhill to the bottom — and stops a little short of
+ * both, which leaves the thin white seam between rows that marks the contour.
+ *
+ * Lehmann darkened steep ground with heavier strokes. A line layer has one
+ * weight, so steepness sets the *spacing* instead: a seed is refused if another
+ * stroke lies within a clearance that grows from `spacing` on the steepest
+ * ground to four times that on the gentlest. `gamma` bends that ramp. Seeds run
+ * steepest first, so the dense ground is settled before the open ground claims
+ * any of it.
+ */
+function buildLehmannHachure(terrain, p, spacing, bands, gamma) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const positions = new F32List(), colors = new F32List()
+  const n = rows * cols
+  let gMin = Infinity, gMax = -Infinity
+  for (let i = 0; i < n; i++) if (gridMask[i]) { if (grid[i] < gMin) gMin = grid[i]; if (grid[i] > gMax) gMax = grid[i] }
+  const nB = Math.max(2, Math.min(60, Math.round(bands ?? 14)))
+  const bandH = (gMax - gMin) / nB
+  if (!(bandH > 0)) return { positions: positions.toArray(), colors: colors.toArray() }
+
+  const pitch = Math.max(1, (spacing ?? 4) / scl)
+  const gam = gamma ?? 1
+  // Slope against its 95th percentile, not the maximum: one cliff cell would
+  // otherwise make every other slope read as gentle and spread the whole plate.
+  const BINS = 256, hist = new Uint32Array(BINS), top = maxSlope || 1
+  let valid = 0
+  for (let i = 0; i < n; i++) if (gridMask[i]) { hist[Math.min(BINS - 1, Math.floor((gridSlopes[i] / top) * BINS))]++; valid++ }
+  let acc = 0, bin = BINS - 1
+  for (let b = 0; b < BINS; b++) { acc += hist[b]; if (acc >= valid * 0.95) { bin = b; break } }
+  const ms = ((bin + 1) / BINS) * top
+  const owner = new Int32Array(n)
+  const rng = mulberry32(0x1e4a)
+  const seeds = []
+  const cand = Math.max(1, pitch * 0.5)
+  for (let rf = 0; rf < rows; rf += cand) {
+    for (let cf = 0; cf < cols; cf += cand) {
+      const r = Math.min(rows - 1, Math.round(rf + (rng() - 0.5) * cand))
+      const c = Math.min(cols - 1, Math.max(0, Math.round(cf + (rng() - 0.5) * cand)))
+      const i = Math.max(0, r) * cols + c
+      if (gridMask[i] && gridSlopes[i] / ms > 0.02) seeds.push(i)
+    }
+  }
+  seeds.sort((a, b) => gridSlopes[b] - gridSlopes[a])
+
+  const GAP = 0.08, STEP = 0.5
+  const grad = (fr, fc) => {
+    const e = 1
+    const gx = sampleBilinear(grid, sMask, rows, cols, fr, fc + e) - sampleBilinear(grid, sMask, rows, cols, fr, fc - e)
+    const gz = sampleBilinear(grid, sMask, rows, cols, fr + e, fc) - sampleBilinear(grid, sMask, rows, cols, fr - e, fc)
+    return [gx, gz]
+  }
+  // Walks from (fr, fc) up (dir 1) or down (dir −1) until `stop` crosses, and
+  // returns the points after the start, ending on the interpolated crossing.
+  // A hachure is a straight-ish stroke. Where the fall line turns hard — on a
+  // terrace edge or a quantised flat — the stroke ends rather than hooking.
+  const walk = (fr, fc, g, dir, stop) => {
+    const pts = []
+    let pr = 0, pc = 0
+    for (let s = 0; s < 400; s++) {
+      const [gx, gz] = grad(fr, fc), mag = Math.sqrt(gx * gx + gz * gz)
+      if (!(mag > 1e-6)) break
+      const ur = gz / mag, uc = gx / mag
+      if (s > 0 && ur * pr + uc * pc < 0.7) break
+      pr = ur; pc = uc
+      const nr = fr + dir * ur * STEP, nc = fc + dir * uc * STEP
+      if (nr < 0 || nr > rows - 1 || nc < 0 || nc > cols - 1) break
+      const ni = Math.round(nr) * cols + Math.round(nc)
+      if (!gridMask[ni]) break
+      const ng = sampleBilinear(grid, sMask, rows, cols, nr, nc)
+      if (ng !== ng) break
+      if (dir > 0 ? ng >= stop : ng <= stop) {
+        const t = (stop - g) / (ng - g || 1)
+        pts.push(fr + (nr - fr) * t, fc + (nc - fc) * t, stop)
+        break
+      }
+      pts.push(nr, nc, ng)
+      fr = nr; fc = nc; g = ng
+    }
+    return pts
+  }
+
+  let id = 0
+  for (const i of seeds) {
+    if (owner[i]) continue
+    const s = gridSlopes[i] / ms
+    const clear = Math.min(24, pitch * (1 + 3 * (1 - Math.pow(Math.min(1, s), 1 / gam))))
+    const r0 = Math.floor(i / cols), c0 = i % cols, R = Math.ceil(clear)
+    let blocked = false
+    for (let dr = -R; dr <= R && !blocked; dr++) {
+      const rr = r0 + dr
+      if (rr < 0 || rr >= rows) continue
+      for (let dc = -R; dc <= R; dc++) {
+        const cc = c0 + dc
+        if (cc < 0 || cc >= cols || dr * dr + dc * dc > clear * clear) continue
+        if (owner[rr * cols + cc]) { blocked = true; break }
+      }
+    }
+    if (blocked) continue
+
+    const g0 = grid[i]
+    const k = Math.min(nB - 1, Math.floor((g0 - gMin) / bandH))
+    const top = gMin + (k + 1 - GAP) * bandH, bot = gMin + (k + GAP) * bandH
+    if (g0 >= top || g0 <= bot) continue
+    id++
+    const up = walk(r0, c0, g0, 1, top), down = walk(r0, c0, g0, -1, bot)
+    const line = []
+    for (let q = up.length - 3; q >= 0; q -= 3) line.push(up[q], up[q + 1], up[q + 2])
+    line.push(r0, c0, g0)
+    for (let q = 0; q < down.length; q += 3) line.push(down[q], down[q + 1], down[q + 2])
+    if (line.length < 6) continue
+    for (let q = 0; q < line.length; q += 3) owner[Math.round(line[q]) * cols + Math.round(line[q + 1])] = id
+
+    for (let q = 3; q < line.length; q += 3) {
+      const e0 = (line[q - 1] - 0.5) * 100 * elevScale, e1 = (line[q + 2] - 0.5) * 100 * elevScale
+      if (!inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+      positions.push6(line[q - 2] * scl - halfW, e0, line[q - 3] * scl - halfH,
+                      line[q + 1] * scl - halfW, e1, line[q] * scl - halfH)
+      colors.pushRgb2(computeVertexColor(normElev(e0, minElev, maxElev), Math.min(1, s),
+        Math.atan2(line[q] - line[q - 3], line[q + 1] - line[q - 2]), p))
     }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
@@ -2050,8 +2196,15 @@ function buildCurvature(terrain, p, spacing, length, threshold, radius, dirMode,
  * how branched the network above a point is rather than by how much area drains
  * through it, so a long unbranched gully stays order 1 no matter how far it
  * runs, and raising the threshold strips headwaters while leaving the trunk.
+ *
+ * `accum` weights the drawn channels by flow accumulation — how many cells
+ * drain through each one, which the same sweep sums on the way down. A line
+ * layer has one weight, so a heavier channel is drawn as parallel passes, up to
+ * `passes` on the trunk, `gap` cells apart. That is also what a plotter does to
+ * lay a heavier line with one pen. The count follows log accumulation, because
+ * the raw count grows by orders of magnitude towards the outlet.
  */
-function buildDagThinning(terrain, p, threshold) {
+function buildDagThinning(terrain, p, threshold, opts = {}) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const n = rows*cols, next = new Int32Array(n).fill(-1), inDeg = new Int32Array(n).fill(0)
@@ -2073,20 +2226,40 @@ function buildDagThinning(terrain, p, threshold) {
   }
   const order = new Int32Array(n).fill(1), currentInDeg = new Int32Array(inDeg), maxInOrder = new Int32Array(n).fill(0), countMaxOrder = new Int32Array(n).fill(0), queue = []
   for (let i = 0; i < n; i++) if (gridMask[i] && inDeg[i] === 0) queue.push(i)
+  const acc = new Float64Array(n).fill(1)
   let head = 0
   while (head < queue.length) {
     const i = queue[head++], dst = next[i]; if (dst === -1) continue
+    acc[dst] += acc[i]
     const o = order[i]; if (o > maxInOrder[dst]) { maxInOrder[dst] = o; countMaxOrder[dst] = 1 } else if (o === maxInOrder[dst]) countMaxOrder[dst]++
     currentInDeg[dst]--; if (currentInDeg[dst] === 0) { order[dst] = (countMaxOrder[dst] > 1) ? maxInOrder[dst]+1 : maxInOrder[dst]; queue.push(dst) }
   }
   const positions = new F32List(), colors = new F32List()
   const strahlerThreshold = Math.max(1, Math.round(threshold ?? 2))
+  const maxPasses = opts.accum ? Math.max(1, Math.min(8, Math.round(opts.passes ?? 4))) : 1
+  let accMin = Infinity, accMax = 0
+  if (maxPasses > 1) {
+    for (let i = 0; i < n; i++) {
+      if (next[i] === -1 || order[i] < strahlerThreshold) continue
+      if (acc[i] < accMin) accMin = acc[i]
+      if (acc[i] > accMax) accMax = acc[i]
+    }
+  }
+  const logSpan = Math.log(accMax / accMin) || 1
+  const gap = (opts.gap ?? 0.35) * scl
   for (let i = 0; i < n; i++) {
     const dst = next[i]; if (dst === -1 || order[i] < strahlerThreshold) continue
     const r0 = Math.floor(i/cols), c0 = i%cols, r1 = Math.floor(dst/cols), c1 = dst%cols, e0 = (grid[i]-0.5)*100*elevScale, e1 = (grid[dst]-0.5)*100*elevScale
     if (!inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut)) continue
-    positions.push6(c0*scl-halfW, e0, r0*scl-halfH, c1*scl-halfW, e1, r1*scl-halfH)
-    const col = computeVertexColor(normElev(e0, minElev, maxElev), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p); colors.pushRgb2(col)
+    const col = computeVertexColor(normElev(e0, minElev, maxElev), gridSlopes[i]/(maxSlope||1), Math.atan2(r1-r0, c1-c0), p)
+    const k = maxPasses > 1 ? 1 + Math.round((maxPasses - 1) * Math.log(acc[i] / accMin) / logSpan) : 1
+    // Offsets across the step, centred on it, so one pass sits on the channel.
+    const len = Math.hypot(c1-c0, r1-r0) || 1, ox = -(r1-r0)/len*gap, oz = (c1-c0)/len*gap
+    for (let q = 0; q < k; q++) {
+      const f = q - (k - 1) / 2
+      positions.push6(c0*scl-halfW+ox*f, e0, r0*scl-halfH+oz*f, c1*scl-halfW+ox*f, e1, r1*scl-halfH+oz*f)
+      colors.pushRgb2(col)
+    }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
@@ -3351,6 +3524,445 @@ function buildZeroCross(terrain, p, o) {
     }
   }
   return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true }
+}
+
+// ─── Point-set modes: Single Line, Roughness Mesh ────────────────────────────
+
+/**
+ * One straight edge in grid coordinates, draped onto the ground a cell at a
+ * time.
+ *
+ * The point-set modes join samples that can lie many cells apart, and a chord
+ * between two draped ends says nothing about the ridge between them. Walking it
+ * in one-cell steps is the same answer the isophotes give a terminator. A step
+ * over NoData or outside the elevation cut lifts the pen for that step only.
+ */
+function drapeEdge(out, terrain, p, sMask, c0, r0, c1, r1, angle) {
+  const { grid, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const steps = Math.max(1, Math.ceil(Math.hypot(c1 - c0, r1 - r0)))
+  let pc = 0, pr = 0, pe = 0, prevOk = false
+  for (let k = 0; k <= steps; k++) {
+    const t = k / steps
+    const fc = Math.max(0, Math.min(cols - 1, c0 + (c1 - c0) * t))
+    const fr = Math.max(0, Math.min(rows - 1, r0 + (r1 - r0) * t))
+    const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+    const e = (b - 0.5) * 100 * elevScale
+    const ok = b === b && inElevCut(e, minElev, maxElev, elevMinCut, elevMaxCut)
+    if (ok && prevOk) {
+      out.positions.push6(pc * scl - halfW, pe, pr * scl - halfH, fc * scl - halfW, e, fr * scl - halfH)
+      const i = Math.round(fr) * cols + Math.round(fc)
+      out.colors.pushRgb2(computeVertexColor(normElev(e, minElev, maxElev), gridSlopes[i] / (maxSlope || 1), angle, p))
+    }
+    prevOk = ok; pc = fc; pr = fr; pe = e
+  }
+}
+
+/**
+ * Points drawn from a density field by rejection, at most one per cell.
+ *
+ * The one-per-cell rule is the cheapest separation there is, and it matters to
+ * both callers: two samples in one cell give the tour a zero-length hop and the
+ * triangulation a sliver. Candidates are uniform over the raster, so the field
+ * decides only how many survive where — the same contract as Stipple.
+ */
+function sampleByDensity(terrain, density, count, rng) {
+  const { gridMask, rows, cols } = terrain
+  const taken = new Uint8Array(rows * cols)
+  const xs = [], ys = []
+  const tries = count * 200
+  for (let k = 0; k < tries && xs.length < count; k++) {
+    const fc = rng() * (cols - 1), fr = rng() * (rows - 1)
+    const i = Math.round(fr) * cols + Math.round(fc)
+    if (!gridMask[i] || taken[i] || rng() >= density[i]) continue
+    taken[i] = 1
+    xs.push(fc); ys.push(fr)
+  }
+  return { xs, ys, n: xs.length }
+}
+
+/**
+ * Points into square buckets, for nearest-neighbour queries.
+ *
+ * `start[b]..start[b+1]` indexes `items`, a counting sort by bucket. Built once
+ * and never edited: the tour marks visited points in its own array, which is
+ * simpler than removing them and costs only a few skipped reads near the end.
+ */
+function bucketPoints(xs, ys, n, cols, rows) {
+  const size = Math.max(1, Math.sqrt((cols * rows) / Math.max(1, n)) * 1.5)
+  const bw = Math.max(1, Math.ceil(cols / size)), bh = Math.max(1, Math.ceil(rows / size))
+  const of = new Int32Array(n), count = new Int32Array(bw * bh + 1)
+  for (let i = 0; i < n; i++) {
+    const b = Math.min(bh - 1, Math.floor(ys[i] / size)) * bw + Math.min(bw - 1, Math.floor(xs[i] / size))
+    of[i] = b; count[b + 1]++
+  }
+  for (let b = 0; b < bw * bh; b++) count[b + 1] += count[b]
+  const start = count.slice(), fill = count.slice(), items = new Int32Array(n)
+  for (let i = 0; i < n; i++) items[fill[of[i]]++] = i
+  return { size, bw, bh, start, items }
+}
+
+/**
+ * The nearest point to (x, y) that `skip` does not reject, searched in square
+ * rings of buckets. A ring can stop the search once its inner edge lies
+ * farther than the best distance found so far.
+ */
+function nearestIn(B, xs, ys, x, y, skip) {
+  const bx = Math.min(B.bw - 1, Math.floor(x / B.size)), by = Math.min(B.bh - 1, Math.floor(y / B.size))
+  let best = -1, bestD = Infinity
+  const maxRing = Math.max(B.bw, B.bh)
+  for (let ring = 0; ring <= maxRing; ring++) {
+    if (best >= 0 && (ring - 1) * B.size > Math.sqrt(bestD)) break
+    for (let gy = by - ring; gy <= by + ring; gy++) {
+      if (gy < 0 || gy >= B.bh) continue
+      const edgeRow = gy === by - ring || gy === by + ring
+      for (let gx = bx - ring; gx <= bx + ring; gx += edgeRow ? 1 : 2 * ring || 1) {
+        if (gx < 0 || gx >= B.bw) continue
+        const b = gy * B.bw + gx
+        for (let k = B.start[b]; k < B.start[b + 1]; k++) {
+          const j = B.items[k]
+          if (skip(j)) continue
+          const d = (xs[j] - x) ** 2 + (ys[j] - y) ** 2
+          if (d < bestD) { bestD = d; best = j }
+        }
+      }
+    }
+  }
+  return best
+}
+
+/** The `k` nearest other points of every point — the 2-opt candidate lists. */
+function nearestLists(B, xs, ys, n, k) {
+  const out = new Int32Array(n * k).fill(-1)
+  const cand = [], dist = []
+  for (let i = 0; i < n; i++) {
+    const bx = Math.min(B.bw - 1, Math.floor(xs[i] / B.size)), by = Math.min(B.bh - 1, Math.floor(ys[i] / B.size))
+    cand.length = 0; dist.length = 0
+    // Two rings cover k neighbours at the bucket size chosen above in all but
+    // the sparsest corners, and a short list there only makes 2-opt a little
+    // less thorough — the full pass after it catches what this misses.
+    for (let gy = by - 2; gy <= by + 2; gy++) {
+      if (gy < 0 || gy >= B.bh) continue
+      for (let gx = bx - 2; gx <= bx + 2; gx++) {
+        if (gx < 0 || gx >= B.bw) continue
+        const b = gy * B.bw + gx
+        for (let m = B.start[b]; m < B.start[b + 1]; m++) {
+          const j = B.items[m]
+          if (j !== i) { cand.push(j); dist.push((xs[j] - xs[i]) ** 2 + (ys[j] - ys[i]) ** 2) }
+        }
+      }
+    }
+    const order = cand.map((_, q) => q).sort((a, b) => dist[a] - dist[b])
+    for (let q = 0; q < Math.min(k, order.length); q++) out[i * k + q] = cand[order[q]]
+  }
+  return out
+}
+
+/**
+ * A short closed tour through every point: nearest neighbour, then 2-opt.
+ *
+ * Two 2-opt phases. The first tries only each city's nearest few neighbours,
+ * which finds almost every improvement at a fraction of the cost. The second
+ * tries every pair, and is what makes the line non-intersecting: in the plane,
+ * two crossing edges can always be uncrossed by a 2-opt move that shortens the
+ * tour, so a tour no pair can improve has no crossings. Both stop at the time
+ * budget, so a very large point count can leave a crossing behind.
+ */
+function tspTour(xs, ys, n, cols, rows, budgetMs) {
+  const t0 = Date.now()
+  const B = bucketPoints(xs, ys, n, cols, rows)
+  const tour = new Int32Array(n), used = new Uint8Array(n)
+  let cur = 0
+  used[0] = 1
+  for (let k = 1; k < n; k++) {
+    const nx = nearestIn(B, xs, ys, xs[cur], ys[cur], (j) => used[j] === 1)
+    tour[k] = nx; used[nx] = 1; cur = nx
+  }
+  if (n < 4) return tour
+
+  const pos = new Int32Array(n)
+  for (let k = 0; k < n; k++) pos[tour[k]] = k
+  const d = (a, b) => Math.sqrt((xs[a] - xs[b]) ** 2 + (ys[a] - ys[b]) ** 2)
+  // Reverses tour positions i..j (cyclic, inclusive), or the complement when
+  // that is shorter — on a cycle the two reversals give the same tour.
+  const reverse = (i, j) => {
+    let len = ((j - i + n) % n) + 1
+    if (len * 2 > n) { const ni = (j + 1) % n; j = (i - 1 + n) % n; i = ni; len = n - len }
+    for (let s = 0; s < len >> 1; s++) {
+      const a = (i + s) % n, b = (j - s + n) % n
+      const ca = tour[a], cb = tour[b]
+      tour[a] = cb; tour[b] = ca; pos[cb] = a; pos[ca] = b
+    }
+  }
+
+  const K = 8
+  const near = nearestLists(B, xs, ys, n, K)
+  let improved = true
+  while (improved && Date.now() - t0 < budgetMs) {
+    improved = false
+    for (let i = 0; i < n; i++) {
+      const a = tour[i], b = tour[(i + 1) % n], dab = d(a, b)
+      for (let q = 0; q < K; q++) {
+        const c = near[a * K + q]
+        if (c < 0) break
+        const dac = d(a, c)
+        if (dac >= dab) break
+        const j = pos[c], e = tour[(j + 1) % n]
+        if (c === b || e === a) continue
+        if (dac + d(b, e) < dab + d(c, e) - 1e-9) { reverse(i + 1, j); improved = true; break }
+      }
+    }
+  }
+  improved = true
+  while (improved && Date.now() - t0 < budgetMs) {
+    improved = false
+    for (let i = 0; i < n - 1 && Date.now() - t0 < budgetMs; i++) {
+      const a = tour[i], b = tour[i + 1], dab = d(a, b)
+      for (let j = i + 2; j < n; j++) {
+        const c = tour[j], e = tour[(j + 1) % n]
+        if (e === a) continue
+        if (d(a, c) + d(b, e) < dab + d(c, e) - 1e-9) { reverse(i + 1, j); improved = true; break }
+      }
+    }
+  }
+  return tour
+}
+
+/**
+ * The density fields the point-set modes sample, all in [0, 1].
+ *
+ * `shade` is Lambert darkness from a fixed sun, which is what gives a single
+ * line portrait of a mountain its modelling: the pen dwells where the slope
+ * turns away from the light.
+ */
+function pointDensity(terrain, p, mode, gamma, azimuth) {
+  const { grid, gridMask, rows, cols, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, jitterAmt } = p
+  const n = rows * cols, out = new Float32Array(n)
+  const dark = mode === 'shade' ? lambertDarkness(terrain, azimuth, 1, elevScale, 1) : null
+  const gam = gamma ?? 1
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const ne = normElev(cellElev(grid, r, c, cols, elevScale, jitterAmt), minElev, maxElev)
+      const s = gridSlopes[i] / (maxSlope || 1)
+      const v = mode === 'shade' ? dark[i]
+        : mode === 'elevation' ? ne
+        : mode === 'invElev' ? 1 - ne
+        : mode === 'invSlope' ? 1 - s
+        : s
+      out[i] = Math.pow(Math.max(0, Math.min(1, v)), gam)
+    }
+  }
+  return out
+}
+
+/**
+ * The whole terrain as one unbroken stroke.
+ *
+ * A weighted stipple, joined by a travelling-salesman tour. The dots crowd
+ * where the density field is high and the tour has to visit every one of them,
+ * so tone becomes how tightly one line coils. For a pen plotter it is the
+ * cheapest plate there is: one pen-down, one pen-up.
+ *
+ * The tour is closed and then, unless `closed` is set, opened at its longest
+ * edge — usually a jump across an empty flat, which is the edge a viewer is
+ * least likely to miss.
+ */
+function buildTsp(terrain, p, o) {
+  const { gridMask, rows, cols } = terrain
+  const out = { positions: new F32List(), colors: new F32List() }
+  const sMask = terrain.hasNoData ? gridMask : null
+  const count = Math.max(50, Math.min(8000, Math.round(o.count ?? 2500)))
+  const rng = mulberry32(((o.seed ?? 7) * 2654435761) >>> 0)
+  const density = pointDensity(terrain, p, o.densityMode ?? 'shade', o.gamma, o.azimuth ?? 315)
+  const { xs, ys, n } = sampleByDensity(terrain, density, count, rng)
+  if (n < 2) return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+
+  const tour = tspTour(xs, ys, n, cols, rows, 2000)
+  let startAt = 0, edges = n
+  if (!o.closed) {
+    let longest = -1
+    for (let k = 0; k < n; k++) {
+      const a = tour[k], b = tour[(k + 1) % n], dd = Math.hypot(xs[a] - xs[b], ys[a] - ys[b])
+      if (dd > longest) { longest = dd; startAt = (k + 1) % n }
+    }
+    edges = n - 1
+  }
+  for (let k = 0; k < edges; k++) {
+    const a = tour[(startAt + k) % n], b = tour[(startAt + k + 1) % n]
+    drapeEdge(out, terrain, p, sMask, xs[a], ys[a], xs[b], ys[b], Math.atan2(ys[b] - ys[a], xs[b] - xs[a]))
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+/**
+ * A triangle net whose mesh size is the ground's roughness.
+ *
+ * The Terrain Ruggedness Index is the mean absolute height difference between
+ * a cell and its eight neighbours — how broken the ground is, independent of
+ * which way it faces. Points are sampled with that as their density, then
+ * triangulated (Delaunator), so scree and crags shatter into small facets and
+ * meadows lie under a few long ones. `floor` keeps a minimum density, or a flat
+ * would get no points and the net would stretch straight across it.
+ *
+ * Voronoi is the same triangulation's dual: one edge between the circumcentres
+ * of every pair of adjacent triangles. Cells on the hull are unbounded and are
+ * left open, and an edge whose end falls off the raster is dropped.
+ */
+function buildRugged(terrain, p, o) {
+  const { grid, gridMask, rows, cols } = terrain
+  const out = { positions: new F32List(), colors: new F32List() }
+  const sMask = terrain.hasNoData ? gridMask : null
+  const n = rows * cols
+  const src = (o.radius ?? 0) > 0 ? boxBlur(grid, cols, rows, o.radius, sMask) : grid
+
+  const tri = new Float32Array(n)
+  let triMax = 0
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      let sum = 0, cnt = 0
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          if (!dr && !dc) continue
+          const rr = r + dr, cc = c + dc
+          if (rr < 0 || rr >= rows || cc < 0 || cc >= cols || !gridMask[rr * cols + cc]) continue
+          sum += Math.abs(src[rr * cols + cc] - src[i]); cnt++
+        }
+      }
+      tri[i] = cnt ? sum / cnt : 0
+      if (tri[i] > triMax) triMax = tri[i]
+    }
+  }
+  // Normalised to the 98th percentile, not the maximum: one cliff pixel would
+  // otherwise set the scale and leave the rest of the plate uniformly sparse.
+  const BINS = 512, hist = new Uint32Array(BINS)
+  let valid = 0
+  for (let i = 0; i < n; i++) if (gridMask[i]) { hist[Math.min(BINS - 1, Math.floor((tri[i] / (triMax || 1)) * BINS))]++; valid++ }
+  let acc = 0, bin = BINS - 1
+  for (let b = 0; b < BINS; b++) { acc += hist[b]; if (acc >= valid * 0.98) { bin = b; break } }
+  const ref = ((bin + 1) / BINS) * (triMax || 1)
+
+  const floor = Math.max(0, Math.min(1, o.floor ?? 0.12)), gam = o.gamma ?? 1
+  const density = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    if (gridMask[i]) density[i] = floor + (1 - floor) * Math.pow(Math.min(1, tri[i] / (ref || 1)), gam)
+  }
+  const count = Math.max(20, Math.min(12000, Math.round(o.count ?? 3000)))
+  const rng = mulberry32(((o.seed ?? 11) * 2654435761) >>> 0)
+  const { xs, ys, n: m } = sampleByDensity(terrain, density, count, rng)
+  if (m < 3) return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+
+  const coords = new Float64Array(m * 2)
+  for (let k = 0; k < m; k++) { coords[2 * k] = xs[k]; coords[2 * k + 1] = ys[k] }
+  const del = new Delaunator(coords)
+  const { triangles, halfedges } = del
+  const kind = o.kind ?? 'delaunay'
+  const next = (e) => (e % 3 === 2 ? e - 2 : e + 1)
+
+  if (kind === 'delaunay' || kind === 'both') {
+    for (let e = 0; e < triangles.length; e++) {
+      if (halfedges[e] > e) continue      // each shared edge once; hull edges (−1) always
+      const a = triangles[e], b = triangles[next(e)]
+      drapeEdge(out, terrain, p, sMask, xs[a], ys[a], xs[b], ys[b], Math.atan2(ys[b] - ys[a], xs[b] - xs[a]))
+    }
+  }
+  if (kind === 'voronoi' || kind === 'both') {
+    const nt = triangles.length / 3, cx = new Float64Array(nt), cy = new Float64Array(nt)
+    for (let t = 0; t < nt; t++) {
+      const a = triangles[3 * t], b = triangles[3 * t + 1], c = triangles[3 * t + 2]
+      const ax = xs[a], ay = ys[a], bx = xs[b] - ax, by = ys[b] - ay, qx = xs[c] - ax, qy = ys[c] - ay
+      const dd = 2 * (bx * qy - by * qx)
+      if (Math.abs(dd) < 1e-12) { cx[t] = NaN; cy[t] = NaN; continue }
+      const b2 = bx * bx + by * by, c2 = qx * qx + qy * qy
+      cx[t] = ax + (qy * b2 - by * c2) / dd
+      cy[t] = ay + (bx * c2 - qx * b2) / dd
+    }
+    const inside = (x, y) => x >= 0 && x <= cols - 1 && y >= 0 && y <= rows - 1
+    for (let e = 0; e < triangles.length; e++) {
+      const f = halfedges[e]
+      if (f < e) continue                 // hull edges (−1) and the second half of each pair
+      const t0 = Math.floor(e / 3), t1 = Math.floor(f / 3)
+      if (!inside(cx[t0], cy[t0]) || !inside(cx[t1], cy[t1])) continue
+      drapeEdge(out, terrain, p, sMask, cx[t0], cy[t0], cx[t1], cy[t1], Math.atan2(cy[t1] - cy[t0], cx[t1] - cx[t0]))
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+// ─── Shadow hatch ────────────────────────────────────────────────────────────
+
+/**
+ * Cross-hatching only where the sun cannot reach.
+ *
+ * The mask is `litField` — the same sweep Shadow Line contours — so it holds
+ * cast shadow as well as ground that faces away: a valley floor under a ridge
+ * is hatched even though it faces the sun. Engraving hatches by Lambert
+ * darkness instead, which knows nothing about what stands between the ground
+ * and the light.
+ *
+ * Parallel strokes are marched across the whole raster and drawn only through
+ * shadowed cells, so each stroke starts and stops at the shadow's edge and the
+ * boundary appears on its own. `outline` also traces that boundary as a line,
+ * which closes the shape the way an engraver would.
+ */
+function buildShadowHatch(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const positions = new F32List(), colors = new F32List()
+  if (!(o.altitude > 0)) return { positions: positions.toArray(), colors: colors.toArray() }
+
+  const lit = smoothField(
+    litField(terrain, { elevScale, azimuth: o.azimuth, altitude: o.altitude }),
+    cols, rows, o.radius ?? 0, sMask)
+  const pitch = Math.max(0.5, (o.spacing ?? 3) / scl)
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
+  const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
+  const angles = o.cross ? [o.angle ?? 45, (o.angle ?? 45) + 90] : [o.angle ?? 45]
+
+  for (const deg of angles) {
+    const theta = (deg * Math.PI) / 180
+    const dx = Math.cos(theta), dz = Math.sin(theta), nx = -dz, nz = dx
+    for (let off = -halfDiag; off <= halfDiag; off += pitch) {
+      const ox = cc + nx * off, oz = rc + nz * off
+      let prevC = 0, prevR = 0, prevE = 0, inRun = false
+      for (let t = -halfDiag; t <= halfDiag; t += 0.5) {
+        const fc = ox + dx * t, fr = oz + dz * t
+        let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1
+        let elev = 0
+        if (ok) {
+          const idx = Math.round(fr) * cols + Math.round(fc)
+          const v = lit[idx]
+          ok = gridMask[idx] === 1 && v >= 0 && v < 0.5
+          if (ok) {
+            const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+            elev = (b - 0.5) * 100 * elevScale
+            ok = b === b && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+          }
+        }
+        if (ok && inRun) {
+          positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH, fc * scl - halfW, elev, fr * scl - halfH)
+          const idx = Math.round(fr) * cols + Math.round(fc)
+          colors.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[idx] / (maxSlope || 1), theta, p))
+        }
+        inRun = ok
+        prevC = fc; prevR = fr; prevE = elev
+      }
+    }
+  }
+
+  const hatch = { positions: positions.toArray(), colors: colors.toArray() }
+  if (!o.outline) return hatch
+  const edge = buildShadowLine(terrain, p, { azimuth: o.azimuth, altitude: o.altitude, smoothing: 2, radius: o.radius ?? 0 })
+  const pos = new Float32Array(hatch.positions.length + edge.positions.length)
+  pos.set(hatch.positions); pos.set(edge.positions, hatch.positions.length)
+  const col = new Float32Array(hatch.colors.length + edge.colors.length)
+  col.set(hatch.colors); col.set(edge.colors, hatch.colors.length)
+  return { positions: pos, colors: col }
 }
 
 // ─── Section ─────────────────────────────────────────────────────────────────

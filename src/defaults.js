@@ -67,13 +67,14 @@ export const STYLE_DEF = {
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
   majorIntervalContours: 10, majorWeightContours: 2, majorOffsetContours: 1, closeRingsContours: false, smoothingContours: 0,
   // Hachure
-  enabledHachure: false, spacingHachure: 4, lengthHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
+  enabledHachure: false, spacingHachure: 4, lengthHachure: 1,
+  styleHachure: 'tick', bandsHachure: 14, gammaHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
   hypsoHachure: false, hypsoModeHachure: 'elevation', hypsoBandedHachure: false, hypsoIntervalHachure: 10,
   // Flow
   enabledFlow: false, spacingFlow: 10, stepFlow: 1, maxLenFlow: 100, colorFlow: '#000000', weightFlow: 1, opacityFlow: 1, dashFlow: 'solid',
   hypsoFlow: false, hypsoModeFlow: 'elevation', hypsoBandedFlow: false, hypsoIntervalFlow: 10,
   // Stream Network (DAG)
-  enabledDag: false, thresholdDag: 2, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
+  enabledDag: false, thresholdDag: 2, accumDag: false, passesDag: 4, gapDag: 0.35, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
   hypsoDag: false, hypsoModeDag: 'elevation', hypsoBandedDag: false, hypsoIntervalDag: 10,
   // Pencil Shading
   enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
@@ -255,6 +256,25 @@ export const STYLE_DEF = {
   gammaRetic: 1, densityModeRetic: 'invElev', seedRetic: 42,
   colorRetic: '#1a1a1a', weightRetic: 2.5, opacityRetic: 0.9, dashRetic: 'solid',
   hypsoRetic: false, hypsoModeRetic: 'elevation', hypsoBandedRetic: false, hypsoIntervalRetic: 10,
+
+  // Single line — a weighted stipple joined by one travelling-salesman tour.
+  enabledTsp: false, countTsp: 2500, densityModeTsp: 'slope', gammaTsp: 1.2,
+  azimuthTsp: 315, seedTsp: 7, closedTsp: false,
+  colorTsp: '#1a1a1a', weightTsp: 1.5, opacityTsp: 1, dashTsp: 'solid',
+  hypsoTsp: false, hypsoModeTsp: 'elevation', hypsoBandedTsp: false, hypsoIntervalTsp: 10,
+
+  // Shadow hatch — cross-hatching confined to the ground the sun cannot reach.
+  enabledShadowHatch: false, azimuthShadowHatch: 315, altitudeShadowHatch: 20,
+  spacingShadowHatch: 5, angleShadowHatch: 45, crossShadowHatch: true,
+  radiusShadowHatch: 1, outlineShadowHatch: true,
+  colorShadowHatch: '#1a1a1a', weightShadowHatch: 1.5, opacityShadowHatch: 1, dashShadowHatch: 'solid',
+  hypsoShadowHatch: false, hypsoModeShadowHatch: 'elevation', hypsoBandedShadowHatch: false, hypsoIntervalShadowHatch: 10,
+
+  // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
+  enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
+  radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
+  colorRugged: '#1a1a1a', weightRugged: 1, opacityRugged: 0.9, dashRugged: 'solid',
+  hypsoRugged: false, hypsoModeRugged: 'elevation', hypsoBandedRugged: false, hypsoIntervalRugged: 10,
 
   // ── Colour modes ──────────────────────────────────────────────────────────
   // Every mode above takes its colour as one scalar into the shared gradient.
@@ -494,7 +514,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the thirty-four modes are
+  // A modifier rather than a mode: it takes whatever the thirty-seven modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

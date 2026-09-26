@@ -283,6 +283,27 @@ const MARKS = {
       </g>
     </g>
   ),
+  // One unbroken line, coiling tight where the tone is dark.
+  tsp: (
+    <g {...BASE}>
+      <path d="M1 11 L3 9 L2 6 L4.5 4 L6 6.5 L5 9 L7 11 L8.5 9.5 L7.5 7.5 L9 6 L8 4 L9.5 2.5 L11 3.5 L10.5 5.5 L12 7 L11 9 L12.5 11 L15 10 L14 7.5 L16.5 5 L15.5 2 L19 1.5 L18 6 L20.5 8 L21 11.5" />
+    </g>
+  ),
+  // Cross-hatching held inside a cast shadow, with its edge drawn.
+  shadowhatch: (
+    <g {...BASE}>
+      <path d="M1 12 C5 6, 9 5.5, 12 7 C15 8.5, 18 5, 21 2" strokeWidth="1.2" />
+      <path d="M4 12 L8 8 M7.5 12 L11.5 8 M11 12 L14 9 M14.5 12 L17.5 7.2 M18 12 L20.5 4.6" strokeWidth="0.6" />
+      <path d="M3 9.2 L6 12 M6.5 7 L11.5 12 M11 7.4 L15.6 12 M15.4 7.4 L20 12" strokeWidth="0.6" opacity="0.7" />
+    </g>
+  ),
+  // Triangles: large facets on the left, shattered small ones on the right.
+  rugged: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1 12 L6 1.5 L11 12 Z M6 1.5 L13 3 L11 12" />
+      <path d="M13 3 L15 6 L11 12 L14.5 9 L15 6 L18 4.5 L13 3 M18 4.5 L21 1.5 M18 4.5 L17.5 8 L15 6 M17.5 8 L21 6 L18 4.5 M17.5 8 L14.5 9 L16 12 L17.5 8 L20 10 L21 6 M20 10 L16 12 M20 10 L21 12" />
+    </g>
+  ),
   // Cell walls, not cells: a crazed network.
   retic: (
     <g stroke="none" fill="currentColor">
