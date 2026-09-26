@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Thirty-eight
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-one
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Thirty-seven modes read $H$ only. [Land cover](#land-cover) reads a second
+Forty modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -565,6 +565,39 @@ rings go around a cliff.
   Levels, limit and smoothing only re-trace it.
 - **Tracing** is the level-set tracer that Sun Hours uses (`traceLevelSet`).
   Unreached cells are −1, and the blur is masked to the reached cells.
+- **Knight's moves** are checked against the two cells they pass between.
+  Otherwise a move could jump a wall one cell thick.
+
+## 39. Truchet
+
+Smith's tile: two quarter circles at opposite corners, in one of two
+orientations. One orientation throughout links the arcs into chains along one
+diagonal, and the other along the other. The sign of
+$\partial z/\partial x \cdot \partial z/\partial y$, read across the whole tile,
+picks the diagonal. *Downhill* lays the chains along the fall line, *Across*
+along the contour, and *Random* is the classic seeded pattern. Tiles flatter
+than *Flat below* (slope against its 95th percentile) stay blank.
+
+## 40. Viewshed
+
+The ground visible from one point (`src/utils/viewshed.js`). One ray runs from
+the eye to every border cell, one cell per step along its longer axis, and
+keeps the steepest elevation angle so far. A cell is visible when its own angle
+reaches that maximum. This is about 4 million steps at 1024², against a billion
+for a separate line of sight to every cell. The heights are real metres, as in
+Isochrones, and the far ground drops by $d^2 (1 - 0.13) / 2R$ for the Earth's
+curvature and refraction: 6.8 m at 10 km.
+
+The 0/1 field is blurred by *Detail*, then hatched on the seen or the hidden
+side with the Shadow Hatch marcher, and its 0.5 level is traced as the outline.
+The share of the ground in view is shown in the panel.
+
+## 41. Route
+
+The fastest walk between two points: the Isochrones search from A, stopped
+when B is settled, and walked back along the predecessors. The grid path turns
+only in sixteen directions, so Chaikin smoothing rounds it before it is draped.
+The panel shows the time, the distance and the climb.
 
 ---
 

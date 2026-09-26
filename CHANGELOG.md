@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.30.0] — 2026-09-26
+
+Tiles that follow the slope, the ground you can see, and the fastest way up.
+
+### Added
+
+- **Truchet.** Quarter-arc tiles turned by the slope, so the arcs link into
+  chains that run downhill, across the slope, or at random. Flat ground stays
+  blank.
+- **Viewshed.** Hatches the ground you can see from one point, or the ground
+  hidden from it, and traces its edge. Pick the eye on the terrain and set its
+  height. The heights are real metres on a GeoTIFF, and the Earth's curvature
+  is included. The panel shows how much of the ground is in view.
+- **Route.** The fastest walk between two picked points, by Tobler's hiking
+  function. The panel shows the walking time, the distance and the climb.
+
+### Fixed
+
+- Isochrones could cross a wall one cell thick with a knight's move. A move
+  now has to pass the two cells it crosses.
+- The start cross of Isochrones sank into steep ground. It is now draped.
+
 ## [1.29.0] — 2026-09-26
 
 Rings of walking time, and fills a pen can draw.

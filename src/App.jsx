@@ -353,6 +353,14 @@ function ComputingPill() {
 }
 
 // ── Root ─────────────────────────────────────────────────────────────────────
+/** Which style keys a terrain pick writes, as [x fraction, y fraction]. */
+const PICK_KEYS = {
+  Isochrone: ['originXIsochrone', 'originYIsochrone'],
+  Viewshed:  ['originXViewshed', 'originYViewshed'],
+  RouteA:    ['startXRoute', 'startYRoute'],
+  RouteB:    ['endXRoute', 'endYRoute'],
+}
+
 export default function App() {
   const { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, loadDem, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
   const heightmapPixels   = useStore((s) => s.heightmapPixels)
@@ -495,7 +503,7 @@ export default function App() {
       // written in stack order, so a preset made after arranging the stack puts
       // it back. Buckets the preset never saw keep their order relative to each
       // other and settle underneath — a preset that knows about three of forty
-      // layers has nothing to say about where the other thirty-eight go.
+      // layers has nothing to say about where the other forty-one go.
       //
       // Only for presets that say so. Before the stack existed the same array
       // was written in *paint* order, ground cover first, and reading one of
@@ -698,9 +706,9 @@ export default function App() {
 
   // ── Elevation profile ─────────────────────────────────────────────────────
   const [profileMode,   setProfileMode]   = useState(false)
-  // Picking the start of the Isochrones: one click on the terrain, through the
-  // same raycast the profile uses.
-  const [isoPick, setIsoPick] = useState(false)
+  // A point picked on the terrain for a mode, through the same raycast the
+  // profile uses: 'Isochrone', 'Viewshed', or 'RouteA' then 'RouteB'.
+  const [pick, setPick] = useState(null)
   const [profileClicks, setProfileClicks] = useState([])
   const [profileData,   setProfileData]   = useState(null)
   // Where the section was taken, kept for as long as the chart is up so the
@@ -738,9 +746,11 @@ export default function App() {
   }, [heightmapPixels, heightmapWidth, heightmapHeight])
 
   const handleProfileClick = useCallback((uv) => {
-    if (isoPick) {
-      setStyle((s) => ({ ...s, originXIsochrone: uv.x, originYIsochrone: 1 - uv.y }))
-      setIsoPick(false)
+    if (pick) {
+      const keys = PICK_KEYS[pick]
+      setStyle((s) => ({ ...s, [keys[0]]: uv.x, [keys[1]]: 1 - uv.y }))
+      // A route is two clicks: the start, then the end.
+      setPick(pick === 'RouteA' ? 'RouteB' : null)
       return
     }
     setProfileAnchors(null)
@@ -752,7 +762,7 @@ export default function App() {
       }
       return next
     })
-  }, [sampleProfile, isoPick])
+  }, [sampleProfile, pick])
 
   // ── Hypsometric integral ──────────────────────────────────────────────────
   const hypsometricIntegral = useMemo(() => {
@@ -1962,7 +1972,7 @@ export default function App() {
     // Metres, for Isochrones: the walking time needs real heights.
     geoTiffElevMin, geoTiffElevMax,
     imageWidth: heightmapWidth, imageHeight: heightmapHeight,
-    profileMode: profileMode || isoPick,
+    profileMode: profileMode || !!pick,
     // Data rather than settings, carried on the bus for the same reason
     // `vectorLayers` and `geoTiffBbox` are: the exporters run off `p` and the
     // credit a plate carries has to reach them, and the geometry worker runs
@@ -2218,7 +2228,7 @@ export default function App() {
         }
         return
       }
-      if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]); setIsoPick(false) }
+      if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]); setPick(null) }
       if (e.code === 'KeyE')   openEditor()
       if (e.code === 'Digit1') beginSvgExport()
       if (e.code === 'Digit2') beginPngExport(false)
@@ -2255,7 +2265,7 @@ export default function App() {
   const noHmap    = !heightmapPixels
 
   // Picking a section is a click, not a drag, and it wants the cursor that says so.
-  const canvasCursor = profileMode || isoPick ? 'crosshair' : (dragging ? 'grabbing' : 'grab')
+  const canvasCursor = profileMode || pick ? 'crosshair' : (dragging ? 'grabbing' : 'grab')
 
   return (
     <div className="w-full h-full" style={{ background: bgCss, position: 'relative' }}>
@@ -2444,9 +2454,9 @@ export default function App() {
         isComputing={isComputing}
         profileMode={profileMode}
         profileClicks={profileClicks}
-        onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]); setIsoPick(false) }}
-        isoPick={isoPick}
-        onIsoPick={(v) => { setIsoPick(v); setProfileMode(false); setProfileClicks([]) }}
+        onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]); setPick(null) }}
+        pick={pick}
+        onPick={(v) => { setPick(v); setProfileMode(false); setProfileClicks([]) }}
         onEditHeightmap={openEditor}
         editSummary={describeEdit(edit, srcWidth, srcHeight)}
         onClearEdit={clearEdit}

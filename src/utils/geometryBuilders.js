@@ -3,7 +3,8 @@
  */
 
 import Delaunator from 'delaunator'
-import { travelTimeField } from './isochrone'
+import { leastCostPath, travelTimeField } from './isochrone'
+import { viewshedField } from './viewshed'
 import { groundPixelMetres, gridValueToMetres } from './geoCoords'
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
@@ -573,6 +574,17 @@ export function buildLineGeometry(terrain, p) {
         interval: p.intervalIsochrone, limit: p.limitIsochrone, maxSlope: p.steepIsochrone,
         cellMetres: p.cellMetresIsochrone, relief: p.reliefIsochrone,
         smoothing: p.smoothingIsochrone, radius: p.radiusIsochrone, marker: p.markerIsochrone }) },
+    { id:'Truchet', builder: (t, ctx) => buildTruchet(t, ctx, {
+        spacing: p.spacingTruchet, threshold: p.thresholdTruchet, align: p.alignTruchet, seed: p.seedTruchet }) },
+    { id:'Viewshed', builder: (t, ctx) => buildViewshed(t, ctx, {
+        originX: p.originXViewshed, originY: p.originYViewshed, eye: p.eyeViewshed,
+        side: p.sideViewshed, spacing: p.spacingViewshed, angle: p.angleViewshed, cross: p.crossViewshed,
+        outline: p.outlineViewshed, radius: p.radiusViewshed, marker: p.markerViewshed,
+        cellMetres: p.cellMetresViewshed, relief: p.reliefViewshed }) },
+    { id:'Route',   builder: (t, ctx) => buildRoute(t, ctx, {
+        startX: p.startXRoute, startY: p.startYRoute, endX: p.endXRoute, endY: p.endYRoute,
+        maxSlope: p.steepRoute, smoothing: p.smoothingRoute, marker: p.markerRoute,
+        cellMetres: p.cellMetresRoute, relief: p.reliefRoute }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },
@@ -685,6 +697,8 @@ export function buildLineGeometry(terrain, p) {
           // the un-mirrored path only: a mirrored label reads backwards, and a
           // kaleidoscope of reversed numbers is not what the option is for.
           labelAnchors: res.labelAnchors ?? null,
+          // A fact the panel reports, such as a route's walking time. Not geometry.
+          note: res.note ?? null,
         })
         continue
       }
@@ -3053,30 +3067,16 @@ let isoCache = { terrain: null, key: null, value: null }
  * of nearly zero.
  */
 function buildIsochrone(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
-  const { elevScale } = p
+  const { rows, cols } = terrain
   const n = rows * cols
-
-  const ground = p.geoTiffBbox && p.geoTiffCRS
-    ? groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight) : null
-  const hasElev = p.geoTiffElevMin != null && p.geoTiffElevMax != null
-  const cellX = (ground ? ground.x : (o.cellMetres ?? 10)) * scl
-  const cellY = (ground ? ground.y : (o.cellMetres ?? 10)) * scl
   const row = (o.originY ?? 0.5) * (rows - 1), col = (o.originX ?? 0.5) * (cols - 1)
+  const m = groundMetres(terrain, p, o.cellMetres, o.relief)
 
-  const key = [row, col, o.direction, o.maxSlope, cellX, cellY, hasElev,
-    p.geoTiffElevMin, p.geoTiffElevMax, p.blackPoint, p.whitePoint, o.relief].join('|')
+  const key = [row, col, o.direction, o.maxSlope, m.key].join('|')
   let seconds
   if (isoCache.terrain === terrain && isoCache.key === key) seconds = isoCache.value
   else {
-    const heights = new Float32Array(n)
-    for (let i = 0; i < n; i++) {
-      heights[i] = hasElev
-        ? gridValueToMetres(grid[i], p.geoTiffElevMin, p.geoTiffElevMax, p.blackPoint ?? 0, p.whitePoint ?? 255)
-        : grid[i] * (o.relief ?? 1000)
-    }
-    seconds = travelTimeField({ heights, mask: gridMask, rows, cols, cellX, cellY },
-      { row, col, direction: o.direction, maxSlopeDeg: o.maxSlope })
+    seconds = travelTimeField(m.ground(), { row, col, direction: o.direction, maxSlopeDeg: o.maxSlope })
     isoCache = { terrain, key, value: seconds }
   }
 
@@ -3094,22 +3094,213 @@ function buildIsochrone(terrain, p, o) {
 
   const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 2)))
   const traced = traceLevelSet(terrain, p, field, levels, smooth)
-  if (!o.marker) return traced
-
   // The origin, as a small cross: the rings mean nothing without their centre.
+  return o.marker ? joinLayers(traced, originCross(terrain, p, row, col)) : traced
+}
+
+/**
+ * The ground in metres, for the modes that walk or look across it.
+ *
+ * A georeferenced raster gives the cell size from its bounding box, and a
+ * GeoTIFF gives heights from its own elevation range through the histogram
+ * handles (`gridValueToMetres`). What the file cannot say comes from the panel:
+ * `cellMetres` per image pixel and `relief` from black to white. `key` names
+ * everything the metres depend on, for a mode's field cache. `ground()` builds
+ * the heights only when a field actually has to be computed.
+ */
+function groundMetres(terrain, p, cellMetres, relief) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const px = p.geoTiffBbox && p.geoTiffCRS
+    ? groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight) : null
+  const hasElev = p.geoTiffElevMin != null && p.geoTiffElevMax != null
+  const cellX = (px ? px.x : (cellMetres ?? 10)) * scl
+  const cellY = (px ? px.y : (cellMetres ?? 10)) * scl
+  const key = [cellX, cellY, hasElev, p.geoTiffElevMin, p.geoTiffElevMax,
+    p.blackPoint, p.whitePoint, hasElev ? '' : (relief ?? 1000)].join('|')
+  const ground = () => {
+    const n = rows * cols, heights = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      heights[i] = hasElev
+        ? gridValueToMetres(grid[i], p.geoTiffElevMin, p.geoTiffElevMax, p.blackPoint ?? 0, p.whitePoint ?? 255)
+        : grid[i] * (relief ?? 1000)
+    }
+    return { heights, mask: gridMask, rows, cols, cellX, cellY }
+  }
+  return { cellX, cellY, key, ground }
+}
+
+/**
+ * A small cross at a grid point, draped on the ground.
+ *
+ * Draped, not flat: a flat cross at the summit's height sinks into the slope
+ * on its uphill side and vanishes under the surface. Nothing off the data.
+ */
+function originCross(terrain, p, row, col) {
+  const { gridMask, rows, cols } = terrain
   const ri = Math.max(0, Math.min(rows - 1, Math.round(row))), ci = Math.max(0, Math.min(cols - 1, Math.round(col)))
-  if (!gridMask[ri * cols + ci]) return traced
-  const e = (grid[ri * cols + ci] - 0.5) * 100 * elevScale
-  const arm = Math.max(3, Math.min(rows, cols) * 0.012) * scl
-  const x = col * scl - halfW, z = row * scl - halfH
-  const col0 = computeVertexColor(normElev(e, minElev, maxElev), 0, 0, p)
-  const pos = new Float32Array(traced.positions.length + 12)
-  pos.set(traced.positions)
-  pos.set([x - arm, e, z - arm, x + arm, e, z + arm, x - arm, e, z + arm, x + arm, e, z - arm], traced.positions.length)
-  const cl = new Float32Array(traced.colors.length + 12)
-  cl.set(traced.colors)
-  for (let k = 0; k < 4; k++) cl.set([col0[0], col0[1], col0[2]], traced.colors.length + k * 3)
-  return { positions: pos, colors: cl }
+  if (!gridMask[ri * cols + ci]) return { positions: new Float32Array(0), colors: new Float32Array(0) }
+  const sMask = terrain.hasNoData ? gridMask : null
+  const arm = Math.max(3, Math.min(rows, cols) * 0.012)
+  const out = { positions: new F32List(), colors: new F32List() }
+  drapeEdge(out, terrain, p, sMask, col - arm, row - arm, col + arm, row + arm, Math.PI / 4)
+  drapeEdge(out, terrain, p, sMask, col - arm, row + arm, col + arm, row - arm, -Math.PI / 4)
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+// ─── Viewshed ────────────────────────────────────────────────────────────────
+
+let viewCache = { terrain: null, key: null, value: null }
+
+/**
+ * The ground visible from one point, hatched, with its edge traced.
+ *
+ * `viewshedField` casts the sight lines in real metres (see viewshed.js). The
+ * 0/1 field is blurred by `radius` before it is used, so the hatch and the
+ * outline follow a smooth edge instead of the cell staircase. `side` picks
+ * which half is hatched: what you see, or what is hidden from you, which is
+ * where a hut or a road can stand unseen.
+ *
+ * The share of the ground in view rides back to the panel as `note`.
+ */
+function buildViewshed(terrain, p, o) {
+  const { gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const row = (o.originY ?? 0.5) * (rows - 1), col = (o.originX ?? 0.5) * (cols - 1)
+  const m = groundMetres(terrain, p, o.cellMetres, o.relief)
+
+  const key = [row, col, o.eye, m.key].join('|')
+  let vis
+  if (viewCache.terrain === terrain && viewCache.key === key) vis = viewCache.value
+  else {
+    vis = viewshedField(m.ground(), { row, col, eye: o.eye })
+    viewCache = { terrain, key, value: vis }
+  }
+
+  const f = new Float32Array(n)
+  let seen = 0, ground = 0
+  for (let i = 0; i < n; i++) {
+    if (!gridMask[i]) { f[i] = -1; continue }
+    f[i] = vis[i]; ground++; seen += vis[i]
+  }
+  const field = smoothField(f, cols, rows, o.radius ?? 0, sMask)
+  const hidden = o.side === 'hidden'
+  const angles = o.cross ? [o.angle ?? 45, (o.angle ?? 45) + 90] : [o.angle ?? 45]
+  let out = hatchWhere(terrain, p,
+    (idx) => field[idx] >= 0 && (hidden ? field[idx] < 0.5 : field[idx] >= 0.5),
+    angles, Math.max(0.5, (o.spacing ?? 4) / scl))
+  if (o.outline) out = joinLayers(out, traceLevelSet(terrain, p, field, [0.5], 2))
+  if (o.marker) out = joinLayers(out, originCross(terrain, p, row, col))
+  return { ...out, note: { visible: ground ? seen / ground : 0 } }
+}
+
+// ─── Least-cost route ────────────────────────────────────────────────────────
+
+let routeCache = { terrain: null, key: null, value: null }
+
+/**
+ * The fastest walk between two points, as one line on the ground.
+ *
+ * `leastCostPath` runs the Isochrones search from A and stops at B. The grid
+ * path moves in the sixteen fixed directions, so Chaikin smoothing rounds its
+ * corners before it is draped a cell at a time. The walking time, distance and
+ * climb ride back to the panel as `note`.
+ */
+function buildRoute(terrain, p, o) {
+  const { rows, cols } = terrain
+  const a = [(o.startY ?? 0.75) * (rows - 1), (o.startX ?? 0.25) * (cols - 1)]
+  const b = [(o.endY ?? 0.25) * (rows - 1), (o.endX ?? 0.75) * (cols - 1)]
+  const m = groundMetres(terrain, p, o.cellMetres, o.relief)
+  const key = [...a, ...b, o.maxSlope, m.key].join('|')
+  let path
+  if (routeCache.terrain === terrain && routeCache.key === key) path = routeCache.value
+  else {
+    path = leastCostPath(m.ground(), a, b, { maxSlopeDeg: o.maxSlope })
+    routeCache = { terrain, key, value: path }
+  }
+  const empty = { positions: new Float32Array(0), colors: new Float32Array(0) }
+  if (!path) return { ...empty, note: { blocked: true } }
+
+  let pts = new Float64Array(path.cells.length * 2)
+  path.cells.forEach((k, q) => { pts[2 * q] = k % cols; pts[2 * q + 1] = (k / cols) | 0 })
+  const smooth = Math.max(0, Math.min(8, Math.round(o.smoothing ?? 3)))
+  if (smooth > 0 && pts.length >= 6) pts = chaikinSmoothFlat(pts, false, smooth, SMOOTH_SIMPLIFY_EPS / smooth)
+
+  const sMask = terrain.hasNoData ? terrain.gridMask : null
+  const line = { positions: new F32List(), colors: new F32List() }
+  for (let q = 2; q < pts.length; q += 2) {
+    drapeEdge(line, terrain, p, sMask, pts[q - 2], pts[q - 1], pts[q], pts[q + 1],
+      Math.atan2(pts[q + 1] - pts[q - 1], pts[q] - pts[q - 2]))
+  }
+  let out = { positions: line.positions.toArray(), colors: line.colors.toArray() }
+  if (o.marker) out = joinLayers(joinLayers(out, originCross(terrain, p, a[0], a[1])), originCross(terrain, p, b[0], b[1]))
+  return { ...out, note: { seconds: path.seconds, metres: path.metres, climb: path.climb } }
+}
+
+// ─── Truchet ─────────────────────────────────────────────────────────────────
+
+/**
+ * Quarter-arc tiles, turned by the ground.
+ *
+ * Smith's tile has two quarter circles at opposite corners, and its two
+ * orientations are the whole alphabet. Tiled one way throughout, the arcs link
+ * into chains along one diagonal; tiled the other way, along the other. So the
+ * sign of ∂z/∂x · ∂z/∂y picks the diagonal: `fall` lays the chains down the
+ * slope, `contour` lays them across it, and `random` is the classic pattern,
+ * seeded.
+ *
+ * The gradient is read across the whole tile rather than one cell, so a tile
+ * answers for the ground it covers. Tiles flatter than `threshold` (slope
+ * against its 95th percentile) are left blank, and the landform shows as the
+ * shape of what is drawn.
+ */
+function buildTruchet(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, gridSlopes } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const out = { positions: new F32List(), colors: new F32List() }
+  const cell = Math.max(2, (o.spacing ?? 8) / scl)
+  const ref = slopePercentile(terrain, 0.95)
+  const align = o.align ?? 'fall'
+  const rng = mulberry32(((o.seed ?? 5) * 2654435761) >>> 0)
+  const R = cell / 2, segs = Math.max(4, Math.min(16, Math.round(cell * 0.8)))
+  const at = (fr, fc) => sampleBilinear(grid, sMask, rows, cols,
+    Math.max(0, Math.min(rows - 1, fr)), Math.max(0, Math.min(cols - 1, fc)))
+
+  const arc = (cx, cy, a0) => {
+    let pc = cx + R * Math.cos(a0), pr = cy + R * Math.sin(a0)
+    for (let k = 1; k <= segs; k++) {
+      const a = a0 + (Math.PI / 2) * (k / segs)
+      const nc = cx + R * Math.cos(a), nr = cy + R * Math.sin(a)
+      drapeEdge(out, terrain, p, sMask, pc, pr, nc, nr, a)
+      pc = nc; pr = nr
+    }
+  }
+  for (let r0 = 0; r0 + cell <= rows - 1 + 1e-9; r0 += cell) {
+    for (let c0 = 0; c0 + cell <= cols - 1 + 1e-9; c0 += cell) {
+      const mr = r0 + R, mc = c0 + R
+      const mi = Math.round(mr) * cols + Math.round(mc)
+      if (!gridMask[mi]) continue
+      if (gridSlopes[mi] / ref < (o.threshold ?? 0.12)) { rng(); continue }
+      const gx = at(mr, c0 + cell) - at(mr, c0), gz = at(r0 + cell, mc) - at(r0, mc)
+      const same = gx * gz > 0
+      const first = align === 'random' ? rng() < 0.5 : (align === 'contour' ? same : !same)
+      if (align !== 'random') rng()
+      if (first) { arc(c0, r0, 0); arc(c0 + cell, r0 + cell, Math.PI) }
+      else { arc(c0 + cell, r0, Math.PI / 2); arc(c0, r0 + cell, Math.PI * 1.5) }
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+/** The slope below which `q` of the ground lies, for normalising against. */
+function slopePercentile(terrain, q) {
+  const { gridMask, gridSlopes, maxSlope } = terrain
+  const BINS = 256, hist = new Uint32Array(BINS), top = maxSlope || 1
+  let valid = 0
+  for (let i = 0; i < gridSlopes.length; i++) if (gridMask[i]) { hist[Math.min(BINS - 1, Math.floor((gridSlopes[i] / top) * BINS))]++; valid++ }
+  let acc = 0
+  for (let b = 0; b < BINS; b++) { acc += hist[b]; if (acc >= valid * q) return ((b + 1) / BINS) * top }
+  return top
 }
 
 // ─── Shadow line ─────────────────────────────────────────────────────────────
@@ -4018,20 +4209,36 @@ function buildRugged(terrain, p, o) {
  * which closes the shape the way an engraver would.
  */
 function buildShadowHatch(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
-  const { elevScale, elevMinCut, elevMaxCut } = p
+  const { gridMask, rows, cols, scl } = terrain
+  const { elevScale } = p
   const sMask = terrain.hasNoData ? gridMask : null
-  const positions = new F32List(), colors = new F32List()
-  if (!(o.altitude > 0)) return { positions: positions.toArray(), colors: colors.toArray() }
+  if (!(o.altitude > 0)) return { positions: new Float32Array(0), colors: new Float32Array(0) }
 
   const lit = smoothField(
     litField(terrain, { elevScale, azimuth: o.azimuth, altitude: o.altitude }),
     cols, rows, o.radius ?? 0, sMask)
-  const pitch = Math.max(0.5, (o.spacing ?? 3) / scl)
+  const angles = o.cross ? [o.angle ?? 45, (o.angle ?? 45) + 90] : [o.angle ?? 45]
+  const hatch = hatchWhere(terrain, p, (idx) => lit[idx] >= 0 && lit[idx] < 0.5,
+    angles, Math.max(0.5, (o.spacing ?? 3) / scl))
+  if (!o.outline) return hatch
+  return joinLayers(hatch,
+    buildShadowLine(terrain, p, { azimuth: o.azimuth, altitude: o.altitude, smoothing: 2, radius: o.radius ?? 0 }))
+}
+
+/**
+ * Parallel strokes through every cell where `test(idx)` holds, draped.
+ *
+ * Lines are marched across the whole raster at each angle, `pitch` cells apart,
+ * and drawn only where the test passes, so each stroke starts and stops at the
+ * region's edge. Shadow Hatch and Viewshed both hatch a region this way.
+ */
+function hatchWhere(terrain, p, test, angles, pitch) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const positions = new F32List(), colors = new F32List()
   const cc = (cols - 1) / 2, rc = (rows - 1) / 2
   const halfDiag = Math.sqrt(cc * cc + rc * rc) + 1
-  const angles = o.cross ? [o.angle ?? 45, (o.angle ?? 45) + 90] : [o.angle ?? 45]
-
   for (const deg of angles) {
     const theta = (deg * Math.PI) / 180
     const dx = Math.cos(theta), dz = Math.sin(theta), nx = -dz, nz = dx
@@ -4044,8 +4251,7 @@ function buildShadowHatch(terrain, p, o) {
         let elev = 0
         if (ok) {
           const idx = Math.round(fr) * cols + Math.round(fc)
-          const v = lit[idx]
-          ok = gridMask[idx] === 1 && v >= 0 && v < 0.5
+          ok = gridMask[idx] === 1 && test(idx)
           if (ok) {
             const b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
             elev = (b - 0.5) * 100 * elevScale
@@ -4062,14 +4268,15 @@ function buildShadowHatch(terrain, p, o) {
       }
     }
   }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
 
-  const hatch = { positions: positions.toArray(), colors: colors.toArray() }
-  if (!o.outline) return hatch
-  const edge = buildShadowLine(terrain, p, { azimuth: o.azimuth, altitude: o.altitude, smoothing: 2, radius: o.radius ?? 0 })
-  const pos = new Float32Array(hatch.positions.length + edge.positions.length)
-  pos.set(hatch.positions); pos.set(edge.positions, hatch.positions.length)
-  const col = new Float32Array(hatch.colors.length + edge.colors.length)
-  col.set(hatch.colors); col.set(edge.colors, hatch.colors.length)
+/** Two `{positions, colors}` results as one. */
+function joinLayers(a, b) {
+  const pos = new Float32Array(a.positions.length + b.positions.length)
+  pos.set(a.positions); pos.set(b.positions, a.positions.length)
+  const col = new Float32Array(a.colors.length + b.colors.length)
+  col.set(a.colors); col.set(b.colors, a.colors.length)
   return { positions: pos, colors: col }
 }
 

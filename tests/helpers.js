@@ -149,7 +149,7 @@ export const switchMarkOn = (page, mark) => setMark(page, mark, true)
 /**
  * Opens one draw mode's section from the sheet.
  *
- * Marks is a sheet of thirty-eight tiles, and a mode's own section is behind the
+ * Marks is a sheet of forty-one tiles, and a mode's own section is behind the
  * tile's name. This is the two clicks that get to it: the pane, then the mark.
  * `id` is the mode's id — `Contours`, `ZeroCross` — the same one `mode-tile-`
  * and `enabled<Id>` use.
@@ -159,7 +159,7 @@ export async function openMark(page, mark) {
   await openStage(page, 'marks')
   /*
    * The sheet lives inside the `Draw Modes` section, so a shut one collapses
-   * all thirty-eight tiles to a zero-height row. They stay in the tree and stay
+   * all forty-one tiles to a zero-height row. They stay in the tree and stay
    * "visible" to a locator — the row is `0fr` and `overflow:hidden`, not
    * `display:none` — so a click on a tile silently lands on the header above
    * it instead. Open it first.

@@ -332,6 +332,13 @@ To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
 9. Add a line in `PANEL_MODES` in `panel/sectionSummary.js`, and a family in
    `panel/markFamilies.js`.
 
+Two optional parts:
+
+- A builder can return `note`, a small object that rides on the layer to the
+  panel. Viewshed returns the share in view, and Route returns its time.
+- A mode that needs a point on the terrain adds its keys to `PICK_KEYS` in
+  `App.jsx` and calls `onPick`. The click goes through the profile's raycast.
+
 The rebuild key is derived, so it is not a step. Two traps fail at module load:
 
 - Render-side params are excluded by regex, and some patterns are prefixes

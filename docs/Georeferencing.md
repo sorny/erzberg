@@ -428,6 +428,10 @@ keep their values and undo is not flooded. Below the horizon, the altitude
 clamps to zero and the panel says *below the horizon*. A PNG has no location, so
 the panel asks for one.
 
+**Isochrones**, **Viewshed** and **Route** work in metres. A georeferenced
+raster gives the cell size (`groundPixelMetres`), and a GeoTIFF gives the
+heights (`gridValueToMetres`). On a PNG, the panel asks for both.
+
 **Sun Hours** and **Shadow Line** use the same solar code. Their maths is in
 [Draw modes](Draw-Modes.md#34-sun-hours). Two limits are stated in the panel:
 

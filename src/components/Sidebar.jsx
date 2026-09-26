@@ -23,6 +23,12 @@ import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
 import { PAPERS, frameRect, paperAspect, paperRatioLabel } from '../utils/frame'
 import { formatClock, zoneForLongitude } from '../utils/solar'
+
+/** A walking time as `2 h 05 min`, or `45 min` under an hour. */
+const formatWalk = (seconds) => {
+  const m = Math.round(seconds / 60)
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
+}
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
 import { shadowSun } from '../utils/sunHours'
 import { isDarkBackground } from '../utils/colorUtils'
@@ -715,7 +721,7 @@ export function Sidebar({
   lineGeo, surfaceGeo, terrainData,
   hypsometricIntegral,
   lastBuildMs, isComputing,
-  profileMode, profileClicks, onProfileMode, isoPick, onIsoPick,
+  profileMode, profileClicks, onProfileMode, pick, onPick,
   onEditHeightmap, editSummary, onClearEdit,
   open: openProp, onOpenChange, onPristine,
 }) {
@@ -874,7 +880,7 @@ export function Sidebar({
      *
      * The sheet is the whole pane now, so a shut `Draw Modes` leaves one header
      * and nothing under it — a dead end that the old pane never had, because
-     * shutting the index there still left thirty-eight section headers below it.
+     * shutting the index there still left forty-one section headers below it.
      * Reopening on arrival keeps the disclosure and removes the dead end.
      */
     if (n === 3) setSec(prev => (prev.modeIndex ? prev : { ...prev, modeIndex: true }))
@@ -952,7 +958,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeSection: false, modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1094,6 +1100,10 @@ export function Sidebar({
   }
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
+  // Facts the builders measured, carried on their layers as `note`.
+  const noteOf = (id) => (Array.isArray(lineGeo) ? lineGeo.find((l) => l.id === id)?.note : null) ?? null
+  const viewshedNote = noteOf('Viewshed')
+  const routeNote = noteOf('Route')
   const crsInfo     = classifyCRS(geoTiffCRS)
 
   /*
@@ -1167,6 +1177,9 @@ export function Sidebar({
       modeShadowHatch: !!newStyle.enabledShadowHatch,
       modeRugged:   !!newStyle.enabledRugged,
       modeIsochrone: !!newStyle.enabledIsochrone,
+      modeTruchet:  !!newStyle.enabledTruchet,
+      modeViewshed: !!newStyle.enabledViewshed,
+      modeRoute:    !!newStyle.enabledRoute,
       modeIndexed:  !!newStyle.enabledIndexed,
       modeOutrun:   !!newStyle.enabledOutrun,
       modeRiso:     !!newStyle.enabledRiso,
@@ -1184,7 +1197,7 @@ export function Sidebar({
    *
    * It used to open the mode's section and scroll to it as well, because turning
    * one on was almost always the first half of tuning it, and the index it lived
-   * in sat above thirty-eight headers that were the real way in. The sheet *is*
+   * in sat above forty-one headers that were the real way in. The sheet *is*
    * the way in, and opening a mode is now its own target on the same tile — so
    * switching one on leaves you on the sheet, where switching on a second and a
    * third is one click each. The section still opens underneath, so drilling in
@@ -1481,7 +1494,7 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-eight draw
+            * they add up to, which nothing on screen ever did: forty-one draw
             * modes compose freely, and counting the lit ones meant scrolling
             * 2 282 px past the thirty-two that were off.
             *
@@ -2417,7 +2430,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The sheet, standing in for the thirty-eight sections below it.
+          {/* The sheet, standing in for the forty-one sections below it.
               It is still a Section so that it can be closed by anyone who does
               not want it, found by the filter, and given the same shut-state
               readout every other header carries — and so that the panel's four
@@ -3297,9 +3310,9 @@ export function Sidebar({
             {style.enabledIsochrone && (
               <>
                 <Sub>
-                  <Btn block variant="toggle" on={!!isoPick} data-testid="isochrone-pick"
-                    onClick={() => onIsoPick?.(!isoPick)} style={{ marginBottom:8 }}>
-                    {isoPick ? 'Click the start on the terrain…' : 'Pick start on terrain'}
+                  <Btn block variant="toggle" on={pick === 'Isochrone'} data-testid="isochrone-pick"
+                    onClick={() => onPick?.(pick === 'Isochrone' ? null : 'Isochrone')} style={{ marginBottom:8 }}>
+                    {pick === 'Isochrone' ? 'Click the start on the terrain…' : 'Pick start on terrain'}
                   </Btn>
                   <div style={{ display:'flex', gap:2, marginBottom:8 }}>
                     {[['out','FROM HERE'],['back','BACK HERE']].map(([m, lbl]) => (
@@ -3324,6 +3337,97 @@ export function Sidebar({
                   <Tog label="Mark the start" checked={!!style.markerIsochrone} onChange={v => ss({ markerIsochrone: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Isochrone" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Truchet" icon={<ModeMark kind="truchet" />} open={sec.modeTruchet} onToggle={() => tog('modeTruchet')} enabled={style.enabledTruchet}>
+            <Tog label="Enabled" testId="mode-truchet" checked={style.enabledTruchet} onChange={v => ss({ enabledTruchet: v })} />
+            {style.enabledTruchet && (
+              <>
+                <Sub>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['fall','DOWNHILL'],['contour','ACROSS'],['random','RANDOM']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.alignTruchet === m}
+                        onClick={() => ss({ alignTruchet: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Tile" help="Tile size. Each tile holds two quarter circles, and the tiles link into chains." min={2} max={60} step={0.5} value={style.spacingTruchet} onChange={v => ss({ spacingTruchet: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Flat below" help="Tiles on ground flatter than this stay blank, so the landform shows as the shape of what is drawn. At 0 every tile is drawn." min={0} max={1} step={0.01} value={style.thresholdTruchet} onChange={v => ss({ thresholdTruchet: v })} fmt={v => v.toFixed(2)} />
+                  {style.alignTruchet === 'random' && (
+                    <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTruchet} onChange={v => ss({ seedTruchet: v })} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Truchet" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Viewshed" icon={<ModeMark kind="viewshed" />} open={sec.modeViewshed} onToggle={() => tog('modeViewshed')} enabled={style.enabledViewshed}>
+            <Tog label="Enabled" testId="mode-viewshed" checked={style.enabledViewshed} onChange={v => ss({ enabledViewshed: v })} />
+            {style.enabledViewshed && (
+              <>
+                <Sub>
+                  <Btn block variant="toggle" on={pick === 'Viewshed'} data-testid="viewshed-pick"
+                    onClick={() => onPick?.(pick === 'Viewshed' ? null : 'Viewshed')} style={{ marginBottom:8 }}>
+                    {pick === 'Viewshed' ? 'Click where you stand…' : 'Pick eye on terrain'}
+                  </Btn>
+                  {viewshedNote && (
+                    <div data-testid="viewshed-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8 }}>
+                      {`${Math.round(viewshedNote.visible * 100)}% of the ground is in view`}
+                    </div>
+                  )}
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['visible','HATCH SEEN'],['hidden','HATCH HIDDEN']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.sideViewshed === m}
+                        onClick={() => ss({ sideViewshed: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Eye height" help="Metres above the ground. A person is about 1.7 m, a tower 20 m or more. On a rounded summit a low eye sees little: the shoulder of the hill hides the slopes below it, as it does on a real one." min={0} max={200} step={0.5} value={style.eyeViewshed} onChange={v => ss({ eyeViewshed: v })} fmt={v => `${v} m`} />
+                  <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingViewshed} onChange={v => ss({ spacingViewshed: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleViewshed} onChange={v => ss({ angleViewshed: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Detail" help="Blur on the edge of the view before it is hatched and traced. At 0 the edge follows the grid." min={0} max={12} step={0.5} value={style.radiusViewshed} onChange={v => ss({ radiusViewshed: v })} fmt={v => v.toFixed(1)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresViewshed} onChange={v => ss({ cellMetresViewshed: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefViewshed} onChange={v => ss({ reliefViewshed: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Cross-hatch" checked={!!style.crossViewshed} onChange={v => ss({ crossViewshed: v })} />
+                  <Tog label="Outline" checked={!!style.outlineViewshed} onChange={v => ss({ outlineViewshed: v })} />
+                  <Tog label="Mark the eye" checked={!!style.markerViewshed} onChange={v => ss({ markerViewshed: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Viewshed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Route" icon={<ModeMark kind="route" />} open={sec.modeRoute} onToggle={() => tog('modeRoute')} enabled={style.enabledRoute}>
+            <Tog label="Enabled" testId="mode-route" checked={style.enabledRoute} onChange={v => ss({ enabledRoute: v })} />
+            {style.enabledRoute && (
+              <>
+                <Sub>
+                  <Btn block variant="toggle" on={pick === 'RouteA' || pick === 'RouteB'} data-testid="route-pick"
+                    onClick={() => onPick?.(pick === 'RouteA' || pick === 'RouteB' ? null : 'RouteA')} style={{ marginBottom:8 }}>
+                    {pick === 'RouteA' ? 'Click the start…' : pick === 'RouteB' ? 'Click the end…' : 'Pick start and end'}
+                  </Btn>
+                  <div data-testid="route-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    {!routeNote ? 'No walkable route between the two points.'
+                      : `${formatWalk(routeNote.seconds)} · ${(routeNote.metres / 1000).toFixed(1)} km · ↑ ${Math.round(routeNote.climb)} m`}
+                  </div>
+                  <InlineSl label="Too steep" help="Ground steeper than this cannot be walked, so the route goes around it." min={10} max={80} step={1} value={style.steepRoute} onChange={v => ss({ steepRoute: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Smoothing" help="Chaikin passes over the grid path, which otherwise turns only in fixed directions." min={0} max={8} step={1} value={style.smoothingRoute} onChange={v => ss({ smoothingRoute: Math.round(v) })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresRoute} onChange={v => ss({ cellMetresRoute: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefRoute} onChange={v => ss({ reliefRoute: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Mark the ends" checked={!!style.markerRoute} onChange={v => ss({ markerRoute: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Route" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>
@@ -3684,7 +3788,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the thirty-eight modes
+              A modifier, not a mode: it takes whatever the forty-one modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

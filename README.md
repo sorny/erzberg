@@ -18,7 +18,7 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 38 independent draw modes: surveyor's
+The app renders it as 3D line art with 41 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, and
 tracks that something with mass laid down a face. Contours letter their own
 heights.
@@ -85,7 +85,7 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 38 modes as tiles in six families:
+- **Marks sheet.** The Marks stage shows the 41 modes as tiles in six families:
   Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you three things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 38 modes.
+  classes you pick. This works for all 41 modes.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.
@@ -284,6 +284,9 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Shadow Hatch | Cross-hatching only inside cast and attached shadow |
 | Roughness Mesh | Delaunay or Voronoi net, dense where the ground is rugged |
 | Isochrones | Lines of equal walking time from one point (Tobler's hiking function) |
+| Truchet | Quarter-arc tiles turned to follow the slope |
+| Viewshed | The ground visible from one point, hatched |
+| Route | The fastest walk between two points, with its time |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

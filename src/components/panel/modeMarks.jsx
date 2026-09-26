@@ -313,6 +313,29 @@ const MARKS = {
       <path d="M1.5 6.5 C1.5 1.5, 15 0.8, 17.5 5 C19 7.5, 21 9, 20 10.5 C17 12.8, 1.6 12, 1.5 6.5 Z" />
     </g>
   ),
+  // Quarter arcs linking tile to tile into chains.
+  truchet: (
+    <g {...BASE}>
+      <path d="M1 6.5 A5.5 5.5 0 0 0 6.5 1 M17.5 1 A5.5 5.5 0 0 0 12 6.5 A5.5 5.5 0 0 1 6.5 12 M17.5 12 A5.5 5.5 0 0 1 21 8.5" />
+      <path d="M6.5 1 A5.5 5.5 0 0 0 12 6.5 M12 6.5 A5.5 5.5 0 0 1 17.5 12 M1 6.5 A5.5 5.5 0 0 1 6.5 12" opacity="0.55" />
+    </g>
+  ),
+  // An eye on a summit, and the slope it can see hatched.
+  viewshed: (
+    <g {...BASE}>
+      <path d="M1 12 L7 3 L10 6 L13 4.5 L21 12" />
+      <path d="M8.5 5 L4 11.5 M10.5 6.4 L6.5 11.5 M12.2 5.3 L9 11.5 M14.5 5.7 L11.5 11.5" strokeWidth="0.6" />
+      <path d="M5.8 3 L8.2 3 M7 1.8 L7 4.2" strokeWidth="1.1" />
+    </g>
+  ),
+  // A path winding between two ends, round a contour rather than over it.
+  route: (
+    <g {...BASE}>
+      <path d="M8 6.5 C8 3.5, 15 3.5, 15 6.5 C15 9.5, 8 9.5, 8 6.5 Z" opacity="0.5" strokeWidth="0.7" />
+      <path d="M2 11 C5 11, 5 8, 6 6.5 C7 3, 11 1.5, 14 2.2 C17.5 3, 18 6, 20 5" strokeWidth="1.5" />
+      <circle cx="2" cy="11" r="1" /><circle cx="20" cy="5" r="1" />
+    </g>
+  ),
   // Cell walls, not cells: a crazed network.
   retic: (
     <g stroke="none" fill="currentColor">

@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-eight at once.
+ * does the index that shows all forty-one at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -201,6 +201,20 @@ export const DRAW_MODES = [
     // cached, so only a new start or a new terrain pays for it again.
     id: 'Isochrone', label: 'Isochrones', cost: 3, mark: 'isochrone',
     pick: { smoothing: [1, 4], radius: [1, 4] },
+  },
+  {
+    id: 'Truchet', label: 'Truchet', cost: 1.5, mark: 'truchet',
+    pick: { spacing: [4, 16], threshold: [0.05, 0.3] },
+  },
+  {
+    // One ray per border cell, about four million steps at 1024². Cached.
+    id: 'Viewshed', label: 'Viewshed', cost: 2.5, mark: 'viewshed',
+    pick: { spacing: [2, 8], angle: [20, 70], radius: [0, 3] },
+  },
+  {
+    // The Isochrones search, stopped at the far end. Cached.
+    id: 'Route', label: 'Route', cost: 2, mark: 'route',
+    pick: { smoothing: [1, 5] },
   },
   {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',

@@ -278,6 +278,26 @@ export const STYLE_DEF = {
   colorIsochrone: '#1a1a1a', weightIsochrone: 1.5, opacityIsochrone: 1, dashIsochrone: 'solid',
   hypsoIsochrone: false, hypsoModeIsochrone: 'elevation', hypsoBandedIsochrone: false, hypsoIntervalIsochrone: 10,
 
+  // Truchet — quarter-arc tiles turned by the slope.
+  enabledTruchet: false, spacingTruchet: 8, thresholdTruchet: 0.12, alignTruchet: 'fall', seedTruchet: 5,
+  colorTruchet: '#1a1a1a', weightTruchet: 1.5, opacityTruchet: 1, dashTruchet: 'solid',
+  hypsoTruchet: false, hypsoModeTruchet: 'elevation', hypsoBandedTruchet: false, hypsoIntervalTruchet: 10,
+
+  // Viewshed — the ground visible from one point, hatched.
+  enabledViewshed: false, originXViewshed: 0.5, originYViewshed: 0.5, eyeViewshed: 2,
+  sideViewshed: 'visible', spacingViewshed: 4, angleViewshed: 45, crossViewshed: false,
+  outlineViewshed: true, radiusViewshed: 1, markerViewshed: true,
+  cellMetresViewshed: 10, reliefViewshed: 1000,
+  colorViewshed: '#1a1a1a', weightViewshed: 1.2, opacityViewshed: 1, dashViewshed: 'solid',
+  hypsoViewshed: false, hypsoModeViewshed: 'elevation', hypsoBandedViewshed: false, hypsoIntervalViewshed: 10,
+
+  // Route — the fastest walk between two points (Tobler's function).
+  enabledRoute: false, startXRoute: 0.25, startYRoute: 0.75, endXRoute: 0.75, endYRoute: 0.25,
+  steepRoute: 40, smoothingRoute: 3, markerRoute: true,
+  cellMetresRoute: 10, reliefRoute: 1000,
+  colorRoute: '#c0561a', weightRoute: 3, opacityRoute: 1, dashRoute: 'solid',
+  hypsoRoute: false, hypsoModeRoute: 'elevation', hypsoBandedRoute: false, hypsoIntervalRoute: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
@@ -522,7 +542,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the thirty-eight modes are
+  // A modifier rather than a mode: it takes whatever the forty-one modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective
