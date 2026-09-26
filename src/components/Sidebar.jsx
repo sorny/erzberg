@@ -715,7 +715,7 @@ export function Sidebar({
   lineGeo, surfaceGeo, terrainData,
   hypsometricIntegral,
   lastBuildMs, isComputing,
-  profileMode, profileClicks, onProfileMode,
+  profileMode, profileClicks, onProfileMode, isoPick, onIsoPick,
   onEditHeightmap, editSummary, onClearEdit,
   open: openProp, onOpenChange, onPristine,
 }) {
@@ -874,7 +874,7 @@ export function Sidebar({
      *
      * The sheet is the whole pane now, so a shut `Draw Modes` leaves one header
      * and nothing under it — a dead end that the old pane never had, because
-     * shutting the index there still left thirty-seven section headers below it.
+     * shutting the index there still left thirty-eight section headers below it.
      * Reopening on arrival keeps the disclosure and removes the dead end.
      */
     if (n === 3) setSec(prev => (prev.modeIndex ? prev : { ...prev, modeIndex: true }))
@@ -952,7 +952,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeSection: false, modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1166,6 +1166,7 @@ export function Sidebar({
       modeTsp:      !!newStyle.enabledTsp,
       modeShadowHatch: !!newStyle.enabledShadowHatch,
       modeRugged:   !!newStyle.enabledRugged,
+      modeIsochrone: !!newStyle.enabledIsochrone,
       modeIndexed:  !!newStyle.enabledIndexed,
       modeOutrun:   !!newStyle.enabledOutrun,
       modeRiso:     !!newStyle.enabledRiso,
@@ -1183,7 +1184,7 @@ export function Sidebar({
    *
    * It used to open the mode's section and scroll to it as well, because turning
    * one on was almost always the first half of tuning it, and the index it lived
-   * in sat above thirty-seven headers that were the real way in. The sheet *is*
+   * in sat above thirty-eight headers that were the real way in. The sheet *is*
    * the way in, and opening a mode is now its own target on the same tile — so
    * switching one on leaves you on the sheet, where switching on a second and a
    * third is one click each. The section still opens underneath, so drilling in
@@ -1480,7 +1481,7 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: thirty-seven draw
+            * they add up to, which nothing on screen ever did: thirty-eight draw
             * modes compose freely, and counting the lit ones meant scrolling
             * 2 282 px past the thirty-two that were off.
             *
@@ -2416,7 +2417,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The sheet, standing in for the thirty-seven sections below it.
+          {/* The sheet, standing in for the thirty-eight sections below it.
               It is still a Section so that it can be closed by anyone who does
               not want it, found by the filter, and given the same shut-state
               readout every other header carries — and so that the panel's four
@@ -3291,6 +3292,42 @@ export function Sidebar({
             )}
           </Section>
 
+          <Section title="Mode: Isochrones" icon={<ModeMark kind="isochrone" />} open={sec.modeIsochrone} onToggle={() => tog('modeIsochrone')} enabled={style.enabledIsochrone}>
+            <Tog label="Enabled" testId="mode-isochrone" checked={style.enabledIsochrone} onChange={v => ss({ enabledIsochrone: v })} />
+            {style.enabledIsochrone && (
+              <>
+                <Sub>
+                  <Btn block variant="toggle" on={!!isoPick} data-testid="isochrone-pick"
+                    onClick={() => onIsoPick?.(!isoPick)} style={{ marginBottom:8 }}>
+                    {isoPick ? 'Click the start on the terrain…' : 'Pick start on terrain'}
+                  </Btn>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['out','FROM HERE'],['back','BACK HERE']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={style.directionIsochrone === m}
+                        onClick={() => ss({ directionIsochrone: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="Every" help="Minutes between the rings." min={1} max={120} step={1} value={style.intervalIsochrone} onChange={v => ss({ intervalIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)} min`} />
+                  <InlineSl label="Up to" help="The longest walk drawn." min={0.25} max={24} step={0.25} value={style.limitIsochrone} onChange={v => ss({ limitIsochrone: v })} fmt={v => `${v} h`} />
+                  <InlineSl label="Too steep" help="Ground steeper than this cannot be walked, so the rings go around it. Tobler's function already slows a walker a lot above 25°." min={10} max={80} step={1} value={style.steepIsochrone} onChange={v => ss({ steepIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  {/* Asked only for what the file cannot say. A georeferenced
+                      raster knows its pixel size, and a GeoTIFF its heights. */}
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresIsochrone} onChange={v => ss({ cellMetresIsochrone: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefIsochrone} onChange={v => ss({ reliefIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <InlineSl label="Detail" help="Blur on the time field before it is traced. At 0 the rings show the grid's steps." min={0} max={12} step={0.5} value={style.radiusIsochrone} onChange={v => ss({ radiusIsochrone: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Smoothing" min={0} max={25} step={1} value={style.smoothingIsochrone} onChange={v => ss({ smoothingIsochrone: Math.round(v) })} />
+                  <Tog label="Mark the start" checked={!!style.markerIsochrone} onChange={v => ss({ markerIsochrone: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Isochrone" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged}>
             <Tog label="Enabled" testId="mode-rugged" checked={style.enabledRugged} onChange={v => ss({ enabledRugged: v })} />
             {style.enabledRugged && (
@@ -3647,7 +3684,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the thirty-seven modes
+              A modifier, not a mode: it takes whatever the thirty-eight modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>
@@ -3838,6 +3875,30 @@ export function Sidebar({
               <Tog label="Plotter order" testId="plot-order" small
                 help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."
                 checked={!!view.plotPenOrder} onChange={v => sv({ plotPenOrder: v })} />
+              {/* Only while a mode that exports filled areas is drawing. It is an
+                  SVG-only choice, so the viewport looks the same either way. */}
+              {(style.enabledIndexed || style.enabledMineral || style.enabledCover || style.enabledShed) && (
+                <div data-testid="plot-area-fill" style={{ marginBottom:6 }}>
+                  <div style={{ fontSize:11, color: DIM, margin:'2px 0 5px' }}>Filled areas in the SVG</div>
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['solid','FILL'],['hatch','HATCH']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={(view.plotAreaFill ?? 'solid') === m}
+                        data-testid={`plot-fill-${m}`} onClick={() => sv({ plotAreaFill: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  {view.plotAreaFill === 'hatch' && (
+                    <>
+                      <InlineSl label="Pitch" testId="plot-hatch-pitch"
+                        help="Distance between hatch lines on paper, for an ink at full contrast with the paper. A lighter ink is hatched more openly, and the darkest inks are cross-hatched. Set it near your pen width for a solid tone."
+                        min={0.2} max={5} step={0.05} value={view.plotHatchPitch ?? 0.8}
+                        onChange={v => sv({ plotHatchPitch: v })} fmt={v => v.toFixed(2) + ' mm'} />
+                      <InlineSl label="Angle" min={0} max={180} step={1} value={view.plotHatchAngle ?? 45}
+                        onChange={v => sv({ plotHatchAngle: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                    </>
+                  )}
+                </div>
+              )}
               <Btn block onClick={onPreflight} data-testid="preflight">Preflight</Btn>
               <div data-testid="preflight-readout" style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.8 }}>
                 {!plotStats ? (

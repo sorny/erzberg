@@ -72,7 +72,7 @@ export const SECTION_PARAMS = {
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
   'Anaglyph': [/^anaglyph/],
   'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
-  'Export': ['plotWidthMm', 'plotPenOrder'],
+  'Export': ['plotWidthMm', 'plotPenOrder', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
@@ -93,7 +93,9 @@ export const SECTION_PARAMS = {
  */
 export const ALSO_READS = {
   'Anaglyph': ['bgColor', 'orthographic'],
-  'Export': ['frameLandscape', 'showFrame', 'plotWidthMm'],
+  'Export': ['frameLandscape', 'showFrame', 'plotWidthMm',
+    // The hatch controls show only while a mode that exports filled areas is on.
+    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
   'Scale and North': ['orthographic', 'plotWidthMm', 'tilt'],
   'Texture': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],
@@ -119,7 +121,7 @@ export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis']
  *
  * The hypsometric ramp: each mode can colour its marks by height, and each one
  * previews the ramp beside that switch. Thirty-three identical entries in
- * `ALSO_READS` would say the same thing at thirty-seven times the length.
+ * `ALSO_READS` would say the same thing at thirty-eight times the length.
  */
 export const MODE_READS = ['gradientStops']
 

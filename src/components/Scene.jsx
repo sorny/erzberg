@@ -466,6 +466,8 @@ export function Scene({
         sheetMarks: marks,
         sheetMarkColor: p.frameMarkColor ?? '#000000',
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
+        areaFill: p.plotAreaFill, hatchPitchMm: p.plotHatchPitch, hatchAngle: p.plotHatchAngle,
+        sheetMm: p.plotWidthMm,
         // The anaglyph runs the whole pipeline twice, once per eye, so the
         // exporter needs the separation and the two filter inks as well as the
         // switch. `rotation` and the raster size are what put the stereo axis

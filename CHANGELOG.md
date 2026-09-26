@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.29.0] — 2026-09-26
+
+Rings of walking time, and fills a pen can draw.
+
+### Added
+
+- **Isochrones.** Lines of equal walking time from one point, by Tobler's
+  hiking function over the terrain. Uphill and downhill differ, so the rings can
+  show the time from a point or the time back to it. Ground that is too steep to
+  walk is a wall. On a georeferenced GeoTIFF the minutes are real. Pick the
+  start with one click on the terrain.
+- **Hatched fills in the SVG.** Indexed, Mineral, Land cover and Watershed can
+  export their areas as hatch strokes instead of fills, so a pen plotter draws
+  the tone. The pitch is set in millimetres on paper. Darker inks are hatched
+  denser, the darkest are cross-hatched, and each ink keeps its own pen layer.
+
+### Changed
+
+- Preflight now counts the outlines of filled areas, which it skipped before.
+- Sun Hours and Isochrones share one level-set tracer. Sun Hours output is
+  unchanged.
+
 ## [1.28.0] — 2026-09-26
 
 Three new marks and two new ways to draw old ones: one unbroken line, hatching

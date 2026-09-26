@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Thirty-seven
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Thirty-eight
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Thirty-six modes read $H$ only. [Land cover](#land-cover) reads a second
+Thirty-seven modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -453,6 +453,14 @@ drops that mode's lines.
 On the sample plate, Indexed, Mineral and Watershed export 6, 5 and 10 pen
 layers. A mirrored scene has no lattice and falls back to boundary lines.
 
+**Hatch.** With *Filled areas in the SVG* set to Hatch (Output), each area keeps
+its outline and gains hatch strokes instead of a fill (`src/utils/hatchFill.js`).
+Each scanline pairs its crossings in order, which is the even-odd rule, so holes
+stay empty. Consecutive lines alternate direction, so the pen never travels
+back across the area. The pitch is millimetres on paper, divided by the ink's
+contrast with the paper in CIE L*. An ink above 0.66 contrast is also crossed at
+90°. An ink below 0.04 keeps only its outline.
+
 ---
 
 ## 33. Shadow Line
@@ -536,6 +544,27 @@ where $f$ is the floor. The points are triangulated with Delaunator. *Delaunay*
 draws each triangle edge once. *Voronoi* joins the circumcentres of adjacent
 triangles. Hull cells stay open, and an edge with an end off the raster is
 dropped.
+
+## 38. Isochrones
+
+Lines of equal walking time from one point. The speed is Tobler's hiking
+function:
+
+$$v = 6\,e^{-3.5\,|S + 0.05|}\ \text{km/h}, \qquad S = \frac{\Delta h}{\Delta x}$$
+
+It peaks at 6 km/h on a 5% descent, so the steps are directed. *From here* is
+the time to walk out, and *Back here* is the time to walk in. Dijkstra runs over
+16 neighbours: the 8 adjacent cells and the 8 knight's moves. With 8 only, the
+rings on flat ground are octagons, up to 8% long on the diagonals. With 16, the
+error is below 3%. Ground steeper than *Too steep* cannot be walked, so the
+rings go around a cliff.
+
+- **Metres.** A georeferenced raster gives the cell size, and a GeoTIFF gives
+  the heights (`gridValueToMetres`). A PNG takes both from the panel.
+- **Cache.** The field is cached by start, direction, limit slope and metres.
+  Levels, limit and smoothing only re-trace it.
+- **Tracing** is the level-set tracer that Sun Hours uses (`traceLevelSet`).
+  Unreached cells are −1, and the blur is masked to the reached cells.
 
 ---
 

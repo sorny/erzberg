@@ -35,7 +35,7 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings']],
+    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones']],
   ['Tone',     'many small marks add up to a grey',
     ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh']],
   ['Relief',   'the ground given thickness',

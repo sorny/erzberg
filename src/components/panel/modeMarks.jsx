@@ -304,6 +304,15 @@ const MARKS = {
       <path d="M13 3 L15 6 L11 12 L14.5 9 L15 6 L18 4.5 L13 3 M18 4.5 L21 1.5 M18 4.5 L17.5 8 L15 6 M17.5 8 L21 6 L18 4.5 M17.5 8 L14.5 9 L16 12 L17.5 8 L20 10 L21 6 M20 10 L16 12 M20 10 L21 12" />
     </g>
   ),
+  // Rings of equal walking time round a start: pushed out along the easy
+  // ground, pinched where the slope is steep.
+  isochrone: (
+    <g {...BASE}>
+      <path d="M7 6.5 L9 6.5 M8 5.5 L8 7.5" strokeWidth="1.2" />
+      <path d="M4.5 6.5 C4.5 3.6, 11.5 3.4, 12 6.5 C12.4 9.4, 4.6 9.6, 4.5 6.5 Z" />
+      <path d="M1.5 6.5 C1.5 1.5, 15 0.8, 17.5 5 C19 7.5, 21 9, 20 10.5 C17 12.8, 1.6 12, 1.5 6.5 Z" />
+    </g>
+  ),
   // Cell walls, not cells: a crazed network.
   retic: (
     <g stroke="none" fill="currentColor">

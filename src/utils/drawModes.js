@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all thirty-seven at once.
+ * does the index that shows all thirty-eight at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -195,6 +195,12 @@ export const DRAW_MODES = [
   {
     id: 'ShadowHatch', label: 'Shadow hatch', cost: 2, mark: 'shadowhatch',
     pick: { spacing: [2, 6], angle: [20, 70], radius: [0, 2] },
+  },
+  {
+    // A Dijkstra over the whole grid with sixteen neighbours. The field is
+    // cached, so only a new start or a new terrain pays for it again.
+    id: 'Isochrone', label: 'Isochrones', cost: 3, mark: 'isochrone',
+    pick: { smoothing: [1, 4], radius: [1, 4] },
   },
   {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',

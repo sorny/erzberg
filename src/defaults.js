@@ -270,6 +270,14 @@ export const STYLE_DEF = {
   colorShadowHatch: '#1a1a1a', weightShadowHatch: 1.5, opacityShadowHatch: 1, dashShadowHatch: 'solid',
   hypsoShadowHatch: false, hypsoModeShadowHatch: 'elevation', hypsoBandedShadowHatch: false, hypsoIntervalShadowHatch: 10,
 
+  // Isochrones — lines of equal walking time from one point (Tobler's function).
+  enabledIsochrone: false, originXIsochrone: 0.5, originYIsochrone: 0.5,
+  directionIsochrone: 'out', intervalIsochrone: 15, limitIsochrone: 4, steepIsochrone: 40,
+  cellMetresIsochrone: 10, reliefIsochrone: 1000,
+  smoothingIsochrone: 2, radiusIsochrone: 2, markerIsochrone: true,
+  colorIsochrone: '#1a1a1a', weightIsochrone: 1.5, opacityIsochrone: 1, dashIsochrone: 'solid',
+  hypsoIsochrone: false, hypsoModeIsochrone: 'elevation', hypsoBandedIsochrone: false, hypsoIntervalIsochrone: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
@@ -514,7 +522,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the thirty-seven modes are
+  // A modifier rather than a mode: it takes whatever the thirty-eight modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective
@@ -543,4 +551,7 @@ export const VIEW_DEF = {
   // the preflight prints what it would save so the decision is an informed one.
   // See utils/penRoute.js.
   plotPenOrder: false,
+  // Filled areas (Indexed, Mineral, Land cover, Watershed) as a fill or as hatch
+  // strokes a pen can draw. The pitch is millimetres on paper at full contrast.
+  plotAreaFill: 'solid', plotHatchPitch: 0.8, plotHatchAngle: 45,
 }

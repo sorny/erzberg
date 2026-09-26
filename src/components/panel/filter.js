@@ -33,9 +33,9 @@ export const PanelStage = createContext(null)
  * The loaded land-cover plate, for the same reason and on the same terms.
  *
  * Every draw mode carries a class mask, and the control for it lives in the one
- * shared `ModeStyleOverride` that all thirty-seven mode sections render. The
+ * shared `ModeStyleOverride` that all thirty-eight mode sections render. The
  * plate is a single value that control needs and no call site has, so threading
- * it as a prop would be thirty-seven edits to hand every section the same object.
+ * it as a prop would be thirty-eight edits to hand every section the same object.
  *
  * `null` is the ordinary state — no plate loaded — and the control renders
  * nothing at all in that case, so a panel that has never seen a cover file looks

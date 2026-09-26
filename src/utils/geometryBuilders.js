@@ -3,6 +3,8 @@
  */
 
 import Delaunator from 'delaunator'
+import { travelTimeField } from './isochrone'
+import { groundPixelMetres, gridValueToMetres } from './geoCoords'
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear, NODATA_SENTINEL_Y } from './terrain'
 import { hexToRgb, computeVertexColor, sampleGradient } from './colorUtils'
 import { isVectorLayerId } from './vectorLayers'
@@ -566,6 +568,11 @@ export function buildLineGeometry(terrain, p) {
         azimuth: p.azimuthShadowHatch, altitude: p.altitudeShadowHatch,
         spacing: p.spacingShadowHatch, angle: p.angleShadowHatch, cross: p.crossShadowHatch,
         radius: p.radiusShadowHatch, outline: p.outlineShadowHatch }) },
+    { id:'Isochrone', builder: (t, ctx) => buildIsochrone(t, ctx, {
+        originX: p.originXIsochrone, originY: p.originYIsochrone, direction: p.directionIsochrone,
+        interval: p.intervalIsochrone, limit: p.limitIsochrone, maxSlope: p.steepIsochrone,
+        cellMetres: p.cellMetresIsochrone, relief: p.reliefIsochrone,
+        smoothing: p.smoothingIsochrone, radius: p.radiusIsochrone, marker: p.markerIsochrone }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },
@@ -2900,23 +2907,18 @@ function buildIsophotes(terrain, p, levels, sunAzimuth, gamma, smoothing, radius
  * - **NoData is a hole, not a shoreline** — the same rule the isophotes follow,
  *   for the same reason. There is no sunlight where there is no ground.
  */
-function buildSunHours(terrain, p, o) {
+/**
+ * Contours of any per-cell field, draped on the ground.
+ *
+ * Sun Hours and Isochrones both contour a field that is not the elevation, with
+ * −1 for "no value here". A cell with such a corner is skipped, so a level never
+ * wraps the edge of the data. Chains are Chaikin-smoothed `smooth` passes and
+ * draped a cell at a time: these lines cross elevations freely.
+ */
+function traceLevelSet(terrain, p, field, levels, smooth) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const sMask = terrain.hasNoData ? gridMask : null
-  const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 1)))
-
-  const { lat } = latitudeFor(p)
-  const sampling = samplingFor(o.period, o.days, o.date)
-  const field = sunHoursField(terrain, {
-    elevScale, lat, perDay: Math.max(2, Math.min(96, Math.round(o.perDay ?? 12))), ...sampling,
-  })
-
-  // A blur on the *field*, not on the trace — and one that puts the no-ground
-  // sentinel back afterwards. See `smoothField`.
-  const hours = smoothField(field.hours, cols, rows, o.radius ?? 0, sMask)
-
-  const levels = sunHourLevels(field.min, field.max, o.levels)
   const positions = new F32List(), colors = new F32List()
   const ex = _edgeX, ey = _edgeY, eid = _edgeId
   const scratch = getChainScratch(rows * cols * 2)
@@ -2927,8 +2929,8 @@ function buildSunHours(terrain, p, o) {
     for (let r = 0; r < rows - 1; r++) {
       const row0 = r * cols, row1 = row0 + cols
       for (let c = 0; c < cols - 1; c++) {
-        const d00 = hours[row0 + c],     d10 = hours[row0 + c + 1]
-        const d01 = hours[row1 + c],     d11 = hours[row1 + c + 1]
+        const d00 = field[row0 + c],     d10 = field[row0 + c + 1]
+        const d01 = field[row1 + c],     d11 = field[row1 + c + 1]
         if (d00 < 0 || d10 < 0 || d01 < 0 || d11 < 0) continue
 
         const idx = (d00 >= level ? 8 : 0) | (d10 >= level ? 4 : 0) |
@@ -3002,6 +3004,112 @@ function buildSunHours(terrain, p, o) {
   }
 
   return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+function buildSunHours(terrain, p, o) {
+  const { gridMask, rows, cols } = terrain
+  const { elevScale } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 1)))
+
+  const { lat } = latitudeFor(p)
+  const sampling = samplingFor(o.period, o.days, o.date)
+  const field = sunHoursField(terrain, {
+    elevScale, lat, perDay: Math.max(2, Math.min(96, Math.round(o.perDay ?? 12))), ...sampling,
+  })
+
+  // A blur on the *field*, not on the trace — and one that puts the no-ground
+  // sentinel back afterwards. See `smoothField`.
+  const hours = smoothField(field.hours, cols, rows, o.radius ?? 0, sMask)
+
+  const levels = sunHourLevels(field.min, field.max, o.levels)
+  return traceLevelSet(terrain, p, hours, levels, smooth)
+}
+
+// ─── Isochrones ──────────────────────────────────────────────────────────────
+
+/**
+ * The last travel-time field, and what it was built from.
+ *
+ * Levels, limit, smoothing and detail only decide how a finished field is
+ * drawn, and each is a geometry parameter that rebuilds. Without this, every
+ * tick of those sliders repeats a Dijkstra over the whole grid. One entry, keyed
+ * like Sun Hours' field cache: the terrain by identity, the rest by value.
+ */
+let isoCache = { terrain: null, key: null, value: null }
+
+/**
+ * Lines of equal walking time from one point.
+ *
+ * The time field is `travelTimeField` (Tobler's hiking function over the grid,
+ * see isochrone.js), in real metres. On a georeferenced raster the cell size
+ * comes from the bounding box and the heights from the file's own elevation
+ * range, so the rings are minutes a walker would really take. A plain PNG
+ * knows neither, so it takes a cell size and a relief from the panel instead.
+ *
+ * The field is −1 where the walk cannot reach — no ground, or behind ground
+ * too steep to walk. The blur that softens the rings is masked to the reached
+ * cells, so an unreachable pocket does not bleed into its neighbours as a time
+ * of nearly zero.
+ */
+function buildIsochrone(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale } = p
+  const n = rows * cols
+
+  const ground = p.geoTiffBbox && p.geoTiffCRS
+    ? groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight) : null
+  const hasElev = p.geoTiffElevMin != null && p.geoTiffElevMax != null
+  const cellX = (ground ? ground.x : (o.cellMetres ?? 10)) * scl
+  const cellY = (ground ? ground.y : (o.cellMetres ?? 10)) * scl
+  const row = (o.originY ?? 0.5) * (rows - 1), col = (o.originX ?? 0.5) * (cols - 1)
+
+  const key = [row, col, o.direction, o.maxSlope, cellX, cellY, hasElev,
+    p.geoTiffElevMin, p.geoTiffElevMax, p.blackPoint, p.whitePoint, o.relief].join('|')
+  let seconds
+  if (isoCache.terrain === terrain && isoCache.key === key) seconds = isoCache.value
+  else {
+    const heights = new Float32Array(n)
+    for (let i = 0; i < n; i++) {
+      heights[i] = hasElev
+        ? gridValueToMetres(grid[i], p.geoTiffElevMin, p.geoTiffElevMax, p.blackPoint ?? 0, p.whitePoint ?? 255)
+        : grid[i] * (o.relief ?? 1000)
+    }
+    seconds = travelTimeField({ heights, mask: gridMask, rows, cols, cellX, cellY },
+      { row, col, direction: o.direction, maxSlopeDeg: o.maxSlope })
+    isoCache = { terrain, key, value: seconds }
+  }
+
+  const reached = new Uint8Array(n)
+  const minutes = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    if (seconds[i] >= 0) { reached[i] = 1; minutes[i] = seconds[i] / 60 } else minutes[i] = -1
+  }
+  const field = smoothField(minutes, cols, rows, o.radius ?? 0, reached)
+
+  const interval = Math.max(1, o.interval ?? 15)
+  const limit = Math.max(interval, (o.limit ?? 4) * 60)
+  const levels = []
+  for (let t = interval; t <= limit + 1e-9 && levels.length < 200; t += interval) levels.push(t)
+
+  const smooth = Math.max(0, Math.min(25, Math.round(o.smoothing ?? 2)))
+  const traced = traceLevelSet(terrain, p, field, levels, smooth)
+  if (!o.marker) return traced
+
+  // The origin, as a small cross: the rings mean nothing without their centre.
+  const ri = Math.max(0, Math.min(rows - 1, Math.round(row))), ci = Math.max(0, Math.min(cols - 1, Math.round(col)))
+  if (!gridMask[ri * cols + ci]) return traced
+  const e = (grid[ri * cols + ci] - 0.5) * 100 * elevScale
+  const arm = Math.max(3, Math.min(rows, cols) * 0.012) * scl
+  const x = col * scl - halfW, z = row * scl - halfH
+  const col0 = computeVertexColor(normElev(e, minElev, maxElev), 0, 0, p)
+  const pos = new Float32Array(traced.positions.length + 12)
+  pos.set(traced.positions)
+  pos.set([x - arm, e, z - arm, x + arm, e, z + arm, x - arm, e, z + arm, x + arm, e, z - arm], traced.positions.length)
+  const cl = new Float32Array(traced.colors.length + 12)
+  cl.set(traced.colors)
+  for (let k = 0; k < 4; k++) cl.set([col0[0], col0[1], col0[2]], traced.colors.length + k * 3)
+  return { positions: pos, colors: cl }
 }
 
 // ─── Shadow line ─────────────────────────────────────────────────────────────

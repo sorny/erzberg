@@ -158,3 +158,26 @@ test('switching occlusion off exports whole areas instead of what the camera see
   // again along a silhouette.
   expect(points(whole)).toBeLessThan(points(cut))
 })
+
+test('hatch turns every fill into strokes a pen can draw', async ({ page }) => {
+  await boot(page)
+  await setSwitch(page, 'Mode: Watershed', 'Enabled', true)
+  await openStage(page, 'output')
+  await page.click('[data-testid="plot-fill-hatch"]')
+  await page.waitForTimeout(3500)
+  const svg = await exportSvg(page)
+  if (process.env.HATCH_SVG_OUT) (await import('node:fs')).writeFileSync(process.env.HATCH_SVG_OUT, svg)
+
+  // Ten inks still means ten pen layers, and none of them fills anything.
+  const inks = labelsOf(svg).filter((l) => l.startsWith('Watershed · ink '))
+  expect(inks.length).toBe(10)
+  expect(svg).not.toMatch(/<g fill="#[0-9a-f]{6}" fill-rule/)
+  // Each area keeps its closed outline and gains an open path of hatch strokes.
+  const paths = [...svg.matchAll(/<path d="([^"]+)"\/>/g)].map((m) => m[1])
+  const closed = paths.filter((d) => d.endsWith('Z'))
+  const hatch = paths.filter((d) => !d.endsWith('Z'))
+  expect(closed.length).toBe(10)
+  expect(hatch.length).toBeGreaterThan(0)
+  const strokes = hatch.reduce((n, d) => n + (d.match(/M/g) || []).length, 0)
+  expect(strokes).toBeGreaterThan(200)
+})

@@ -269,7 +269,7 @@ export function PanelStyles() {
        * its own 20 px target inside it. Nobody has to be told which is which,
        * because they no longer look alike.
        *
-       * Styles rather than inline hover handlers: this is thirty-seven tiles with
+       * Styles rather than inline hover handlers: this is thirty-eight tiles with
        * two targets each, so handlers would be sixty-eight closures rebuilt on
        * every render of the sheet. A backtick in this comment would also end the
        * template literal the whole stylesheet is written in.

@@ -44,6 +44,7 @@ import { hexToRgb, isDarkBackground } from './colorUtils'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 import { orderRuns, routeStats } from './penRoute'
+import { hatchLoops, hatchPlan } from './hatchFill'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -501,6 +502,9 @@ async function runExport({
   // panel can answer "is this drawing too dense" before the click rather than at
   // the machine. See utils/penRoute.js.
   penOrder = false, measureOnly = false, onStats = null,
+  // Filled areas as hatch strokes instead of fills. The pitch is millimetres on
+  // paper, so it needs the sheet width to become page units. See hatchFill.js.
+  areaFill = 'solid', hatchPitchMm = 0.8, hatchAngle = 45, sheetMm = 297,
   /*
    * Anaglyph. `eye` is a world-space offset applied before the camera, which is
    * a real eye separation under a perspective camera: a near mark moves further
@@ -1305,21 +1309,46 @@ async function runExport({
      * and a plot of the fills is the map filled in.
      */
     if (layer.isAreas) {
+      /*
+       * Hatched, the fill becomes strokes and the ring stays as the outline.
+       * The pitch is set on paper, so it is converted through the sheet width:
+       * a 0.8 mm hatch is 0.8 mm whatever the export's pixel size. Each ink
+       * keeps its own pen layer, and its density follows its contrast with the
+       * paper — see `hatchPlan`.
+       */
+      const hatched = areaFill === 'hatch'
+      const pxPerMm = vw / Math.max(1, sheetMm)
       for (const g of layer.groups) {
+        const plan = hatched ? hatchPlan(g.hex, bgColor, hatchPitchMm * pxPerMm) : null
         const els = await mapPaced(g.paths, ({ loops }) => {
           let d = ''
           for (const pts of loops) {
             for (let i = 0; i < pts.length; i += 2) {
               d += `${i === 0 ? 'M' : 'L'}${(pts[i] - vx).toFixed(1)},${(pts[i + 1] - vy).toFixed(1)}`
+              if (i > 0) plot.ink += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1])
             }
             d += 'Z'
+            plot.ink += Math.hypot(pts[0] - pts[pts.length - 2], pts[1] - pts[pts.length - 1])
+            plot.strokes++
           }
-          return `<path d="${d}"/>`
+          if (!plan) return `<path d="${d}"/>`
+          let h = ''
+          for (const angle of plan.cross ? [hatchAngle, hatchAngle + 90] : [hatchAngle]) {
+            const r = hatchLoops(loops, plan.pitch, angle)
+            for (let k = 0; k < r.segs.length; k += 4) {
+              h += `M${(r.segs[k] - vx).toFixed(1)},${(r.segs[k + 1] - vy).toFixed(1)}` +
+                   `L${(r.segs[k + 2] - vx).toFixed(1)},${(r.segs[k + 3] - vy).toFixed(1)}`
+            }
+            plot.ink += r.ink; plot.strokes += r.strokes
+            plot.travelAsBuilt += r.travel; plot.travelOrdered += r.travel
+          }
+          return `<path d="${d}"/>` + (h ? `<path d="${h}"/>` : '')
         })
         const no = String(g.no).padStart(2, '0')
+        const fill = hatched ? 'none' : g.hex
         layerGroups.push(penLayer(`${modeId}-ink-${no}`, `${modeLabel} · ink ${no} ${g.hex}`,
-          `<g fill="${g.hex}" fill-rule="evenodd" stroke="${g.hex}" stroke-width="${sw}" ` +
-          `stroke-linejoin="round" opacity="${layer.opacity}">${els.join('')}</g>`))
+          `<g fill="${fill}" fill-rule="evenodd" stroke="${g.hex}" stroke-width="${sw}" ` +
+          `stroke-linejoin="round" stroke-linecap="round" opacity="${layer.opacity}">${els.join('')}</g>`))
       }
       continue
     }

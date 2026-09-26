@@ -294,13 +294,15 @@ export function useTerrainGeometry(p) {
     //  • gradientStops is an array (see GEOMETRY_NON_SCALAR) and is depended on
     //    by identity, as it was before.
     //  • needsSurfaceShading is computed onto `p` by App, not a stored param.
-    //  • geoTiffBbox / geoTiffCRS come from the store, not from defaults.
+    //  • geoTiffBbox / geoTiffCRS / geoTiffElevMin / geoTiffElevMax come from
+    //    the store, not from defaults.
     // `send` is held in sendRef and is stable by construction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     heightmapPixels, nodataMask, heightmapWidth, heightmapHeight,
     rebuildKey,
     p.gradientStops, p.needsSurfaceShading, p.geoTiffBbox, p.geoTiffCRS,
+    p.geoTiffElevMin, p.geoTiffElevMax,
     // Vector layers. `vectorBuildKey` is a string rather than p.vectorLayers
     // itself, and that is the whole point: the layer array is replaced on every
     // colour-picker tick, so depending on its identity would rebuild every
