@@ -76,7 +76,9 @@ export const SECTION_PARAMS = {
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
-    'pillarSegments', 'pillarLidColor'],
+    'pillarSegments', 'pillarLidColor', 'pillarAbove', 'pillarCeiling', 'pillarInk', 'pillarAboveInk', 'pillarSolid',
+    'colorPillarsAbove', 'weightPillarsAbove', 'opacityPillarsAbove', 'dashPillarsAbove',
+    'hypsoPillarsAbove', 'hypsoModePillarsAbove', 'hypsoBandedPillarsAbove', 'hypsoIntervalPillarsAbove'],
   'Mode: Stipple Dots': ['stippleDensityMode', 'stippleGamma', 'stippleJitter'],
   // Tanaka is the contour section's illumination — the relief shading that
   // lights each contour by its own bearing — so it resets with Contours.

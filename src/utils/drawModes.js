@@ -255,6 +255,7 @@ export const SUB_LAYER_LABEL = {
   'Air-RunIn':               'Run-in',
   'RaceLine-Field':          'Field',
   'RaceLine-Best':           'Best line',
+  'Pillars-Above':           'Above',
   'Section-Face':            'Cut face',
   'Section-Hatch':           'Hatch',
   'Section-Beyond':          'Beyond',

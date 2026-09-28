@@ -336,6 +336,13 @@ Two optional parts:
 
 - A builder can return `note`, a small object that rides on the layer to the
   panel. Viewshed returns the share in view, and Route returns its time.
+- A builder can return `occluder`, depth-only triangles appended to the layer's
+  curtains. Use it when the lines alone hang no useful curtain, as Pillars'
+  vertical lines do.
+- A builder can return `selfOcclude: true`. The layer's lines then write depth
+  and test against it, so the nearer line covers the farther whatever order
+  they were emitted in. Use it for a layer whose lines overlap on screen in
+  different inks, as Pillars' do.
 - A mode that needs a point on the terrain adds its keys to `PICK_KEYS` in
   `App.jsx` and calls `onPick`. The click goes through the profile's raycast.
 

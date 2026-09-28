@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.31.0] — 2026-09-28
+
+Pillars as a box: a second half above the ground with its own pen, land cover
+inks, and near pillars that finally stand in front of far ones.
+
+### Added
+
+- **Pillars: above the ground.** Each pillar can also run from the ground up to
+  a ceiling at the highest point, plus an optional extra height. With both
+  halves the pillars fill a box, and a Gap opens a seam that follows the
+  terrain through it. The upper half is its own layer and pen, with its own
+  colour, weight, opacity, dash and hypsometric tint.
+- **Pillars: land cover ink.** Each half can take the colour of its land cover
+  class, or of the cover plate's imagery at its cell.
+
+- **Pillars: occlusion width.** Optional depth-only walls around each pillar,
+  from none (0, the default) to a solid block (1), so the pillars can hide the
+  lines and ground behind them.
+
+### Fixed
+
+- **Far pillars covered near ones.** Lines draw without depth, so the order
+  they are emitted in decides which one is on top. Pillars are emitted row by
+  row, so seen from behind (away from the front ± 45°), the far rows were drawn
+  last and painted over the near ones, in the viewport and in the PNG. It
+  showed with more than one ink, such as land cover classes. Pillar lines now
+  write depth and test against it, so the nearer line wins.
+
+### Changed
+
+- The Occ. Dist slider (occlusion bias) now goes to 200, up from 50.
+
 ## [1.30.0] — 2026-09-26
 
 Tiles that follow the slope, the ground you can see, and the fastest way up.

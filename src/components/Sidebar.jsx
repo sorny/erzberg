@@ -2150,7 +2150,7 @@ export function Sidebar({
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
             {style.depthOcclusion && (
               <Sub>
-                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={50} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
                 <InlineSl label="Ghost Opac" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -2497,8 +2497,39 @@ export function Sidebar({
                   {(style.pillarStyle === 'cuboid' || style.pillarStyle === 'cylinder') && (
                     <ColorRow label="Lid Color" value={style.pillarLidColor ?? '#ffffff'} onChange={v => ss({ pillarLidColor: v })} />
                   )}
+                  <InlineSl label="Occlusion width" testId="pillar-solid"
+                    help="How much of its cell each pillar hides behind it, with Depth occlusion on. At 0 the pillar lines hide nothing. At 1 the pillars join into a solid block and hide the ground behind them. Cuboids and cylinders hide with their own sides at any value above 0."
+                    min={0} max={1} step={0.05} value={style.pillarSolid ?? 0} onChange={v => ss({ pillarSolid: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <Tog label="Above the ground" testId="pillar-above"
+                    help="Mirrors each pillar upwards, from the ground to a ceiling at the highest point. With both halves the pillars fill a box, and the terrain is where they meet. A Gap opens a seam along the ground."
+                    checked={!!style.pillarAbove} onChange={v => ss({ pillarAbove: v })} />
+                  {style.pillarAbove && (
+                    <InlineSl label="Ceiling" help="Extra height of the ceiling above the highest point." min={0} max={100} step={1} value={style.pillarCeiling ?? 0} onChange={v => ss({ pillarCeiling: v })} />
+                  )}
+                  <div style={{ marginBottom: 4 }}>
+                    <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>{style.pillarAbove ? 'Ink below' : 'Ink'}</span>
+                    <SegGroup label="Pillar ink" options={[['Line style', 'line'], ['Cover class', 'class'], ['Cover plate', 'plate']]}
+                      value={style.pillarInk ?? 'line'} onChange={(v) => ss({ pillarInk: v })} />
+                  </div>
+                  {style.pillarAbove && (
+                    <div style={{ marginBottom: 4 }}>
+                      <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Ink above</span>
+                      <SegGroup label="Pillar ink above" options={[['Line style', 'line'], ['Cover class', 'class'], ['Cover plate', 'plate']]}
+                        value={style.pillarAboveInk ?? 'line'} onChange={(v) => ss({ pillarAboveInk: v })} />
+                    </div>
+                  )}
+                  {[style.pillarInk, style.pillarAbove && style.pillarAboveInk].some((m) => m === 'class' || m === 'plate') && !cover && (
+                    <Note>No cover plate loaded, so the pillars use the line style. Open one under Land Cover.</Note>
+                  )}
                 </Sub>
-                <ModeStyleOverride prefix="Pillars" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+                <ModeStyleOverride prefix="Pillars" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg}
+                  label={style.pillarAbove ? 'Line style below' : 'Line style'} />
+                {/* The upper half is its own layer and pen, so it has its own
+                    style. Land cover and painted masks stay with the mode. */}
+                {style.pillarAbove && (
+                  <ModeStyleOverride prefix="PillarsAbove" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg}
+                    label="Line style above" showCover={false} />
+                )}
               </>
             )}
           </Section>

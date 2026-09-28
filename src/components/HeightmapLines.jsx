@@ -439,7 +439,19 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!lines) return
     material.linewidth = drawWeight
     material.opacity = opacity ?? 1
-    material.depthTest = !!depthOcclusion
+    /*
+     * A self-occluding layer writes depth and tests against it, occlusion on
+     * or off. Every other mark draws with depthWrite false, where the order the
+     * segments sit in the buffer decides who covers whom — and a builder emits
+     * in one fixed order, blind to the camera. For a field of pillars that
+     * order is right from the front and backwards from behind: the far rows,
+     * drawn last, painted over the near ones in the viewport and in the PNG.
+     * With depth, the nearer line wins whatever the order. With occlusion off
+     * nothing else writes depth, so these lines only hide each other.
+     */
+    const self = !!layer.selfOcclude
+    material.depthTest = !!depthOcclusion || self
+    material.depthWrite = self
     material.resolution.copy(resolution)
 
     // MSAA alpha-to-coverage: smoothstep edge alpha instead of a hard discard,
@@ -491,7 +503,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostMaterial.gapSize = d.gapSize
       ghostLines.renderOrder = base + SUB_GHOST
     }
-  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base, layer.selfOcclude])
 
   useEffect(() => () => {
     material?.dispose()

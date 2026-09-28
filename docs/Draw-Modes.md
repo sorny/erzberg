@@ -28,6 +28,22 @@ Lines at $\theta$ and at $\theta + 90°$, merged into one layer.
 A vertical segment per sampled cell, from a set base depth up to $H(x, y)$
 minus a gap.
 
+- **Above the ground** mirrors each pillar from $H + \text{gap}$ up to a ceiling
+  at $\max H$ plus *Ceiling*. With both halves the pillars fill a box. The gap
+  applies on both sides, so it opens a seam along the ground. The upper half
+  has no lids, or the ceilings would hide the plate from above. It is its own
+  layer and pen, `Pillars · Above`, with its own line style.
+- **Depth.** Pillar lines write depth and test against it, occlusion on or off.
+  The builder emits row by row, blind to the camera, and without depth the rows
+  drawn last would cover the rest, which from behind are the far ones.
+- **Occlusion width.** A vertical line hangs a curtain of no width, so pillars
+  hide nothing by themselves. Above 0, each half adds depth-only walls: two
+  crossed walls that share of a cell wide for a line, the sides for a cuboid
+  or cylinder. At 1 the pillars are a solid block. The default is 0.
+- **Ink**, for each half, takes the colour from that half's line style, from the
+  land cover class of the pillar's cell, or from the cover plate's imagery at
+  that cell. Without a plate, both fall back to the line style.
+
 ## 4. Contours
 
 Marching Squares with linear edge interpolation. A level $e$ is major if

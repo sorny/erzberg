@@ -171,6 +171,9 @@ function resolveLayerStyle(id, p) {
                color: p.labelColorContours ?? p.colorContours ?? '#000000' }
     case 'Gpx':
       return { weight: p.weightGpx, opacity: p.opacityGpx, dash: p.dashGpx }
+    // The upper half of Pillars, with its own flat style keys.
+    case 'Pillars-Above':
+      return { weight: p.weightPillarsAbove, opacity: p.opacityPillarsAbove, dash: p.dashPillarsAbove }
     case 'Swiss-Rock':
       return { weight: p.weightSwiss, opacity: p.opacitySwiss, dash: p.dashSwiss }
     case 'Swiss-Scree':
@@ -653,7 +656,9 @@ export function buildLineGeometry(terrain, p) {
       for (let i = 0; i < segCount * 6; i += 6) {
         const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
         const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
-        if (Math.abs(x0-x1)<1e-4 && Math.abs(y0-y1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
+        // A vertical segment's curtain lies in its own line and has no area.
+        // It hides nothing, so it is not built. This also covers a zero-length one.
+        if (Math.abs(x0-x1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
         cPfull[cPn]=x0;   cPfull[cPn+1]=y0;     cPfull[cPn+2]=z0
         cPfull[cPn+3]=x1; cPfull[cPn+4]=y1;     cPfull[cPn+5]=z1
         cPfull[cPn+6]=x1; cPfull[cPn+7]=floorY; cPfull[cPn+8]=z1
@@ -664,8 +669,27 @@ export function buildLineGeometry(terrain, p) {
         cIn += 6
         vIdx += 4
       }
-      const cPbase = cPn === cPfull.length ? cPfull : cPfull.subarray(0, cPn)
-      const cIbase = cIn === cIfull.length ? cIfull : cIfull.subarray(0, cIn)
+      let cPbase = cPn === cPfull.length ? cPfull : cPfull.subarray(0, cPn)
+      let cIbase = cIn === cIfull.length ? cIfull : cIfull.subarray(0, cIn)
+      /*
+       * A builder's own occluder, appended to the curtains.
+       *
+       * A curtain hangs from a segment to the floor, which is right for a line
+       * across the ground and useless for a vertical one: Pillars' curtains have
+       * no width, so without this a pillar field hid nothing, and with no
+       * surface layer on, the far side of a hill showed straight through it.
+       * `occluder` is depth-only triangles in the same form, so the viewport and
+       * the SVG's Z-buffer both take it with the curtains.
+       */
+      if (p.depthOcclusion && res.occluder?.indices?.length) {
+        const oP = res.occluder.positions, oI = res.occluder.indices, off = cPbase.length / 3
+        const mP = new Float32Array(cPbase.length + oP.length)
+        mP.set(cPbase); mP.set(oP, cPbase.length)
+        const mI = new Uint32Array(cIbase.length + oI.length)
+        mI.set(cIbase)
+        for (let k = 0; k < oI.length; k++) mI[cIbase.length + k] = oI[k] + off
+        cPbase = mP; cIbase = mI
+      }
       const cVerts = cPbase.length / 3
 
       const baseLidP = res.lids?.positions ?? new Float32Array(0)
@@ -699,6 +723,9 @@ export function buildLineGeometry(terrain, p) {
           labelAnchors: res.labelAnchors ?? null,
           // A fact the panel reports, such as a route's walking time. Not geometry.
           note: res.note ?? null,
+          // Lines that write depth and test against it, so the nearer of two
+          // covers the farther whatever order they were emitted in.
+          selfOcclude: !!res.selfOcclude,
         })
         continue
       }
@@ -781,6 +808,7 @@ export function buildLineGeometry(terrain, p) {
         // mirrored with everything else.
         areas: null,
         isPoints: res.isPoints ?? false,
+        selfOcclude: !!res.selfOcclude,
       })
     }
   }
@@ -2493,9 +2521,35 @@ function buildTpiFeatures(terrain, p, spacing, radius, threshold, isRidge) {
  * cylinder styles also return a `lids` sub-mesh of filled caps. That is a
  * separate triangle geometry rather than more segments because a cap has to be
  * opaque — without it you see straight down the inside of every column.
+ *
+ * ── Above ────────────────────────────────────────────────────────────────────
+ * `pillarAbove` mirrors each pillar upwards, from the surface to a ceiling at
+ * the highest point plus `pillarCeiling`. With both halves the field fills a
+ * rectangular block, and the terrain is the surface where they meet. The gap
+ * applies on both sides of it, so a gap opens a seam that follows the ground
+ * through the block. The upper half has no lids: a lid on every ceiling would
+ * cover the whole plate when seen from above.
+ *
+ * The upper half is its own sub-layer, `Pillars-Above`, with its own colour,
+ * weight, opacity, dash and hypsometric tint (`<prop>PillarsAbove`). One ink
+ * for both halves hides the seam that the whole option exists to show, and a
+ * separate layer is also a separate pen on the plot.
+ *
+ * ── Occlusion ────────────────────────────────────────────────────────────────
+ * A vertical line hangs a curtain of no width, so pillars hide nothing by
+ * themselves. `pillarSolid` gives each half an `occluder`: depth-only walls a
+ * share of the cell wide, which hide what stands behind them. At 0, the
+ * default, there are none. Both follow the Depth occlusion switch.
+ *
+ * ── Ink ──────────────────────────────────────────────────────────────────────
+ * `pillarInk` (below) and `pillarAboveInk` (above) take the colour from that
+ * half's line style (`line`), from the land cover class of the pillar's cell
+ * (`class`), or from the cover plate's own imagery at that cell (`plate`).
+ * Without a loaded plate both fall back to the line style.
  */
 function buildPillars(terrain, p, spacing) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes,
+          gridClass, gridPlate } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt, pillarGap, pillarDepth } = p
 
   const step     = Math.max(1, Math.round((spacing ?? 8) / scl))
@@ -2504,10 +2558,120 @@ function buildPillars(terrain, p, spacing) {
   const style    = p.pillarStyle ?? 'line'
   const halfSize = (p.pillarSize ?? 0.8) * step * scl * 0.5
   const segs     = Math.max(3, Math.round(p.pillarSegments ?? 8))
+  const above    = !!p.pillarAbove
+  const ceiling  = maxElev + (p.pillarCeiling ?? 0)
 
-  const positions = new F32List(), colors = new F32List()
+  const palette = gridClass ? (terrain.classColors ?? []).map(hexToRgb) : null
+  const inkAt = (mode, i) => {
+    if (mode === 'class' && palette) return palette[gridClass[i]] ?? null
+    if (mode === 'plate' && gridPlate) return [gridPlate[i * 3] / 255, gridPlate[i * 3 + 1] / 255, gridPlate[i * 3 + 2] / 255]
+    return null
+  }
+  // The upper half's own line style, in the keys `computeVertexColor` reads.
+  const pAbove = {
+    ...p,
+    lineColor:         p.colorPillarsAbove ?? '#888888',
+    lineHypsometric:   p.hypsoPillarsAbove,
+    lineHypsoMode:     p.hypsoModePillarsAbove,
+    lineBanded:        p.hypsoBandedPillarsAbove,
+    lineHypsoInterval: p.hypsoIntervalPillarsAbove,
+  }
+
+  const below = { positions: new F32List(), colors: new F32List() }
+  const upper = { positions: new F32List(), colors: new F32List() }
   const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
   let lidVIdx = 0
+  // Depth-only walls for each half — see `occluder` in the dispatcher.
+  const occBelow = { p: new F32List(), i: new U32List(), v: 0 }
+  const occUpper = { p: new F32List(), i: new U32List(), v: 0 }
+  let occ = occBelow
+  const wall = (x0, z0, x1, z1, bottom, top) => {
+    occ.p.push6(x0, bottom, z0, x1, bottom, z1); occ.p.push6(x1, top, z1, x0, top, z0)
+    occ.i.push3(occ.v, occ.v + 1, occ.v + 2); occ.i.push3(occ.v, occ.v + 2, occ.v + 3)
+    occ.v += 4
+  }
+  // How much of its cell a pillar hides, 0–1. At 0 the lines hide nothing.
+  const solid = Math.max(0, Math.min(1, p.pillarSolid ?? 0))
+  const wallHalf = step * scl * 0.5 * solid
+  /*
+   * What a pillar hides. A line has no body, so it stands for a share of its
+   * cell: two crossed walls `solid` of a cell wide. At 1 they join into one
+   * solid block across the field; lower values hide only a band around each
+   * line. A cuboid or cylinder hides with its own sides. The pillar's own lines
+   * lie on these faces, and the curtain bias keeps them in front.
+   */
+  const occlude = (target, wx, wz, bottom, top) => {
+    if (!p.depthOcclusion || solid <= 0) return
+    occ = target
+    if (style === 'cuboid') {
+      const h = halfSize
+      wall(wx-h, wz-h, wx+h, wz-h, bottom, top); wall(wx+h, wz-h, wx+h, wz+h, bottom, top)
+      wall(wx+h, wz+h, wx-h, wz+h, bottom, top); wall(wx-h, wz+h, wx-h, wz-h, bottom, top)
+    } else if (style === 'cylinder') {
+      for (let s = 0; s < segs; s++) {
+        const a0 = (s / segs) * Math.PI * 2, a1 = ((s + 1) / segs) * Math.PI * 2
+        wall(wx + halfSize * Math.cos(a0), wz + halfSize * Math.sin(a0),
+             wx + halfSize * Math.cos(a1), wz + halfSize * Math.sin(a1), bottom, top)
+      }
+    } else {
+      wall(wx - wallHalf, wz, wx + wallHalf, wz, bottom, top)
+      wall(wx, wz - wallHalf, wx, wz + wallHalf, bottom, top)
+    }
+  }
+
+  // One pillar body from `bottom` to `top`, in the current style, into `out`.
+  // `lid` caps the top face; the upper half passes null.
+  const body = (out, wx, wz, bottom, top, colBottom, colTop, lid) => {
+    const { positions, colors } = out
+    if (style === 'cuboid') {
+      const h = halfSize
+      // Top face perimeter (4 edges)
+      positions.push6(wx-h,top,wz-h, wx+h,top,wz-h); positions.push6(wx+h,top,wz-h, wx+h,top,wz+h)
+      positions.push6(wx+h,top,wz+h, wx-h,top,wz+h); positions.push6(wx-h,top,wz+h, wx-h,top,wz-h)
+      for (let e = 0; e < 4; e++) colors.pushRgb2(colTop)
+      // Bottom face (4 edges)
+      positions.push6(wx-h,bottom,wz-h, wx+h,bottom,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,bottom,wz+h)
+      positions.push6(wx+h,bottom,wz+h, wx-h,bottom,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,bottom,wz-h)
+      for (let e = 0; e < 4; e++) colors.pushRgb2(colBottom)
+      // 4 vertical edges (bottom → top colour gradient)
+      positions.push6(wx-h,bottom,wz-h, wx-h,top,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,top,wz-h)
+      positions.push6(wx+h,bottom,wz+h, wx+h,top,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,top,wz+h)
+      for (let e = 0; e < 4; e++) { colors.pushRgb(colBottom); colors.pushRgb(colTop) }
+      if (lid) {
+        // Lid mesh — 2 triangles covering the top face
+        lidP.push6(wx-h,top,wz-h, wx+h,top,wz-h); lidP.push6(wx+h,top,wz+h, wx-h,top,wz+h)
+        for (let v = 0; v < 4; v++) lidC.pushRgb(lid)
+        lidI.push3(lidVIdx, lidVIdx+1, lidVIdx+2); lidI.push3(lidVIdx, lidVIdx+2, lidVIdx+3)
+        lidVIdx += 4
+      }
+    } else if (style === 'cylinder') {
+      const rad = halfSize
+      for (let s = 0; s < segs; s++) {
+        const a0 = (s       / segs) * Math.PI * 2
+        const a1 = ((s + 1) / segs) * Math.PI * 2
+        const x0 = wx + rad * Math.cos(a0), z0 = wz + rad * Math.sin(a0)
+        const x1 = wx + rad * Math.cos(a1), z1 = wz + rad * Math.sin(a1)
+        positions.push6(x0, top,    z0, x1, top,    z1); colors.pushRgb2(colTop)
+        positions.push6(x0, bottom, z0, x1, bottom, z1); colors.pushRgb2(colBottom)
+        positions.push6(x0, bottom, z0, x0, top,    z0); colors.pushRgb(colBottom); colors.pushRgb(colTop)
+      }
+      if (lid) {
+        // Lid mesh — N-gon fan from centre
+        lidP.push3(wx, top, wz); lidC.pushRgb(lid)          // centre vertex
+        for (let s = 0; s < segs; s++) {
+          const a = (s / segs) * Math.PI * 2
+          lidP.push3(wx + rad * Math.cos(a), top, wz + rad * Math.sin(a))
+          lidC.pushRgb(lid)
+        }
+        for (let s = 0; s < segs; s++)
+          lidI.push3(lidVIdx, lidVIdx + s + 1, lidVIdx + ((s + 1) % segs) + 1)
+        lidVIdx += segs + 1
+      }
+    } else {
+      positions.push6(wx, bottom, wz, wx, top, wz)
+      colors.pushRgb(colBottom); colors.pushRgb(colTop)
+    }
+  }
 
   for (let r = 0; r < rows; r += step) {
     for (let c = 0; c < cols; c += step) {
@@ -2521,56 +2685,23 @@ function buildPillars(terrain, p, spacing) {
       const wz = r * scl - halfH
       const top    = elev - gap
       const bottom = minElev - depth
-      if (top <= bottom) continue
+      const slope  = gridSlopes[i] / (maxSlope || 1)
 
-      const slope   = gridSlopes[i]
-      const colBase = computeVertexColor(normElev(bottom, minElev, maxElev), 0, 0, p)
-      const colPeak = computeVertexColor(normElev(top,    minElev, maxElev), slope / (maxSlope || 1), 0, p)
-      const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
-
-      if (style === 'cuboid') {
-        const h = halfSize
-        // Top face perimeter (4 edges)
-        positions.push6(wx-h,top,wz-h, wx+h,top,wz-h); positions.push6(wx+h,top,wz-h, wx+h,top,wz+h)
-        positions.push6(wx+h,top,wz+h, wx-h,top,wz+h); positions.push6(wx-h,top,wz+h, wx-h,top,wz-h)
-        for (let e = 0; e < 4; e++) colors.pushRgb2(colPeak)
-        // Bottom face (4 edges)
-        positions.push6(wx-h,bottom,wz-h, wx+h,bottom,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,bottom,wz+h)
-        positions.push6(wx+h,bottom,wz+h, wx-h,bottom,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,bottom,wz-h)
-        for (let e = 0; e < 4; e++) colors.pushRgb2(colBase)
-        // 4 vertical edges (base → peak colour gradient)
-        positions.push6(wx-h,bottom,wz-h, wx-h,top,wz-h); positions.push6(wx+h,bottom,wz-h, wx+h,top,wz-h)
-        positions.push6(wx+h,bottom,wz+h, wx+h,top,wz+h); positions.push6(wx-h,bottom,wz+h, wx-h,top,wz+h)
-        for (let e = 0; e < 4; e++) { colors.pushRgb(colBase); colors.pushRgb(colPeak) }
-        // Lid mesh — 2 triangles covering the top face
-        lidP.push6(wx-h,top,wz-h, wx+h,top,wz-h); lidP.push6(wx+h,top,wz+h, wx-h,top,wz+h)
-        for (let v = 0; v < 4; v++) lidC.pushRgb(colLid)
-        lidI.push3(lidVIdx, lidVIdx+1, lidVIdx+2); lidI.push3(lidVIdx, lidVIdx+2, lidVIdx+3)
-        lidVIdx += 4
-      } else if (style === 'cylinder') {
-        const rad = halfSize
-        for (let s = 0; s < segs; s++) {
-          const a0 = (s       / segs) * Math.PI * 2
-          const a1 = ((s + 1) / segs) * Math.PI * 2
-          const x0 = wx + rad * Math.cos(a0), z0 = wz + rad * Math.sin(a0)
-          const x1 = wx + rad * Math.cos(a1), z1 = wz + rad * Math.sin(a1)
-          positions.push6(x0, top,    z0, x1, top,    z1); colors.pushRgb2(colPeak)
-          positions.push6(x0, bottom, z0, x1, bottom, z1); colors.pushRgb2(colBase)
-          positions.push6(x0, bottom, z0, x0, top,    z0); colors.pushRgb(colBase); colors.pushRgb(colPeak)
-        }
-        // Lid mesh — N-gon fan from centre
-        lidP.push3(wx, top, wz); lidC.pushRgb(colLid)          // centre vertex
-        for (let s = 0; s < segs; s++) {
-          const a = (s / segs) * Math.PI * 2
-          lidP.push3(wx + rad * Math.cos(a), top, wz + rad * Math.sin(a))
-          lidC.pushRgb(colLid)
-        }
-        for (let s = 0; s < segs; s++)
-          lidI.push3(lidVIdx, lidVIdx + s + 1, lidVIdx + ((s + 1) % segs) + 1)
-        lidVIdx += segs + 1
-      } else {
-        positions.push6(wx, bottom, wz, wx, top, wz)
-        colors.pushRgb(colBase); colors.pushRgb(colPeak)
+      if (top > bottom) {
+        const ink = inkAt(p.pillarInk, i)
+        const colBase = ink ?? computeVertexColor(normElev(bottom, minElev, maxElev), 0, 0, p)
+        const colPeak = ink ?? computeVertexColor(normElev(top, minElev, maxElev), slope, 0, p)
+        const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
+        body(below, wx, wz, bottom, top, colBase, colPeak, colLid)
+        occlude(occBelow, wx, wz, bottom, top)
+      }
+      const low = elev + gap
+      if (above && ceiling > low) {
+        const ink = inkAt(p.pillarAboveInk, i)
+        const colLow  = ink ?? computeVertexColor(normElev(low, minElev, maxElev), slope, 0, pAbove)
+        const colCeil = ink ?? computeVertexColor(normElev(ceiling, minElev, maxElev), 0, 0, pAbove)
+        body(upper, wx, wz, low, ceiling, colLow, colCeil, null)
+        occlude(occUpper, wx, wz, low, ceiling)
       }
     }
   }
@@ -2578,7 +2709,18 @@ function buildPillars(terrain, p, spacing) {
   const lids = lidI.length > 0
     ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
     : null
-  return { positions: positions.toArray(), colors: colors.toArray(), lids }
+  const occluderOf = (o) => (o.i.length ? { positions: o.p.toArray(), indices: o.i.toArray() } : null)
+  // `selfOcclude`: the pillars are emitted row by row whatever the camera does,
+  // so without depth the last row drawn covered the rest — the far ones, seen
+  // from behind. See the renderer.
+  const lower = { positions: below.positions.toArray(), colors: below.colors.toArray(), lids,
+                  occluder: occluderOf(occBelow), selfOcclude: true }
+  if (!above) return lower
+  return {
+    Pillars: lower,
+    'Pillars-Above': { positions: upper.positions.toArray(), colors: upper.colors.toArray(),
+                       occluder: occluderOf(occUpper), selfOcclude: true },
+  }
 }
 
 // ─── Seeded randomness ───────────────────────────────────────────────────────
