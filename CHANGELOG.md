@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.1] — 2026-09-28
+
+### Fixed
+
+- **The scale bar and north arrow did not appear** after they were switched
+  on, and the panel said "No georeference", until the camera moved. They are
+  measured in a frame, and under on-demand rendering nothing asked for one:
+  react-three-fiber 9.8.0 drew a frame on the re-render anyway, and 9.8.1,
+  updated in v1.33.0, does not. The scene now asks for a frame itself when the
+  marks are switched on or the raster under them changes.
+
 ## [1.33.0] — 2026-09-28
 
 A review of the whole tool: two fixes it found, one it did not expect, class

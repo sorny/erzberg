@@ -207,6 +207,19 @@ export function Scene({
       screenProjector(cam, groupRef.current?.matrixWorld, el.clientWidth, el.clientHeight),
       ground))
   })
+  /*
+   * One frame when the marks are switched on, or the ground under them changes.
+   *
+   * The measurement above runs only in a frame, and under on-demand rendering a
+   * frame is drawn only when something asks for one. Turning the bar on changes
+   * DOM and state, not the scene, so nothing did — the panel said "no
+   * georeference" until the camera next moved. It used to work because
+   * react-three-fiber drew a frame on the re-render anyway; 9.8.1 stopped doing
+   * that, and this stops relying on it.
+   */
+  useEffect(() => {
+    if (wantsMarks) invalidate()
+  }, [wantsMarks, p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight, invalidate])
 
   // WebM capture reads the live canvas via captureStream; under on-demand
   // rendering we must keep drawing frames for the whole recording, even if no
