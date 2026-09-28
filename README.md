@@ -295,6 +295,10 @@ fill becomes hatch strokes a pen can draw, denser for darker inks.
 **Ghost occlusion.** Each line makes an invisible curtain that writes depth, so
 lines hide other lines. Hidden segments can take their own colour and opacity.
 
+**Inks as picked.** By default inks pass through a filmic tone curve and look
+softer on screen. Switch this on in Terrain Style to draw and export every ink
+exactly as picked, so a pen matched to a swatch matches the plot.
+
 **Anaglyph.** Every layer is drawn twice with a real parallax offset, for
 red/cyan glasses. Filled areas take the eye's ink too, with their tone as its
 weight. The SVG writes each eye as its own pen layer.

@@ -63,6 +63,24 @@ function dotsAlong(pos, col, feat, chains, spacing) {
 }
 
 /**
+ * sRGB colours as the linear values the renderer expects.
+ *
+ * Vertex colours reach the shader as linear light, and the output pass encodes
+ * to sRGB. The builders write sRGB — the picked hex, divided by 255 — so without
+ * this the colour is encoded twice and comes out lighter. Only used with "Inks
+ * as picked", which also turns tone mapping off: the two together return the
+ * exact picked colour on screen.
+ */
+function srgbToLinear(colors) {
+  const out = new Float32Array(colors.length)
+  for (let i = 0; i < colors.length; i++) {
+    const c = colors[i]
+    out[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  }
+  return out
+}
+
+/**
  * Area colours as one anaglyph eye sees them.
  *
  * A filled area keeps its tone and takes the eye's filter ink. On paper the
@@ -172,7 +190,7 @@ const BLEND_MODES = {
   normal:   THREE.NormalBlending,
 }
 
-function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift }) {
+function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, asPicked }) {
   const { positions: srcPositions, colors: srcColors, sphere } = layer
   // Round dots replace the stroke's own segments. Rebuilt with the weight,
   // because the spacing grows with it; cheap next to a worker rebuild.
@@ -186,6 +204,8 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   ), [chains, srcPositions, srcColors, layer.featureOfSegment, weight])
   const positions = dots ? dots.positions : srcPositions
   const colors = dots ? dots.colors : srcColors
+  // Converted once per geometry, and only for "Inks as picked".
+  const shownColors = useMemo(() => (asPicked && colors ? srgbToLinear(colors) : colors), [colors, asPicked])
   const featureOfSegment = dots ? dots.features : layer.featureOfSegment
   const base = (layerIndex ?? 0) + 1
   /**
@@ -246,11 +266,11 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     } else {
       geo.setPositions(positions)
     }
-    if (colors && colors.length === positions.length) {
-      geo.setColors(colors)
+    if (shownColors && shownColors.length === positions.length) {
+      geo.setColors(shownColors)
     }
     return geo
-  }, [positions, colors, sphere])
+  }, [positions, shownColors, sphere])
 
   useEffect(() => () => geometry?.dispose(), [geometry])
 
@@ -281,6 +301,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
 
   useEffect(() => {
     fillMat.color.set(fillColor || '#1a78c2')
+    if (fillMat.toneMapped === !!asPicked) { fillMat.toneMapped = !asPicked; fillMat.needsUpdate = true }
     const o = fillOpacity ?? 0.45
     fillMat.opacity = o
 
@@ -317,7 +338,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     const solid = o >= 0.999
     fillMat.depthWrite = solid && !isMark
     fillMat.depthTest = !!depthOcclusion
-  }, [fillMat, fillColor, fillOpacity, depthOcclusion, isMark])
+  }, [fillMat, fillColor, fillOpacity, depthOcclusion, isMark, asPicked])
 
   useEffect(() => () => fillGeo?.dispose(), [fillGeo])
   useEffect(() => () => fillMat?.dispose(), [fillMat])
@@ -347,10 +368,11 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(layer.lids.positions, 3))
     if (layer.lids.sphere) geo.boundingSphere = toSphere(layer.lids.sphere)
-    geo.setAttribute('color',    new THREE.BufferAttribute(tint ? eyeTone(layer.lids.colors, tint, blending) : layer.lids.colors, 3))
+    const lidColors = tint ? eyeTone(layer.lids.colors, tint, blending) : layer.lids.colors
+    geo.setAttribute('color',    new THREE.BufferAttribute(asPicked ? srgbToLinear(lidColors) : lidColors, 3))
     geo.setIndex(new THREE.BufferAttribute(layer.lids.indices, 1))
     return geo
-  }, [layer.lids, tint, blending])
+  }, [layer.lids, tint, blending, asPicked])
 
   const lidMat = useMemo(() => new THREE.MeshBasicMaterial({
     vertexColors: true,
@@ -385,6 +407,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     // opacity is a uniform and depthTest is render state — no recompile needed.
     lidMat.opacity   = opacity ?? 1
     lidMat.depthTest = !!depthOcclusion
+    if (lidMat.toneMapped === !!asPicked) { lidMat.toneMapped = !asPicked; lidMat.needsUpdate = true }
     // An anaglyph eye blends like its lines, or the second eye's areas would
     // simply cover the first's.
     const lidBlend = tint ? (BLEND_MODES[blending] ?? THREE.NormalBlending) : THREE.NormalBlending
@@ -396,7 +419,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     const bias = layer.lids?.hugsSurface ? LID_OFFSET.hug : LID_OFFSET.cap
     lidMat.polygonOffsetFactor = bias
     lidMat.polygonOffsetUnits  = bias
-  }, [lidMat, opacity, depthOcclusion, layer.lids, tint, blending])
+  }, [lidMat, opacity, depthOcclusion, layer.lids, tint, blending, asPicked])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
   // Built once; weight/opacity/depthOcclusion/resolution here are seed values only
@@ -470,6 +493,8 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!lines) return
     material.linewidth = drawWeight
     material.opacity = opacity ?? 1
+    // "Inks as picked": no tone curve, so a colour reaches the screen as picked.
+    if (material.toneMapped === !!asPicked) { material.toneMapped = !asPicked; material.needsUpdate = true }
     /*
      * A self-occluding layer writes depth and tests against it, occlusion on
      * or off. Every other mark draws with depthWrite false, where the order the
@@ -527,6 +552,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostMaterial.linewidth = weight || 1
       ghostMaterial.opacity = occlusionOpacity ?? 0
       ghostMaterial.color.set(occlusionColor || '#000000')
+      if (ghostMaterial.toneMapped === !!asPicked) { ghostMaterial.toneMapped = !asPicked; ghostMaterial.needsUpdate = true }
       ghostMaterial.resolution.copy(resolution)
       ghostMaterial.alphaToCoverage = (occlusionOpacity ?? 0) >= 0.99
       ghostMaterial.dashed = d.dashed
@@ -534,7 +560,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostMaterial.gapSize = d.gapSize
       ghostLines.renderOrder = base + SUB_GHOST
     }
-  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base, layer.selfOcclude])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base, layer.selfOcclude, asPicked])
 
   useEffect(() => () => {
     material?.dispose()
@@ -674,6 +700,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           occlusionOpacity={p.occlusionOpacity}
           occlusionColor={p.occlusionColor}
           occlusionBias={p.occlusionBias}
+          asPicked={!!p.inksAsPicked}
           resolution={resolution}
           tilt={p.tilt}
           layerIndex={i}

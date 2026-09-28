@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.34.0] — 2026-09-28
+
+Inks exactly as picked.
+
+### Added
+
+- **Inks as picked** (Surface → Terrain Style). Lines and areas are drawn in
+  exactly the colour picked, as its swatch shows it, and the SVG writes that
+  colour to each pen layer. Off, as before, inks pass through the viewport's
+  filmic tone curve and come out lighter: a land cover class of `#9650a0` drew
+  as `#ceaacf`. Off by default, so every preset keeps its look.
+
 ## [1.33.1] — 2026-09-28
 
 ### Fixed

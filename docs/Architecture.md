@@ -268,6 +268,13 @@ screen: Jet's `#800000` renders as `#ca0006`. Two facts were measured:
 
 `tests/unit/screen-ink.test.js` pins four pairs read from the running app.
 
+**Inks as picked** (`inksAsPicked`, Surface → Terrain Style) turns both steps
+off for inks. The line, ghost, lid and fill materials skip tone mapping, and
+vertex colours are converted from sRGB to linear before upload, so the output
+encode returns the picked hex. The SVG then writes the picked hex instead of
+`screenInk`. Measured: `#9650a0` renders as `#ceaacf` off, and as `#9650a0` on.
+The switch is render-side and off by default, so the presets keep their look.
+
 ### Credits
 
 `workAttribution()` in `attribution.js` decides which credits a file owes, for

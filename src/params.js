@@ -110,6 +110,9 @@ const RENDER_SIDE = [
   // The anaglyph modifier. It draws each layer twice with a world offset and two
   // filter inks — a property of the render, not of a single vertex.
   /^anaglyph/,
+  // How inks are shown: a material flag and a colour conversion on the main
+  // thread, and a choice in the SVG writer. No vertex moves.
+  /^inksAsPicked$/,
   // Particles: both fields are built on the main thread from the terrain grid
   // the worker already returned.
   /^(flock|holo|point|particle|animateParticles|showPoints)/,

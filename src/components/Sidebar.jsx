@@ -2166,6 +2166,10 @@ export function Sidebar({
               </Sub>
             )}
             
+            <Tog label="Inks as picked" testId="inks-as-picked"
+              help="Draws every line and area in exactly the colour you picked, as its swatch shows it. Off, colours pass through the viewport's filmic tone curve and come out lighter and softer. Also sets the colours written to the SVG."
+              checked={!!style.inksAsPicked} onChange={v => ss({ inksAsPicked: v })} />
+
             <ColorRow label="Background" testId="bg-color" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
               <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />

@@ -505,6 +505,10 @@ async function runExport({
   // Filled areas as hatch strokes instead of fills. The pitch is millimetres on
   // paper, so it needs the sheet width to become page units. See hatchFill.js.
   areaFill = 'solid', hatchPitchMm = 0.8, hatchAngle = 45, sheetMm = 297,
+  // "Inks as picked": write each ink as its picked hex rather than as the tone-
+  // mapped colour the default viewport shows. The viewport does the same then,
+  // so the file still matches the screen.
+  inksAsPicked = false,
   /*
    * Anaglyph. `eye` is a world-space offset applied before the camera, which is
    * a real eye separation under a perspective camera: a near mark moves further
@@ -540,7 +544,9 @@ async function runExport({
   const ghostOpac = occlusionOpacity ?? 0
   // One ghost ink for the whole file: the hidden pass, the hidden dots and the
   // hidden half of the flock all draw in it, and they must not disagree.
-  const ghostInk = screenInkHex(occlusionColor)
+  const inkRGB = inksAsPicked ? (r, g, b) => `#${hex2(r)}${hex2(g)}${hex2(b)}` : screenInk
+  const inkHex = inksAsPicked ? (h) => (h || '#000000').toLowerCase() : screenInkHex
+  const ghostInk = inkHex(occlusionColor)
   const camInv = camera.matrixWorldInverse
   const wld2 = new THREE.Vector3()
   const viw2 = new THREE.Vector3()
@@ -775,7 +781,7 @@ async function runExport({
     const cw = lw + 1
     const byInk = new Map()
     for (const { area, loops } of traced) {
-      const hex = screenInk(inks[area * 3], inks[area * 3 + 1], inks[area * 3 + 2])
+      const hex = inkRGB(inks[area * 3], inks[area * 3 + 1], inks[area * 3 + 2])
       const kept = []
       let depthSum = 0, depthN = 0
       for (const loop of loops) {
@@ -830,7 +836,7 @@ async function runExport({
       // `screenInkHex`: the file is for glasses and a two-pen plotter, and the
       // tone curve turned #ff2020 into a salmon #f37870 that the red filter
       // leaks, which is what made an exported anaglyph read as a grey drawing.
-      const flatStroke = eyeInk ? eyeInk : screenInkHex(color)
+      const flatStroke = eyeInk ? eyeInk : inkHex(color)
 
       // ── Area layers (Indexed, Mineral, Watershed) ────────────────────────
       //
@@ -866,7 +872,7 @@ async function runExport({
           if (lineZ > nearZ || offCanvas1(sx, sy)) continue
           if (!dotInside(sx, sy)) continue
           const fill = (!eyeInk && colors && colors.length > i + 2)
-            ? screenInk(colors[i], colors[i+1], colors[i+2])
+            ? inkRGB(colors[i], colors[i+1], colors[i+2])
             : flatStroke
           let visible = true
           if (surfViewZ) {
@@ -976,7 +982,7 @@ async function runExport({
         // would see.
         let stroke = flatStroke
         if (!eyeInk && colors && colors.length > i + 2) {
-          stroke = screenInk(colors[i], colors[i+1], colors[i+2])
+          stroke = inkRGB(colors[i], colors[i+1], colors[i+2])
         }
 
         // The one funnel every segment passes through, visible and ghost alike,

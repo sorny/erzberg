@@ -249,3 +249,32 @@ test('a palette re-inks the classes, and the pens follow', async ({ page }) => {
   const pens = labelsOf(svg).filter((l) => l.startsWith('Pillars · '))
   expect(pens).toEqual(['Pillars · Class A #e69f00', 'Pillars · Class B #56b4e9', 'Pillars · Class C #009e73'])
 })
+
+test('with Inks as picked, the pens are the class inks exactly', async ({ page }) => {
+  test.setTimeout(240_000)
+  await boot(page)
+  await dropPlate(page, syntheticPlate())
+  await page.fill('[data-testid="panel-filter"]', 'Land Cover')
+  await page.waitForTimeout(500)
+  await page.click('[data-testid="cover-palette-distinct"]')
+  await page.fill('[data-testid="panel-filter"]', 'Inks as picked')
+  await page.waitForTimeout(500)
+  await page.locator('input[type=checkbox][aria-label="Inks as picked"]').evaluate((el) => { if (!el.checked) el.click() })
+  await page.fill('[data-testid="panel-filter"]', '')
+  await page.waitForTimeout(300)
+
+  await setMark(page, 'Lines', false)
+  await setMark(page, 'Pillars', true)
+  await openMark(page, 'Pillars')
+  await page.getByRole('button', { name: 'Cover class' }).first().click()
+  await page.waitForTimeout(3500)
+  const svg = await exportSvg(page)
+  // Off, the file carries the tone-mapped screen colour (#e69f00 → #e2d149).
+  // On, the stroke is the swatch.
+  for (const [label, ink] of [['Class A', '#e69f00'], ['Class B', '#56b4e9'], ['Class C', '#009e73']]) {
+    const layer = svg.match(new RegExp(`inkscape:label="Pillars · ${label} ${ink}">([\\s\\S]*?)</g>`))
+    expect(layer, `no pen layer for ${label}`).toBeTruthy()
+    const strokes = new Set([...layer[1].matchAll(/stroke="(#[0-9a-f]{6})"/g)].map((m) => m[1]))
+    expect([...strokes]).toEqual([ink])
+  }
+})
