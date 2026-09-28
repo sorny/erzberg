@@ -38,6 +38,18 @@ import { describe, expect, it } from 'vitest'
 
 const SIDEBAR = 'src/components/Sidebar.jsx'
 /**
+ * The Sidebar's source with `<ModeSections … />` expanded in place.
+ *
+ * The mode sections live in their own file but render exactly where the tag
+ * stands, inside the Marks stage — and this test reads the panel by position.
+ */
+function sidebarSource() {
+  const src = readFileSync(SIDEBAR, 'utf8')
+  const modes = readFileSync('src/components/panel/ModeSections.jsx', 'utf8')
+  const body = modes.slice(modes.indexOf('<>') + 2, modes.lastIndexOf('</>'))
+  return src.replace(/<ModeSections\b[^>]*\/>/, body)
+}
+/**
  * Sections that live in their own file, and the section they are.
  *
  * Their labels have to be counted or the uniqueness rule lies: `Use single-line
@@ -70,7 +82,7 @@ function stageOfSection() {
  * than to any section in it, and is on screen whichever pane is selected.
  */
 function stageOfHandle() {
-  const src = readFileSync(SIDEBAR, 'utf8')
+  const src = sidebarSource()
   const stated = stageOfSection()
   const marks = [...src.matchAll(/<Section\s+title="([^"]+)"/g)].map((m) => [m.index, m[1]])
   const lastClose = src.lastIndexOf('</Stage>')

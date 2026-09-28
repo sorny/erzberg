@@ -1,0 +1,95 @@
+{
+  "format": 2,
+  "terrain": {
+    "resolution": 1,
+    "elevScale": 0,
+    "blurRadius": 0,
+    "gridOffsetX": 0,
+    "gridOffsetY": 0,
+    "elevMinCut": 0,
+    "elevMaxCut": 100,
+    "blackPoint": 0,
+    "whitePoint": 255,
+    "jitterAmt": 0
+  },
+  "style": {
+    "enabledLines": false,
+    "bgColor": "#eef1f3",
+    "bgGradient": false,
+    "showFill": false,
+    "enabledShadowHatch": true,
+    "altitudeShadowHatch": 14,
+    "azimuthShadowHatch": 225,
+    "spacingShadowHatch": 4,
+    "crossShadowHatch": true,
+    "colorShadowHatch": "#27384a",
+    "weightShadowHatch": 1,
+    "enabledContours": true,
+    "intervalContours": 6,
+    "colorContours": "#8a94a0",
+    "weightContours": 1,
+    "opacityContours": 0.7
+  },
+  "points": {
+    "showPoints": false,
+    "pointColor": "#000000",
+    "pointSize": 4,
+    "particleSpacing": 1,
+    "animateParticles": false,
+    "holoGlowColor": "#7df9ff",
+    "holoFloat": 1,
+    "holoNoiseAmt": 1,
+    "holoNoiseScale": 1,
+    "holoFlowSpeed": 1,
+    "holoMaskContrast": 1.5,
+    "holoShimmer": 0.4
+  },
+  "view": {
+    "tilt": 50,
+    "rotation": 0,
+    "zoom": 0.75,
+    "fov": 60,
+    "orthographic": false,
+    "renderScale": 1,
+    "panX": 0,
+    "panY": 0,
+    "autoRotate": false,
+    "autoRotateSpeed": 0.2,
+    "autoRotateAxis": "Y",
+    "autoRotateDir": 1,
+    "showGuides": false,
+    "showRawTerrain": false
+  },
+  "gradientStops": [
+    {
+      "pos": 0,
+      "color": "#0d3b00"
+    },
+    {
+      "pos": 0.3,
+      "color": "#5a8c00"
+    },
+    {
+      "pos": 0.6,
+      "color": "#c8a800"
+    },
+    {
+      "pos": 0.85,
+      "color": "#8b4513"
+    },
+    {
+      "pos": 1,
+      "color": "#ffffff"
+    }
+  ],
+  "bgGradientStops": [
+    {
+      "pos": 0,
+      "color": "#ffffff"
+    },
+    {
+      "pos": 1,
+      "color": "#cccccc"
+    }
+  ]
+}

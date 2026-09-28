@@ -17,6 +17,7 @@ import { deflateSync } from 'zlib'
 import {
   ALL_CLASSES, MAX_CLASSES, alignCover, classBit, decodeCover, describeMask,
   maskHasClass, parseCover, suggestInks, toggleClass,
+  COVER_PALETTES, effectiveClasses, paletteInks, parseCoverInks, setCoverInk,
 } from '../../src/utils/coverPlate'
 
 const pack = (bytes) => deflateSync(Buffer.from(bytes)).toString('base64')
@@ -220,5 +221,22 @@ describe('suggestInks', () => {
     const plan = suggestInks(classes, { 0: 0.1, 1: 0.9, 2: 0.5 })
     expect(plan.map((x) => x.classIndex)).toEqual([1, 2, 0])
     expect(new Set(plan.map((x) => x.mode)).size).toBe(3)
+  })
+})
+
+describe('class inks', () => {
+  const classes = [0, 1, 2].map((i) => ({ index: i, name: `C${i}`, color: '#101010' }))
+  it('override one class and keep the rest', () => {
+    const inks = setCoverInk('', 1, '#ff0000', 3)
+    expect(effectiveClasses(classes, inks).map((c) => c.color)).toEqual(['#101010', '#ff0000', '#101010'])
+    expect(setCoverInk(inks, 1, null, 3)).toBe('')
+  })
+  it('deal a palette in class order, repeating past its length', () => {
+    const inks = parseCoverInks(paletteInks('distinct', 10))
+    expect(inks).toHaveLength(10)
+    expect(inks[8]).toBe(COVER_PALETTES.distinct[0])
+  })
+  it('ignore anything that is not a colour', () => {
+    expect(parseCoverInks('#abc,red,#00FF00')).toEqual([null, null, '#00ff00'])
   })
 })

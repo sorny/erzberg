@@ -5,10 +5,8 @@
  * The custom <Sidebar> renders the right-hand control panel.
  */
 import { Canvas, useThree } from '@react-three/fiber'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { EditPanel } from './components/EditPanel'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ElevationProfile } from './components/ElevationProfile'
-import { HeightmapEditor } from './components/HeightmapEditor'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
@@ -43,17 +41,16 @@ import { exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache } from './utils/osmFetch'
 import { workAttribution } from './utils/attribution'
-import { GROUP_OF } from './params'
+import { GROUP_OF, presetStyle } from './params'
 
 /** Every tweakable key, from the index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, readPresetFile } from './utils/presetFile'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
-import { alignCover, classBit, decodeCover, parseCover, suggestInks } from './utils/coverPlate'
+import { alignCover, classBit, decodeCover, effectiveClasses, parseCover, suggestInks } from './utils/coverPlate'
 import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, uniqueMaskName } from './utils/maskLayers'
 import { fetchImagery, findScenes, searchBboxFor } from './utils/imageryFetch'
 import { toneFor } from './utils/imageryTone'
-import { MaskStudio } from './components/MaskStudio'
 import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
@@ -353,6 +350,15 @@ function ComputingPill() {
 }
 
 // ── Root ─────────────────────────────────────────────────────────────────────
+/*
+ * Loaded on first use. Edit Mode and Mask Studio are whole views of their own
+ * that most sessions never open, so their code stays out of the first load and
+ * arrives the first time one is opened. Named exports, so each is unwrapped.
+ */
+const MaskStudio = lazy(() => import('./components/MaskStudio').then((m) => ({ default: m.MaskStudio })))
+const HeightmapEditor = lazy(() => import('./components/HeightmapEditor').then((m) => ({ default: m.HeightmapEditor })))
+const EditPanel = lazy(() => import('./components/EditPanel').then((m) => ({ default: m.EditPanel })))
+
 /** Which style keys a terrain pick writes, as [x fraction, y fraction]. */
 const PICK_KEYS = {
   Isochrone: ['originXIsochrone', 'originYIsochrone'],
@@ -594,6 +600,18 @@ export default function App() {
   }))
   const [terrain, setTerrain] = useState(() => withDefaults(TERRAIN_DEF, restored?.terrain))
   const [style,   setStyle]   = useState(() => withDefaults(STYLE_DEF,   restored?.style))
+  /**
+   * The plate as the rest of the app sees it: its classes with the panel's ink
+   * overrides applied (`coverInks`). Everything that shows or draws a class
+   * colour reads this, so a swatch edited in the panel reaches the legend, the
+   * modes, Ink by land class and the SVG's pen names in one step.
+   */
+  const coverInks = style.coverInks
+  const coverView = useMemo(() => {
+    if (!cover) return null
+    const classes = effectiveClasses(cover.classes, coverInks)
+    return { ...cover, classes, classColors: classes.map((c) => c.color) }
+  }, [cover, coverInks])
   const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored?.points))
   const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored?.view))
   /*
@@ -854,6 +872,9 @@ export default function App() {
       classColors: decoded.classes.map((c) => c.color),
       filename,
     })
+    // Overrides are by class index, and a new plate's class 3 is not the old
+    // one's, so they go with the plate they were made for.
+    setStyle((st) => (st.coverInks ? { ...st, coverInks: '' } : st))
     const pct = decoded.variance != null ? `, ${Math.round(decoded.variance * 100)}% of variance` : ''
     notify(`${decoded.classes.length} land cover classes from ${filename}${pct}`)
   }, [heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS, setCover, notify])
@@ -1488,7 +1509,8 @@ export default function App() {
     // anybody reading the list back.
     tagHistory(name ? `Preset · ${name}` : 'Preset')
     if (d.terrain)         setTerrain(prev => ({ ...prev, ...d.terrain }))
-    if (d.style)           setStyle(prev   => ({ ...prev, ...d.style }))
+    // Over the defaults, not the live look — see `presetStyle`.
+    if (d.style)           setStyle(prev   => presetStyle(prev, d.style))
     if (d.points)          setPoints(prev  => ({ ...prev, ...d.points }))
     if (d.view)            setView(prev    => ({ ...prev, ...d.view }))
     if (d.gradientStops)   setGradientStops(d.gradientStops)
@@ -1918,14 +1940,14 @@ export default function App() {
    * cost is one nearest-neighbour pass over the raster, and none of those four
    * moves during a slider drag.
    */
-  const { grid: coverGrid, error: coverError } = useMemo(() => {
+  const { grid: coverAligned, error: coverError } = useMemo(() => {
     if (!cover) return { grid: null, error: null }
     try {
       const aligned = alignCover(cover, {
         width: heightmapWidth, height: heightmapHeight,
         bbox: geoTiffBbox, crs: geoTiffCRS,
       })
-      return { grid: { ...aligned, classColors: cover.classColors }, error: null }
+      return { grid: aligned, error: null }
     } catch (err) {
       // Surfaced in the Land Cover section rather than thrown: the plate loaded
       // cleanly once, so this is the raster having changed out from under it,
@@ -1934,6 +1956,11 @@ export default function App() {
       return { grid: null, error: err.message }
     }
   }, [cover, heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS])
+  // The inks on top, apart from the alignment: editing a class colour must not
+  // resample the plate onto the raster again.
+  const coverGrid = useMemo(
+    () => (coverAligned ? { ...coverAligned, classColors: coverView.classColors } : null),
+    [coverAligned, coverView])
 
   // ── Merged params ─────────────────────────────────────────────────────────
   // elevScale: intrinsic GeoTIFF scale + user offset. view.zoom is the raw effective zoom.
@@ -1977,7 +2004,7 @@ export default function App() {
     // `vectorLayers` and `geoTiffBbox` are: the exporters run off `p` and the
     // credit a plate carries has to reach them, and the geometry worker runs
     // off `p` and the classes have to reach that.
-    cover, coverGrid,
+    cover: coverView, coverGrid,
     imagery,
   }
 
@@ -2049,9 +2076,9 @@ export default function App() {
    * is why this deals marks rather than hard-wiring them.
    */
   const inkByClass = useCallback(() => {
-    if (!cover?.classes?.length || !terrainData?.gridClass) return
+    if (!coverView?.classes?.length || !terrainData?.gridClass) return
     const { gridClass, gridSlopes, gridMask } = terrainData
-    const count = cover.classes.length
+    const count = coverView.classes.length
     const sum = new Float64Array(count), seen = new Int32Array(count)
     for (let i = 0; i < gridClass.length; i++) {
       const c = gridClass[i]
@@ -2059,9 +2086,9 @@ export default function App() {
       sum[c] += gridSlopes[i]; seen[c]++
     }
     const meanSlope = {}
-    for (const c of cover.classes) meanSlope[c.index] = seen[c.index] ? sum[c.index] / seen[c.index] : 0
+    for (const c of coverView.classes) meanSlope[c.index] = seen[c.index] ? sum[c.index] / seen[c.index] : 0
 
-    const plan = suggestInks(cover.classes, meanSlope)
+    const plan = suggestInks(coverView.classes, meanSlope)
     const patch = {}
     for (const { mode, classIndex, color } of plan) {
       patch[`enabled${mode}`] = true
@@ -2070,7 +2097,7 @@ export default function App() {
     }
     setStyle((s) => ({ ...s, ...patch }))
     notify(`${plan.length} layers inked by land cover class, steepest first`)
-  }, [cover, terrainData, notify])
+  }, [coverView, terrainData, notify])
 
   // A preflight describes one drawing seen from one camera. Both of those are
   // objects that change identity whenever anything inside them does, which makes
@@ -2323,6 +2350,9 @@ export default function App() {
           A separate view from Edit Mode, because the two answer different
           questions: a clip changes the raster for everything, a mask changes
           one layer and leaves the rest alone. */}
+      {/* One boundary for the three on-demand views. Nothing is shown while one
+          loads: it is a few kilobytes, and a spinner would only flash. */}
+      <Suspense fallback={null}>
       {studioMask && (
         <MaskStudio
           srcPixels={srcPixels} srcMask={srcMask}
@@ -2363,6 +2393,7 @@ export default function App() {
           bboxSrc={geoTiffBboxSrc} crs={geoTiffCRS} onError={showError}
         />
       )}
+      </Suspense>
 
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
       {/* Hidden rather than unmounted while editing: every section's open/closed
@@ -2413,7 +2444,7 @@ export default function App() {
         onRemoveVectorLayer={removeVectorLayer}
         onRemoveVectorSource={dropVectorSource}
         onAdoptVectorSource={adoptVectorSource}
-        cover={cover} coverError={coverError} onLoadCover={loadCoverFromPicker}
+        cover={coverView} coverError={coverError} onLoadCover={loadCoverFromPicker}
         onClearCover={() => setCover(null)} onInkByClass={inkByClass}
         masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask} onCopyMask={copyMask}
         onRemoveMask={removeMask} onImportMask={importMask}

@@ -44,7 +44,7 @@ import { hexToRgb, isDarkBackground } from './colorUtils'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 import { orderRuns, routeStats } from './penRoute'
-import { hatchLoops, hatchPlan } from './hatchFill'
+import { hatchLoops, hatchPlan, inkLightness } from './hatchFill'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -1318,8 +1318,19 @@ async function runExport({
        */
       const hatched = areaFill === 'hatch'
       const pxPerMm = vw / Math.max(1, sheetMm)
+      /*
+       * An anaglyph eye paints every area in its own filter ink, with the
+       * area's tone as the ink's weight: on paper the eyes multiply, so ink at
+       * the area's darkness; on a dark ground they add, so ink at its
+       * lightness. In the areas' own colours both eyes carried the same picture
+       * and the glasses could not tell them apart.
+       */
+      const darkPaper = isDarkBackground(bgColor)
       for (const g of layer.groups) {
         const plan = hatched ? hatchPlan(g.hex, bgColor, hatchPitchMm * pxPerMm) : null
+        const light = inkLightness(g.hex)
+        const ink = eyeInk ?? g.hex
+        const inkOpacity = eyeInk ? (darkPaper ? light : 1 - light) : 1
         const els = await mapPaced(g.paths, ({ loops }) => {
           let d = ''
           for (const pts of loops) {
@@ -1345,9 +1356,12 @@ async function runExport({
           return `<path d="${d}"/>` + (h ? `<path d="${h}"/>` : '')
         })
         const no = String(g.no).padStart(2, '0')
-        const fill = hatched ? 'none' : g.hex
+        const fill = hatched ? 'none' : ink
+        // A hatch is already a tone, so its strokes take the eye ink at full
+        // weight; a fill carries the tone as its opacity.
+        const tone = eyeInk && !hatched ? ` fill-opacity="${inkOpacity.toFixed(3)}" stroke-opacity="${inkOpacity.toFixed(3)}"` : ''
         layerGroups.push(penLayer(`${modeId}-ink-${no}`, `${modeLabel} · ink ${no} ${g.hex}`,
-          `<g fill="${fill}" fill-rule="evenodd" stroke="${g.hex}" stroke-width="${sw}" ` +
+          `<g fill="${fill}" fill-rule="evenodd" stroke="${ink}" stroke-width="${sw}"${tone} ` +
           `stroke-linejoin="round" stroke-linecap="round" opacity="${layer.opacity}">${els.join('')}</g>`))
       }
       continue

@@ -37,6 +37,11 @@ How a file becomes a picture, and which changes are allowed to cost anything.
 Everything above the worker is React. Everything inside the worker is plain
 functions over typed arrays, with no framework and no DOM.
 
+`geometryBuilders.js` holds the dispatcher and re-exports the public API. The
+builders live in `src/utils/builders/`, one module per family, and the helpers
+more than one family uses live in `builders/shared.js`. No family imports from
+another or from the dispatcher.
+
 ### Lettering, on the main thread
 
 Four passes add geometry that the worker cannot make:
@@ -176,7 +181,9 @@ raster, `zoom`, the pans and `terrain.resolution` are not stored, because they
 describe the loaded image, not the look.
 
 `applyPreset` in `Sidebar.jsx` leaves out `terrain` and `view` for the same
-reason. A preset also carries `vectorStyles`, matched on `bucket`, so last
+reason. The style goes through `presetStyle` (`params.js`): the preset over the
+defaults, not over the live look, so a key the preset predates falls back to
+its default. `coverInks` is kept, because it belongs to the loaded plate. A preset also carries `vectorStyles`, matched on `bucket`, so last
 week's palette lands on a new fetch of the same valley. `hidden` is stripped,
 because feature indices mean nothing against a different fetch.
 
@@ -300,7 +307,7 @@ buffers.
 
 ### A stencil
 
-`maskedTerrain` in `geometryBuilders.js` folds the cover class selection and the
+`maskedTerrain` in `builders/shared.js` folds the cover class selection and the
 layer's painted masks into its `gridMask`. Every builder already gates on that
 mask. A third source is one more `continue` in the same loop.
 
@@ -320,13 +327,14 @@ To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
 
 ### A draw mode
 
-1. Write a builder in `geometryBuilders.js` that returns `{ positions, colors }`,
+1. Write a builder in the family module under `src/utils/builders/` (lines,
+   tone, light, relief, colour …) that returns `{ positions, colors }`,
    or an object of sub-layers for separate pens.
 2. Register it in `MODES_CONFIG` in `buildLineGeometry`.
 3. Add a `layerStyle` case for each sub-layer.
 4. Add its params to `STYLE_DEF` in `src/defaults.js`.
 5. Add an entry in `src/utils/drawModes.js`, so the randomiser knows it.
-6. Add a `<Section>` in `Sidebar.jsx` in the Marks stage.
+6. Add a `<Section>` in `panel/ModeSections.jsx`.
 7. Add a 22×13 mark in `panel/modeMarks.jsx` that shows the mode's gesture.
 8. Add a line in `SECTION_TERMS`.
 9. Add a line in `PANEL_MODES` in `panel/sectionSummary.js`, and a family in

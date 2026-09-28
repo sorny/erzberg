@@ -11,7 +11,7 @@
  * These are the assertions that used to be a 180-line array nobody could audit.
  */
 import { describe, expect, it } from 'vitest'
-import { GEOMETRY_KEYS, GEOMETRY_NON_SCALAR, GROUP_OF, auditParamSpace, geometryKey } from '../../src/params'
+import { GEOMETRY_KEYS, GEOMETRY_NON_SCALAR, GROUP_OF, auditParamSpace, geometryKey, presetStyle } from '../../src/params'
 import { DRAW_MODE_IDS } from '../../src/utils/drawModes'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from '../../src/defaults'
 
@@ -163,5 +163,21 @@ describe('auditParamSpace', () => {
 
   it('lets a null default through — null is a scalar for the key', () => {
     expect(() => auditParamSpace({ style: { anchorLines: null } }, DRAW_MODE_IDS)).not.toThrow()
+  })
+})
+
+describe('presetStyle', () => {
+  it('lays a preset over the defaults, not over the live look', () => {
+    // A preset saved before a mode existed does not mention it; the mode must
+    // not survive from whatever was on screen.
+    const live = { ...STYLE_DEF, enabledTsp: true, colorLines: '#ff0000' }
+    const out = presetStyle(live, { enabledContours: true })
+    expect(out.enabledTsp).toBe(false)
+    expect(out.colorLines).toBe(STYLE_DEF.colorLines)
+    expect(out.enabledContours).toBe(true)
+  })
+  it('keeps what belongs to the loaded plate', () => {
+    const out = presetStyle({ ...STYLE_DEF, coverInks: '#ff0000' }, { coverInks: '' })
+    expect(out.coverInks).toBe('#ff0000')
   })
 })

@@ -62,6 +62,29 @@ function dotsAlong(pos, col, feat, chains, spacing) {
   return { positions: out, colors: outCol, features }
 }
 
+/**
+ * Area colours as one anaglyph eye sees them.
+ *
+ * A filled area keeps its tone and takes the eye's filter ink. On paper the
+ * eyes multiply, so ink laid at the area's darkness `d` is `1 − d·(1 − ink)`.
+ * On a dark ground they add, so it is the ink scaled by the area's lightness.
+ * Without this, both eyes carried the areas in their own colours and the
+ * glasses could not separate them.
+ */
+function eyeTone(colors, tint, blending) {
+  const t = new THREE.Color(tint)
+  const out = new Float32Array(colors.length)
+  const additive = blending === 'additive'
+  for (let i = 0; i < colors.length; i += 3) {
+    const l = 0.2126 * colors[i] + 0.7152 * colors[i + 1] + 0.0722 * colors[i + 2]
+    const d = 1 - l
+    out[i]     = additive ? t.r * l : 1 - d * (1 - t.r)
+    out[i + 1] = additive ? t.g * l : 1 - d * (1 - t.g)
+    out[i + 2] = additive ? t.b * l : 1 - d * (1 - t.b)
+  }
+  return out
+}
+
 /** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
 const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
 
@@ -324,10 +347,10 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(layer.lids.positions, 3))
     if (layer.lids.sphere) geo.boundingSphere = toSphere(layer.lids.sphere)
-    geo.setAttribute('color',    new THREE.BufferAttribute(layer.lids.colors, 3))
+    geo.setAttribute('color',    new THREE.BufferAttribute(tint ? eyeTone(layer.lids.colors, tint, blending) : layer.lids.colors, 3))
     geo.setIndex(new THREE.BufferAttribute(layer.lids.indices, 1))
     return geo
-  }, [layer.lids])
+  }, [layer.lids, tint, blending])
 
   const lidMat = useMemo(() => new THREE.MeshBasicMaterial({
     vertexColors: true,
@@ -362,10 +385,18 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     // opacity is a uniform and depthTest is render state — no recompile needed.
     lidMat.opacity   = opacity ?? 1
     lidMat.depthTest = !!depthOcclusion
+    // An anaglyph eye blends like its lines, or the second eye's areas would
+    // simply cover the first's.
+    const lidBlend = tint ? (BLEND_MODES[blending] ?? THREE.NormalBlending) : THREE.NormalBlending
+    if (lidMat.blending !== lidBlend) {
+      lidMat.blending = lidBlend
+      lidMat.premultipliedAlpha = lidBlend === THREE.MultiplyBlending
+      lidMat.needsUpdate = true
+    }
     const bias = layer.lids?.hugsSurface ? LID_OFFSET.hug : LID_OFFSET.cap
     lidMat.polygonOffsetFactor = bias
     lidMat.polygonOffsetUnits  = bias
-  }, [lidMat, opacity, depthOcclusion, layer.lids])
+  }, [lidMat, opacity, depthOcclusion, layer.lids, tint, blending])
 
   // ── Main (Visible) Pass ───────────────────────────────────────────────────
   // Built once; weight/opacity/depthOcclusion/resolution here are seed values only

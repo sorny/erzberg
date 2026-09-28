@@ -94,3 +94,19 @@ describe('new options on existing modes', () => {
     expect(heavy.positions.length).toBeLessThanOrEqual(plain.positions.length * 4)
   })
 })
+
+describe('Valleys', () => {
+  it('draw at their defaults, with ticks along the valley', () => {
+    // A trough running along z: every tick should lie along z, not across.
+    const W = 80, px = new Float32Array(W * W)
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) px[y * W + x] = 0.2 + Math.abs(x - 40) / 40 * 0.6 + 0.3 * (y / W)
+    const p = { ...TERRAIN_DEF, ...STYLE_DEF, ...VIEW_DEF, ...POINTS_DEF, elevScale: 1, enabledLines: false, enabledValley: true }
+    const t = buildTerrain(px, new Uint8Array(W * W).fill(1), W, W, p)
+    const l = buildLineGeometry(t, p).find((x) => x.id === 'Valley')
+    expect(l.positions.length).toBeGreaterThan(0)
+    for (let k = 0; k < l.positions.length; k += 6) {
+      const dx = Math.abs(l.positions[k + 3] - l.positions[k]), dz = Math.abs(l.positions[k + 5] - l.positions[k + 2])
+      expect(dz).toBeGreaterThan(dx)
+    }
+  })
+})

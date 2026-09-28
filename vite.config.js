@@ -33,7 +33,24 @@ export default defineConfig({
      * code here, and it would buy two or three percent.
      *
      * The limit is raised to say "this is expected", not to silence a problem.
+     *
+     * What can be done is caching. The libraries go into chunks of their own:
+     * they change when a dependency is bumped, and the app changes with every
+     * deploy. Split out, a returning visitor keeps three and React from the
+     * last visit and downloads only the app: 0.6 MB of the 1.8 MB.
      */
     chunkSizeWarningLimit: 1500,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          // three and its React renderer as one chunk: the bundler merges them
+          // anyway, since fiber and drei reach into three everywhere.
+          if (/node_modules\/(three|three-stdlib|@react-three)\//.test(id)) return 'three'
+          if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'react'
+          return undefined
+        },
+      },
+    },
   },
 })

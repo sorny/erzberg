@@ -82,7 +82,7 @@ export const SECTION_TERMS = {
   'Extent':           'extent bbox bounding box provenance source layers coverage where place latitude longitude crs projection credit imagery land cover map features size km',
   'Satellite':        'satellite imagery aerial photo sentinel copernicus true colour drape backdrop scene cloud esa',
   'Masks':            'mask masks paint brush draw stencil region select restrict layer studio import png jpg',
-  'Land Cover':       'landcover land use class classes mask stencil vegetation forest water rock alphaearth embedding satellite plate ink by class',
+  'Land Cover':       'landcover land use class classes mask stencil vegetation forest water rock alphaearth embedding satellite plate ink by class palette colour color swatch pens',
   'Anaglyph':         'anaglyph stereo 3d red cyan glasses depth parallax two pen eyes stereoscopic',
   'Scale and North':  'scale bar ruler distance metres kilometres north arrow compass bearing grid convergence ratio legend annotation',
   'Analysis':         'elevation profile cross-section transect chart a b pins',

@@ -42,11 +42,9 @@ const ACTIONS = [
   // Extent reads the store and writes nothing — there is no setting on it to
   // put back, which is what this list means.
   'Extent',
-  // Land Cover holds a loaded file and the action that deals marks from it, the
-  // same shape as Vector Layers. The per-layer `coverMask*` keys it gives
-  // meaning to are parameters, but they belong to the mode sections that render
-  // them, not to this one.
-  'Land Cover',
+  // Land Cover is no longer here: it owns `coverInks`, the class colours, which
+  // Reset puts back to the plate's own. The per-layer `coverMask*` keys it
+  // gives meaning to still belong to the mode sections that render them.
   // Masks holds the list and the Studio that draws into it. The per-layer
   // `layerMask*` keys it gives meaning to belong to the mode sections that
   // render them, exactly as the cover classes' do.
@@ -107,12 +105,19 @@ describe('the partition', () => {
 describe('the table against the panel source', () => {
   /** The parameter names each `<Section>`'s own JSX mentions. */
   const rendered = (() => {
+    // The mode sections render where `<ModeSections … />` stands in the
+    // Sidebar, so they are read there, in place: as a file of their own, the
+    // tag's props would be credited to the section before it.
     const files = ['src/components/Sidebar.jsx', 'src/components/panel/ErosionSection.jsx',
       'src/components/panel/TextSection.jsx', 'src/components/panel/ModeSheet.jsx']
+    const inline = (src) => {
+      const modes = readFileSync('src/components/panel/ModeSections.jsx', 'utf8')
+      return src.replace(/<ModeSections\b[^>]*\/>/, modes.slice(modes.indexOf('<>') + 2, modes.lastIndexOf('</>')))
+    }
     const known = new Set(ALL)
     const out = {}
     for (const f of files) {
-      const src = readFileSync(f, 'utf8')
+      const src = inline(readFileSync(f, 'utf8'))
       const marks = [...src.matchAll(/<Section\s+title="([^"]+)"/g)]
       for (let i = 0; i < marks.length; i++) {
         const chunk = src.slice(marks[i].index,

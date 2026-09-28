@@ -176,7 +176,7 @@ but after that they are independent. A mask of one feature takes its name.
 
 ## How it reaches the draw modes
 
-`maskedTerrain` in `geometryBuilders.js` folds both stencils into the layer's
+`maskedTerrain` in `builders/shared.js` folds both stencils into the layer's
 `gridMask`:
 
 ```js

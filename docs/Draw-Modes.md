@@ -155,8 +155,14 @@ The Topographic Position Index:
 
 $$\mathrm{TPI}(x, y) = H(x, y) - \bar{H}_r(x, y)$$
 
-Cells with $\mathrm{TPI} < -\text{threshold}$ draw as valley segments. A
-summed-area table gives $\bar{H}_r$ in $O(N)$, so radius does not change cost.
+Cells with $\mathrm{TPI} < -0.05\,\text{threshold}$ draw as valley ticks, with
+the threshold as a share of the whole relief (default 0.2). A summed-area table
+gives $\bar{H}_r$ in $O(N)$, so radius does not change cost.
+
+Each tick lies along the valley's axis: the direction of least curvature of the
+smoothed grid, a quarter turn from $\theta = \tfrac12\operatorname{atan2}(2h_{xz},
+h_{xx} - h_{zz})$. The gradient would not do, because beside the floor it points
+across the valley, at the floor.
 
 ## 11. Stipple
 

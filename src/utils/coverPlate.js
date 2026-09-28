@@ -320,3 +320,54 @@ export function suggestInks(classes, meanSlopeByClass) {
   }
   return out
 }
+
+// ── Class inks ──────────────────────────────────────────────────────────────
+
+/**
+ * Palettes a plate's classes can be inked from instead of their own colours.
+ *
+ * A plate's class colour is the mean imagery colour of the class, which looks
+ * like the ground and is often a poor set of pens: close tones, pale and
+ * muddy. These are dealt to the classes in order and repeat past their length.
+ * The classes are unnamed clusters, so no palette can know which one is water;
+ * that is what the swatch per class is for.
+ */
+export const COVER_PALETTES = {
+  // Okabe and Ito, the colour-blind-safe qualitative set.
+  distinct: ['#e69f00', '#56b4e9', '#009e73', '#f0e442', '#0072b2', '#d55e00', '#cc79a7', '#000000'],
+  // Muted map tones: forest, meadow, sand, scree, rock, water, soil, snow.
+  earth: ['#5b7f3a', '#9bb56b', '#c9b27c', '#8c7a64', '#b9b4a8', '#4f7ea6', '#7a4e3a', '#e0d6c2'],
+  // Risograph spot inks, for a print in a handful of drums.
+  riso: ['#ff48b0', '#0078bf', '#ffe800', '#00a95c', '#ff6c2f', '#765ba7', '#3d5588', '#f15060'],
+}
+
+/**
+ * The `coverInks` param as one entry per class: a `#rrggbb` override, or null
+ * for "the plate's own colour". One comma-separated string rather than an
+ * array, so it rides the geometry key and undo like any scalar.
+ */
+export function parseCoverInks(str) {
+  if (!str) return []
+  return str.split(',').map((s) => (/^#[0-9a-f]{6}$/i.test(s.trim()) ? s.trim().toLowerCase() : null))
+}
+
+/** `coverInks` with class `index` set to `hex`, or cleared when `hex` is null. */
+export function setCoverInk(str, index, hex, count) {
+  const inks = parseCoverInks(str)
+  while (inks.length < count) inks.push(null)
+  inks[index] = hex
+  return inks.some(Boolean) ? inks.map((h) => h ?? '').join(',') : ''
+}
+
+/** `coverInks` for a named palette, dealt over `count` classes. */
+export function paletteInks(name, count) {
+  const pal = COVER_PALETTES[name]
+  if (!pal) return ''
+  return Array.from({ length: count }, (_, i) => pal[i % pal.length]).join(',')
+}
+
+/** The plate's classes with any overrides applied, as the rest of the app sees them. */
+export function effectiveClasses(classes, str) {
+  const inks = parseCoverInks(str)
+  return classes.map((c) => (inks[c.index] ? { ...c, color: inks[c.index] } : c))
+}

@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'zlib'
-import { openStage, resetToDefaults } from './helpers.js'
+import { openMark, openStage, resetToDefaults, setMark } from './helpers.js'
 
 /**
  * Drawing from what the ground *is* rather than from its shape.
@@ -220,4 +220,32 @@ test('the Land cover mode inks one layer per class', async ({ page }) => {
   // CC-BY travels with the work, not with the app: a plate that is actually in
   // the picture puts its credit in the file.
   expect(svg).toContain('Synthetic fixture')
+})
+
+test('a palette re-inks the classes, and the pens follow', async ({ page }) => {
+  test.setTimeout(240_000)
+  await boot(page)
+  await dropPlate(page, syntheticPlate())
+
+  await page.fill('[data-testid="panel-filter"]', 'Land Cover')
+  await page.waitForTimeout(500)
+  await page.click('[data-testid="cover-palette-distinct"]')
+  await page.waitForTimeout(500)
+  // Okabe–Ito, dealt in class order.
+  const distinct = ['#e69f00', '#56b4e9', '#009e73']
+  for (let i = 0; i < 3; i++) {
+    await expect(page.locator(`[data-testid="cover-ink-${i}"]`)).toHaveValue(distinct[i])
+  }
+  await page.fill('[data-testid="panel-filter"]', '')
+  await page.waitForTimeout(300)
+
+  // Pillars inked by class name each pen after its class's ink.
+  await setMark(page, 'Lines', false)
+  await setMark(page, 'Pillars', true)
+  await openMark(page, 'Pillars')
+  await page.getByRole('button', { name: 'Cover class' }).first().click()
+  await page.waitForTimeout(3500)
+  const svg = await exportSvg(page)
+  const pens = labelsOf(svg).filter((l) => l.startsWith('Pillars · '))
+  expect(pens).toEqual(['Pillars · Class A #e69f00', 'Pillars · Class B #56b4e9', 'Pillars · Class C #009e73'])
 })

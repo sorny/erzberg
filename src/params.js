@@ -227,3 +227,25 @@ export function geometryKey(p) {
   for (const k of GEOMETRY_KEYS) s += k + ' ' + p[k] + ' '
   return s
 }
+
+/**
+ * The style a preset sets: its own values over the defaults.
+ *
+ * Not over the current look. A preset is saved with every key that existed on
+ * the day it was saved, and none of the ones added since. Spread over the live
+ * style, a key it does not mention kept whatever was on screen — so Swiss Topo,
+ * saved before Single Line existed, left Single Line drawing if it was on. Over
+ * the defaults, a missing key means "default", which is what the preset's
+ * author saw.
+ *
+ * `PRESET_KEEPS` are the keys that belong to loaded data rather than to a look:
+ * the class inks describe the plate that is open, not the preset.
+ */
+export const PRESET_KEEPS = ['coverInks']
+
+export function presetStyle(current, style) {
+  const out = { ...STYLE_DEF, ...style }
+  for (const k of PRESET_KEEPS) if (current?.[k] !== undefined) out[k] = current[k]
+  return out
+}
+

@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.33.0] — 2026-09-28
+
+A review of the whole tool: two fixes it found, one it did not expect, class
+inks and presets for the newer modes, and the two largest files taken apart.
+
+### Added
+
+- **Class inks for land cover.** Every class swatch in the Land Cover section
+  can be changed, or a palette dealt in class order: Distinct (colour-blind
+  safe), Earth or Riso. *Plate* goes back to the plate's own colours. Modes,
+  the legend and the SVG pen names all follow.
+- **Nine new presets** that show the newer modes: One Stroke, Winter Afternoon,
+  Scree Net, Hut Walk, Lookout, Truchet Weave, Lehmann, Sun Year, Catchments.
+  65 presets in all.
+- **A smoke test for every draw mode.** Each mode alone on the sample plate
+  must draw, reach the SVG as its own pen layer, and raise no error. Plus a
+  browser test for the terrain pick.
+
+### Fixed
+
+- **Presets could leave modes on.** A preset was laid over the current look, so
+  a mode it did not mention stayed as it was. Every preset saved before a mode
+  existed left that mode drawing. A preset now lays over the defaults.
+- **Anaglyph areas.** Filled areas (Indexed, Mineral, Land cover, Watershed)
+  kept their own colours in both eyes, in the viewport and in the SVG, so the
+  glasses could not separate them. They now take each eye's ink, with their
+  tone as its weight.
+- **Valleys drew almost nothing** at their defaults: 10 marks on the sample
+  plate. The default threshold is now 0.2, the slider stops at 1, and each tick
+  lies along the valley instead of along x.
+
+### Changed
+
+- `geometryBuilders.js` is split into one module per builder family under
+  `src/utils/builders/`. Output is identical for every mode.
+- The forty mode sections moved out of `Sidebar.jsx` into
+  `panel/ModeSections.jsx`.
+- Edit Mode and Mask Studio load on first use. three.js and React are their
+  own chunks, so a returning visitor downloads only the app after a deploy.
+- Patch updates: three 0.186.1, drei 10.7.9, fiber 9.8.1, vite 8.3.1, vitest
+  5.0.2.
+
 ## [1.32.0] — 2026-09-28
 
 One pen per land cover class for Pillars.

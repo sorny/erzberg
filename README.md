@@ -59,7 +59,7 @@ Each sends a place name or a bounding box. None sends a file or needs a key.
   </tr>
 </table>
 
-<sub>Six of the 56 bundled presets, rendered by the app's own PNG exporter from
+<sub>Six of the 65 bundled presets, rendered by the app's own PNG exporter from
 the sample heightmap.</sub>
 
 ---
@@ -296,12 +296,13 @@ fill becomes hatch strokes a pen can draw, denser for darker inks.
 lines hide other lines. Hidden segments can take their own colour and opacity.
 
 **Anaglyph.** Every layer is drawn twice with a real parallax offset, for
-red/cyan glasses. The SVG writes each eye as its own pen layer.
+red/cyan glasses. Filled areas take the eye's ink too, with their tone as its
+weight. The SVG writes each eye as its own pen layer.
 
 **Text layers.** Place your own words on the plate, in any label font. Each text
 is its own layer and pen, and follows the ground under it.
 
-**Presets.** 56 presets ship as thumbnails. *Surprise me* rolls a seeded look:
+**Presets.** 65 presets ship as thumbnails. *Surprise me* rolls a seeded look:
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. The seed is shown, so you can return to a look.
 

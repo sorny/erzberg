@@ -91,7 +91,7 @@ re-derived when the raster changes, so an Edit Mode crop re-cuts the plate.
 
 ## How masking works
 
-Every builder in `geometryBuilders.js` already checks `gridMask`, because a
+Every builder in `src/utils/builders/` already checks `gridMask`, because a
 GeoTIFF can have voids. A class filter is the same check on a mask with more
 zeros:
 
@@ -157,6 +157,15 @@ into closed rings. The Erzberg mine is a relation. Without relations, no class
 was named after it.
 
 ---
+
+## Class inks
+
+Each class starts in its plate colour, the mean imagery colour of the class.
+Change any class's swatch in the Land Cover section, or deal a palette
+(Distinct, Earth, Riso) in class order. *Plate* goes back to the plate colours.
+The inks are one `coverInks` parameter. They can be undone, they stay with the
+plate when a preset is applied, and a new plate clears them. Every mode, the
+legend and the SVG pen names read them.
 
 ## Ink by land class
 

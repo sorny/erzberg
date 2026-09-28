@@ -88,7 +88,7 @@ export const STYLE_DEF = {
   enabledRidge: false, spacingRidge: 1, radiusRidge: 1, thresholdRidge: 0.1, colorRidge: '#000000', weightRidge: 1, opacityRidge: 1, dashRidge: 'solid',
   hypsoRidge: false, hypsoModeRidge: 'elevation', hypsoBandedRidge: false, hypsoIntervalRidge: 10,
   // Valley
-  enabledValley: false, spacingValley: 2, radiusValley: 2, thresholdValley: 0.5, colorValley: '#000000', weightValley: 1, opacityValley: 1, dashValley: 'solid',
+  enabledValley: false, spacingValley: 2, radiusValley: 2, thresholdValley: 0.2, colorValley: '#000000', weightValley: 1, opacityValley: 1, dashValley: 'solid',
   hypsoValley: false, hypsoModeValley: 'elevation', hypsoBandedValley: false, hypsoIntervalValley: 10,
 
   // Stipple — seedStipple: same seed, same dot pattern (reproducible prints)
@@ -260,6 +260,10 @@ export const STYLE_DEF = {
   gammaRetic: 1, densityModeRetic: 'invElev', seedRetic: 42,
   colorRetic: '#1a1a1a', weightRetic: 2.5, opacityRetic: 0.9, dashRetic: 'solid',
   hypsoRetic: false, hypsoModeRetic: 'elevation', hypsoBandedRetic: false, hypsoIntervalRetic: 10,
+
+  // Land cover class inks: one #rrggbb per class index, comma-separated; an empty
+  // entry keeps the plate's own colour. A string so it rides the geometry key.
+  coverInks: '',
 
   // Single line — a weighted stipple joined by one travelling-salesman tour.
   enabledTsp: false, countTsp: 2500, densityModeTsp: 'slope', gammaTsp: 1.2,

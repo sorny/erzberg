@@ -71,6 +71,7 @@ export const SECTION_PARAMS = {
   'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
   'Anaglyph': [/^anaglyph/],
+  'Land Cover': ['coverInks'],
   'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
   'Export': ['plotWidthMm', 'plotPenOrder', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are

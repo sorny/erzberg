@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { openStage, resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, setMark, waitForApp } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
@@ -255,4 +255,35 @@ test('the panel says when the camera cannot give it depth', async ({ page }) => 
   await page.waitForTimeout(1200)
   await openAnaglyph(page)
   await expect(note).toContainText('Orthographic — no depth')
+})
+
+test('filled areas take the eye inks too, with their tone as the weight', async ({ page }) => {
+  test.setTimeout(300_000)
+  await page.goto('http://localhost:5173')
+  await waitForApp(page)
+  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await resetToDefaults(page)
+  // Watershed paints areas and draws no lines of its own in the SVG.
+  await setMark(page, 'Shed', true)
+  await openAnaglyph(page)
+  await page.locator('[data-testid="anaglyph-on"]').click()
+  await page.waitForTimeout(3000)
+
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  const wait = page.waitForEvent('download', { timeout: 180_000 })
+  await page.keyboard.press('Digit1')
+  const svg = readFileSync(await (await wait).path(), 'utf8')
+
+  // Every area group, in both eyes, is painted in a filter ink and nothing else.
+  const areaGroups = [...svg.matchAll(/<g fill="(#[0-9a-f]{6})" fill-rule="evenodd" stroke="(#[0-9a-f]{6})"[^>]*fill-opacity="([\d.]+)"/gi)]
+  expect(areaGroups.length).toBeGreaterThan(0)
+  for (const [, fill, stroke, op] of areaGroups) {
+    expect(['#ff2020', '#20e0ff']).toContain(fill.toLowerCase())
+    expect(stroke.toLowerCase()).toBe(fill.toLowerCase())
+    // The tone survives as the ink's weight, so the ten catchments stay ten tones.
+    expect(Number(op)).toBeGreaterThan(0)
+    expect(Number(op)).toBeLessThanOrEqual(1)
+  }
+  const tones = new Set(areaGroups.map((m) => m[3]))
+  expect(tones.size).toBeGreaterThan(2)
 })
