@@ -144,6 +144,23 @@ function resolveLayerStyle(id, p) {
     }
   }
 
+  /*
+   * Pillars inked by land cover, one layer per class and half — so a plot gets
+   * one pen per class. Styled by its half, and named for its class and ink,
+   * the way the filled areas' pen layers carry theirs.
+   */
+  const pillarClass = /^Pillars(-Above)?-Class(\d+)$/.exec(id)
+  if (pillarClass) {
+    const suf = pillarClass[1] ? 'PillarsAbove' : 'Pillars'
+    const k = Number(pillarClass[2])
+    const c = p.cover?.classes?.find((x) => x.index === k)
+    const cname = c?.name ?? `Class ${String.fromCharCode(65 + k)}`
+    return {
+      weight: p[`weight${suf}`], opacity: p[`opacity${suf}`], dash: p[`dash${suf}`],
+      name: `Pillars · ${pillarClass[1] ? 'Above · ' : ''}${cname}${c?.color ? ` ${c.color}` : ''}`,
+    }
+  }
+
   switch (id) {
     case 'Contours-Minor':
       return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }
@@ -2579,6 +2596,16 @@ function buildPillars(terrain, p, spacing) {
 
   const below = { positions: new F32List(), colors: new F32List() }
   const upper = { positions: new F32List(), colors: new F32List() }
+  // Inked by land cover, a half splits into one layer per class, so the SVG
+  // writes one pen layer per class. Keyed by class index.
+  const splitBelow = !!gridClass && (p.pillarInk === 'class' || p.pillarInk === 'plate')
+  const splitAbove = !!gridClass && (p.pillarAboveInk === 'class' || p.pillarAboveInk === 'plate')
+  const belowBy = new Map(), upperBy = new Map()
+  const targetOf = (map, k) => {
+    let t = map.get(k)
+    if (!t) { t = { positions: new F32List(), colors: new F32List() }; map.set(k, t) }
+    return t
+  }
   const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
   let lidVIdx = 0
   // Depth-only walls for each half — see `occluder` in the dispatcher.
@@ -2692,7 +2719,7 @@ function buildPillars(terrain, p, spacing) {
         const colBase = ink ?? computeVertexColor(normElev(bottom, minElev, maxElev), 0, 0, p)
         const colPeak = ink ?? computeVertexColor(normElev(top, minElev, maxElev), slope, 0, p)
         const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
-        body(below, wx, wz, bottom, top, colBase, colPeak, colLid)
+        body(splitBelow ? targetOf(belowBy, gridClass[i]) : below, wx, wz, bottom, top, colBase, colPeak, colLid)
         occlude(occBelow, wx, wz, bottom, top)
       }
       const low = elev + gap
@@ -2700,7 +2727,7 @@ function buildPillars(terrain, p, spacing) {
         const ink = inkAt(p.pillarAboveInk, i)
         const colLow  = ink ?? computeVertexColor(normElev(low, minElev, maxElev), slope, 0, pAbove)
         const colCeil = ink ?? computeVertexColor(normElev(ceiling, minElev, maxElev), 0, 0, pAbove)
-        body(upper, wx, wz, low, ceiling, colLow, colCeil, null)
+        body(splitAbove ? targetOf(upperBy, gridClass[i]) : upper, wx, wz, low, ceiling, colLow, colCeil, null)
         occlude(occUpper, wx, wz, low, ceiling)
       }
     }
@@ -2713,14 +2740,24 @@ function buildPillars(terrain, p, spacing) {
   // `selfOcclude`: the pillars are emitted row by row whatever the camera does,
   // so without depth the last row drawn covered the rest — the far ones, seen
   // from behind. See the renderer.
-  const lower = { positions: below.positions.toArray(), colors: below.colors.toArray(), lids,
-                  occluder: occluderOf(occBelow), selfOcclude: true }
-  if (!above) return lower
-  return {
-    Pillars: lower,
-    'Pillars-Above': { positions: upper.positions.toArray(), colors: upper.colors.toArray(),
-                       occluder: occluderOf(occUpper), selfOcclude: true },
+  const pack = (t) => ({ positions: t.positions.toArray(), colors: t.colors.toArray(), selfOcclude: true })
+  const layers = {}
+  // One half: a single layer, or one per class in class order. The half's
+  // lids and occluder ride on its first layer; both are drawn for every layer.
+  const half = (id, single, split, byClass, extra) => {
+    const ids = []
+    if (split) {
+      for (const k of [...byClass.keys()].sort((a, b) => a - b)) {
+        layers[`${id}-Class${k}`] = pack(byClass.get(k)); ids.push(`${id}-Class${k}`)
+      }
+    } else {
+      layers[id] = pack(single); ids.push(id)
+    }
+    if (ids.length) Object.assign(layers[ids[0]], extra)
   }
+  half('Pillars', below, splitBelow, belowBy, { lids, occluder: occluderOf(occBelow) })
+  if (above) half('Pillars-Above', upper, splitAbove, upperBy, { occluder: occluderOf(occUpper) })
+  return layers
 }
 
 // ─── Seeded randomness ───────────────────────────────────────────────────────

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.32.0] — 2026-09-28
+
+One pen per land cover class for Pillars.
+
+### Added
+
+- **Pillars: one pen layer per land cover class.** With Cover class or Cover
+  plate ink, each class gets its own layer, and its own pen layer in the SVG,
+  named for the class and its colour (`Pillars · Forest #228833`). The upper
+  half gets its own set. Line style ink stays one layer.
+
 ## [1.31.0] — 2026-09-28
 
 Pillars as a box: a second half above the ground with its own pen, land cover

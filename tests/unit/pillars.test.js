@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { buildTerrain } from '../../src/utils/terrain'
-import { buildLineGeometry } from '../../src/utils/geometryBuilders'
+import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
 import { STYLE_DEF, TERRAIN_DEF, VIEW_DEF, POINTS_DEF } from '../../src/defaults'
 
 const W = 64
@@ -52,16 +52,30 @@ describe('Pillars', () => {
     expect(all.find((l) => l.id === 'Pillars-Above').lids).toBeNull()
   })
 
-  it('takes the land cover class ink', () => {
-    const l = pillars({ pillarInk: 'class' })
-    const seen = new Set()
-    for (let s = 0; s < l.positions.length / 6; s++) {
-      const x = l.positions[s * 6], c = l.colors.slice(s * 6, s * 6 + 3)
-      seen.add(`${x < 0 ? 'L' : 'R'}${c.join(',')}`)
-    }
-    // Every pillar on the left is red and every one on the right is blue.
-    expect([...seen].filter((k) => k.startsWith('L'))).toEqual(['L1,0,0'])
-    expect([...seen].filter((k) => k.startsWith('R'))).toEqual(['R0,0,1'])
+  it('splits into one layer per land cover class, each in its ink', () => {
+    const all = buildLineGeometry(terrain, { ...p0, pillarInk: 'class' })
+    const red = all.find((l) => l.id === 'Pillars-Class0'), blue = all.find((l) => l.id === 'Pillars-Class1')
+    expect(all.find((l) => l.id === 'Pillars')).toBeUndefined()
+    // Class 0 is the left half of the plate, class 1 the right.
+    for (let k = 0; k < red.positions.length; k += 6) expect(red.positions[k]).toBeLessThan(0)
+    for (let k = 0; k < blue.positions.length; k += 6) expect(blue.positions[k]).toBeGreaterThan(-1)
+    expect(Array.from(red.colors.slice(0, 3))).toEqual([1, 0, 0])
+    expect(Array.from(blue.colors.slice(0, 3))).toEqual([0, 0, 1])
+    // Together they are every pillar the single layer had.
+    expect(red.positions.length + blue.positions.length).toBe(pillars({}).positions.length)
+  })
+
+  it('names each class layer for its pen', () => {
+    const p = { ...p0, cover: { classes: [{ index: 0, name: 'Forest', color: '#228833' }] } }
+    expect(layerStyle('Pillars-Class0', p).name).toBe('Pillars · Forest #228833')
+    expect(layerStyle('Pillars-Above-Class0', p).name).toBe('Pillars · Above · Forest #228833')
+    expect(layerStyle('Pillars-Class3', p0).name).toBe('Pillars · Class D')
+  })
+
+  it('splits each half by its own ink', () => {
+    const ids = buildLineGeometry(terrain, { ...p0, pillarAbove: true, pillarInk: 'line', pillarAboveInk: 'class' })
+      .map((l) => l.id).filter((id) => id.startsWith('Pillars'))
+    expect(ids).toEqual(['Pillars', 'Pillars-Above-Class0', 'Pillars-Above-Class1'])
   })
 
   it('hides what stands behind it, with occlusion on', () => {

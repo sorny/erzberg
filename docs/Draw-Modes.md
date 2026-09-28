@@ -42,7 +42,9 @@ minus a gap.
   or cylinder. At 1 the pillars are a solid block. The default is 0.
 - **Ink**, for each half, takes the colour from that half's line style, from the
   land cover class of the pillar's cell, or from the cover plate's imagery at
-  that cell. Without a plate, both fall back to the line style.
+  that cell. Without a plate, both fall back to the line style. Inked by land
+  cover, a half splits into one layer per class (`Pillars-Class3`), so the SVG
+  writes one pen layer per class, named `Pillars · Forest #228833`.
 
 ## 4. Contours
 
