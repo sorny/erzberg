@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-three
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Thirty-nine modes read $H$ only. [Land cover](#land-cover) reads a second
+Forty-two modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -620,6 +620,43 @@ The fastest walk between two points: the Isochrones search from A, stopped
 when B is settled, and walked back along the predecessors. The grid path turns
 only in sixteen directions, so Chaikin smoothing rounds it before it is draped.
 The panel shows the time, the distance and the climb.
+
+## 42. Panorama
+
+The ridges a summit board would show from one eye (`src/utils/panorama.js`).
+Rays leave the eye at even bearings, about one cell apart at the far edge, and
+walk out in half-cell steps as Viewshed's rays do, with the same curvature and
+refraction. A **crest** is the last visible sample before a ray drops out of
+sight. It counts only if the ground it hides runs on for *Min. depth* metres.
+Crests at about the same range on neighbouring rays are joined, and a join
+must run at least about 20° off the line of sight. The joins are chained into
+strokes, rounded by Chaikin and draped.
+
+The **skyline** is the farthest visible sample on each ray, as a second pen.
+Where it lies on the raster's edge, the ray has none. The crest that is also
+the skyline is left out of the crest pen, so no line is plotted twice. For the
+board's look, put the camera low behind the eye.
+
+## 43. Bedding
+
+Tilted layers of rock. A bed dips at $\delta$ towards the bearing $\beta$, so
+it meets the ground where
+
+$$h + s \tan\delta = \text{const}, \qquad s = x \sin\beta - y \cos\beta$$
+
+with $h$, $x$ and $y$ in true metres and $y$ down the raster. The traces are
+level sets of that field, *Beds* of them across the sheet. At $\delta = 0$ they
+are contours. Where a trace crosses a valley it bends into a V (the rule of
+V's). Every *Marker every*-th bed is a second pen with its own colour.
+
+## 44. Slope Classes
+
+Slope in degrees from central differences in true metres, blurred by *Detail*,
+in three bands: *From*–*Middle*, *Middle*–*Steepest* and over *Steepest*. The
+defaults, 30°, 35° and 40°, are the bands of Alpine avalanche maps. The bands
+are hatched at twice the spacing, at the spacing, and cross-hatched at the
+spacing, and each is its own pen layer, named for its degrees. The panel shows
+the share of the ground in each band.
 
 ---
 

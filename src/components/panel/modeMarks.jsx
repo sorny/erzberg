@@ -319,6 +319,31 @@ const MARKS = {
       <path d="M5.8 3 L8.2 3 M7 1.8 L7 4.2" strokeWidth="1.1" />
     </g>
   ),
+  // Ridges behind ridges, the far one heaviest, and the eye below them.
+  panorama: (
+    <g {...BASE}>
+      <path d="M1 5 L5 2.5 L8 4 L12 1.5 L16 3.5 L21 2.5" strokeWidth="1.5" />
+      <path d="M1 8 L4 6.5 L9 8.5 L13 5.5 L17 7.5 L21 6" strokeWidth="0.8" />
+      <path d="M3 11 L8 9.5 L12 11 L16 9 L20 10.5" strokeWidth="0.8" />
+      <path d="M10 12.5 L12 12.5 M11 11.5 L11 13.5" strokeWidth="1.1" />
+    </g>
+  ),
+  // Tilted layers bending into a V where they cross a valley; one is the seam.
+  bedding: (
+    <g {...BASE}>
+      <path d="M1 2 L9 3.5 L11 6 L13 3.5 L21 2" strokeWidth="0.8" />
+      <path d="M1 5.5 L8.5 7 L11 10.5 L13.5 7 L21 5.5" strokeWidth="1.6" />
+      <path d="M1 9 L8 10.5 L10 13 M12 13 L14 10.5 L21 9" strokeWidth="0.8" />
+    </g>
+  ),
+  // Three bands of hatch, sparse to crossed, as the ground steepens.
+  slopeclass: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M1 12 L5 4 M4 12 L7 6" />
+      <path d="M8 12 L11 6 M9.5 12 L12 6 M11 12 L14 6 M12.5 12 L14 8" />
+      <path d="M15 12 L19 2 M16.5 12 L21 2 M18 12 L21 6 M15 3 L21 12 M15 7 L18.5 12 M17 2 L21 8" />
+    </g>
+  ),
   // A path winding between two ends, round a contour rather than over it.
   route: (
     <g {...BASE}>

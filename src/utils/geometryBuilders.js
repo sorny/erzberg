@@ -11,7 +11,8 @@ import { shadowSun } from './sunHours'
 import { buildCover, buildIndexed, buildMineral, buildOutrun, buildRiso, buildWatershed } from './builders/colour.js'
 import { buildContours } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
-import { buildIsochrone, buildRoute, buildViewshed } from './builders/ground.js'
+import { buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
+import { buildBedding, buildSlopeClass } from './builders/survey.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
@@ -153,6 +154,19 @@ export function buildLineGeometry(terrain, p) {
         startX: p.startXRoute, startY: p.startYRoute, endX: p.endXRoute, endY: p.endYRoute,
         maxSlope: p.steepRoute, smoothing: p.smoothingRoute, marker: p.markerRoute,
         cellMetres: p.cellMetresRoute, relief: p.reliefRoute }) },
+    { id:'Panorama', builder: (t, ctx) => buildPanorama(t, ctx, {
+        originX: p.originXPanorama, originY: p.originYPanorama, eye: p.eyePanorama,
+        minDepth: p.depthPanorama, skyline: p.skylinePanorama, marker: p.markerPanorama,
+        cellMetres: p.cellMetresPanorama, relief: p.reliefPanorama }) },
+    { id:'Bedding', builder: (t, ctx) => buildBedding(t, ctx, {
+        dip: p.dipBedding, azimuth: p.azimuthBedding, beds: p.bedsBedding, offset: p.offsetBedding,
+        marker: p.markerBedding, markerColor: p.markerColorBedding, smoothing: p.smoothingBedding,
+        cellMetres: p.cellMetresBedding, relief: p.reliefBedding }) },
+    { id:'SlopeClass', builder: (t, ctx) => buildSlopeClass(t, ctx, {
+        low: p.lowSlopeClass, mid: p.midSlopeClass, high: p.highSlopeClass,
+        spacing: p.spacingSlopeClass, angle: p.angleSlopeClass, radius: p.radiusSlopeClass,
+        outline: p.outlineSlopeClass,
+        cellMetres: p.cellMetresSlopeClass, relief: p.reliefSlopeClass }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },

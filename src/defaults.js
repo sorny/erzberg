@@ -305,6 +305,27 @@ export const STYLE_DEF = {
   colorRoute: '#c0561a', weightRoute: 3, opacityRoute: 1, dashRoute: 'solid',
   hypsoRoute: false, hypsoModeRoute: 'elevation', hypsoBandedRoute: false, hypsoIntervalRoute: 10,
 
+  // Panorama — the ridges seen from one point, drawn where they lie.
+  enabledPanorama: false, originXPanorama: 0.5, originYPanorama: 0.5, eyePanorama: 2,
+  depthPanorama: 150, skylinePanorama: true, markerPanorama: true,
+  cellMetresPanorama: 10, reliefPanorama: 1000,
+  colorPanorama: '#1a1a1a', weightPanorama: 1.2, skylineWeightPanorama: 2.4, opacityPanorama: 1, dashPanorama: 'solid',
+  hypsoPanorama: false, hypsoModePanorama: 'elevation', hypsoBandedPanorama: false, hypsoIntervalPanorama: 10,
+
+  // Bedding — where tilted layers of rock would crop out. Dip towards a bearing.
+  enabledBedding: false, dipBedding: 25, azimuthBedding: 135, bedsBedding: 40, offsetBedding: 0,
+  markerBedding: 6, markerColorBedding: '#c0561a', markerWeightBedding: 2.4, smoothingBedding: 2,
+  cellMetresBedding: 10, reliefBedding: 1000,
+  colorBedding: '#1a1a1a', weightBedding: 1, opacityBedding: 1, dashBedding: 'solid',
+  hypsoBedding: false, hypsoModeBedding: 'elevation', hypsoBandedBedding: false, hypsoIntervalBedding: 10,
+
+  // Slope classes — the avalanche map's bands, 30–35°, 35–40° and over 40°.
+  enabledSlopeClass: false, lowSlopeClass: 30, midSlopeClass: 35, highSlopeClass: 40,
+  spacingSlopeClass: 3, angleSlopeClass: 45, radiusSlopeClass: 1, outlineSlopeClass: true,
+  cellMetresSlopeClass: 10, reliefSlopeClass: 1000,
+  colorSlopeClass: '#1a1a1a', weightSlopeClass: 1, opacitySlopeClass: 1, dashSlopeClass: 'solid',
+  hypsoSlopeClass: false, hypsoModeSlopeClass: 'elevation', hypsoBandedSlopeClass: false, hypsoIntervalSlopeClass: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
@@ -549,7 +570,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the forty modes are
+  // A modifier rather than a mode: it takes whatever the forty-three modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

@@ -18,7 +18,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, sec, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, viewshedNote }) {
+export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, viewshedNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1010,6 +1010,93 @@ export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, in
                   <Tog label="Mark the ends" checked={!!style.markerRoute} onChange={v => ss({ markerRoute: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Route" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Panorama" icon={<ModeMark kind="panorama" />} open={sec.modePanorama} onToggle={() => tog('modePanorama')} enabled={style.enabledPanorama}>
+            <Tog label="Enabled" testId="mode-panorama" checked={style.enabledPanorama} onChange={v => ss({ enabledPanorama: v })} />
+            {style.enabledPanorama && (
+              <>
+                <Sub>
+                  <Btn block variant="toggle" on={pick === 'Panorama'} data-testid="panorama-pick"
+                    onClick={() => onPick?.(pick === 'Panorama' ? null : 'Panorama')} style={{ marginBottom:8 }}>
+                    {pick === 'Panorama' ? 'Click where you stand…' : 'Pick eye on terrain'}
+                  </Btn>
+                  <Note>Each line is a ridge that hides the ground behind it, seen from the eye. Put the camera low behind the eye and the ridges stack as on a summit board.</Note>
+                  <InlineSl label="Eye height" help="Metres above the ground. A person is about 1.7 m, a tower 20 m or more." min={0} max={200} step={0.5} value={style.eyePanorama} onChange={v => ss({ eyePanorama: v })} fmt={v => `${v} m`} />
+                  <InlineSl label="Min. depth" help="A ridge draws only if the ground it hides runs on for at least this far. Raise it to keep the big ridges and drop the small bumps." min={0} max={2000} step={10} value={style.depthPanorama} onChange={v => ss({ depthPanorama: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresPanorama} onChange={v => ss({ cellMetresPanorama: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefPanorama} onChange={v => ss({ reliefPanorama: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Skyline" help="The farthest ground seen in each direction, as a second, heavier pen." checked={!!style.skylinePanorama} onChange={v => ss({ skylinePanorama: v })} />
+                  {style.skylinePanorama && (
+                    <InlineSl label="Skyline weight" min={0.5} max={6} step={0.1} value={style.skylineWeightPanorama} onChange={v => ss({ skylineWeightPanorama: v })} fmt={v => v.toFixed(1)} />
+                  )}
+                  <Tog label="Mark the eye" checked={!!style.markerPanorama} onChange={v => ss({ markerPanorama: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Panorama" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Bedding" icon={<ModeMark kind="bedding" />} open={sec.modeBedding} onToggle={() => tog('modeBedding')} enabled={style.enabledBedding}>
+            <Tog label="Enabled" testId="mode-bedding" checked={style.enabledBedding} onChange={v => ss({ enabledBedding: v })} />
+            {style.enabledBedding && (
+              <>
+                <Sub>
+                  <InlineSl label="Dip" help="How steep the layers are. At 0 they are level and the lines are contours. Where a layer crosses a valley, its line bends into a V." min={0} max={85} step={1} value={style.dipBedding} onChange={v => ss({ dipBedding: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Dip towards" help="The bearing the layers dip towards. 0° is north, 90° is east." min={0} max={359} step={1} value={style.azimuthBedding} onChange={v => ss({ azimuthBedding: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Beds" help="How many layers across the whole sheet." min={2} max={300} step={1} value={style.bedsBedding} onChange={v => ss({ bedsBedding: Math.round(v) })} />
+                  <InlineSl label="Shift" help="Moves every layer up or down by a part of one bed." min={0} max={1} step={0.01} value={style.offsetBedding} onChange={v => ss({ offsetBedding: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Smoothing" min={0} max={8} step={1} value={style.smoothingBedding} onChange={v => ss({ smoothingBedding: Math.round(v) })} />
+                  <InlineSl label="Marker every" help="Every Nth bed as a second pen, as a map picks out a seam. At 0 there is none." min={0} max={20} step={1} value={style.markerBedding} onChange={v => ss({ markerBedding: Math.round(v) })} fmt={v => (v ? `${Math.round(v)}` : 'off')} />
+                  {style.markerBedding > 0 && (
+                    <>
+                      <ColorRow label="Marker colour" value={style.markerColorBedding} onChange={v => ss({ markerColorBedding: v })} />
+                      <InlineSl label="Marker weight" min={0.5} max={6} step={0.1} value={style.markerWeightBedding} onChange={v => ss({ markerWeightBedding: v })} fmt={v => v.toFixed(1)} />
+                    </>
+                  )}
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresBedding} onChange={v => ss({ cellMetresBedding: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefBedding} onChange={v => ss({ reliefBedding: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Bedding" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Slope Classes" icon={<ModeMark kind="slopeclass" />} open={sec.modeSlopeClass} onToggle={() => tog('modeSlopeClass')} enabled={style.enabledSlopeClass}>
+            <Tog label="Enabled" testId="mode-slopeclass" checked={style.enabledSlopeClass} onChange={v => ss({ enabledSlopeClass: v })} />
+            {style.enabledSlopeClass && (
+              <>
+                <Sub>
+                  {slopeClassNote && (
+                    <div data-testid="slopeclass-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${Math.round(slopeClassNote.low * 100)}% · ${Math.round(slopeClassNote.mid * 100)}% · ${Math.round(slopeClassNote.high * 100)}% of the ground`}
+                    </div>
+                  )}
+                  <InlineSl label="From" help="The lowest band starts here. Avalanche maps use 30°." min={5} max={60} step={1} value={style.lowSlopeClass} onChange={v => ss({ lowSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Middle" min={5} max={70} step={1} value={style.midSlopeClass} onChange={v => ss({ midSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Steepest" help="Ground over this is cross-hatched." min={5} max={80} step={1} value={style.highSlopeClass} onChange={v => ss({ highSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Spacing" help="The hatch in the middle and steepest bands. The lowest band uses twice this." min={0.5} max={30} step={0.5} value={style.spacingSlopeClass} onChange={v => ss({ spacingSlopeClass: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleSlopeClass} onChange={v => ss({ angleSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Detail" help="Blur on the slope before it is banded. At 0 the bands follow the grid." min={0} max={12} step={0.5} value={style.radiusSlopeClass} onChange={v => ss({ radiusSlopeClass: v })} fmt={v => v.toFixed(1)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresSlopeClass} onChange={v => ss({ cellMetresSlopeClass: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefSlopeClass} onChange={v => ss({ reliefSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Outline" help="The edge of the lowest band, drawn with its pen." checked={!!style.outlineSlopeClass} onChange={v => ss({ outlineSlopeClass: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="SlopeClass" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

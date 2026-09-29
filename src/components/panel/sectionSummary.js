@@ -126,6 +126,9 @@ export const PANEL_MODES = [
   ['Mode: Truchet',        'enabledTruchet',   'Tile',      (s) => num(s.spacingTruchet)],
   ['Mode: Viewshed',       'enabledViewshed',  'Eye',       (s) => `${num(s.eyeViewshed)} m`],
   ['Mode: Route',          'enabledRoute',     'Steep',     (s) => deg(s.steepRoute)],
+  ['Mode: Panorama',       'enabledPanorama',  'Eye',       (s) => `${num(s.eyePanorama)} m`],
+  ['Mode: Bedding',        'enabledBedding',   'Dip',       (s) => deg(s.dipBedding)],
+  ['Mode: Slope Classes',  'enabledSlopeClass', 'From',     (s) => deg(s.lowSlopeClass)],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
 ]
 

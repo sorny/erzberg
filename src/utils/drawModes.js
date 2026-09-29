@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all forty at once.
+ * does the index that shows all forty-three at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -213,6 +213,20 @@ export const DRAW_MODES = [
     pick: { smoothing: [1, 5] },
   },
   {
+    // Rays at every bearing from the eye, a cell apart at the far edge. Cached.
+    id: 'Panorama', label: 'Panorama', cost: 2.5, mark: 'panorama',
+    pick: {},
+  },
+  {
+    // One traced level set of a field that is height plus a tilted plane.
+    id: 'Bedding', label: 'Bedding', cost: 2, mark: 'bedding',
+    pick: { dip: [10, 60], azimuth: [0, 360], beds: [20, 70] },
+  },
+  {
+    id: 'SlopeClass', label: 'Slope classes', cost: 2, mark: 'slopeclass',
+    pick: { spacing: [2, 6], angle: [20, 70] },
+  },
+  {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
     pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
@@ -257,6 +271,10 @@ export const SUB_LAYER_LABEL = {
   'Riso-A':                  'Ink A',
   'Riso-B':                  'Ink B',
   'Riso-C':                  'Ink C',
+  'Panorama-Crests':         'Crests',
+  'Panorama-Skyline':        'Skyline',
+  'Bedding-Beds':            'Beds',
+  'Bedding-Marker':          'Marker bed',
 }
 
 /**

@@ -214,6 +214,24 @@ function resolveLayerStyle(id, p) {
       return { weight: p.weightRaceLine, opacity: (p.opacityRaceLine ?? 1) * 0.45, dash: p.dashRaceLine }
     case 'RaceLine-Best':
       return { weight: p.bestWeightRaceLine ?? 3, opacity: p.opacityRaceLine, dash: 'solid' }
+    case 'Panorama-Crests':
+      return { weight: p.weightPanorama, opacity: p.opacityPanorama, dash: p.dashPanorama }
+    // The skyline is the line the board is drawn for, so it takes the heavier pen.
+    case 'Panorama-Skyline':
+      return { weight: p.skylineWeightPanorama ?? 2.4, opacity: p.opacityPanorama, dash: 'solid' }
+    case 'Bedding-Beds':
+      return { weight: p.weightBedding, opacity: p.opacityBedding, dash: p.dashBedding }
+    case 'Bedding-Marker':
+      return { weight: p.markerWeightBedding ?? 2.4, opacity: p.opacityBedding, dash: 'solid' }
+    // One pen per band, named for its degrees, so the plot says which is which.
+    case 'SlopeClass-Low':
+    case 'SlopeClass-Mid':
+    case 'SlopeClass-High': {
+      const [a, b, c] = [p.lowSlopeClass ?? 30, p.midSlopeClass ?? 35, p.highSlopeClass ?? 40].sort((x, y) => x - y)
+      const band = id === 'SlopeClass-Low' ? `${a}–${b}°` : id === 'SlopeClass-Mid' ? `${b}–${c}°` : `over ${c}°`
+      return { weight: p.weightSlopeClass, opacity: p.opacitySlopeClass, dash: p.dashSlopeClass,
+               name: `Slope classes · ${band}` }
+    }
     default:
       return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
   }

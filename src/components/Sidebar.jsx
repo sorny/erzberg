@@ -883,7 +883,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1025,10 +1025,13 @@ export function Sidebar({
   }
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
-  // Facts the builders measured, carried on their layers as `note`.
-  const noteOf = (id) => (Array.isArray(lineGeo) ? lineGeo.find((l) => l.id === id)?.note : null) ?? null
+  // Facts the builders measured, carried on their layers as `note`. A mode with
+  // several pens carries it on each, so any one of them that drew will do.
+  const noteOf = (id) => (Array.isArray(lineGeo)
+    ? lineGeo.find((l) => (l.id === id || l.id.startsWith(`${id}-`)) && l.note)?.note : null) ?? null
   const viewshedNote = noteOf('Viewshed')
   const routeNote = noteOf('Route')
+  const slopeClassNote = noteOf('SlopeClass')
   const crsInfo     = classifyCRS(geoTiffCRS)
 
   /*
@@ -1104,6 +1107,9 @@ export function Sidebar({
       modeTruchet:  !!newStyle.enabledTruchet,
       modeViewshed: !!newStyle.enabledViewshed,
       modeRoute:    !!newStyle.enabledRoute,
+      modePanorama: !!newStyle.enabledPanorama,
+      modeBedding:  !!newStyle.enabledBedding,
+      modeSlopeClass: !!newStyle.enabledSlopeClass,
       modeIndexed:  !!newStyle.enabledIndexed,
       modeOutrun:   !!newStyle.enabledOutrun,
       modeRiso:     !!newStyle.enabledRiso,
@@ -2389,7 +2395,7 @@ export function Sidebar({
               otherwise. */}
           {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
-          <ModeSections cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} routeNote={routeNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} viewshedNote={viewshedNote} />
+          <ModeSections cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} routeNote={routeNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} viewshedNote={viewshedNote} />
 
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —
@@ -2724,7 +2730,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the forty modes
+              A modifier, not a mode: it takes whatever the forty-three modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

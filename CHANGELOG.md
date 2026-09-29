@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.36.0] — 2026-09-29
+
+Three new draw modes from the conventions of real maps: the summit board, the
+geological map and the avalanche map.
+
+### Added
+
+- **Panorama** (Marks → Light). Pick an eye on the terrain. Each ridge that
+  hides the ground behind it, seen from there, is drawn where it lies, and the
+  farthest ground seen in each direction is the skyline, as a second, heavier
+  pen. With the camera low behind the eye the ridges stack as on a summit
+  board. The flat 360° board itself would be a second kind of output beside
+  the 3D scene, so the ridges are draped instead and every mask, pen layer and
+  export works as for any other mode. *Min. depth* drops the small bumps: a
+  ridge draws only if the ground it hides runs on that far.
+- **Bedding** (Marks → Line). Where tilted layers of rock crop out, for a dip
+  and a dip direction. At a dip of 0 the lines are contours. Where a layer
+  crosses a valley its line bends into a V, as on a geological map. Every Nth
+  bed can be a marker bed in its own colour and pen. Dip and distance are true
+  metres, so the height exaggeration does not change the angle.
+- **Slope Classes** (Marks → Tone). The avalanche map's bands, 30–35°, 35–40°
+  and over 40°, hatched sparse, dense and crossed. Each band is its own pen
+  layer, named for its degrees, and the panel shows how much of the ground is
+  in each. The bounds can move.
+- The randomiser can roll Bedding's dip, direction and bed count.
+
 ## [1.35.0] — 2026-09-29
 
 Masks from level, one way to work in both editors, and the Section mode removed.

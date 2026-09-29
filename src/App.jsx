@@ -368,6 +368,7 @@ const PICK_KEYS = {
   Viewshed:  ['originXViewshed', 'originYViewshed'],
   RouteA:    ['startXRoute', 'startYRoute'],
   RouteB:    ['endXRoute', 'endYRoute'],
+  Panorama:  ['originXPanorama', 'originYPanorama'],
 }
 
 export default function App() {
@@ -728,7 +729,7 @@ export default function App() {
   // ── Elevation profile ─────────────────────────────────────────────────────
   const [profileMode,   setProfileMode]   = useState(false)
   // A point picked on the terrain for a mode, through the same raycast the
-  // profile uses: 'Isochrone', 'Viewshed', or 'RouteA' then 'RouteB'.
+  // profile uses: 'Isochrone', 'Viewshed', 'Panorama', or 'RouteA' then 'RouteB'.
   const [pick, setPick] = useState(null)
   const [profileClicks, setProfileClicks] = useState([])
   const [profileData,   setProfileData]   = useState(null)

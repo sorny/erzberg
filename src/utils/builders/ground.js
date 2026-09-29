@@ -1,13 +1,15 @@
 /**
- * Walking and looking: Isochrones, Viewshed, Route.
+ * Walking and looking: Isochrones, Viewshed, Route, Panorama.
  *
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
 import { leastCostPath, travelTimeField } from '../isochrone'
 import { viewshedField } from '../viewshed'
+import { linkCrests, panoramaCrests } from '../panorama'
 import { groundPixelMetres, gridValueToMetres } from '../geoCoords'
 import { smoothField } from '../sunHours'
+import { chainSegments } from '../chainSegments'
 import { F32List, SMOOTH_SIMPLIFY_EPS, chaikinSmoothFlat, drapeEdge, hatchWhere, joinLayers, traceLevelSet } from './shared.js'
 
 // ─── Isochrones ──────────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ export function buildIsochrone(terrain, p, o) {
  * everything the metres depend on, for a mode's field cache. `ground()` builds
  * the heights only when a field actually has to be computed.
  */
-function groundMetres(terrain, p, cellMetres, relief) {
+export function groundMetres(terrain, p, cellMetres, relief) {
   const { grid, gridMask, rows, cols, scl } = terrain
   const px = p.geoTiffBbox && p.geoTiffCRS
     ? groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight) : null
@@ -205,4 +207,79 @@ export function buildRoute(terrain, p, o) {
   let out = { positions: line.positions.toArray(), colors: line.colors.toArray() }
   if (o.marker) out = joinLayers(joinLayers(out, originCross(terrain, p, a[0], a[1])), originCross(terrain, p, b[0], b[1]))
   return { ...out, note: { seconds: path.seconds, metres: path.metres, climb: path.climb } }
+}
+
+// ─── Panorama ────────────────────────────────────────────────────────────────
+
+let panoCache = { terrain: null, key: null, value: null }
+
+/**
+ * The ridges a summit board would show from one point, drawn where they lie.
+ *
+ * `panoramaCrests` finds, on rays out from the eye, each edge where the ground
+ * drops out of sight behind a ridge (see panorama.js). Crests at about the same
+ * range on neighbouring rays are joined into lines. Seen from above they are
+ * the ridges that stand in front of one another. With the camera low behind the
+ * eye, they stack as they do on the board at the summit.
+ *
+ * Two pens: the crests, and the skyline, the farthest ground seen on each ray.
+ */
+export function buildPanorama(terrain, p, o) {
+  const { rows, cols } = terrain
+  const row = (o.originY ?? 0.5) * (rows - 1), col = (o.originX ?? 0.5) * (cols - 1)
+  const m = groundMetres(terrain, p, o.cellMetres, o.relief)
+  const key = [row, col, o.eye, o.minDepth, m.key].join('|')
+  let pano
+  if (panoCache.terrain === terrain && panoCache.key === key) pano = panoCache.value
+  else {
+    pano = panoramaCrests(m.ground(), { row, col, eye: o.eye, minDepth: o.minDepth })
+    panoCache = { terrain, key, value: pano }
+  }
+
+  const sMask = terrain.hasNoData ? terrain.gridMask : null
+  // The links are joined end to end into strokes, and each stroke is rounded
+  // by Chaikin before it is draped. Crests sit on half-cell steps of the march,
+  // and a ridge drawn through them as found zig-zags by that half cell.
+  const draw = (segs) => {
+    const out = { positions: new F32List(), colors: new F32List() }
+    const flat = new Float32Array(segs.length)
+    for (let q = 0; q < segs.length; q += 2) { flat[q] = segs[q + 1]; flat[q + 1] = segs[q] }
+    const { order, flip, start } = chainSegments(flat, 2, 1000)
+    const flush = (pts) => {
+      if (pts.length < 4) return
+      const line = pts.length >= 6 ? chaikinSmoothFlat(Float64Array.from(pts), false, 2, SMOOTH_SIMPLIFY_EPS / 2) : pts
+      for (let q = 2; q < line.length; q += 2) {
+        drapeEdge(out, terrain, p, sMask, line[q - 2], line[q - 1], line[q], line[q + 1],
+          Math.atan2(line[q + 1] - line[q - 1], line[q] - line[q - 2]))
+      }
+    }
+    let pts = []
+    for (let k = 0; k < order.length; k++) {
+      const o = order[k] * 4, f = flip[k]
+      if (start[k]) { flush(pts); pts = [flat[o + (f ? 2 : 0)], flat[o + (f ? 3 : 1)]] }
+      pts.push(flat[o + (f ? 0 : 2)], flat[o + (f ? 1 : 3)])
+    }
+    flush(pts)
+    return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+  }
+
+  let crests = draw(linkCrests(pano, !!o.skyline))
+  if (o.marker) crests = joinLayers(crests, originCross(terrain, p, row, col))
+  const ridges = { ...crests, note: { rays: pano.rays } }
+  if (!o.skyline) return ridges
+
+  // Neighbouring skyline points join unless the horizon jumps from one ridge
+  // to another, farther one, where the line has to lift. The test is the one
+  // `linkCrests` uses: a join may run no closer than about 20° to the line of
+  // sight.
+  const { rays, sky } = pano, skySegs = [], step = (2 * Math.PI) / rays
+  for (let a = 0; a < rays; a++) {
+    const b = (a + 1) % rays
+    const r0 = sky[2 * a], c0 = sky[2 * a + 1], r1 = sky[2 * b], c1 = sky[2 * b + 1]
+    if (r0 !== r0 || r1 !== r1) continue
+    const d0 = Math.hypot(r0 - row, c0 - col), d1 = Math.hypot(r1 - row, c1 - col)
+    if (Math.abs(d1 - d0) > 2.75 * Math.max(d0, d1) * step + 1) continue
+    skySegs.push(r0, c0, r1, c1)
+  }
+  return { 'Panorama-Crests': ridges, 'Panorama-Skyline': draw(skySegs) }
 }
