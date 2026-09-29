@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.35.0] — 2026-09-29
+
+Masks from level, one way to work in both editors, and the Section mode removed.
+
+### Added
+
+- **Masks from level** (Mask Studio → Level). A mask of the ground between two
+  heights, in metres when the GeoTIFF gives them. The wash previews the result
+  live while the From and To sliders move. *Smooth* blurs the heights first, so
+  the edge follows the landform and not the noise in the data.
+- **Combine** for the Level and Features tools: Replace, Add, Subtract or
+  Intersect with the mask, then *Apply to mask*. *Done* and `Esc` also keep
+  a preview that is on screen, as one undoable step.
+- **Undo in the Mask Studio.** `⌘Z` and `⇧⌘Z`, or the Undo and Redo buttons,
+  step through the last ten strokes, shapes and applied regions. Before, a mask
+  change could not be undone.
+- **Tool keys in Edit Mode:** `C` Crop, `O` Ellipse, `L` Lasso, `P` Polygon,
+  `F` Features.
+- **Undo in Edit Mode.** `⌘Z` and `⇧⌘Z`, or the Undo and Redo buttons, step
+  through changes to the clip. Before, Cancel was the only way back.
+- **A Features tool in Edit Mode**, as in the Mask Studio. The outline shows on
+  the raster while you pick features, before *Clip to this*.
+- The `?` card lists the Edit Mode tool keys and the Mask Studio's keys.
+- **Shift draws a circle** with the Mask Studio's Ellipse, as in Edit Mode.
+
+### Changed
+
+- **A mask from features moved into the Mask Studio** (Features tool), with the
+  same live preview as Level. The Masks section keeps the list, *+ Draw a mask*
+  and *Import…*.
+- **Edit Mode and the Mask Studio look and work alike.** One glyph per tool
+  across both. Each panel shows only the active tool's controls: in Edit Mode
+  the crop fields appear for Crop alone. Both panels show the same Backdrop
+  block, with the imagery line and the exposure controls, and a History row.
+  The hint bars use the same words. The Studio's subtitle is now "Make a
+  stencil", and *Apply to mask* stays grey until there is something to apply.
+- In the Studio, `⌘R` and other chords no longer also switch the tool.
+
+### Fixed
+
+- **App shortcuts fired inside the Mask Studio.** `E` switched the eraser and
+  also opened Edit Mode over the Studio, and `1`–`5` exported the hidden
+  terrain. The Studio now owns the keyboard, as Edit Mode does.
+
+### Removed
+
+- **The Section draw mode.** A level mask with any mode does the same job with
+  more control. Presets and sessions that used it load without it. Forty draw
+  modes remain.
+
 ## [1.34.0] — 2026-09-28
 
 Inks exactly as picked.

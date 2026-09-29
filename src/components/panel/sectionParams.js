@@ -124,7 +124,7 @@ export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis']
  *
  * The hypsometric ramp: each mode can colour its marks by height, and each one
  * previews the ramp beside that switch. Thirty-three identical entries in
- * `ALSO_READS` would say the same thing at forty-one times the length.
+ * `ALSO_READS` would say the same thing at forty times the length.
  */
 export const MODE_READS = ['gradientStops']
 

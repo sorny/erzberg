@@ -421,3 +421,62 @@ test('the cursor says which way a box handle resizes', async ({ page }) => {
   expect(await cursorAt(page, (x0 + x1) / 2, y1), 'ellipse s grip').toBe('ns-resize')
   expect(await cursorAt(page, cx, cy),            'inside the ellipse').toBe('move')
 })
+
+test('one letter picks each tool, as in the Mask Studio', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  const panel = page.locator('[data-testid="edit-panel"]')
+  // The hint box follows the tool, so it says which one is active.
+  await page.keyboard.press('p')
+  await expect(panel).toContainText('Click to place corners')
+  await page.keyboard.press('l')
+  await expect(panel).toContainText('trace a free-hand outline')
+  await page.keyboard.press('o')
+  await expect(panel).toContainText('hold Shift for a perfect circle')
+  await page.keyboard.press('f')
+  await expect(panel).toContainText('Clip to the outline of loaded map features')
+  await page.keyboard.press('c')
+  await expect(panel).toContainText('Drag on the image to draw a crop')
+})
+
+test('the panel shows the active tool\'s controls', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  await expect(page.locator('[data-testid="edit-w"]')).toBeVisible()
+  await page.locator('[data-testid="edit-tool-lasso"]').click()
+  // The crop fields belong to Crop. Feather applies to every shape, so it stays.
+  await expect(page.locator('[data-testid="edit-w"]')).toHaveCount(0)
+  await expect(page.locator('[data-testid="edit-feather"]')).toBeVisible()
+  await page.locator('[data-testid="edit-tool-features"]').click()
+  await expect(page.locator('[data-testid="edit-panel"]')).toContainText('No features are loaded')
+})
+
+test('undo and redo step through the draft, by button and by ⌘Z', async ({ page }) => {
+  await boot(page)
+  await openEditor(page)
+  const result = page.locator('[data-testid="edit-result"]')
+  await expect(page.locator('[data-testid="edit-undo"]')).toBeDisabled()
+
+  await setCrop(page, { x: 0, y: 0, w: 512, h: 512 })
+  await expect(result).toHaveText('512×512')
+  // Past the pause that joins quick changes into one step.
+  await page.waitForTimeout(600)
+  await setCrop(page, { x: 0, y: 0, w: 256, h: 256 })
+  await expect(result).toHaveText('256×256')
+
+  await page.locator('[data-testid="edit-undo"]').click()
+  await expect(result).toHaveText('512×512')
+  await page.locator('[data-testid="edit-undo"]').click()
+  await expect(result).toHaveText('1024×1024')
+  await page.locator('[data-testid="edit-redo"]').click()
+  await expect(result).toHaveText('512×512')
+
+  // The keyboard, outside any field. ⌘Z undoes the draft, not the app.
+  await page.locator('[data-testid="edit-panel"]').click({ position: { x: 5, y: 5 } })
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(result).toHaveText('1024×1024')
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect(result).toHaveText('512×512')
+  // Still in Edit Mode: nothing was applied or cancelled.
+  await expect(page.locator('[data-testid="heightmap-editor"]')).toBeVisible()
+})

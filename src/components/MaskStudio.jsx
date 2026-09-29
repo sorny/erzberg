@@ -18,16 +18,29 @@
  *
  * ── What is drawn, and where it lives ────────────────────────────────────────
  * One plane of bits at the *source* raster's size. The brush writes into it
- * directly — no undo stack of its own, because the app's history already
- * snapshots the mask list and a stroke is a step like any other.
+ * directly. The app's history does not hold mask planes, so the Studio keeps
+ * its own undo: a copy of the plane before each stroke, shape, Apply or
+ * whole-mask action, the last UNDO_DEPTH of them. A copy is one byte per
+ * pixel, so ten on an 8k raster are a few hundred megabytes at worst and a few
+ * megabytes on an ordinary one.
  *
  * The canvas is drawn at source resolution and scaled by the view transform, so
  * a stroke lands on the pixel the pointer is over at any zoom. `image-rendering`
  * stays pixelated for the mask overlay, because a mask has no intermediate
  * value and a smoothed edge would show a boundary that is not there.
+ *
+ * ── Regions the app can compute ──────────────────────────────────────────────
+ * Two tools do not paint. Level takes the ground between two heights, and
+ * Features takes the outline of loaded map features. Both preview live: while
+ * their controls move, the wash shows the mask as Apply would leave it, after
+ * Replace, Add, Subtract or Intersect. Apply writes it into the plane and is one
+ * step of history, like a stroke.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { fillAll, invert, stamp, stroke } from '../utils/maskLayers'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { combineMask, fillAll, invert, stamp, stroke } from '../utils/maskLayers'
+import { levelSource, thresholdLevel } from '../utils/maskFromLevel'
+import { canMakeMask, maskFromFeatures } from '../utils/maskFromVector'
+import { useFeaturePick } from './panel/FeaturePicker'
 import { MaskPanel } from './MaskPanel'
 import { useBackdrop } from '../hooks/useBackdrop'
 import { DESK, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, TEXT, VEIL } from './panel/ui'
@@ -40,7 +53,17 @@ const STUDIO_TOOLS = [
   ['rect', 'Rectangle', 'R'],
   ['ellipse', 'Ellipse', 'O'],
   ['lasso', 'Lasso', 'L'],
+  ['level', 'Level', 'H'],
+  ['features', 'Features', 'F'],
 ]
+
+/** The tools that compute a region instead of painting one. */
+const REGION_TOOLS = new Set(['level', 'features'])
+
+/** A mask that still has its default name takes the region's name on Replace. */
+const DEFAULT_NAME = /^Mask \d+$/
+
+const UNDO_DEPTH = 10
 
 const MIN_BRUSH = 1
 const MAX_BRUSH = 400
@@ -50,6 +73,7 @@ export function MaskStudio({
   imagery, tone, mask, onCommit, onClose, rightInset = 0,
   backdrop = 'auto', setBackdrop,
   style, ss,
+  vectorLayers = [], vectorSources = [], featureRaster, elevMin, elevMax,
 }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
@@ -65,9 +89,97 @@ export function MaskStudio({
   const [tool, setTool] = useState('brush')
   const [brush, setBrush] = useState(24)
   const [erase, setErase] = useState(false)
-  const [, bump] = useState(0)
+  const [rev, bump] = useState(0)
 
   dataRef.current = mask?.data ?? null
+
+  // ── Undo ───────────────────────────────────────────────────────────────────
+  // Per mask: opening another one starts a fresh history.
+  const undoRef = useRef({ id: null, past: [], future: [] })
+  if (undoRef.current.id !== mask?.id) undoRef.current = { id: mask?.id, past: [], future: [] }
+  /** Keep a copy of the plane as it is now, before a change. */
+  const remember = () => {
+    const plane = dataRef.current
+    if (!plane) return
+    const h = undoRef.current
+    h.past.push(plane.slice())
+    if (h.past.length > UNDO_DEPTH) h.past.shift()
+    h.future = []
+  }
+
+  // ── Computed regions ───────────────────────────────────────────────────────
+  const regionTool = REGION_TOOLS.has(tool)
+  const [level, setLevel] = useState({ lo: 0.5, hi: 1, smooth: 2 })
+  const [combine, setCombine] = useState('replace')
+  const [dist, setDist] = useState(0)
+  const [fillClosed, setFillClosed] = useState(true)
+  const pick = useFeaturePick(vectorLayers, vectorSources)
+
+  const metres = elevMin != null && elevMax != null
+  const fmtLevel = useCallback((v) => (metres
+    ? `${Math.round(elevMin + v * (elevMax - elevMin))} m`
+    : `${Math.round(v * 100)} %`), [metres, elevMin, elevMax])
+
+  // The blur is the slow half of a level mask, so it runs once per Smooth
+  // value. A drag of From or To is then one pass over the raster.
+  const heights = useMemo(
+    () => (tool === 'level' && srcPixels
+      ? levelSource(srcPixels, srcMask, srcWidth, srcHeight, level.smooth)
+      : null),
+    [tool, srcPixels, srcMask, srcWidth, srcHeight, level.smooth])
+
+  const fBbox = featureRaster?.bbox, fCrs = featureRaster?.crs
+  const raster = useMemo(() => ({ bbox: fBbox, crs: fCrs, width: srcWidth, height: srcHeight }),
+    [fBbox, fCrs, srcWidth, srcHeight])
+  const { chosen, bucket, closes, picked } = pick
+  const geom = chosen?.geom ?? 'area'
+  const filling = geom === 'area' || (closes && fillClosed)
+  const featureOk = Boolean(bucket && canMakeMask(bucket, raster))
+  const pickedKey = [...picked].sort((a, b) => a - b).join(',')
+
+  // Features rasterise far slower than a threshold, and the buffer is typed
+  // digit by digit, so the preview waits for a short pause.
+  const [featRegion, setFeatRegion] = useState(null)
+  useEffect(() => {
+    if (tool !== 'features' || !featureOk) return undefined
+    const t = setTimeout(() => {
+      setFeatRegion(maskFromFeatures(bucket, raster, {
+        geom: bucket.geom, hidden: chosen.hidden,
+        only: pickedKey ? pickedKey.split(',').map(Number) : [],
+        ...(closes ? { fill: fillClosed } : null),
+        ...(filling ? { grow: dist } : { widthM: Math.max(1, dist || 25) }),
+      }))
+    }, 120)
+    return () => clearTimeout(t)
+  }, [tool, featureOk, bucket, raster, chosen, pickedKey, closes, fillClosed, filling, dist])
+
+  // The mask as Apply would leave it. Written into two reused buffers, because
+  // a slider drag asks for it on every move and a raster is megabytes.
+  const buffers = useRef({ region: null, result: null })
+  const preview = useMemo(() => {
+    const base = mask?.data
+    if (!regionTool || !base) return null
+    const b = buffers.current
+    let region = null
+    if (tool === 'level' && heights) {
+      region = thresholdLevel(heights, srcMask, level.lo, level.hi, b.region).data
+      b.region = region
+    } else if (tool === 'features' && featureOk && featRegion?.length === base.length) {
+      region = featRegion
+    }
+    if (!region) return null
+    if (b.result?.length !== base.length) b.result = new Uint8Array(base.length)
+    const on = combineMask(b.result, base, region, combine)
+    return { data: b.result, on }
+    // `rev` is here because Apply changes the plane's bytes, not its identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionTool, tool, heights, srcMask, level.lo, level.hi, featureOk, featRegion, combine, mask?.data, rev])
+  const previewRef = useRef(null)
+  previewRef.current = preview
+
+  const regionName = () => (tool === 'level'
+    ? `Level ${fmtLevel(Math.min(level.lo, level.hi)).replace(/ (m|%)$/, '')}–${fmtLevel(Math.max(level.lo, level.hi))}`
+    : pick.label)
 
   // The same backdrop builder as Edit Mode, and the same choice. The imagery
   // is under the drape's own exposure: a boundary painted against one
@@ -86,7 +198,7 @@ export function MaskStudio({
    * only the brush's bounding box.
    */
   const rebuildOverlay = useCallback(() => {
-    const plane = dataRef.current
+    const plane = previewRef.current?.data ?? dataRef.current
     if (!plane || !srcWidth || !srcHeight) { overlayRef.current = null; return }
     let o = overlayRef.current
     if (!o || o.canvas.width !== srcWidth || o.canvas.height !== srcHeight) {
@@ -102,6 +214,8 @@ export function MaskStudio({
 
   // A new plane (import, copy, another mask) or a new colour repaints it all.
   useEffect(() => { rebuildOverlay(); drawRef.current() }, [rebuildOverlay, mask?.data])
+  // A preview repaints it too, and so does leaving a region tool.
+  useEffect(() => { rebuildOverlay(); drawRef.current() }, [rebuildOverlay, preview])
 
   /** Repaint the overlay inside a box of image pixels, after a brush stamp. */
   const patchOverlay = (x0, y0, x1, y1) => {
@@ -243,7 +357,51 @@ export function MaskStudio({
   }, [fit])
 
   // ── Gestures ───────────────────────────────────────────────────────────────
-  const commit = () => { onCommit?.(); bump((n) => n + 1) }
+  const commit = (patch) => { onCommit?.(patch); bump((n) => n + 1) }
+
+  /** Write the previewed result into the plane, as one step of history. */
+  const apply = () => {
+    const plane = dataRef.current
+    if (!plane || !preview) return
+    remember()
+    plane.set(preview.data)
+    const name = combine === 'replace' && DEFAULT_NAME.test(mask.name) ? regionName() : ''
+    commit(name ? { name } : undefined)
+  }
+
+  /**
+   * Leave the Studio, keeping what the wash shows.
+   *
+   * A Level or Features preview looks exactly like the mask, so closing on one
+   * and getting the old mask back reads as the Studio losing work: strokes are
+   * kept without a button, and a person reasonably expects this to be kept too.
+   * So a preview that differs from the mask is applied first, as one undoable
+   * step. Switching to another tool still drops it, and the wash shows that.
+   */
+  const close = () => {
+    const plane = dataRef.current
+    if (plane && preview && !samePlane(plane, preview.data)) apply()
+    onClose?.()
+  }
+  const closeRef = useRef(close)
+  closeRef.current = close
+
+  /** Step the plane back (or forward) one change. The name stays as it is. */
+  const step = (back) => {
+    const plane = dataRef.current, h = undoRef.current
+    const from = back ? h.past : h.future, to = back ? h.future : h.past
+    if (!plane || !from.length) return
+    to.push(plane.slice())
+    plane.set(from.pop())
+    rebuildOverlay()
+    commit()
+    drawRef.current()
+  }
+  /** One whole-mask action, remembered first. */
+  const whole = (fn) => {
+    if (!dataRef.current) return
+    remember(); fn(dataRef.current); rebuildOverlay(); commit(); draw()
+  }
 
   const onDown = (e) => {
     // Alt is the pan modifier and outranks every tool, exactly as it does in
@@ -254,10 +412,11 @@ export function MaskStudio({
                           ox: viewRef.current.ox, oy: viewRef.current.oy }
       return
     }
-    if (!dataRef.current || e.button !== 0) return
+    if (!dataRef.current || e.button !== 0 || regionTool) return
     const pt = toImage(e)
     e.currentTarget.setPointerCapture?.(e.pointerId)
     if (tool === 'brush') {
+      remember()
       dragRef.current = { tool, last: pt }
       stamp(dataRef.current, srcWidth, srcHeight, pt.x, pt.y, brush, erase)
       patchOverlay(pt.x - brush, pt.y - brush, pt.x + brush, pt.y + brush)
@@ -294,7 +453,8 @@ export function MaskStudio({
         // polygon needs, and every extra vertex costs a crossing test per row.
         if (Math.hypot(pt.x - prev.x, pt.y - prev.y) > 2) d.points.push(pt)
       } else {
-        d.to = pt
+        // Shift makes the ellipse a circle, as it does in Edit Mode.
+        d.to = e.shiftKey && d.tool === 'ellipse' ? squareFrom(d.from, pt) : pt
       }
     }
     requestDraw()
@@ -305,7 +465,7 @@ export function MaskStudio({
     dragRef.current = null
     if (d?.tool === 'pan') { draw(); return }
     if (!d || !dataRef.current) { draw(); return }
-    if (d.tool !== 'brush') { fillShape(dataRef.current, srcWidth, srcHeight, d, erase); rebuildOverlay() }
+    if (d.tool !== 'brush') { remember(); fillShape(dataRef.current, srcWidth, srcHeight, d, erase); rebuildOverlay() }
     commit()
     draw()
   }
@@ -333,12 +493,21 @@ export function MaskStudio({
     requestDraw()
   }
 
+  const stepRef = useRef(step)
+  stepRef.current = step
+
   // ── Keys ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
       if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return
       const k = e.key.toLowerCase()
-      if (k === 'escape') { onClose?.(); return }
+      if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyZ' || e.code === 'KeyY')) {
+        e.preventDefault()
+        stepRef.current(e.code === 'KeyZ' && !e.shiftKey)
+        return
+      }
+      if (e.metaKey || e.ctrlKey) return
+      if (k === 'escape') { closeRef.current(); return }
       const hit = STUDIO_TOOLS.find(([, , key]) => key.toLowerCase() === k)
       if (hit) { setTool(hit[0]); e.preventDefault(); return }
       if (k === 'e') { setErase((v) => !v); e.preventDefault() }
@@ -347,7 +516,7 @@ export function MaskStudio({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
 
   return (
     <div ref={wrapRef} data-testid="mask-studio"
@@ -361,7 +530,8 @@ export function MaskStudio({
         onPointerLeave={() => { hoverRef.current = null; placeRing() }}
         onWheel={onWheel}
         onContextMenu={(e) => e.preventDefault()}
-        style={{ display: 'block', cursor: tool === 'brush' ? 'none' : 'crosshair', touchAction: 'none' }} />
+        style={{ display: 'block', touchAction: 'none',
+                 cursor: tool === 'brush' ? 'none' : regionTool ? 'default' : 'crosshair' }} />
       <div ref={ringRef} aria-hidden="true" style={{
         position: 'absolute', left: 0, top: 0, display: 'none', pointerEvents: 'none',
         border: '1.5px solid #ffffff', borderRadius: '50%', boxSizing: 'border-box',
@@ -388,8 +558,10 @@ export function MaskStudio({
           {' · '}
           {tool === 'brush'   && 'drag to paint · [ and ] resize'}
           {tool === 'rect'    && 'drag a rectangle'}
-          {tool === 'ellipse' && 'drag an ellipse'}
+          {tool === 'ellipse' && 'drag an ellipse · shift for a circle'}
           {tool === 'lasso'   && 'drag to trace · it closes itself'}
+          {tool === 'level'   && 'set the heights in the panel'}
+          {tool === 'features' && 'pick the features in the panel'}
           {' · alt-drag to pan · scroll to zoom'}
         </span>
       </div>
@@ -402,16 +574,37 @@ export function MaskStudio({
         backdrop={backdrop} setBackdrop={setBackdrop}
         hasPhoto={hasPhoto} imagery={imagery}
         style={style} ss={ss}
-        onFill={() => { if (dataRef.current) { fillAll(dataRef.current, 1); rebuildOverlay(); commit(); draw() } }}
-        onInvert={() => { if (dataRef.current) { invert(dataRef.current); rebuildOverlay(); commit(); draw() } }}
-        onClear={() => { if (dataRef.current) { fillAll(dataRef.current, 0); rebuildOverlay(); commit(); draw() } }}
-        onDone={onClose}
+        onFill={() => whole((d) => fillAll(d, 1))}
+        onInvert={() => whole(invert)}
+        onClear={() => whole((d) => fillAll(d, 0))}
+        onUndo={() => step(true)} onRedo={() => step(false)}
+        canUndo={undoRef.current.past.length > 0} canRedo={undoRef.current.future.length > 0}
+        onDone={close}
+        region={{
+          level, setLevel, fmtLevel, combine, setCombine,
+          pick, dist, setDist, fillClosed, setFillClosed, filling, featureOk,
+          preview, onApply: apply,
+        }}
       />
     </div>
   )
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Whether two planes hold the same bits. */
+function samePlane(a, b) {
+  if (a.length !== b.length) return false
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false
+  return true
+}
+
+/** The corner opposite `from` of the square that `pt` reaches furthest along. */
+function squareFrom(from, pt) {
+  const dx = pt.x - from.x, dy = pt.y - from.y
+  const s = Math.max(Math.abs(dx), Math.abs(dy))
+  return { x: from.x + (dx < 0 ? -s : s), y: from.y + (dy < 0 ? -s : s) }
+}
 
 function hexRgb(color) {
   const n = parseInt((color ?? '#ffffff').slice(1), 16)

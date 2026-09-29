@@ -16,7 +16,7 @@ import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
 import { buildPillars } from './builders/pillars.js'
-import { buildBitplane, buildSection } from './builders/relief.js'
+import { buildBitplane } from './builders/relief.js'
 import { maskedTerrain, paintFor } from './builders/shared.js'
 import { buildReticulation, buildRugged, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
@@ -78,9 +78,6 @@ export function buildLineGeometry(terrain, p) {
         gamma: p.gammaRetic, densityMode: p.densityModeRetic, seed: p.seedRetic }) },
     { id:'ZeroCross',builder: (t, ctx) => buildZeroCross(t, ctx, {
         detrend: p.detrendZeroCross, spacing: p.spacingZeroCross, axes: p.axesZeroCross }) },
-    { id:'Section', builder: (t, ctx) => buildSection(t, ctx, {
-        cut: p.cutSection, hatch: p.hatchSection, hatchAngle: p.hatchAngleSection,
-        beyond: p.beyondSection }) },
     { id:'FallLine',builder: (t, ctx) => buildFallLine(t, ctx, {
         spacing: p.spacingFallLine, gravity: p.gravityFallLine, drag: p.dragFallLine,
         dragQuad: p.dragQuadFallLine, carve: p.carveFallLine, smoothing: p.smoothingFallLine, maxLen: p.maxLenFallLine }) },

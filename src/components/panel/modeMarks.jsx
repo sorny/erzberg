@@ -255,15 +255,6 @@ const MARKS = {
       <path d="M4 3.2 C6 6.5, 6.5 9, 8.5 11.5" strokeWidth="1.9" />
     </g>
   ),
-  // A cutting plane: hatched below, outline beyond.
-  section: (
-    <g stroke="currentColor" fill="none" strokeLinecap="round" vectorEffect="non-scaling-stroke">
-      <path d="M1 3 L6 1.5 L10 3.5 L14 1 L18 3 L21 2" strokeWidth="0.7" opacity="0.5" />
-      <path d="M1 6.5 L21 6.5" strokeWidth="1.8" />
-      <path d="M2 12 L7.5 6.5 M5.5 12 L11 6.5 M9 12 L14.5 6.5 M12.5 12 L18 6.5 M16 12 L21 7"
-            strokeWidth="0.7" />
-    </g>
-  ),
   // Dots at every sign change: dense where the ground is busy.
   zerocross: (
     <g stroke="none" fill="currentColor">

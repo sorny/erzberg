@@ -108,7 +108,6 @@ export const PANEL_MODES = [
   ['Mode: Berms',          'enabledBerm',      'Spacing',   (s) => num(s.spacingBerm)],
   ['Mode: Air',            'enabledAir',       'Spacing',   (s) => num(s.spacingAir)],
   ['Mode: Race Line',      'enabledRaceLine',  'Fan',       (s) => num(s.fanRaceLine)],
-  ['Mode: Section',        'enabledSection',   'Cut',       (s) => pct(s.cutSection)],
   // The hour, because that is what the line is about — every other mode's one
   // fact is a setting and this one's is a moment. Bare, like the rest: a clock
   // reading is five characters and `MODE: SHADOW LINE` cannot spare them. The
@@ -276,7 +275,7 @@ export function buildSectionSummaries({
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
 
   // ── Marks ─────────────────────────────────────────────────────────────────
-  // The index says how many of the forty-one are drawing. It is the one header
+  // The index says how many of the forty are drawing. It is the one header
   // whose readout is about the sections under it rather than about itself.
   out['Draw Modes'] = `${PANEL_MODES.filter(([, k]) => style[k]).length} of ${PANEL_MODES.length}`
   for (const [title, key, label, fact] of PANEL_MODES) {

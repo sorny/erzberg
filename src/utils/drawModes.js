@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all forty-one at once.
+ * does the index that shows all forty at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -142,10 +142,6 @@ export const DRAW_MODES = [
     pick: { detrend: [2, 16], spacing: [1, 6] },
   },
   {
-    id: 'Section', label: 'Section', cost: 2, mark: 'section',
-    pick: { cut: [0.2, 0.7], hatch: [2, 9], hatchAngle: [0, 180], beyond: [4, 16] },
-  },
-  {
     id: 'Halation', label: 'Halation', cost: 5, mark: 'halation',
     pick: { azimuth: [0, 360], height: [1.2, 2.8], falloff: [1, 2.2],
             exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],
@@ -256,9 +252,6 @@ export const SUB_LAYER_LABEL = {
   'RaceLine-Field':          'Field',
   'RaceLine-Best':           'Best line',
   'Pillars-Above':           'Above',
-  'Section-Face':            'Cut face',
-  'Section-Hatch':           'Hatch',
-  'Section-Beyond':          'Beyond',
   'Outrun-Core':             'Filament',
   'Outrun-Glow':             'Halo',
   'Riso-A':                  'Ink A',

@@ -214,9 +214,6 @@ function resolveLayerStyle(id, p) {
       return { weight: p.weightRaceLine, opacity: (p.opacityRaceLine ?? 1) * 0.45, dash: p.dashRaceLine }
     case 'RaceLine-Best':
       return { weight: p.bestWeightRaceLine ?? 3, opacity: p.opacityRaceLine, dash: 'solid' }
-    case 'Section-Face':   return { weight: p.weightSection, opacity: p.opacitySection, dash: 'solid' }
-    case 'Section-Hatch':  return { weight: p.hatchWeightSection ?? 1, opacity: (p.opacitySection ?? 1) * 0.9, dash: 'solid' }
-    case 'Section-Beyond': return { weight: p.beyondWeightSection ?? 1, opacity: (p.opacitySection ?? 1) * 0.35, dash: p.dashSection }
     default:
       return { weight: p[`weight${id}`], opacity: p[`opacity${id}`], dash: p[`dash${id}`] }
   }

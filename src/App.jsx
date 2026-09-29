@@ -22,6 +22,7 @@ import { useVectorIcons } from './hooks/useVectorIcons'
 import { useVectorLabels } from './hooks/useVectorLabels'
 import { useTextLayers } from './hooks/useTextLayers'
 import { useHistory } from './hooks/useHistory'
+import { useDraftHistory } from './hooks/useDraftHistory'
 import { adoptTextLayers } from './utils/textLayers'
 import { useContourLabels } from './hooks/useContourLabels'
 import { flattenSvg } from './utils/svgFlatten'
@@ -34,7 +35,6 @@ import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
 import { layersFromSource, moveLayer, sourceRings } from './utils/vectorLayers'
-import { canMakeMask, maskFromFeatures } from './utils/maskFromVector'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
 import { exportHeightmap } from './utils/heightmapExport'
@@ -355,6 +355,9 @@ function ComputingPill() {
  * that most sessions never open, so their code stays out of the first load and
  * arrives the first time one is opened. Named exports, so each is unwrapped.
  */
+/** Edit Mode's tool keys, matching the Mask Studio's one-letter scheme. */
+const EDIT_TOOL_KEYS = { KeyC: 'crop', KeyO: 'ellipse', KeyL: 'lasso', KeyP: 'polygon', KeyF: 'features' }
+
 const MaskStudio = lazy(() => import('./components/MaskStudio').then((m) => ({ default: m.MaskStudio })))
 const HeightmapEditor = lazy(() => import('./components/HeightmapEditor').then((m) => ({ default: m.HeightmapEditor })))
 const EditPanel = lazy(() => import('./components/EditPanel').then((m) => ({ default: m.EditPanel })))
@@ -509,7 +512,7 @@ export default function App() {
       // written in stack order, so a preset made after arranging the stack puts
       // it back. Buckets the preset never saw keep their order relative to each
       // other and settle underneath — a preset that knows about three of forty
-      // layers has nothing to say about where the other forty-one go.
+      // layers has nothing to say about where the other forty go.
       //
       // Only for presets that say so. Before the stack existed the same array
       // was written in *paint* order, ground cover first, and reading one of
@@ -912,8 +915,11 @@ export default function App() {
    * array's identity to tell React and the worker that it moved. The bytes are
    * the same bytes; only the wrapper is new.
    */
-  const commitMask = useCallback((id) => {
-    setMasks(srcMasks.map((m) => (m.id === id ? { ...m, data: m.data } : m)))
+  const commitMask = useCallback((id, patch) => {
+    const others = srcMasks.filter((m) => m.id !== id)
+    // A new name, when the Studio proposes one, must not repeat another row's.
+    const named = patch?.name ? { ...patch, name: uniqueMaskName(patch.name.slice(0, 32), others) } : patch
+    setMasks(srcMasks.map((m) => (m.id === id ? { ...m, ...named, data: m.data } : m)))
   }, [srcMasks, setMasks])
 
   /**
@@ -947,56 +953,6 @@ export default function App() {
     if (studioMaskId === id) setStudioMaskId(null)
     setMasks(srcMasks.filter((m) => m.id !== id))
   }, [srcMasks, setMasks, studioMaskId])
-
-  /**
-   * A mask from features that are already loaded.
-   *
-   * The shape of a forest, a lake or a quarry is something OpenStreetMap and
-   * GeoJSON already hold exactly, and tracing it by hand in the Studio is
-   * copying an outline the app has in memory. This is the same stencil by the
-   * other route.
-   *
-   * Every geometry kind is offered, not only areas: a line becomes a corridor
-   * and a point becomes a disc once either is given a width, and those are two
-   * of the most useful masks over a valley.
-   */
-  const maskFromLayer = useCallback((layerId, opts = {}) => {
-    const layer = vectorLayers.find((l) => l.id === layerId)
-    const source = layer && vectorSources.find((s) => s.id === layer.sourceId)
-    const bucket = source?.buckets?.find((b) => b.key === layer.bucket)
-    if (!bucket) { showError('Those features are no longer loaded.'); return null }
-
-    const raster = { bbox: geoTiffBboxSrc, crs: geoTiffCRS, width: srcWidth, height: srcHeight }
-    if (!canMakeMask(bucket, raster)) {
-      showError('A mask from features needs a georeferenced raster and features with coordinates.')
-      return null
-    }
-    if (srcMasks.length >= MAX_MASKS) {
-      showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
-      return null
-    }
-
-    const data = maskFromFeatures(bucket, raster, {
-      geom: bucket.geom, hidden: layer.hidden, ...opts,
-    })
-    let on = 0
-    for (let i = 0; i < data.length; i++) on += data[i]
-    if (!on) {
-      showError(`Nothing from ${layer.name} falls inside this raster.`)
-      return null
-    }
-
-    // Named after the one feature when that is what was picked — "Jakomini"
-    // says far more in a mask list than "Boundary · City district" does.
-    const one = opts.only?.length === 1 ? bucket.names?.get(opts.only[0]) : null
-    const name = (one ?? layer.name).slice(0, 32)
-    const mask = createMask(srcWidth, srcHeight, srcMasks.length, name)
-    mask.data = data
-    setMasks([...srcMasks, mask])
-    notify(`${name} → mask, ${Math.round((100 * on) / data.length)}% of the raster`)
-    return mask
-  }, [vectorLayers, vectorSources, geoTiffBboxSrc, geoTiffCRS, srcWidth, srcHeight,
-      srcMasks, setMasks, notify, showError])
 
   /** A mask from an image file — a black-and-white stencil drawn anywhere else. */
   const importMask = useCallback(() => {
@@ -1588,6 +1544,11 @@ export default function App() {
   const [editMode,  setEditMode]  = useState(false)
   const [editDraft, setEditDraft] = useState(null)
   const [editTool,  setEditTool]  = useState('crop')
+  // Undo inside Edit Mode, over the draft alone. Every change to the draft goes
+  // through `editHistory.change`, so each is a step.
+  const editHistory = useDraftHistory(editDraft, setEditDraft)
+  // The outline the Features tool would clip to, drawn before it is applied.
+  const [editPreview, setEditPreview] = useState(null)
   // What Edit Mode and the Mask Studio are drawn over. One choice for both, so
   // the two views show the same ground — see utils/rasterBackdrop.js.
   const [backdrop, setBackdrop] = useState('auto')
@@ -1615,8 +1576,9 @@ export default function App() {
     // A streamed soundscape would redraw the picture under the cursor 30×/s.
     soundscape.pause()
     setEditDraft(edit ?? { rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })
+    editHistory.clear()
     setEditMode(true)
-  }, [srcPixels, srcWidth, srcHeight, edit, soundscape])
+  }, [srcPixels, srcWidth, srcHeight, edit, soundscape, editHistory])
 
   const applyEditDraft = useCallback(() => {
     const b = effectiveBounds(editDraft, srcWidth, srcHeight)
@@ -2210,12 +2172,19 @@ export default function App() {
        * layer's box, ⌘Z is the browser's own text undo and this never sees it.
        */
       const meta = e.metaKey || e.ctrlKey
-      if (meta && e.code === 'KeyZ' && !editMode) {
+      // Edit Mode and the Studio answer ⌘Z themselves: a clip draft and a mask
+      // plane are not in this history. Edit Mode's is here, the Studio's is its own.
+      if (meta && editMode && (e.code === 'KeyZ' || e.code === 'KeyY')) {
+        e.preventDefault()
+        if (e.code === 'KeyZ' && !e.shiftKey) editHistory.undo(); else editHistory.redo()
+        return
+      }
+      if (meta && e.code === 'KeyZ' && !editMode && !studioMaskId) {
         e.preventDefault()
         if (e.shiftKey) redo(); else undo()
         return
       }
-      if (meta && e.code === 'KeyY' && !editMode) {   // the Windows spelling
+      if (meta && e.code === 'KeyY' && !editMode && !studioMaskId) {   // the Windows spelling
         e.preventDefault()
         redo()
         return
@@ -2253,8 +2222,15 @@ export default function App() {
           if (editKeysRef.current?.drawing?.()) editKeysRef.current.closeShape()
           else applyEditDraft()
         }
+        // One letter per tool, as in the Mask Studio.
+        const tool = EDIT_TOOL_KEYS[e.code]
+        if (tool && !e.altKey) setEditTool(tool)
         return
       }
+      // The Mask Studio owns the keyboard the same way, and answers its own
+      // keys. Without this, E toggled its eraser *and* opened Edit Mode on top
+      // of it, and 1–5 exported a terrain nobody could see.
+      if (studioMaskId) return
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]); setPick(null) }
       if (e.code === 'KeyE')   openEditor()
       if (e.code === 'Digit1') beginSvgExport()
@@ -2268,7 +2244,7 @@ export default function App() {
     // beginSvgExport belongs here for the same reason handleStl does: both claim
     // the single export slot, and a stale copy would not see it taken.
   }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport,
-      beginPngExport, undo, redo, showKeys])
+      beginPngExport, undo, redo, showKeys, studioMaskId, editHistory])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -2359,7 +2335,10 @@ export default function App() {
           srcWidth={srcWidth}   srcHeight={srcHeight}
           imagery={imagery}     tone={imageryTone}  mask={studioMask}
           style={style}         ss={(v) => setStyle((prev) => ({ ...prev, ...v }))}
-          onCommit={() => commitMask(studioMask.id)}
+          onCommit={(patch) => commitMask(studioMask.id, patch)}
+          vectorLayers={vectorLayers} vectorSources={vectorSources}
+          featureRaster={{ bbox: geoTiffBboxSrc, crs: geoTiffCRS, width: srcWidth, height: srcHeight }}
+          elevMin={geoTiffElevMin} elevMax={geoTiffElevMax}
           onClose={() => setStudioMaskId(null)}
           rightInset={PANEL_W}
           backdrop={backdrop}   setBackdrop={setBackdrop}
@@ -2371,8 +2350,8 @@ export default function App() {
         <HeightmapEditor
           srcPixels={srcPixels} srcMask={srcMask}
           srcWidth={srcWidth}   srcHeight={srcHeight}
-          edit={editDraft}      onChange={setEditDraft}
-          tool={editTool}       aspect={aspect}
+          edit={editDraft}      onChange={editHistory.change}
+          tool={editTool}       aspect={aspect}   previewRings={editPreview}
           rightInset={PANEL_W}  keysRef={editKeysRef}
           imagery={imagery}     tone={imageryTone}  backdrop={backdrop}
         />
@@ -2382,13 +2361,17 @@ export default function App() {
         <EditPanel
           filename={heightmapFilename}
           srcWidth={srcWidth} srcHeight={srcHeight}
-          edit={editDraft}    onChange={setEditDraft}
+          edit={editDraft}    onChange={editHistory.change}
           tool={editTool}     setTool={setEditTool}
+          onPreview={setEditPreview}
+          onUndo={editHistory.undo} onRedo={editHistory.redo}
+          canUndo={editHistory.canUndo} canRedo={editHistory.canRedo}
           backdrop={backdrop} setBackdrop={setBackdrop} hasImagery={!!imagery?.rgba}
+          imagery={imagery}   style={style} ss={(v) => setStyle((prev) => ({ ...prev, ...v }))}
           aspect={aspectKey}  setAspect={setAspectKey}
           onApply={applyEditDraft}
           onCancel={() => setEditMode(false)}
-          onReset={() => setEditDraft({ rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })}
+          onReset={() => editHistory.change({ rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape: null, feather: 0 })}
           vectorLayers={vectorLayers} vectorSources={vectorSources}
           bboxSrc={geoTiffBboxSrc} crs={geoTiffCRS} onError={showError}
         />
@@ -2448,7 +2431,6 @@ export default function App() {
         onClearCover={() => setCover(null)} onInkByClass={inkByClass}
         masks={srcMasks} onAddMask={addMask} onPatchMask={patchMask} onCopyMask={copyMask}
         onRemoveMask={removeMask} onImportMask={importMask}
-        onMaskFromLayer={maskFromLayer}
         onEditMask={(id) => setStudioMaskId(id)}
         imagery={imagery} imageryBusy={imageryBusy}
         onFetchImagery={fetchSatellite} onClearImagery={() => setImagery(null)}

@@ -63,6 +63,7 @@ function cursorFor(hit, dragging) {
     case 'resize': case 'ellipse-resize': return RESIZE_CURSOR[hit.handle]
     case 'move':   case 'ellipse-move':   return dragging ? 'grabbing' : 'move'
     case 'close':                      return 'pointer'     // clicking closes the ring
+    case 'none':                       return 'default'     // the tool works from the panel
     default:                           return 'crosshair'
   }
 }
@@ -76,6 +77,7 @@ export function HeightmapEditor({
   rightInset = 0,
   keysRef,
   imagery, tone, backdrop = 'auto',
+  previewRings = null,
 }) {
   const wrapRef   = useRef(null)
   const canvasRef = useRef(null)
@@ -87,6 +89,8 @@ export function HeightmapEditor({
   const drawRef   = useRef(() => {})
 
   editRef.current = edit
+  const previewRef = useRef(previewRings)
+  previewRef.current = previewRings
 
   // Shared with the Mask Studio, capped at 2048 px — see utils/rasterBackdrop.js.
   const { canvas: preview } = useBackdrop({
@@ -289,9 +293,25 @@ export function HeightmapEditor({
         ctx.fillRect(hx - HANDLE / 2, hy - HANDLE / 2, HANDLE, HANDLE)
       }
     }
+
+    // What the Features tool would clip to, before it is applied: a light wash
+    // inside and a dashed outline, so it reads apart from the selection.
+    const pre = previewRef.current
+    if (pre?.length) {
+      ctx.beginPath()
+      for (const r of pre) addPoly(r)
+      ctx.fillStyle = HEX.accent + '33'
+      ctx.fill('evenodd')
+      ctx.strokeStyle = HEX.accent
+      ctx.lineWidth = 1.5
+      ctx.setLineDash([5, 4])
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
   }, [preview, srcWidth, srcHeight, tool])
 
   drawRef.current = draw
+  useEffect(() => { drawRef.current() }, [previewRings])
   useEffect(() => {
     const redraw = () => drawRef.current()
     window.addEventListener(THEME_EVENT, redraw)
@@ -415,6 +435,8 @@ export function HeightmapEditor({
    * must be re-read per event, not latched.
    */
   const pick = (p, shiftKey) => {
+    // Features is picked in the panel. The canvas only shows its outline.
+    if (tool === 'features') return { kind: 'none' }
     const ed = editRef.current
     const shape = ed?.shape ?? null
     const rect = ed?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
@@ -786,7 +808,7 @@ export function HeightmapEditor({
         backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
         boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
-        <button onClick={fit} style={{
+        <button onClick={fit} data-testid="edit-fit" style={{
           background: VEIL, color: TEXT, border: `1px solid ${GLASS_BORDER}`,
           borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
@@ -794,8 +816,9 @@ export function HeightmapEditor({
           {bounds ? `${bounds.w}×${bounds.h} px` : 'empty selection'}
           {' · '}
           {tool === 'crop'    && 'drag to crop · handles to resize'}
-          {tool === 'ellipse' && 'drag to draw · hold shift for a circle'}
-          {tool === 'lasso'   && 'drag to draw · then drag the points to adjust'}
+          {tool === 'ellipse' && 'drag an ellipse · shift for a circle'}
+          {tool === 'lasso'   && 'drag to trace · then drag the points to adjust'}
+          {tool === 'features' && 'pick the features in the panel'}
           {tool === 'polygon' && 'click to add points · Enter or first point to close'}
           {POINT_TOOLS.has(tool) && ' · drag a point to move it · drag an edge to add one · right-click to remove'}
           {' · alt-drag to pan · scroll to zoom'}

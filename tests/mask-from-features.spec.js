@@ -98,8 +98,7 @@ async function boot(page) {
   // Admin boundaries starts unticked — it is not what most rasters want.
   await page.click('[data-testid="osm-cat-boundaries"]')
   await page.click('[data-testid="osm-fetch"]')
-  // Attached rather than visible: this text is also an <option> inside the
-  // Masks section's picker, and an option in a closed select is never visible.
+  // Attached rather than visible: the layer list can sit on a closed pane.
   await page.waitForSelector('text=Water · Lake', { state: 'attached', timeout: 20_000 })
 }
 
@@ -108,16 +107,50 @@ async function filter(page, term) {
   await page.waitForTimeout(500)
 }
 
-/** Pick the layer whose option text matches, then make the mask. */
-async function makeMask(page, match, dist = null) {
+/** A new mask, open in the Studio on its Features tool. */
+async function openFeatures(page) {
   await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]')
+  await page.click('[data-testid="studio-tool-features"]')
   await page.waitForSelector('[data-testid="mask-from-layer"]')
+}
+
+/** Choose the layer whose option text matches. */
+async function pickLayer(page, match) {
   const value = await page.locator('[data-testid="mask-from-layer"] option')
     .filter({ hasText: match }).first().getAttribute('value')
+  expect(value, `a layer matching ${match}`).toBeTruthy()
   await page.selectOption('[data-testid="mask-from-layer"]', value)
+}
+
+/** The previewed coverage, in percent, after the preview's pause. */
+async function previewShare(page) {
+  await page.waitForTimeout(900)
+  const text = await page.locator('[data-testid="studio-preview-coverage"]').textContent()
+  return text.startsWith('<') ? 0.5 : Number(text.replace('%', ''))
+}
+
+async function applyAndClose(page) {
+  await page.waitForTimeout(900)
+  await page.click('[data-testid="studio-apply"]')
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(1000)
+}
+
+/** Pick the layer whose option text matches, then make the mask. */
+async function makeMask(page, match, dist = null) {
+  await openFeatures(page)
+  await pickLayer(page, match)
   if (dist !== null) await page.fill('[data-testid="mask-from-dist"]', String(dist))
-  await page.click('[data-testid="mask-from-features"]')
-  await page.waitForTimeout(1500)
+  await applyAndClose(page)
+}
+
+/** The names in the mask list. They are inputs, so text matching cannot see them. */
+async function maskNames(page) {
+  await filter(page, 'Masks')
+  return page.locator('[data-section="Masks"] input[aria-label^="Name of"]')
+    .evaluateAll((els) => els.map((e) => e.value))
 }
 
 function segmentsIn(svg, label) {
@@ -141,13 +174,6 @@ async function exportSvg(page) {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-/** Coverage of the newest mask row, as a number. */
-async function newestCoverage(page) {
-  const text = await page.locator('[data-section="Masks"]').textContent()
-  const all = [...text.matchAll(/(\d+)%/g)].map((m) => Number(m[1]))
-  return all[all.length - 1]
-}
-
 test.describe('a mask from features', () => {
   test.skip(!existsSync(FIXTURE), `${FIXTURE} not present (gitignored) — see tests/testdata/README.md`)
 
@@ -157,7 +183,7 @@ test.describe('a mask from features', () => {
     await makeMask(page, 'Water · Lake')
 
     const section = page.locator('[data-section="Masks"]')
-    await expect(section).toContainText('Water · Lake')
+    expect(await maskNames(page)).toContain('Water · Lake')
     const shown = (await section.textContent()).match(/(\d+)%/)
     expect(shown, 'the new mask reports a coverage').not.toBeNull()
     // The lake spans 0.06° × 0.024° inside a 12 × 7 km extent: a real slice of
@@ -169,16 +195,15 @@ test.describe('a mask from features', () => {
   test('a line layer becomes a corridor, and a wider one covers more', async ({ page }) => {
     test.setTimeout(180_000)
     await boot(page)
+    await openFeatures(page)
+    await pickLayer(page, 'Water · Stream')
 
-    await makeMask(page, 'Water · Stream', 20)
-    const section = page.locator('[data-section="Masks"]')
-    const narrow = Number((await section.textContent()).match(/(\d+(?:\.\d+)?)%/)[1])
-
-    await makeMask(page, 'Water · Stream', 400)
-    const both = await section.textContent()
-    const all = [...both.matchAll(/(\d+(?:\.\d+)?)%/g)].map((m) => Number(m[1]))
-    expect(all.length, 'two masks now').toBeGreaterThanOrEqual(2)
-    expect(Math.max(...all), 'the wider corridor covers more').toBeGreaterThan(narrow)
+    await page.fill('[data-testid="mask-from-dist"]', '20')
+    const narrow = await previewShare(page)
+    await page.fill('[data-testid="mask-from-dist"]', '400')
+    const wide = await previewShare(page)
+    expect(narrow, 'a corridor covers something').toBeGreaterThan(0)
+    expect(wide, 'the wider corridor covers more').toBeGreaterThan(narrow)
   })
 
   test('the mask stencils an ordinary draw mode', async ({ page }) => {
@@ -208,42 +233,35 @@ test.describe('a mask from features', () => {
   test('only the picked features go into the mask', async ({ page }) => {
     test.setTimeout(180_000)
     await boot(page)
-    await filter(page, 'Masks')
-    await page.waitForSelector('[data-testid="mask-from-layer"]')
-    const value = await page.locator('[data-testid="mask-from-layer"] option')
-      .filter({ hasText: 'Water · Lake' }).first().getAttribute('value')
-    await page.selectOption('[data-testid="mask-from-layer"]', value)
+    await openFeatures(page)
+    await pickLayer(page, 'Water · Lake')
     await page.waitForTimeout(400)
 
     // Two lakes in this layer, both ticked to begin with because both are drawn.
     await expect(page.locator('[data-testid="mask-from-count"]')).toContainText('Using 2 of 2')
 
-    // Take just the small one. Its area is a fraction of the big one's, so the
-    // coverage figure alone proves which was used.
     await page.click('[data-testid="mask-from-none"]')
     await expect(page.locator('[data-testid="mask-from-count"]')).toContainText('Using 0 of 2')
-    await expect(page.locator('[data-testid="mask-from-features"]')).toBeDisabled()
+    expect(await previewShare(page), 'nothing picked, nothing previewed').toBe(0)
 
     // Tick by label rather than by index — the list is sorted named-first, so
     // an index is a statement about the sort and not about the feature.
     await page.locator('label', { hasText: 'Kleiner See' }).first().locator('input').check()
     await expect(page.locator('[data-testid="mask-from-count"]')).toContainText('Using 1 of 2')
+    const onlySmall = await previewShare(page)
 
-    await page.click('[data-testid="mask-from-features"]')
-    await page.waitForTimeout(1500)
-    const onlySmall = await newestCoverage(page)
-
-    // The mask takes the feature's own name when exactly one was picked.
-    await expect(page.locator('[data-section="Masks"]')).toContainText('Kleiner See')
-
-    // Now both, which must cover materially more.
+    // Both must cover materially more. The small lake's area is a fraction of
+    // the big one's, so the coverage alone proves which was used.
     await page.click('[data-testid="mask-from-all"]')
-    await expect(page.locator('[data-testid="mask-from-count"]')).toContainText('Using 2 of 2')
-    await page.click('[data-testid="mask-from-features"]')
-    await page.waitForTimeout(1500)
-    const both = await newestCoverage(page)
-
+    const both = await previewShare(page)
     expect(both, 'both lakes cover more than the small one alone').toBeGreaterThan(onlySmall)
+
+    // Back to the small one, applied. The mask takes the feature's own name
+    // when exactly one was picked.
+    await page.click('[data-testid="mask-from-none"]')
+    await page.locator('label', { hasText: 'Kleiner See' }).first().locator('input').check()
+    await applyAndClose(page)
+    expect(await maskNames(page)).toContain('Kleiner See')
   })
 
   test('a boundary made of open segments fills, and can trace instead', async ({ page }) => {
@@ -254,29 +272,19 @@ test.describe('a mask from features', () => {
     // filled at all.
     test.setTimeout(180_000)
     await boot(page)
-    await filter(page, 'Masks')
-    await page.waitForSelector('[data-testid="mask-from-layer"]')
-    const value = await page.locator('[data-testid="mask-from-layer"] option')
-      .filter({ hasText: 'City district' }).first().getAttribute('value')
-    expect(value, 'the level-9 boundary must become a layer').toBeTruthy()
-    await page.selectOption('[data-testid="mask-from-layer"]', value)
-    await page.waitForTimeout(500)
+    await openFeatures(page)
+    await pickLayer(page, 'City district')
 
     // The switch appears only because these lines actually close.
     const fill = page.locator('[data-testid="mask-from-fill"]')
     await expect(fill).toBeVisible()
-
-    await page.click('[data-testid="mask-from-features"]')
-    await page.waitForTimeout(1500)
-    const filled = await newestCoverage(page)
+    const filled = await previewShare(page)
     expect(filled, 'a filled district covers real ground').toBeGreaterThan(3)
 
     // Switched off it traces the border, which must be a fraction of the area.
     await fill.uncheck()
     await page.fill('[data-testid="mask-from-dist"]', '30')
-    await page.click('[data-testid="mask-from-features"]')
-    await page.waitForTimeout(1500)
-    const traced = await newestCoverage(page)
+    const traced = await previewShare(page)
     expect(traced, 'the outline is much less than the inside').toBeLessThan(filled)
   })
 })

@@ -10,7 +10,7 @@ Both go through the same stencil.
 
 | | Cover classes | Masks |
 |---|---|---|
-| Source | AlphaEarth, cut offline | Drawn, imported, or made from features |
+| Source | AlphaEarth, cut offline | Drawn, imported, or made from heights or features |
 | Shape | **Partition**: each pixel in one class | **Overlap**: a pixel can be in several |
 | Stored as | One `Uint8Array` of indices | One bit plane per mask |
 | Two selected | Either class | Union of both regions |
@@ -98,9 +98,12 @@ Its panel replaces the sidebar.
 |---|---|---|
 | Brush | `B` | `[` and `]` resize |
 | Rectangle | `R` | |
-| Ellipse | `O` | |
+| Ellipse | `O` | Shift for a circle |
 | Lasso | `L` | |
+| Level | `H` | the ground between two heights |
+| Features | `F` | loaded map features |
 | Erase | `E` | toggles paint/erase |
+| Undo, redo | `⌘Z`, `⇧⌘Z` | the last ten changes |
 | Close | `Esc` | |
 
 | Gesture | |
@@ -115,7 +118,12 @@ if you fetched some, else the relief. Edit Mode shares the same builder
 
 - The Studio shares its frame, primitives and gestures with Edit Mode. Alt pans
   in both. `MaskPanel` is a sibling of `EditPanel`, not a generalisation.
-- The exposure controls also appear in the Studio panel.
+- Both views share the tool glyphs, one-letter tool keys (Edit Mode: `C` `O`
+  `L` `P` `F`), a Features tool with a live preview, a panel that shows only
+  the active tool's controls, undo, and the Backdrop block
+  (`panel/BackdropBlock.jsx`) with its exposure controls.
+- Both own the keyboard while open: the app's shortcuts, `E` and `1`–`5`
+  included, do nothing.
 - It stays separate from Edit Mode: a clip changes the raster for everything, a
   mask changes one layer.
 - The brush is hard-edged, because a mask is one bit per pixel.
@@ -123,12 +131,44 @@ if you fetched some, else the relief. Edit Mode shares the same builder
 - The mask wash is one cached canvas. A brush stroke repaints only its bounding
   box. Redraws are batched to one per frame, and the brush ring is a DOM circle,
   so a hover costs no canvas work.
+- **Undo is the Studio's own.** The app history holds no mask planes. The
+  Studio copies the plane before each stroke, shape, apply or whole-mask
+  action, and keeps the last ten. While it is open, the app's `⌘Z` steps aside.
+
+### Level and Features
+
+These two tools compute a region instead of painting one. While their controls
+move, the wash shows the mask as **Apply to mask** will leave it. *Combine* sets how the
+region meets the mask:
+
+| Combine | Result |
+|---|---|
+| Replace | The region |
+| Add | Mask or region |
+| Subtract | Mask and not region |
+| Intersect | Mask and region |
+
+On Replace, a mask with its default name ("Mask 3") takes the region's name.
+**Done** and `Esc` apply a preview that differs from the mask, because the wash
+shows it as the mask. Switching to another tool drops it.
+
+**Level.** *From* and *To* are fractions of the raster's range, shown in metres
+when the GeoTIFF gives the range. NoData is never inside. *Smooth* blurs the
+heights before the cut (NoData-aware), so the edge follows the landform and not
+the sensor noise. The blur runs once per Smooth value, so a drag of From or To
+is one pass over the raster (`levelSource`, `thresholdLevel`).
+
+---
+
+**Features.** The rules follow below. The preview waits 120 ms after the last
+change, because a rasteriser is slower than a threshold.
 
 ---
 
 ## A mask from features
 
-Pick a loaded OSM or GeoJSON layer, set a distance, and press **Make a mask**.
+In the Studio's Features tool, pick a loaded OSM or GeoJSON layer, set a
+distance, and press **Apply to mask**.
 
 | Layer | The number is | |
 |---|---|---|
@@ -211,7 +251,8 @@ that draws from it:
 
 | File | Role |
 |---|---|
-| `src/utils/maskLayers.js` | Bit planes: create, stamp, stroke, import, 32-bit selection |
+| `src/utils/maskLayers.js` | Bit planes: create, stamp, stroke, combine, import, 32-bit selection |
+| `src/utils/maskFromLevel.js` | `levelSource`, `thresholdLevel`, `maskFromLevel` |
 | `src/utils/maskFromVector.js` | `stitchRings`, `maskFromFeatures`, `featureRings`, `growMask` |
 | `src/utils/imageryTone.js` | Exposure: `applyTone` and `TONE_GLSL` |
 | `src/utils/imageryFetch.js` | Scene search and windowed COG read |
@@ -219,4 +260,4 @@ that draws from it:
 | `src/components/MaskPanel.jsx` | Its panel |
 | `src/components/panel/FeaturePicker.jsx` | `useFeaturePick`, shared with Edit Mode |
 | `tests/masks.spec.js`, `tests/mask-from-features.spec.js` | End-to-end |
-| `tests/unit/maskFromVector.test.js`, `tests/unit/imageryTone.test.js` | Unit |
+| `tests/unit/maskFromVector.test.js`, `tests/unit/maskFromLevel.test.js`, `tests/unit/imageryTone.test.js` | Unit |

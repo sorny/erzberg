@@ -18,7 +18,7 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 41 independent draw modes: surveyor's
+The app renders it as 3D line art with 40 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, and
 tracks that something with mass laid down a face. Contours letter their own
 heights.
@@ -85,7 +85,7 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 41 modes as tiles in six families:
+- **Marks sheet.** The Marks stage shows the 40 modes as tiles in six families:
   Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
@@ -119,7 +119,7 @@ different style from the grid, then tune it.
 | **Fetch** | Type a place. Nominatim resolves it, and a map lets you place and size the box before you download. The panel states the zoom, tile count, raster size and metres per pixel first. Tiles come from Terrain Tiles on AWS Open Data. |
 | **OpenStreetMap** | Roads, water, rail, landuse, buildings, lifts and peaks inside the raster's extent, through Overpass. |
 | **Satellite** | True-colour Sentinel-2 at 10 m from AWS Open Data. It drapes on the terrain and backs the Mask Studio. |
-| **Mask** | A PNG, JPG or WebP stencil, a drawn mask, or a mask cut from features. See [Masks](#masks). |
+| **Mask** | A PNG, JPG or WebP stencil, a drawn mask, or a mask made from heights or features. See [Masks](#masks). |
 | **Cover plate** | A `.landcover.json` from `scripts/embed-window.js`. See [Land cover](#land-cover). |
 
 <img src="docs/images/fetch-window.png" alt="The Fetch section: a shaded-relief map of the Eiger with a draggable selection box, above a readout of zoom 13, 20 of 36 tiles, a 915 by 921 pixel raster and 13 metres per pixel" width="312">
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you three things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 41 modes.
+  classes you pick. This works for all 40 modes.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.
@@ -205,9 +205,13 @@ a land-cover class does, and a layer can carry both.
 - **Draw.** *Masks → + Draw a mask* opens the Studio: brush, rectangle, ellipse
   and lasso. `E` erases and `[` `]` resize the brush. The backdrop is satellite
   imagery, relief or height, the same choice as Edit Mode.
-- **From features.** Rasterise any loaded OSM or GeoJSON layer. Areas fill,
-  lines become corridors, points become discs. A negative buffer shrinks the
-  shape. A boundary counts as an area.
+- **From level.** The Studio's *Level* tool takes the ground between two
+  heights. The wash previews the result while you drag the sliders.
+- **From features.** The Studio's *Features* tool rasterises any loaded OSM or
+  GeoJSON layer. Areas fill, lines become corridors, points become discs. A
+  negative buffer shrinks the shape. A boundary counts as an area.
+- **Combine.** Level and Features *Replace*, *Add*, *Subtract* or *Intersect*
+  with the mask. `⌘Z` in the Studio steps back through the last ten changes.
 - **Import.** A PNG, JPG or WebP. White is inside. Black and transparent are
   outside.
 - **Copy.** **⧉** duplicates a mask with a new colour.
@@ -228,8 +232,11 @@ Press `E`. The viewport shows the raster flat. Crop it with a rectangle, an
 ellipse, a lasso or a polygon, or clip it to a feature from a loaded layer, for
 example a municipality or a lake.
 
+- `C`, `O`, `L`, `P` and `F` pick Crop, Ellipse, Lasso, Polygon and Features.
+  The Features tool shows the outline before you clip.
 - Drag a point to move it. Drag an edge to add a point. Right-click a point to
   remove it.
+- `⌘Z` undoes a change to the clip. Cancel discards the whole draft.
 - *Feather* ramps the clipped edge down to the base level.
 - The clip is non-destructive. Enter Edit Mode again to change it, or clear it.
 
@@ -272,7 +279,6 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Berms | Lateral load on the outside of each turn |
 | Air | Spans where the ballistic path clears the surface |
 | Race Line | All lines from one drop-in, the fastest inked heavier |
-| Section | A cutting plane with cut face, hatch and outline |
 | Crossings | Sign changes of the detrended scanline |
 | Indexed | Elevation tier by slope class, Bayer-dithered |
 | Outrun | An additive halo under a near-white filament |
@@ -395,6 +401,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `Esc` | Cancel the current shape, leave Edit Mode, or cancel a profile pick |
 | `Enter` | Close the current shape, or apply the clip |
 | `Backspace` | Remove the last polygon vertex |
+| `C` `O` `L` `P` `F` | Edit Mode tools |
 | `Shift` | Constrain an ellipse to a circle |
 | Right-click | Remove a point from a lasso or polygon |
 | `Q` | Toggle auto-rotate |

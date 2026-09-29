@@ -96,7 +96,8 @@ cuts the vertex count 5 to 10 times.
 
 ### Rings from a map feature
 
-Pick a loaded OSM or GeoJSON layer and press **Clip to this** to cut the
+With the **Features** tool (`F`), pick a loaded OSM or GeoJSON layer. The
+outline shows dashed on the raster while you pick. Press **Clip to this** to cut the
 heightmap to a municipality, district, lake or park. It is its own shape kind,
 `rings`, because:
 
@@ -188,8 +189,16 @@ are skipped, so the ramp is not baked in twice.
   directly and is left alone during a gesture.
 - **View.** Scroll to zoom about the cursor. Alt-drag or middle-drag to pan.
   `Fit` resets.
-- **Keys.** `Esc` cancels a half-drawn shape, or leaves Edit Mode without
+- **Keys.** `C`, `O`, `L`, `P` and `F` pick Crop, Ellipse, Lasso, Polygon and
+  Features. `Esc` cancels a half-drawn shape, or leaves Edit Mode without
   applying. `Enter` closes a shape, or applies the edit.
+- **Undo.** `⌘Z`, `⇧⌘Z` and the History buttons step through the draft
+  (`useDraftHistory`). Changes less than 400 ms apart are one step, so a Feather
+  drag or a typed width undoes at once. The history starts empty each time Edit
+  Mode opens.
+- **Panel.** Each tool shows its own controls: the crop fields for Crop, the
+  feature picker for Features. The selection readout and Feather always show.
+  The layout, glyphs, Backdrop block and key scheme match the Mask Studio.
 
 The backdrop comes from `utils/rasterBackdrop.js`, shared with the Mask
 Studio, with the same choice: Auto, Sat, Relief or Height. It is capped at

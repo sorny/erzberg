@@ -62,10 +62,24 @@ export const SHORTCUTS = [
     group: 'Edit Mode',
     rows: [
       { keys: ['E'],   codes: ['KeyE'],      label: 'Open the heightmap editor' },
+      { keys: ['C', 'O', 'L', 'P', 'F'], codes: ['KeyC', 'KeyO', 'KeyL', 'KeyP', 'KeyF'],
+        label: 'Crop, Ellipse, Lasso, Polygon, Features' },
+      { keys: ['⌘Z'], label: 'Undo a change to the clip', note: '⌘⇧Z redoes' },
       { keys: ['Enter'], codes: ['Enter'],   label: 'Close the shape, then apply' },
       { keys: ['⌫'],   codes: ['Backspace'], label: 'Undo the last point' },
       { keys: ['Esc'], codes: ['Escape'],    label: 'Abandon the shape, then leave',
         note: 'also leaves the profile tool' },
+    ],
+  },
+  {
+    /* No `codes`: the Studio reads `e.key`, and owns the keyboard while open. */
+    group: 'Mask Studio',
+    rows: [
+      { keys: ['B', 'R', 'O', 'L', 'H', 'F'], label: 'Brush, Rectangle, Ellipse, Lasso, Level, Features' },
+      { keys: ['E'],      label: 'Paint or erase' },
+      { keys: ['[', ']'], label: 'Brush size' },
+      { keys: ['⌘Z'],     label: 'Undo a change to the mask', note: '⌘⇧Z redoes' },
+      { keys: ['Esc'],    label: 'Close the Studio', note: 'changes are kept' },
     ],
   },
 ]

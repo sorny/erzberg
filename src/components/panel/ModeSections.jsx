@@ -661,28 +661,6 @@ export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, in
             )}
           </Section>
 
-          <Section title="Mode: Section" icon={<ModeMark kind="section" />} open={sec.modeSection} onToggle={() => tog('modeSection')} enabled={style.enabledSection}>
-            <Tog label="Enabled" checked={style.enabledSection} onChange={v => ss({ enabledSection: v })} />
-            {style.enabledSection && (
-              <>
-                <Sub label="CUT">
-                  <InlineSl label="Level" help="Where the cutting plane sits, as a fraction of the elevation range." min={0} max={1} step={0.01} value={style.cutSection} onChange={v => ss({ cutSection: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Face weight" min={0.5} max={10} step={0.5} value={style.weightSection} onChange={v => ss({ weightSection: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <Sub label="HATCH">
-                  <InlineSl label="Pitch" min={1} max={30} step={0.5} value={style.hatchSection} onChange={v => ss({ hatchSection: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Angle" min={0} max={180} step={5} value={style.hatchAngleSection} onChange={v => ss({ hatchAngleSection: v })} fmt={v => v + '°'} />
-                  <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.hatchWeightSection} onChange={v => ss({ hatchWeightSection: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <Sub label="BEYOND">
-                  <InlineSl label="Line pitch" help="The ground above the plane, drawn in outline so the section reads as standing in a landscape." min={1} max={40} step={1} value={style.beyondSection} onChange={v => ss({ beyondSection: v })} />
-                  <InlineSl label="Weight" min={0.5} max={6} step={0.5} value={style.beyondWeightSection} onChange={v => ss({ beyondWeightSection: v })} fmt={v => v.toFixed(1)} />
-                </Sub>
-                <ModeStyleOverride prefix="Section" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Ink" />
-              </>
-            )}
-          </Section>
-
           {/* ── Shadow line ──────────────────────────────────────────────
               Where the sunlight stops, at one instant. One call to the same
               shadow sweep Sun Hours sums over a year, traced at the single level

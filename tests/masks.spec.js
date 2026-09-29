@@ -282,3 +282,145 @@ test('a mask can be copied, pixels and all', async ({ page }) => {
   expect(new Set(after).size, `names must stay unique: ${after.join(', ')}`).toBe(3)
   expect(after).toContain('Mask 1 copy 2')
 })
+
+/** Drive a range input the way React sees it. */
+async function setSlider(loc, v) {
+  await loc.evaluate((el, val) => {
+    const set = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    set.call(el, String(val))
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+  }, v)
+}
+
+test('the Level tool previews a height range live, and Apply keeps it', async ({ page }) => {
+  test.setTimeout(150_000)
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.click('[data-testid="studio-tool-level"]')
+
+  const preview = page.locator('[data-testid="studio-preview-coverage"]')
+  const share = async () => {
+    await page.waitForTimeout(300)
+    const t = await preview.textContent()
+    return t.startsWith('<') ? 0.5 : Number(t.replace('%', ''))
+  }
+  const from = page.locator('[data-testid="studio-level-from"]')
+  const to = page.locator('[data-testid="studio-level-to"]')
+
+  // The upper half of the range, which is the tool's opening state.
+  await expect(preview).toBeVisible()
+  const upper = await share()
+  expect(upper, 'the upper half of the range holds some ground').toBeGreaterThan(0)
+
+  // A drag changes the preview at once, before anything is applied.
+  await setSlider(from, 0)
+  const whole = await share()
+  expect(whole, 'the whole range takes more').toBeGreaterThan(upper)
+  await setSlider(to, 0.3)
+  const low = await share()
+  expect(low, 'the low ground alone takes less than all of it').toBeLessThan(whole)
+  expect(low, 'and still something').toBeGreaterThan(0)
+  await expect(page.locator('[data-testid="studio-coverage"]'), 'nothing is written before Apply').toHaveText('0%')
+
+  // Back to the upper half, applied.
+  await setSlider(from, 0.5)
+  await setSlider(to, 1)
+  expect(await share()).toBe(upper)
+  await page.click('[data-testid="studio-apply"]')
+  const coverage = page.locator('[data-testid="studio-coverage"]')
+  await expect(coverage).toHaveText(`${upper}%`)
+
+  // The Studio keeps its own undo, since the app's history holds no planes.
+  await page.click('[data-testid="studio-undo"]')
+  await expect(coverage, 'undo takes the Apply back').toHaveText('0%')
+  await page.click('[data-testid="studio-redo"]')
+  await expect(coverage, 'redo puts it back').toHaveText(`${upper}%`)
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(coverage, '⌘Z does the same').toHaveText('0%')
+  await page.keyboard.press('ControlOrMeta+Shift+z')
+  await expect(coverage).toHaveText(`${upper}%`)
+
+  // Subtracting the same region from the mask leaves nothing, and Intersect
+  // keeps all of it.
+  await page.click('[data-testid="studio-combine-subtract"]')
+  expect(await share()).toBe(0)
+  await page.click('[data-testid="studio-combine-intersect"]')
+  expect(await share()).toBe(upper)
+
+  // The mask had its default name, so Replace named it after the range.
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(800)
+  await filter(page, 'Masks')
+  const section = page.locator('[data-section="Masks"]')
+  const names = await section.locator('input[aria-label^="Name of"]').evaluateAll((els) => els.map((e) => e.value))
+  expect(names).toEqual(['Level 50–100 %'])
+})
+
+test('the Studio owns the keyboard: E erases, and app shortcuts stay quiet', async ({ page }) => {
+  test.setTimeout(90_000)
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  let downloads = 0
+  page.on('download', () => { downloads++ })
+
+  // E was also the app's key for Edit Mode, which opened over the Studio.
+  await page.keyboard.press('e')
+  await expect(page.locator('[data-testid="studio-mode-erase"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-testid="heightmap-editor"]')).toHaveCount(0)
+
+  // 1 was the app's SVG export, of a terrain the Studio hides.
+  await page.keyboard.press('1')
+  await page.waitForTimeout(2500)
+  expect(downloads, 'no export starts from inside the Studio').toBe(0)
+  await expect(page.locator('[data-testid="mask-studio"]')).toBeVisible()
+})
+
+test('Done keeps a Level preview, and Replace replaces what was painted', async ({ page }) => {
+  // The report: paint, switch to Level, press Done, and the painted mask came
+  // back. The wash showed the level mask, so Done has to keep it.
+  test.setTimeout(120_000)
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(800)
+
+  // A small painted square in a corner, which the upper levels do not match.
+  const canvas = page.locator('[data-testid="mask-studio"] canvas')
+  const box = await canvas.boundingBox()
+  await page.click('[data-testid="studio-tool-rect"]')
+  await page.mouse.move(box.x + box.width * 0.10, box.y + box.height * 0.10)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.30, box.y + box.height * 0.30, { steps: 6 })
+  await page.mouse.up()
+  const coverage = page.locator('[data-testid="studio-coverage"]')
+  const painted = await coverage.textContent()
+  expect(painted).not.toBe('0%')
+
+  await page.click('[data-testid="studio-tool-level"]')
+  await expect(page.locator('[data-testid="studio-combine-replace"]')).toHaveAttribute('aria-pressed', 'true')
+  // The whole range, so the level mask cannot cover what the square did.
+  await setSlider(page.locator('[data-testid="studio-level-from"]'), 0)
+  await page.waitForTimeout(400)
+  const shown = (await page.locator('[data-testid="studio-preview-coverage"]').textContent()).trim()
+  expect(shown).not.toBe(painted)
+
+  // Done, not Apply.
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(800)
+  await filter(page, 'Masks')
+  const section = page.locator('[data-section="Masks"]')
+  const names = await section.locator('input[aria-label^="Name of"]').evaluateAll((els) => els.map((e) => e.value))
+  expect(names, 'Replace named the mask after the range').toEqual(['Level 0–100 %'])
+  const row = (await section.innerText()).match(/(\d+)%/)?.[1]
+  expect(`${row}%`, 'the mask is the level preview, not the paint').toBe(shown)
+
+  // Reopening shows the same mask.
+  await section.locator('[data-testid^="mask-edit-"]').first().click()
+  await page.waitForSelector('[data-testid="mask-studio"]')
+  await expect(coverage).toHaveText(shown)
+})

@@ -35,6 +35,10 @@ function boundCodes(file) {
   const src = readFileSync(path.join(process.cwd(), file), 'utf8')
   const found = new Set()
   for (const m of src.matchAll(/\be\.code\s*===\s*'(\w+)'/g)) found.add(m[1])
+  // A table looked up by `e.code`, such as App's EDIT_TOOL_KEYS.
+  for (const t of src.matchAll(/const \w+_KEYS\s*=\s*\{([^}]*)\}/g)) {
+    for (const c of t[1].matchAll(/\b(Key[A-Z]|Digit\d)\s*:/g)) found.add(c[1])
+  }
   // `switch (e.code)` up to its closing brace at the same indent.
   for (const sw of src.matchAll(/switch\s*\(\s*e\.code\s*\)\s*\{([\s\S]*?)\n\s*\}/g)) {
     for (const c of sw[1].matchAll(/case\s+'(\w+)'/g)) found.add(c[1])

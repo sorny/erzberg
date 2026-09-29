@@ -1,8 +1,8 @@
 /**
  * Choosing a vector layer, and which of its features you mean.
  *
- * Shared by the two places that turn map features into a region: the Masks
- * section, which rasterises them into a stencil, and Edit Mode, which clips the
+ * Shared by the two places that turn map features into a region: the Mask
+ * Studio, which rasterises them into a stencil, and Edit Mode, which clips the
  * heightmap to their outline. Those answer different questions and their
  * surrounding controls differ, but the *choosing* is identical — a layer, a
  * filterable list, all/none — and two copies of it would drift.

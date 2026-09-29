@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-one
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Forty modes read $H$ only. [Land cover](#land-cover) reads a second
+Thirty-nine modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -359,12 +359,10 @@ flights and a real break still fires. Flights shorter than `minAir` are dropped.
 **Race Line.** One seed, headings fanned across ±θ, no occupancy mask. The run
 that reaches the lowest ground soonest goes to its own heavier sub-layer.
 
-## 23. Section
+## 23. Section (removed)
 
-A cutting plane drawn as a drawing: a heavy **face** at the plane, 45° hatch on
-the solid **below**, and the ground **beyond** in outline. The hatch uses the
-Engraving marcher, thresholded on height. Face and hatch lie exactly in the
-plane. On a cone, the hatched area grows as the plane rises.
+Removed in v1.35.0. To keep a layer above or below a height, make a mask
+from levels in the Mask Studio. See [Masks](Masks.md).
 
 ## 24. Crossings
 

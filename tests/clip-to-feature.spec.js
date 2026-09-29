@@ -93,6 +93,9 @@ async function boot(page) {
   await openStage(page, 'terrain')
   await page.click('[data-testid="edit-heightmap"]')
   await expect(page.locator('[data-testid="edit-panel"]')).toBeVisible()
+  // Features is a tool of its own, as in the Mask Studio.
+  await page.click('[data-testid="edit-tool-features"]')
+  await page.waitForSelector('[data-testid="edit-from-layer"]')
 }
 
 /** Select the layer whose option text matches, in the Edit panel's picker. */

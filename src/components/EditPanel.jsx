@@ -8,18 +8,20 @@
 import { useEffect, useState } from 'react'
 import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
-import { BACKDROP_OPTIONS } from '../utils/rasterBackdrop'
+import { BackdropBlock } from './panel/BackdropBlock'
 import { useFeaturePick } from './panel/FeaturePicker'
 import { ACCENT, BG, BORDER, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
 
+/** The same glyphs as the Mask Studio's, one per tool across both views. */
 const TOOLS = [
-  ['▣ Crop',    'crop'],
+  ['⬚ Crop',    'crop'],
   ['⬭ Ellipse', 'ellipse'],
-  ['✎ Lasso',   'lasso'],
+  ['⌇ Lasso',   'lasso'],
   ['⬡ Polygon', 'polygon'],
+  ['⌖ Features', 'features'],
 ]
 
 const HINTS = {
@@ -27,6 +29,7 @@ const HINTS = {
   ellipse: 'Drag to draw an ellipse — hold Shift for a perfect circle. Drag inside it to move it, or use the eight handles to resize.',
   lasso:   'Drag to trace a free-hand outline. Afterwards the points stay editable: drag one to move it, drag an edge to add one there, right-click one to remove it.',
   polygon: 'Click to place corners; click the first one again, press Enter, or double-click to close. Once closed, drag its points to reshape it — or drag an edge to add a point.',
+  features: 'Clip to the outline of loaded map features. The outline shows on the image while you pick, before you clip.',
 }
 
 /** Integer field that only publishes a parseable value. */
@@ -58,7 +61,8 @@ export function EditPanel({
   aspect, setAspect,
   onApply, onCancel, onReset,
   vectorLayers, vectorSources, bboxSrc, crs, onError,
-  backdrop = 'auto', setBackdrop, hasImagery = false,
+  backdrop = 'auto', setBackdrop, hasImagery = false, imagery, style, ss,
+  onPreview, onUndo, onRedo, canUndo = false, canRedo = false,
 }) {
   const rect = edit?.rect ?? { x: 0, y: 0, w: srcWidth, h: srcHeight }
   const bounds = effectiveBounds(edit, srcWidth, srcHeight)
@@ -75,9 +79,10 @@ export function EditPanel({
     onChange({ rect: next, shape: edit?.shape ?? null, feather })
   }
 
-  const btn = (label, onClick, kind, testId) => (
-    <button onClick={onClick} data-testid={testId} style={{
-      flex: 1, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
+  const btn = (label, onClick, kind, testId, disabled = false) => (
+    <button onClick={onClick} data-testid={testId} disabled={disabled} style={{
+      flex: 1, padding: '8px 0', borderRadius: 5, cursor: disabled ? 'default' : 'pointer',
+      opacity: disabled ? 0.45 : 1,
       fontSize: 11, fontWeight: 600,
       background: kind === 'primary' ? ACCENT : SURF,
       color: kind === 'primary' ? ON_ACCENT : DIM,
@@ -121,6 +126,10 @@ export function EditPanel({
 
           <HelpBox text={HINTS[tool]} />
 
+          {/* Each tool shows its own controls, as in the Mask Studio. The
+              selection below applies to every tool, so it always shows. */}
+          {tool === 'crop' && (
+            <>
           <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Crop</div>
           <SegRow
             label="Aspect"
@@ -140,6 +149,22 @@ export function EditPanel({
             width: '100%', padding: '4px 0', background: SURF, color: MUTED,
             border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 12,
           }}>Full extent</button>
+            </>
+          )}
+          {tool === 'features' && (
+            <ClipFromFeatures
+              layers={vectorLayers} sources={vectorSources}
+              bboxSrc={bboxSrc} crs={crs} srcWidth={srcWidth} srcHeight={srcHeight}
+              btn={btn} onPreview={onPreview}
+              onShape={(shape) => onChange({
+                // The whole raster, so the clip is the feature and nothing else.
+                // A crop left over from a previous selection would silently cut
+                // a municipality in half.
+                rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape, feather,
+              })}
+              onError={onError}
+            />
+          )}
 
           <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Selection</div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
@@ -163,17 +188,6 @@ export function EditPanel({
               border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 8,
             }}>Clear shape</button>
           )}
-          <ClipFromFeatures
-            layers={vectorLayers} sources={vectorSources}
-            bboxSrc={bboxSrc} crs={crs} srcWidth={srcWidth} srcHeight={srcHeight}
-            onShape={(shape) => onChange({
-              // The whole raster, so the clip is the feature and nothing else.
-              // A crop left over from a previous selection would silently cut
-              // a municipality in half.
-              rect: { x: 0, y: 0, w: srcWidth, h: srcHeight }, shape, feather,
-            })}
-            onError={onError}
-          />
 
           <InlineSl
             label="Feather" testId="edit-feather"
@@ -183,20 +197,14 @@ export function EditPanel({
             fmt={(v) => v + 'px'}
           />
 
-          {setBackdrop && (
-            <SegRow
-              label="Show" testIdPrefix="edit-backdrop"
-              help="What the raster is drawn as while you cut it. The same choice as the Mask Studio's. Auto shows the satellite scene when one is fetched, and the relief when not."
-              options={BACKDROP_OPTIONS}
-              value={backdrop}
-              onChange={setBackdrop}
-            />
-          )}
-          {backdrop === 'imagery' && !hasImagery && (
-            <div style={{ fontSize: 10, color: '#ef4444', lineHeight: 1.6 }}>
-              Nothing to show. Fetch imagery in the Satellite section first.
-            </div>
-          )}
+          <BackdropBlock prefix="edit" backdrop={backdrop} setBackdrop={setBackdrop}
+            hasPhoto={hasImagery} imagery={imagery} style={style} ss={ss} />
+
+          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>History</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {btn('↶ Undo', onUndo, 'ghost', 'edit-undo', !canUndo)}
+            {btn('↷ Redo', onRedo, 'ghost', 'edit-redo', !canRedo)}
+          </div>
 
           <div style={{
             marginTop: 12, padding: '8px 8px', background: SUNK,
@@ -219,6 +227,7 @@ export function EditPanel({
           </div>
           <div style={{ fontSize: 10, color: MUTED, marginTop: 8, lineHeight: 1.5 }}>
             Applying keeps the original raster — re-open Edit Mode any time to adjust or drop the clip.
+            ⌘Z steps back through this session's changes.
           </div>
         </div>
       </div>
@@ -229,7 +238,7 @@ export function EditPanel({
 /**
  * Clip the heightmap to a map feature.
  *
- * The same choosing the Masks section does, spent differently: there a feature
+ * The same choosing the Mask Studio does, spent differently: there a feature
  * becomes a stencil over the whole raster, here it becomes the raster's own
  * outline. "Cut this to the municipality" is the request, and tracing a border
  * by hand with the lasso was the only way to answer it.
@@ -238,13 +247,38 @@ export function EditPanel({
  * cannot clip anything — and the shape it produces is deliberately not
  * vertex-editable. It came from a survey.
  */
-function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, onShape, onError }) {
+function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, btn, onPreview, onShape, onError }) {
   const { usable, chosen, bucket, picked, closes, label, element } =
     useFeaturePick(layers ?? [], sources ?? [], 'edit-from')
-  if (!usable.length) return null
 
   const areaLike = chosen?.geom === 'area' || closes
   const ready = !!bboxSrc && !!crs && areaLike && picked.size > 0
+  const pickedKey = [...picked].sort((a, b) => a - b).join(',')
+
+  // The outline on the image while you pick, as the Studio previews its
+  // region. Rings are cheap next to a raster, so only a short pause is kept for
+  // a burst of ticks.
+  useEffect(() => {
+    if (!ready) { onPreview?.(null); return undefined }
+    const t = setTimeout(() => {
+      const only = pickedKey ? pickedKey.split(',').map(Number) : []
+      const rings = featureRings(bucket, { bbox: bboxSrc, crs, width: srcWidth, height: srcHeight }, { only })
+      onPreview?.(rings.length ? rings : null)
+    }, 80)
+    return () => clearTimeout(t)
+  }, [ready, bucket, pickedKey, bboxSrc, crs, srcWidth, srcHeight, onPreview])
+  useEffect(() => () => onPreview?.(null), [onPreview])
+
+  if (!usable.length) {
+    return (
+      <>
+        <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Features</div>
+        <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
+          No features are loaded. Add a GeoJSON or GPX file, or OpenStreetMap features, in the Vector section.
+        </div>
+      </>
+    )
+  }
 
   const apply = () => {
     const rings = featureRings(bucket, { bbox: bboxSrc, crs, width: srcWidth, height: srcHeight },
@@ -258,20 +292,16 @@ function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, 
 
   return (
     <>
-      <div style={{ fontSize: 10, color: MUTED, fontWeight: 700, margin: '12px 0 4px', letterSpacing: 1 }}>
-        FROM FEATURES
-      </div>
+      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Features</div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
         {element}
-        <button onClick={apply} disabled={!ready} data-testid="edit-from-apply" style={{
-          width: '100%', padding: '6px 0', borderRadius: 5, fontSize: 10,
-          cursor: ready ? 'pointer' : 'not-allowed', opacity: ready ? 1 : 0.5,
-          background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-        }}>Clip to this</button>
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
           {!areaLike
             ? 'These features do not enclose anything, so there is nothing to clip to.'
             : 'The crop is reset to the whole raster and the outline becomes the selection. Feather still applies.'}
+        </div>
+        <div style={{ display: 'flex' }}>
+          {btn('Clip to this', apply, 'primary', 'edit-from-apply', !ready)}
         </div>
       </div>
     </>

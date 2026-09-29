@@ -242,6 +242,30 @@ export function invert(data) {
   for (let i = 0; i < data.length; i++) data[i] = data[i] ? 0 : 1
 }
 
+/**
+ * A generated region laid onto a mask, the four ways an image editor offers.
+ *
+ * `replace` takes the region as it is. `add` is the union, `subtract` removes
+ * the region, and `intersect` keeps only the overlap. Written into `out`, so
+ * the Studio can preview the result on every slider move without allocating a
+ * raster per move.
+ *
+ * @returns {number} how many cells the result has on
+ */
+export function combineMask(out, base, region, mode) {
+  let on = 0
+  for (let i = 0; i < out.length; i++) {
+    const a = base[i], b = region[i]
+    const v = mode === 'add' ? (a || b)
+      : mode === 'subtract' ? (a && !b)
+      : mode === 'intersect' ? (a && b)
+      : b
+    out[i] = v ? 1 : 0
+    on += out[i]
+  }
+  return on
+}
+
 // ── Import ───────────────────────────────────────────────────────────────────
 
 /**

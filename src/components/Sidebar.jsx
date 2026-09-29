@@ -10,7 +10,6 @@ import { HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
 import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '../utils/geoCoords'
 
-import { useFeaturePick } from './panel/FeaturePicker'
 
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
@@ -596,74 +595,6 @@ function CoverRow({ children }) {
   return <div style={{ display: 'flex', gap: 4 }}>{children}</div>
 }
 
-/**
- * A mask from features that are already loaded.
- *
- * Every geometry kind is offered, not areas alone. A line becomes a corridor
- * and a point becomes a disc once either has a width, and "everything within
- * fifty metres of the stream" is a mask people reach for constantly.
- *
- * The one control is therefore the same number with three meanings, and it is
- * labelled for whichever is selected rather than given a neutral name that
- * would be wrong twice out of three times. For an area — or a line that closes,
- * which is what an administrative boundary is — it is a buffer and may be
- * negative: "the forest, but not its first twenty metres".
- */
-function FromFeatures({ layers = [], sources = [], masks = [], onMake }) {
-  const [dist, setDist] = useState(0)
-  const [fillClosed, setFillClosed] = useState(true)
-  const { usable, chosen, bucket, picked, closes, element } = useFeaturePick(layers, sources)
-  const full = masks.length >= MAX_MASKS
-  if (!usable.length) return null
-
-  const geom = chosen?.geom ?? 'area'
-  const filling = geom === 'area' || (closes && fillClosed)
-  const label = filling ? 'Buffer' : geom === 'line' ? 'Half-width' : 'Radius'
-  const floor = filling ? -500 : 0
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5,
-                  borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <CoverLabel>From features</CoverLabel>
-      {element}
-      {closes && (
-        <Tog label="Fill the enclosed area" checked={fillClosed} small
-          onChange={(v) => setFillClosed(v)} testId="mask-from-fill" />
-      )}
-      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-        <span style={{ fontSize: 9.5, color: MUTED, flex: 1 }}>{label}</span>
-        <input type="number" value={dist} step={10} min={floor} max={2000}
-          data-testid="mask-from-dist"
-          onChange={(e) => setDist(Number(e.target.value) || 0)}
-          style={{ width: 62, background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-                   borderRadius: 5, fontSize: 10, padding: '2px 4px', textAlign: 'right' }} />
-        <span style={{ fontSize: 9.5, color: MUTED }}>m</span>
-      </div>
-      <CoverRow>
-        <Btn block data-testid="mask-from-features" disabled={!chosen || full || !picked.size}
-          onClick={() => onMake?.(chosen.id, {
-            only: [...picked],
-            ...(closes ? { fill: fillClosed } : null),
-            ...(filling ? { grow: dist } : { widthM: Math.max(1, dist || 25) }),
-          })}>
-          Make a mask
-        </Btn>
-      </CoverRow>
-      <CoverProse caption>
-        {geom === 'point'
-          ? 'One disc of this radius per point.'
-          : filling
-            ? 'The area inside, with any holes cut out. A negative buffer eats the result back from its edge.'
-            : 'A corridor along the lines, this far to each side.'}
-        {closes && !fillClosed ? ' These lines close, so they can be filled instead.' : ''}
-        {bucket && bucket.count > 1
-          ? ' Only the ticked features go in. They start as whatever the layer draws.'
-          : ''}
-      </CoverProse>
-    </div>
-  )
-}
-
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -696,7 +627,6 @@ export function Sidebar({
   cover, coverError, onLoadCover, onClearCover, onInkByClass,
   // Hand-drawn masks, the Studio that paints them, and the imagery behind it.
   masks = [], onAddMask, onPatchMask, onCopyMask, onRemoveMask, onImportMask, onEditMask,
-  onMaskFromLayer,
   imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
@@ -875,7 +805,7 @@ export function Sidebar({
      *
      * The sheet is the whole pane now, so a shut `Draw Modes` leaves one header
      * and nothing under it — a dead end that the old pane never had, because
-     * shutting the index there still left forty-one section headers below it.
+     * shutting the index there still left forty section headers below it.
      * Reopening on arrival keeps the disclosure and removes the dead end.
      */
     if (n === 3) setSec(prev => (prev.modeIndex ? prev : { ...prev, modeIndex: true }))
@@ -952,7 +882,7 @@ export function Sidebar({
     modeIso: false, modeEngrave: false, modeCurv: false, modeSwiss: false,
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
-    modeSection: false, modeZeroCross: false,
+    modeZeroCross: false,
     modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
@@ -1164,7 +1094,6 @@ export function Sidebar({
       modeBerm:     !!newStyle.enabledBerm,
       modeAir:      !!newStyle.enabledAir,
       modeRaceLine: !!newStyle.enabledRaceLine,
-      modeSection:  !!newStyle.enabledSection,
       modeZeroCross: !!newStyle.enabledZeroCross,
       modeSprite:   !!newStyle.enabledSprite,
       modeRetic:    !!newStyle.enabledRetic,
@@ -1192,7 +1121,7 @@ export function Sidebar({
    *
    * It used to open the mode's section and scroll to it as well, because turning
    * one on was almost always the first half of tuning it, and the index it lived
-   * in sat above forty-one headers that were the real way in. The sheet *is*
+   * in sat above forty headers that were the real way in. The sheet *is*
    * the way in, and opening a mode is now its own target on the same tile — so
    * switching one on leaves you on the sheet, where switching on a second and a
    * third is one click each. The section still opens underneath, so drilling in
@@ -1489,7 +1418,7 @@ export function Sidebar({
             * The standing line — what you are looking at, in one row.
             *
             * The section headers say what each control is set to. This says what
-            * they add up to, which nothing on screen ever did: forty-one draw
+            * they add up to, which nothing on screen ever did: forty draw
             * modes compose freely, and counting the lit ones meant scrolling
             * 2 282 px past the thirty-two that were off.
             *
@@ -1843,14 +1772,11 @@ export function Sidebar({
               </CoverRow>
               <CoverProse caption>
                 Drawing opens the Studio over the viewport, with the satellite
-                imagery behind it when there is some. Import takes a black-and-white
-                PNG or JPG — white is inside, and transparent is outside.
+                imagery behind it when there is some. Its Level and Features tools
+                make a mask from heights or from loaded map features. Import takes
+                a black-and-white PNG or JPG — white is inside, and transparent is
+                outside.
               </CoverProse>
-              {/* The third route, and the one that needs no drawing at all: the
-                  shape of a forest or a lake is something the loaded features
-                  already hold exactly. */}
-              <FromFeatures layers={vectorLayers} sources={vectorSources}
-                masks={masks} onMake={onMaskFromLayer} />
             </div>
           </Section>
 
@@ -2445,7 +2371,7 @@ export function Sidebar({
 
           {/* ── DRAW MODES ─────────────────────────────────────────────────── */}
 
-          {/* The sheet, standing in for the forty-one sections below it.
+          {/* The sheet, standing in for the forty sections below it.
               It is still a Section so that it can be closed by anyone who does
               not want it, found by the filter, and given the same shut-state
               readout every other header carries — and so that the panel's four
@@ -2798,7 +2724,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the forty-one modes
+              A modifier, not a mode: it takes whatever the forty modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

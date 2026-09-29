@@ -199,11 +199,6 @@ export const STYLE_DEF = {
   bestWeightRaceLine: 3,
   hypsoRaceLine: false, hypsoModeRaceLine: 'slope', hypsoBandedRaceLine: false, hypsoIntervalRaceLine: 10,
 
-  enabledSection: false, cutSection: 0.45, hatchSection: 4, hatchAngleSection: 45, beyondSection: 8,
-  colorSection: '#000000', weightSection: 3, opacitySection: 1, dashSection: 'solid',
-  hatchWeightSection: 1, beyondWeightSection: 1,
-  hypsoSection: false, hypsoModeSection: 'elevation', hypsoBandedSection: false, hypsoIntervalSection: 10,
-
   // ── Shadow line ───────────────────────────────────────────────────────────
   // The edge of the shadow at one instant: the terminator the terrain casts on
   // itself, as ink. Sun Hours sums the lit moments over a year; this asks the
@@ -554,7 +549,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the forty-one modes are
+  // A modifier rather than a mode: it takes whatever the forty modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

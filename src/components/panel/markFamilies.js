@@ -39,7 +39,7 @@ export const FAMILIES = [
   ['Tone',     'many small marks add up to a grey',
     ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet']],
   ['Relief',   'the ground given thickness',
-    ['Pillars', 'Bitplane', 'Sprite Blocks', 'Section']],
+    ['Pillars', 'Bitplane', 'Sprite Blocks']],
   ['Plate',    'colour rather than mark-making',
     ['Indexed', 'Riso', 'Mineral', 'Land cover', 'Watershed', 'Outrun']],
   ['Light',    'a lamp, a sun, or a year of one',
