@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-five
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-one
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Forty-four modes read $H$ only. [Land cover](#land-cover) reads a second
+Fifty modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -688,6 +688,62 @@ with $z_0$ the release height, $s$ the distance walked and $\alpha$ the
 keeps its heading. Each stop is a tick across the fall line. The first path
 through a cell draws it, so the paths do not overdraw one gully. The release
 zones are a second pen, outlined and hatched.
+
+## 47. Venation
+
+Leaf veins grown by space colonization (Runions et al., 2005). *Attractors*
+are scattered with a density from the wetness index $\ln(a / \tan\beta)$, where
+$a$ is the D8 flow accumulation on a blurred grid and $\beta$ the slope. Each
+attractor pulls the vein node nearest to it within a reach, and each pulled node
+grows one *Step* toward the mean of its pulls. An attractor dies when a vein
+comes within 1.5 steps. The *Roots* are the sinks that drain the most ground. A
+new node closer than half a step to an old one is dropped, so a vein cannot grow
+in place.
+
+## 48. Geodesic Fan
+
+Straight lines on the ground from a picked centre: geodesics of $z = h(x, y)$,
+
+$$\ddot x = -h_x \frac{Q}{1 + h_x^2 + h_y^2}, \quad \ddot y = -h_y \frac{Q}{1 + h_x^2 + h_y^2}, \quad Q = h_{xx}\dot x^2 + 2h_{xy}\dot x\dot y + h_{yy}\dot y^2$$
+
+in true metres, held at unit speed on the surface. *Bend* multiplies the heights
+first, and *Detail* blurs them, because second derivatives of a raw DEM are
+noise. Where neighbouring rays cross they bunch into caustics.
+
+## 49. Radar
+
+A side-looking radar that looks toward a bearing at a *Look angle* $\theta$ from
+the vertical. Along lines in the look direction, each sample gets a return
+$\cos$ of the local incidence angle, zero in radar shadow, and a slant range
+$s = t\sin\theta - z\cos\theta$. The returns fill a histogram in $s$, so a slope
+that faces the sensor packs into few bins (foreshortening and layover). Each
+sample reads its bin, and 1D error diffusion turns that into range ticks on the
+ground, one per *Spacing* on level ground.
+
+## 50. Spines
+
+For each of *Levels* heights, the medial axis of the ground above it: the
+ridges of its exact Euclidean distance transform (Felzenszwalb–Huttenlocher),
+where $2d - d_+ - d_- \ge 0.5$ along one of four directions. Cells less than
+*Min. depth* in, and pieces of a few cells, are dropped. A crest is the spine of
+the ground above it at every height, so the main ridges draw densest.
+
+## 51. Coral
+
+One closed line grown by differential growth. Each node pulls toward the
+midpoint of its neighbours and pushes away all nodes within the *Gap*, which
+halves on the steepest ground. An edge longer than about half the local gap
+splits. The line starts as a ring at the summit and stays on the ground *Above*
+a share of the height range. It grows until *Nodes* or *Steps* runs out.
+
+## 52. Glacier
+
+Ice above a *Snowline* on ground flatter than *Steepest ice*, blurred by
+*Detail*. Three pens, as on the Swiss national map: the ice edge and contours
+on the ice every *Interval* true metres, in the ice colour; crevasses, short
+arcs across the fall line where the ice is steeper than *Cracks from*, longer as
+it steepens; and moraine rings in a band just outside the edge. The panel shows
+the share of the ground under ice and the snowline in metres.
 
 ---
 

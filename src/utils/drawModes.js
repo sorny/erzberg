@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all forty-five at once.
+ * does the index that shows all fifty-one at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -237,6 +237,34 @@ export const DRAW_MODES = [
     pick: { spacing: [4, 10] },
   },
   {
+    // A D8 sweep, then space colonization with a bucketed nearest-node update.
+    id: 'Venation', label: 'Venation', cost: 3, mark: 'venation',
+    pick: { spacing: [2, 6], gamma: [0.8, 2] },
+  },
+  {
+    // One integration per ray, a few thousand half-cell steps each.
+    id: 'Geodesic', label: 'Geodesic fan', cost: 1.5, mark: 'geodesic',
+    pick: { radius: [1, 4] },
+  },
+  {
+    id: 'Radar', label: 'Radar', cost: 1.5, mark: 'radar',
+    pick: { spacing: [2, 6], azimuth: [0, 360] },
+  },
+  {
+    // A distance transform per level: two passes over the grid each.
+    id: 'Spines', label: 'Spines', cost: 2, mark: 'spines',
+    pick: { levels: [8, 30], radius: [1, 4] },
+  },
+  {
+    // Differential growth: thousands of steps over thousands of nodes.
+    id: 'Coral', label: 'Coral', cost: 4.5, mark: 'coral',
+    pick: { spacing: [3, 8] },
+  },
+  {
+    id: 'Glacier', label: 'Glacier', cost: 2, mark: 'glacier',
+    pick: { spacing: [4, 10], radius: [1, 3] },
+  },
+  {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
     pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
@@ -287,6 +315,9 @@ export const SUB_LAYER_LABEL = {
   'Bedding-Marker':          'Marker bed',
   'Runout-Paths':            'Paths',
   'Runout-Release':          'Release zones',
+  'Glacier-Ice':             'Ice',
+  'Glacier-Crevasses':       'Crevasses',
+  'Glacier-Moraine':         'Moraine',
 }
 
 /**

@@ -18,7 +18,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, viewshedNote, windNote }) {
+export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1172,6 +1172,138 @@ export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, in
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Runout" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Venation" icon={<ModeMark kind="venation" />} open={sec.modeVenation} onToggle={() => tog('modeVenation')} enabled={style.enabledVenation}>
+            <Tog label="Enabled" testId="mode-venation" checked={style.enabledVenation} onChange={v => ss({ enabledVenation: v })} />
+            {style.enabledVenation && (
+              <>
+                <Sub>
+                  {venationNote && (
+                    <div data-testid="venation-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${venationNote.nodes.toLocaleString()} vein nodes`}
+                    </div>
+                  )}
+                  <InlineSl label="Attractors" help="Points the veins grow toward, scattered densest on wet ground. More of them fill more of the slopes." min={500} max={30000} step={100} value={style.countVenation} onChange={v => ss({ countVenation: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
+                  <InlineSl label="Roots" help="How many outlets the veins grow from, the ones that drain the most ground." min={1} max={30} step={1} value={style.rootsVenation} onChange={v => ss({ rootsVenation: Math.round(v) })} />
+                  <InlineSl label="Step" help="The length of one vein segment." min={0.5} max={20} step={0.5} value={style.spacingVenation} onChange={v => ss({ spacingVenation: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Wet bias" help="How strongly the attractors favour wet ground. At low values the veins spread evenly over the slopes." min={0.2} max={4} step={0.1} value={style.gammaVenation} onChange={v => ss({ gammaVenation: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedVenation} onChange={v => ss({ seedVenation: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Venation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Geodesic Fan" icon={<ModeMark kind="geodesic" />} open={sec.modeGeodesic} onToggle={() => tog('modeGeodesic')} enabled={style.enabledGeodesic}>
+            <Tog label="Enabled" testId="mode-geodesic" checked={style.enabledGeodesic} onChange={v => ss({ enabledGeodesic: v })} />
+            {style.enabledGeodesic && (
+              <>
+                <Sub>
+                  <Btn block variant="toggle" on={pick === 'Geodesic'} data-testid="geodesic-pick"
+                    onClick={() => onPick?.(pick === 'Geodesic' ? null : 'Geodesic')} style={{ marginBottom:8 }}>
+                    {pick === 'Geodesic' ? 'Click the centre of the fan…' : 'Pick centre on terrain'}
+                  </Btn>
+                  <InlineSl label="Rays" min={8} max={1000} step={1} value={style.raysGeodesic} onChange={v => ss({ raysGeodesic: Math.round(v) })} />
+                  <InlineSl label="Bend" help="Multiplies the heights before the rays read them. Real ground bends a straight line only a little." min={0.5} max={10} step={0.1} value={style.exaggerationGeodesic} onChange={v => ss({ exaggerationGeodesic: v })} fmt={v => `×${v.toFixed(1)}`} />
+                  <InlineSl label="Detail" help="Blur on the ground before the rays read it. The rays follow the curvature, and a raw DEM curves at every cell." min={0} max={12} step={0.5} value={style.radiusGeodesic} onChange={v => ss({ radiusGeodesic: v })} fmt={v => v.toFixed(1)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresGeodesic} onChange={v => ss({ cellMetresGeodesic: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefGeodesic} onChange={v => ss({ reliefGeodesic: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Mark the centre" checked={!!style.markerGeodesic} onChange={v => ss({ markerGeodesic: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Geodesic" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Radar" icon={<ModeMark kind="radar" />} open={sec.modeRadar} onToggle={() => tog('modeRadar')} enabled={style.enabledRadar}>
+            <Tog label="Enabled" testId="mode-radar" checked={style.enabledRadar} onChange={v => ss({ enabledRadar: v })} />
+            {style.enabledRadar && (
+              <>
+                <Sub>
+                  <InlineSl label="Looks toward" help="The bearing the radar looks toward. At 90° it sits in the west and looks east, and slopes that face west come back brightest." min={0} max={359} step={1} value={style.azimuthRadar} onChange={v => ss({ azimuthRadar: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Look angle" help="The angle of the beam from the vertical. A steep look makes more layover, a flat one more shadow." min={10} max={80} step={1} value={style.lookRadar} onChange={v => ss({ lookRadar: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Spacing" help="The gap between the lines of ticks, and between ticks on level ground." min={0.5} max={20} step={0.5} value={style.spacingRadar} onChange={v => ss({ spacingRadar: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Gain" help="More ticks for the same return." min={0.1} max={4} step={0.05} value={style.gainRadar} onChange={v => ss({ gainRadar: v })} fmt={v => v.toFixed(2)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresRadar} onChange={v => ss({ cellMetresRadar: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefRadar} onChange={v => ss({ reliefRadar: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Radar" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Spines" icon={<ModeMark kind="spines" />} open={sec.modeSpines} onToggle={() => tog('modeSpines')} enabled={style.enabledSpines}>
+            <Tog label="Enabled" testId="mode-spines" checked={style.enabledSpines} onChange={v => ss({ enabledSpines: v })} />
+            {style.enabledSpines && (
+              <>
+                <Sub>
+                  <InlineSl label="Levels" help="How many heights get a skeleton, evenly spaced from low to high." min={1} max={80} step={1} value={style.levelsSpines} onChange={v => ss({ levelsSpines: Math.round(v) })} />
+                  <InlineSl label="Min. depth" help="A spine draws only where the ground above its level is at least this far across, so thin tongues give none." min={1} max={30} step={0.5} value={style.depthSpines} onChange={v => ss({ depthSpines: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="Blur on the ground first. Without it every bump on an edge sprouts a spine." min={0} max={12} step={0.5} value={style.radiusSpines} onChange={v => ss({ radiusSpines: v })} fmt={v => v.toFixed(1)} />
+                </Sub>
+                <ModeStyleOverride prefix="Spines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Coral" icon={<ModeMark kind="coral" />} open={sec.modeCoral} onToggle={() => tog('modeCoral')} enabled={style.enabledCoral}>
+            <Tog label="Enabled" testId="mode-coral" checked={style.enabledCoral} onChange={v => ss({ enabledCoral: v })} />
+            {style.enabledCoral && (
+              <>
+                <Sub>
+                  {coralNote && (
+                    <div data-testid="coral-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${coralNote.nodes.toLocaleString()} nodes`}
+                    </div>
+                  )}
+                  <InlineSl label="Gap" help="The distance the folds keep apart. It halves on the steepest ground." min={1} max={30} step={0.5} value={style.spacingCoral} onChange={v => ss({ spacingCoral: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Above" help="The line grows on the ground above this share of the height range." min={0} max={0.95} step={0.01} value={style.levelCoral} onChange={v => ss({ levelCoral: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Nodes" help="The growth stops at this many points on the line. More fill more of the ground and take longer." min={500} max={60000} step={500} value={style.nodesCoral} onChange={v => ss({ nodesCoral: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
+                  <InlineSl label="Steps" help="The growth also stops after this many steps." min={100} max={20000} step={100} value={style.stepsCoral} onChange={v => ss({ stepsCoral: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedCoral} onChange={v => ss({ seedCoral: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Coral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Glacier" icon={<ModeMark kind="glacier" />} open={sec.modeGlacier} onToggle={() => tog('modeGlacier')} enabled={style.enabledGlacier}>
+            <Tog label="Enabled" testId="mode-glacier" checked={style.enabledGlacier} onChange={v => ss({ enabledGlacier: v })} />
+            {style.enabledGlacier && (
+              <>
+                <Sub>
+                  {glacierNote && (
+                    <div data-testid="glacier-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${Math.round(glacierNote.share * 100)}% of the ground under ice · snowline ${Math.round(glacierNote.snowline)} m`}
+                    </div>
+                  )}
+                  <InlineSl label="Snowline" help="Ice lies above this share of the height range." min={0} max={1} step={0.01} value={style.snowlineGlacier} onChange={v => ss({ snowlineGlacier: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Steepest ice" help="Ground steeper than this is rock wall and holds no ice." min={5} max={80} step={1} value={style.steepGlacier} onChange={v => ss({ steepGlacier: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Cracks from" help="Ice steeper than this gets crevasses, longer as it steepens." min={0} max={60} step={1} value={style.crackGlacier} onChange={v => ss({ crackGlacier: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Interval" help="Contours on the ice, in true metres." min={5} max={500} step={5} value={style.intervalGlacier} onChange={v => ss({ intervalGlacier: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  <InlineSl label="Spacing" help="The grid the crevasses sit on. The moraine rings use half of it." min={1} max={40} step={0.5} value={style.spacingGlacier} onChange={v => ss({ spacingGlacier: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="Blur on the ice before its edge is drawn." min={0} max={12} step={0.5} value={style.radiusGlacier} onChange={v => ss({ radiusGlacier: v })} fmt={v => v.toFixed(1)} />
+                  <ColorRow label="Ice colour" value={style.iceColorGlacier} onChange={v => ss({ iceColorGlacier: v })} />
+                  <Tog label="Moraine" help="Rings along the outside of the ice edge, in the mode's own colour." checked={!!style.moraineGlacier} onChange={v => ss({ moraineGlacier: v })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresGlacier} onChange={v => ss({ cellMetresGlacier: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefGlacier} onChange={v => ss({ reliefGlacier: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Glacier" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

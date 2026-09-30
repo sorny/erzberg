@@ -340,6 +340,41 @@ export const STYLE_DEF = {
   colorRunout: '#1a1a1a', weightRunout: 1, opacityRunout: 1, dashRunout: 'solid',
   hypsoRunout: false, hypsoModeRunout: 'elevation', hypsoBandedRunout: false, hypsoIntervalRunout: 10,
 
+  // Venation — leaf veins that grow up the wet ground from the outlets.
+  enabledVenation: false, countVenation: 6000, rootsVenation: 6, spacingVenation: 3, gammaVenation: 1.2, seedVenation: 1,
+  colorVenation: '#1a1a1a', weightVenation: 1, opacityVenation: 1, dashVenation: 'solid',
+  hypsoVenation: false, hypsoModeVenation: 'elevation', hypsoBandedVenation: false, hypsoIntervalVenation: 10,
+
+  // Geodesic fan — straight lines on the ground, fanned out from a picked point.
+  enabledGeodesic: false, originXGeodesic: 0.5, originYGeodesic: 0.5, raysGeodesic: 180,
+  exaggerationGeodesic: 1.5, radiusGeodesic: 6, markerGeodesic: true,
+  cellMetresGeodesic: 10, reliefGeodesic: 1000,
+  colorGeodesic: '#1a1a1a', weightGeodesic: 0.8, opacityGeodesic: 1, dashGeodesic: 'solid',
+  hypsoGeodesic: false, hypsoModeGeodesic: 'elevation', hypsoBandedGeodesic: false, hypsoIntervalGeodesic: 10,
+
+  // Radar — a side-looking radar's view, as range ticks. Looks toward a bearing.
+  enabledRadar: false, azimuthRadar: 90, lookRadar: 35, spacingRadar: 4, gainRadar: 1,
+  cellMetresRadar: 10, reliefRadar: 1000,
+  colorRadar: '#1a1a1a', weightRadar: 0.8, opacityRadar: 1, dashRadar: 'solid',
+  hypsoRadar: false, hypsoModeRadar: 'elevation', hypsoBandedRadar: false, hypsoIntervalRadar: 10,
+
+  // Spines — the skeleton of the ground above each of a stack of levels.
+  enabledSpines: false, levelsSpines: 16, depthSpines: 2, radiusSpines: 2,
+  colorSpines: '#1a1a1a', weightSpines: 0.8, opacitySpines: 1, dashSpines: 'solid',
+  hypsoSpines: false, hypsoModeSpines: 'elevation', hypsoBandedSpines: false, hypsoIntervalSpines: 10,
+
+  // Coral — one closed line grown until it fills the ground above a level.
+  enabledCoral: false, spacingCoral: 12, levelCoral: 0.3, nodesCoral: 30000, stepsCoral: 4000, seedCoral: 1,
+  colorCoral: '#1a1a1a', weightCoral: 0.8, opacityCoral: 1, dashCoral: 'solid',
+  hypsoCoral: false, hypsoModeCoral: 'elevation', hypsoBandedCoral: false, hypsoIntervalCoral: 10,
+
+  // Glacier — ice above a snowline, with contours, crevasses and moraine.
+  enabledGlacier: false, snowlineGlacier: 0.6, steepGlacier: 40, crackGlacier: 15, intervalGlacier: 50,
+  spacingGlacier: 6, radiusGlacier: 2, moraineGlacier: true, iceColorGlacier: '#2f6690',
+  cellMetresGlacier: 10, reliefGlacier: 1000,
+  colorGlacier: '#1a1a1a', weightGlacier: 1, opacityGlacier: 1, dashGlacier: 'solid',
+  hypsoGlacier: false, hypsoModeGlacier: 'elevation', hypsoBandedGlacier: false, hypsoIntervalGlacier: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
@@ -584,7 +619,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the forty-five modes are
+  // A modifier rather than a mode: it takes whatever the fifty-one modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

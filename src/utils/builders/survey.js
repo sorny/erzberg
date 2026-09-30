@@ -1,9 +1,10 @@
 /**
- * Map conventions: Bedding, Slope Classes, Runout.
+ * Map conventions: Bedding, Slope Classes, Runout, Glacier.
  *
- * All three read the ground in real metres, through the same `groundMetres` the
+ * All four read the ground in real metres, through the same `groundMetres` the
  * walking and looking modes use, because each answers in a unit a map reader
- * already knows: a dip in degrees, a slope in degrees, a reach angle in degrees.
+ * already knows: a dip, a slope and a reach angle in degrees, and a contour
+ * interval on the ice in metres.
  */
 import { boxBlur, sampleBilinear } from '../terrain'
 import { smoothField } from '../sunHours'
@@ -246,4 +247,110 @@ export function buildRunout(terrain, p, o) {
   let zone = traceLevelSet(terrain, zoneInk, field, [release], 2)
   if (o.hatch) zone = joinLayers(zone, hatchWhere(terrain, zoneInk, (i) => field[i] >= release, [o.angle ?? 45], Math.max(0.5, pitch / 2)))
   return { 'Runout-Paths': paths, 'Runout-Release': { ...zone, note } }
+}
+
+// ─── Glacier ─────────────────────────────────────────────────────────────────
+
+/**
+ * Ice on the high ground, as the Swiss national map draws it.
+ *
+ * Ice lies above the `snowline` (a share of the height range, from low to
+ * high) on ground flatter than `steep` degrees. A rock wall too steep to hold
+ * ice stays out of it. The 0/1 field is blurred by `radius`, so the edge of the
+ * ice follows the landform and not single cells.
+ *
+ * Three pens, as on the map:
+ *  - Ice: the edge of the ice, and contours on the ice every `interval` true
+ *    metres, in the ice colour. Off the ice there are none; Contours draws the
+ *    rock.
+ *  - Crevasses: short arcs across the fall line, on a staggered grid, where
+ *    the ice is steeper than `crack` degrees. They grow longer as the ice
+ *    steepens toward `steep`, the way an icefall breaks up.
+ *  - Moraine: small rings in a band just outside the edge, where the ice drops
+ *    its rock.
+ *
+ * The share of the ground under ice and the snowline in metres ride back to
+ * the panel as `note`.
+ */
+export function buildGlacier(terrain, p, o) {
+  const { gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const ground = groundMetres(terrain, p, o.cellMetres, o.relief).ground()
+  const { heights, cellX, cellY } = ground
+  let lo = Infinity, hi = -Infinity
+  for (let i = 0; i < n; i++) if (gridMask[i]) { if (heights[i] < lo) lo = heights[i]; if (heights[i] > hi) hi = heights[i] }
+  if (!(hi > lo)) return null
+  const snow = lo + Math.max(0, Math.min(1, o.snowline ?? 0.7)) * (hi - lo)
+  const steep = Math.max(5, Math.min(80, o.steep ?? 35))
+  const crack = Math.max(0, Math.min(steep - 1, o.crack ?? 15))
+  const slope = slopeDegrees(terrain, ground)
+
+  const ice0 = new Float32Array(n)
+  for (let i = 0; i < n; i++) ice0[i] = gridMask[i] && heights[i] >= snow && slope[i] < steep ? 1 : 0
+  const radius = Math.max(0, o.radius ?? 2)
+  const ice = radius > 0 ? boxBlur(ice0, cols, rows, radius, sMask) : ice0
+  let under = 0, groundCells = 0
+  for (let i = 0; i < n; i++) if (gridMask[i]) { groundCells++; if (ice[i] >= 0.5) under++ }
+  const note = { share: groundCells ? under / groundCells : 0, snowline: snow }
+  if (!under) return null
+
+  const iceInk = { ...p, lineColor: o.iceColor ?? p.lineColor }
+  // Contours on the ice only: traceLevelSet reads a negative value as no ground.
+  const onIce = new Float32Array(n)
+  for (let i = 0; i < n; i++) onIce[i] = ice[i] >= 0.5 ? heights[i] - lo + 1 : -1
+  const interval = Math.max(1, o.interval ?? 50)
+  const levels = []
+  for (let h = Math.ceil(snow / interval) * interval; h < hi && levels.length < 400; h += interval) levels.push(h - lo + 1)
+  const edge = traceLevelSet(terrain, iceInk, ice, [0.5], 2)
+  const iceLayer = levels.length ? joinLayers(edge, traceLevelSet(terrain, iceInk, onIce, levels, 2)) : edge
+
+  // Crevasses: arcs across the fall line of the ice.
+  const hs = (r, c) => sampleBilinear(heights, sMask, rows, cols, r, c)
+  const P = Math.max(1, (o.spacing ?? 6) / scl)
+  const cracks = { positions: new F32List(), colors: new F32List() }
+  for (let rf = P / 2, row = 0; rf < rows - 1; rf += P, row++) {
+    for (let cf = P / 2 + (row % 2) * P / 2; cf < cols - 1; cf += P) {
+      const i = Math.round(rf) * cols + Math.round(cf)
+      if (!gridMask[i] || ice[i] < 0.8 || slope[i] < crack) continue
+      const gx = (hs(rf, cf + 0.5) - hs(rf, cf - 0.5)) / cellX, gy = (hs(rf + 0.5, cf) - hs(rf - 0.5, cf)) / cellY
+      const m = Math.hypot(gx, gy)
+      if (!(m > 0)) continue
+      // Downhill and across, in cells.
+      let dc = -gx / m / cellX, dr = -gy / m / cellY
+      const dm = Math.hypot(dc, dr); dc /= dm; dr /= dm
+      const tc = -dr, tr = dc
+      const L = P * (0.45 + 0.6 * Math.min(1, (slope[i] - crack) / ((steep - crack) || 1)))
+      let pc = cf - tc * L / 2, pr = rf - tr * L / 2
+      for (let s = 1; s <= 6; s++) {
+        const t = s / 6, bow = 4 * t * (1 - t) * 0.3 * L
+        const qc = cf + tc * L * (t - 0.5) + dc * bow, qr = rf + tr * L * (t - 0.5) + dr * bow
+        drapeEdge(cracks, terrain, iceInk, sMask, pc, pr, qc, qr, Math.atan2(qr - pr, qc - pc))
+        pc = qc; pr = qr
+      }
+    }
+  }
+  const out = {
+    'Glacier-Ice': { ...iceLayer, note },
+    'Glacier-Crevasses': { positions: cracks.positions.toArray(), colors: cracks.colors.toArray(), note },
+  }
+  if (!o.moraine) return out
+
+  // Moraine: rings in the band just outside the edge.
+  const mp = Math.max(0.75, P / 2), rad = 0.22 * mp
+  const dots = { positions: new F32List(), colors: new F32List() }
+  for (let rf = mp / 2, row = 0; rf < rows - 1; rf += mp, row++) {
+    for (let cf = mp / 2 + (row % 2) * mp / 2; cf < cols - 1; cf += mp) {
+      const i = Math.round(rf) * cols + Math.round(cf)
+      if (!gridMask[i] || ice[i] < 0.12 || ice[i] >= 0.45) continue
+      let pc = cf + rad, pr = rf
+      for (let s = 1; s <= 6; s++) {
+        const a = s / 6 * 2 * Math.PI, qc = cf + Math.cos(a) * rad, qr = rf + Math.sin(a) * rad
+        drapeEdge(dots, terrain, p, sMask, pc, pr, qc, qr, a)
+        pc = qc; pr = qr
+      }
+    }
+  }
+  out['Glacier-Moraine'] = { positions: dots.positions.toArray(), colors: dots.colors.toArray(), note }
+  return out
 }

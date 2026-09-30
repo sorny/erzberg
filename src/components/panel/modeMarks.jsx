@@ -353,6 +353,45 @@ const MARKS = {
       <path d="M5 10 L8 10 M10 8.5 L13 8.5 M13 11 L16 11" strokeWidth="1.2" />
     </g>
   ),
+  // Veins that branch up from one root and fine out.
+  venation: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M11 13 L11 8 L7 4 L4 1.5 M7 4 L8 1 M11 8 L15 4 L18 1.5 M15 4 L14 1 M11 10 L6 9 L2 8 M11 10 L16 9.5 L20 8" />
+    </g>
+  ),
+  // Rays from one point, bent round a hill and crowded where they cross.
+  geodesic: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M2 7 L21 1 M2 7 C8 5 12 3 21 4 M2 7 C8 6 12 5 21 7 M2 7 C8 8 12 9 21 10 M2 7 L21 13" />
+      <circle cx="2" cy="7" r="1" />
+    </g>
+  ),
+  // Range ticks, dense on the slope that faces the sensor, none in its shadow.
+  radar: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M2 4 L2 10 M5 4 L5 10 M7 4 L7 10 M8 4 L8 10 M9 4 L9 10 M9.8 4 L9.8 10 M10.5 4 L10.5 10 M18 4 L18 10 M21 4 L21 10" />
+    </g>
+  ),
+  // Skeletons stacked inside each other: a spine with ribs.
+  spines: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M2 7 L20 7 M5 7 L3 3 M5 7 L3 11 M9 7 L7 2 M9 7 L7 12 M13 7 L11 3 M13 7 L11 11 M17 7 L16 4 M17 7 L16 10" />
+    </g>
+  ),
+  // One closed line folded into a maze.
+  coral: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M4 2 L4 11 L7 11 L7 4 L10 4 L10 11 L13 11 L13 4 L16 4 L16 11 L19 11 L19 2 Z" />
+    </g>
+  ),
+  // The ice edge, a crevasse arc and the moraine dots below.
+  glacier: (
+    <g {...BASE}>
+      <path d="M1 9 C5 4 9 3 12 3 C15 3 18 5 21 9" strokeWidth="1.1" />
+      <path d="M8 6 Q11 7.5 14 6" strokeWidth="0.8" />
+      <path d="M3 11.5 L3.3 11.5 M7 12 L7.3 12 M11 12.3 L11.3 12.3 M15 12 L15.3 12 M19 11.5 L19.3 11.5" strokeWidth="1.4" />
+    </g>
+  ),
   // Three bands of hatch, sparse to crossed, as the ground steepens.
   slopeclass: (
     <g {...BASE} strokeWidth="0.7">

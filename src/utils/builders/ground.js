@@ -1,5 +1,5 @@
 /**
- * Walking and looking: Isochrones, Viewshed, Route, Panorama.
+ * Walking and looking: Isochrones, Viewshed, Route, Panorama, Geodesic Fan.
  *
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
@@ -10,6 +10,7 @@ import { linkCrests, panoramaCrests } from '../panorama'
 import { groundPixelMetres, gridValueToMetres } from '../geoCoords'
 import { smoothField } from '../sunHours'
 import { chainSegments } from '../chainSegments'
+import { boxBlur, sampleBilinear } from '../terrain'
 import { F32List, SMOOTH_SIMPLIFY_EPS, chaikinSmoothFlat, drapeEdge, hatchWhere, joinLayers, traceLevelSet } from './shared.js'
 
 // ─── Isochrones ──────────────────────────────────────────────────────────────
@@ -282,4 +283,88 @@ export function buildPanorama(terrain, p, o) {
     skySegs.push(r0, c0, r1, c1)
   }
   return { 'Panorama-Crests': ridges, 'Panorama-Skyline': draw(skySegs) }
+}
+
+// ─── Geodesic Fan ────────────────────────────────────────────────────────────
+
+/**
+ * Straight lines on the ground, fanned out from one point.
+ *
+ * A geodesic of the surface z = h(x, y) is the path a taut string or a car
+ * with its wheel held straight would take: straight on the ground, curved
+ * seen from above. With the heights in true metres and the plan position in
+ * metres too, it follows
+ *
+ *     x'' = −h_x · Q / (1 + h_x² + h_y²)
+ *     y'' = −h_y · Q / (1 + h_x² + h_y²),   Q = h_xx x'² + 2 h_xy x'y' + h_yy y'²
+ *
+ * integrated in half-cell steps and held at unit speed on the surface. `rays`
+ * start at even bearings from the eye. They bend round the mountains like
+ * light round a star, and where neighbours cross they bunch into caustics.
+ *
+ * Real ground bends a geodesic only a little. `exaggeration` multiplies the
+ * heights before the derivatives are taken, as the scene's height slider does
+ * for the picture. `radius` blurs the heights first, because the second
+ * derivatives of a raw DEM are noise.
+ */
+export function buildGeodesic(terrain, p, o) {
+  const { gridMask, rows, cols } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const row0 = (o.originY ?? 0.5) * (rows - 1), col0 = (o.originX ?? 0.5) * (cols - 1)
+  if (!gridMask[Math.round(row0) * cols + Math.round(col0)]) return null
+  const g = groundMetres(terrain, p, o.cellMetres, o.relief).ground()
+  const { cellX, cellY } = g
+  const radius = Math.max(0, o.radius ?? 2)
+  const k = Math.max(0.1, o.exaggeration ?? 1)
+  const hs = radius > 0 ? boxBlur(g.heights, cols, rows, radius, sMask) : g.heights
+  const z = (r, c, i) => {
+    const q = Math.max(0, Math.min(rows - 1, r)) * cols + Math.max(0, Math.min(cols - 1, c))
+    return (gridMask[q] ? hs[q] : hs[i]) * k
+  }
+  const hx = new Float32Array(n), hy = new Float32Array(n), hxx = new Float32Array(n), hyy = new Float32Array(n), hxy = new Float32Array(n)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const zc = z(r, c, i)
+      hx[i] = (z(r, c + 1, i) - z(r, c - 1, i)) / (2 * cellX)
+      hy[i] = (z(r + 1, c, i) - z(r - 1, c, i)) / (2 * cellY)
+      hxx[i] = (z(r, c + 1, i) - 2 * zc + z(r, c - 1, i)) / (cellX * cellX)
+      hyy[i] = (z(r + 1, c, i) - 2 * zc + z(r - 1, c, i)) / (cellY * cellY)
+      hxy[i] = (z(r + 1, c + 1, i) - z(r - 1, c + 1, i) - z(r + 1, c - 1, i) + z(r - 1, c - 1, i)) / (4 * cellX * cellY)
+    }
+  }
+  const at = (F, r, c) => sampleBilinear(F, sMask, rows, cols, r, c)
+
+  const rays = Math.max(8, Math.min(2000, Math.round(o.rays ?? 180)))
+  const ds = 0.5 * Math.min(cellX, cellY)
+  const maxSteps = 6 * (rows + cols)
+  const out = { positions: new F32List(), colors: new F32List() }
+  for (let a = 0; a < rays; a++) {
+    // A bearing: 0 is north, which is row 0, and 90 is east.
+    const th = (a / rays) * 2 * Math.PI
+    let X = col0 * cellX, Y = row0 * cellY, vx = Math.sin(th), vy = -Math.cos(th)
+    let pc = col0, pr = row0
+    for (let s = 0; s < maxSteps; s++) {
+      const r = Y / cellY, c = X / cellX
+      const px = at(hx, r, c), py = at(hy, r, c)
+      if (px !== px || py !== py) break
+      const Q = at(hxx, r, c) * vx * vx + 2 * at(hxy, r, c) * vx * vy + at(hyy, r, c) * vy * vy
+      const d = 1 + px * px + py * py
+      vx -= px * Q / d * ds; vy -= py * Q / d * ds
+      const sp = Math.sqrt(vx * vx + vy * vy + (px * vx + py * vy) ** 2) || 1
+      vx /= sp; vy /= sp
+      X += vx * ds; Y += vy * ds
+      const nc = X / cellX, nr = Y / cellY
+      if (nr < 0 || nc < 0 || nr > rows - 1 || nc > cols - 1 || !gridMask[Math.round(nr) * cols + Math.round(nc)]) break
+      // One draped edge per cell walked, not per half step.
+      if (Math.hypot(nc - pc, nr - pr) >= 1) {
+        drapeEdge(out, terrain, p, sMask, pc, pr, nc, nr, Math.atan2(nr - pr, nc - pc))
+        pc = nc; pr = nr
+      }
+    }
+  }
+  const fan = { positions: out.positions.toArray(), colors: out.colors.toArray() }
+  return o.marker ? joinLayers(fan, originCross(terrain, p, row0, col0)) : fan
 }

@@ -9,13 +9,14 @@
  */
 import { shadowSun } from './sunHours'
 import { buildCover, buildIndexed, buildMineral, buildOutrun, buildRiso, buildWatershed } from './builders/colour.js'
-import { buildContours } from './builders/contours.js'
+import { buildContours, buildSpines } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
-import { buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
-import { buildBedding, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
+import { buildBedding, buildGlacier, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildCoral, buildVenation } from './builders/growth.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
-import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
+import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
 import { buildPillars } from './builders/pillars.js'
 import { buildBitplane } from './builders/relief.js'
@@ -178,6 +179,25 @@ export function buildLineGeometry(terrain, p) {
         radius: p.radiusRunout, zone: p.zoneRunout, zoneColor: p.zoneColorRunout,
         hatch: p.hatchRunout, angle: p.angleRunout,
         cellMetres: p.cellMetresRunout, relief: p.reliefRunout }) },
+    { id:'Venation', builder: (t, ctx) => buildVenation(t, ctx, {
+        count: p.countVenation, roots: p.rootsVenation, spacing: p.spacingVenation,
+        gamma: p.gammaVenation, seed: p.seedVenation }) },
+    { id:'Geodesic', builder: (t, ctx) => buildGeodesic(t, ctx, {
+        originX: p.originXGeodesic, originY: p.originYGeodesic, rays: p.raysGeodesic,
+        exaggeration: p.exaggerationGeodesic, radius: p.radiusGeodesic, marker: p.markerGeodesic,
+        cellMetres: p.cellMetresGeodesic, relief: p.reliefGeodesic }) },
+    { id:'Radar',   builder: (t, ctx) => buildRadar(t, ctx, {
+        azimuth: p.azimuthRadar, look: p.lookRadar, spacing: p.spacingRadar, gain: p.gainRadar,
+        cellMetres: p.cellMetresRadar, relief: p.reliefRadar }) },
+    { id:'Spines',  builder: (t, ctx) => buildSpines(t, ctx, {
+        levels: p.levelsSpines, depth: p.depthSpines, radius: p.radiusSpines }) },
+    { id:'Coral',   builder: (t, ctx) => buildCoral(t, ctx, {
+        spacing: p.spacingCoral, level: p.levelCoral, nodes: p.nodesCoral, steps: p.stepsCoral, seed: p.seedCoral }) },
+    { id:'Glacier', builder: (t, ctx) => buildGlacier(t, ctx, {
+        snowline: p.snowlineGlacier, steep: p.steepGlacier, crack: p.crackGlacier,
+        interval: p.intervalGlacier, spacing: p.spacingGlacier, radius: p.radiusGlacier,
+        moraine: p.moraineGlacier, iceColor: p.iceColorGlacier,
+        cellMetres: p.cellMetresGlacier, relief: p.reliefGlacier }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },

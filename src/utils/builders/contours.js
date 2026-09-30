@@ -1,11 +1,12 @@
 /**
- * Contours: marching squares, chaining, smoothing, Tanaka, labels.
+ * Contours: marching squares, chaining, smoothing, Tanaka, labels; Spines.
  *
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
+import { boxBlur } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
-import { EMPTY_F32, EMPTY_F64, EMPTY_U8, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, edgeLerp01, getChainScratch, inElevCut, normElev, simplifyFlat } from './shared.js'
+import { EMPTY_F32, EMPTY_F64, EMPTY_U8, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, inElevCut, normElev, simplifyFlat } from './shared.js'
 
 // Given one contour level's chains (grid coords), returns flat world-space segments
 // [x0,y,z0, x1,y,z1, ...] that bridge open chain endpoints sitting on the grid
@@ -634,4 +635,124 @@ function buildContoursTanaka(terrain, p, interval) {
     'Contours-Tanaka-Bright': { positions: brightPos.toArray(), colors: brightCol.toArray() },
     'Contours-Tanaka-Dark':   { positions: darkPos.toArray(),   colors: darkCol.toArray() },
   }
+}
+
+// ─── Spines ──────────────────────────────────────────────────────────────────
+
+/**
+ * The squared Euclidean distance transform of one row or column, in place.
+ *
+ * Felzenszwalb and Huttenlocher's lower envelope of parabolas: `f` holds 0 on
+ * the outside and a large value inside, and comes back as the squared distance
+ * to the nearest outside cell along this line. Run over every column and then
+ * over every row of the result, it gives the exact 2D distance.
+ */
+function edt1(f, n, d, v, z) {
+  let k = 0
+  v[0] = 0; z[0] = -Infinity; z[1] = Infinity
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k])
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]) }
+    k++; v[k] = q; z[k] = s; z[k + 1] = Infinity
+  }
+  k = 0
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++
+    d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]
+  }
+  for (let q = 0; q < n; q++) f[q] = d[q]
+}
+
+/**
+ * For every level, the skeleton of the ground above it.
+ *
+ * The region above each of `levels` evenly spaced heights gets an exact
+ * Euclidean distance transform, with NoData and the lower ground as its
+ * outside. The medial axis is where that distance folds: along one of four
+ * directions, the cell is at least as far in as both neighbours, and the fold
+ * 2d − d₊ − d₋ is at least 0.5. A cheaper chamfer distance has straight creases
+ * at fixed angles, and every crease drew as a long straight spine. Cells less
+ * than `depth` in are dropped, so a narrow tongue of ground gives no spine.
+ *
+ * A piece of skeleton shorter than a few cells is dropped: a fold that small
+ * is a notch in the edge of the region, and on paper it is a dot. Neighbouring
+ * skeleton cells are joined in a line. A diagonal join is left out where the
+ * two cells already meet through a shared neighbour, or every bend in a spine
+ * would draw a small triangle.
+ *
+ * Stacked, the skeletons look like fish bones, and the main ridges draw
+ * densest, because a crest is the spine of the ground above it at every
+ * height it crosses.
+ */
+export function buildSpines(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const g = (o.radius ?? 2) > 0 ? boxBlur(grid, cols, rows, o.radius ?? 2, sMask) : grid
+  let lo = Infinity, hi = -Infinity
+  for (let i = 0; i < n; i++) if (gridMask[i]) { if (g[i] < lo) lo = g[i]; if (g[i] > hi) hi = g[i] }
+  if (!(hi > lo)) return null
+  const levels = Math.max(1, Math.min(200, Math.round(o.levels ?? 16)))
+  const depth = Math.max(1, (o.depth ?? 2) / scl)
+  const D = new Float32Array(n), sk = new Uint8Array(n)
+  const m = Math.max(rows, cols), line = new Float64Array(m), tmp = new Float64Array(m)
+  const v = new Int32Array(m), z = new Float64Array(m + 1)
+  const BIG = 1e12
+  const stack = new Int32Array(n), minCells = Math.max(4, Math.round(2 * depth))
+  const out = { positions: new F32List(), colors: new F32List() }
+  for (let q = 1; q <= levels; q++) {
+    const lv = lo + (hi - lo) * q / (levels + 1)
+    for (let i = 0; i < n; i++) D[i] = gridMask[i] && g[i] > lv ? BIG : 0
+    for (let c = 0; c < cols; c++) {
+      for (let r = 0; r < rows; r++) line[r] = D[r * cols + c]
+      edt1(line, rows, tmp, v, z)
+      for (let r = 0; r < rows; r++) D[r * cols + c] = line[r]
+    }
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) line[c] = D[r * cols + c]
+      edt1(line, cols, tmp, v, z)
+      for (let c = 0; c < cols; c++) D[r * cols + c] = Math.sqrt(line[c])
+    }
+    sk.fill(0)
+    for (let r = 1; r < rows - 1; r++) {
+      for (let c = 1; c < cols - 1; c++) {
+        const i = r * cols + c, d = D[i]
+        if (d < depth || d > 1e5) continue
+        for (const s of [1, cols, cols + 1, cols - 1]) {
+          if (d >= D[i + s] && d >= D[i - s] && 2 * d - D[i + s] - D[i - s] >= 0.5) { sk[i] = 1; break }
+        }
+      }
+    }
+    // Drop the small pieces: flood each 8-connected piece and clear it when short.
+    for (let i = 0; i < n; i++) {
+      if (sk[i] !== 1) continue
+      stack[0] = i; sk[i] = 2
+      let sp = 1, size = 0, head = 0
+      while (head < sp) {
+        const k = stack[head++]; size++
+        const r = (k / cols) | 0, c = k % cols
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr, nc = c + dc
+            if (nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue
+            const m2 = nr * cols + nc
+            if (sk[m2] === 1) { sk[m2] = 2; stack[sp++] = m2 }
+          }
+        }
+      }
+      if (size < minCells) for (let q2 = 0; q2 < sp; q2++) sk[stack[q2]] = 0
+    }
+    for (let r = 1; r < rows - 1; r++) {
+      for (let c = 1; c < cols - 1; c++) {
+        const i = r * cols + c
+        if (!sk[i]) continue
+        const right = sk[i + 1], down = sk[i + cols], left = sk[i - 1]
+        if (right) drapeEdge(out, terrain, p, sMask, c, r, c + 1, r, 0)
+        if (down) drapeEdge(out, terrain, p, sMask, c, r, c, r + 1, Math.PI / 2)
+        if (sk[i + cols + 1] && !right && !down) drapeEdge(out, terrain, p, sMask, c, r, c + 1, r + 1, Math.PI / 4)
+        if (sk[i + cols - 1] && !left && !down) drapeEdge(out, terrain, p, sMask, c, r, c - 1, r + 1, 3 * Math.PI / 4)
+      }
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
 }

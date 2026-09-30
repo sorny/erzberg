@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.38.0] — 2026-09-30
+
+Six new draw modes, all first sketched on the Ten More Marks page.
+
+### Added
+
+- **Venation** (Marks → Line). Leaf veins that grow up the wet ground from the
+  outlets that drain the most of it, by space colonization. The attractors are
+  densest where the wetness index is high, so the veins climb the valley floors
+  first. A new node too close to an old one is dropped: without that, a node
+  pulled the same way at every step grew in place, and a full raster ran to
+  hundreds of thousands of nodes on a few veins.
+- **Geodesic Fan** (Marks → Line). Pick a centre. Rays that run straight on
+  the ground fan out from it and bend round the mountains, with caustics where
+  they cross. *Bend* multiplies the heights, because real ground bends a
+  straight line only a little. *Detail* blurs them, because the rays follow
+  second derivatives, and on a raw DEM those tangled the rays into loops.
+- **Radar** (Marks → Light). The ground as a side-looking radar sees it: range
+  ticks, dense on slopes that face the sensor, none in radar shadow. The returns
+  are binned in slant range before they become ticks, so foreshortening and
+  layover show as brightness. The plate stays in map geometry and draped, like
+  every mode.
+- **Spines** (Marks → Line). For a stack of levels, the medial axis of the
+  ground above each, from an exact Euclidean distance transform. A chamfer
+  distance was tried first: its creases drew as long straight false spines.
+- **Coral** (Marks → Tone). One closed line grown by differential growth from a
+  ring at the summit, folding into a maze on the ground above a level. The fold
+  gap halves on steep ground, and the split length follows it; with a fixed
+  split length, a steep region stopped growing.
+- **Glacier** (Marks → Line). Ice above a snowline on ground not too steep to
+  hold it, in three pens as on the Swiss map: the ice edge and blue contours on
+  the ice, crevasses across the fall line of steep ice, and moraine rings along
+  the edge. The panel shows the share of the ground under ice and the snowline
+  in metres.
+
 ## [1.37.0] — 2026-09-30
 
 Two new draw modes: the wind over the ground, and the rockfall hazard map.

@@ -18,9 +18,9 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 45 independent draw modes: surveyor's
+The app renders it as 3D line art with 51 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, wind,
-and tracks that something with mass laid down a face. Contours letter their own
+growth, and tracks that something with mass laid down a face. Contours letter their own
 heights.
 
 Export to SVG for a pen plotter, to STL for a printer, or to 4K PNG for the wall.
@@ -85,7 +85,7 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 45 modes as tiles in six families:
+- **Marks sheet.** The Marks stage shows the 51 modes as tiles in six families:
   Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you three things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 45 modes.
+  classes you pick. This works for all 51 modes.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.
@@ -298,6 +298,12 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Slope Classes | The avalanche map's bands, 30–35°, 35–40° and over 40°, one hatch and one pen each |
 | Wind | Streamlines of one wind, bent along the slopes, crowded on the crests, broken in the lee |
 | Runout | Where falling rock stops, by the reach angle of hazard maps, with the release zones |
+| Venation | Leaf veins grown up the wet ground from the outlets (space colonization) |
+| Geodesic Fan | Straight lines on the ground from one point, bent round the mountains |
+| Radar | A side-looking radar's view as range ticks, with layover and radar shadow |
+| Spines | The skeleton of the ground above each of a stack of levels |
+| Coral | One closed line grown by differential growth until it fills the high ground |
+| Glacier | Ice above a snowline, with blue contours, crevasses and moraine |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

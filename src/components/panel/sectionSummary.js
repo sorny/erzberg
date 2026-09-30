@@ -131,6 +131,12 @@ export const PANEL_MODES = [
   ['Mode: Slope Classes',  'enabledSlopeClass', 'From',     (s) => deg(s.lowSlopeClass)],
   ['Mode: Wind',           'enabledWind',      'From',      (s) => deg(s.azimuthWind)],
   ['Mode: Runout',         'enabledRunout',    'Reach',     (s) => deg(s.reachRunout)],
+  ['Mode: Venation',       'enabledVenation',  'Roots',     (s) => num(s.rootsVenation)],
+  ['Mode: Geodesic Fan',   'enabledGeodesic',  'Rays',      (s) => num(s.raysGeodesic)],
+  ['Mode: Radar',          'enabledRadar',     'Look',      (s) => deg(s.azimuthRadar)],
+  ['Mode: Spines',         'enabledSpines',    'Levels',    (s) => num(s.levelsSpines)],
+  ['Mode: Coral',          'enabledCoral',     'Gap',       (s) => num(s.spacingCoral)],
+  ['Mode: Glacier',        'enabledGlacier',   'Snowline',  (s) => `${Math.round((s.snowlineGlacier ?? 0.7) * 100)}%`],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
 ]
 

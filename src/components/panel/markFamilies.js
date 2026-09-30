@@ -35,15 +35,15 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind']],
+    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier']],
   ['Tone',     'many small marks add up to a grey',
-    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes']],
+    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes', 'Coral']],
   ['Relief',   'the ground given thickness',
     ['Pillars', 'Bitplane', 'Sprite Blocks']],
   ['Plate',    'colour rather than mark-making',
     ['Indexed', 'Riso', 'Mineral', 'Land cover', 'Watershed', 'Outrun']],
   ['Light',    'a lamp, a sun, or a year of one',
-    ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama']],
+    ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama', 'Radar']],
   ['Momentum', 'something with mass went down this slope',
     ['Fall Line', 'Berms', 'Air', 'Race Line', 'Runout']],
 ]

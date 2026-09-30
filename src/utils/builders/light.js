@@ -1,5 +1,5 @@
 /**
- * Light modes: Engraving, Isophotes, Sun Hours, Shadow Line, Shadow Hatch, Flashbulb, Halation.
+ * Light modes: Engraving, Isophotes, Sun Hours, Shadow Line, Shadow Hatch, Flashbulb, Halation, Radar.
  *
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
@@ -7,7 +7,8 @@
 import { boxBlur, sampleBilinear } from '../terrain'
 import { hexToRgb, computeVertexColor } from '../colorUtils'
 import { latitudeFor, litField, samplingFor, smoothField, sunHourLevels, sunHoursField } from '../sunHours'
-import { EMPTY_F32, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, edgeLerp01, getChainScratch, hatchWhere, inElevCut, joinLayers, lambertDarkness, lightVector, mulberry32, normElev, simplifyFlat, traceLevelSet } from './shared.js'
+import { groundMetres } from './ground.js'
+import { EMPTY_F32, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, hatchWhere, inElevCut, joinLayers, lambertDarkness, lightVector, mulberry32, normElev, simplifyFlat, traceLevelSet } from './shared.js'
 
 // ─── Engraving (illumination cross-hatch) ────────────────────────────────────
 
@@ -853,4 +854,88 @@ export function buildHalation(terrain, p, opt) {
     'Halation-Grain': { positions: gP.toArray(), colors: gC.toArray(), isPoints: true },
     'Halation-Bloom': { positions: bP.toArray(), colors: bC.toArray(), isPoints: true },
   }
+}
+
+// ─── Radar ───────────────────────────────────────────────────────────────────
+
+/**
+ * The ground as a side-looking radar sees it.
+ *
+ * The sensor looks toward the bearing `azimuth` at `look` degrees from the
+ * vertical. Lines run along the look direction, `spacing` apart. On each line,
+ * every half-cell sample gets:
+ *
+ *  - a return, the cosine of the local incidence angle between the look and
+ *    the ground normal: bright where a slope faces the sensor, dim where it
+ *    faces away;
+ *  - a shadow test: a sample is dark if nearer ground rises above the ray that
+ *    would reach it;
+ *  - a slant range s = t·sin θ − z·cos θ, with t the distance along the line
+ *    and z the height, both in true metres.
+ *
+ * The returns fill a histogram in slant range, as a radar image does. A slope
+ * that faces the sensor packs many samples into few range bins, and where it
+ * is steeper than the look angle its top comes back before its foot (layover).
+ * Each sample then reads its bin, so that compression shows on the ground as
+ * brightness.
+ *
+ * The plate stays in map geometry, draped like every mode. Brightness becomes
+ * the density of short range ticks across the line, by 1D error diffusion: on
+ * level ground one tick every `spacing`, `gain` times as many per unit of
+ * brightness. Radar shadow stays blank.
+ */
+export function buildRadar(terrain, p, o) {
+  const { gridMask, rows, cols, scl } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const g = groundMetres(terrain, p, o.cellMetres, o.relief).ground()
+  const { heights, cellX, cellY } = g
+  const th = Math.max(10, Math.min(80, o.look ?? 35)) * Math.PI / 180
+  const st = Math.sin(th), ct = Math.cos(th), cot = ct / st
+  const b = (o.azimuth ?? 90) * Math.PI / 180
+  // The look direction in cells, and in metres along the ground.
+  const dc = Math.sin(b), dr = -Math.cos(b)
+  const stepM = 0.5 * Math.hypot(dc * cellX, dr * cellY)
+  const ux = dc * cellX * 0.5 / stepM, uy = dr * cellY * 0.5 / stepM
+  const pitch = Math.max(0.75, (o.spacing ?? 3) / scl)
+  const gain = Math.max(0.05, o.gain ?? 1)
+  const tick = 0.4 * pitch
+  const hAt = (r, c) => sampleBilinear(heights, sMask, rows, cols, r, c)
+
+  const out = { positions: new F32List(), colors: new F32List() }
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2, half = Math.hypot(cc, rc) + 1
+  const nc = -dr, nr = dc
+  const fr = [], fcs = [], sig = [], sl = []
+  for (let off = -half; off <= half; off += pitch) {
+    fr.length = 0; fcs.length = 0; sig.length = 0; sl.length = 0
+    let M = -Infinity, sMin = Infinity, sMax = -Infinity
+    for (let t = -half, k = 0; t <= half; t += 0.5, k++) {
+      const c = cc + nc * off + dc * t, r = rc + nr * off + dr * t
+      if (c < 0.5 || r < 0.5 || c > cols - 1.5 || r > rows - 1.5 || !gridMask[Math.round(r) * cols + Math.round(c)]) { M = -Infinity; continue }
+      const z = hAt(r, c)
+      if (z !== z) { M = -Infinity; continue }
+      const gx = (hAt(r, c + 0.5) - hAt(r, c - 0.5)) / cellX, gy = (hAt(r + 0.5, c) - hAt(r - 0.5, c)) / cellY
+      let s = (st * (gx * ux + gy * uy) + ct) / Math.sqrt(1 + gx * gx + gy * gy)
+      const tm = k * stepM
+      if (z + tm * cot < M) s = 0
+      M = Math.max(M, z + tm * cot)
+      const slant = tm * st - z * ct
+      fr.push(r); fcs.push(c); sig.push(Math.max(0, s)); sl.push(slant)
+      if (slant < sMin) sMin = slant
+      if (slant > sMax) sMax = slant
+    }
+    if (!fr.length) continue
+    const bw = stepM * st, nb = Math.max(1, Math.ceil((sMax - sMin) / bw) + 1)
+    const hist = new Float32Array(nb)
+    for (let q = 0; q < fr.length; q++) hist[Math.floor((sl[q] - sMin) / bw)] += sig[q]
+    let acc = 0
+    for (let q = 0; q < fr.length; q++) {
+      const lit = sig[q] > 0 ? hist[Math.floor((sl[q] - sMin) / bw)] / ct : 0
+      acc += lit * gain * 0.5 / pitch
+      if (acc < 1) continue
+      acc -= Math.floor(acc)
+      const r = fr[q], c = fcs[q]
+      drapeEdge(out, terrain, p, sMask, c - nc * tick, r - nr * tick, c + nc * tick, r + nr * tick, Math.atan2(nr, nc))
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray() }
 }

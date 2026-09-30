@@ -228,6 +228,12 @@ function resolveLayerStyle(id, p) {
     // The zones are where the paths start, so they take their own, lighter pen.
     case 'Runout-Release':
       return { weight: p.zoneWeightRunout ?? 0.8, opacity: p.opacityRunout, dash: 'solid' }
+    // The ice and its cracks share the ice colour; the moraine is rock, in the
+    // mode's own ink.
+    case 'Glacier-Ice':
+    case 'Glacier-Crevasses':
+    case 'Glacier-Moraine':
+      return { weight: p.weightGlacier, opacity: p.opacityGlacier, dash: id === 'Glacier-Ice' ? p.dashGlacier : 'solid' }
     // One pen per band, named for its degrees, so the plot says which is which.
     case 'SlopeClass-Low':
     case 'SlopeClass-Mid':
