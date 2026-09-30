@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all forty-three at once.
+ * does the index that shows all forty-five at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -227,6 +227,16 @@ export const DRAW_MODES = [
     pick: { spacing: [2, 6], angle: [20, 70] },
   },
   {
+    // Evenly spaced streamlines: every step tests the points near it.
+    id: 'Wind', label: 'Wind', cost: 2.5, mark: 'wind',
+    pick: { spacing: [5, 14], azimuth: [0, 360], radius: [1, 4] },
+  },
+  {
+    // One fall-line walk per seed in the release zones, which are few.
+    id: 'Runout', label: 'Runout', cost: 1.5, mark: 'runout',
+    pick: { spacing: [4, 10] },
+  },
+  {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
     pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
@@ -275,6 +285,8 @@ export const SUB_LAYER_LABEL = {
   'Panorama-Skyline':        'Skyline',
   'Bedding-Beds':            'Beds',
   'Bedding-Marker':          'Marker bed',
+  'Runout-Paths':            'Paths',
+  'Runout-Release':          'Release zones',
 }
 
 /**

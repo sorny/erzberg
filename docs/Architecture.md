@@ -335,7 +335,7 @@ To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
 ### A draw mode
 
 1. Write a builder in the family module under `src/utils/builders/` (lines,
-   tone, light, relief, colour …) that returns `{ positions, colors }`,
+   tone, light, relief, colour, weather …) that returns `{ positions, colors }`,
    or an object of sub-layers for separate pens.
 2. Register it in `MODES_CONFIG` in `buildLineGeometry`.
 3. Add a `layerStyle` case for each sub-layer.

@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.37.0] — 2026-09-30
+
+Two new draw modes: the wind over the ground, and the rockfall hazard map.
+
+### Added
+
+- **Wind** (Marks → Line). Streamlines of one wind from a bearing. The air
+  turns along a slope instead of going straight up it, the lines crowd over
+  the crests where wind is fastest, and the pen lifts in the lee of a steep face.
+  Flow Lines follow the fall of the ground and never cross a ridge. Wind
+  crosses every ridge, so the two read as different maps of the same ground.
+  The turn is capped so that no line turns back, and the slope is in true
+  metres, so a setting means the same on any raster. The speed comes from the
+  landform: fast on ground that stands above its surroundings, slow in hollows.
+  A height above sea level crowded a whole high plateau. *Eddies* (on by
+  default) draws curls in the lee. The first version left a bare gap there,
+  and it read as a fault in the drawing. *Arrows* and *Streaks* show which way
+  the air goes: a plain line has no front and back. Streaks are dashes with
+  heads, longer where the air is faster, as on a weather map.
+- **Runout** (Marks → Momentum). Where falling rock stops. Paths start in the
+  ground steeper than *Release* (40°) and walk down the fall line. A path stops
+  where the line back up to its start is flatter than *Reach* (32°), the
+  Fahrböschung of Alpine hazard maps, so a higher start runs farther. Each stop
+  is a tick across the fall line, and the ticks form a front at the foot of each
+  wall. On flat ground a block keeps its heading, because the reach angle and
+  not the slope stops it. Paths that join in a gully draw it once. The release
+  zones are a second pen, outlined and hatched. The panel shows the number of
+  paths and the longest run in metres.
+
+### Changed
+
+- Slope Classes and Runout share one slope calculation in true metres.
+
 ## [1.36.0] — 2026-09-29
 
 Three new draw modes from the conventions of real maps: the summit board, the

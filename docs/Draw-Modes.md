@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-three
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Forty-five
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Forty-two modes read $H$ only. [Land cover](#land-cover) reads a second
+Forty-four modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -657,6 +657,37 @@ defaults, 30°, 35° and 40°, are the bands of Alpine avalanche maps. The bands
 are hatched at twice the spacing, at the spacing, and cross-hatched at the
 spacing, and each is its own pen layer, named for its degrees. The panel shows
 the share of the ground in each band.
+
+## 45. Wind
+
+Streamlines of one wind from the bearing *From*, with unit vector $\mathbf{w}$.
+Where the ground rises across its path, the air turns along the slope:
+
+$$d = \mathbf{w} \cdot \nabla h, \qquad \mathbf{v} = \mathbf{w} - k \, \frac{d \, \nabla h}{1 + |\nabla h|^2}$$
+
+with $\nabla h$ in true metres and $k$ the *Turn*. For $k \le 1$, $\mathbf{v}
+\cdot \mathbf{w} > 0$, so no line turns back. The lines are evenly spaced
+(Jobard–Lefer). The relative speed $u$ is high on ground above the mean height
+round it and low in hollows. The gap is $\text{spacing} / u^{2c}$, with $c$ the
+*Crowding*, so at $c = 0.5$ it follows continuity. Where the ground falls along
+the wind more steeply than *Lee*, the pen lifts, and *Eddies* draws curls there
+that turn back on the wind. *Arrows* puts a half arrowhead on each line at
+intervals. *Streaks* breaks the lines into dashes with heads, $u^2$ times as long
+where the air is faster.
+
+## 46. Runout
+
+Where falling rock stops. Release zones are the ground steeper than *Release*.
+From seeds in them, a block walks down the fall line in true metres. It stops
+at the first point where
+
+$$\frac{z_0 - z}{s} < \tan \alpha$$
+
+with $z_0$ the release height, $s$ the distance walked and $\alpha$ the
+*Reach* (the Fahrböschung, about 32° for rockfall). On flat ground the block
+keeps its heading. Each stop is a tick across the fall line. The first path
+through a cell draws it, so the paths do not overdraw one gully. The release
+zones are a second pen, outlined and hatched.
 
 ---
 

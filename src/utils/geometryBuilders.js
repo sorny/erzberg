@@ -12,7 +12,8 @@ import { buildCover, buildIndexed, buildMineral, buildOutrun, buildRiso, buildWa
 import { buildContours } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
 import { buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
-import { buildBedding, buildSlopeClass } from './builders/survey.js'
+import { buildBedding, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
@@ -167,6 +168,16 @@ export function buildLineGeometry(terrain, p) {
         spacing: p.spacingSlopeClass, angle: p.angleSlopeClass, radius: p.radiusSlopeClass,
         outline: p.outlineSlopeClass,
         cellMetres: p.cellMetresSlopeClass, relief: p.reliefSlopeClass }) },
+    { id:'Wind',    builder: (t, ctx) => buildWind(t, ctx, {
+        azimuth: p.azimuthWind, spacing: p.spacingWind, deflect: p.deflectWind,
+        crest: p.crestWind, lee: p.leeWind, radius: p.radiusWind,
+        stroke: p.strokeWind, eddies: p.eddiesWind,
+        cellMetres: p.cellMetresWind, relief: p.reliefWind }) },
+    { id:'Runout',  builder: (t, ctx) => buildRunout(t, ctx, {
+        release: p.releaseRunout, reach: p.reachRunout, spacing: p.spacingRunout,
+        radius: p.radiusRunout, zone: p.zoneRunout, zoneColor: p.zoneColorRunout,
+        hatch: p.hatchRunout, angle: p.angleRunout,
+        cellMetres: p.cellMetresRunout, relief: p.reliefRunout }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },

@@ -18,7 +18,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, viewshedNote }) {
+export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1097,6 +1097,81 @@ export function ModeSections({ cover, geoTiffBbox, gradientStops, hasGeoTiff, in
                   <Tog label="Outline" help="The edge of the lowest band, drawn with its pen." checked={!!style.outlineSlopeClass} onChange={v => ss({ outlineSlopeClass: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="SlopeClass" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Wind" icon={<ModeMark kind="wind" />} open={sec.modeWind} onToggle={() => tog('modeWind')} enabled={style.enabledWind}>
+            <Tog label="Enabled" testId="mode-wind" checked={style.enabledWind} onChange={v => ss({ enabledWind: v })} />
+            {style.enabledWind && (
+              <>
+                <Sub>
+                  {windNote && (
+                    <div data-testid="wind-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${windNote.lines} lines`}
+                    </div>
+                  )}
+                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
+                    {[['lines','LINES'],['arrows','ARROWS'],['streaks','STREAKS']].map(([m, lbl]) => (
+                      <Btn key={m} block variant="toggle" on={(style.strokeWind ?? 'lines') === m}
+                        onClick={() => ss({ strokeWind: m })}
+                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
+                    ))}
+                  </div>
+                  <InlineSl label="From" help="The bearing the wind blows from. 0° is north, 270° is west." min={0} max={359} step={1} value={style.azimuthWind} onChange={v => ss({ azimuthWind: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Spacing" help="The gap between lines on low ground." min={1} max={40} step={0.5} value={style.spacingWind} onChange={v => ss({ spacingWind: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Crowding" help="How much closer the lines run where the wind is faster, over crests and ridges. At 0 the gap is the same everywhere." min={0} max={1} step={0.05} value={style.crestWind} onChange={v => ss({ crestWind: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Turn" help="How far the air turns along a slope instead of going up it. At 0 the lines are straight." min={0} max={1} step={0.05} value={style.deflectWind} onChange={v => ss({ deflectWind: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Lee" help="Where the ground falls away along the wind more steeply than this, the air breaks away and the pen lifts. At 0 it never lifts." min={0} max={60} step={1} value={style.leeWind} onChange={v => ss({ leeWind: Math.round(v) })} fmt={v => (v ? `${Math.round(v)}°` : 'off')} />
+                  {style.leeWind > 0 && (
+                    <Tog label="Eddies" help="Curls in the lee, where the air breaks away. Without them the lee is left blank." checked={!!style.eddiesWind} onChange={v => ss({ eddiesWind: v })} />
+                  )}
+                  <InlineSl label="Detail" help="Blur on the ground before the wind reads it. Higher values let the air pass over small bumps." min={0} max={12} step={0.5} value={style.radiusWind} onChange={v => ss({ radiusWind: v })} fmt={v => v.toFixed(1)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresWind} onChange={v => ss({ cellMetresWind: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefWind} onChange={v => ss({ reliefWind: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Wind" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Runout" icon={<ModeMark kind="runout" />} open={sec.modeRunout} onToggle={() => tog('modeRunout')} enabled={style.enabledRunout}>
+            <Tog label="Enabled" testId="mode-runout" checked={style.enabledRunout} onChange={v => ss({ enabledRunout: v })} />
+            {style.enabledRunout && (
+              <>
+                <Sub>
+                  {runoutNote && (
+                    <div data-testid="runout-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {runoutNote.paths ? `${runoutNote.paths} paths · longest ${Math.round(runoutNote.longest)} m` : 'No ground is steep enough to release'}
+                    </div>
+                  )}
+                  <InlineSl label="Release" help="Rock falls from ground steeper than this." min={20} max={80} step={1} value={style.releaseRunout} onChange={v => ss({ releaseRunout: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Reach" help="A rock stops where the line back up to its start is flatter than this. Hazard maps use about 32° for rockfall. Lower values let it run farther." min={15} max={45} step={0.5} value={style.reachRunout} onChange={v => ss({ reachRunout: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Spacing" help="The gap between the points in the release zones where paths start." min={1} max={40} step={0.5} value={style.spacingRunout} onChange={v => ss({ spacingRunout: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="Blur on the ground before the slope is read and the paths walk it." min={0} max={12} step={0.5} value={style.radiusRunout} onChange={v => ss({ radiusRunout: v })} fmt={v => v.toFixed(1)} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresRunout} onChange={v => ss({ cellMetresRunout: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefRunout} onChange={v => ss({ reliefRunout: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <Tog label="Release zones" help="The ground steeper than the release angle, outlined as a second pen." checked={!!style.zoneRunout} onChange={v => ss({ zoneRunout: v })} />
+                  {style.zoneRunout && (
+                    <>
+                      <ColorRow label="Zone colour" value={style.zoneColorRunout} onChange={v => ss({ zoneColorRunout: v })} />
+                      <InlineSl label="Zone weight" min={0.3} max={6} step={0.1} value={style.zoneWeightRunout} onChange={v => ss({ zoneWeightRunout: v })} fmt={v => v.toFixed(1)} />
+                      <Tog label="Hatch zones" checked={!!style.hatchRunout} onChange={v => ss({ hatchRunout: v })} />
+                      {style.hatchRunout && (
+                        <InlineSl label="Hatch angle" min={0} max={180} step={1} value={style.angleRunout} onChange={v => ss({ angleRunout: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                      )}
+                    </>
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Runout" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

@@ -326,6 +326,20 @@ export const STYLE_DEF = {
   colorSlopeClass: '#1a1a1a', weightSlopeClass: 1, opacitySlopeClass: 1, dashSlopeClass: 'solid',
   hypsoSlopeClass: false, hypsoModeSlopeClass: 'elevation', hypsoBandedSlopeClass: false, hypsoIntervalSlopeClass: 10,
 
+  // Wind — streamlines of one prevailing wind, bent by the ground. From a bearing.
+  enabledWind: false, azimuthWind: 250, spacingWind: 8, deflectWind: 0.9, crestWind: 0.8,
+  leeWind: 30, radiusWind: 2, strokeWind: 'lines', eddiesWind: true,
+  cellMetresWind: 10, reliefWind: 1000,
+  colorWind: '#1a1a1a', weightWind: 1, opacityWind: 1, dashWind: 'solid',
+  hypsoWind: false, hypsoModeWind: 'elevation', hypsoBandedWind: false, hypsoIntervalWind: 10,
+
+  // Runout — where falling rock stops, by the reach angle of Alpine hazard maps.
+  enabledRunout: false, releaseRunout: 40, reachRunout: 32, spacingRunout: 6, radiusRunout: 1,
+  zoneRunout: true, zoneColorRunout: '#c0561a', zoneWeightRunout: 0.8, hatchRunout: true, angleRunout: 45,
+  cellMetresRunout: 10, reliefRunout: 1000,
+  colorRunout: '#1a1a1a', weightRunout: 1, opacityRunout: 1, dashRunout: 'solid',
+  hypsoRunout: false, hypsoModeRunout: 'elevation', hypsoBandedRunout: false, hypsoIntervalRunout: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,
@@ -570,7 +584,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the forty-three modes are
+  // A modifier rather than a mode: it takes whatever the forty-five modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

@@ -1,13 +1,14 @@
 /**
- * Map conventions: Bedding, Slope Classes.
+ * Map conventions: Bedding, Slope Classes, Runout.
  *
- * Both read the ground in real metres, through the same `groundMetres` the
+ * All three read the ground in real metres, through the same `groundMetres` the
  * walking and looking modes use, because each answers in a unit a map reader
- * already knows: a dip in degrees, a slope in degrees.
+ * already knows: a dip in degrees, a slope in degrees, a reach angle in degrees.
  */
+import { boxBlur, sampleBilinear } from '../terrain'
 import { smoothField } from '../sunHours'
 import { groundMetres } from './ground.js'
-import { hatchWhere, joinLayers, traceLevelSet } from './shared.js'
+import { F32List, drapeEdge, hatchWhere, joinLayers, traceLevelSet } from './shared.js'
 
 const RAD = Math.PI / 180
 
@@ -75,6 +76,31 @@ export function buildBedding(terrain, p, o) {
 // ─── Slope Classes ───────────────────────────────────────────────────────────
 
 /**
+ * Slope in degrees per cell, from central differences in true metres, and −1
+ * off the ground. A neighbour in NoData reads as the cell itself, so the edge
+ * of a clipped selection is not a cliff.
+ */
+function slopeDegrees(terrain, ground) {
+  const { gridMask, rows, cols } = terrain
+  const { heights, cellX, cellY } = ground
+  const h = (r, c, i) => {
+    const k = Math.max(0, Math.min(rows - 1, r)) * cols + Math.max(0, Math.min(cols - 1, c))
+    return gridMask[k] ? heights[k] : heights[i]
+  }
+  const deg = new Float32Array(rows * cols)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) { deg[i] = -1; continue }
+      const gx = (h(r, c + 1, i) - h(r, c - 1, i)) / (2 * cellX)
+      const gy = (h(r + 1, c, i) - h(r - 1, c, i)) / (2 * cellY)
+      deg[i] = Math.atan(Math.hypot(gx, gy)) / RAD
+    }
+  }
+  return deg
+}
+
+/**
  * Steep ground in three bands, each hatched and each its own pen.
  *
  * The bands are the ones Alpine avalanche maps use: 30–35°, 35–40° and over
@@ -91,21 +117,7 @@ export function buildBedding(terrain, p, o) {
 export function buildSlopeClass(terrain, p, o) {
   const { gridMask, rows, cols, scl } = terrain
   const n = rows * cols
-  const { heights, cellX, cellY } = groundMetres(terrain, p, o.cellMetres, o.relief).ground()
-  const h = (r, c, i) => {
-    const k = Math.max(0, Math.min(rows - 1, r)) * cols + Math.max(0, Math.min(cols - 1, c))
-    return gridMask[k] ? heights[k] : heights[i]
-  }
-  const deg = new Float32Array(n)
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      if (!gridMask[i]) { deg[i] = -1; continue }
-      const gx = (h(r, c + 1, i) - h(r, c - 1, i)) / (2 * cellX)
-      const gy = (h(r + 1, c, i) - h(r - 1, c, i)) / (2 * cellY)
-      deg[i] = Math.atan(Math.hypot(gx, gy)) / RAD
-    }
-  }
+  const deg = slopeDegrees(terrain, groundMetres(terrain, p, o.cellMetres, o.relief).ground())
   const field = smoothField(deg, cols, rows, o.radius ?? 1, gridMask)
 
   const [a, b, c] = [o.low ?? 30, o.mid ?? 35, o.high ?? 40].sort((x, y) => x - y)
@@ -128,4 +140,110 @@ export function buildSlopeClass(terrain, p, o) {
   // The outline goes with the lightest band, where it is the edge of the ink.
   if (o.outline) out['SlopeClass-Low'] = { ...joinLayers(out['SlopeClass-Low'], traceLevelSet(terrain, p, field, [a], 2)), note }
   return out
+}
+
+// ─── Runout ──────────────────────────────────────────────────────────────────
+
+/**
+ * Where falling rock stops.
+ *
+ * Release zones are the ground steeper than `release` degrees. From seeds on a
+ * grid inside them, a block walks down the fall line of the ground in true
+ * metres. It stops where the line from its release point to where it is now
+ * is flatter than `reach` degrees: the reach angle, or Fahrböschung, that
+ * Alpine hazard maps use for rockfall. A higher release point therefore runs
+ * farther over the same ground than a lower one.
+ *
+ * Paths from neighbouring seeds meet in the same gully and would plot the same
+ * line many times. The first path through a cell owns it, and a later one goes
+ * on walking there without drawing, so that it still stops where its own
+ * release height says. It draws again where it runs past the end of the path
+ * it joined. Seeds run highest first, so the longest paths claim the gullies.
+ *
+ * On flat ground the block keeps the heading it had, because the reach angle
+ * and not the slope decides where it stops. Each stop is a short tick across
+ * the fall line, and the ticks make a front along the foot of each wall. A walk
+ * that leaves the data does not stop, and gets no tick.
+ *
+ * Two pens: the paths with their stops, and the release zones, outlined and
+ * hatched. The number of paths and the longest run ride back as `note`.
+ */
+export function buildRunout(terrain, p, o) {
+  const { gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const ground = groundMetres(terrain, p, o.cellMetres, o.relief).ground()
+  const { cellX, cellY } = ground
+  const release = Math.max(5, Math.min(85, o.release ?? 40))
+  const reach = Math.max(1, Math.min(release - 1, o.reach ?? 32))
+  const radius = Math.max(0, o.radius ?? 1)
+  const field = smoothField(slopeDegrees(terrain, ground), cols, rows, radius, gridMask)
+  // The walk reads the same blurred ground, or it steps round every bump in the
+  // data that the release zones were blurred to ignore.
+  const hs = radius > 0 ? boxBlur(ground.heights, cols, rows, radius, sMask) : ground.heights
+  const at = (fr, fc) => sampleBilinear(hs, sMask, rows, cols, fr, fc)
+
+  const pitch = Math.max(1, (o.spacing ?? 6) / scl)
+  const seeds = []
+  for (let rf = 0.5, row = 0; rf < rows - 1; rf += pitch, row++) {
+    for (let cf = 0.5 + (row % 2) * pitch / 2; cf < cols - 1; cf += pitch) {
+      const i = Math.round(rf) * cols + Math.round(cf)
+      if (gridMask[i] && field[i] >= release) seeds.push(i)
+    }
+  }
+  seeds.sort((a, b) => hs[b] - hs[a])
+
+  const tanReach = Math.tan(reach * RAD)
+  const stepM = 0.5 * Math.min(cellX, cellY)
+  const maxSteps = 4 * (rows + cols)
+  const owner = new Int32Array(n), ticked = new Uint8Array(n)
+  const out = { positions: new F32List(), colors: new F32List() }
+  const tick = Math.max(1.5, pitch * 0.5)
+  let id = 0, longest = 0
+  for (const seed of seeds) {
+    if (owner[seed]) continue
+    id++
+    let fr = Math.floor(seed / cols), fc = seed % cols, dist = 0, stopped = false, ux = 0, uy = 0
+    const z0 = at(fr, fc)
+    if (z0 !== z0) continue
+    for (let s = 0; s < maxSteps; s++) {
+      const gx = (at(fr, fc + 0.5) - at(fr, fc - 0.5)) / cellX
+      const gy = (at(fr + 0.5, fc) - at(fr - 0.5, fc)) / cellY
+      const mag = Math.hypot(gx, gy)
+      // NaN is a tap in NoData, and the walk ends. On flat ground the block
+      // keeps its heading, because the reach angle, not the slope, stops it.
+      if (mag !== mag) break
+      if (mag > 1e-6) { ux = -gx / mag; uy = -gy / mag }
+      else if (!ux && !uy) { stopped = true; break }
+      const nfc = fc + ux * stepM / cellX, nfr = fr + uy * stepM / cellY
+      if (nfr < 0 || nfc < 0 || nfr > rows - 1 || nfc > cols - 1) break
+      const k = Math.round(nfr) * cols + Math.round(nfc)
+      if (!gridMask[k]) break
+      const z = at(nfr, nfc)
+      if (z !== z) break
+      if (owner[k] === 0 || owner[k] === id) {
+        owner[k] = id
+        drapeEdge(out, terrain, p, sMask, fc, fr, nfc, nfr, Math.atan2(uy, ux))
+      }
+      fr = nfr; fc = nfc; dist += stepM
+      if (dist > 2 * stepM && (z0 - z) / dist < tanReach) { stopped = true; break }
+    }
+    if (dist > longest) longest = dist
+    const k = Math.round(fr) * cols + Math.round(fc)
+    if (!stopped || ticked[k]) continue
+    ticked[k] = 1
+    // Across the fall line, in cells.
+    let tc = -uy / cellX, tr = ux / cellY
+    const tm = Math.hypot(tc, tr) || 1
+    tc = tc / tm * tick; tr = tr / tm * tick
+    drapeEdge(out, terrain, p, sMask, fc - tc, fr - tr, fc + tc, fr + tr, Math.atan2(tr, tc))
+  }
+  const note = { paths: id, longest }
+  const paths = { positions: out.positions.toArray(), colors: out.colors.toArray(), note }
+  if (!o.zone) return paths
+
+  const zoneInk = { ...p, lineColor: o.zoneColor ?? p.lineColor }
+  let zone = traceLevelSet(terrain, zoneInk, field, [release], 2)
+  if (o.hatch) zone = joinLayers(zone, hatchWhere(terrain, zoneInk, (i) => field[i] >= release, [o.angle ?? 45], Math.max(0.5, pitch / 2)))
+  return { 'Runout-Paths': paths, 'Runout-Release': { ...zone, note } }
 }

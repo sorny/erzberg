@@ -65,6 +65,8 @@ export const SECTION_TERMS = {
   'Mode: Panorama': 'panorama summit board skyline ridges horizon silhouette crests view from a point observer eye stacked',
   'Mode: Bedding': 'bedding strata layers rock geology dip strike outcrop tilted plane seam ore marker bed rule of vs geological map',
   'Mode: Slope Classes': 'slope classes steepness degrees avalanche map 30 35 40 hatch bands steep ground ski touring',
+  'Mode: Wind': 'wind streamlines air weather prevailing bearing lee crest ridge gust breeze flow over ground arrows streaks eddies turbulence rotor weather map',
+  'Mode: Runout': 'runout rockfall falling rock hazard map reach angle fahrböschung release zone cliff scree avalanche stop',
   'Mode: Roughness Mesh': 'delaunay voronoi triangles mesh tri terrain ruggedness index rough low poly facets net',
   'Mode: Indexed':    'palette lookup index 2d table quantise tiers slope bands bayer dither 16-bit retro gameboy arcade sky ramp swatches',
   'Mode: Outrun':     'neon glow additive synthwave retrowave vaporwave magenta cyan halo bloom filament emit light dark 80s',

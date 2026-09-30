@@ -336,6 +336,23 @@ const MARKS = {
       <path d="M1 9 L8 10.5 L10 13 M12 13 L14 10.5 L21 9" strokeWidth="0.8" />
     </g>
   ),
+  // Wind lines bunched over a crest, broken in its lee.
+  wind: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1 3 C6 3 8 1.5 11 1.5 C14 1.5 16 3 21 3" />
+      <path d="M1 6 C5 6 7.5 3.5 11 3.5 C12.5 3.5 13 4 13.5 4.5 M17 6.5 L21 6.5" />
+      <path d="M1 9 C5 9 7.5 6 11 6 C12 6 12.5 6.3 13 6.6 M17 9.5 L21 9.5" />
+      <path d="M1 12 L21 12" />
+    </g>
+  ),
+  // Paths down from a wall, each ending in a stop tick; the release zone above.
+  runout: (
+    <g {...BASE}>
+      <path d="M2 2 L20 2" strokeWidth="1.3" />
+      <path d="M5 2.5 L6 7 L6.5 10 M11 2.5 L11.5 8.5 M16 2.5 L15 6.5 L14.5 11" strokeWidth="0.7" />
+      <path d="M5 10 L8 10 M10 8.5 L13 8.5 M13 11 L16 11" strokeWidth="1.2" />
+    </g>
+  ),
   // Three bands of hatch, sparse to crossed, as the ground steepens.
   slopeclass: (
     <g {...BASE} strokeWidth="0.7">

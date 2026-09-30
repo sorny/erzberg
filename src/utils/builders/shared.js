@@ -223,6 +223,11 @@ function resolveLayerStyle(id, p) {
       return { weight: p.weightBedding, opacity: p.opacityBedding, dash: p.dashBedding }
     case 'Bedding-Marker':
       return { weight: p.markerWeightBedding ?? 2.4, opacity: p.opacityBedding, dash: 'solid' }
+    case 'Runout-Paths':
+      return { weight: p.weightRunout, opacity: p.opacityRunout, dash: p.dashRunout }
+    // The zones are where the paths start, so they take their own, lighter pen.
+    case 'Runout-Release':
+      return { weight: p.zoneWeightRunout ?? 0.8, opacity: p.opacityRunout, dash: 'solid' }
     // One pen per band, named for its degrees, so the plot says which is which.
     case 'SlopeClass-Low':
     case 'SlopeClass-Mid':

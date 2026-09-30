@@ -35,7 +35,7 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding']],
+    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind']],
   ['Tone',     'many small marks add up to a grey',
     ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes']],
   ['Relief',   'the ground given thickness',
@@ -45,5 +45,5 @@ export const FAMILIES = [
   ['Light',    'a lamp, a sun, or a year of one',
     ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama']],
   ['Momentum', 'something with mass went down this slope',
-    ['Fall Line', 'Berms', 'Air', 'Race Line']],
+    ['Fall Line', 'Berms', 'Air', 'Race Line', 'Runout']],
 ]

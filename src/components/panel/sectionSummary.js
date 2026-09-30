@@ -129,6 +129,8 @@ export const PANEL_MODES = [
   ['Mode: Panorama',       'enabledPanorama',  'Eye',       (s) => `${num(s.eyePanorama)} m`],
   ['Mode: Bedding',        'enabledBedding',   'Dip',       (s) => deg(s.dipBedding)],
   ['Mode: Slope Classes',  'enabledSlopeClass', 'From',     (s) => deg(s.lowSlopeClass)],
+  ['Mode: Wind',           'enabledWind',      'From',      (s) => deg(s.azimuthWind)],
+  ['Mode: Runout',         'enabledRunout',    'Reach',     (s) => deg(s.reachRunout)],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
 ]
 
