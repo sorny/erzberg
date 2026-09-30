@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, MONO, MUTED, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
@@ -299,6 +299,27 @@ function TerrainFetchPanel({ onFetched }) {
             <div style={{ wordBreak:'break-word' }}>{`This ground: ${credit.sources.join(', ')}`}</div>
           )}
         </div>
+      )}
+    </>
+  )
+}
+
+/**
+ * The ground's scale, for the surface layers that read true degrees.
+ *
+ * A GeoTIFF knows its own pixel size and its heights, and then this is not
+ * shown. A plain heightmap knows neither, so the slope in degrees needs them
+ * from here, as the draw modes take theirs. Shared by Slope Shading, Aspect Map
+ * and Openness: it is one fact about the ground, not three settings.
+ */
+function GroundScale({ style, ss, geoTiffBbox, hasGeoTiff }) {
+  return (
+    <>
+      {!geoTiffBbox && (
+        <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale. Shared by every surface layer that reads degrees." min={0.5} max={200} step={0.5} value={style.groundCellMetres ?? 10} onChange={v => ss({ groundCellMetres: v })} fmt={v => `${v} m`} />
+      )}
+      {!hasGeoTiff && (
+        <InlineSl label="Relief" help="Metres from black to white in the heightmap. Shared by every surface layer that reads degrees." min={10} max={9000} step={10} value={style.groundRelief ?? 1000} onChange={v => ss({ groundRelief: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
       )}
     </>
   )
@@ -888,6 +909,7 @@ export function Sidebar({
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
+    localRelief: false, curvShade: false, openness: false, texShade: false, aerial: false, wetness: false, sunTint: false,
     points: false, texture: false, mirror: false, erosion: false, export: true,
     sheetMarks: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
@@ -2354,8 +2376,21 @@ export function Sidebar({
             {style.showSlopeShade && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off is the old reading, from the normal as drawn, which moves with the height slider; plates made before v1.39.0 open with it off, so they look as they did." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
                 <ColorRow label="Flat colour" value={style.slopeColorLow} onChange={v => ss({ slopeColorLow: v })} />
                 <ColorRow label="Steep colour" value={style.slopeColorHigh} onChange={v => ss({ slopeColorHigh: v })} />
+                {style.slopeShadeTrue !== false && (<>
+                <InlineSl label="Full at" help="The slope, in true degrees, that gets the full steep colour. Flatter ground fades toward the fill." min={5} max={89} step={1} value={style.slopeShadeMax ?? 45} onChange={v => ss({ slopeShadeMax: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                <InlineSl label="Bands" help="Steps of this many degrees instead of a smooth ramp. At 0 the colour is smooth." min={0} max={20} step={1} value={style.slopeShadeBand ?? 0} onChange={v => ss({ slopeShadeBand: Math.round(v) })} fmt={v => (v ? `${Math.round(v)}°` : 'smooth')} />
+                {/* Written out here rather than through GroundScale: this section
+                    owns the two keys, and the others borrow them. */}
+                {!geoTiffBbox && (
+                  <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale. Shared by every surface layer that reads degrees." min={0.5} max={200} step={0.5} value={style.groundCellMetres ?? 10} onChange={v => ss({ groundCellMetres: v })} fmt={v => `${v} m`} />
+                )}
+                {!hasGeoTiff && (
+                  <InlineSl label="Relief" help="Metres from black to white in the heightmap. Shared by every surface layer that reads degrees." min={10} max={9000} step={10} value={style.groundRelief ?? 1000} onChange={v => ss({ groundRelief: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                )}
+                </>)}
               </Sub>
             )}
           </Section>
@@ -2378,6 +2413,118 @@ export function Sidebar({
             {style.showAspectMap && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <Tog label="Fade on flat ground" help="A bivariate map: the hue fades to grey as the ground flattens, because level ground faces no direction." checked={style.aspectMapBivariate !== false} onChange={v => ss({ aspectMapBivariate: v })} />
+                {style.aspectMapBivariate !== false && (
+                  <InlineSl label="Full at" help="The slope, in true degrees, that gets the full hue." min={2} max={89} step={1} value={style.aspectMapFull ?? 30} onChange={v => ss({ aspectMapFull: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                )}
+                {style.aspectMapBivariate !== false && (!geoTiffBbox || !hasGeoTiff) && (
+                  <GroundScale style={style} ss={ss} geoTiffBbox={geoTiffBbox} hasGeoTiff={hasGeoTiff} />
+                )}
+              </Sub>
+            )}
+          </Section>
+
+
+          {/* ── Local Relief ────────────────────────────────────────────────── */}
+          <Section title="Local Relief" open={sec.localRelief} onToggle={() => tog('localRelief')} enabled={style.showLocalRelief}>
+            <Tog label="Enabled" checked={!!style.showLocalRelief} onChange={v => ss({ showLocalRelief: v })} />
+            {style.showLocalRelief && (
+              <Sub>
+                <Note>The ground minus a blur of itself. The mountain goes, and what sits on it stays: terraces, benches, paths, walls.</Note>
+                <InlineSl label="Radius" help="The largest feature kept. Anything wider is part of the mountain and is taken away." min={4} max={400} step={1} value={style.localReliefRadius ?? 40} onChange={v => ss({ localReliefRadius: Math.round(v) })} />
+                <InlineSl label="Gain" min={0.2} max={5} step={0.1} value={style.localReliefGain ?? 1} onChange={v => ss({ localReliefGain: v })} fmt={v => `×${v.toFixed(1)}`} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.localReliefOpacity ?? 0.8} onChange={v => ss({ localReliefOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Below" value={style.localReliefLow ?? '#2f5d8a'} onChange={v => ss({ localReliefLow: v })} />
+                <ColorRow label="Above" value={style.localReliefHigh ?? '#b5472d'} onChange={v => ss({ localReliefHigh: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Curvature Shading ───────────────────────────────────────────── */}
+          <Section title="Curvature Shading" open={sec.curvShade} onToggle={() => tog('curvShade')} enabled={style.showCurvShade}>
+            <Tog label="Enabled" checked={!!style.showCurvShade} onChange={v => ss({ showCurvShade: v })} />
+            {style.showCurvShade && (
+              <Sub>
+                <Note>Convex ground in one colour and hollows in the other. The form with no light direction at all.</Note>
+                <InlineSl label="Scale" help="The size of the forms it reads. Small values show the grain of the ground, large ones its main ridges and valleys." min={1} max={100} step={1} value={style.curvShadeRadius ?? 8} onChange={v => ss({ curvShadeRadius: Math.round(v) })} />
+                <InlineSl label="Gain" min={0.2} max={5} step={0.1} value={style.curvShadeGain ?? 1} onChange={v => ss({ curvShadeGain: v })} fmt={v => `×${v.toFixed(1)}`} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.curvShadeOpacity ?? 0.8} onChange={v => ss({ curvShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Convex" value={style.curvShadeConvex ?? '#c0561a'} onChange={v => ss({ curvShadeConvex: v })} />
+                <ColorRow label="Concave" value={style.curvShadeConcave ?? '#2f6690'} onChange={v => ss({ curvShadeConcave: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Openness ────────────────────────────────────────────────────── */}
+          <Section title="Openness" open={sec.openness} onToggle={() => tog('openness')} enabled={style.showOpenness}>
+            <Tog label="Enabled" checked={!!style.showOpenness} onChange={v => ss({ showOpenness: v })} />
+            {style.showOpenness && (
+              <Sub>
+                <Note>Bright where the ground is open to the sky, dark where it is enclosed, with no light direction. With red, steep ground reads red: the Red Relief Image Map of Japanese LiDAR surveys.</Note>
+                <Tog label="Red relief" help="Red in proportion to the slope, over the grey." checked={style.opennessRed !== false} onChange={v => ss({ opennessRed: v })} />
+                {style.opennessRed !== false && (
+                  <InlineSl label="Full red at" help="The slope, in true degrees, that is fully red." min={5} max={89} step={1} value={style.opennessRedFull ?? 45} onChange={v => ss({ opennessRedFull: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                )}
+                <InlineSl label="Reach" help="How far each ray looks, in steps. Longer reaches see bigger valleys and cost more GPU time." min={4} max={64} step={1} value={style.opennessReach ?? 32} onChange={v => ss({ opennessReach: Math.round(v) })} />
+                <InlineSl label="Gain" min={0.2} max={6} step={0.1} value={style.opennessGain ?? 1.5} onChange={v => ss({ opennessGain: v })} fmt={v => `×${v.toFixed(1)}`} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.opennessOpacity ?? 0.85} onChange={v => ss({ opennessOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                {style.opennessRed !== false && (!geoTiffBbox || !hasGeoTiff) && (
+                  <GroundScale style={style} ss={ss} geoTiffBbox={geoTiffBbox} hasGeoTiff={hasGeoTiff} />
+                )}
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Texture Shading ─────────────────────────────────────────────── */}
+          <Section title="Texture Shading" open={sec.texShade} onToggle={() => tog('texShade')} enabled={style.showTexShade}>
+            <Tog label="Enabled" checked={!!style.showTexShade} onChange={v => ss({ showTexShade: v })} />
+            {style.showTexShade && (
+              <Sub>
+                <Note>Leland Brown's texture shading: the ridges and canyons at every scale at once, from a fractional Laplacian of the ground.</Note>
+                <InlineSl label="Detail" help="The order of the Laplacian. Low values keep the big forms, high values the fine grain. On a mountain range 0.7 to 1 shows the ridge network best." min={0.1} max={1.5} step={0.05} value={style.texShadeDetail ?? 0.8} onChange={v => ss({ texShadeDetail: v })} fmt={v => v.toFixed(2)} />
+                <InlineSl label="Contrast" min={0.2} max={4} step={0.1} value={style.texShadeContrast ?? 1.2} onChange={v => ss({ texShadeContrast: v })} fmt={v => `×${v.toFixed(1)}`} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.texShadeOpacity ?? 0.8} onChange={v => ss({ texShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Aerial Perspective ──────────────────────────────────────────── */}
+          <Section title="Aerial Perspective" open={sec.aerial} onToggle={() => tog('aerial')} enabled={style.showAerial}>
+            <Tog label="Enabled" checked={!!style.showAerial} onChange={v => ss({ showAerial: v })} />
+            {style.showAerial && (
+              <Sub>
+                <Note>Low ground fades into haze, so the summits stand in front, as in Imhof's Swiss relief maps.</Note>
+                <InlineSl label="Strength" help="How far the lowest ground fades." min={0} max={1} step={0.01} value={style.aerialStrength ?? 0.6} onChange={v => ss({ aerialStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <InlineSl label="Falloff" help="How fast the haze thins with height. Higher values keep it in the valleys." min={0.3} max={5} step={0.1} value={style.aerialGamma ?? 1.6} onChange={v => ss({ aerialGamma: v })} fmt={v => v.toFixed(1)} />
+                <ColorRow label="Haze" value={style.aerialColor ?? '#6f8fb0'} onChange={v => ss({ aerialColor: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Wetness ─────────────────────────────────────────────────────── */}
+          <Section title="Wetness" open={sec.wetness} onToggle={() => tog('wetness')} enabled={style.showWetness}>
+            <Tog label="Enabled" checked={!!style.showWetness} onChange={v => ss({ showWetness: v })} />
+            {style.showWetness && (
+              <Sub>
+                <Note>Where water gathers: a large catchment on flat ground. The topographic wetness index, ln(a / tan β).</Note>
+                <InlineSl label="From" help="Only the wettest ground is tinted. Lower this to spread the tint up the valleys." min={0} max={0.95} step={0.01} value={style.wetnessFrom ?? 0.45} onChange={v => ss({ wetnessFrom: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.wetnessOpacity ?? 0.8} onChange={v => ss({ wetnessOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Colour" value={style.wetnessColor ?? '#1f6fb5'} onChange={v => ss({ wetnessColor: v })} />
+              </Sub>
+            )}
+          </Section>
+
+          {/* ── Sunlight ────────────────────────────────────────────────────── */}
+          <Section title="Sunlight" open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint}>
+            <Tog label="Enabled" checked={!!style.showSunTint} onChange={v => ss({ showSunTint: v })} />
+            {style.showSunTint && (
+              <Sub>
+                <Note>Hours of direct sun, with the shadows of the ridges, from the shaded colour to the sunny one. At the latitude of a GeoTIFF, or the Hillshade's for a plain heightmap.</Note>
+                <SegGroup label="Over" options={[['A year', 'year'], ["The Hillshade's date", 'day']]}
+                  value={style.sunTintPeriod ?? 'year'} onChange={(m) => ss({ sunTintPeriod: m })} style={{ marginBottom: 6 }} />
+                <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.sunTintOpacity ?? 0.7} onChange={v => ss({ sunTintOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
+                <ColorRow label="Shaded" value={style.sunTintShade ?? '#2d4a7a'} onChange={v => ss({ sunTintShade: v })} />
+                <ColorRow label="Sunny" value={style.sunTintSun ?? '#f0c24b'} onChange={v => ss({ sunTintSun: v })} />
               </Sub>
             )}
           </Section>

@@ -479,11 +479,43 @@ export const STYLE_DEF = {
   // Multi-directional hillshade
   hillshadeMultiDir: false,
 
-  // Slope & Aspect shading
+  // Slope & Aspect shading. Slope is in true degrees: full colour at
+  // `slopeShadeMax`, in bands of `slopeShadeBand` degrees (0 is smooth).
   showSlopeShade: false, slopeShadeOpacity: 0.75, slopeColorLow: '#86efac', slopeColorHigh: '#dc2626',
+  slopeShadeMax: 45, slopeShadeBand: 0, slopeShadeTrue: true,
 
-  // Aspect map overlay
-  showAspectMap: false, aspectMapOpacity: 0.8,
+  // Aspect map overlay. Bivariate: the hue fades to grey as the ground flattens,
+  // reaching full colour at `aspectMapFull` degrees.
+  showAspectMap: false, aspectMapOpacity: 0.8, aspectMapBivariate: true, aspectMapFull: 30,
+
+  // The ground's scale on a plain heightmap, for the layers that read true
+  // degrees. A GeoTIFF supplies both itself.
+  groundCellMetres: 10, groundRelief: 1000,
+
+  // Local relief: the ground minus a blur of itself, as two colours.
+  showLocalRelief: false, localReliefRadius: 40, localReliefGain: 1, localReliefOpacity: 0.8,
+  localReliefLow: '#2f5d8a', localReliefHigh: '#b5472d',
+
+  // Curvature: convex ground one colour, hollows the other.
+  showCurvShade: false, curvShadeRadius: 8, curvShadeGain: 1, curvShadeOpacity: 0.8,
+  curvShadeConvex: '#c0561a', curvShadeConcave: '#2f6690',
+
+  // Openness, as grey or as a Red Relief Image Map.
+  showOpenness: false, opennessRed: true, opennessReach: 32, opennessGain: 1.5,
+  opennessOpacity: 0.85, opennessRedFull: 45,
+
+  // Texture shading (Leland Brown): the fractional Laplacian of the ground.
+  showTexShade: false, texShadeDetail: 0.8, texShadeContrast: 1.2, texShadeOpacity: 0.8,
+
+  // Aerial perspective: low ground fades into haze.
+  showAerial: false, aerialStrength: 0.6, aerialColor: '#6f8fb0', aerialGamma: 1.6,
+
+  // Wetness: where water gathers, from the topographic wetness index.
+  showWetness: false, wetnessFrom: 0.45, wetnessOpacity: 0.8, wetnessColor: '#1f6fb5',
+
+  // Sunlight: hours of direct sun over a year or the hillshade's date, as a tint.
+  showSunTint: false, sunTintPeriod: 'year', sunTintOpacity: 0.7,
+  sunTintShade: '#2d4a7a', sunTintSun: '#f0c24b',
 
   // Ambient occlusion (Sky View Factor)
   showAO: false, aoStrength: 0.7, aoRays: 8,

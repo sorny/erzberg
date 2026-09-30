@@ -338,7 +338,17 @@ and Roughness Mesh carry a seed. The same seed gives the same pattern.
   quality. Multi-directional mode blends several azimuths.
 - **Almanac sun.** Set a date, time and zone. The app computes the real solar
   position from the raster's latitude and states sunrise, noon and sunset.
-- **Slope shading**, **aspect map** and **Sky View Factor** occlusion.
+- **Slope shading** in true degrees, smooth or in bands, and a bivariate
+  **aspect map** that fades to grey on flat ground.
+- **Sky View Factor** occlusion, and **openness** as grey or as a Red Relief
+  Image Map (slope in red).
+- **Local relief** (the ground minus a blur of itself) and **curvature**
+  shading, for form without a light direction.
+- **Texture shading** after Leland Brown: the ridge and gully network at every
+  scale, from a fractional Laplacian of the ground.
+- **Aerial perspective**: low ground fades into haze.
+- **Wetness** (the topographic wetness index) and **sunlight** (hours of direct
+  sun over a year or one day) as tints.
 - **Water fill** at a set level, and **Tanaka** contours.
 - **Hypsometric tinting** from a shared editable gradient.
 - **Texture overlay** with blend modes, scale and offset.

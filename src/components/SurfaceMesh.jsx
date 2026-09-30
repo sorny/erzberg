@@ -7,6 +7,9 @@ import { hexToRgb, sampleGradient } from '../utils/colorUtils'
 import { hasFillLayer } from '../utils/geometryBuilders'
 import { TONE_GLSL, toneFor } from '../utils/imageryTone'
 import { useStore } from '../store/useStore'
+import { groundPixelMetres, metresPerWorldUnit } from '../utils/geoCoords'
+import { latitudeFor } from '../utils/sunHours'
+import { curvatureField, fieldGrid, gridKey, localReliefField, packFields, sunHoursTint, textureShadeField, wetnessField } from '../utils/surfaceFields'
 
 /** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
 const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
@@ -151,6 +154,53 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uSlopeShadeOpacity;
   uniform vec3      uSlopeColorLow;
   uniform vec3      uSlopeColorHigh;
+  uniform float     uSlopeShadeMax;
+  uniform float     uSlopeShadeBand;
+  uniform bool      uSlopeShadeTrue;
+  uniform bool      uAspectBivariate;
+  uniform float     uAspectFull;
+  // True metres: the tangent of a slope as drawn, times this, is its tangent on
+  // the ground. The drawn one carries the height slider; this takes it out.
+  uniform float     uTrueK;
+
+  // Fields computed on the main thread (surfaceFields.js): local relief,
+  // curvature, texture shading, wetness in one texture, sun hours in the next.
+  uniform sampler2D uFieldTex;
+  uniform sampler2D uFieldTex2;
+  uniform vec2      uFieldSize;
+  uniform bool      uLocalRelief;
+  uniform float     uLocalReliefGain;
+  uniform float     uLocalReliefOpacity;
+  uniform vec3      uLocalReliefLow;
+  uniform vec3      uLocalReliefHigh;
+  uniform bool      uCurvShade;
+  uniform float     uCurvShadeGain;
+  uniform float     uCurvShadeOpacity;
+  uniform vec3      uCurvShadeConvex;
+  uniform vec3      uCurvShadeConcave;
+  uniform bool      uTexShade;
+  uniform float     uTexShadeContrast;
+  uniform float     uTexShadeOpacity;
+  uniform bool      uWetness;
+  uniform float     uWetnessFrom;
+  uniform float     uWetnessOpacity;
+  uniform vec3      uWetnessColor;
+  uniform bool      uSunTint;
+  uniform float     uSunTintOpacity;
+  uniform vec3      uSunTintShade;
+  uniform vec3      uSunTintSun;
+
+  uniform bool      uOpenness;
+  uniform bool      uOpennessRed;
+  uniform float     uOpennessGain;
+  uniform float     uOpennessOpacity;
+  uniform int       uOpennessSteps;
+  uniform float     uOpennessRedFull;
+
+  uniform bool      uAerial;
+  uniform float     uAerialStrength;
+  uniform vec3      uAerialColor;
+  uniform float     uAerialGamma;
   varying float     vBrightness;
   varying vec3      vNormal;
   varying vec2      vUv;
@@ -190,6 +240,50 @@ ${TONE_GLSL}
       sumH += maxH;
     }
     return 1.0 - sumH / float(uAORays);
+  }
+
+  // Positive and negative openness (Yokoyama et al., 2002), as 0…2 in units of
+  // a right angle: how far the sky opens above a point, and how far the ground
+  // opens below it, averaged over eight directions. The same march as the sky
+  // view factor, keeping the steepest angle down as well as up.
+  vec2 computeOpenness(vec2 uv) {
+    float h0 = texture2D(uHeightmapTex, uv).r;
+    float pos = 0.0, neg = 0.0;
+    for (int i = 0; i < 8; i++) {
+      float az = float(i) * 0.78539816;
+      vec2 dir = vec2(cos(az) / uHeightmapCols, sin(az) / uHeightmapRows);
+      float up = -1.5707963, down = -1.5707963, acc = 0.0;
+      for (int s = 1; s <= 64; s++) {
+        if (s > uOpennessSteps) break;
+        acc += 1.0 + float(s - 1) * 0.12;
+        vec2 sUV = uv + dir * acc;
+        if (sUV.x < 0.0 || sUV.x > 1.0 || sUV.y < 0.0 || sUV.y > 1.0) break;
+        float a = atan((texture2D(uHeightmapTex, sUV).r - h0) / (acc * uShadowStepH));
+        up = max(up, a);
+        down = max(down, -a);
+      }
+      pos += 1.5707963 - up;
+      neg += 1.5707963 - down;
+    }
+    return vec2(pos, neg) / (8.0 * 1.5707963);
+  }
+
+  // The slope on the ground, in degrees, from the normal as drawn.
+  float trueSlopeDeg(vec3 n) {
+    float t = length(n.xz) / max(abs(n.y), 1e-4);
+    return degrees(atan(t * uTrueK));
+  }
+
+  // A field texel for this fragment. The UVs run corner to corner and a
+  // texel's centre is half a texel in, so this maps one onto the other.
+  vec4 fieldAt(sampler2D tex) {
+    vec2 uv = (vUv * (uFieldSize - 1.0) + 0.5) / uFieldSize;
+    return texture2D(tex, uv);
+  }
+
+  // A signed field as a two-colour tint: toward lo below zero, hi above.
+  vec3 diverge(vec3 base, float v, vec3 lo, vec3 hi, float opacity) {
+    return mix(base, v < 0.0 ? lo : hi, opacity * clamp(abs(v), 0.0, 1.0));
   }
 
   void main() {
@@ -299,6 +393,17 @@ ${TONE_GLSL}
       base = mix(base, uWaterColor * (1.0 - depth * 0.6), uWaterOpacity);
     }
 
+    // Colour tints for what the ground is like: wet, or sunny. Before the
+    // hillshade, so the relief shades them like any other fill.
+    if (uWetness) {
+      float w = fieldAt(uFieldTex).a;
+      base = mix(base, uWetnessColor, uWetnessOpacity * smoothstep(uWetnessFrom, 1.0, w));
+    }
+    if (uSunTint) {
+      float sun = fieldAt(uFieldTex2).r;
+      base = mix(base, mix(uSunTintShade, uSunTintSun, sun), uSunTintOpacity);
+    }
+
     if (uHillshade) {
       float alt = uHillshadeAltitude * 3.14159265 / 180.0;
       vec3 exagNormal = normalize(vec3(n.x * uHillshadeExaggeration, n.y, n.z * uHillshadeExaggeration));
@@ -371,16 +476,64 @@ ${TONE_GLSL}
       base *= mix(1.0, computeSVF(vUv), uAOStrength);
     }
 
-    // Aspect map overlay — fixed circular HSL wheel, independent of gradient
-    if (uAspectMap) {
-      float asp = atan(n.z, n.x) / (2.0 * 3.14159265) + 0.5;
-      base = mix(base, hsl_s1(asp, 0.65), uAspectMapOpacity);
+    // Light-free relief: the fields that show form with no sun at all.
+    if (uTexShade) {
+      float v = fieldAt(uFieldTex).b;
+      base = mix(base, vec3(clamp(0.5 + 0.5 * v * uTexShadeContrast, 0.0, 1.0)), uTexShadeOpacity);
+    }
+    if (uLocalRelief) {
+      base = diverge(base, fieldAt(uFieldTex).r * uLocalReliefGain, uLocalReliefLow, uLocalReliefHigh, uLocalReliefOpacity);
+    }
+    if (uCurvShade) {
+      base = diverge(base, fieldAt(uFieldTex).g * uCurvShadeGain, uCurvShadeConcave, uCurvShadeConvex, uCurvShadeOpacity);
+    }
+    // Openness: bright where the ground is open to the sky, dark where it is
+    // enclosed. The Red Relief Image Map (Chiba et al., 2008) adds red in
+    // proportion to the slope, so steep ground reads red and flat ground grey.
+    if (uOpenness) {
+      vec2 o = computeOpenness(vUv);
+      float g = clamp(0.5 + (o.x - o.y) * uOpennessGain, 0.0, 1.0);
+      vec3 col = vec3(g);
+      if (uOpennessRed) {
+        float red = clamp(trueSlopeDeg(n) / max(uOpennessRedFull, 1.0), 0.0, 1.0);
+        col = g * mix(vec3(1.0), vec3(1.0, 0.28, 0.18), red);
+      }
+      base = mix(base, col, uOpennessOpacity);
     }
 
+    // Aspect: hue from the direction the ground faces. As a bivariate map
+    // (Brewer and Marlow, 1993) the colour also fades to grey as the ground
+    // flattens, because a level field faces nowhere and a loud hue there says
+    // it faces somewhere.
+    if (uAspectMap) {
+      float asp = atan(n.z, n.x) / (2.0 * 3.14159265) + 0.5;
+      vec3 hue = hsl_s1(asp, 0.65);
+      if (uAspectBivariate) hue = mix(vec3(0.62), hue, clamp(trueSlopeDeg(n) / max(uAspectFull, 1.0), 0.0, 1.0));
+      base = mix(base, hue, uAspectMapOpacity);
+    }
+
+    // Slope in true degrees, full colour at uSlopeShadeMax, optionally banded.
+    // It used to read 1 − n.y of the drawn normal, which moved with the height
+    // slider and could not say where the ground passes 30°.
+    // With uSlopeShadeTrue off, the old reading, kept exactly for plates made
+    // before it changed (see migrateShading in presetFile.js).
     if (uSlopeShade) {
-      float slope = clamp(1.0 - n.y, 0.0, 1.0);
-      vec3 slopeCol = mix(uSlopeColorLow, uSlopeColorHigh, slope);
-      base = mix(base, slopeCol, uSlopeShadeOpacity * slope);
+      float t;
+      if (uSlopeShadeTrue) {
+        float d = trueSlopeDeg(n);
+        if (uSlopeShadeBand > 0.0) d = floor(d / uSlopeShadeBand) * uSlopeShadeBand;
+        t = clamp(d / max(uSlopeShadeMax, 1.0), 0.0, 1.0);
+      } else {
+        t = clamp(1.0 - n.y, 0.0, 1.0);
+      }
+      base = mix(base, mix(uSlopeColorLow, uSlopeColorHigh, t), uSlopeShadeOpacity * t);
+    }
+
+    // Aerial perspective, after Imhof: low ground fades into a haze, so the
+    // summits stand in front. Last, because haze lies over everything.
+    if (uAerial) {
+      float haze = uAerialStrength * pow(1.0 - cut, uAerialGamma);
+      base = mix(base, uAerialColor, clamp(haze, 0.0, 1.0));
     }
 
     gl_FragColor = vec4(base, 1.0);
@@ -460,7 +613,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   // Only the cast-shadow and AO branches sample the heightmap texture, and both
   // are off by default — so this used to hand the GPU a full-resolution R32F
   // copy of the raster (268 MB for an 8k GeoTIFF) that nothing ever read.
-  const needsHeightmapTex = !!(p.hillshadeCastShadows || p.showAO)
+  const needsHeightmapTex = !!(p.hillshadeCastShadows || p.showAO || p.showOpenness)
 
   const hmTexRef = useRef(null)
   const heightmapTex = useMemo(() => {
@@ -487,6 +640,62 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     hmTexRef.current = tex
     return tex
   }, [needsHeightmapTex, heightmapPixels, heightmapWidth, heightmapHeight])
+
+  // ── Surface fields ──────────────────────────────────────────────────────
+  // Computed on the main thread, and only for the layers that are on. A new
+  // surface arrives on many rebuilds that do not change the ground at all, so
+  // each field is cached by a key of the grid's content and its own settings,
+  // and a rebuild that only moved a line costs one scan of the grid.
+  const needFields = !!(p.showLocalRelief || p.showCurvShade || p.showTexShade || p.showWetness || p.showSunTint)
+  const fieldCache = useRef(new Map())
+  const fields = useMemo(() => {
+    if (!needFields || !surfaceGeo) return null
+    const g = fieldGrid(surfaceGeo, p.resolution ?? 1)
+    if (!g) return null
+    const key = gridKey(g), cache = fieldCache.current, used = new Set()
+    const get = (name, params, fn) => {
+      const k = `${name}|${key}|${params}`
+      used.add(k)
+      if (!cache.has(k)) cache.set(k, fn())
+      return cache.get(k)
+    }
+    // Radii are in world units, like every spacing in the app; a field cell
+    // spans `g.scl` of them.
+    const cells = (w) => Math.max(1, (w ?? 1) / g.scl)
+    const lat = latitudeFor({ ...p, latSunHours: p.hillshadeLat }).lat
+    const a = [
+      p.showLocalRelief ? get('relief', p.localReliefRadius, () => localReliefField(g, cells(p.localReliefRadius ?? 40))) : null,
+      p.showCurvShade ? get('curv', p.curvShadeRadius, () => curvatureField(g, cells(p.curvShadeRadius ?? 8))) : null,
+      p.showTexShade ? get('tex', p.texShadeDetail, () => textureShadeField(g, p.texShadeDetail ?? 0.8)) : null,
+      p.showWetness ? get('wet', '', () => wetnessField(g)) : null,
+    ]
+    const sunKey = `${p.sunTintPeriod}|${p.hillshadeDate}|${lat}|${p.elevScale}`
+    const b = [p.showSunTint ? get('sun', sunKey, () => sunHoursTint(g, {
+      elevScale: p.elevScale || 1, lat, period: p.sunTintPeriod ?? 'year', date: p.hillshadeDate })) : null]
+    // Keep only what this build used: the cache holds one grid's fields, not a history.
+    for (const k of cache.keys()) if (!used.has(k)) cache.delete(k)
+    return { g, a: packFields(g, a), b: packFields(g, b) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needFields, surfaceGeo, p.resolution, p.showLocalRelief, p.localReliefRadius, p.showCurvShade,
+      p.curvShadeRadius, p.showTexShade, p.texShadeDetail, p.showWetness, p.showSunTint,
+      p.sunTintPeriod, p.hillshadeDate, p.hillshadeLat, p.elevScale, p.geoTiffBbox, p.geoTiffCRS])
+
+  const fieldTexRef = useRef([null, null])
+  const fieldTex = useMemo(() => {
+    for (const t of fieldTexRef.current) t?.dispose()
+    if (!fields) { fieldTexRef.current = [null, null]; return null }
+    const make = (data) => {
+      const t = new THREE.DataTexture(data, fields.g.cols, fields.g.rows, THREE.RGBAFormat, THREE.FloatType)
+      t.minFilter = THREE.LinearFilter
+      t.magFilter = THREE.LinearFilter
+      t.needsUpdate = true
+      return t
+    }
+    const pair = [make(fields.a), make(fields.b)]
+    fieldTexRef.current = pair
+    return pair
+  }, [fields])
+  useEffect(() => () => { for (const t of fieldTexRef.current) t?.dispose() }, [])
 
   // Built once, then driven by the uniform-sync effects below — see the note there
   // on why uniforms and render state are set rather than rebuilt.
@@ -558,6 +767,46 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uWaterOpacity:          { value: 0.82 },
       uAspectMap:             { value: false },
       uAspectMapOpacity:      { value: 0.8 },
+      uAspectBivariate:       { value: true },
+      uAspectFull:            { value: 30 },
+      uSlopeShadeMax:         { value: 45 },
+      uSlopeShadeBand:        { value: 0 },
+      uSlopeShadeTrue:        { value: true },
+      uTrueK:                 { value: 1 },
+      uFieldTex:              { value: null },
+      uFieldTex2:             { value: null },
+      uFieldSize:             { value: new THREE.Vector2(2, 2) },
+      uLocalRelief:           { value: false },
+      uLocalReliefGain:       { value: 1 },
+      uLocalReliefOpacity:    { value: 0.8 },
+      uLocalReliefLow:        { value: new THREE.Vector3(0.18, 0.36, 0.54) },
+      uLocalReliefHigh:       { value: new THREE.Vector3(0.71, 0.28, 0.18) },
+      uCurvShade:             { value: false },
+      uCurvShadeGain:         { value: 1 },
+      uCurvShadeOpacity:      { value: 0.8 },
+      uCurvShadeConvex:       { value: new THREE.Vector3(0.75, 0.34, 0.1) },
+      uCurvShadeConcave:      { value: new THREE.Vector3(0.18, 0.4, 0.56) },
+      uTexShade:              { value: false },
+      uTexShadeContrast:      { value: 1 },
+      uTexShadeOpacity:       { value: 0.8 },
+      uWetness:               { value: false },
+      uWetnessFrom:           { value: 0.55 },
+      uWetnessOpacity:        { value: 0.8 },
+      uWetnessColor:          { value: new THREE.Vector3(0.12, 0.44, 0.71) },
+      uSunTint:               { value: false },
+      uSunTintOpacity:        { value: 0.7 },
+      uSunTintShade:          { value: new THREE.Vector3(0.18, 0.29, 0.48) },
+      uSunTintSun:            { value: new THREE.Vector3(0.94, 0.76, 0.29) },
+      uOpenness:              { value: false },
+      uOpennessRed:           { value: true },
+      uOpennessGain:          { value: 1.5 },
+      uOpennessOpacity:       { value: 0.85 },
+      uOpennessSteps:         { value: 32 },
+      uOpennessRedFull:       { value: 45 },
+      uAerial:                { value: false },
+      uAerialStrength:        { value: 0.6 },
+      uAerialColor:           { value: new THREE.Vector3(0.44, 0.56, 0.69) },
+      uAerialGamma:           { value: 1.6 },
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
@@ -646,6 +895,55 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uWaterOpacity.value       = p.waterOpacity ?? 0.82
     surfMat.uniforms.uAspectMap.value          = !!(p.showAspectMap)
     surfMat.uniforms.uAspectMapOpacity.value   = p.aspectMapOpacity ?? 0.8
+    surfMat.uniforms.uAspectBivariate.value    = p.aspectMapBivariate !== false
+    surfMat.uniforms.uAspectFull.value         = p.aspectMapFull ?? 30
+    surfMat.uniforms.uSlopeShadeMax.value      = p.slopeShadeMax ?? 45
+    surfMat.uniforms.uSlopeShadeBand.value     = p.slopeShadeBand ?? 0
+    surfMat.uniforms.uSlopeShadeTrue.value     = p.slopeShadeTrue !== false
+
+    // Metres per world unit, down and across. A GeoTIFF answers both itself; a
+    // plain heightmap takes them from the panel, as the draw modes do.
+    const px = p.geoTiffBbox && p.geoTiffCRS ? groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight) : null
+    const across = px ? (px.x + px.y) / 2 : (p.groundCellMetres ?? 10)
+    const down = metresPerWorldUnit(p.geoTiffElevMin, p.geoTiffElevMax, elevScaleSafe, p.blackPoint, p.whitePoint)
+      ?? (p.groundRelief ?? 1000) / (100 * Math.abs(elevScaleSafe))
+    surfMat.uniforms.uTrueK.value = down / (across || 1)
+
+    const [ta, tb] = fieldTex ?? [null, null]
+    surfMat.uniforms.uFieldTex.value  = ta
+    surfMat.uniforms.uFieldTex2.value = tb
+    if (fields) surfMat.uniforms.uFieldSize.value.set(fields.g.cols, fields.g.rows)
+    surfMat.uniforms.uLocalRelief.value        = !!(p.showLocalRelief && ta)
+    surfMat.uniforms.uLocalReliefGain.value    = p.localReliefGain ?? 1
+    surfMat.uniforms.uLocalReliefOpacity.value = p.localReliefOpacity ?? 0.8
+    surfMat.uniforms.uLocalReliefLow.value.set(...hexToRgb(p.localReliefLow ?? '#2f5d8a'))
+    surfMat.uniforms.uLocalReliefHigh.value.set(...hexToRgb(p.localReliefHigh ?? '#b5472d'))
+    surfMat.uniforms.uCurvShade.value          = !!(p.showCurvShade && ta)
+    surfMat.uniforms.uCurvShadeGain.value      = p.curvShadeGain ?? 1
+    surfMat.uniforms.uCurvShadeOpacity.value   = p.curvShadeOpacity ?? 0.8
+    surfMat.uniforms.uCurvShadeConvex.value.set(...hexToRgb(p.curvShadeConvex ?? '#c0561a'))
+    surfMat.uniforms.uCurvShadeConcave.value.set(...hexToRgb(p.curvShadeConcave ?? '#2f6690'))
+    surfMat.uniforms.uTexShade.value           = !!(p.showTexShade && ta)
+    surfMat.uniforms.uTexShadeContrast.value   = p.texShadeContrast ?? 1.2
+    surfMat.uniforms.uTexShadeOpacity.value    = p.texShadeOpacity ?? 0.8
+    surfMat.uniforms.uWetness.value            = !!(p.showWetness && ta)
+    surfMat.uniforms.uWetnessFrom.value        = p.wetnessFrom ?? 0.45
+    surfMat.uniforms.uWetnessOpacity.value     = p.wetnessOpacity ?? 0.8
+    surfMat.uniforms.uWetnessColor.value.set(...hexToRgb(p.wetnessColor ?? '#1f6fb5'))
+    surfMat.uniforms.uSunTint.value            = !!(p.showSunTint && tb)
+    surfMat.uniforms.uSunTintOpacity.value     = p.sunTintOpacity ?? 0.7
+    surfMat.uniforms.uSunTintShade.value.set(...hexToRgb(p.sunTintShade ?? '#2d4a7a'))
+    surfMat.uniforms.uSunTintSun.value.set(...hexToRgb(p.sunTintSun ?? '#f0c24b'))
+    surfMat.uniforms.uOpenness.value           = !!(p.showOpenness && heightmapTex)
+    surfMat.uniforms.uOpennessRed.value        = p.opennessRed !== false
+    surfMat.uniforms.uOpennessGain.value       = p.opennessGain ?? 1.5
+    surfMat.uniforms.uOpennessOpacity.value    = p.opennessOpacity ?? 0.85
+    surfMat.uniforms.uOpennessSteps.value      = Math.round(p.opennessReach ?? 32)
+    surfMat.uniforms.uOpennessRedFull.value    = p.opennessRedFull ?? 45
+    surfMat.uniforms.uAerial.value             = !!(p.showAerial)
+    surfMat.uniforms.uAerialStrength.value     = p.aerialStrength ?? 0.6
+    surfMat.uniforms.uAerialColor.value.set(...hexToRgb(p.aerialColor ?? '#6f8fb0'))
+    surfMat.uniforms.uAerialGamma.value        = p.aerialGamma ?? 1.6
 
     const anyFill = hasFillLayer(p)
     surfMat.colorWrite = anyFill
@@ -656,7 +954,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     // No needsUpdate: only uniform values and render-state flags change here,
     // neither requires a program rebuild — and this effect runs on every render
     // (p is a fresh object), so flagging it would re-validate the program per frame.
-  }, [surfMat, p, imageryTex, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight])
+  }, [surfMat, p, imageryTex, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight, fieldTex, fields])
 
   useEffect(() => {
     if (!surfMat) return

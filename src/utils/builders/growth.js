@@ -6,7 +6,8 @@
  * out like the other builder files: geometryBuilders.js keeps the dispatcher
  * and re-exports the public API.
  */
-import { boxBlur, sampleBilinear } from '../terrain'
+import { sampleBilinear } from '../terrain'
+import { d8Accumulation } from '../drainage'
 import { F32List, drapeEdge, mulberry32 } from './shared.js'
 
 // ─── Venation ────────────────────────────────────────────────────────────────
@@ -37,34 +38,7 @@ export function buildVenation(terrain, p, o) {
   const sMask = terrain.hasNoData ? gridMask : null
   const rng = mulberry32(Math.round(o.seed ?? 1))
 
-  // D8 to the lowest neighbour, then accumulation from the tops down.
-  const g = boxBlur(grid, cols, rows, 2, sMask)
-  const next = new Int32Array(n).fill(-1), inDeg = new Int32Array(n)
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const i = r * cols + c
-      if (!gridMask[i]) continue
-      let lo = g[i], t = -1
-      for (let dr = -1; dr <= 1; dr++) {
-        for (let dc = -1; dc <= 1; dc++) {
-          const nr = r + dr, nc = c + dc
-          if ((!dr && !dc) || nr < 0 || nc < 0 || nr >= rows || nc >= cols) continue
-          const q = nr * cols + nc
-          if (gridMask[q] && g[q] < lo) { lo = g[q]; t = q }
-        }
-      }
-      if (t >= 0) { next[i] = t; inDeg[t]++ }
-    }
-  }
-  const acc = new Float32Array(n).fill(1), queue = new Int32Array(n)
-  let qn = 0
-  for (let i = 0; i < n; i++) if (gridMask[i] && !inDeg[i]) queue[qn++] = i
-  for (let h = 0; h < qn; h++) {
-    const i = queue[h], d = next[i]
-    if (d < 0) continue
-    acc[d] += acc[i]
-    if (--inDeg[d] === 0) queue[qn++] = d
-  }
+  const { next, acc } = d8Accumulation(grid, gridMask, rows, cols, 2)
 
   const wet = new Float32Array(n)
   const vals = []

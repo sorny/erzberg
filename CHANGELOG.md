@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.39.0] — 2026-09-30
+
+Seven new surface layers, and two old ones made honest. All are shader
+uniforms or main-thread fields: none of them rebuilds the geometry.
+
+### Added
+
+- **Local Relief** (Surface). The ground minus a blur of itself, in two
+  colours. The mountain goes, and what sits on it stays: terraces, benches,
+  paths, walls. The standard first look at a LiDAR survey.
+- **Curvature Shading** (Surface). Convex ground in one colour, hollows in the
+  other, at a chosen scale. The form with no light direction. Curvature was a
+  line mode only.
+- **Openness** (Surface). Positive minus negative openness, as grey, or as a
+  Red Relief Image Map with red in proportion to the true slope. The sky view
+  factor was the positive half only, and only as a darkening.
+- **Texture Shading** (Surface). Leland Brown's fractional Laplacian of the
+  ground, by FFT, which brings out the ridge and gully network at every scale.
+  The default order is 0.8: at Brown's 0.5 a mountain range still reads mostly
+  as its elevation.
+- **Aerial Perspective** (Surface). Low ground fades into haze, as in Imhof's
+  Swiss relief maps.
+- **Wetness** (Surface). The topographic wetness index as a tint, from a D8
+  walk shared with Venation (now in `drainage.js`). Blurred by a cell, because
+  D8 runs straight lines across flat ground.
+- **Sunlight** (Surface). Hours of direct sun over a year or the Hillshade's
+  date, with the shadows of the ridges, as a tint between two colours.
+
+### Changed
+
+- **Slope Shading** reads true degrees, with a *Full at* angle and optional
+  bands. It used the normal as drawn, so it moved with the height slider and
+  could not say where the ground passes 30°. A plain heightmap takes its pixel
+  size and relief in the section, as the draw modes do.
+- **Aspect Map** is bivariate: the hue fades to grey as the ground flattens,
+  because level ground faces nowhere. A switch turns it back to hue alone.
+- **Old plates keep their look.** The preset format is now 3. A preset file,
+  embedded plate or saved session from before it opens with *True degrees* and
+  *Fade on flat ground* off, which is the old shader branch exactly. Iron Oxide,
+  Scarlet Relief and Lunar Survey carry the two switches on disk. Without this,
+  Iron Oxide's light scatter of red became a solid slab.
+
 ## [1.38.0] — 2026-09-30
 
 Six new draw modes, all first sketched on the Ten More Marks page.

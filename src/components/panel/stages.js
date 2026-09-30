@@ -111,6 +111,13 @@ const STATED = {
   'Slope Shading': 2,
   'Water Fill': 2,
   'Aspect Map': 2,
+  'Local Relief': 2,
+  'Curvature Shading': 2,
+  'Openness': 2,
+  'Texture Shading': 2,
+  'Aerial Perspective': 2,
+  'Wetness': 2,
+  'Sunlight': 2,
 
   'Draw Modes': 3,
 

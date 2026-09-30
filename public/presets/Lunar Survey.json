@@ -280,7 +280,9 @@
         "pos": 1,
         "color": "#800000"
       }
-    ]
+    ],
+    "slopeShadeTrue": false,
+    "aspectMapBivariate": false
   },
   "points": {
     "showPoints": false,

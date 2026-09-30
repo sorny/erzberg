@@ -110,7 +110,8 @@ through `layerBuildKey`: visibility, area fill and hidden features.
 
 **Tier 2. Re-render only, through uniforms.** Line weight, opacity and dash,
 vector layer colours and fills, the feature highlight, the terrain fill colour,
-and all surface shading (hillshade, slope, water, aspect, AO, raw view).
+and all surface shading (hillshade, slope, water, aspect, AO, openness, the
+relief fields and tints, aerial perspective, raw view).
 `layerStyle(id, p)` resolves these per layer at render time.
 
 Two exceptions are argued at `RENDER_SIDE` in `src/params.js`:
@@ -156,8 +157,16 @@ does not keep the renderer at 60 fps.
 per-vertex colours when hypsometric tinting is on.
 
 `SurfaceMesh` does all fill and overlay work in one shader. Hypsometric ramp,
-hillshade (with optional ray-marched shadows), slope, aspect, AO, water and the
-raw view are branches, not passes.
+hillshade (with optional ray-marched shadows), slope, aspect, AO, openness,
+water, aerial perspective and the raw view are branches, not passes.
+
+Five layers need a field the shader cannot compute per pixel: local relief,
+curvature, texture shading (an FFT), wetness (a D8 walk) and sun hours (a
+sweep per sun position). `surfaceFields.js` computes them on the main thread
+from the surface's own brightness buffer, cut to at most 1024 cells a side,
+and `SurfaceMesh` hands them to the shader as two float textures. Each field is
+cached by a key of the grid's content and its own settings, so a rebuild that
+changes only lines costs one scan of the grid.
 
 **Ghost occlusion.** Each segment also makes an invisible curtain that writes
 depth, so lines hide other lines. Hidden segments can draw in their own colour.

@@ -216,7 +216,9 @@ describe('parsePreset', () => {
     // A preset written before this module existed is still a preset. The test is
     // whether the object holds a parameter group, not whether it announces
     // itself.
-    expect(parsePreset('{"style":{"enabledLines":true}}')).toEqual({ style: { enabledLines: true } })
+    // It is also older than format 3, so it keeps the old slope and aspect reading.
+    expect(parsePreset('{"style":{"enabledLines":true}}'))
+      .toEqual({ style: { enabledLines: true, slopeShadeTrue: false, aspectMapBivariate: false } })
   })
 
   it('migrates anything older than the true-bearing scale, once', () => {
@@ -235,5 +237,17 @@ describe('parsePreset', () => {
     expect(parsePreset('[1,2,3]')).toBeNull()
     expect(parsePreset('not json')).toBeNull()
     expect(parsePreset('')).toBeNull()
+  })
+})
+
+describe('migrateShading', () => {
+  it('keeps a plate from before format 3 on the old slope and aspect reading', () => {
+    const p = parsePreset('{"format":2,"style":{"showSlopeShade":true}}')
+    expect(p.style.slopeShadeTrue).toBe(false)
+    expect(p.style.aspectMapBivariate).toBe(false)
+  })
+  it('leaves a current plate and an explicit choice alone', () => {
+    expect(parsePreset(`{"format":${PRESET_FORMAT},"style":{"showSlopeShade":true}}`).style.slopeShadeTrue).toBeUndefined()
+    expect(parsePreset('{"format":2,"style":{"slopeShadeTrue":true}}').style.slopeShadeTrue).toBe(true)
   })
 })

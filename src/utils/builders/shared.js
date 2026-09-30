@@ -34,7 +34,7 @@ export function hasFillLayer(p) {
   // surface is not drawn at all — so fetching imagery on bare defaults put a
   // texture on a mesh nobody could see and looked exactly like a broken fetch.
   return !!(p.showFill || p.showRawTerrain || p.showHillshade || p.showSlopeShade ||
-            p.showWaterFill || p.showAO || p.showAspectMap ||
+            p.showWaterFill || p.showAO || p.showAspectMap || surfaceField(p) ||
             (p.showImagery && p.imagery))
 }
 
@@ -52,7 +52,13 @@ export function needsSurfaceShading(p) {
   // texel and the terrain comes out one flat colour.
   return !!(p.showFill || p.showHillshade || p.showSlopeShade ||
             p.showWaterFill || p.showAO || p.showAspectMap || p.profileMode ||
-            (p.showImagery && p.imagery))
+            surfaceField(p) || (p.showImagery && p.imagery))
+}
+
+/** The relief fields, tints and haze of the Surface stage, any of them on. */
+function surfaceField(p) {
+  return !!(p.showLocalRelief || p.showCurvShade || p.showOpenness || p.showTexShade ||
+            p.showAerial || p.showWetness || p.showSunTint)
 }
 
 /**

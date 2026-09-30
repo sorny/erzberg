@@ -43,8 +43,32 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 2 is the true-bearing scale. Every azimuth in a format-1 payload is a quarter
  * turn from a compass, and `parsePreset` adds the 90° on the way in — which is
  * what lets a plate exported by v1.13 reopen looking exactly as it did.
+ *
+ * 3 is the true-degree slope and the bivariate aspect map. Both change what an
+ * old plate looks like, so a payload before 3 gets both switched back to the
+ * old reading (`migrateShading`).
  */
-export const PRESET_FORMAT = 2
+export const PRESET_FORMAT = 3
+
+/**
+ * Keep an old plate's Slope Shading and Aspect Map as they were.
+ *
+ * Slope Shading used to colour by 1 − n.y of the normal as drawn, and the Aspect
+ * Map drew full hue on flat ground. v1.39.0 reads true degrees and fades the hue
+ * on flat ground, and a plate made before that would open looking different:
+ * measured on the bundled Iron Oxide, a light scatter of red became a solid
+ * slab. Setting the two switches off gives the old shader branch, exactly.
+ *
+ * Only a key the payload does not already carry is written, and a new object
+ * comes back, for the reasons `migrateAzimuths` gives.
+ */
+export function migrateShading(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const style = { ...payload.style }
+  if (style.slopeShadeTrue === undefined) style.slopeShadeTrue = false
+  if (style.aspectMapBivariate === undefined) style.aspectMapBivariate = false
+  return { ...payload, style }
+}
 
 /**
  * The azimuths that gained 90° when the light became a true bearing.
@@ -176,7 +200,9 @@ export function parsePreset(text) {
      * applies them directly, and they were migrated on disk, so a second pass
      * would turn their light a further quarter.
      */
-    return (d.format ?? 1) < 2 ? migrateAzimuths(d) : d
+    const f = d.format ?? 1
+    const bearings = f < 2 ? migrateAzimuths(d) : d
+    return f < 3 ? migrateShading(bearings) : bearings
   } catch {
     return null
   }

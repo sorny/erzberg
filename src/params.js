@@ -85,6 +85,12 @@ const RENDER_SIDE = [
   // surface shader.
   /^(hillshade|slopeShade|slopeColor|aspectMap|ao|water)/,
   /^show(Hillshade|SlopeShade|AspectMap|AO|WaterFill|Sun|RawTerrain)$/,
+  // The light-free relief fields and the tints (surfaceFields.js), and the
+  // ground scale they and the slope read on a plain heightmap. Uniforms and
+  // main-thread textures; none reaches the worker.
+  /^(localRelief|curvShade|openness|texShade|aerial|wetness|sunTint)/,
+  /^show(LocalRelief|CurvShade|Openness|TexShade|Aerial|Wetness|SunTint)$/,
+  /^ground(CellMetres|Relief)$/,
   // Ink that is chosen after the geometry exists: Tanaka's two stroke weights,
   // the contour label's own colour/weight, the major-contour weight, the scree
   // dot weight. `tanakaContours` and the label *placement* params are geometry

@@ -268,7 +268,9 @@
         "pos": 1,
         "color": "#c8c2ba"
       }
-    ]
+    ],
+    "slopeShadeTrue": false,
+    "aspectMapBivariate": false
   },
   "points": {
     "showPoints": false,

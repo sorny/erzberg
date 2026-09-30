@@ -284,6 +284,13 @@ export function buildSectionSummaries({
   out['Slope Shading'] = when(style.showSlopeShade, pct(style.slopeShadeOpacity))
   out['Water Fill']    = when(style.showWaterFill,  `level ${pct(style.waterLevel)}`)
   out['Aspect Map']    = when(style.showAspectMap,  pct(style.aspectMapOpacity))
+  out['Local Relief']  = when(style.showLocalRelief, `${num(style.localReliefRadius)} · ${pct(style.localReliefOpacity)}`)
+  out['Curvature Shading'] = when(style.showCurvShade, `${num(style.curvShadeRadius)} · ${pct(style.curvShadeOpacity)}`)
+  out['Openness']      = when(style.showOpenness, `${style.opennessRed !== false ? 'red' : 'grey'} · ${pct(style.opennessOpacity)}`)
+  out['Texture Shading'] = when(style.showTexShade, `α ${(style.texShadeDetail ?? 0.8).toFixed(2)} · ${pct(style.texShadeOpacity)}`)
+  out['Aerial Perspective'] = when(style.showAerial, pct(style.aerialStrength))
+  out['Wetness']       = when(style.showWetness, pct(style.wetnessOpacity))
+  out['Sunlight']      = when(style.showSunTint, `${style.sunTintPeriod === 'day' ? 'one day' : 'a year'} · ${pct(style.sunTintOpacity)}`)
 
   // ── Marks ─────────────────────────────────────────────────────────────────
   // The index says how many of the forty are drawing. It is the one header
