@@ -123,49 +123,58 @@ function buildContourLabelLayer(anchors, size, font, elevMin, elevMax, blackPoin
  */
 export function useContourLabels(lineGeo, style, geoTiffElevMin, geoTiffElevMax,
                                  blackPoint = 0, whitePoint = 255) {
-  const fontKey = style?.labelContours ? contourFontKey(style) : null
+  /*
+   * One view per Contours that can carry labels: the mode itself, and each
+   * mode copy with its values over the style (see utils/modeCopies.js). Each
+   * labels its own host layer, `Contours-Minor` or `Contours-Minor@c3`, in its
+   * own size and face.
+   *
+   * Only what the *geometry* depends on goes into `sig`: the em size and the
+   * face. `style` is a fresh object on every edit, so depending on it rebuilt
+   * every label on every slider drag anywhere in the panel. Colour, weight and
+   * opacity reach these through `layerStyle`, which is the whole reason
+   * recolouring is a re-render rather than a rebuild.
+   */
+  const views = [{ suffix: '', st: style },
+    ...(style?.modeCopies ?? []).filter((c) => c.mode === 'Contours')
+      .map((c) => ({ suffix: `@${c.uid}`, st: { ...style, ...c.values } }))]
+  const wants = views.filter((v) => v.st?.labelContours)
+    .map((v) => ({ suffix: v.suffix, fontKey: contourFontKey(v.st), size: v.st.labelSizeContours ?? 9 }))
+  const sig = wants.length ? JSON.stringify(wants) : ''
   const [fonts, setFonts] = useState({})
 
   useEffect(() => {
-    if (!fontKey || fonts[fontKey]) return
     let alive = true
-    loadTextFont(fontKey).then((f) => {
-      if (alive && f) setFonts((prev) => (prev[fontKey] ? prev : { ...prev, [fontKey]: f }))
-    })
+    for (const key of new Set(sig ? JSON.parse(sig).map((w) => w.fontKey) : [])) {
+      if (fonts[key]) continue
+      loadTextFont(key).then((f) => {
+        if (alive && f) setFonts((prev) => (prev[key] ? prev : { ...prev, [key]: f }))
+      })
+    }
     return () => { alive = false }
-  }, [fontKey, fonts])
-
-  /*
-   * Only what the *geometry* depends on: the em size and the face.
-   *
-   * `style` is a fresh object on every edit, so depending on it rebuilt every
-   * label on every slider drag anywhere in the panel — and the colour control
-   * below would have been the worst of them, redrawing the lettering on each
-   * frame of a drag to change something the renderer resolves at draw time.
-   * Colour, weight and opacity all reach these through `layerStyle`, which is
-   * the whole reason recolouring is a re-render rather than a rebuild.
-   */
-  const size = style?.labelSizeContours ?? 9
+  }, [sig, fonts])
 
   return useMemo(() => {
-    if (!fontKey || !Array.isArray(lineGeo)) return lineGeo
-    const host = lineGeo.find((l) => l.labelAnchors?.length)
-    if (!host) return lineGeo
-    const font = fonts[fontKey]
-    if (!font) return lineGeo
-
-    const built = buildContourLabelLayer(host.labelAnchors, size, font,
-                                        geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint)
-    if (!built) return lineGeo
-
-    // Directly behind the contours it belongs to, not appended: `layerIndex`
+    if (!sig || !Array.isArray(lineGeo)) return lineGeo
+    const bySuffix = new Map(JSON.parse(sig).map((w) => [w.suffix, w]))
+    let changed = false
+    const out = []
+    // Directly behind the contours each belongs to, not appended: `layerIndex`
     // becomes `renderOrder`, so a label tacked onto the end would draw in front
     // of the whole scene.
-    const out = []
     for (const entry of lineGeo) {
       out.push(entry)
-      if (entry === host) out.push(built)
+      if (!entry.labelAnchors?.length) continue
+      const suffix = /(@\w+)$/.exec(entry.id)?.[1] ?? ''
+      const want = bySuffix.get(suffix)
+      const font = want && fonts[want.fontKey]
+      if (!font) continue
+      const built = buildContourLabelLayer(entry.labelAnchors, want.size, font,
+                                           geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint)
+      if (!built) continue
+      out.push({ ...built, id: built.id + suffix })
+      changed = true
     }
-    return out
-  }, [lineGeo, fonts, fontKey, size, geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint])
+    return changed ? out : lineGeo
+  }, [lineGeo, fonts, sig, geoTiffElevMin, geoTiffElevMax, blackPoint, whitePoint])
 }

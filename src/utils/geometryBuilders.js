@@ -41,7 +41,7 @@ export function buildLineGeometry(terrain, p) {
   // computeVertexColor expects. Opacity is deliberately absent: it is resolved
   // render-side by layerStyle, never baked into vertex colours, and carrying it
   // here only suggested otherwise.
-  const getLayerContext = (id, baseColor) => ({
+  const getLayerContext = (p, id, baseColor) => ({
     ...p,
     lineColor:        baseColor,
     lineHypsometric:  p[`hypso${id}`],
@@ -50,7 +50,9 @@ export function buildLineGeometry(terrain, p) {
     lineHypsoInterval:p[`hypsoInterval${id}`]
   })
 
-  const MODES_CONFIG = [
+  // A function of `p`, not a constant over it: a mode copy runs the same
+  // builders against its own values (see the run list below).
+  const modeConfigs = (p) => [
     { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, {
         spacing: p.spacingCross, angle: p.angleCross, lines: p.linesCross,
@@ -229,16 +231,37 @@ export function buildLineGeometry(terrain, p) {
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },
   ]
 
+  /*
+   * The run list: every mode, each followed by its enabled copies.
+   *
+   * A copy is the same mode built against `{ ...p, ...copy.values }`, so it has
+   * its own interval, mask and ink, and its layers carry `@<uid>` on their ids.
+   * `layerStyle` resolves that suffix against the same values. A copy can be on
+   * while its original is off.
+   */
+  const runs = []
+  const copies = Array.isArray(p.modeCopies) ? p.modeCopies : []
+  for (const cfg of modeConfigs(p)) {
+    runs.push({ cfg, p, suffix: '' })
+    for (const copy of copies) {
+      if (copy?.mode !== cfg.id || !copy.values?.[`enabled${cfg.id}`]) continue
+      const pp = { ...p, ...copy.values }
+      runs.push({ cfg: modeConfigs(pp).find((c) => c.id === cfg.id), p: pp, suffix: `@${copy.uid}` })
+    }
+  }
+
   const finalLayers = []
 
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
   const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
 
-  for (const cfg of MODES_CONFIG) {
+  for (const run of runs) {
+    // The run's own parameters: the bus itself, or a copy's values over it.
+    const { cfg, p, suffix } = run
     if (!p[`enabled${cfg.id}`]) continue
 
-    const ctx = getLayerContext(cfg.id, p[`color${cfg.id}`])
+    const ctx = getLayerContext(p, cfg.id, p[`color${cfg.id}`])
 
     // The layer's own view of the ground, with both stencils folded in.
     // Identity when the layer has neither, which is every layer by default.
@@ -354,7 +377,7 @@ export function buildLineGeometry(terrain, p) {
       // base arrays ARE the final layer. Skip the octant copy loop entirely.
       if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
         finalLayers.push({
-          id: (subId === cfg.id) ? cfg.id : subId,
+          id: ((subId === cfg.id) ? cfg.id : subId) + suffix,
           positions: baseP,
           colors: res.colors,
           curtains: { positions: cPbase, indices: cIbase },
@@ -448,7 +471,7 @@ export function buildLineGeometry(terrain, p) {
       // weight / opacity / dash are render-side params resolved via layerStyle(id, p),
       // not baked here — see layerStyle() above.
       finalLayers.push({
-        id: (subId === cfg.id) ? cfg.id : subId,
+        id: ((subId === cfg.id) ? cfg.id : subId) + suffix,
         positions: layerPos,
         colors: layerCol,
         curtains: { positions: layerCPos, indices: layerCInd },

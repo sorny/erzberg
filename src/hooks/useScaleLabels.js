@@ -41,7 +41,8 @@ function buildNumbers(host, font) {
   }
   if (!positions.length) return null
   return {
-    id: host.id.replace(/-Scale$/, '-Numbers'),
+    // `MapGrid-Scale@c3` → `MapGrid-Numbers@c3` for a mode copy.
+    id: host.id.replace(/-Scale(@\w+)?$/, '-Numbers$1'),
     positions: new Float32Array(positions),
     colors: null, curtains: null, lids: null,
     isPoints: false, isLabelText: true, textRuns: null, textStyle: null, fills: null,

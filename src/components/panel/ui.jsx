@@ -8,7 +8,7 @@
  * design system and nothing else.
  */
 import { useContext, useEffect, useId, useRef, useState } from 'react'
-import { PanelStage, SectionFilter, sectionMatches } from './filter'
+import { ModeCopiesPanel, PanelStage, SectionFilter, SectionScope, sectionMatches } from './filter'
 import { PRESETS_STAGE, STAGES } from './stages'
 import { HEX, PALETTES } from '../../utils/theme'
 
@@ -757,6 +757,10 @@ const RESET_W = 20
 
 export function Section({ title, terms, summary, open, onToggle, enabled, icon, children }) {
   const ctx = useContext(SectionFilter)
+  const scope = useContext(SectionScope)
+  const copies = useContext(ModeCopiesPanel)
+  // A mode copy's body: only the scoped section, with no header. See filter.js.
+  if (scope) return title === scope ? <div data-copy-body={title}>{children}</div> : null
   const q = ctx?.q ?? ''
   /**
    * A filtered-out section is *hidden*, never unmounted.
@@ -923,6 +927,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
         <div style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
           {children}
+          {copies && title.startsWith('Mode: ') && copies.render(title)}
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
 import { isVectorLayerId } from '../vectorLayers'
 import { isTextLayerId, textLayerName } from '../textLayers'
-import { layerDisplayName } from '../drawModes'
+import { MODE_LABEL, layerDisplayName } from '../drawModes'
 import { ALL_CLASSES, maskHasClass } from '../coverPlate'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -76,6 +76,21 @@ export function layerStyle(id, p) {
 }
 
 function resolveLayerStyle(id, p) {
+  /*
+   * A layer of a mode copy: `Contours-Minor@c3`. Styled as the same layer of the
+   * mode, against the copy's own values, and named for the copy in place of
+   * the mode, so a plot reads "Contours 2 · Minor".
+   */
+  const copyOf = typeof id === 'string' ? /^(.+)@(\w+)$/.exec(id) : null
+  if (copyOf) {
+    const copy = p.modeCopies?.find((c) => c.uid === copyOf[2])
+    if (!copy) return resolveLayerStyle(copyOf[1], p)
+    const base = resolveLayerStyle(copyOf[1], { ...p, ...copy.values })
+    const name = base.name ?? layerDisplayName(copyOf[1])
+    const label = MODE_LABEL[copy.mode] ?? copy.mode
+    return { ...base, name: name.startsWith(label) ? copy.name + name.slice(label.length) : `${copy.name} · ${name}` }
+  }
+
   // Free text carries its ink on its own record, the way a vector layer does,
   // so recolouring one is a material update rather than a worker rebuild. It
   // never reaches the worker at all: the lettering is built on the main thread

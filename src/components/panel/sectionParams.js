@@ -80,6 +80,8 @@ export const SECTION_PARAMS = {
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
   'Anaglyph': [/^anaglyph/],
   'Land Cover': ['coverInks'],
+  // Every mode section lists its own copies, and the list is one key for all.
+  'Draw Modes': ['modeCopies'],
   'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
   'Export': ['plotWidthMm', 'plotPenOrder', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
@@ -125,7 +127,11 @@ export const ALSO_READS = {
  * the source check below cannot find them in a section's JSX because they are
  * not in anyone's JSX.
  */
-export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis']
+export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis',
+  // Drawn, but by no section's own JSX: `Section` adds the copies block under
+  // every mode through a context (panel/ModeCopies.jsx). Draw Modes owns it,
+  // so a reset there removes every copy.
+  'modeCopies']
 
 /**
  * What every draw mode section reads without owning.

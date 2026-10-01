@@ -37,7 +37,9 @@ const TITLES = Object.keys(SECTION_TERMS)
  * growing an inert button.
  */
 const ACTIONS = [
-  'Presets', 'Draw Modes', 'Analysis', 'Fetch', 'Hydraulic Erosion',
+  // Draw Modes is no longer here: it owns `modeCopies`, so its reset removes
+  // every mode copy.
+  'Presets', 'Analysis', 'Fetch', 'Hydraulic Erosion',
   'Soundscapes', 'Vector Layers', 'Text',
   // Extent reads the store and writes nothing — there is no setting on it to
   // put back, which is what this list means.
@@ -167,7 +169,7 @@ describe('the table against the panel source', () => {
     expect(bad, bad.join('\n')).toEqual([])
   })
 
-  it('has a control for everything but the three that never had one', () => {
+  it('has a control in its own section for everything but UNEXPOSED', () => {
     /*
      * The inverse of `UNEXPOSED`, so the list cannot quietly grow: a parameter
      * added without a control has to be admitted here rather than just skipped.

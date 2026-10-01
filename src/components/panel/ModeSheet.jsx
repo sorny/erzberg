@@ -96,7 +96,10 @@ export function ModeSheet({ style, onToggle, onOpen }) {
         // `ROW_BY_NAME` turns it back into the section title and the boolean.
         const [title, key] = ROW_BY_NAME.get(name)
         const id = key.slice('enabled'.length)
-        const on = !!style[key]
+        // Copies of this mode (see ModeCopies.jsx): the tile is lit when the
+        // mode or any copy draws, and it counts the copies.
+        const copies = (style.modeCopies ?? []).filter((c) => c.mode === id)
+        const on = !!style[key] || copies.some((c) => c.values?.[key])
         return (
           /*
            * A group, not a button. A button inside a button is invalid markup
@@ -137,6 +140,12 @@ export function ModeSheet({ style, onToggle, onOpen }) {
                 {/* The chevron is what says the card goes somewhere. It is the
                     only thing the first build was missing, and it is why the
                     second target was invisible. */}
+                {copies.length > 0 && (
+                  <span data-testid={`mode-copies-${id}`} title={`${copies.length + 1} copies of ${name}`}
+                    style={{ flexShrink:0, fontSize:9, fontFamily: MONO, color: MUTED, marginRight:2 }}>
+                    ×{copies.length + 1}
+                  </span>
+                )}
                 <span aria-hidden="true" className="hmchev"
                   style={{ flexShrink:0, fontSize:9, lineHeight:1, color: MUTED }}>›</span>
               </span>

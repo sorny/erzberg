@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.46.0] — 2026-10-01
+
+### Added
+
+- **Mode copies.** *Duplicate mode* at the foot of a mode's section adds a copy
+  of the mode with its own settings, mask and pens. For example: dense contours
+  on forest and sparse ones on rock, or fine hachures in one painted mask and
+  coarse ones elsewhere. A copy is a snapshot, and from then on it changes
+  independently. It travels in undo, sessions and presets. The Marks sheet
+  counts the copies. → [Copies](docs/Draw-Modes.md#copies)
+- A copy shows the mode's own controls, through a scoped `Section`, so the 56
+  mode bodies did not change. The dispatcher builds each copy with the same
+  builders.
+
 ## [1.45.0] — 2026-10-01
 
 ### Added

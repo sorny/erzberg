@@ -11,6 +11,26 @@ See [Land cover](Land-Cover.md#how-masking-works) and
 
 ---
 
+## Copies
+
+**Duplicate mode**, at the foot of each mode's section, adds a copy of the
+mode. The copy takes a snapshot of all the mode's settings. After that, the
+original and the copy change independently: each has its own settings, class
+mask, painted mask and colour source. A copy can be on while the original is
+off.
+
+Each copy is its own set of pen layers, named for the copy: `Sparse · Minor`.
+A copy goes into undo, the session, presets and the look that every PNG and SVG
+carries. The tile in the Marks sheet counts the copies (`×3`). A reset of
+*Draw Modes* removes every copy. A reset of one mode leaves its copies alone.
+
+Copies use the same builders. The dispatcher runs each enabled copy after its
+mode, with the copy's values over the parameters, and adds `@<id>` to its layer
+ids. Only a copy's geometry settings cause a rebuild. Its colour, weight and
+dash do not.
+
+---
+
 ## 1. Lines
 
 Parallel draped ridgelines at a bearing $\theta$. Lines sit at

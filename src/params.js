@@ -66,6 +66,10 @@ export const GROUP_OF = (() => {
  * identical, 172 keys either way, so the rebuild contract is unchanged.
  */
 const RENDER_SIDE = [
+  // Mode copies are an array, so the scalar key below cannot carry them.
+  // `geometryKey` adds their geometry keys itself, and leaves their style
+  // render-side, as for the modes they copy.
+  /^modeCopies$/,
   // Resolved per layer at render time by layerStyle(id, p) — in HeightmapLines
   // for the viewport and in svgExport for the plot. Dragging a line's weight or
   // opacity must not cost a rebuild of all fifteen draw modes.
@@ -224,6 +228,7 @@ auditParamSpace(GROUPS, DRAW_MODE_IDS)
  * of any particular render.
  */
 export const GEOMETRY_KEYS = [...GROUP_OF.keys()].filter(isGeometry).sort()
+const GEOMETRY_SET = new Set(GEOMETRY_KEYS)
 
 /**
  * The rebuild contract as one comparable value.
@@ -241,6 +246,12 @@ export const GEOMETRY_KEYS = [...GROUP_OF.keys()].filter(isGeometry).sort()
 export function geometryKey(p) {
   let s = ''
   for (const k of GEOMETRY_KEYS) s += k + ' ' + p[k] + ' '
+  // Each mode copy: its id, then only its geometry keys, so a copy's interval
+  // rebuilds and its weight does not.
+  for (const c of Array.isArray(p.modeCopies) ? p.modeCopies : []) {
+    s += '@' + c.uid + ' ' + c.mode + ' '
+    for (const [k, v] of Object.entries(c.values ?? {})) if (GEOMETRY_SET.has(k)) s += k + ' ' + v + ' '
+  }
   return s
 }
 

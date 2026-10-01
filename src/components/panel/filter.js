@@ -56,3 +56,17 @@ export function sectionMatches(title, terms, q) {
  * and a component that needs only one should not re-render when the other moves.
  */
 export const PaintedMasks = createContext(null)
+
+/**
+ * Mode copies: one mode section's controls, shown for a copy of the mode.
+ *
+ * `SectionScope` holds a section title while a copy's body renders. Every
+ * `Section` then renders nothing but the one with that title, and that one as
+ * a bare body. So a copy shows the mode's own controls, read from and written
+ * to the copy, with no change to the fifty-six mode bodies.
+ *
+ * `ModeCopiesPanel` is `{ render(title) }`, which draws the copies block under
+ * a mode's body. Null outside the Sidebar. See ModeCopies.jsx.
+ */
+export const SectionScope = createContext(null)
+export const ModeCopiesPanel = createContext(null)

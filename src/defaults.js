@@ -595,6 +595,15 @@ export const STYLE_DEF = {
    * and the rebuild key — exactly as the class selection is.
    */
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`layerMask${id}`, 0])),
+
+  /*
+   * Copies of draw modes: one mode, several settings. Each is
+   * `{ uid, mode, name, values }`, where `values` is a snapshot of every key the
+   * mode's section owns, taken when the copy was made and edited on its own
+   * from then on. The dispatcher builds each enabled copy after its mode, with
+   * `values` over the bus. See utils/geometryBuilders.js.
+   */
+  modeCopies: [],
 }
 
 export const POINTS_DEF = {

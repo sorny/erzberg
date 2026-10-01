@@ -1,7 +1,7 @@
 /**
  * Custom right-hand control panel — design mirrors the original p5.js tool.
  */
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from 'react'
+import { createElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, Fragment } from 'react'
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
@@ -40,7 +40,8 @@ import { ModeSections } from './panel/ModeSections'
 import { TextSection } from './panel/TextSection'
 import { CoverMap } from './panel/CoverMap'
 import { paletteInks, setCoverInk } from '../utils/coverPlate'
-import { CoverPlate, PaintedMasks, PanelStage, SectionFilter, sectionMatches } from './panel/filter'
+import { CoverPlate, ModeCopiesPanel, PaintedMasks, PanelStage, SectionFilter, SectionScope, sectionMatches } from './panel/filter'
+import { ModeCopies } from './panel/ModeCopies'
 
 import { MAX_MASKS, maskCoverage } from '../utils/maskLayers'
 import { modifiedSections } from './panel/sectionParams'
@@ -1342,6 +1343,23 @@ export function Sidebar({
   const tris  = surfaceGeo ? ((surfaceGeo.indices.length + totalFillIdx) / 3).toLocaleString() : '–'
   const grid  = terrainData ? `${terrainData.cols}×${terrainData.rows}` : '–'
 
+
+  // The mode sections, for the panel and for a mode copy's body. A copy reads
+  // its own view of the style and writes to itself; see panel/ModeCopies.jsx.
+  // The props the mode sections take besides the style, for the panel and for a
+  // copy's body. The panel's own tag stays where it stands below, because
+  // tests/unit/sectionParams.test.js reads the mode bodies in at that place.
+  const modeSectionProps = { mapGridNote, cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan, coralNote, glacierNote, routeNote, runoutNote, slopeClassNote, sec, sg, shadowLineSun, singleLineFonts, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }
+  const renderModeSections = (st, setter) => createElement(ModeSections, { ...modeSectionProps, style: st, ss: setter })
+  const modeCopiesPanel = {
+    render: (title) => (
+      <ModeCopies title={title} style={style} ss={ss}
+        renderBody={(t, view, setter) => (
+          <SectionScope.Provider value={t}>{renderModeSections(view, setter)}</SectionScope.Provider>
+        )} />
+    ),
+  }
+
   return (
     <>
       <PanelStyles />
@@ -1555,6 +1573,7 @@ export function Sidebar({
           <PanelStage.Provider value={stageCtx}>
           <SectionFilter.Provider value={filterCtx}>
           <CoverPlate.Provider value={cover}>
+          <ModeCopiesPanel.Provider value={modeCopiesPanel}>
           <PaintedMasks.Provider value={masks}>
           {/*
             * Source holds the load block and Presets now.
@@ -2568,7 +2587,7 @@ export function Sidebar({
               otherwise. */}
           {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
-          <ModeSections mapGridNote={mapGridNote} cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} />
+          <ModeSections mapGridNote={mapGridNote} cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts}  sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} ss={ss} style={style} />
 
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —
@@ -3211,6 +3230,7 @@ export function Sidebar({
             )}
           </div>
           </PaintedMasks.Provider>
+          </ModeCopiesPanel.Provider>
           </CoverPlate.Provider>
           </SectionFilter.Provider>
           </PanelStage.Provider>
