@@ -62,6 +62,22 @@ test.describe('panel', () => {
     await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(TERRAIN_COUNT)
   })
 
+  test('a shut header keeps its readout clear of the reset button', async ({ page }) => {
+    await openApp(page)
+    await openStage(page, 'surface')
+    const sec = page.locator('[data-section="Water Fill"]')
+    await page.click('[data-testid="section-water-fill"]')
+    await sec.getByText('Enabled', { exact: true }).click()
+    await page.click('[data-testid="section-water-fill"]')
+    const summary = page.locator('[data-testid="summary-water-fill"]')
+    const reset = page.locator('[data-testid="reset-water-fill"]')
+    await expect(summary).toBeVisible()
+    // The button shows on hover, which is when the two used to overlap.
+    await page.hover('[data-testid="section-water-fill"]')
+    const a = await summary.boundingBox(), b = await reset.boundingBox()
+    expect(a.x + a.width, 'the readout runs under the reset button').toBeLessThanOrEqual(b.x)
+  })
+
   test('a filtered-out section is hidden, not unmounted', async ({ page }) => {
     // A collapsed section has always kept its children mounted behind a
     // zero-height row, so the panel's local state — a running Overpass fetch and
@@ -468,6 +484,8 @@ test.describe('panel', () => {
     await openMark(page, 'ZeroCross')
     const back = page.locator('[data-testid="mode-back"]')
     await expect(back).toBeVisible()
+    // The count is the sheet's own, so a new mode cannot leave it stale.
+    await expect(back).toContainText(`All ${PANEL_MODES.length} marks`)
     const backOver = await back.evaluate((el) => {
       const t = el.querySelector('span:last-child')
       return Math.round(t.scrollWidth - t.clientWidth)

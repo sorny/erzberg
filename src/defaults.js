@@ -76,6 +76,8 @@ export const STYLE_DEF = {
   labelColorContours: null,
   labelMajorOnlyContours: true, labelSingleLineContours: false, labelFontContours: 'HersheySans1',
   labelWeightContours: 1,
+  // A `+` on the highest cell and a `−` on the lowest, as their own pen.
+  extremesContours: false, extremeSizeContours: 16, extremeWeightContours: 1.5,
   hypsoContours: false, hypsoModeContours: 'elevation', hypsoBandedContours: false, hypsoIntervalContours: 10,
   majorIntervalContours: 10, majorWeightContours: 2, majorOffsetContours: 1, closeRingsContours: false, smoothingContours: 0,
   // Hachure
@@ -352,6 +354,35 @@ export const STYLE_DEF = {
   cellMetresMapGrid: 10,
   colorMapGrid: '#1a1a1a', weightMapGrid: 0.8, opacityMapGrid: 1, dashMapGrid: 'solid',
   hypsoMapGrid: false, hypsoModeMapGrid: 'elevation', hypsoBandedMapGrid: false, hypsoIntervalMapGrid: 10,
+
+  // Line printer — a SYMAP map: one glyph per character cell, from · to an
+  // overprinted block, by class of elevation or slope. Pitch in world units.
+  enabledPrinter: false, pitchPrinter: 8, aspectPrinter: 1.25, classesPrinter: 6,
+  fieldPrinter: 'elevation', quantilePrinter: true, blankPrinter: false,
+  colorPrinter: '#1a1a1a', weightPrinter: 0.8, opacityPrinter: 1, dashPrinter: 'solid',
+  hypsoPrinter: false, hypsoModePrinter: 'elevation', hypsoBandedPrinter: false, hypsoIntervalPrinter: 10,
+
+  // Stems — a dotted stem from a datum to the ground, and a dot at the tip.
+  enabledStems: false, spacingStems: 6, datumStems: 'mean', tipsStems: true, tipSizeStems: 1.5, tipWeightStems: 2,
+  colorStems: '#1a1a1a', weightStems: 0.6, opacityStems: 1, dashStems: 'dotted',
+  hypsoStems: false, hypsoModeStems: 'elevation', hypsoBandedStems: false, hypsoIntervalStems: 10,
+
+  // Hair — a short climbing random walk at each sampled cell; the tone is the overlap.
+  enabledHair: false, spacingHair: 3, lengthHair: 6, jitterHair: 0.6, segmentsHair: 6, seedHair: 1,
+  colorHair: '#1a1a1a', weightHair: 0.4, opacityHair: 0.8, dashHair: 'solid',
+  hypsoHair: false, hypsoModeHair: 'elevation', hypsoBandedHair: false, hypsoIntervalHair: 10,
+
+  // Spectrogram — the relief's spectrum along x, as ridges or as hatched blocks.
+  enabledSpectro: false, styleSpectro: 'ridges', windowSpectro: 64, bandsSpectro: 24, gammaSpectro: 0.5,
+  heightSpectro: 120, linesSpectro: 6, whitenSpectro: true, sourceSpectro: 'row', rowSpectro: 50,
+  colorSpectro: '#1a1a1a', weightSpectro: 1, opacitySpectro: 1, dashSpectro: 'solid',
+  hypsoSpectro: false, hypsoModeSpectro: 'elevation', hypsoBandedSpectro: false, hypsoIntervalSpectro: 10,
+
+  // Waveform — one column of a waveform plot, read along a line at any direction.
+  enabledWaveform: false, lineWaveform: 'summit', angleWaveform: 0, placeWaveform: 'column', sidesWaveform: 'both', spacingWaveform: 1.5, widthWaveform: 120,
+  detailWaveform: 1.5, smoothWaveform: 4, gammaWaveform: 1,
+  colorWaveform: '#1a1a1a', weightWaveform: 0.6, opacityWaveform: 1, dashWaveform: 'solid',
+  hypsoWaveform: false, hypsoModeWaveform: 'elevation', hypsoBandedWaveform: false, hypsoIntervalWaveform: 10,
 
   // Venation — leaf veins that grow up the wet ground from the outlets.
   enabledVenation: false, countVenation: 6000, rootsVenation: 6, spacingVenation: 3, gammaVenation: 1.2, seedVenation: 1,
@@ -664,7 +695,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the fifty-two modes are
+  // A modifier rather than a mode: it takes whatever the fifty-seven modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

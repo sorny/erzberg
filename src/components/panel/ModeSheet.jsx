@@ -1,5 +1,5 @@
 /**
- * The forty draw modes as a sheet, and the way into one of them.
+ * The draw modes as a sheet, and the way into one of them.
  *
  * This is `ModeIndex` grown into the whole Marks pane. The index was a 6×6 grid
  * of bare glyphs inside a section, under forty headers that were the real
@@ -61,7 +61,7 @@ const ROW_BY_NAME = new Map(PANEL_MODES.map((row) => [markName(row[0]), row]))
 /**
  * The sheet.
  *
- * `PANEL_MODES` rather than `DRAW_MODES`: the two hold the same forty in
+ * `PANEL_MODES` rather than `DRAW_MODES`: the two hold the same modes in
  * different orders, and the tile under the cursor has to be the section the name
  * opens. `DRAW_MODES` is in pipeline order, which is the order the geometry is
  * built in and not the order the panel lists.
@@ -220,9 +220,11 @@ export function ModeBack({ title, onBack }) {
       onMouseEnter={(e) => { e.currentTarget.style.color = TEXT }}
       onMouseLeave={(e) => { e.currentTarget.style.color = DIM }}>
       <span aria-hidden="true" style={{ fontSize:13, lineHeight:1, color: ACCENT_TEXT }}>‹</span>
-      <span>All 40 marks</span>
+      {/* Counted, not written: it said 40 for seventeen releases after there
+          were more. */}
+      <span>{`All ${PANEL_MODES.length} marks`}</span>
       <span style={{ flex:1 }} />
-      {/* Capped and ellipsised, so the longest mark name cannot push "All 40
+      {/* Capped and ellipsised, so the longest mark name cannot push "All …
           marks" off the bar. The full name comes back on hover, the way a
           truncated readout on a section header does. */}
       <span title={markName(title)} style={{

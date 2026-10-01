@@ -101,6 +101,7 @@ const RENDER_SIDE = [
   /^label(SingleLine|Font)Contours$/,
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
+  /^(extremeWeightContours|tipWeightStems)$/,
   // Texture overlay — sampled in the surface shader.
   /^(texture|showTexture)/,
   // The drape's opacity is a shader uniform and nothing else. `showImagery` is
@@ -167,6 +168,7 @@ const MODE_SUFFIX_RENDER_SIDE = [
   // Intersection crosses and Map Grid's scale: their own pens' weight and dash.
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
+  /^(extremeWeightContours|tipWeightStems)$/,
 ]
 
 /**

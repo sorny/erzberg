@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all fifty-two at once.
+ * does the index that shows all fifty-seven at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -242,6 +242,30 @@ export const DRAW_MODES = [
     pick: {},
   },
   {
+    // One glyph of a few strokes per character cell.
+    id: 'Printer', label: 'Line printer', cost: 1.5, mark: 'printer',
+    pick: {},
+  },
+  {
+    id: 'Stems', label: 'Stems', cost: 1.5, mark: 'stems',
+    pick: { spacing: [4, 12] },
+  },
+  {
+    // A few segments per sampled cell; dense at a small spacing.
+    id: 'Hair', label: 'Hair', cost: 3, mark: 'hair',
+    pick: { spacing: [2, 6] },
+  },
+  {
+    // An FFT per window on up to 128 rows.
+    id: 'Spectro', label: 'Spectrogram', cost: 2, mark: 'spectro',
+    pick: {},
+  },
+  {
+    // One stroke per sample down one line.
+    id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform',
+    pick: {},
+  },
+  {
     // A D8 sweep, then space colonization with a bucketed nearest-node update.
     id: 'Venation', label: 'Venation', cost: 3, mark: 'venation',
     pick: { spacing: [2, 6], gamma: [0.8, 2] },
@@ -300,6 +324,8 @@ export const SUB_LAYER_LABEL = {
   'Contours-Minor':          'Minor',
   'Contours-Major':          'Major',
   'Contours-Labels':         'Heights',
+  'Contours-Extremes':       'Summit and hollow',
+  'Stems-Tips':              'Tips',
   'Contours-Tanaka-Bright':  'Tanaka, lit',
   'Contours-Tanaka-Dark':    'Tanaka, shaded',
   'Swiss-Rock':              'Cliff hachures',

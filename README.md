@@ -18,7 +18,7 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 52 independent draw modes: surveyor's
+The app renders it as 3D line art with 57 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, wind,
 growth, and tracks that something with mass laid down a face. Contours letter their own
 heights.
@@ -85,7 +85,7 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 52 modes as tiles in six families:
+- **Marks sheet.** The Marks stage shows the 57 modes as tiles in six families:
   Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you three things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 52 modes.
+  classes you pick. This works for all 57 modes.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.
@@ -305,6 +305,11 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Coral | One closed line grown by differential growth until it fills the high ground |
 | Glacier | Ice above a snowline, with blue contours, crevasses and moraine |
 | Map Grid | A grid at a round true distance from the south-west corner, as lines or crosses, with the map sheet's edge scale in km |
+| Line Printer | A SYMAP line-printer map: one glyph per character cell, from a dot to an overprinted block |
+| Stems | A dotted stem from a datum to the ground at each cell, with a dot at the tip |
+| Hair | A short curling stroke at each cell; seen from the side, the overlap is the tone |
+| Spectrogram | The relief's spectrum along x, from an FFT per window, as 3D ridges or hatched blocks |
+| Waveform | A column of scanlines read along a line through the summit at any direction, mirrored or one-sided, as on a record sleeve |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

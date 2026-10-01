@@ -752,6 +752,9 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
  * as a prop, so the fifty call sites in Sidebar.jsx are untouched; passing it
  * directly still works, for a section whose state the panel cannot see.
  */
+/** The reset button's width, and the room the header row keeps free for it. */
+const RESET_W = 20
+
 export function Section({ title, terms, summary, open, onToggle, enabled, icon, children }) {
   const ctx = useContext(SectionFilter)
   const q = ctx?.q ?? ''
@@ -869,6 +872,11 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
                 maxWidth:104, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
               }}>{readout.text}</span>
           )}
+          {/* Room for the reset button, which floats over this row rather than
+              sitting in it (see below). Without it the readout ran under the
+              button. Reserved whenever the button can appear, not only on
+              hover, so the readout does not jump sideways under the pointer. */}
+          {canReset && <span aria-hidden="true" style={{ width: RESET_W, flexShrink:0 }} />}
           {/* A drawn chevron in a 22 px box: the header's height and the reset
               button beside it are both measured from that box. */}
           <span aria-hidden="true" className="hmchevron" style={{
@@ -906,9 +914,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           title={`Reset ${title} to its defaults`}
           aria-label={`Reset ${title} to its defaults`}
           style={{
-            position:'absolute', right:30, top:0,
+            position:'absolute', right:30, top:0, width: RESET_W,
             background:'none', border:'none', cursor:'pointer',
-            padding:'10px 4px', lineHeight:'22px',
+            padding:'10px 0', lineHeight:'22px', textAlign:'center',
             color: MUTED, fontSize:12, borderRadius:4,
           }}>↺</button>
       </>)}

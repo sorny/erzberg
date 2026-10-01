@@ -148,6 +148,13 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   {!style.tanakaContours && (
                     <InlineSl label="Smoothing" help="Chaikin corner-cutting passes. 0 = crisp marching-squares lines; higher = soft, flowing form lines." min={0} max={4} step={1} value={style.smoothingContours ?? 0} onChange={v => ss({ smoothingContours: v })} />
                   )}
+                  <Tog label="Summit and hollow" testId="contour-extremes" help="A plus sign on the highest point and a minus sign on the lowest, as their own pen." checked={!!style.extremesContours} onChange={v => ss({ extremesContours: v })} />
+                  {style.extremesContours && (
+                    <>
+                      <InlineSl label="Mark size" help="Arm to arm, in world units." min={2} max={80} step={0.5} value={style.extremeSizeContours ?? 16} onChange={v => ss({ extremeSizeContours: v })} fmt={v => v.toFixed(1)} />
+                      <InlineSl label="Mark weight" min={0.5} max={6} step={0.5} value={style.extremeWeightContours ?? 1.5} onChange={v => ss({ extremeWeightContours: v })} fmt={v => v.toFixed(1)} />
+                    </>
+                  )}
                   <Tog label="Label heights" help="Prints each contour's elevation into the line itself — the contour stops, the number sits in the gap at the line's own angle, and the contour resumes. That is what makes a sheet of nested curves readable, and it is why a printed map does it this way rather than setting the number beside the line." checked={!!style.labelContours} onChange={v => ss({ labelContours: v })} />
                   {style.labelContours && (
                     <Sub>
@@ -1188,6 +1195,102 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Runout" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Line Printer" icon={<ModeMark kind="printer" />} open={sec.modePrinter} onToggle={() => tog('modePrinter')} enabled={style.enabledPrinter}>
+            <Tog label="Enabled" testId="mode-printer" checked={style.enabledPrinter} onChange={v => ss({ enabledPrinter: v })} />
+            {style.enabledPrinter && (
+              <>
+                <Sub>
+                  <InlineSl label="Pitch" help="The width of one character cell, in world units. Rows are taller by the aspect, as on a line printer." min={2} max={Math.max(40, Math.round(plateSpan / 20))} step={0.5} value={style.pitchPrinter ?? 8} onChange={v => ss({ pitchPrinter: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Aspect" help="Row height over column width. A printer at 10 characters and 6 lines to the inch has 1.67." min={0.5} max={2.5} step={0.05} value={style.aspectPrinter ?? 1.25} onChange={v => ss({ aspectPrinter: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Classes" help="How many glyphs, from a dot to an overprinted block." min={2} max={8} step={1} value={style.classesPrinter ?? 6} onChange={v => ss({ classesPrinter: Math.round(v) })} />
+                  <SegRow label="Value" testIdPrefix="printer-field" options={[['elevation', 'height'], ['slope', 'slope']]} value={style.fieldPrinter ?? 'elevation'} onChange={v => ss({ fieldPrinter: v })} />
+                  <Tog label="Equal count" help="Classes with the same number of cells each (quantiles). Off, the classes are equal steps of the value." checked={!!style.quantilePrinter} onChange={v => ss({ quantilePrinter: v })} />
+                  <Tog label="Blank lowest" help="Leave the lowest class empty, so the low ground is paper." checked={!!style.blankPrinter} onChange={v => ss({ blankPrinter: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Printer" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Stems" icon={<ModeMark kind="stems" />} open={sec.modeStems} onToggle={() => tog('modeStems')} enabled={style.enabledStems}>
+            <Tog label="Enabled" testId="mode-stems" checked={style.enabledStems} onChange={v => ss({ enabledStems: v })} />
+            {style.enabledStems && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" help="The distance between stems, in world units." min={1} max={40} step={0.5} value={style.spacingStems ?? 6} onChange={v => ss({ spacingStems: v })} fmt={v => v.toFixed(1)} />
+                  <SegRow label="Datum" help="Where the stems start. Ground above it stands up, ground below hangs down. Look from the side to read it as a signal." testIdPrefix="stems-datum" options={[['mean', 'mean'], ['mid', 'middle'], ['min', 'lowest']]} value={style.datumStems ?? 'mean'} onChange={v => ss({ datumStems: v })} />
+                  <Tog label="Tips" help="A dot at the top of each stem, as its own pen." checked={!!style.tipsStems} onChange={v => ss({ tipsStems: v })} />
+                  {style.tipsStems && (
+                    <>
+                      <InlineSl label="Tip size" min={0.2} max={10} step={0.1} value={style.tipSizeStems ?? 1.5} onChange={v => ss({ tipSizeStems: v })} fmt={v => v.toFixed(1)} />
+                      <InlineSl label="Tip weight" min={0.5} max={8} step={0.5} value={style.tipWeightStems ?? 2} onChange={v => ss({ tipWeightStems: v })} fmt={v => v.toFixed(1)} />
+                    </>
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Stems" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Hair" icon={<ModeMark kind="hair" />} open={sec.modeHair} onToggle={() => tog('modeHair')} enabled={style.enabledHair}>
+            <Tog label="Enabled" testId="mode-hair" checked={style.enabledHair} onChange={v => ss({ enabledHair: v })} />
+            {style.enabledHair && (
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" help="The distance between hairs, in world units. Small values are dense and slow." min={1} max={20} step={0.5} value={style.spacingHair ?? 3} onChange={v => ss({ spacingHair: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Length" help="The height of each hair, centred on the ground." min={0.5} max={60} step={0.5} value={style.lengthHair ?? 6} onChange={v => ss({ lengthHair: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Curl" help="How far each step wanders sideways, against the step up." min={0} max={3} step={0.05} value={style.jitterHair ?? 0.6} onChange={v => ss({ jitterHair: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Segments" min={2} max={16} step={1} value={style.segmentsHair ?? 6} onChange={v => ss({ segmentsHair: Math.round(v) })} />
+                  <InlineSl label="Seed" min={1} max={99} step={1} value={style.seedHair ?? 1} onChange={v => ss({ seedHair: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Hair" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Spectrogram" icon={<ModeMark kind="spectro" />} open={sec.modeSpectro} onToggle={() => tog('modeSpectro')} enabled={style.enabledSpectro}>
+            <Tog label="Enabled" testId="mode-spectro" checked={style.enabledSpectro} onChange={v => ss({ enabledSpectro: v })} />
+            {style.enabledSpectro && (
+              <>
+                <Sub>
+                  <SegRow label="Style" testIdPrefix="spectro-style" options={[['ridges', 'ridges'], ['blocks', 'blocks']]} value={style.styleSpectro ?? 'ridges'} onChange={v => ss({ styleSpectro: v })} />
+                  <SegRow label="Read" help="All rows averages the spectrum of the whole ground. One row reads a single west–east line." testIdPrefix="spectro-source" options={[['all', 'all rows'], ['row', 'one row']]} value={style.sourceSpectro ?? 'row'} onChange={v => ss({ sourceSpectro: v })} />
+                  {style.sourceSpectro === 'row' && (
+                    <InlineSl label="Row" help="The line read, from north (0 %) to south (100 %)." min={0} max={100} step={1} value={style.rowSpectro ?? 50} onChange={v => ss({ rowSpectro: Math.round(v) })} fmt={v => `${Math.round(v)} %`} />
+                  )}
+                  <InlineSl label="Window" help="Cells per FFT window. It snaps to a power of two. A longer window resolves long waves, a shorter one places features more exactly." log min={8} max={512} step={1} value={style.windowSpectro ?? 64} onChange={v => ss({ windowSpectro: 2 ** Math.round(Math.log2(v)) })} />
+                  <InlineSl label="Bands" help="Wavelength bands, log-spaced from the window length down to two cells." min={2} max={64} step={1} value={style.bandsSpectro ?? 24} onChange={v => ss({ bandsSpectro: Math.round(v) })} />
+                  <InlineSl label="Gamma" help="Below 1 lifts the weak bands, as a decibel scale does." min={0.1} max={2} step={0.05} value={style.gammaSpectro ?? 0.5} onChange={v => ss({ gammaSpectro: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Whiten" help="Weights each band by its frequency. Ground has much more relief in long waves than in short ones; without this the short waves are near zero." checked={style.whitenSpectro !== false} onChange={v => ss({ whitenSpectro: v })} />
+                  {(style.styleSpectro ?? 'ridges') === 'ridges'
+                    ? <InlineSl label="Height" help="The height of full energy, in world units." min={1} max={300} step={1} value={style.heightSpectro ?? 120} onChange={v => ss({ heightSpectro: v })} />
+                    : <InlineSl label="Lines per block" help="Strokes in a block at full energy. The grey is the count." min={1} max={20} step={1} value={style.linesSpectro ?? 6} onChange={v => ss({ linesSpectro: Math.round(v) })} />}
+                </Sub>
+                <ModeStyleOverride prefix="Spectro" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Waveform" icon={<ModeMark kind="waveform" />} open={sec.modeWaveform} onToggle={() => tog('modeWaveform')} enabled={style.enabledWaveform}>
+            <Tog label="Enabled" testId="mode-waveform" checked={style.enabledWaveform} onChange={v => ss({ enabledWaveform: v })} />
+            {style.enabledWaveform && (
+              <>
+                <Sub>
+                  <SegRow label="Through" help="The line read passes through the highest point, or through the middle of the terrain." testIdPrefix="waveform-line" options={[['summit', 'summit'], ['centre', 'centre']]} value={style.lineWaveform ?? 'summit'} onChange={v => ss({ lineWaveform: v })} />
+                  <InlineSl label="Direction" help="The direction the line is read in. 0° is top to bottom (north to south), 90° left to right, 180° bottom to top, 270° right to left." testId="waveform-angle" min={0} max={359} step={1} value={style.angleWaveform ?? 0} onChange={v => ss({ angleWaveform: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  <SegRow label="Place" help="Column stands upright in the middle of the plate. Row lies left to right through the middle. On line draws it on the ground, along the line it reads." testIdPrefix="waveform-place" options={[['column', 'column'], ['row', 'row'], ['line', 'on line']]} value={style.placeWaveform ?? 'column'} onChange={v => ss({ placeWaveform: v })} />
+                  <SegRow label="Sides" help="Mirrored about the axis, or drawn from the axis to one side only: up from a row, right from a column." testIdPrefix="waveform-sides" options={[['both', 'mirrored'], ['one', 'one side']]} value={style.sidesWaveform ?? 'both'} onChange={v => ss({ sidesWaveform: v })} />
+                  <InlineSl label="Width" help="The column's full width at the line's highest point, in world units." min={5} max={Math.max(400, Math.round(plateSpan / 2))} step={1} value={style.widthWaveform ?? 120} onChange={v => ss({ widthWaveform: v })} />
+                  <InlineSl label="Spacing" help="The distance between scanlines, in world units." min={0.2} max={10} step={0.1} value={style.spacingWaveform ?? 1.5} onChange={v => ss({ spacingWaveform: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="How much of the short-wave relief is added back to the edge. Cliffs show as bursts." min={0} max={6} step={0.1} value={style.detailWaveform ?? 1.5} onChange={v => ss({ detailWaveform: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail scale" help="The blur, in samples, that separates the short waves from the form." min={1} max={30} step={1} value={style.smoothWaveform ?? 4} onChange={v => ss({ smoothWaveform: Math.round(v) })} />
+                  <InlineSl label="Gamma" help="Above 1 narrows the low ground and leaves the summit wide." min={0.2} max={4} step={0.05} value={style.gammaWaveform ?? 1} onChange={v => ss({ gammaWaveform: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="Waveform" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

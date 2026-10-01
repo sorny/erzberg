@@ -904,7 +904,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeSpectro: false, modeWaveform: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1146,6 +1146,11 @@ export function Sidebar({
       modeWind:     !!newStyle.enabledWind,
       modeRunout:   !!newStyle.enabledRunout,
       modeMapGrid:  !!newStyle.enabledMapGrid,
+      modePrinter:  !!newStyle.enabledPrinter,
+      modeStems:    !!newStyle.enabledStems,
+      modeHair:     !!newStyle.enabledHair,
+      modeSpectro:  !!newStyle.enabledSpectro,
+      modeWaveform: !!newStyle.enabledWaveform,
       modeVenation: !!newStyle.enabledVenation,
       modeGeodesic: !!newStyle.enabledGeodesic,
       modeRadar:    !!newStyle.enabledRadar,
@@ -2897,7 +2902,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the fifty-two modes
+              A modifier, not a mode: it takes whatever the fifty-seven modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

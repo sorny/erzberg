@@ -9,12 +9,13 @@
  */
 import { shadowSun } from './sunHours'
 import { buildCover, buildIndexed, buildMineral, buildOutrun, buildRiso, buildWatershed } from './builders/colour.js'
-import { buildContours, buildSpines } from './builders/contours.js'
+import { buildContours, contourExtremes, buildSpines } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
 import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
 import { buildBedding, buildGlacier, buildRunout, buildSlopeClass } from './builders/survey.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
 import { buildMapGrid } from './builders/mapGrid.js'
+import { buildHair, buildPrinter, buildSpectro, buildStems, buildWaveform } from './builders/signal.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
@@ -54,7 +55,11 @@ export function buildLineGeometry(terrain, p) {
         spacing: p.spacingCross, angle: p.angleCross, lines: p.linesCross,
         marks: p.marksCross, markSize: p.markSizeCross, markColor: p.markColorCross }) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
-    { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours) },
+    { id:'Contours',builder: (t, ctx) => {
+        const res = buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours)
+        const ext = p.extremesContours ? contourExtremes(t, ctx, p.extremeSizeContours) : null
+        return ext ? { ...res, 'Contours-Extremes': ext } : res
+      } },
     { id:'Hachure', builder: (t, ctx) => p.styleHachure === 'lehmann'
         ? buildLehmannHachure(t, ctx, p.spacingHachure, p.bandsHachure, p.gammaHachure)
         : buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
@@ -187,6 +192,22 @@ export function buildLineGeometry(terrain, p) {
         markSize: p.markSizeMapGrid, markColor: p.markColorMapGrid,
         scale: p.scaleMapGrid, scaleSize: p.scaleSizeMapGrid, scaleColor: p.scaleColorMapGrid,
         cellMetres: p.cellMetresMapGrid }) },
+    { id:'Printer', builder: (t, ctx) => buildPrinter(t, ctx, {
+        pitch: p.pitchPrinter, aspect: p.aspectPrinter, classes: p.classesPrinter,
+        field: p.fieldPrinter, quantile: p.quantilePrinter, blank: p.blankPrinter }) },
+    { id:'Stems',   builder: (t, ctx) => buildStems(t, ctx, {
+        spacing: p.spacingStems, datum: p.datumStems, tips: p.tipsStems, tipSize: p.tipSizeStems }) },
+    { id:'Hair',    builder: (t, ctx) => buildHair(t, ctx, {
+        spacing: p.spacingHair, length: p.lengthHair, jitter: p.jitterHair,
+        segments: p.segmentsHair, seed: p.seedHair }) },
+    { id:'Spectro', builder: (t, ctx) => buildSpectro(t, ctx, {
+        style: p.styleSpectro, window: p.windowSpectro, whiten: p.whitenSpectro, bands: p.bandsSpectro, gamma: p.gammaSpectro,
+        height: p.heightSpectro, fill: p.linesSpectro,
+        row: p.sourceSpectro === 'row' ? (p.rowSpectro ?? 50) / 100 : null }) },
+    { id:'Waveform', builder: (t, ctx) => buildWaveform(t, ctx, {
+        line: p.lineWaveform, angle: p.angleWaveform, place: p.placeWaveform, sides: p.sidesWaveform,
+        spacing: p.spacingWaveform, width: p.widthWaveform,
+        detail: p.detailWaveform, smooth: p.smoothWaveform, gamma: p.gammaWaveform }) },
     { id:'Venation', builder: (t, ctx) => buildVenation(t, ctx, {
         count: p.countVenation, roots: p.rootsVenation, spacing: p.spacingVenation,
         gamma: p.gammaVenation, seed: p.seedVenation }) },

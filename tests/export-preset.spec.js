@@ -16,7 +16,7 @@ import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { openStage, resetToDefaults } from './helpers.js'
-import { readPngPreset, readSvgPreset } from '../src/utils/presetFile.js'
+import { PRESET_FORMAT, readPngPreset, readSvgPreset } from '../src/utils/presetFile.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 
@@ -68,7 +68,7 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
   const preset = readPngPreset(readFileSync(file))
   expect(preset, 'the exported PNG carries no erzberg:preset chunk').not.toBeNull()
   expect(preset.app).toBe('erzberg')
-  expect(preset.format).toBe(2)
+  expect(preset.format).toBe(PRESET_FORMAT)
   expect(preset.view.tilt).toBe(TILT)
   // The promise the README makes. A plate is a picture that leaves the machine.
   expect(JSON.stringify(preset)).not.toContain('heightmapDataURL')

@@ -4,7 +4,7 @@
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
-import { boxBlur } from '../terrain'
+import { boxBlur, cellElev } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
 import { EMPTY_F32, EMPTY_F64, EMPTY_U8, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, inElevCut, normElev, simplifyFlat } from './shared.js'
 
@@ -755,4 +755,33 @@ export function buildSpines(terrain, p, o) {
     }
   }
   return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+/**
+ * A `+` on the highest point and a `−` on the lowest, as a map marks a summit
+ * and a hollow that the contours ring but do not name.
+ *
+ * Its own pen, `Contours-Extremes`. The marks lie flat at the height of their
+ * cell, so a plan view shows them as glyphs; `size` is arm to arm, in world units.
+ */
+export function contourExtremes(terrain, p, size) {
+  const { grid, gridMask, cols, scl, halfW, halfH, minElev, maxElev, gridSlopes, maxSlope } = terrain
+  let hi = -1, lo = -1
+  for (let i = 0; i < grid.length; i++) {
+    if (!gridMask[i]) continue
+    if (hi < 0 || grid[i] > grid[hi]) hi = i
+    if (lo < 0 || grid[i] < grid[lo]) lo = i
+  }
+  if (hi < 0 || hi === lo) return null
+  const a = Math.max(0.5, size ?? 16) / 2
+  const positions = new F32List(), colors = new F32List()
+  for (const [i, plus] of [[hi, true], [lo, false]]) {
+    const c = i % cols, r = (i - c) / cols
+    const x = c * scl - halfW, z = r * scl - halfH
+    const y = cellElev(grid, r, c, cols, p.elevScale, 0)
+    const rgb = computeVertexColor(normElev(y, minElev, maxElev), gridSlopes[i] / (maxSlope || 1), 0, p)
+    positions.push6(x - a, y, z, x + a, y, z); colors.pushRgb2(rgb)
+    if (plus) { positions.push6(x, y, z - a, x, y, z + a); colors.pushRgb2(rgb) }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray() }
 }

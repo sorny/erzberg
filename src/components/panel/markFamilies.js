@@ -35,11 +35,11 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier']],
+    ['Lines', 'Contours', 'Flow', 'Network', 'Ridge', 'Valley', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier', 'Spectrogram']],
   ['Tone',     'many small marks add up to a grey',
-    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes', 'Coral']],
+    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes', 'Coral', 'Line Printer', 'Hair', 'Waveform']],
   ['Relief',   'the ground given thickness',
-    ['Pillars', 'Bitplane', 'Sprite Blocks']],
+    ['Pillars', 'Bitplane', 'Sprite Blocks', 'Stems']],
   ['Plate',    'colour rather than mark-making',
     ['Indexed', 'Riso', 'Mineral', 'Land cover', 'Watershed', 'Outrun']],
   ['Light',    'a lamp, a sun, or a year of one',

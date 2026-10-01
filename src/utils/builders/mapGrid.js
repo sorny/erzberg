@@ -96,10 +96,12 @@ function edgeScale(terrain, p, o, { stepM, cellX, cellY }) {
   for (let k = 0; k * stepM / cellY <= rows - 1 + 1e-6; k++) down.push([rows - 1 - k * stepM / cellY, k * stepM])
   const most = Math.max(across[across.length - 1]?.[1] ?? 0, down[down.length - 1]?.[1] ?? 0)
   const km = most >= 1000
-  const label = (m) => {
-    const v = km ? m / 1000 : m
-    return String(Math.round(v * 100) / 100)
-  }
+  // As many decimals as the interval needs, and no more: a 5 m grid on a
+  // kilometre sheet reads 0.005, 0.01, 0.015, which two fixed decimals rounded
+  // to 0.01, 0.01, 0.02.
+  const unit = km ? stepM / 1000 : stepM
+  const decimals = Math.max(0, -Math.floor(Math.log10(unit) + 1e-9))
+  const label = (m) => String(Number((km ? m / 1000 : m).toFixed(decimals)))
 
   const anchors = []
   const top = Z(0) - tick, bottom = Z(rows - 1) + tick, left = X(0) - tick, right = X(cols - 1) + tick

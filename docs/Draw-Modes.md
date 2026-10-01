@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-two
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-seven
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Fifty-one modes read $H$ only. [Land cover](#land-cover) reads a second
+Fifty-six modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -94,6 +94,10 @@ the line.
 - Labels have their own flat ink, which defaults to the contour colour.
 - With a GeoTIFF, labels are metres, read through the histogram. With a PNG,
   labels are height above the lowest ground.
+
+**Summit and hollow.** A `+` on the highest cell and a `−` on the lowest, flat
+at their own height, as their own pen (`Contours-Extremes`). The contours ring
+these points but do not name them.
 
 ## 5. Hachure
 
@@ -767,6 +771,60 @@ each grid distance on all four sides, an outer frame line, and the distances
 from the corner in metres, or kilometres once the sheet passes one, with the
 unit at each corner. The numbers are set in a single-line font, which a pen draws
 in one pass. Crosshatch is the pattern; this is the measurement.
+
+## 54. Line Printer
+
+A line-printer map after SYMAP, from the 1960s. The plate is cut into
+character cells of a fixed *Pitch*, taller than wide by the *Aspect*. Each cell
+takes one glyph by the class of its elevation or slope: `·`, `+`, `x`, `o`, `Θ`,
+then three overprints, where the printer struck the cell several times. Classes
+are equal steps of the value, or equal counts (quantiles). *Blank lowest* leaves
+the low ground as paper.
+
+## 55. Stems
+
+A stem from a datum (the mean, the middle or the lowest height) to the ground at
+each sampled cell, dotted by default, and a dot at the tip as a second pen
+(three short strokes along the axes). Ground above the datum stands up and
+ground below hangs down. From the side, the plate reads as a signal.
+
+## 56. Hair
+
+A short random walk at each sampled cell, centred on the ground. Each step
+climbs by $\text{length} / n$ and moves sideways by a seeded random amount scaled
+by *Curl*. The steps add up, so a hair curls. From the side, the hairs overlap
+where many cells share a height: the tone is the count.
+
+## 57. Spectrogram
+
+The spectrum of the relief along $x$. A window of $N$ cells (a power of two)
+slides along a row with a hop of $N/4$. Each window is detrended (mean and end-to-end
+ramp), Hann-tapered and transformed with a radix-2 FFT. The magnitudes go into
+*Bands*, log-spaced from bin 1 to $N/2$. *Whiten* weights bin $k$ by $k$,
+because terrain amplitude falls about as $1/f$. Values are normalised to the
+maximum and raised to *Gamma*. *Read* takes one row or the mean of up to 128.
+
+- **Ridges.** One line per band, long waves at the back, height = energy.
+- **Blocks.** A flat grid of window × band cells, each with
+  $\text{round}(v \cdot \text{lines})$ strokes.
+
+## 58. Waveform
+
+One column of a waveform plot, read along a line through the highest cell (or
+the middle) at a *Direction*: 0° top to bottom, 90° left to right, 180° bottom
+to top, 270° right to left. The line is clipped to the raster. The half-width at
+each sample is
+
+$$w = \text{clamp}\big(\hat h^{\gamma} + d \cdot (h - \text{blur}(h)) / \Delta h\big) \cdot \tfrac{\text{width}}{2}$$
+
+with $\hat h$ the height normalised to the line's own range $\Delta h$ and $d$ the
+*Detail*. Each sample is one stroke across the reading direction, flat above the
+ground. *Place* puts the column upright in the middle of the plate, as a row
+through the middle, or on the line it reads. *Sides* mirrors each stroke or draws
+it to the left of the reading direction at the same full width, so a row rises
+like a profile. One plate per peak, side by side, makes a
+sleeve. The width is relative to each line's own range, so two plates share a
+scale only in their length.
 
 ---
 

@@ -237,6 +237,11 @@ function resolveLayerStyle(id, p) {
     case 'MapGrid-Numbers':
       return { weight: p.scaleWeightMapGrid ?? 1, opacity: p.opacityMapGrid, dash: 'solid',
                color: p.scaleColorMapGrid ?? '#1a1a1a' }
+    case 'Contours-Extremes':
+      return { weight: p.extremeWeightContours ?? 1.5, opacity: p.opacityContours, dash: 'solid' }
+    // A dot is never dashed.
+    case 'Stems-Tips':
+      return { weight: p.tipWeightStems ?? 2, opacity: p.opacityStems, dash: 'solid' }
     case 'Bedding-Beds':
       return { weight: p.weightBedding, opacity: p.opacityBedding, dash: p.dashBedding }
     case 'Bedding-Marker':

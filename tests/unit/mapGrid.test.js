@@ -44,6 +44,19 @@ describe('Map grid', () => {
     expect(texts).toContain('3')
   })
 
+  it('names a fine grid on a kilometre sheet with the decimals it needs', () => {
+    // 47 cells of 2 px at 15 m: a 1 410 m sheet, and a 5 m grid is 282 lines.
+    const scale = layers({ intervalMapGrid: 5, cellMetresMapGrid: 15 }).find((l) => l.id === 'MapGrid-Scale')
+    expect(scale.note.stepM).toBe(5)
+    const texts = scale.scaleAnchors.map((a) => a.text)
+    for (const s of ['km', '0.005', '0.015', '1.405']) expect(texts).toContain(s)
+    // Each distance is named at most on all four sides, never twice on one:
+    // two fixed decimals named 0.005 and 0.01 both "0.01".
+    const count = {}
+    for (const s of texts) count[s] = (count[s] ?? 0) + 1
+    for (const [s, n] of Object.entries(count)) if (s !== 'km') expect(n).toBeLessThanOrEqual(4)
+  })
+
   it('raises an interval that would draw too many lines, and says so', () => {
     const scale = layers({ intervalMapGrid: 1 }).find((l) => l.id === 'MapGrid-Scale')
     expect(scale.note.stepM).toBeGreaterThan(1)

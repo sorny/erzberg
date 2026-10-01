@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.42.0] — 2026-10-01
+
+Five modes after pictures that were not made from terrain: a line-printer map,
+a stem plot, a hair drawing, a spectrogram and a record sleeve of waveforms.
+Each draws a value with a mark of its own, and the heightmap supplies the value.
+
+### Added
+
+- **Line Printer** (Marks → Tone). One glyph per character cell, by class of
+  elevation or slope, from `·` through `+ x o Θ` to three overprints, as SYMAP
+  printed maps. Classes are equal steps or quantiles. The glyphs are strokes in
+  the builder, not a font, so a pen draws each in a few passes.
+- **Stems** (Marks → Relief). A dotted stem from the mean, middle or lowest
+  height to the ground at each cell, with a dot at the tip as its own pen. From
+  the side it is a signal about its mean.
+- **Hair** (Marks → Tone). A short, seeded random walk that climbs at each cell.
+  From the side, the overlap of thousands of hairs is the tone.
+- **Spectrogram** (Marks → Line). The relief's spectrum along x: a Hann-windowed
+  FFT per window, in log-spaced wavelength bands, as 3D ridges (long waves at
+  the back) or as flat blocks hatched by energy. *Whiten* weights each band by
+  its frequency. Without it, terrain's roughly 1/f fall leaves every short-wave
+  band near zero. It reads one row by default, because the mean of many rows
+  averages the variation along x away.
+- **Waveform** (Marks → Tone). A column of scanlines read along a line through
+  the summit (or the middle), with the short waves of the profile added back to
+  the edge. *Direction* turns the line to any angle: 0° reads top to bottom,
+  90° left to right. *Place* stands the column upright, lays it as a row, or
+  draws it on the ground along the line it reads. *Sides* draws it mirrored or
+  one-sided. One plate per peak, side by side, is a record sleeve. The width is
+  relative to each line's own range.
+- **Contours: Summit and hollow.** A `+` on the highest point and a `−` on the
+  lowest, as their own pen. Off by default, so no preset changes.
+
+### Fixed
+
+- **Map Grid scale numbers** get as many decimals as the interval needs. A 5 m
+  grid on a sheet over 1 km read 0.01, 0.01, 0.02 for 5, 10 and 15 m, because
+  the numbers were rounded to two fixed decimals. They now read 0.005, 0.01,
+  0.015.
+- **The back bar of a drilled-in mode** said "All 40 marks". It now counts
+  the marks on the sheet, 57 today.
+- **A shut section's readout ran under its reset button** (for example Water
+  Fill, "level 30%"). The header row now keeps room for the button whenever the
+  section has one.
+
 ## [1.41.0] — 2026-10-01
 
 ### Added

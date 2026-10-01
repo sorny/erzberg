@@ -361,6 +361,42 @@ const MARKS = {
       <path d="M6 5 L8 5 M7 4 L7 6 M10 5 L12 5 M11 4 L11 6 M14 5 L16 5 M15 4 L15 6 M6 9 L8 9 M7 8 L7 10 M10 9 L12 9 M11 8 L11 10 M14 9 L16 9 M15 8 L15 10" />
     </g>
   ),
+  // A row of printer glyphs, light to an overprinted block.
+  printer: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M2.5 7 L3.5 7 M6 7 L9 7 M7.5 5.5 L7.5 8.5 M11 5.5 L14 8.5 M11 8.5 L14 5.5" />
+      <circle cx="18" cy="7" r="1.6" />
+      <path d="M16.2 7 L19.8 7 M20.5 5 L23 9 M20.5 9 L23 5 M20.5 7 L23 7" />
+    </g>
+  ),
+  // Dotted stems up and down from a datum, a dot at each tip.
+  stems: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M2 8 L22 8" strokeWidth="0.4" />
+      <path d="M5 8 L5 3 M9 8 L9 5 M13 8 L13 11 M17 8 L17 2 M20 8 L20 10" strokeDasharray="0.8 1" />
+      <path d="M5 3 L5 3 M9 5 L9 5 M13 11 L13 11 M17 2 L17 2 M20 10 L20 10" strokeWidth="1.8" />
+    </g>
+  ),
+  // Wavy strands, dense in the middle.
+  hair: (
+    <g {...BASE} strokeWidth="0.5">
+      <path d="M4 11 Q5 8 4 5 M7 12 Q6 8 7 3 M9 12 Q10 7 9 2 M11 13 Q12 8 11 2 M13 12 Q12 7 13 3 M15 12 Q16 8 15 4 M18 11 Q17 8 18 6 M20 10 Q21 8 20 7" />
+    </g>
+  ),
+  // Stacked ridgelines, tall at the back and fine at the front.
+  spectro: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M2 5 C6 1 9 6 12 3 C15 1 18 5 22 4" />
+      <path d="M2 8 L5 7 L7 8.5 L10 6 L13 8 L16 6.5 L19 8 L22 7" />
+      <path d="M2 11.5 L4 10.8 L5 11.6 L7 10.5 L8 11.5 L10 10.6 L12 11.6 L14 10.4 L16 11.5 L18 10.7 L20 11.6 L22 10.8" />
+    </g>
+  ),
+  // A mirrored column of scanlines.
+  waveform: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M11 1.5 L13 1.5 M10 3 L14 3 M8 4.5 L16 4.5 M9 6 L15 6 M6 7.5 L18 7.5 M7.5 9 L16.5 9 M9.5 10.5 L14.5 10.5 M11 12 L13 12" />
+    </g>
+  ),
   // Veins that branch up from one root and fine out.
   venation: (
     <g {...BASE} strokeWidth="0.8">
