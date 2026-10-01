@@ -164,6 +164,19 @@ function resolveLayerStyle(id, p) {
     }
   }
 
+  /*
+   * Any other mode inked by land cover (builders/classInk.js): styled as the
+   * part it was split from, and named for its class and ink like Pillars.
+   */
+  const anyClass = /^(.+)-Class(\d+)$/.exec(id)
+  if (anyClass) {
+    const base = resolveLayerStyle(anyClass[1], p)
+    const k = Number(anyClass[2])
+    const c = p.cover?.classes?.find((x) => x.index === k)
+    const cname = c?.name ?? `Class ${String.fromCharCode(65 + k)}`
+    return { ...base, name: `${base.name ?? layerDisplayName(anyClass[1])} · ${cname}${c?.color ? ` ${c.color}` : ''}` }
+  }
+
   switch (id) {
     case 'Contours-Minor':
       return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }

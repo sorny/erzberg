@@ -222,6 +222,34 @@ test('the Land cover mode inks one layer per class', async ({ page }) => {
   expect(svg).toContain('Synthetic fixture')
 })
 
+test('an ordinary mode inked by class splits into one pen per class', async ({ page }) => {
+  test.setTimeout(240_000)
+  await boot(page)
+  await dropPlate(page, syntheticPlate())
+
+  // Lines again, for the reason the mask spec gives: its builder knows nothing
+  // of land cover, so a split here is the dispatcher's pass reaching any mode.
+  await setSwitch(page, 'Mode: Lines', 'Hypsometric', true)
+  const source = async (name) => {
+    await page.fill('[data-testid="panel-filter"]', 'Mode: Lines')
+    await page.waitForTimeout(450)
+    await page.locator('button:visible', { hasText: new RegExp(`^${name}$`) }).first().click()
+    await page.waitForTimeout(3000)
+    await page.fill('[data-testid="panel-filter"]', '')
+    await page.waitForTimeout(250)
+  }
+
+  await source('Class')
+  const split = labelsOf(await exportSvg(page)).filter((l) => l.startsWith('Lines'))
+  expect(split, 'one pen layer per class, named for it').toEqual(
+    ['A', 'B', 'C'].map((k) => expect.stringMatching(new RegExp(`^Lines · Class ${k} #[0-9a-f]{6}$`))))
+  expect(split).toHaveLength(BANDS)
+
+  await source('Elevation')
+  const whole = labelsOf(await exportSvg(page)).filter((l) => l.startsWith('Lines'))
+  expect(whole, 'back to one layer on any other source').toEqual(['Lines'])
+})
+
 test('a palette re-inks the classes, and the pens follow', async ({ page }) => {
   test.setTimeout(240_000)
   await boot(page)

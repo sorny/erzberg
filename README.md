@@ -183,10 +183,12 @@ The script names each class from the OpenStreetMap landcover it overlaps, for
 example *Forest · steep — 54% forest, 36% quarry*. The section draws the plate
 as a map with a legend.
 
-A plate gives you three things:
+A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
   classes you pick. This works for all 56 modes.
+- **Class colours.** Any mode can take the class ink or the plate colour, as
+  one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
   mean slope.
 - **The Land cover mode.** A colour plate from the classes.

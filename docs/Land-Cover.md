@@ -167,6 +167,18 @@ The inks are one `coverInks` parameter. They can be undone, they stay with the
 plate when a preset is applied, and a new plate clears them. Every mode, the
 legend and the SVG pen names read them.
 
+## Class as a colour source
+
+Any draw mode can take its colour from the land cover. Under *Hypsometric*, set
+the source to **Class** (the class ink) or **Plate** (the plate colour at each
+end of a stroke). The layer then splits into one pen layer per class, named
+for the class and its ink, so a plot gets one pen per class.
+
+A stroke goes to the class under its midpoint, because one stroke is one pen.
+A stroke on a cell with no data keeps the line colour. Filled areas keep their
+own colours. Pillars and the Land cover mode ink by class in their own
+builders, so they do not offer these two sources.
+
 ## Ink by land class
 
 One press gives each class a mark, a class mask and the class colour. Marks are

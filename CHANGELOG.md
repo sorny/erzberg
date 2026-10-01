@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.45.0] — 2026-10-01
+
+### Added
+
+- **Land class as a colour source for every draw mode.** The *Hypsometric*
+  source gets **Class** and **Plate**. The layer splits into one pen layer per
+  class, named for the class and its ink. Before, only Pillars and the Land
+  cover mode could ink by class. One pass after the build does it for every
+  mode, from the cell under each stroke, so no builder changed.
+  → [Land cover](docs/Land-Cover.md)
+
 ## [1.44.0] — 2026-10-01
 
 ### Added

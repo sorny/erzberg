@@ -23,6 +23,7 @@ import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, bui
 import { buildPillars } from './builders/pillars.js'
 import { buildBitplane } from './builders/relief.js'
 import { maskedTerrain, paintFor } from './builders/shared.js'
+import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
 import { buildReticulation, buildRugged, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
 export { F32List, U32List, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
@@ -249,9 +250,23 @@ export function buildLineGeometry(terrain, p) {
     if (!baseRes) continue
 
     // Handle builders that return sub-layers (e.g. { minor: {...}, major: {...} })
-    const subLayers = (baseRes.positions instanceof Float32Array) 
+    let subLayers = (baseRes.positions instanceof Float32Array) 
       ? { [cfg.id]: baseRes } 
       : baseRes
+
+    // Inked by land cover: each part splits into one layer per class, so the
+    // SVG writes one pen per class. See builders/classInk.js. Pillars and the
+    // Land cover mode ink by class in their own builders.
+    const source = p[`hypso${cfg.id}`] && p[`hypsoMode${cfg.id}`]
+    if (CLASS_INK_SOURCES.has(source) && !OWN_CLASS_INK.has(cfg.id) && terrain.gridClass) {
+      const split = {}
+      for (const [subId, res] of Object.entries(subLayers)) {
+        const parts = res?.positions instanceof Float32Array ? inkByClass(res, terrain, source) : null
+        if (!parts) { split[subId] = res; continue }
+        for (const [suffix, part] of Object.entries(parts)) split[suffix ? `${subId}-${suffix}` : subId] = part
+      }
+      subLayers = split
+    }
 
     for (const [subId, res] of Object.entries(subLayers)) {
       // A layer is drawable if it has strokes *or* fills. Until the colour modes
