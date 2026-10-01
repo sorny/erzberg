@@ -416,6 +416,10 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 - **Plotter order** re-orders strokes inside each pen layer. On the sample plate
   it cuts pen-up travel from 52.4 m to 1.4 m. It is off by default, because
   stroke order decides which ink is on top.
+- **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o
+  graz.svg` renders a plate without the panel, through the same app in headless
+  Chrome. Draw modes, presets and any parameter are arguments.
+  → [Command line](docs/CLI.md)
 
 ---
 
@@ -483,6 +487,7 @@ Inside a text box, `⌘Z` belongs to the browser. A slider drag is one undo step
 ## Documentation
 
 - [Architecture: how a file becomes a picture](docs/Architecture.md)
+- [Command line](docs/CLI.md)
 - [Draw mode mathematics](docs/Draw-Modes.md)
 - [Edit Mode](docs/Edit-Mode.md)
 - [Georeferencing](docs/Georeferencing.md)

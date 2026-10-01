@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.44.0] — 2026-10-01
+
+### Added
+
+- **Command line.** `node scripts/erzberg.js render <heightmap> -o <file>`
+  writes SVG, PNG or STL without the panel. A preset, the draw modes and any
+  parameter are arguments, and `--stats` prints the plot preflight as JSON. The
+  CLI drives the built app in headless Chrome through `window.erzberg`, so its
+  files match the UI's. A second renderer in Node would have lost the labels,
+  text layers, icons and PNG, which need a browser, and it would drift from the
+  UI. → [Command line](docs/CLI.md)
+- **`?automation`.** With this query parameter the app reads no stored
+  session, skips the opening preset, starts with the panel shut, and installs
+  `window.erzberg`. Without it, nothing changes.
+
 ## [1.43.0] — 2026-10-01
 
 ### Removed

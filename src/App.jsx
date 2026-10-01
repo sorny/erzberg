@@ -43,6 +43,7 @@ import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache } from './utils/osmFetch'
 import { workAttribution } from './utils/attribution'
 import { GROUP_OF, presetStyle } from './params'
+import { AUTOMATION, useAutomation } from './automation'
 
 /** Every tweakable key, from the index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
@@ -599,7 +600,8 @@ export default function App() {
    * default on each slider step and orbit sync. Nothing re-reads it: it seeds
    * the values below and answers "was there a session?" for the panel note.
    */
-  const [restored] = useState(() => loadSession({
+  // A scripted run starts from the defaults, never from somebody's stored work.
+  const [restored] = useState(() => AUTOMATION ? null : loadSession({
     terrain: TERRAIN_DEF, style: STYLE_DEF, points: POINTS_DEF, view: VIEW_DEF,
     gradientStops: GRADIENT_PRESETS['Jet'],
     bgGradientStops: [{ pos: 0, color: '#ffffff' }, { pos: 1, color: '#cccccc' }],
@@ -1123,7 +1125,10 @@ export default function App() {
   // file, and by then the job state has already been cleared.
   const exportKindRef = useRef(null)
 
+  // How a scripted export hears that it finished. See src/automation.js.
+  const automationDoneRef = useRef(null)
   const finishExport = useCallback((status = 'done') => {
+    automationDoneRef.current?.(status)
     const [ext, name] = EXPORT_KINDS[exportKindRef.current] ?? ['file', 'Export']
     exportBusyRef.current = false
     exportKindRef.current = null
@@ -1221,7 +1226,8 @@ export default function App() {
    * untouched, which is what lets every exporter keep reading its dimensions
    * from `gl.domElement` and get the framing the user actually composed.
    */
-  const [panelOpen, setPanelOpen] = useState(true)
+  // Shut under automation, so the canvas is the whole window the script sized.
+  const [panelOpen, setPanelOpen] = useState(!AUTOMATION)
   const viewInset = panelOpen ? PANEL_W : 0
 
   const [showHint, setShowHint] = useState(() => {
@@ -2140,6 +2146,15 @@ export default function App() {
     }, 0)
   }, [surfaceGeo, terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p, exportBaseName,
       beginExport, finishExport, handleExportProgress])
+
+  // The page as a script drives it. Installed only under `?automation`; see
+  // src/automation.js. Below every callback it hands on, so none is undefined.
+  automationDoneRef.current = useAutomation({
+    p, lineGeo, isComputing, isLoading, lastBuildMs, loadError, plotStats, externalPresets,
+    heightmapFilename, heightmapWidth, heightmapHeight,
+    handleDroppedFile, applyPreset, setParams,
+    beginSvgExport, beginPngExport, beginPreflight, handleStl,
+  })
 
   const handleHeightmapExport = useCallback(() => {
     const written = exportHeightmap(terrainData, exportBaseName)

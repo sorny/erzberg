@@ -1,13 +1,17 @@
 {
   "name": "erzberg",
-  "version": "1.43.0",
+  "version": "1.44.0",
   "private": true,
   "license": "MIT",
   "type": "module",
+  "bin": {
+    "erzberg": "scripts/erzberg.js"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/licenses.js",
     "preview": "vite preview",
+    "cli": "node scripts/erzberg.js",
     "lint": "eslint .",
     "test": "npm run test:light && npm run test:heavy",
     "test:unit": "vitest run",

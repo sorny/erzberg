@@ -51,6 +51,7 @@ const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { applyTheme, storedTheme } from '../utils/theme'
+import { AUTOMATION } from '../automation'
 
 /**
  * Square-law mapping for the flock-size slider.
@@ -1244,7 +1245,8 @@ export function Sidebar({
    * A restored session wins, because that is somebody's actual work.
    */
   useEffect(() => {
-    if (openingSpent.current || sessionRestored) return
+    // A scripted run states its own look, so the opening must not land on it.
+    if (AUTOMATION || openingSpent.current || sessionRestored) return
     const preset = externalPresets?.[OPENING_PRESET]
     if (!preset) return                       // manifest still in flight
     spendOpening()
