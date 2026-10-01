@@ -14,6 +14,7 @@ import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/de
 import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
 import { buildBedding, buildGlacier, buildRunout, buildSlopeClass } from './builders/survey.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
+import { buildMapGrid } from './builders/mapGrid.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
@@ -181,6 +182,11 @@ export function buildLineGeometry(terrain, p) {
         radius: p.radiusRunout, zone: p.zoneRunout, zoneColor: p.zoneColorRunout,
         hatch: p.hatchRunout, angle: p.angleRunout,
         cellMetres: p.cellMetresRunout, relief: p.reliefRunout }) },
+    { id:'MapGrid', builder: (t, ctx) => buildMapGrid(t, ctx, {
+        interval: p.intervalMapGrid, lines: p.linesMapGrid, marks: p.marksMapGrid,
+        markSize: p.markSizeMapGrid, markColor: p.markColorMapGrid,
+        scale: p.scaleMapGrid, scaleSize: p.scaleSizeMapGrid, scaleColor: p.scaleColorMapGrid,
+        cellMetres: p.cellMetresMapGrid }) },
     { id:'Venation', builder: (t, ctx) => buildVenation(t, ctx, {
         count: p.countVenation, roots: p.rootsVenation, spacing: p.spacingVenation,
         gamma: p.gammaVenation, seed: p.seedVenation }) },
@@ -333,6 +339,9 @@ export function buildLineGeometry(terrain, p) {
           // the un-mirrored path only: a mirrored label reads backwards, and a
           // kaleidoscope of reversed numbers is not what the option is for.
           labelAnchors: res.labelAnchors ?? null,
+          // The same, for the numbers of Map Grid's edge scale. A field of its
+          // own, because `useContourLabels` takes the first layer with anchors.
+          scaleAnchors: res.scaleAnchors ?? null,
           // A fact the panel reports, such as a route's walking time. Not geometry.
           note: res.note ?? null,
           // Lines that write depth and test against it, so the nearer of two

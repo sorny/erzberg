@@ -11,6 +11,10 @@ import { formatClock } from '../../utils/solar'
 import { BORDER, Btn, ColorRow, DIM, DateRow, HelpBox, InlineSl, MUTED, Note, SURF, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
 import { ModeStyleOverride } from './ModeStyleOverride'
 import { ModeMark } from './modeMarks'
+import { roundDistance } from '../../utils/builders/mapGrid.js'
+
+/** A distance on the ground, as a map would print it: `500 m`, `2 km`. */
+const formatMetres = (m) => (m >= 1000 ? `${Math.round(m / 10) / 100} km` : `${Math.round(m * 10) / 10} m`)
 
 /** A walking time as `2 h 05 min`, or `45 min` under an hour. */
 const formatWalk = (seconds) => {
@@ -18,7 +22,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
+export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1184,6 +1188,47 @@ export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradi
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Runout" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Map Grid" icon={<ModeMark kind="mapgrid" />} open={sec.modeMapGrid} onToggle={() => tog('modeMapGrid')} enabled={style.enabledMapGrid}>
+            <Tog label="Enabled" testId="mode-mapgrid" checked={style.enabledMapGrid} onChange={v => ss({ enabledMapGrid: v })} />
+            {style.enabledMapGrid && (
+              <>
+                <Sub>
+                  <Note>A grid at a true distance on the ground, from the south-west corner, and the map sheet's scale round the edge.</Note>
+                  {mapGridNote?.stepM > 0 && (
+                    <div data-testid="mapgrid-readout" style={{ fontSize:10.5, color: mapGridNote.raised ? WARN : DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`a line every ${formatMetres(mapGridNote.stepM)}${mapGridNote.raised ? ' — raised, the interval set would draw too many lines' : ''}`}
+                    </div>
+                  )}
+                  <InlineSl label="Interval" log help="The distance between grid lines on the ground. It snaps to round distances: 1, 2 or 5 times a power of ten." min={1} max={100000} step={1} value={style.intervalMapGrid ?? 1000} onChange={v => ss({ intervalMapGrid: roundDistance(v) })} fmt={formatMetres} />
+                  <Tog label="Lines" help="The grid as full lines, with the terrain's edge as a frame." checked={!!style.linesMapGrid} onChange={v => ss({ linesMapGrid: v })} />
+                  <Tog label="Crosses" help="A plus sign at each intersection, as its own pen. Many maps draw a grid this way, with no lines." checked={!!style.marksMapGrid} onChange={v => ss({ marksMapGrid: v })} />
+                  {style.marksMapGrid && (
+                    <>
+                      <InlineSl label="Cross size" log help="The width of each cross, arm to arm, in world units." min={1} max={Math.max(50, Math.round(plateSpan / 4))} step={0.5} value={style.markSizeMapGrid ?? 10} onChange={v => ss({ markSizeMapGrid: v })} fmt={v => (v >= 10 ? Math.round(v) : v.toFixed(1))} />
+                      <ColorRow label="Cross colour" value={style.markColorMapGrid ?? '#1a1a1a'} onChange={v => ss({ markColorMapGrid: v })} />
+                      <InlineSl label="Cross weight" min={0.5} max={10} step={0.5} value={style.markWeightMapGrid ?? 1} onChange={v => ss({ markWeightMapGrid: v })} fmt={v => v.toFixed(1)} />
+                      <SegGroup label="Cross dash" capitalize
+                        options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
+                        value={style.markDashMapGrid ?? 'solid'} onChange={(d) => ss({ markDashMapGrid: d })} style={{ marginBottom: 6 }} />
+                    </>
+                  )}
+                  <Tog label="Edge scale" testId="mapgrid-scale" help="Ticks and distances round the edge of the terrain, from the south-west corner, with an outer frame line, as on a map sheet. Its own pen." checked={!!style.scaleMapGrid} onChange={v => ss({ scaleMapGrid: v })} />
+                  {style.scaleMapGrid && (
+                    <>
+                      <InlineSl label="Number size" log help="The height of the numbers, in world units. The ticks are a little over half of it." min={2} max={Math.max(60, Math.round(plateSpan / 10))} step={0.5} value={style.scaleSizeMapGrid ?? 12} onChange={v => ss({ scaleSizeMapGrid: v })} fmt={v => (v >= 10 ? Math.round(v) : v.toFixed(1))} />
+                      <ColorRow label="Scale colour" value={style.scaleColorMapGrid ?? '#1a1a1a'} onChange={v => ss({ scaleColorMapGrid: v })} />
+                      <InlineSl label="Scale weight" min={0.5} max={6} step={0.5} value={style.scaleWeightMapGrid ?? 1} onChange={v => ss({ scaleWeightMapGrid: v })} fmt={v => v.toFixed(1)} />
+                    </>
+                  )}
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale; the distances come from this." min={0.5} max={200} step={0.5} value={style.cellMetresMapGrid ?? 10} onChange={v => ss({ cellMetresMapGrid: v })} fmt={v => `${v} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="MapGrid" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

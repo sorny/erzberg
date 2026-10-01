@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.41.0] — 2026-10-01
+
+### Added
+
+- **Map Grid** (Marks → Line). A grid at a round true distance on the ground
+  (500 m, 1 km), laid from the south-west corner as a map sheet's is, drawn as
+  lines, as crosses at the intersections, or both. *Edge scale* adds the
+  sheet's scale round the terrain: a tick at each grid distance on all four
+  sides, an outer frame line, and the distances in metres or kilometres, with
+  the unit at each corner, in a single-line font a plotter draws in one pass.
+  Crosses, scale and numbers are each their own pen. An interval that would
+  draw more than 300 lines across is raised to the next round one, and the
+  panel says so. It was first built into Crosshatch. It is its own mode
+  because Crosshatch is a pattern, stretched to fit and turned to any angle,
+  and this is a measurement.
+- Crosshatch and Map Grid share the line and cross geometry in `lines.js`.
+
 ## [1.40.0] — 2026-10-01
 
 ### Added

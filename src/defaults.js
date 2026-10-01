@@ -344,6 +344,15 @@ export const STYLE_DEF = {
   colorRunout: '#1a1a1a', weightRunout: 1, opacityRunout: 1, dashRunout: 'solid',
   hypsoRunout: false, hypsoModeRunout: 'elevation', hypsoBandedRunout: false, hypsoIntervalRunout: 10,
 
+  // Map grid — a grid at a round true distance from the south-west corner, as
+  // lines and/or crosses, and the sheet's scale round the edge. Metres.
+  enabledMapGrid: false, intervalMapGrid: 1000, linesMapGrid: false, marksMapGrid: true,
+  markSizeMapGrid: 10, markColorMapGrid: '#1a1a1a', markWeightMapGrid: 1, markDashMapGrid: 'solid',
+  scaleMapGrid: true, scaleSizeMapGrid: 12, scaleColorMapGrid: '#1a1a1a', scaleWeightMapGrid: 1,
+  cellMetresMapGrid: 10,
+  colorMapGrid: '#1a1a1a', weightMapGrid: 0.8, opacityMapGrid: 1, dashMapGrid: 'solid',
+  hypsoMapGrid: false, hypsoModeMapGrid: 'elevation', hypsoBandedMapGrid: false, hypsoIntervalMapGrid: 10,
+
   // Venation — leaf veins that grow up the wet ground from the outlets.
   enabledVenation: false, countVenation: 6000, rootsVenation: 6, spacingVenation: 3, gammaVenation: 1.2, seedVenation: 1,
   colorVenation: '#1a1a1a', weightVenation: 1, opacityVenation: 1, dashVenation: 'solid',
@@ -655,7 +664,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the fifty-one modes are
+  // A modifier rather than a mode: it takes whatever the fifty-two modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

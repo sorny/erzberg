@@ -74,6 +74,7 @@ export const SECTION_TERMS = {
   'Mode: Slope Classes': 'slope classes steepness degrees avalanche map 30 35 40 hatch bands steep ground ski touring',
   'Mode: Wind': 'wind streamlines air weather prevailing bearing lee crest ridge gust breeze flow over ground arrows streaks eddies turbulence rotor weather map',
   'Mode: Runout': 'runout rockfall falling rock hazard map reach angle fahrböschung release zone cliff scree avalanche stop',
+  'Mode: Map Grid': 'map grid kilometre km graticule scale edge ticks frame sheet coordinates crosses reference grid',
   'Mode: Venation': 'venation veins leaf network space colonization growth roots wetness valleys branching organic',
   'Mode: Geodesic Fan': 'geodesic fan shortest path straight line on the ground rays caustics lensing curved surface point',
   'Mode: Radar': 'radar sar side looking backscatter layover foreshortening shadow slant range ticks remote sensing',

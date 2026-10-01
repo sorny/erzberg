@@ -904,7 +904,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1059,6 +1059,7 @@ export function Sidebar({
   const venationNote = noteOf('Venation')
   const coralNote = noteOf('Coral')
   const glacierNote = noteOf('Glacier')
+  const mapGridNote = noteOf('MapGrid')
   const crsInfo     = classifyCRS(geoTiffCRS)
 
   /*
@@ -1144,6 +1145,7 @@ export function Sidebar({
       modeSlopeClass: !!newStyle.enabledSlopeClass,
       modeWind:     !!newStyle.enabledWind,
       modeRunout:   !!newStyle.enabledRunout,
+      modeMapGrid:  !!newStyle.enabledMapGrid,
       modeVenation: !!newStyle.enabledVenation,
       modeGeodesic: !!newStyle.enabledGeodesic,
       modeRadar:    !!newStyle.enabledRadar,
@@ -2560,7 +2562,7 @@ export function Sidebar({
               otherwise. */}
           {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
-          <ModeSections cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} />
+          <ModeSections mapGridNote={mapGridNote} cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} />
 
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —
@@ -2895,7 +2897,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
-              A modifier, not a mode: it takes whatever the fifty-one modes
+              A modifier, not a mode: it takes whatever the fifty-two modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
                    enabled={summaries['Anaglyph'] !== '—'}>

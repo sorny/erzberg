@@ -131,6 +131,7 @@ export const PANEL_MODES = [
   ['Mode: Slope Classes',  'enabledSlopeClass', 'From',     (s) => deg(s.lowSlopeClass)],
   ['Mode: Wind',           'enabledWind',      'From',      (s) => deg(s.azimuthWind)],
   ['Mode: Runout',         'enabledRunout',    'Reach',     (s) => deg(s.reachRunout)],
+  ['Mode: Map Grid',       'enabledMapGrid',   'Every',     (s) => ((s.intervalMapGrid ?? 1000) >= 1000 ? `${(s.intervalMapGrid ?? 1000) / 1000} km` : `${s.intervalMapGrid} m`)],
   ['Mode: Venation',       'enabledVenation',  'Roots',     (s) => num(s.rootsVenation)],
   ['Mode: Geodesic Fan',   'enabledGeodesic',  'Rays',      (s) => num(s.raysGeodesic)],
   ['Mode: Radar',          'enabledRadar',     'Look',      (s) => deg(s.azimuthRadar)],

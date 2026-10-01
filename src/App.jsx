@@ -25,6 +25,7 @@ import { useHistory } from './hooks/useHistory'
 import { useDraftHistory } from './hooks/useDraftHistory'
 import { adoptTextLayers } from './utils/textLayers'
 import { useContourLabels } from './hooks/useContourLabels'
+import { useScaleLabels } from './hooks/useScaleLabels'
 import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
@@ -2020,8 +2021,11 @@ export default function App() {
   // Free text goes on last, which is what puts it in front of the drawing it
   // annotates. Nothing derives it, so unlike every other label it needs no
   // features, no raster and no worker — only a face and a place to stand.
+  // Map Grid's edge scale numbers, the same split again.
+  const scaleLabelled = useScaleLabels(contourLabelled)
+
   const { lineGeo, overflowed: textOverflow } =
-    useTextLayers(contourLabelled, textLayers, terrainData, view.tilt, view.rotation)
+    useTextLayers(scaleLabelled, textLayers, terrainData, view.tilt, view.rotation)
 
   /**
    * One mark per land-cover class, in one press.

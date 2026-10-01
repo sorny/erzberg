@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all fifty-one at once.
+ * does the index that shows all fifty-two at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -237,6 +237,11 @@ export const DRAW_MODES = [
     pick: { spacing: [4, 10] },
   },
   {
+    // A few hundred lines at most, and a few hundred ticks.
+    id: 'MapGrid', label: 'Map grid', cost: 1, mark: 'mapgrid',
+    pick: {},
+  },
+  {
     // A D8 sweep, then space colonization with a bucketed nearest-node update.
     id: 'Venation', label: 'Venation', cost: 3, mark: 'venation',
     pick: { spacing: [2, 6], gamma: [0.8, 2] },
@@ -289,6 +294,9 @@ export const MODE_LABEL = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.labe
  */
 export const SUB_LAYER_LABEL = {
   'Cross-Marks':             'Intersections',
+  'MapGrid-Marks':           'Crosses',
+  'MapGrid-Scale':           'Scale',
+  'MapGrid-Numbers':         'Scale numbers',
   'Contours-Minor':          'Minor',
   'Contours-Major':          'Major',
   'Contours-Labels':         'Heights',

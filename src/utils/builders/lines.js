@@ -17,10 +17,15 @@ import { F32List, drapeEdge, inElevCut, neighbour, normElev } from './shared.js'
  * Shared by Lines, which draws one family, and Crosshatch, which draws two and
  * marks where they meet, so the marks sit exactly on the lines.
  */
-function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary) {
+export function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary, origin = null) {
   const { rows, cols, scl } = terrain
-  const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
-  const shiftCells = (shift ?? 0) % lineStep
+  // Whole cells, so at 0° and 90° the samples land on grid rows. A grid laid
+  // from a corner at a true distance (`origin`) cannot round: 1 km on 30 m cells
+  // is 33⅓ of them, and rounding would put the tenth line 33 m out.
+  const lineStep = origin
+    ? Math.max(0.5, (spacing ?? 4) / scl)
+    : Math.max(1, Math.round((spacing ?? 4) / scl))
+  let shiftCells = (shift ?? 0) % lineStep
   const theta = ((angleDeg ?? 0) * Math.PI) / 180
   // Snap near-axis components to exact 0/±1. At multiples of 90° cos/sin carry a
   // ~1e-16 rounding error; with fitBoundary the edge lines sit exactly on the grid
@@ -39,6 +44,10 @@ function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary) {
     const tt = dx * c + dz * r; if (tt < tMin) tMin = tt; if (tt > tMax) tMax = tt
   }
   const t0 = Math.ceil(tMin), t1 = Math.floor(tMax)
+  if (origin) {
+    const o = nx * origin.c + nz * origin.r
+    shiftCells = ((o % lineStep) + lineStep) % lineStep
+  }
 
   // Line positions along the normal. By default lines sit at fixed multiples of
   // lineStep, so the far edge keeps whatever partial gap is left over (open/half
@@ -54,6 +63,12 @@ function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary) {
     const kMin = Math.ceil((pMin - shiftCells) / lineStep)
     const kMax = Math.floor((pMax - shiftCells) / lineStep)
     for (let k = kMin; k <= kMax; k++) linePos.push(k * lineStep + shiftCells)
+    // Laid from a corner, the grid still has a frame: the two edge lines, unless
+    // a grid line already sits on one.
+    if (origin) {
+      if (!linePos.length || linePos[0] - pMin > 1e-6) linePos.unshift(pMin)
+      if (pMax - linePos[linePos.length - 1] > 1e-6) linePos.push(pMax)
+    }
   }
 
   return { linePos, dx, dz, nx, nz, t0, t1, theta }
@@ -120,51 +135,99 @@ export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundar
  * outermost lines run along its border at any spacing. At a spacing as wide as
  * the raster, those border lines are all that is left: a frame.
  *
- * The marks are the survey map's grid crosses. Family A's lines satisfy
- * nA · x = p and family B's satisfy nB · x = q, and the two normals are unit
- * and at right angles, so each pair meets at x = p·nA + q·nB. Each cross has
- * one arm along each family, `markSize` world units across, draped like the
- * lines. A cross with no ground under its centre is left out. The marks are
- * their own pen, `Cross-Marks`, with their own colour, weight and dash.
+ * The marks are a second pen, `Cross-Marks`, with their own colour, weight and
+ * dash; see `intersectionMarks`. `lines` off leaves the crosses alone.
  *
- * `lines` off leaves the crosses alone, which is how many maps draw a grid: a
- * cross at each intersection instead of the full lines.
+ * A grid at true distances, with a scale round the edge, is Map Grid's job
+ * (builders/mapGrid.js): this one is a pattern, stretched to fit and turned to
+ * any angle.
  */
 export function buildCrosshatch(terrain, p, o) {
   const angle = o.angle ?? 0
+  const A = lineFamily(terrain, o.spacing, 0, angle, true)
+  const B = lineFamily(terrain, o.spacing, 0, angle + 90, true)
   const out = {}
-  if (o.lines !== false) {
-    const a = buildAngleLines(terrain, p, o.spacing, 0, angle, true)
-    const b = buildAngleLines(terrain, p, o.spacing, 0, angle + 90, true)
-    const pos = new Float32Array(a.positions.length + b.positions.length)
-    pos.set(a.positions); pos.set(b.positions, a.positions.length)
-    const col = new Float32Array(a.colors.length + b.colors.length)
-    col.set(a.colors); col.set(b.colors, a.colors.length)
-    out.Cross = { positions: pos, colors: col }
-  }
-  if (o.marks) {
-    const { gridMask, rows, cols, scl } = terrain
-    const sMask = terrain.hasNoData ? gridMask : null
-    const A = lineFamily(terrain, o.spacing, 0, angle, true)
-    const B = lineFamily(terrain, o.spacing, 0, angle + 90, true)
-    const half = Math.max(0.5, (o.markSize ?? 6) / scl / 2)
-    const ink = { ...p, lineColor: o.markColor ?? p.lineColor }
-    const marks = { positions: new F32List(), colors: new F32List() }
-    for (const pa of A.linePos) {
-      for (const pb of B.linePos) {
-        const c = A.nx * pa + B.nx * pb, r = A.nz * pa + B.nz * pb
-        if (c < -1e-6 || r < -1e-6 || c > cols - 1 + 1e-6 || r > rows - 1 + 1e-6) continue
-        if (!hasData(gridMask, Math.round(r), Math.round(c), cols)) continue
-        drapeEdge(marks, terrain, ink, sMask, c - A.dx * half, r - A.dz * half, c + A.dx * half, r + A.dz * half, A.theta)
-        drapeEdge(marks, terrain, ink, sMask, c - B.dx * half, r - B.dz * half, c + B.dx * half, r + B.dz * half, B.theta)
-      }
-    }
-    out['Cross-Marks'] = { positions: marks.positions.toArray(), colors: marks.colors.toArray() }
-  }
+  if (o.lines !== false) out.Cross = joinFamilies(terrain, p, A, B)
+  if (o.marks) out['Cross-Marks'] = intersectionMarks(terrain, p, A, B, o.markSize, o.markColor)
   const keys = Object.keys(out)
   if (!keys.length) return null
   return keys.length === 1 && keys[0] === 'Cross' ? out.Cross : out
 }
+
+/** Two families of lines, drawn into one layer. */
+export function joinFamilies(terrain, p, A, B) {
+  const a = drawFamily(terrain, p, A), b = drawFamily(terrain, p, B)
+  const pos = new Float32Array(a.positions.length + b.positions.length)
+  pos.set(a.positions); pos.set(b.positions, a.positions.length)
+  const col = new Float32Array(a.colors.length + b.colors.length)
+  col.set(a.colors); col.set(b.colors, a.colors.length)
+  return { positions: pos, colors: col }
+}
+
+/**
+ * A plus sign at every crossing of two families of lines.
+ *
+ * Family A's lines satisfy nA · x = p and family B's nB · x = q, and the two
+ * normals are unit and at right angles, so each pair meets at x = p·nA + q·nB.
+ * Each cross has one arm along each family, `size` world units across, draped
+ * like the lines. A cross with no ground under its centre is left out. Shared by
+ * Crosshatch and Map Grid.
+ */
+export function intersectionMarks(terrain, p, A, B, size, color) {
+  const { gridMask, rows, cols, scl } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const half = Math.max(0.5, (size ?? 6) / scl / 2)
+  const ink = { ...p, lineColor: color ?? p.lineColor }
+  const marks = { positions: new F32List(), colors: new F32List() }
+  for (const pa of A.linePos) {
+    for (const pb of B.linePos) {
+      const c = A.nx * pa + B.nx * pb, r = A.nz * pa + B.nz * pb
+      if (c < -1e-6 || r < -1e-6 || c > cols - 1 + 1e-6 || r > rows - 1 + 1e-6) continue
+      if (!hasData(gridMask, Math.round(r), Math.round(c), cols)) continue
+      drapeEdge(marks, terrain, ink, sMask, c - A.dx * half, r - A.dz * half, c + A.dx * half, r + A.dz * half, A.theta)
+      drapeEdge(marks, terrain, ink, sMask, c - B.dx * half, r - B.dz * half, c + B.dx * half, r + B.dz * half, B.theta)
+    }
+  }
+  return { positions: marks.positions.toArray(), colors: marks.colors.toArray() }
+}
+
+
+/** One family of lines, drawn: the march of `buildAngleLines` over given positions. */
+export function drawFamily(terrain, p, F) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const positions = new F32List(), colors = new F32List()
+  const { linePos, dx, dz, nx, nz, t0, t1, theta } = F
+  for (const pos of linePos) {
+    const ox = nx * pos, oz = nz * pos
+    let prevOk = false, prevC = 0, prevR = 0, prevE = 0
+    for (let t = t0; t <= t1; t++) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let ok = fc >= -1e-6 && fc <= cols - 1 + 1e-6 && fr >= -1e-6 && fr <= rows - 1 + 1e-6
+      let elev = 0
+      if (ok) {
+        ok = hasData(gridMask, Math.round(fr), Math.round(fc), cols)
+        if (ok) {
+          const b = sampleBilinear(grid, sMask, rows, cols, Math.min(rows - 1, Math.max(0, fr)), Math.min(cols - 1, Math.max(0, fc)))
+          ok = b === b
+          elev = (b - 0.5) * 100 * elevScale
+          if (jitterAmt > 0) elev += jitterNoise(fc, fr) * jitterAmt
+          ok = ok && inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)
+        }
+      }
+      if (ok && prevOk) {
+        positions.push6(prevC * scl - halfW, prevE, prevR * scl - halfH, fc * scl - halfW, elev, fr * scl - halfH)
+        const i0 = Math.round(prevR) * cols + Math.round(prevC), i1 = Math.round(fr) * cols + Math.round(fc)
+        colors.pushRgb(computeVertexColor(normElev(prevE, minElev, maxElev), gridSlopes[i0] / (maxSlope || 1), theta, p))
+        colors.pushRgb(computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[i1] / (maxSlope || 1), theta, p))
+      }
+      prevOk = ok; prevC = fc; prevR = fr; prevE = elev
+    }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
 
 // ─── Flow lines ───────────────────────────────────────────────────────────────
 

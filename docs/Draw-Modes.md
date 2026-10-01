@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-one
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-two
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Fifty modes read $H$ only. [Land cover](#land-cover) reads a second
+Fifty-one modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -753,6 +753,20 @@ on the ice every *Interval* true metres, in the ice colour; crevasses, short
 arcs across the fall line where the ice is steeper than *Cracks from*, longer as
 it steepens; and moraine rings in a band just outside the edge. The panel shows
 the share of the ground under ice and the snowline in metres.
+
+## 53. Map Grid
+
+A grid at a true distance on the ground, as a map sheet draws it. The
+*Interval* is a round distance, $\{1, 2, 5\} \times 10^k$ metres, and the grid
+starts at the south-west corner and follows the raster's axes, with metres per
+pixel from the GeoTIFF or the panel. An interval that would draw more than 300
+lines across is raised to the next round one, and the panel says so. The grid
+draws as *Lines* (with the terrain's edge as a frame), as *Crosses* at the
+intersections, or both, each its own pen. *Edge scale* is a third pen: a tick at
+each grid distance on all four sides, an outer frame line, and the distances
+from the corner in metres, or kilometres once the sheet passes one, with the
+unit at each corner. The numbers are set in a single-line font, which a pen draws
+in one pass. Crosshatch is the pattern; this is the measurement.
 
 ---
 

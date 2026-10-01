@@ -353,6 +353,14 @@ const MARKS = {
       <path d="M5 10 L8 10 M10 8.5 L13 8.5 M13 11 L16 11" strokeWidth="1.2" />
     </g>
   ),
+  // A framed sheet with ticks along two edges and crosses inside.
+  mapgrid: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M3 2 L21 2 L21 12 L3 12 Z" />
+      <path d="M7 12 L7 13.5 M11 12 L11 13.5 M15 12 L15 13.5 M19 12 L19 13.5 M3 9 L1.5 9 M3 5 L1.5 5" />
+      <path d="M6 5 L8 5 M7 4 L7 6 M10 5 L12 5 M11 4 L11 6 M14 5 L16 5 M15 4 L15 6 M6 9 L8 9 M7 8 L7 10 M10 9 L12 9 M11 8 L11 10 M14 9 L16 9 M15 8 L15 10" />
+    </g>
+  ),
   // Veins that branch up from one root and fine out.
   venation: (
     <g {...BASE} strokeWidth="0.8">

@@ -44,23 +44,26 @@ another or from the dispatcher.
 
 ### Lettering, on the main thread
 
-Four passes add geometry that the worker cannot make:
+Five passes add geometry that the worker cannot make:
 
 ```
   worker output ──> useVectorIcons   ──> useVectorLabels ──>
-                    useContourLabels ──> useTextLayers    ──> lineGeo
+                    useContourLabels ──> useScaleLabels   ──>
+                    useTextLayers    ──> lineGeo
 ```
 
 They run on the main thread because fonts are fetched and the worker has none.
 `useVectorIcons` also flattens SVG through the browser's geometry API. As a
 result, size, lift and orientation cost a frame, not a rebuild.
 
-The four passes differ only in where the string and the anchor come from:
+The five passes differ only in where the string and the anchor come from:
 
 - An icon replaces the dot it is drawn from.
 - A vector label reads its string from the feature.
 - A contour label reads its value from the elevation, and its place from gaps
   that the worker left.
+- A Map Grid scale number gets both its text and its place from the worker,
+  which can measure the distance. Only the lettering is left to do.
 - A text layer is given both. It is appended last, so it draws in front.
 
 ---
@@ -344,7 +347,7 @@ To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
 ### A draw mode
 
 1. Write a builder in the family module under `src/utils/builders/` (lines,
-   tone, light, relief, colour, weather, growth …) that returns `{ positions, colors }`,
+   tone, light, relief, colour, weather, growth, mapGrid …) that returns `{ positions, colors }`,
    or an object of sub-layers for separate pens.
 2. Register it in `MODES_CONFIG` in `buildLineGeometry`.
 3. Add a `layerStyle` case for each sub-layer.
