@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.40.0] — 2026-10-01
+
+### Added
+
+- **Crosshatch intersections.** A plus sign where the lines cross, as its own
+  pen layer ("Crosshatch · Intersections") with its own size, colour, weight
+  and dash. *Lines* can be switched off to leave only the crosses, the way
+  many maps draw a grid.
+
+### Changed
+
+- **Crosshatch spacing** runs up to the width of the terrain, on a log scale.
+  At the top only the lines along the edges are left, a frame round the
+  terrain. The old maximum was 100.
+- Any slider can now run on a log scale (`InlineSl log`), for ranges that span
+  orders of magnitude.
+
 ## [1.39.0] — 2026-09-30
 
 Seven new surface layers, and two old ones made honest. All are shader

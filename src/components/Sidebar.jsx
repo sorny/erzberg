@@ -1085,6 +1085,11 @@ export function Sidebar({
    * elevation range is what the raster actually holds after a crop, so the
    * bounds below track the ground rather than a nominal full-range raster.
    */
+  // The terrain's longer side in world units: as far as a spacing can usefully
+  // go, where a grid fitted to the edges is only its frame.
+  const plateSpan = terrainData?.cols
+    ? Math.ceil(Math.max(terrainData.cols - 1, terrainData.rows - 1) * (terrainData.scl || 1))
+    : 1000
   const mPerWorld = hasGeoTiff && terrainData
     ? metresPerWorldUnit(geoTiffElevMin, geoTiffElevMax, terrainData.elevScale,
                          terrain.blackPoint, terrain.whitePoint)
@@ -2555,7 +2560,7 @@ export function Sidebar({
               otherwise. */}
           {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
-          <ModeSections cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} />
+          <ModeSections cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts} ss={ss} style={style} sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} />
 
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —

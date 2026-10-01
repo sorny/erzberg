@@ -254,7 +254,7 @@ dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathemat
 | Mode | Technique |
 |---|---|
 | Lines | Parallel terrain ridgelines at any bearing |
-| Crosshatch | Two perpendicular line sets at a set angle |
+| Crosshatch | Two perpendicular line sets at a set angle, with optional plus signs at the intersections as their own pen |
 | Pillars | Vertical extrusion per cell (line, cuboid or cylinder), below and optionally above the ground, inked by land cover class |
 | Contours | Marching Squares isolines, with optional ring closing and Chaikin smoothing |
 | Hachure | Slope-directed short strokes, or Lehmann downslope strokes between contours |

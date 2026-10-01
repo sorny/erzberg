@@ -593,10 +593,21 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
   )
 }
 
-export function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId }) {
+export function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId, log = false }) {
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
+  // A log scale, for a range that runs over orders of magnitude: a spacing from
+  // 1 to the width of a 4 000 px raster left the useful end, 1 to 20, in the
+  // first half-percent of the track. The track runs 0…1000 and maps through
+  // min·(max/min)^t; the value field still takes and shows the real number.
+  const L = log && min > 0 && max > min
+  const toTrack = (v) => (L ? Math.round(1000 * Math.log(Math.max(min, v) / min) / Math.log(max / min)) : v)
+  const fromTrack = (t) => {
+    if (!L) return parsed(t)
+    const v = min * Math.pow(max / min, Number(t) / 1000)
+    return Math.min(max, Math.max(min, Math.round(v / step) * step))
+  }
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
@@ -611,8 +622,9 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
             already in scope. */}
         <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
           aria-valuetext={fmt ? String(fmt(value)) : undefined}
-          min={min} max={max} step={step} value={value} style={fillOf(value, min, max)}
-          onChange={e => onChange(parsed(e.target.value))} />
+          min={L ? 0 : min} max={L ? 1000 : max} step={L ? 1 : step} value={toTrack(value)}
+          style={L ? fillOf(toTrack(value), 0, 1000) : fillOf(value, min, max)}
+          onChange={e => onChange(fromTrack(e.target.value))} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
           min={min} max={max} step={step} width={32} />
       </div>

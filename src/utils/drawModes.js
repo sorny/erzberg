@@ -288,6 +288,7 @@ export const MODE_LABEL = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.labe
  * mean something else anywhere else.
  */
 export const SUB_LAYER_LABEL = {
+  'Cross-Marks':             'Intersections',
   'Contours-Minor':          'Minor',
   'Contours-Major':          'Major',
   'Contours-Labels':         'Heights',

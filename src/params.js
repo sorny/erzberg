@@ -99,6 +99,7 @@ const RENDER_SIDE = [
   // (tanakaWeightBright, labelColorContours, screeWeightSwiss).
   /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight)/,
   /^label(SingleLine|Font)Contours$/,
+  /^mark(Weight|Dash)Cross$/,
   // Texture overlay — sampled in the surface shader.
   /^(texture|showTexture)/,
   // The drape's opacity is a shader uniform and nothing else. `showImagery` is
@@ -162,6 +163,8 @@ const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
   /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,
+  // Crosshatch's intersection marks: their own pen's weight and dash.
+  /^mark(Weight|Dash)Cross$/,
 ]
 
 /**

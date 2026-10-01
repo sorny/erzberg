@@ -21,7 +21,16 @@ samples land on grid rows and columns.
 
 ## 2. Crosshatch
 
-Lines at $\theta$ and at $\theta + 90°$, merged into one layer.
+Lines at $\theta$ and at $\theta + 90°$, merged into one layer. Both sets are
+fitted to the raster's edges, so the outer lines run along its border. At a
+*Spacing* as wide as the terrain, only those border lines are left: a frame.
+
+*Intersections* puts a plus sign where the lines cross, as a second pen with its
+own colour, weight and dash. The lines of one set satisfy $\mathbf{n}_A \cdot
+\mathbf{x} = p$ and of the other $\mathbf{n}_B \cdot \mathbf{x} = q$, with unit
+normals at right angles, so each pair meets at $p\,\mathbf{n}_A +
+q\,\mathbf{n}_B$. Each cross has one arm along each set, *Size* across. With
+*Lines* off, only the crosses are drawn, as many maps draw a grid.
 
 ## 3. Pillars
 

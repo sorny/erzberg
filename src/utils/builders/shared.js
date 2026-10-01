@@ -225,6 +225,9 @@ function resolveLayerStyle(id, p) {
     // The skyline is the line the board is drawn for, so it takes the heavier pen.
     case 'Panorama-Skyline':
       return { weight: p.skylineWeightPanorama ?? 2.4, opacity: p.opacityPanorama, dash: 'solid' }
+    // The crosses are a second pen: their own weight and dash, the mode's opacity.
+    case 'Cross-Marks':
+      return { weight: p.markWeightCross ?? 1.5, opacity: p.opacityCross, dash: p.markDashCross ?? 'solid' }
     case 'Bedding-Beds':
       return { weight: p.weightBedding, opacity: p.opacityBedding, dash: p.dashBedding }
     case 'Bedding-Marker':

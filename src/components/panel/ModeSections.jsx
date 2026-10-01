@@ -18,7 +18,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
+export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -40,8 +40,20 @@ export function ModeSections({ coralNote, cover, geoTiffBbox, glacierNote, gradi
             {style.enabledCross && (
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} />
+                  <InlineSl label="Spacing" log help="The gap between lines. It runs up to the width of the terrain, where only the lines along its edges are left: a frame." min={1} max={Math.max(100, plateSpan)} step={0.5} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} fmt={v => (v >= 10 ? Math.round(v) : v.toFixed(1))} />
                   <InlineSl label="Angle" help="Bearing of the first line set; the second runs perpendicular to it." min={0} max={90} step={1} value={style.angleCross ?? 0} onChange={v => ss({ angleCross: v })} fmt={v => `${v}°`} />
+                  <Tog label="Lines" help="Off leaves only the crosses at the intersections, as many maps draw a grid." checked={style.linesCross !== false} onChange={v => ss({ linesCross: v })} />
+                  <Tog label="Intersections" testId="cross-marks" help="A plus sign where the lines cross, as its own pen." checked={!!style.marksCross} onChange={v => ss({ marksCross: v })} />
+                  {style.marksCross && (
+                    <>
+                      <InlineSl label="Size" log help="The width of each cross, arm to arm." min={1} max={Math.max(50, Math.round(plateSpan / 4))} step={0.5} value={style.markSizeCross ?? 6} onChange={v => ss({ markSizeCross: v })} fmt={v => (v >= 10 ? Math.round(v) : v.toFixed(1))} />
+                      <ColorRow label="Cross colour" value={style.markColorCross ?? '#c0561a'} onChange={v => ss({ markColorCross: v })} />
+                      <InlineSl label="Cross weight" min={0.5} max={10} step={0.5} value={style.markWeightCross ?? 1.5} onChange={v => ss({ markWeightCross: v })} fmt={v => v.toFixed(1)} />
+                      <SegGroup label="Cross dash" capitalize
+                        options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
+                        value={style.markDashCross ?? 'solid'} onChange={(d) => ss({ markDashCross: d })} style={{ marginBottom: 6 }} />
+                    </>
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Cross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>

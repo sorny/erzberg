@@ -49,7 +49,9 @@ export function buildLineGeometry(terrain, p) {
 
   const MODES_CONFIG = [
     { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines) },
-    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, p.spacingCross, p.angleCross) },
+    { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, {
+        spacing: p.spacingCross, angle: p.angleCross, lines: p.linesCross,
+        marks: p.marksCross, markSize: p.markSizeCross, markColor: p.markColorCross }) },
     { id:'Pillars', builder: (t, ctx) => buildPillars(t, ctx, p.spacingPillars) },
     { id:'Contours',builder: (t, ctx) => buildContours(t, ctx, p.intervalContours, p.majorIntervalContours, p.majorOffsetContours, p.closeRingsContours, p.smoothingContours) },
     { id:'Hachure', builder: (t, ctx) => p.styleHachure === 'lehmann'

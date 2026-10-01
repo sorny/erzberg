@@ -6,28 +6,19 @@
  */
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
-import { F32List, concat, inElevCut, neighbour, normElev } from './shared.js'
+import { F32List, drapeEdge, inElevCut, neighbour, normElev } from './shared.js'
 
 // ─── Lines (arbitrary bearing) ───────────────────────────────────────────────
 
 /**
- * Parallel terrain-draped lines at any bearing angle — the merger of the old
- * X Lines (angle 0°) and Y Lines (angle 90°) modes.
+ * Where a family of parallel lines lies: its direction, its normal, and the
+ * position of each line along that normal, in grid cells.
  *
- * Lines sit at perpendicular positions pos = k·lineStep + shift (in grid cells)
- * along the normal of the march direction, and are sampled in unit-cell steps.
- * At 0°/90° the sample points land exactly on grid rows/columns, so those
- * angles reproduce the old axis-aligned modes; oblique angles sample the
- * terrain bilinearly along the rotated rays.
+ * Shared by Lines, which draws one family, and Crosshatch, which draws two and
+ * marks where they meet, so the marks sit exactly on the lines.
  */
-export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
-  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
-  const positions = new F32List(), colors = new F32List()
-  // A solid raster takes the plain bilinear path — the renormalising one costs
-  // a mask read and a divide per sample, and this is the hottest loop here.
-  const sMask = terrain.hasNoData ? gridMask : null
-
+function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary) {
+  const { rows, cols, scl } = terrain
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
   const shiftCells = (shift ?? 0) % lineStep
   const theta = ((angleDeg ?? 0) * Math.PI) / 180
@@ -65,6 +56,29 @@ export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundar
     for (let k = kMin; k <= kMax; k++) linePos.push(k * lineStep + shiftCells)
   }
 
+  return { linePos, dx, dz, nx, nz, t0, t1, theta }
+}
+
+/**
+ * Parallel terrain-draped lines at any bearing angle — the merger of the old
+ * X Lines (angle 0°) and Y Lines (angle 90°) modes.
+ *
+ * Lines sit at perpendicular positions pos = k·lineStep + shift (in grid cells)
+ * along the normal of the march direction, and are sampled in unit-cell steps.
+ * At 0°/90° the sample points land exactly on grid rows/columns, so those
+ * angles reproduce the old axis-aligned modes; oblique angles sample the
+ * terrain bilinearly along the rotated rays.
+ */
+export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
+  const positions = new F32List(), colors = new F32List()
+  // A solid raster takes the plain bilinear path — the renormalising one costs
+  // a mask read and a divide per sample, and this is the hottest loop here.
+  const sMask = terrain.hasNoData ? gridMask : null
+
+  const { linePos, dx, dz, nx, nz, t0, t1, theta } = lineFamily(terrain, spacing, shift, angleDeg, fitBoundary)
+
   for (const pos of linePos) {
     const ox = nx * pos, oz = nz * pos
     let prevOk = false, prevC = 0, prevR = 0, prevE = 0
@@ -99,10 +113,57 @@ export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundar
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
-export function buildCrosshatch(terrain, p, spacing, angleDeg) {
-  const a = buildAngleLines(terrain, p, spacing, 0, angleDeg ?? 0, true)
-  const b = buildAngleLines(terrain, p, spacing, 0, (angleDeg ?? 0) + 90, true)
-  return { positions: concat(a.positions, b.positions), colors: concat(a.colors, b.colors) }
+/**
+ * Two perpendicular families of lines, and a plus sign where they cross.
+ *
+ * Both families are fitted to the edges of the raster (`fitBoundary`), so the
+ * outermost lines run along its border at any spacing. At a spacing as wide as
+ * the raster, those border lines are all that is left: a frame.
+ *
+ * The marks are the survey map's grid crosses. Family A's lines satisfy
+ * nA · x = p and family B's satisfy nB · x = q, and the two normals are unit
+ * and at right angles, so each pair meets at x = p·nA + q·nB. Each cross has
+ * one arm along each family, `markSize` world units across, draped like the
+ * lines. A cross with no ground under its centre is left out. The marks are
+ * their own pen, `Cross-Marks`, with their own colour, weight and dash.
+ *
+ * `lines` off leaves the crosses alone, which is how many maps draw a grid: a
+ * cross at each intersection instead of the full lines.
+ */
+export function buildCrosshatch(terrain, p, o) {
+  const angle = o.angle ?? 0
+  const out = {}
+  if (o.lines !== false) {
+    const a = buildAngleLines(terrain, p, o.spacing, 0, angle, true)
+    const b = buildAngleLines(terrain, p, o.spacing, 0, angle + 90, true)
+    const pos = new Float32Array(a.positions.length + b.positions.length)
+    pos.set(a.positions); pos.set(b.positions, a.positions.length)
+    const col = new Float32Array(a.colors.length + b.colors.length)
+    col.set(a.colors); col.set(b.colors, a.colors.length)
+    out.Cross = { positions: pos, colors: col }
+  }
+  if (o.marks) {
+    const { gridMask, rows, cols, scl } = terrain
+    const sMask = terrain.hasNoData ? gridMask : null
+    const A = lineFamily(terrain, o.spacing, 0, angle, true)
+    const B = lineFamily(terrain, o.spacing, 0, angle + 90, true)
+    const half = Math.max(0.5, (o.markSize ?? 6) / scl / 2)
+    const ink = { ...p, lineColor: o.markColor ?? p.lineColor }
+    const marks = { positions: new F32List(), colors: new F32List() }
+    for (const pa of A.linePos) {
+      for (const pb of B.linePos) {
+        const c = A.nx * pa + B.nx * pb, r = A.nz * pa + B.nz * pb
+        if (c < -1e-6 || r < -1e-6 || c > cols - 1 + 1e-6 || r > rows - 1 + 1e-6) continue
+        if (!hasData(gridMask, Math.round(r), Math.round(c), cols)) continue
+        drapeEdge(marks, terrain, ink, sMask, c - A.dx * half, r - A.dz * half, c + A.dx * half, r + A.dz * half, A.theta)
+        drapeEdge(marks, terrain, ink, sMask, c - B.dx * half, r - B.dz * half, c + B.dx * half, r + B.dz * half, B.theta)
+      }
+    }
+    out['Cross-Marks'] = { positions: marks.positions.toArray(), colors: marks.colors.toArray() }
+  }
+  const keys = Object.keys(out)
+  if (!keys.length) return null
+  return keys.length === 1 && keys[0] === 'Cross' ? out.Cross : out
 }
 
 // ─── Flow lines ───────────────────────────────────────────────────────────────

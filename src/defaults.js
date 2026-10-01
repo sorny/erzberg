@@ -53,6 +53,10 @@ export const STYLE_DEF = {
   hypsoLines: false, hypsoModeLines: 'elevation', hypsoBandedLines: false, hypsoIntervalLines: 10,
   // Crosshatch (two perpendicular line sets at angleCross / angleCross+90)
   enabledCross: false, spacingCross: 4, angleCross: 0, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
+  // A plus sign where the lines cross, as its own pen; and the lines themselves,
+  // which can be switched off to leave a grid of crosses.
+  linesCross: true, marksCross: false, markSizeCross: 6, markColorCross: '#c0561a',
+  markWeightCross: 1.5, markDashCross: 'solid',
   hypsoCross: false, hypsoModeCross: 'elevation', hypsoBandedCross: false, hypsoIntervalCross: 10,
   // Pillars
   enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',
