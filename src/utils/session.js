@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateShading } from './presetFile'
+import { migrateAzimuths, migratePillarInk, migrateShading } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -39,6 +39,9 @@ const AZIMUTH_SCALE = 2
  * `migrateShading`.
  */
 const SHADING_SCALE = 2
+
+/** And for Pillars' ink rows, which became its Colour row in v1.47.0. */
+const PILLAR_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -87,6 +90,7 @@ export function loadSession(defaults) {
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     if ((data.azimuthScale ?? 1) < AZIMUTH_SCALE) out = migrateAzimuths(out)
     if ((data.shadingScale ?? 1) < SHADING_SCALE) out = migrateShading(out)
+    if ((data.pillarScale ?? 1) < PILLAR_SCALE) out = migratePillarInk(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
       out[field] = { ...out[field] }
@@ -129,7 +133,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE }
+    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {

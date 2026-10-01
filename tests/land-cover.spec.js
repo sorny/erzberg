@@ -229,25 +229,50 @@ test('an ordinary mode inked by class splits into one pen per class', async ({ p
 
   // Lines again, for the reason the mask spec gives: its builder knows nothing
   // of land cover, so a split here is the dispatcher's pass reaching any mode.
-  await setSwitch(page, 'Mode: Lines', 'Hypsometric', true)
-  const source = async (name) => {
+  // The Colour row, the same one every mode has.
+  const source = async (value) => {
     await page.fill('[data-testid="panel-filter"]', 'Mode: Lines')
     await page.waitForTimeout(450)
-    await page.locator('button:visible', { hasText: new RegExp(`^${name}$`) }).first().click()
+    await page.locator(`[data-testid="colour-Lines-${value}"]:visible`).first().click()
     await page.waitForTimeout(3000)
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(250)
   }
 
-  await source('Class')
+  await source('class')
   const split = labelsOf(await exportSvg(page)).filter((l) => l.startsWith('Lines'))
   expect(split, 'one pen layer per class, named for it').toEqual(
     ['A', 'B', 'C'].map((k) => expect.stringMatching(new RegExp(`^Lines · Class ${k} #[0-9a-f]{6}$`))))
   expect(split).toHaveLength(BANDS)
 
-  await source('Elevation')
+  await source('elevation')
   const whole = labelsOf(await exportSvg(page)).filter((l) => l.startsWith('Lines'))
   expect(whole, 'back to one layer on any other source').toEqual(['Lines'])
+})
+
+test('without a plate, land cover is shown but cannot be picked', async ({ page }) => {
+  test.setTimeout(120_000)
+  await boot(page)
+
+  // The Colour row offers Class and Plate, disabled, with the reason.
+  await page.fill('[data-testid="panel-filter"]', 'Mode: Lines')
+  await page.waitForTimeout(450)
+  const cls = page.locator('[data-testid="colour-Lines-class"]:visible').first()
+  await expect(cls).toBeDisabled()
+  await expect(cls).toHaveAttribute('title', /Needs a land cover plate/)
+  await page.fill('[data-testid="panel-filter"]', '')
+  await page.waitForTimeout(250)
+
+  // The Land cover tile cannot be switched on.
+  await openStage(page, 'marks')
+  const pip = page.locator('[data-testid="mode-tile-Cover"]')
+  await expect(pip).toBeDisabled()
+  await expect(pip).toHaveAttribute('aria-pressed', 'false')
+
+  // With a plate, both open up.
+  await dropPlate(page, syntheticPlate())
+  await openStage(page, 'marks')
+  await expect(pip).toBeEnabled()
 })
 
 test('a palette re-inks the classes, and the pens follow', async ({ page }) => {
@@ -271,7 +296,7 @@ test('a palette re-inks the classes, and the pens follow', async ({ page }) => {
   await setMark(page, 'Lines', false)
   await setMark(page, 'Pillars', true)
   await openMark(page, 'Pillars')
-  await page.getByRole('button', { name: 'Cover class' }).first().click()
+  await page.locator('[data-testid="colour-Pillars-class"]').first().click()
   await page.waitForTimeout(3500)
   const svg = await exportSvg(page)
   const pens = labelsOf(svg).filter((l) => l.startsWith('Pillars · '))
@@ -294,7 +319,7 @@ test('with Inks as picked, the pens are the class inks exactly', async ({ page }
   await setMark(page, 'Lines', false)
   await setMark(page, 'Pillars', true)
   await openMark(page, 'Pillars')
-  await page.getByRole('button', { name: 'Cover class' }).first().click()
+  await page.locator('[data-testid="colour-Pillars-class"]').first().click()
   await page.waitForTimeout(3500)
   const svg = await exportSvg(page)
   // Off, the file carries the tone-mapped screen colour (#e69f00 → #e2d149).

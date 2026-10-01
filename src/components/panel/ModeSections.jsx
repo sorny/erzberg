@@ -95,21 +95,6 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   {style.pillarAbove && (
                     <InlineSl label="Ceiling" help="Extra height of the ceiling above the highest point." min={0} max={100} step={1} value={style.pillarCeiling ?? 0} onChange={v => ss({ pillarCeiling: v })} />
                   )}
-                  <div style={{ marginBottom: 4 }}>
-                    <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>{style.pillarAbove ? 'Ink below' : 'Ink'}</span>
-                    <SegGroup label="Pillar ink" options={[['Line style', 'line'], ['Cover class', 'class'], ['Cover plate', 'plate']]}
-                      value={style.pillarInk ?? 'line'} onChange={(v) => ss({ pillarInk: v })} />
-                  </div>
-                  {style.pillarAbove && (
-                    <div style={{ marginBottom: 4 }}>
-                      <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Ink above</span>
-                      <SegGroup label="Pillar ink above" options={[['Line style', 'line'], ['Cover class', 'class'], ['Cover plate', 'plate']]}
-                        value={style.pillarAboveInk ?? 'line'} onChange={(v) => ss({ pillarAboveInk: v })} />
-                    </div>
-                  )}
-                  {[style.pillarInk, style.pillarAbove && style.pillarAboveInk].some((m) => m === 'class' || m === 'plate') && !cover && (
-                    <Note>No cover plate loaded, so the pillars use the line style. Open one under Land Cover.</Note>
-                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Pillars" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg}
                   label={style.pillarAbove ? 'Line style below' : 'Line style'} />

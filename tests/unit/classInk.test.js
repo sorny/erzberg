@@ -107,8 +107,9 @@ describe('the dispatcher', () => {
   })
 
   it('leaves Pillars to its own class ink', () => {
-    // Stated as a guard: the generic pass on Pillars would split it twice.
+    // Stated as a guard: Pillars splits itself, by each half's own source, and
+    // the generic pass on top would split it twice.
     const got = ids({ enabledPillars: true, hypsoPillars: true, hypsoModePillars: 'class' })
-    expect(got).toEqual(['Pillars'])
+    expect(got).toEqual(['Pillars-Class0', 'Pillars-Class1'])
   })
 })

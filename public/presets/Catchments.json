@@ -88,8 +88,6 @@
     "pillarLidColor": "#ffffff",
     "pillarAbove": false,
     "pillarCeiling": 0,
-    "pillarInk": "line",
-    "pillarAboveInk": "line",
     "pillarSolid": 0,
     "colorPillarsAbove": "#8a8a8a",
     "weightPillarsAbove": 1,

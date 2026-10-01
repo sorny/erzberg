@@ -44,10 +44,13 @@ import { F32List, U32List, inElevCut, normElev } from './shared.js'
  * default, there are none. Both follow the Depth occlusion switch.
  *
  * ── Ink ──────────────────────────────────────────────────────────────────────
- * `pillarInk` (below) and `pillarAboveInk` (above) take the colour from that
- * half's line style (`line`), from the land cover class of the pillar's cell
- * (`class`), or from the cover plate's own imagery at that cell (`plate`).
- * Without a loaded plate both fall back to the line style.
+ * Each half takes its colour from its own Colour row, as every mode does:
+ * `hypsoModePillars` below and `hypsoModePillarsAbove` above. `class` and
+ * `plate` read the land cover at the pillar's own cell, and split the half
+ * into one layer per class. Without a loaded plate both fall back to the line
+ * style. The generic pass in classInk.js leaves Pillars alone, because the two
+ * halves have two sources. Before v1.47.0 these were `pillarInk` and
+ * `pillarAboveInk`; `migratePillarInk` in presetFile.js reads them.
  */
 export function buildPillars(terrain, p, spacing) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes,
@@ -83,8 +86,10 @@ export function buildPillars(terrain, p, spacing) {
   const upper = { positions: new F32List(), colors: new F32List() }
   // Inked by land cover, a half splits into one layer per class, so the SVG
   // writes one pen layer per class. Keyed by class index.
-  const splitBelow = !!gridClass && (p.pillarInk === 'class' || p.pillarInk === 'plate')
-  const splitAbove = !!gridClass && (p.pillarAboveInk === 'class' || p.pillarAboveInk === 'plate')
+  const inkBelow = p.hypsoPillars ? p.hypsoModePillars : 'line'
+  const inkAbove = p.hypsoPillarsAbove ? p.hypsoModePillarsAbove : 'line'
+  const splitBelow = !!gridClass && (inkBelow === 'class' || inkBelow === 'plate')
+  const splitAbove = !!gridClass && (inkAbove === 'class' || inkAbove === 'plate')
   const belowBy = new Map(), upperBy = new Map()
   const targetOf = (map, k) => {
     let t = map.get(k)
@@ -200,7 +205,7 @@ export function buildPillars(terrain, p, spacing) {
       const slope  = gridSlopes[i] / (maxSlope || 1)
 
       if (top > bottom) {
-        const ink = inkAt(p.pillarInk, i)
+        const ink = inkAt(inkBelow, i)
         const colBase = ink ?? computeVertexColor(normElev(bottom, minElev, maxElev), 0, 0, p)
         const colPeak = ink ?? computeVertexColor(normElev(top, minElev, maxElev), slope, 0, p)
         const colLid  = p.pillarLidColor ? hexToRgb(p.pillarLidColor) : colPeak
@@ -209,7 +214,7 @@ export function buildPillars(terrain, p, spacing) {
       }
       const low = elev + gap
       if (above && ceiling > low) {
-        const ink = inkAt(p.pillarAboveInk, i)
+        const ink = inkAt(inkAbove, i)
         const colLow  = ink ?? computeVertexColor(normElev(low, minElev, maxElev), slope, 0, pAbove)
         const colCeil = ink ?? computeVertexColor(normElev(ceiling, minElev, maxElev), 0, 0, pAbove)
         body(splitAbove ? targetOf(upperBy, gridClass[i]) : upper, wx, wz, low, ceiling, colLow, colCeil, null)

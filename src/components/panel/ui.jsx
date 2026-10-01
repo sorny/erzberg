@@ -714,15 +714,19 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
       background: SUNK, border:`1px solid ${BORDER}`,
       ...style,
     }}>
-      {options.map(([lbl, v]) => {
+      {/* An option may carry `{ disabled, title }` as a third element: shown, so
+          the choice is visible, but not pickable, with the reason on hover. */}
+      {options.map(([lbl, v, opt]) => {
         const on = value === v
+        const off = !!opt?.disabled
         return (
-          <button key={String(v)} onClick={() => onChange(v)} type="button" className="hmseg"
-            data-testid={testIdOf ? testIdOf(v) : undefined}
+          <button key={String(v)} onClick={off ? undefined : () => onChange(v)} type="button" className="hmseg"
+            data-testid={testIdOf ? testIdOf(v) : undefined} disabled={off} title={opt?.title}
             aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
             style={{
               flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 4, border:'none',
-              cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+              cursor: off ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
+              opacity: off && !on ? 0.4 : 1,
               ...(capitalize && { textTransform:'capitalize' }),
               fontWeight: on ? 600 : 500,
               background: on ? ACCENT_DEEP : 'transparent',

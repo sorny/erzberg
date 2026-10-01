@@ -335,8 +335,9 @@ test.describe('vector layers', () => {
     await row.locator('button', { hasText: 'Roads · Motorway' }).click()
     const id = (await row.getAttribute('data-testid')).replace('vector-layer-', '')
 
+    // No Colour row: a road has no elevation of its own to colour by.
     await expect(page.locator(`[data-testid="vector-layer-${id}"]`)
-      .locator('text=Hypsometric')).toHaveCount(0)
+      .locator('[data-testid^="colour-"]')).toHaveCount(0)
 
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 60000 }),

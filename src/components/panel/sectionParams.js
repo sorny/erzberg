@@ -87,7 +87,7 @@ export const SECTION_PARAMS = {
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
-    'pillarSegments', 'pillarLidColor', 'pillarAbove', 'pillarCeiling', 'pillarInk', 'pillarAboveInk', 'pillarSolid',
+    'pillarSegments', 'pillarLidColor', 'pillarAbove', 'pillarCeiling', 'pillarSolid',
     'colorPillarsAbove', 'weightPillarsAbove', 'opacityPillarsAbove', 'dashPillarsAbove',
     'hypsoPillarsAbove', 'hypsoModePillarsAbove', 'hypsoBandedPillarsAbove', 'hypsoIntervalPillarsAbove'],
   'Mode: Stipple Dots': ['stippleDensityMode', 'stippleGamma', 'stippleJitter'],

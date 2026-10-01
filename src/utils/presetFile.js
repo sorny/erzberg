@@ -47,8 +47,41 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 3 is the true-degree slope and the bivariate aspect map. Both change what an
  * old plate looks like, so a payload before 3 gets both switched back to the
  * old reading (`migrateShading`).
+ *
+ * 4 is one Colour row for every mode. Pillars had its own `pillarInk` and
+ * `pillarAboveInk`, and a payload before 4 has them moved onto each half's
+ * colour source (`migratePillarInk`).
  */
-export const PRESET_FORMAT = 3
+export const PRESET_FORMAT = 4
+
+/**
+ * Pillars' own ink rows, onto the Colour row every mode has.
+ *
+ * `class` or `plate` on a half becomes that half's source, with the switch on.
+ * It wins over a gradient source the half also had, as the old ink row did.
+ * `line` is what the source already falls back to, so it only drops the key.
+ * Mode copies carry the same keys in their values, so they are moved too.
+ */
+export function migratePillarInk(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const move = (values) => {
+    if (!values || (values.pillarInk === undefined && values.pillarAboveInk === undefined)) return values
+    const out = { ...values }
+    for (const [ink, half] of [['pillarInk', 'Pillars'], ['pillarAboveInk', 'PillarsAbove']]) {
+      if (out[ink] === 'class' || out[ink] === 'plate') {
+        out[`hypso${half}`] = true
+        out[`hypsoMode${half}`] = out[ink]
+      }
+      delete out[ink]
+    }
+    return out
+  }
+  const style = move(payload.style)
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (c?.values ? { ...c, values: move(c.values) } : c))
+  }
+  return { ...payload, style }
+}
 
 /**
  * Keep an old plate's Slope Shading and Aspect Map as they were.
@@ -202,7 +235,8 @@ export function parsePreset(text) {
      */
     const f = d.format ?? 1
     const bearings = f < 2 ? migrateAzimuths(d) : d
-    return f < 3 ? migrateShading(bearings) : bearings
+    const shading = f < 3 ? migrateShading(bearings) : bearings
+    return f < 4 ? migratePillarInk(shading) : shading
   } catch {
     return null
   }

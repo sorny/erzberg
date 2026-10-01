@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.47.0] — 2026-10-02
+
+### Changed
+
+- **One Colour row for every draw mode**: Line · Height · Slope · Aspect ·
+  Class · Plate. It replaces the *Hypsometric* switch and its source row.
+  *Banded* and the gradient appear only for a gradient source. *Speed* shows
+  only for the four descent modes, the only ones that have a speed.
+- **Pillars uses the same row** for each half. Its own *Pillar ink* rows are
+  gone. A preset or session with `pillarInk` or `pillarAboveInk` set to class
+  or plate reads as that half's Colour source, so it renders as before.
+  `PRESET_FORMAT` is now 4.
+- **Without a land cover plate**, Class and Plate are shown but disabled, with
+  the reason on hover. The Land cover tile cannot be switched on. If a preset
+  arrives with it on, it stays on and shows a warning until a plate is open.
+
 ## [1.46.0] — 2026-10-01
 
 ### Added

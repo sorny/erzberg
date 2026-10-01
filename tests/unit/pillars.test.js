@@ -53,7 +53,7 @@ describe('Pillars', () => {
   })
 
   it('splits into one layer per land cover class, each in its ink', () => {
-    const all = buildLineGeometry(terrain, { ...p0, pillarInk: 'class' })
+    const all = buildLineGeometry(terrain, { ...p0, hypsoPillars: true, hypsoModePillars: 'class' })
     const red = all.find((l) => l.id === 'Pillars-Class0'), blue = all.find((l) => l.id === 'Pillars-Class1')
     expect(all.find((l) => l.id === 'Pillars')).toBeUndefined()
     // Class 0 is the left half of the plate, class 1 the right.
@@ -73,7 +73,7 @@ describe('Pillars', () => {
   })
 
   it('splits each half by its own ink', () => {
-    const ids = buildLineGeometry(terrain, { ...p0, pillarAbove: true, pillarInk: 'line', pillarAboveInk: 'class' })
+    const ids = buildLineGeometry(terrain, { ...p0, pillarAbove: true, hypsoPillars: false, hypsoPillarsAbove: true, hypsoModePillarsAbove: 'class' })
       .map((l) => l.id).filter((id) => id.startsWith('Pillars'))
     expect(ids).toEqual(['Pillars', 'Pillars-Above-Class0', 'Pillars-Above-Class1'])
   })
@@ -116,7 +116,7 @@ describe('Pillars', () => {
 
   it('falls back to the line style without a cover plate', () => {
     const bare = buildTerrain(px, mask, W, W, p0)
-    const l = buildLineGeometry(bare, { ...p0, pillarInk: 'class' }).find((x) => x.id === 'Pillars')
+    const l = buildLineGeometry(bare, { ...p0, hypsoPillars: true, hypsoModePillars: 'class' }).find((x) => x.id === 'Pillars')
     expect(Array.from(l.colors.slice(0, 3))).toEqual([0, 0, 0])
   })
 })

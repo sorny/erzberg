@@ -251,7 +251,8 @@ at the cut. → [Edit Mode](docs/Edit-Mode.md)
 ## Draw modes
 
 Every mode runs independently, with its own colour, weight, line style (solid,
-dashed, short, long or round dots) and hypsometric tint. → [Draw mode mathematics](docs/Draw-Modes.md)
+dashed, short, long or round dots) and colour: the line colour, a gradient by
+height, slope or aspect, or the land cover class. → [Draw mode mathematics](docs/Draw-Modes.md)
 
 **Duplicate mode** at the foot of a mode's section adds a copy of the mode with
 its own settings, mask and pens: for example, dense contours on forest and

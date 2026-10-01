@@ -169,15 +169,21 @@ legend and the SVG pen names read them.
 
 ## Class as a colour source
 
-Any draw mode can take its colour from the land cover. Under *Hypsometric*, set
-the source to **Class** (the class ink) or **Plate** (the plate colour at each
-end of a stroke). The layer then splits into one pen layer per class, named
-for the class and its ink, so a plot gets one pen per class.
+Every draw mode has one **Colour** row: Line, Height, Slope, Aspect (Speed for
+the descent modes), **Class** and **Plate**. Class is the class ink. Plate is
+the plate colour at each end of a stroke. With either, the layer splits into
+one pen layer per class, named for the class and its ink, so a plot gets one
+pen per class.
 
 A stroke goes to the class under its midpoint, because one stroke is one pen.
 A stroke on a cell with no data keeps the line colour. Filled areas keep their
-own colours. Pillars and the Land cover mode ink by class in their own
-builders, so they do not offer these two sources.
+own colours. Pillars uses the cell of each pillar, for each half. The Land
+cover mode has its own Plate and Class choice, because the classes are what
+it draws.
+
+Without a plate, Class and Plate are shown but cannot be picked, and the Land
+cover tile cannot be switched on. A preset that arrives with Land cover on
+keeps it on, and the tile shows a warning until a plate is open.
 
 ## Ink by land class
 

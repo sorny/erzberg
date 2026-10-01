@@ -62,7 +62,7 @@ export const STYLE_DEF = {
   enabledPillars: false, spacingPillars: 8, colorPillars: '#000000', weightPillars: 1, opacityPillars: 1, dashPillars: 'solid',
   hypsoPillars: false, hypsoModePillars: 'elevation', hypsoBandedPillars: false, hypsoIntervalPillars: 10,
   pillarGap: 0, pillarDepth: 0, pillarStyle: 'line', pillarSize: 0.8, pillarSegments: 8, pillarLidColor: '#ffffff',
-  pillarAbove: false, pillarCeiling: 0, pillarInk: 'line', pillarAboveInk: 'line', pillarSolid: 0,
+  pillarAbove: false, pillarCeiling: 0, pillarSolid: 0,
   // The upper half is its own layer and pen, so it carries a full line style.
   colorPillarsAbove: '#8a8a8a', weightPillarsAbove: 1, opacityPillarsAbove: 0.6, dashPillarsAbove: 'solid',
   hypsoPillarsAbove: false, hypsoModePillarsAbove: 'elevation', hypsoBandedPillarsAbove: false, hypsoIntervalPillarsAbove: 10,

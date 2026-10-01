@@ -11,6 +11,7 @@ import { NO_MASKS, describeSelection, selectionHasMask, toggleMaskSelection } fr
 import { CoverPlate, PaintedMasks } from './filter'
 import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
+import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
 import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
 
@@ -144,14 +145,12 @@ function PaintedMaskRow({ prefix, style, ss }) {
 // modes switch hypsometric off because they ink from their own table, and every
 // one of them is still a draw mode built from the terrain grid and so still
 // maskable. The empty prefix is the vector-layer call, and only that one.
-export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', gradientStops, setGradientStops }) {
+export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', showDash = true, showHypso = true, showColor = true, showCover = prefix !== '', classSource = prefix !== '' && prefix !== 'Cover', gradientStops, setGradientStops }) {
   const isHypso = style[`hypso${prefix}`]
   const cover = useContext(CoverPlate)
-  // Land class and plate are sources for every mode built from the grid, except
-  // the two that ink by class in their own builder. See builders/classInk.js.
-  const byClass = showCover && prefix !== 'Pillars' && prefix !== 'Cover'
-  const source = style[`hypsoMode${prefix}`]
-  const fromCover = byClass && (source === 'class' || source === 'plate')
+  const hasPlate = !!cover?.classes?.length
+  const source = isHypso ? style[`hypsoMode${prefix}`] : 'line'
+  const ramp = source === 'elevation' || source === 'slope' || source === 'aspect' || source === 'speed'
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
       <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>{label}</div>
@@ -184,35 +183,35 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           of its own, so the tint would have to read the ground under it, which
           is a different thing from what the draw modes mean by it. */}
       {showHypso && <div style={{ marginTop: 8 }}>
-        <Tog label="Hypsometric" small checked={isHypso} onChange={v => ss({ [`hypso${prefix}`]: v })} />
-        {isHypso && (
+        <SegGroup label="Colour" testIdOf={(v) => `colour-${prefix}-${v}`}
+          options={colourOptions({ prefix, current: source, classSource, hasPlate })}
+          value={source}
+          onChange={(m) => ss(m === 'line' ? { [`hypso${prefix}`]: false } : { [`hypso${prefix}`]: true, [`hypsoMode${prefix}`]: m })}
+          style={{ marginBottom: 4 }} />
+        {/* A source picked while a plate was open, now without one: say why the
+            layer draws in its line colour. */}
+        {(source === 'class' || source === 'plate') && !hasPlate && (
+          <Note>No cover plate loaded, so this layer uses its line colour. Open one under Land Cover.</Note>
+        )}
+        {(source === 'class' || source === 'plate') && hasPlate && (
+          <div style={{ fontSize: 10, color: DIM }}>One pen layer for each class.</div>
+        )}
+        {ramp && (
           <Sub>
-            <SegGroup label="Hypsometric source"
-              options={[['Elevation', 'elevation'], ['Slope', 'slope'], ['Aspect', 'aspect'], ['Speed', 'speed'],
-                ...(byClass ? [['Class', 'class'], ['Plate', 'plate']] : [])]}
-              value={source} onChange={(m) => ss({ [`hypsoMode${prefix}`]: m })}
-              style={{ marginBottom: 4 }} />
-            {/* One pen per class: the layer splits by the class under each
-                stroke. Banding and the gradient have nothing to act on. */}
-            {fromCover && !cover?.classes?.length && (
-              <Note>No cover plate loaded, so this layer uses its line style. Open one under Land Cover.</Note>
-            )}
-            {!fromCover && <>
             <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
             {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
-            {/* The gradient is global (shared by every hypsometric layer + fill),
-                but it must be editable right where hypso is switched on — not
-                hidden behind enabling fill in Terrain Style. */}
+            {/* The gradient is global (shared by every gradient source and the
+                fill), but it must be editable right where a source picks it —
+                not hidden behind enabling fill in Terrain Style. */}
             {gradientStops && setGradientStops && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Gradient, shared by every hypsometric layer</div>
+                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Gradient, shared by every layer that uses one</div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
               </div>
             )}
-            </>}
           </Sub>
         )}
       </div>}

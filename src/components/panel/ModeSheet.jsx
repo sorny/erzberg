@@ -47,7 +47,13 @@ import { DRAW_MODES } from '../../utils/drawModes'
 import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
 import { FAMILIES } from './markFamilies'
-import { ACCENT_DEEP, ACCENT_TEXT, BORDER, DIM, GREEN, MONO, MUTED, SURF, TEXT } from './ui'
+import { ACCENT_DEEP, ACCENT_TEXT, BORDER, DIM, GREEN, MONO, MUTED, SURF, TEXT, WARN } from './ui'
+import { useContext } from 'react'
+import { CoverPlate } from './filter'
+
+// The modes that draw nothing without a file: `needsData` in drawModes.js.
+const NEEDS_PLATE = new Set(DRAW_MODES.filter((m) => m.needsData).map((m) => m.id))
+const PLATE_HINT = 'Needs a land cover plate. Open one under Land Cover.'
 
 /** id → the glyph that shows what it draws. One lookup, built once. */
 const MARK_FOR = Object.fromEntries(DRAW_MODES.map((m) => [m.id, m.mark]))
@@ -72,6 +78,7 @@ const ROW_BY_NAME = new Map(PANEL_MODES.map((row) => [markName(row[0]), row]))
  * @param {Function} props.onOpen    (sectionTitle) => void
  */
 export function ModeSheet({ style, onToggle, onOpen }) {
+  const hasPlate = !!useContext(CoverPlate)?.classes?.length
   return (
     <>
     <div data-testid="mode-sheet">
@@ -100,6 +107,13 @@ export function ModeSheet({ style, onToggle, onOpen }) {
         // mode or any copy draws, and it counts the copies.
         const copies = (style.modeCopies ?? []).filter((c) => c.mode === id)
         const on = !!style[key] || copies.some((c) => c.values?.[key])
+        /*
+         * A mode that needs a plate, without one: it cannot be switched on, and
+         * says why. If it is already on (a preset or a session arrived before the
+         * plate), it stays on and shows a warning, so the setting is not lost.
+         */
+        const waiting = NEEDS_PLATE.has(id) && !hasPlate
+        const blocked = waiting && !on
         return (
           /*
            * A group, not a button. A button inside a button is invalid markup
@@ -113,8 +127,9 @@ export function ModeSheet({ style, onToggle, onOpen }) {
           <div key={key} role="group" aria-label={name} className="hmcard" style={{
             position:'relative', borderRadius:6,
             background: on ? 'color-mix(in srgb, var(--hm-accent) 16%, transparent)' : SURF,
-            border:`1px solid ${on ? ACCENT_DEEP : BORDER}`,
-          }}>
+            border:`1px solid ${on ? (waiting ? WARN : ACCENT_DEEP) : BORDER}`,
+            opacity: blocked ? 0.5 : 1,
+          }} data-needs-plate={waiting ? 'true' : undefined}>
             <button
               type="button"
               className="hmcardhit"
@@ -163,17 +178,20 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               className="hmpip"
               aria-pressed={on}
               aria-label={`${name} — ${on ? 'switch off' : 'switch on'}`}
-              title={`${name} — ${on ? 'drawing, click to switch off' : 'off, click to switch on'}`}
+              title={waiting ? `${name} — ${PLATE_HINT}`
+                : `${name} — ${on ? 'drawing, click to switch off' : 'off, click to switch on'}`}
               data-testid={`mode-tile-${id}`}
-              onClick={() => onToggle(key, !on)}
+              disabled={blocked}
+              onClick={blocked ? undefined : () => onToggle(key, !on)}
               style={{
+                cursor: blocked ? 'not-allowed' : undefined,
                 position:'absolute', left:0, top:0, width:20, height:20, zIndex:1,
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>
               <span aria-hidden="true" className="hmpipdot" style={{
                 width:9, height:9, borderRadius:'50%',
-                border:`1.5px solid ${on ? GREEN : MUTED}`,
-                background: on ? GREEN : 'transparent',
+                border:`1.5px solid ${on ? (waiting ? WARN : GREEN) : MUTED}`,
+                background: on ? (waiting ? WARN : GREEN) : 'transparent',
                 boxShadow: on ? '0 0 6px var(--hm-green-glow)' : 'none',
               }} />
             </button>
