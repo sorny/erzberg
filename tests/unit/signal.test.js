@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTerrain } from '../../src/utils/terrain'
 import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
-import { terrainSpectrum, PRINTER_RAMP } from '../../src/utils/builders/signal'
+import { PRINTER_RAMP } from '../../src/utils/builders/signal'
 import { STYLE_DEF, TERRAIN_DEF, VIEW_DEF, POINTS_DEF } from '../../src/defaults'
 
 const W = 96
@@ -58,27 +58,6 @@ describe('Hair', () => {
   it('draws one stroke of the set segments per sampled cell', () => {
     const step = Math.max(1, Math.round(3 / t.scl)), n = Math.ceil(t.rows / step) * Math.ceil(t.cols / step)
     expect(layer(layers({ enabledHair: true }), 'Hair').positions.length / 6).toBe(n * 6)
-  })
-})
-
-describe('Spectrogram', () => {
-  // A wave 16 pixels long along x and nothing along y. The grid holds every
-  // second pixel, so it is 8 cells long: in a 64-cell window, bin 8.
-  const wave = plate((x) => 0.5 + 0.3 * Math.sin(2 * Math.PI * x / 16))
-
-  it('puts the energy of a pure wave in the band of its wavelength', () => {
-    const s = terrainSpectrum(wave, { window: 32, bands: 16, gamma: 1, whiten: false })
-    const mid = s.S[Math.floor(s.nWin / 2)]
-    // As many bands as bins: band b is bin b + 1, so bin 4 of a 32-cell window.
-    expect(mid.indexOf(Math.max(...mid))).toBe(3)
-  })
-
-  it('draws ridges, or hatched blocks lying flat', () => {
-    const ridges = layer(layers({ enabledSpectro: true }), 'Spectro')
-    const blocks = layer(layers({ enabledSpectro: true, styleSpectro: 'blocks' }), 'Spectro')
-    expect(ridges.positions.length).toBeGreaterThan(0)
-    expect(blocks.positions.length).toBeGreaterThan(0)
-    for (let q = 0; q < blocks.positions.length; q += 3) expect(blocks.positions[q + 1]).toBeCloseTo(t.maxElev, 4)
   })
 })
 

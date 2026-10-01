@@ -15,7 +15,7 @@ import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed
 import { buildBedding, buildGlacier, buildRunout, buildSlopeClass } from './builders/survey.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
 import { buildMapGrid } from './builders/mapGrid.js'
-import { buildHair, buildPrinter, buildSpectro, buildStems, buildWaveform } from './builders/signal.js'
+import { buildHair, buildPrinter, buildStems, buildWaveform } from './builders/signal.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
@@ -200,10 +200,6 @@ export function buildLineGeometry(terrain, p) {
     { id:'Hair',    builder: (t, ctx) => buildHair(t, ctx, {
         spacing: p.spacingHair, length: p.lengthHair, jitter: p.jitterHair,
         segments: p.segmentsHair, seed: p.seedHair }) },
-    { id:'Spectro', builder: (t, ctx) => buildSpectro(t, ctx, {
-        style: p.styleSpectro, window: p.windowSpectro, whiten: p.whitenSpectro, bands: p.bandsSpectro, gamma: p.gammaSpectro,
-        height: p.heightSpectro, fill: p.linesSpectro,
-        row: p.sourceSpectro === 'row' ? (p.rowSpectro ?? 50) / 100 : null }) },
     { id:'Waveform', builder: (t, ctx) => buildWaveform(t, ctx, {
         line: p.lineWaveform, angle: p.angleWaveform, place: p.placeWaveform, sides: p.sidesWaveform,
         spacing: p.spacingWaveform, width: p.widthWaveform,

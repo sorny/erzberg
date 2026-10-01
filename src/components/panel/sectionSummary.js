@@ -135,7 +135,6 @@ export const PANEL_MODES = [
   ['Mode: Line Printer',   'enabledPrinter',   'Classes',   (s) => num(s.classesPrinter)],
   ['Mode: Stems',          'enabledStems',     'From',      (s) => s.datumStems ?? 'mean'],
   ['Mode: Hair',           'enabledHair',      'Length',    (s) => num(s.lengthHair)],
-  ['Mode: Spectrogram',    'enabledSpectro',   'Bands',     (s) => num(s.bandsSpectro)],
   ['Mode: Waveform',       'enabledWaveform',  'Line',      (s) => s.lineWaveform ?? 'summit'],
   ['Mode: Venation',       'enabledVenation',  'Roots',     (s) => num(s.rootsVenation)],
   ['Mode: Geodesic Fan',   'enabledGeodesic',  'Rays',      (s) => num(s.raysGeodesic)],

@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-seven
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-six
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Fifty-six modes read $H$ only. [Land cover](#land-cover) reads a second
+Fifty-five modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -795,20 +795,7 @@ climbs by $\text{length} / n$ and moves sideways by a seeded random amount scale
 by *Curl*. The steps add up, so a hair curls. From the side, the hairs overlap
 where many cells share a height: the tone is the count.
 
-## 57. Spectrogram
-
-The spectrum of the relief along $x$. A window of $N$ cells (a power of two)
-slides along a row with a hop of $N/4$. Each window is detrended (mean and end-to-end
-ramp), Hann-tapered and transformed with a radix-2 FFT. The magnitudes go into
-*Bands*, log-spaced from bin 1 to $N/2$. *Whiten* weights bin $k$ by $k$,
-because terrain amplitude falls about as $1/f$. Values are normalised to the
-maximum and raised to *Gamma*. *Read* takes one row or the mean of up to 128.
-
-- **Ridges.** One line per band, long waves at the back, height = energy.
-- **Blocks.** A flat grid of window × band cells, each with
-  $\text{round}(v \cdot \text{lines})$ strokes.
-
-## 58. Waveform
+## 57. Waveform
 
 One column of a waveform plot, read along a line through the highest cell (or
 the middle) at a *Direction*: 0° top to bottom, 90° left to right, 180° bottom

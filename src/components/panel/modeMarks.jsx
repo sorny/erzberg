@@ -383,14 +383,6 @@ const MARKS = {
       <path d="M4 11 Q5 8 4 5 M7 12 Q6 8 7 3 M9 12 Q10 7 9 2 M11 13 Q12 8 11 2 M13 12 Q12 7 13 3 M15 12 Q16 8 15 4 M18 11 Q17 8 18 6 M20 10 Q21 8 20 7" />
     </g>
   ),
-  // Stacked ridgelines, tall at the back and fine at the front.
-  spectro: (
-    <g {...BASE} strokeWidth="0.7">
-      <path d="M2 5 C6 1 9 6 12 3 C15 1 18 5 22 4" />
-      <path d="M2 8 L5 7 L7 8.5 L10 6 L13 8 L16 6.5 L19 8 L22 7" />
-      <path d="M2 11.5 L4 10.8 L5 11.6 L7 10.5 L8 11.5 L10 10.6 L12 11.6 L14 10.4 L16 11.5 L18 10.7 L20 11.6 L22 10.8" />
-    </g>
-  ),
   // A mirrored column of scanlines.
   waveform: (
     <g {...BASE} strokeWidth="0.7">

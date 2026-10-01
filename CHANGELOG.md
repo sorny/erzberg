@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.43.0] — 2026-10-01
+
+### Removed
+
+- **Spectrogram.** The relief's spectrum, as ridges or hatched blocks, did not
+  earn its place on the sheet next to the other modes. A saved session or preset
+  that has it on loads as before, without it. The audio spectrogram is a
+  separate feature and is unchanged.
+
 ## [1.42.0] — 2026-10-01
 
 Five modes after pictures that were not made from terrain: a line-printer map,

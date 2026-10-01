@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all fifty-seven at once.
+ * does the index that shows all fifty-six at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -254,11 +254,6 @@ export const DRAW_MODES = [
     // A few segments per sampled cell; dense at a small spacing.
     id: 'Hair', label: 'Hair', cost: 3, mark: 'hair',
     pick: { spacing: [2, 6] },
-  },
-  {
-    // An FFT per window on up to 128 rows.
-    id: 'Spectro', label: 'Spectrogram', cost: 2, mark: 'spectro',
-    pick: {},
   },
   {
     // One stroke per sample down one line.

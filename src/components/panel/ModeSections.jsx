@@ -1252,29 +1252,6 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
-          <Section title="Mode: Spectrogram" icon={<ModeMark kind="spectro" />} open={sec.modeSpectro} onToggle={() => tog('modeSpectro')} enabled={style.enabledSpectro}>
-            <Tog label="Enabled" testId="mode-spectro" checked={style.enabledSpectro} onChange={v => ss({ enabledSpectro: v })} />
-            {style.enabledSpectro && (
-              <>
-                <Sub>
-                  <SegRow label="Style" testIdPrefix="spectro-style" options={[['ridges', 'ridges'], ['blocks', 'blocks']]} value={style.styleSpectro ?? 'ridges'} onChange={v => ss({ styleSpectro: v })} />
-                  <SegRow label="Read" help="All rows averages the spectrum of the whole ground. One row reads a single west–east line." testIdPrefix="spectro-source" options={[['all', 'all rows'], ['row', 'one row']]} value={style.sourceSpectro ?? 'row'} onChange={v => ss({ sourceSpectro: v })} />
-                  {style.sourceSpectro === 'row' && (
-                    <InlineSl label="Row" help="The line read, from north (0 %) to south (100 %)." min={0} max={100} step={1} value={style.rowSpectro ?? 50} onChange={v => ss({ rowSpectro: Math.round(v) })} fmt={v => `${Math.round(v)} %`} />
-                  )}
-                  <InlineSl label="Window" help="Cells per FFT window. It snaps to a power of two. A longer window resolves long waves, a shorter one places features more exactly." log min={8} max={512} step={1} value={style.windowSpectro ?? 64} onChange={v => ss({ windowSpectro: 2 ** Math.round(Math.log2(v)) })} />
-                  <InlineSl label="Bands" help="Wavelength bands, log-spaced from the window length down to two cells." min={2} max={64} step={1} value={style.bandsSpectro ?? 24} onChange={v => ss({ bandsSpectro: Math.round(v) })} />
-                  <InlineSl label="Gamma" help="Below 1 lifts the weak bands, as a decibel scale does." min={0.1} max={2} step={0.05} value={style.gammaSpectro ?? 0.5} onChange={v => ss({ gammaSpectro: v })} fmt={v => v.toFixed(2)} />
-                  <Tog label="Whiten" help="Weights each band by its frequency. Ground has much more relief in long waves than in short ones; without this the short waves are near zero." checked={style.whitenSpectro !== false} onChange={v => ss({ whitenSpectro: v })} />
-                  {(style.styleSpectro ?? 'ridges') === 'ridges'
-                    ? <InlineSl label="Height" help="The height of full energy, in world units." min={1} max={300} step={1} value={style.heightSpectro ?? 120} onChange={v => ss({ heightSpectro: v })} />
-                    : <InlineSl label="Lines per block" help="Strokes in a block at full energy. The grey is the count." min={1} max={20} step={1} value={style.linesSpectro ?? 6} onChange={v => ss({ linesSpectro: Math.round(v) })} />}
-                </Sub>
-                <ModeStyleOverride prefix="Spectro" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
-              </>
-            )}
-          </Section>
-
           <Section title="Mode: Waveform" icon={<ModeMark kind="waveform" />} open={sec.modeWaveform} onToggle={() => tog('modeWaveform')} enabled={style.enabledWaveform}>
             <Tog label="Enabled" testId="mode-waveform" checked={style.enabledWaveform} onChange={v => ss({ enabledWaveform: v })} />
             {style.enabledWaveform && (

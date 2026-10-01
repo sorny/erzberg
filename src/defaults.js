@@ -372,12 +372,6 @@ export const STYLE_DEF = {
   colorHair: '#1a1a1a', weightHair: 0.4, opacityHair: 0.8, dashHair: 'solid',
   hypsoHair: false, hypsoModeHair: 'elevation', hypsoBandedHair: false, hypsoIntervalHair: 10,
 
-  // Spectrogram — the relief's spectrum along x, as ridges or as hatched blocks.
-  enabledSpectro: false, styleSpectro: 'ridges', windowSpectro: 64, bandsSpectro: 24, gammaSpectro: 0.5,
-  heightSpectro: 120, linesSpectro: 6, whitenSpectro: true, sourceSpectro: 'row', rowSpectro: 50,
-  colorSpectro: '#1a1a1a', weightSpectro: 1, opacitySpectro: 1, dashSpectro: 'solid',
-  hypsoSpectro: false, hypsoModeSpectro: 'elevation', hypsoBandedSpectro: false, hypsoIntervalSpectro: 10,
-
   // Waveform — one column of a waveform plot, read along a line at any direction.
   enabledWaveform: false, lineWaveform: 'summit', angleWaveform: 0, placeWaveform: 'column', sidesWaveform: 'both', spacingWaveform: 1.5, widthWaveform: 120,
   detailWaveform: 1.5, smoothWaveform: 4, gammaWaveform: 1,
@@ -695,7 +689,7 @@ export const VIEW_DEF = {
   frameMarkScale: 1, frameMarkColor: '#000000',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
-  // A modifier rather than a mode: it takes whatever the fifty-seven modes are
+  // A modifier rather than a mode: it takes whatever the fifty-six modes are
   // drawing and makes it stereo, for the cost of drawing each layer twice.
   //
   // The offset is a lateral *world* translation, which under the perspective

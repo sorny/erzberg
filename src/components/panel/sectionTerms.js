@@ -78,7 +78,6 @@ export const SECTION_TERMS = {
   'Mode: Line Printer': 'line printer symap ascii characters glyphs typewriter overprint classes quantile computer map 1960s harvard',
   'Mode: Stems': 'stems stem plot dotted lines datum mean signal lollipop dots tips side view audio',
   'Mode: Hair': 'hair fur strands random walk cloud density side view noise scribble waveform',
-  'Mode: Spectrogram': 'spectrogram spectrum fft fourier frequency wavelength energy sound audio bands ridges joy division blocks',
   'Mode: Waveform': 'waveform audio sound wave column mirrored scanlines record sleeve poster profile transect summit peak',
   'Mode: Venation': 'venation veins leaf network space colonization growth roots wetness valleys branching organic',
   'Mode: Geodesic Fan': 'geodesic fan shortest path straight line on the ground rays caustics lensing curved surface point',
