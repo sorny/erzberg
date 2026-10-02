@@ -1923,14 +1923,10 @@ export function Sidebar({
                       true to the ground, often close to each other as pens.
                       A palette deals a set of distinct inks in class order;
                       each swatch below can still be changed on its own. */}
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    {[['Plate', ''], ['Distinct', 'distinct'], ['Earth', 'earth'], ['Riso', 'riso']].map(([label, name]) => (
-                      <Btn key={label} block variant="toggle" data-testid={`cover-palette-${label.toLowerCase()}`}
-                        on={name ? style.coverInks === paletteInks(name, cover.classes.length) : !style.coverInks}
-                        onClick={() => ss({ coverInks: name ? paletteInks(name, cover.classes.length) : '' })}
-                        style={{ fontSize: 10, padding: '2px 0', borderRadius: 2 }}>{label}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Class ink palette" testIdOf={(name) => `cover-palette-${name || 'plate'}`}
+                    options={[['Plate', ''], ['Distinct', 'distinct'], ['Earth', 'earth'], ['Riso', 'riso']]}
+                    value={!style.coverInks ? '' : ['distinct', 'earth', 'riso'].find((n) => style.coverInks === paletteInks(n, cover.classes.length)) ?? null}
+                    onChange={(name) => ss({ coverInks: name ? paletteInks(name, cover.classes.length) : '' })} />
                   {/* Two lines per class, because one was not enough to be
                       useful. A cluster cannot say what it is, so the script
                       asks OpenStreetMap what covers it and the second line is
@@ -2072,7 +2068,7 @@ export function Sidebar({
                     min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
                   <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
                     min={2} max={60} value={snd.opts.fps} onChange={v => snd.setOpts({ fps: v })} fmt={v => v + '/s'} />
-                  <InlineSl label="dB Floor" help="Noise gate. Raise it to drop quiet detail into flat ground and leave only the loud structure standing."
+                  <InlineSl label="dB floor" help="Noise gate. Raise it to drop quiet detail into flat ground and leave only the loud structure standing."
                     min={0} max={0.9} step={0.01} value={snd.opts.dbFloor} onChange={v => snd.setOpts({ dbFloor: v })} fmt={v => Math.round(v*100)+'%'} />
                   <InlineSl label="Contrast" help="Gamma applied after the gate. Above 1 sharpens peaks into ridges; below 1 flattens them into plateaus."
                     min={0.3} max={3} step={0.1} value={snd.opts.contrast} onChange={v => snd.setOpts({ contrast: v })} fmt={v => v.toFixed(1)} />
@@ -2138,7 +2134,7 @@ export function Sidebar({
                       value={style.fillHypsoMode} onChange={(m) => ss({ fillHypsoMode: m })}
                       style={{ marginBottom: 4 }} />
                     <Tog label="Banded" small checked={style.fillBanded} onChange={v => ss({ fillBanded: v })} />
-                    {style.fillBanded && <><InlineSl label="Band Dist" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band Weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
+                    {style.fillBanded && <><InlineSl label="Band interval" min={0.5} max={50} value={style.fillHypsoInterval} onChange={v => ss({ fillHypsoInterval: v })} /><InlineSl label="Band weight" min={0} max={5} step={0.5} value={style.fillHypsoWeight} onChange={v => ss({ fillHypsoWeight: v })} /></>}
                   </Sub>
                 )}
               </Sub>
@@ -2160,8 +2156,8 @@ export function Sidebar({
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
             {style.depthOcclusion && (
               <Sub>
-                <InlineSl label="Occ. Dist" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
-                <InlineSl label="Ghost Opac" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
+                <InlineSl label="Depth tolerance" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
             
@@ -2325,10 +2321,10 @@ export function Sidebar({
                     onChange={v => ss({ hillshadeAlmanac: v === 'almanac' })} />
                 )}
                 {!style.hillshadeMultiDir && !almanac && (
-                  <InlineSl label="Azimuth" help="Where the light comes from, as a compass bearing: 0°=N, 90°=E, 315°=NW. The default is the classic north-west, because light from the upper left is what stops a ridge from reading as a gully." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Sun azimuth" help="Where the light comes from, as a compass bearing: 0°=N, 90°=E, 315°=NW. The default is the classic north-west, because light from the upper left is what stops a ridge from reading as a gully." min={0} max={360} step={5} value={style.hillshadeAzimuth} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} />
                 )}
                 {!almanac && (
-                  <InlineSl label="Altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Sun altitude" help="Sun angle above the horizon. 45° is classic; 90° is directly overhead." min={0} max={90} step={1} value={style.hillshadeAltitude} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} />
                 )}
                 {almanac && (<>
                   <DateRow label="Date" testId="sun-date"
@@ -2384,19 +2380,19 @@ export function Sidebar({
                 <InlineSl label="Exaggeration" help="Amplifies normals for dramatic relief at low elevation scales." min={0.1} max={10} step={0.1} value={style.hillshadeExaggeration} onChange={v => ss({ hillshadeExaggeration: v })} fmt={v => v.toFixed(1)} />
                 <ColorRow label="Highlight" value={style.hillshadeHighlightColor} onChange={v => ss({ hillshadeHighlightColor: v })} />
                 <ColorRow label="Shadow" value={style.hillshadeShadowColor} onChange={v => ss({ hillshadeShadowColor: v })} />
-                <Tog label="Show Sun" help="Display a sun orb in the scene at the light source position." checked={style.showSun} onChange={v => ss({ showSun: v })} />
+                <Tog label="Show sun" help="Display a sun orb in the scene at the light source position." checked={style.showSun} onChange={v => ss({ showSun: v })} />
                 {!style.hillshadeMultiDir && (<>
-                  <Tog label="Cast Shadows" help="Ray-march cast shadows: ridges block sunlight." checked={style.hillshadeCastShadows} onChange={v => ss({ hillshadeCastShadows: v })} />
+                  <Tog label="Cast shadows" help="Ray-march cast shadows: ridges block sunlight." checked={style.hillshadeCastShadows} onChange={v => ss({ hillshadeCastShadows: v })} />
                   {style.hillshadeCastShadows && (<>
                     <InlineSl label="Darkness" help="How dark cast shadows are (0 = no effect, 100% = pitch black)." min={0} max={1} step={0.05} value={style.hillshadeShadowDarkness} onChange={v => ss({ hillshadeShadowDarkness: v })} fmt={v => Math.round(v * 100) + '%'} />
                     <InlineSl label="Softness" help="Penumbra width — 0 for crisp edges, higher for soft gradual shadows." min={0} max={5} step={0.1} value={style.hillshadeShadowSoftness} onChange={v => ss({ hillshadeShadowSoftness: v })} fmt={v => v.toFixed(1)} />
                     <InlineSl label="Quality" help="Shadow ray steps — more steps = longer shadows but higher GPU cost." min={16} max={128} step={8} value={style.hillshadeShadowSteps} onChange={v => ss({ hillshadeShadowSteps: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
                   </>)}
                 </>)}
-                <Tog label="Sky View Factor" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
+                <Tog label="Sky-view factor" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
                 {style.showAO && (<>
-                  <InlineSl label="SVF Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="SVF Rays" help="More rays = smoother result at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                  <InlineSl label="SVF strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="SVF rays" help="More rays = smoother result at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
                 </>)}
               </Sub>
             )}
@@ -2434,7 +2430,7 @@ export function Sidebar({
               <Sub>
                 <InlineSl label="Level" help="Flood threshold — percentage of terrain height." min={0} max={1} step={0.01} value={style.waterLevel ?? 0.3} onChange={v => ss({ waterLevel: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.waterOpacity ?? 0.82} onChange={v => ss({ waterOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
-                <ColorRow label="Color" value={style.waterColor ?? '#1a78c2'} onChange={v => ss({ waterColor: v })} />
+                <ColorRow label="Colour" value={style.waterColor ?? '#1a78c2'} onChange={v => ss({ waterColor: v })} />
               </Sub>
             )}
           </Section>
@@ -2769,9 +2765,9 @@ export function Sidebar({
                             here because that section hides them unless Hillshade is
                             enabled — and the flock's shadows do not require it. One
                             value, two places to reach it, so they cannot disagree. */}
-                        <InlineSl label="Sun az." min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 315} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
+                        <InlineSl label="Sun azimuth" min={0} max={360} step={5} value={style.hillshadeAzimuth ?? 315} onChange={v => ss({ hillshadeAzimuth: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-azimuth"
                           help="Which way the shadows fall: 0°=N, 90°=E, 315°=NW. This is the Hillshade sun — the same slider, shown here too because Hillshade hides it when it is switched off. Moving it here moves the terrain's shading as well." />
-                        <InlineSl label="Sun alt." min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
+                        <InlineSl label="Sun altitude" min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
                           help="Sun height above the horizon. Overhead drops each shadow straight under its bird; low sun throws the whole flock's shadow long across the valley. Clamped at 5° for the shadow maths, since a sun on the horizon casts to infinity." />
                         <ColorRow label="Sh. colour" value={points.flockShadowColor ?? '#000000'} onChange={v => sp({ flockShadowColor: v })}
                           help="Black reads as shadow; a dark tint of the background reads as haze. It is a flat colour with a soft edge, not a darkening of what is underneath, so on a dark background a shadow lighter than the terrain will look like glow." />
@@ -2875,7 +2871,7 @@ export function Sidebar({
             <Sub>
               <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
               {!view.orthographic && (
-                <InlineSl label="Focal Len" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+                <InlineSl label="Focal length" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
               )}
               {/* fmt is not decoration: these mirror the orbit target, which a
                   mouse pan moves continuously, and without it a drag left the
@@ -3096,7 +3092,7 @@ export function Sidebar({
                   or worse, land after it. */}
               <ExpBtn label="Preset ⬆" hint="open" onClick={() => { spendOpening(); onLoadPreset?.() }} testId="preset-load" />
             </div>
-            <InlineSl label="WebM dur." min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
+            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
 
             {/* ── The plot ─────────────────────────────────────────────────
                 The stated audience of this whole tool is a pen plotter, and
@@ -3118,13 +3114,9 @@ export function Sidebar({
               {(style.enabledIndexed || style.enabledMineral || style.enabledCover || style.enabledShed) && (
                 <div data-testid="plot-area-fill" style={{ marginBottom:6 }}>
                   <div style={{ fontSize:11, color: DIM, margin:'2px 0 5px' }}>Filled areas in the SVG</div>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['solid','FILL'],['hatch','HATCH']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={(view.plotAreaFill ?? 'solid') === m}
-                        data-testid={`plot-fill-${m}`} onClick={() => sv({ plotAreaFill: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Filled areas in the SVG" options={[['Fill', 'solid'], ['Hatch', 'hatch']]}
+                    testIdOf={(m) => `plot-fill-${m}`} value={view.plotAreaFill ?? 'solid'}
+                    onChange={(m) => sv({ plotAreaFill: m })} style={{ marginBottom: 8 }} />
                   {view.plotAreaFill === 'hatch' && (
                     <>
                       <InlineSl label="Pitch" testId="plot-hatch-pitch"

@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, ON_ACCENT, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -246,10 +246,10 @@ function Ink({ layer, set, prefix, help = {}, noFill = false }) {
         <Sub>
           {/* Falls back through this mark's *own* stroke colour before the
               layer's, so colouring the mark colours all of it. */}
-          <ColorRow label="Fill Colour" value={F('FillColor') ?? color}
+          <ColorRow label="Fill colour" value={F('FillColor') ?? color}
                     testId={`${prefix}-fill-color-${id}`}
                     onChange={(v) => set({ [`${prefix}FillColor`]: v })} />
-          <InlineSl label="Fill Op." min={0} max={1} step={0.01}
+          <InlineSl label="Fill opacity" min={0} max={1} step={0.01}
             value={F('FillOpacity') ?? opacity} fmt={(v) => Math.round(v * 100) + '%'}
             testId={`${prefix}-fill-opacity-${id}`}
             onChange={(v) => set({ [`${prefix}FillOpacity`]: v })} />
@@ -259,14 +259,9 @@ function Ink({ layer, set, prefix, help = {}, noFill = false }) {
               sit in. */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
             <span style={{ fontSize: 10, color: DIM, width: 54 }}>Stroke</span>
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {[[true, 'Outside'], [false, 'Centred']].map(([v, text]) => (
-                <Btn key={text} block variant="toggle" on={!!F('StrokeOutside') === v}
-                  onClick={() => set({ [`${prefix}StrokeOutside`]: v })}
-                  data-testid={`${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
-                  style={{ padding: '4px 0', fontSize: 10 }}>{text}</Btn>
-              ))}
-            </div>
+            <SegGroup label="Stroke" options={[['Outside', true], ['Centred', false]]}
+              testIdOf={(v) => `${prefix}-stroke-${v ? 'outside' : 'centred'}-${id}`}
+              value={!!F('StrokeOutside')} onChange={(v) => set({ [`${prefix}StrokeOutside`]: v })} style={{ flex: 1 }} />
           </div>
         </Sub>
       )}
@@ -1010,9 +1005,9 @@ export function VectorLayersPanel({
                     <Tog label="Fill" small checked={l.fill} onChange={(v) => onPatch(l.id, { fill: v })} />
                     {l.fill && (
                       <Sub>
-                        <ColorRow label="Fill Colour" value={l.fillColor}
+                        <ColorRow label="Fill colour" value={l.fillColor}
                                   onChange={(v) => onPatch(l.id, { fillColor: v })} />
-                        <InlineSl label="Fill Op." min={0} max={1} step={0.01} value={l.fillOpacity}
+                        <InlineSl label="Fill opacity" min={0} max={1} step={0.01} value={l.fillOpacity}
                                   fmt={(v) => Math.round(v * 100) + '%'}
                                   onChange={(v) => onPatch(l.id, { fillOpacity: v })} />
                       </Sub>

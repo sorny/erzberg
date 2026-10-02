@@ -120,8 +120,8 @@ test.describe('panel', () => {
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
     await page.waitForTimeout(1200)
 
-    const slider = page.locator('input.hmr[aria-label="Azimuth"]')
-    const field  = page.locator('input.hmval[aria-label="Azimuth value"]')
+    const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
+    const field  = page.locator('input.hmval[aria-label="Sun azimuth value"]')
     await expect(slider).toHaveAttribute('step', '5')
 
     await field.fill('37')
@@ -175,12 +175,12 @@ test.describe('panel', () => {
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
     await page.waitForTimeout(1200)
 
-    const slider = page.locator('input.hmr[aria-label="Azimuth"]')
+    const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
     await expect(slider).toHaveValue('315')
     await expect(slider).toHaveAttribute('aria-valuetext', '315°')
 
     // And it tracks the value rather than being a one-off at mount.
-    await page.locator('input.hmval[aria-label="Azimuth value"]').fill('90')
+    await page.locator('input.hmval[aria-label="Sun azimuth value"]').fill('90')
     await page.keyboard.press('Enter')
     await page.waitForTimeout(400)
     await expect(slider).toHaveAttribute('aria-valuetext', '90°')
@@ -197,12 +197,12 @@ test.describe('panel', () => {
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
     await page.waitForTimeout(1200)
 
-    const slider = page.locator('input.hmr[aria-label="Azimuth"]')
+    const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
     const id = await slider.getAttribute('id')
     expect(id, 'the slider must carry an id to be pointed at').toBeTruthy()
 
     const label = page.locator(`label[for="${id}"]`)
-    await expect(label).toHaveText('Azimuth')
+    await expect(label).toHaveText('Sun azimuth')
     await label.click()
     await expect(slider).toBeFocused()
   })
@@ -221,8 +221,8 @@ test.describe('panel', () => {
     await expect(enabled).toBeChecked()
 
     // Cast shadows carries both a switch and a help button.
-    const help = page.locator('button.hmi[aria-label="What Cast Shadows does"]')
-    const shadows = page.locator('input[type=checkbox][aria-label="Cast Shadows"]')
+    const help = page.locator('button.hmi[aria-label="What Cast shadows does"]')
+    const shadows = page.locator('input[type=checkbox][aria-label="Cast shadows"]')
     const before = await shadows.isChecked()
     await help.click()
     await page.waitForTimeout(300)
@@ -259,7 +259,7 @@ test.describe('panel', () => {
     await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
     await page.waitForTimeout(1200)
 
-    const azimuth = page.locator('input.hmr[aria-label="Azimuth"]')
+    const azimuth = page.locator('input.hmr[aria-label="Sun azimuth"]')
     await azimuth.fill('120')
     await page.waitForTimeout(600)
 

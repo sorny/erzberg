@@ -352,7 +352,7 @@ and Roughness Mesh carry a seed. The same seed gives the same pattern.
   position from the raster's latitude and states sunrise, noon and sunset.
 - **Slope shading** in true degrees, smooth or in bands, and a bivariate
   **aspect map** that fades to grey on flat ground.
-- **Sky View Factor** occlusion, and **openness** as grey or as a Red Relief
+- **Sky-view factor** occlusion, and **openness** as grey or as a Red Relief
   Image Map (slope in red).
 - **Local relief** (the ground minus a blur of itself) and **curvature**
   shading, for form without a light direction.

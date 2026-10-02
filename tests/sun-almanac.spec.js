@@ -33,15 +33,15 @@ test('the almanac replaces the azimuth slider and says where the sun is', async 
 
   // Convention is the default, and it is not a fallback: 315° is the classic
   // north-west light, and no real sun ever sits there at this latitude.
-  await expect(page.locator('input.hmr[aria-label="Azimuth"]')).toHaveValue('315')
+  await expect(page.locator('input.hmr[aria-label="Sun azimuth"]')).toHaveValue('315')
   await expect(page.locator('[data-testid="sun-readout"]')).toHaveCount(0)
 
   await page.click('[data-testid="sun-mode-almanac"]')
   await page.waitForTimeout(600)
 
   // The two free numbers are gone: they are being computed now.
-  await expect(page.locator('input.hmr[aria-label="Azimuth"]')).toHaveCount(0)
-  await expect(page.locator('input.hmr[aria-label="Altitude"]')).toHaveCount(0)
+  await expect(page.locator('input.hmr[aria-label="Sun azimuth"]')).toHaveCount(0)
+  await expect(page.locator('input.hmr[aria-label="Sun altitude"]')).toHaveCount(0)
 
   const readout = page.locator('[data-testid="sun-readout"]')
   await expect(readout).toBeVisible()
@@ -154,7 +154,7 @@ test('the lit side of the plate is the side the bearing names', async ({ page })
 
 test('the almanac never writes to the sliders it replaces', async ({ page }) => {
   await openHillshade(page)
-  await page.locator('input.hmval[aria-label="Azimuth value"]').fill('120')
+  await page.locator('input.hmval[aria-label="Sun azimuth value"]').fill('120')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(400)
 
@@ -169,7 +169,7 @@ test('the almanac never writes to the sliders it replaces', async ({ page }) => 
   // and filled the undo history with one entry per tick of the clock.
   await page.click('[data-testid="sun-mode-convention"]')
   await page.waitForTimeout(400)
-  await expect(page.locator('input.hmr[aria-label="Azimuth"]')).toHaveValue('120')
+  await expect(page.locator('input.hmr[aria-label="Sun azimuth"]')).toHaveValue('120')
 })
 
 test('a georeferenced raster answers the latitude itself', async ({ page }) => {

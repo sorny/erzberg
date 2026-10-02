@@ -159,7 +159,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           would be a control that changes nothing. */}
       {showColor && (
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 10, color: DIM }}>Base Color</span>
+          <span style={{ fontSize: 10, color: DIM }}>Base colour</span>
           <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
         </div>
       )}
@@ -199,7 +199,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
         {ramp && (
           <Sub>
             <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
-            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band Dist" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
+            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band interval" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
             {/* The gradient is global (shared by every gradient source and the
                 fill), but it must be editable right where a source picks it —
                 not hidden behind enabling fill in Terrain Style. */}

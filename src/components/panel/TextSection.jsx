@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import { BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, SURF, Section, Sub, TEXT, Tog } from './ui'
+import { BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, SURF, Section, SegGroup, Sub, TEXT, Tog } from './ui'
 import { useStackDrag } from './stackDrag'
 import { makeTextLayer, textLayerName } from '../../utils/textLayers'
 
@@ -206,13 +206,8 @@ export function TextSection({
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '4px 0' }}>
                   <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
-                  <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-                    {[['left', 'Left'], ['center', 'Centre'], ['right', 'Right']].map(([k, lbl]) => (
-                      <Btn key={k} block variant="toggle" on={(l.align ?? 'center') === k}
-                        onClick={() => set({ align: k })}
-                        style={{ fontSize: 10, padding: '2px 0', borderRadius: 2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
+                    value={l.align ?? 'center'} onChange={(k) => set({ align: k })} style={{ flex: 1 }} />
                 </div>
 
                 <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '10px 0 4px' }}>Ink</div>
@@ -236,7 +231,7 @@ export function TextSection({
                       <Sub>
                         <ColorRow label="Fill colour" value={l.fillColor ?? l.color}
                           onChange={(v) => set({ fillColor: v })} />
-                        <InlineSl label="Fill op." min={0} max={1} step={0.01}
+                        <InlineSl label="Fill opacity" min={0} max={1} step={0.01}
                           value={l.fillOpacity ?? l.opacity}
                           fmt={(v) => Math.round(v * 100) + '%'}
                           onChange={(v) => set({ fillOpacity: v })} />

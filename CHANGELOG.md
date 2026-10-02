@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.48.0] — 2026-10-02
+
+### Changed
+
+- **Every exclusive choice is a segmented row.** Fourteen choices were rows of
+  separate toggle buttons, mostly in capitals: Hachure style, the Land cover
+  ink, Crossings axes, Reticulation and TSP density, Isochrone direction,
+  Truchet alignment, Viewshed hatch, Wind stroke, Rugged mesh, the class ink
+  palette, filled areas in the SVG, text alignment and the vector stroke
+  position. They now look and work like every other choice. The pick-on-map
+  buttons, the projection chips and Bold/Italic stay buttons, because they are
+  actions or independent switches.
+- **Labels are sentence case, in whole words and British spelling.** For
+  example: "Band interval" for "Band Dist", "Fill opacity" for "Fill Op.",
+  "Focal length", "Lid colour", "Depth tolerance" and "Hidden opacity" for
+  "Occ. Dist" and "Ghost Opac", and "Lit weight" and "Shaded weight" for
+  Tanaka.
+- **The sun has one name.** Its bearing is "Sun azimuth" and its height "Sun
+  altitude" in every section. Before, they had six and three names. The
+  bearings of a flash, the wind, the radar and a rock bed keep their own
+  names.
+
+No setting, preset or rendering changed.
+
 ## [1.47.0] — 2026-10-02
 
 ### Changed

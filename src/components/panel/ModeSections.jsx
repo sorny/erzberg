@@ -84,7 +84,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     <InlineSl label="Segments" help="Number of polygon sides approximating the circle." min={3} max={16} step={1} value={style.pillarSegments ?? 8} onChange={v => ss({ pillarSegments: v })} fmt={v => Math.round(v)} />
                   )}
                   {(style.pillarStyle === 'cuboid' || style.pillarStyle === 'cylinder') && (
-                    <ColorRow label="Lid Color" value={style.pillarLidColor ?? '#ffffff'} onChange={v => ss({ pillarLidColor: v })} />
+                    <ColorRow label="Lid colour" value={style.pillarLidColor ?? '#ffffff'} onChange={v => ss({ pillarLidColor: v })} />
                   )}
                   <InlineSl label="Occlusion width" testId="pillar-solid"
                     help="How much of its cell each pillar hides behind it, with Depth occlusion on. At 0 the pillar lines hide nothing. At 1 the pillars join into a solid block and hide the ground behind them. Cuboids and cylinders hide with their own sides at any value above 0."
@@ -122,12 +122,12 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   ) : (
                     <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
                   )}
-                  <InlineSl label="Major Every" min={0} max={50} step={1} value={style.majorIntervalContours} onChange={v => ss({ majorIntervalContours: v })} fmt={v => v === 0 ? 'None' : 'Every '+v} />
+                  <InlineSl label="Major every" min={0} max={50} step={1} value={style.majorIntervalContours} onChange={v => ss({ majorIntervalContours: v })} fmt={v => v === 0 ? 'None' : 'Every '+v} />
                   {style.majorIntervalContours > 1 && (
-                    <InlineSl label="Major Offset" min={1} max={style.majorIntervalContours} step={1} value={style.majorOffsetContours} onChange={v => ss({ majorOffsetContours: v })} />
+                    <InlineSl label="Major offset" min={1} max={style.majorIntervalContours} step={1} value={style.majorOffsetContours} onChange={v => ss({ majorOffsetContours: v })} />
                   )}
                   {style.majorIntervalContours > 0 && (
-                    <InlineSl label="Major Weight" min={0.5} max={10} step={0.5} value={style.majorWeightContours} onChange={v => ss({ majorWeightContours: v })} />
+                    <InlineSl label="Major weight" min={0.5} max={10} step={0.5} value={style.majorWeightContours} onChange={v => ss({ majorWeightContours: v })} />
                   )}
                   <Tog label="Close contours" checked={!!style.closeRingsContours} onChange={v => ss({ closeRingsContours: v })} />
                   {!style.tanakaContours && (
@@ -177,9 +177,9 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <Tog label="Tanaka illumination" help="Split contours into thick-bright (illuminated side) and thin-dark (shadow side) layers." checked={!!style.tanakaContours} onChange={v => ss({ tanakaContours: v })} />
                   {style.tanakaContours && (
                     <Sub>
-                      <InlineSl label="Sun Azimuth" min={0} max={360} step={5} value={style.tanakaSunAzimuth ?? 315} onChange={v => ss({ tanakaSunAzimuth: v })} fmt={v => Math.round(v) + '°'} />
-                      <InlineSl label="Bright Weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightBright ?? 2.5} onChange={v => ss({ tanakaWeightBright: v })} />
-                      <InlineSl label="Dark Weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightDark ?? 0.5} onChange={v => ss({ tanakaWeightDark: v })} />
+                      <InlineSl label="Sun azimuth" min={0} max={360} step={5} value={style.tanakaSunAzimuth ?? 315} onChange={v => ss({ tanakaSunAzimuth: v })} fmt={v => Math.round(v) + '°'} />
+                      <InlineSl label="Lit weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightBright ?? 2.5} onChange={v => ss({ tanakaWeightBright: v })} />
+                      <InlineSl label="Shaded weight" min={0.5} max={10} step={0.5} value={style.tanakaWeightDark ?? 0.5} onChange={v => ss({ tanakaWeightDark: v })} />
                     </Sub>
                   )}
                 </Sub>
@@ -193,13 +193,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             {style.enabledHachure && (
               <>
                 <Sub>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['tick','TICKS'],['lehmann','LEHMANN']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={(style.styleHachure ?? 'tick') === m} data-testid={`hachure-style-${m}`}
-                        onClick={() => ss({ styleHachure: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Hachure style" options={[['Ticks', 'tick'], ['Lehmann', 'lehmann']]} testIdOf={(m) => `hachure-style-${m}`}
+                    value={style.styleHachure ?? 'tick'} onChange={(m) => ss({ styleHachure: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Spacing" help={style.styleHachure === 'lehmann' ? 'Gap between strokes on the steepest ground. Gentle ground gets up to four times this.' : undefined} min={1} max={100} value={style.spacingHachure} onChange={v => ss({ spacingHachure: v })} />
                   {style.styleHachure === 'lehmann' ? (
                     <>
@@ -222,7 +217,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
                   <InlineSl label="Step" min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
-                  <InlineSl label="Max Len" min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
+                  <InlineSl label="Max length" min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Flow" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -315,7 +310,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many lines of constant light to trace. A contour joins points of equal height; an isophote joins points of equal illumination, so the lines bunch where the surface turns away from the sun and open out where it faces it." min={1} max={24} step={1} value={style.levelsIso} onChange={v => ss({ levelsIso: v })} />
-                  <InlineSl label="Sun" help="Light azimuth. Turning it moves every line, because the lines *are* the light — unlike contours, which stay put whatever the sun does." min={0} max={360} step={5} value={style.sunAzimuthIso} onChange={v => ss({ sunAzimuthIso: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Sun azimuth" help="Light azimuth. Turning it moves every line, because the lines *are* the light — unlike contours, which stay put whatever the sun does." min={0} max={360} step={5} value={style.sunAzimuthIso} onChange={v => ss({ sunAzimuthIso: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 pushes the lines toward the shadows; <1 spreads them onto the lit slopes." min={0.3} max={3} step={0.1} value={style.gammaIso} onChange={v => ss({ gammaIso: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Detail" help="How much the ground is smoothed before the light is measured off it. Illumination is a *slope*, not a height, so it inherits every bump the terrain has and magnifies it — at 0 the lines fracture into noise. Turn it down for crags, up for broad forms." min={0} max={12} step={0.5} value={style.radiusIso} onChange={v => ss({ radiusIso: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Smoothing" help="Chaikin passes over each finished line, rounding the staircase left by tracing a level set across grid cells. The curve converges: most of the effect lands in the first two passes and the shape stops changing after about four, so the upper end of this range costs time without changing the drawing. For a broader, rounder line reach for Detail instead — it smooths the ground before the light is measured off it, which is a different thing entirely." min={0} max={25} step={1} value={style.smoothingIso} onChange={v => ss({ smoothingIso: v })} />
@@ -333,7 +328,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Spacing" help="Pitch between hatch strokes." min={1} max={20} step={0.5} value={style.spacingEngrave} onChange={v => ss({ spacingEngrave: v })} />
                   <InlineSl label="Angle" help="Base hatch direction. Additional levels add +90°, +45°, +135°." min={0} max={180} step={1} value={style.angleEngrave} onChange={v => ss({ angleEngrave: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Levels" help="Cross-hatch layers: shadows accumulate up to this many stacked directions." min={1} max={4} step={1} value={style.levelsEngrave} onChange={v => ss({ levelsEngrave: v })} />
-                  <InlineSl label="Sun" help="Light azimuth driving the hatching: lit slopes stay sparse, shadows hatch densely." min={0} max={360} step={5} value={style.sunAzimuthEngrave} onChange={v => ss({ sunAzimuthEngrave: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Sun azimuth" help="Light azimuth driving the hatching: lit slopes stay sparse, shadows hatch densely." min={0} max={360} step={5} value={style.sunAzimuthEngrave} onChange={v => ss({ sunAzimuthEngrave: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 confines hatching to deep shadow; <1 spreads it." min={0.3} max={3} step={0.1} value={style.gammaEngrave} onChange={v => ss({ gammaEngrave: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Engrave" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -485,13 +480,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             {style.enabledCover && cover && (
               <>
                 <Sub label="Ink">
-                  <div style={{ display: 'flex', gap: 2, marginBottom: 4 }}>
-                    {[['Plate', 'plate'], ['Class', 'class']].map(([label, val]) => (
-                      <Btn key={val} block variant="toggle" on={style.sourceCover === val}
-                        onClick={() => ss({ sourceCover: val })}
-                        style={{ fontSize: 10, padding: '2px 0', borderRadius: 2 }}>{label}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Land cover ink" options={[['Plate', 'plate'], ['Class', 'class']]}
+                    value={style.sourceCover} onChange={(m) => ss({ sourceCover: m })} style={{ marginBottom: 4 }} />
                   <Note>
                     {style.sourceCover === 'class'
                       ? 'One flat colour per class, as a printed land-use sheet would have it.'
@@ -800,13 +790,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Detrend" help="Blur radius subtracted first. Without it a scanline crosses its own mean twice on a whole mountain and the mode draws two dots." min={1} max={40} step={1} value={style.detrendZeroCross} onChange={v => ss({ detrendZeroCross: v })} />
                   <InlineSl label="Line pitch" min={0.5} max={30} step={0.5} value={style.spacingZeroCross} onChange={v => ss({ spacingZeroCross: v })} fmt={v => v.toFixed(1)} />
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {['rows', 'both'].map(m => (
-                      <Btn key={m} block variant="toggle" on={style.axesZeroCross === m}
-                        onClick={() => ss({ axesZeroCross: m })}
-                        style={{ fontSize:10.5, padding:'3px 0', borderRadius:4, textTransform:'capitalize' }}>{m}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Crossing axes" options={[['Rows', 'rows'], ['Both', 'both']]}
+                    value={style.axesZeroCross} onChange={(m) => ss({ axesZeroCross: m })} style={{ marginBottom: 8 }} />
                 </Sub>
                 <ModeStyleOverride prefix="ZeroCross" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
@@ -838,13 +823,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Crack width" min={0.05} max={2} step={0.05} value={style.widthRetic} onChange={v => ss({ widthRetic: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Dot pitch" min={0.5} max={12} step={0.5} value={style.spacingRetic} onChange={v => ss({ spacingRetic: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Gamma" min={0.2} max={3} step={0.05} value={style.gammaRetic} onChange={v => ss({ gammaRetic: v })} fmt={v => v.toFixed(2)} />
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['invElev','LOW'],['elevation','HIGH'],['slope','STEEP'],['invSlope','FLAT']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.densityModeRetic === m}
-                        onClick={() => ss({ densityModeRetic: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Density from" options={[['Low', 'invElev'], ['High', 'elevation'], ['Steep', 'slope'], ['Flat', 'invSlope']]}
+                    value={style.densityModeRetic} onChange={(m) => ss({ densityModeRetic: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRetic} onChange={v => ss({ seedRetic: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Retic" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
@@ -859,15 +839,10 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Points" help="Dots the line must visit. The tour gets two seconds, so very high counts can keep a few crossings." min={100} max={8000} step={100} value={style.countTsp} onChange={v => ss({ countTsp: Math.round(v) })} />
                   <InlineSl label="Gamma" help="Above 1, the dots crowd into the densest part of the field and the line coils tighter there." min={0.3} max={4} step={0.05} value={style.gammaTsp} onChange={v => ss({ gammaTsp: v })} fmt={v => v.toFixed(2)} />
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['slope','STEEP'],['shade','SHADE'],['invElev','LOW'],['elevation','HIGH']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.densityModeTsp === m}
-                        onClick={() => ss({ densityModeTsp: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Density from" options={[['Steep', 'slope'], ['Shade', 'shade'], ['Low', 'invElev'], ['High', 'elevation']]}
+                    value={style.densityModeTsp} onChange={(m) => ss({ densityModeTsp: m })} style={{ marginBottom: 8 }} />
                   {style.densityModeTsp === 'shade' && (
-                    <InlineSl label="Sun" help="Compass bearing of the light that sets the tone." min={0} max={360} step={1} value={style.azimuthTsp} onChange={v => ss({ azimuthTsp: v })} fmt={v => `${Math.round(v)}°`} />
+                    <InlineSl label="Sun azimuth" help="Compass bearing of the light that sets the tone." min={0} max={360} step={1} value={style.azimuthTsp} onChange={v => ss({ azimuthTsp: v })} fmt={v => `${Math.round(v)}°`} />
                   )}
                   <Tog label="Closed loop" checked={!!style.closedTsp} onChange={v => ss({ closedTsp: v })} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTsp} onChange={v => ss({ seedTsp: v })} />
@@ -882,8 +857,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             {style.enabledShadowHatch && (
               <>
                 <Sub>
-                  <InlineSl label="Sun bearing" min={0} max={360} step={1} value={style.azimuthShadowHatch} onChange={v => ss({ azimuthShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
-                  <InlineSl label="Sun height" help="Degrees above the horizon. A low sun throws long shadows across the valleys. At 0 or below nothing is drawn." min={-5} max={85} step={0.5} value={style.altitudeShadowHatch} onChange={v => ss({ altitudeShadowHatch: v })} fmt={v => `${v.toFixed(1)}°`} />
+                  <InlineSl label="Sun azimuth" min={0} max={360} step={1} value={style.azimuthShadowHatch} onChange={v => ss({ azimuthShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
+                  <InlineSl label="Sun altitude" help="Degrees above the horizon. A low sun throws long shadows across the valleys. At 0 or below nothing is drawn." min={-5} max={85} step={0.5} value={style.altitudeShadowHatch} onChange={v => ss({ altitudeShadowHatch: v })} fmt={v => `${v.toFixed(1)}°`} />
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingShadowHatch} onChange={v => ss({ spacingShadowHatch: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleShadowHatch} onChange={v => ss({ angleShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
                   <InlineSl label="Detail" help="How much the shadow mask is smoothed. At 0 the hatching stops at every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowHatch} onChange={v => ss({ radiusShadowHatch: v })} fmt={v => v.toFixed(1)} />
@@ -904,13 +879,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     onClick={() => onPick?.(pick === 'Isochrone' ? null : 'Isochrone')} style={{ marginBottom:8 }}>
                     {pick === 'Isochrone' ? 'Click the start on the terrain…' : 'Pick start on terrain'}
                   </Btn>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['out','FROM HERE'],['back','BACK HERE']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.directionIsochrone === m}
-                        onClick={() => ss({ directionIsochrone: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Direction" options={[['From here', 'out'], ['Back here', 'back']]}
+                    value={style.directionIsochrone} onChange={(m) => ss({ directionIsochrone: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Every" help="Minutes between the rings." min={1} max={120} step={1} value={style.intervalIsochrone} onChange={v => ss({ intervalIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)} min`} />
                   <InlineSl label="Up to" help="The longest walk drawn." min={0.25} max={24} step={0.25} value={style.limitIsochrone} onChange={v => ss({ limitIsochrone: v })} fmt={v => `${v} h`} />
                   <InlineSl label="Too steep" help="Ground steeper than this cannot be walked, so the rings go around it. Tobler's function already slows a walker a lot above 25°." min={10} max={80} step={1} value={style.steepIsochrone} onChange={v => ss({ steepIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
@@ -936,13 +906,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             {style.enabledTruchet && (
               <>
                 <Sub>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['fall','DOWNHILL'],['contour','ACROSS'],['random','RANDOM']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.alignTruchet === m}
-                        onClick={() => ss({ alignTruchet: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Tile alignment" options={[['Downhill', 'fall'], ['Across', 'contour'], ['Random', 'random']]}
+                    value={style.alignTruchet} onChange={(m) => ss({ alignTruchet: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Tile" help="Tile size. Each tile holds two quarter circles, and the tiles link into chains." min={2} max={60} step={0.5} value={style.spacingTruchet} onChange={v => ss({ spacingTruchet: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Flat below" help="Tiles on ground flatter than this stay blank, so the landform shows as the shape of what is drawn. At 0 every tile is drawn." min={0} max={1} step={0.01} value={style.thresholdTruchet} onChange={v => ss({ thresholdTruchet: v })} fmt={v => v.toFixed(2)} />
                   {style.alignTruchet === 'random' && (
@@ -968,13 +933,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       {`${Math.round(viewshedNote.visible * 100)}% of the ground is in view`}
                     </div>
                   )}
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['visible','HATCH SEEN'],['hidden','HATCH HIDDEN']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.sideViewshed === m}
-                        onClick={() => ss({ sideViewshed: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Hatch" options={[['Hatch seen', 'visible'], ['Hatch hidden', 'hidden']]}
+                    value={style.sideViewshed} onChange={(m) => ss({ sideViewshed: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Eye height" help="Metres above the ground. A person is about 1.7 m, a tower 20 m or more. On a rounded summit a low eye sees little: the shoulder of the hill hides the slopes below it, as it does on a real one." min={0} max={200} step={0.5} value={style.eyeViewshed} onChange={v => ss({ eyeViewshed: v })} fmt={v => `${v} m`} />
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingViewshed} onChange={v => ss({ spacingViewshed: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleViewshed} onChange={v => ss({ angleViewshed: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
@@ -1033,7 +993,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   </Btn>
                   <Note>Each line is a ridge that hides the ground behind it, seen from the eye. Put the camera low behind the eye and the ridges stack as on a summit board.</Note>
                   <InlineSl label="Eye height" help="Metres above the ground. A person is about 1.7 m, a tower 20 m or more." min={0} max={200} step={0.5} value={style.eyePanorama} onChange={v => ss({ eyePanorama: v })} fmt={v => `${v} m`} />
-                  <InlineSl label="Min. depth" help="A ridge draws only if the ground it hides runs on for at least this far. Raise it to keep the big ridges and drop the small bumps." min={0} max={2000} step={10} value={style.depthPanorama} onChange={v => ss({ depthPanorama: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  <InlineSl label="Min depth" help="A ridge draws only if the ground it hides runs on for at least this far. Raise it to keep the big ridges and drop the small bumps." min={0} max={2000} step={10} value={style.depthPanorama} onChange={v => ss({ depthPanorama: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresPanorama} onChange={v => ss({ cellMetresPanorama: v })} fmt={v => `${v} m`} />
                   )}
@@ -1119,13 +1079,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       {`${windNote.lines} lines`}
                     </div>
                   )}
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['lines','LINES'],['arrows','ARROWS'],['streaks','STREAKS']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={(style.strokeWind ?? 'lines') === m}
-                        onClick={() => ss({ strokeWind: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Wind stroke" options={[['Lines', 'lines'], ['Arrows', 'arrows'], ['Streaks', 'streaks']]}
+                    value={style.strokeWind ?? 'lines'} onChange={(m) => ss({ strokeWind: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="From" help="The bearing the wind blows from. 0° is north, 270° is west." min={0} max={359} step={1} value={style.azimuthWind} onChange={v => ss({ azimuthWind: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
                   <InlineSl label="Spacing" help="The gap between lines on low ground." min={1} max={40} step={0.5} value={style.spacingWind} onChange={v => ss({ spacingWind: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Crowding" help="How much closer the lines run where the wind is faster, over crests and ridges. At 0 the gap is the same everywhere." min={0} max={1} step={0.05} value={style.crestWind} onChange={v => ss({ crestWind: v })} fmt={v => v.toFixed(2)} />
@@ -1371,7 +1326,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many heights get a skeleton, evenly spaced from low to high." min={1} max={80} step={1} value={style.levelsSpines} onChange={v => ss({ levelsSpines: Math.round(v) })} />
-                  <InlineSl label="Min. depth" help="A spine draws only where the ground above its level is at least this far across, so thin tongues give none." min={1} max={30} step={0.5} value={style.depthSpines} onChange={v => ss({ depthSpines: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Min depth" help="A spine draws only where the ground above its level is at least this far across, so thin tongues give none." min={1} max={30} step={0.5} value={style.depthSpines} onChange={v => ss({ depthSpines: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Detail" help="Blur on the ground first. Without it every bump on an edge sprouts a spine." min={0} max={12} step={0.5} value={style.radiusSpines} onChange={v => ss({ radiusSpines: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Spines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -1435,13 +1390,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             {style.enabledRugged && (
               <>
                 <Sub>
-                  <div style={{ display:'flex', gap:2, marginBottom:8 }}>
-                    {[['delaunay','DELAUNAY'],['voronoi','VORONOI'],['both','BOTH']].map(([m, lbl]) => (
-                      <Btn key={m} block variant="toggle" on={style.kindRugged === m}
-                        onClick={() => ss({ kindRugged: m })}
-                        style={{ fontSize:9, padding:'3px 0', borderRadius:2 }}>{lbl}</Btn>
-                    ))}
-                  </div>
+                  <SegGroup label="Mesh" options={[['Delaunay', 'delaunay'], ['Voronoi', 'voronoi'], ['Both', 'both']]}
+                    value={style.kindRugged} onChange={(m) => ss({ kindRugged: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Points" min={50} max={12000} step={50} value={style.countRugged} onChange={v => ss({ countRugged: Math.round(v) })} />
                   <InlineSl label="Gamma" help="Above 1, only the roughest ground gets small facets." min={0.2} max={3} step={0.05} value={style.gammaRugged} onChange={v => ss({ gammaRugged: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Floor" help="Point density on smooth ground, as a fraction of the roughest. At 0 the flats get almost no points and a few long triangles span them." min={0} max={1} step={0.01} value={style.floorRugged} onChange={v => ss({ floorRugged: v })} fmt={v => v.toFixed(2)} />

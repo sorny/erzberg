@@ -193,7 +193,7 @@ test.describe('the interval slider says metres', () => {
     await slider.fill('100')
     // Every level lettered, so a gap in the numbers means a missing contour
     // rather than a minor one.
-    await page.locator('input[aria-label="Major Every"]').fill('1')
+    await page.locator('input[aria-label="Major every"]').fill('1')
     await page.locator('input[aria-label="Label heights"]').click({ force: true })
     await page.waitForTimeout(4000)
 

@@ -928,7 +928,7 @@ test.describe('vector layers', () => {
       return top / total
     })
 
-    // Fill Op. is the last range control in the expanded row.
+    // Fill opacity is the last range control in the expanded row.
     const ranges = page.locator(`[data-testid="vector-layer-${id}"] input[type="range"]`)
     const last = (await ranges.count()) - 1
 
