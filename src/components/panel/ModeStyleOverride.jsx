@@ -13,7 +13,7 @@ import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
 import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
-import { ACCENT_DEEP, BORDER, Btn, DIM, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
+import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
 
 /**
  * Which land-cover classes this layer is allowed to mark.
@@ -158,10 +158,8 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           show: Riso's three separations each carry their own, and a swatch here
           would be a control that changes nothing. */}
       {showColor && (
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 8 }}>
-          <span style={{ fontSize: 10, color: DIM }}>Base colour</span>
-          <input type="color" className="hmc" value={style[`color${prefix}`]} onChange={e => ss({ [`color${prefix}`]: e.target.value })} />
-        </div>
+        <ColorRow label="Base colour" testId={`base-colour-${prefix || 'vector'}`}
+          value={style[`color${prefix}`]} onChange={(v) => ss({ [`color${prefix}`]: v })} />
       )}
       <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />

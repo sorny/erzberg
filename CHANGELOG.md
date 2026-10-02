@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.49.0] — 2026-10-02
+
+### Changed
+
+- **Blur is called Blur.** Fifteen modes blur the ground or a field before
+  they trace it. Twelve called the slider *Detail*, which runs the wrong way:
+  a higher value gives less detail. Three called it *Smoothing*, the name of
+  the smoothing passes in seven other modes. All fifteen are now *Blur*. Ridge
+  and Valley keep *Radius*, because there it is the size of the neighbourhood.
+- **Base colour** in every mode is the same colour row as the other colour
+  controls: the same label size, and a name for screen readers.
+- **Particle opacity** shows a percentage, as the other opacity sliders do.
+- **The Hair seed** runs to 999, as the other seeds do.
+- **The Texture switch** is called *Enabled*, as in the other 68 sections.
+
+No setting, preset or rendering changed.
+
 ## [1.48.0] — 2026-10-02
 
 ### Changed

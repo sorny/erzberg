@@ -312,7 +312,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Levels" help="How many lines of constant light to trace. A contour joins points of equal height; an isophote joins points of equal illumination, so the lines bunch where the surface turns away from the sun and open out where it faces it." min={1} max={24} step={1} value={style.levelsIso} onChange={v => ss({ levelsIso: v })} />
                   <InlineSl label="Sun azimuth" help="Light azimuth. Turning it moves every line, because the lines *are* the light — unlike contours, which stay put whatever the sun does." min={0} max={360} step={5} value={style.sunAzimuthIso} onChange={v => ss({ sunAzimuthIso: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 pushes the lines toward the shadows; <1 spreads them onto the lit slopes." min={0.3} max={3} step={0.1} value={style.gammaIso} onChange={v => ss({ gammaIso: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail" help="How much the ground is smoothed before the light is measured off it. Illumination is a *slope*, not a height, so it inherits every bump the terrain has and magnifies it — at 0 the lines fracture into noise. Turn it down for crags, up for broad forms." min={0} max={12} step={0.5} value={style.radiusIso} onChange={v => ss({ radiusIso: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="How much the ground is smoothed before the light is measured off it. Illumination is a *slope*, not a height, so it inherits every bump the terrain has and magnifies it — at 0 the lines fracture into noise. Turn it down for crags, up for broad forms." min={0} max={12} step={0.5} value={style.radiusIso} onChange={v => ss({ radiusIso: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Smoothing" help="Chaikin passes over each finished line, rounding the staircase left by tracing a level set across grid cells. The curve converges: most of the effect lands in the first two passes and the shape stops changing after about four, so the upper end of this range costs time without changing the drawing. For a broader, rounder line reach for Detail instead — it smooths the ground before the light is measured off it, which is a different thing entirely." min={0} max={25} step={1} value={style.smoothingIso} onChange={v => ss({ smoothingIso: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Iso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -348,7 +348,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Spacing" help="Separation between strokes. Each line claims territory as it advances and stops on reaching another's, so strokes stay evenly spread instead of clumping." min={1} max={20} step={0.5} value={style.spacingCurv} onChange={v => ss({ spacingCurv: v })} />
                   <InlineSl label="Length" help="Maximum steps per stroke. Short values give a broken, sketched texture; long values give sweeping continuous lines." min={5} max={400} step={5} value={style.lengthCurv} onChange={v => ss({ lengthCurv: v })} />
                   <InlineSl label="Step" help="Integration step in grid cells. Smaller follows the curvature field more faithfully at more segments." min={0.25} max={3} step={0.25} value={style.stepCurv} onChange={v => ss({ stepCurv: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Smoothing" help="Pre-blur radius before differencing. Second derivatives amplify noise, so raise this on grainy terrain." min={0} max={6} step={1} value={style.radiusCurv} onChange={v => ss({ radiusCurv: v })} />
+                  <InlineSl label="Blur" help="Pre-blur radius before differencing. Second derivatives amplify noise, so raise this on grainy terrain." min={0} max={6} step={1} value={style.radiusCurv} onChange={v => ss({ radiusCurv: v })} />
                   <InlineSl label="Threshold" help="Minimum curvature, as a fraction of the strongest present. Raise it to leave flat ground bare and engrave only where the surface actually bends." min={0} max={0.9} step={0.01} value={style.thresholdCurv} onChange={v => ss({ thresholdCurv: v })} fmt={v => Math.round(v*100)+'%'} />
                 </Sub>
                 <ModeStyleOverride prefix="Curv" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -463,7 +463,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub label="CLASSIFIER">
                   <InlineSl label="Steep at" help="Slope above which a cell is rock rather than ground." min={0.05} max={0.95} step={0.01} value={style.steepMineral} onChange={v => ss({ steepMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Broken at" help="Curvature above which rock is a face rather than massive." min={0.05} max={0.95} step={0.01} value={style.brokenMineral} onChange={v => ss({ brokenMineral: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Smoothing" help="Curvature is a second derivative, so it is taken on a blurred grid. On a raw DEM every pixel of sensor grain becomes its own rock type." min={0} max={8} step={1} value={style.radiusMineral} onChange={v => ss({ radiusMineral: v })} />
+                  <InlineSl label="Blur" help="Curvature is a second derivative, so it is taken on a blurred grid. On a raw DEM every pixel of sensor grain becomes its own rock type." min={0} max={8} step={1} value={style.radiusMineral} onChange={v => ss({ radiusMineral: v })} />
                   <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
@@ -688,7 +688,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       value={style.lonShadowLine ?? 0} onChange={v => ss({ lonShadowLine: v })}
                       fmt={v => `${Math.abs(v).toFixed(2)}° ${v < 0 ? 'W' : 'E'}`} />
                   </>)}
-                  <InlineSl label="Detail" help="How much the lit/unlit field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the line follows every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowLine ?? 1} onChange={v => ss({ radiusShadowLine: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="How much the lit/unlit field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the line follows every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowLine ?? 1} onChange={v => ss({ radiusShadowLine: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Smoothing" help="Chaikin passes over the finished line, rounding the staircase left by tracing a level set across grid cells." min={0} max={25} step={1} value={style.smoothingShadowLine ?? 2} onChange={v => ss({ smoothingShadowLine: Math.round(v) })} />
                   {shadowLineSun && (
                     <div data-testid="shadowline-note" style={{ fontSize:10, color: MUTED, lineHeight:1.7 }}>
@@ -748,7 +748,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       onChange={v => ss({ latSunHours: v })}
                       fmt={v => `${Math.abs(v).toFixed(1)}° ${v < 0 ? 'S' : 'N'}`} />
                   )}
-                  <InlineSl label="Detail" help="How much the field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the lines follow every notch in the skyline. This is the control that makes a line broad." min={0} max={12} step={0.5} value={style.radiusSunHours ?? 1} onChange={v => ss({ radiusSunHours: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="How much the field is smoothed before it is traced. A shadow edge is hard by nature — a ridge either blocks the sun or it does not — so at 0 the lines follow every notch in the skyline. This is the control that makes a line broad." min={0} max={12} step={0.5} value={style.radiusSunHours ?? 1} onChange={v => ss({ radiusSunHours: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Smoothing" help="Chaikin passes over each finished line, rounding the staircase left by tracing a level set across grid cells. Most of the effect lands in the first two." min={0} max={25} step={1} value={style.smoothingSunHours ?? 1} onChange={v => ss({ smoothingSunHours: Math.round(v) })} />
                   {/* What this mode is honest about, said where it is set.
                       Two things a user has to know and could not guess: the
@@ -861,7 +861,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Sun altitude" help="Degrees above the horizon. A low sun throws long shadows across the valleys. At 0 or below nothing is drawn." min={-5} max={85} step={0.5} value={style.altitudeShadowHatch} onChange={v => ss({ altitudeShadowHatch: v })} fmt={v => `${v.toFixed(1)}°`} />
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingShadowHatch} onChange={v => ss({ spacingShadowHatch: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleShadowHatch} onChange={v => ss({ angleShadowHatch: v })} fmt={v => `${Math.round(v)}°`} />
-                  <InlineSl label="Detail" help="How much the shadow mask is smoothed. At 0 the hatching stops at every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowHatch} onChange={v => ss({ radiusShadowHatch: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="How much the shadow mask is smoothed. At 0 the hatching stops at every notch in the skyline." min={0} max={12} step={0.5} value={style.radiusShadowHatch} onChange={v => ss({ radiusShadowHatch: v })} fmt={v => v.toFixed(1)} />
                   <Tog label="Cross-hatch" checked={!!style.crossShadowHatch} onChange={v => ss({ crossShadowHatch: v })} />
                   <Tog label="Outline" checked={!!style.outlineShadowHatch} onChange={v => ss({ outlineShadowHatch: v })} />
                 </Sub>
@@ -892,7 +892,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   {!hasGeoTiff && (
                     <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefIsochrone} onChange={v => ss({ reliefIsochrone: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
                   )}
-                  <InlineSl label="Detail" help="Blur on the time field before it is traced. At 0 the rings show the grid's steps." min={0} max={12} step={0.5} value={style.radiusIsochrone} onChange={v => ss({ radiusIsochrone: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the time field before it is traced. At 0 the rings show the grid's steps." min={0} max={12} step={0.5} value={style.radiusIsochrone} onChange={v => ss({ radiusIsochrone: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Smoothing" min={0} max={25} step={1} value={style.smoothingIsochrone} onChange={v => ss({ smoothingIsochrone: Math.round(v) })} />
                   <Tog label="Mark the start" checked={!!style.markerIsochrone} onChange={v => ss({ markerIsochrone: v })} />
                 </Sub>
@@ -938,7 +938,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Eye height" help="Metres above the ground. A person is about 1.7 m, a tower 20 m or more. On a rounded summit a low eye sees little: the shoulder of the hill hides the slopes below it, as it does on a real one." min={0} max={200} step={0.5} value={style.eyeViewshed} onChange={v => ss({ eyeViewshed: v })} fmt={v => `${v} m`} />
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingViewshed} onChange={v => ss({ spacingViewshed: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleViewshed} onChange={v => ss({ angleViewshed: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
-                  <InlineSl label="Detail" help="Blur on the edge of the view before it is hatched and traced. At 0 the edge follows the grid." min={0} max={12} step={0.5} value={style.radiusViewshed} onChange={v => ss({ radiusViewshed: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the edge of the view before it is hatched and traced. At 0 the edge follows the grid." min={0} max={12} step={0.5} value={style.radiusViewshed} onChange={v => ss({ radiusViewshed: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresViewshed} onChange={v => ss({ cellMetresViewshed: v })} fmt={v => `${v} m`} />
                   )}
@@ -1055,7 +1055,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Steepest" help="Ground over this is cross-hatched." min={5} max={80} step={1} value={style.highSlopeClass} onChange={v => ss({ highSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
                   <InlineSl label="Spacing" help="The hatch in the middle and steepest bands. The lowest band uses twice this." min={0.5} max={30} step={0.5} value={style.spacingSlopeClass} onChange={v => ss({ spacingSlopeClass: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Angle" min={0} max={180} step={1} value={style.angleSlopeClass} onChange={v => ss({ angleSlopeClass: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
-                  <InlineSl label="Detail" help="Blur on the slope before it is banded. At 0 the bands follow the grid." min={0} max={12} step={0.5} value={style.radiusSlopeClass} onChange={v => ss({ radiusSlopeClass: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the slope before it is banded. At 0 the bands follow the grid." min={0} max={12} step={0.5} value={style.radiusSlopeClass} onChange={v => ss({ radiusSlopeClass: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresSlopeClass} onChange={v => ss({ cellMetresSlopeClass: v })} fmt={v => `${v} m`} />
                   )}
@@ -1089,7 +1089,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   {style.leeWind > 0 && (
                     <Tog label="Eddies" help="Curls in the lee, where the air breaks away. Without them the lee is left blank." checked={!!style.eddiesWind} onChange={v => ss({ eddiesWind: v })} />
                   )}
-                  <InlineSl label="Detail" help="Blur on the ground before the wind reads it. Higher values let the air pass over small bumps." min={0} max={12} step={0.5} value={style.radiusWind} onChange={v => ss({ radiusWind: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the ground before the wind reads it. Higher values let the air pass over small bumps." min={0} max={12} step={0.5} value={style.radiusWind} onChange={v => ss({ radiusWind: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresWind} onChange={v => ss({ cellMetresWind: v })} fmt={v => `${v} m`} />
                   )}
@@ -1115,7 +1115,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Release" help="Rock falls from ground steeper than this." min={20} max={80} step={1} value={style.releaseRunout} onChange={v => ss({ releaseRunout: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
                   <InlineSl label="Reach" help="A rock stops where the line back up to its start is flatter than this. Hazard maps use about 32° for rockfall. Lower values let it run farther." min={15} max={45} step={0.5} value={style.reachRunout} onChange={v => ss({ reachRunout: v })} fmt={v => `${v}°`} />
                   <InlineSl label="Spacing" help="The gap between the points in the release zones where paths start." min={1} max={40} step={0.5} value={style.spacingRunout} onChange={v => ss({ spacingRunout: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail" help="Blur on the ground before the slope is read and the paths walk it." min={0} max={12} step={0.5} value={style.radiusRunout} onChange={v => ss({ radiusRunout: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the ground before the slope is read and the paths walk it." min={0} max={12} step={0.5} value={style.radiusRunout} onChange={v => ss({ radiusRunout: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresRunout} onChange={v => ss({ cellMetresRunout: v })} fmt={v => `${v} m`} />
                   )}
@@ -1185,7 +1185,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Length" help="The height of each hair, centred on the ground." min={0.5} max={60} step={0.5} value={style.lengthHair ?? 6} onChange={v => ss({ lengthHair: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Curl" help="How far each step wanders sideways, against the step up." min={0} max={3} step={0.05} value={style.jitterHair ?? 0.6} onChange={v => ss({ jitterHair: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Segments" min={2} max={16} step={1} value={style.segmentsHair ?? 6} onChange={v => ss({ segmentsHair: Math.round(v) })} />
-                  <InlineSl label="Seed" min={1} max={99} step={1} value={style.seedHair ?? 1} onChange={v => ss({ seedHair: Math.round(v) })} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedHair ?? 1} onChange={v => ss({ seedHair: Math.round(v) })} />
                 </Sub>
                 <ModeStyleOverride prefix="Hair" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -1285,7 +1285,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   </Btn>
                   <InlineSl label="Rays" min={8} max={1000} step={1} value={style.raysGeodesic} onChange={v => ss({ raysGeodesic: Math.round(v) })} />
                   <InlineSl label="Bend" help="Multiplies the heights before the rays read them. Real ground bends a straight line only a little." min={0.5} max={10} step={0.1} value={style.exaggerationGeodesic} onChange={v => ss({ exaggerationGeodesic: v })} fmt={v => `×${v.toFixed(1)}`} />
-                  <InlineSl label="Detail" help="Blur on the ground before the rays read it. The rays follow the curvature, and a raw DEM curves at every cell." min={0} max={12} step={0.5} value={style.radiusGeodesic} onChange={v => ss({ radiusGeodesic: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the ground before the rays read it. The rays follow the curvature, and a raw DEM curves at every cell." min={0} max={12} step={0.5} value={style.radiusGeodesic} onChange={v => ss({ radiusGeodesic: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresGeodesic} onChange={v => ss({ cellMetresGeodesic: v })} fmt={v => `${v} m`} />
                   )}
@@ -1327,7 +1327,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Levels" help="How many heights get a skeleton, evenly spaced from low to high." min={1} max={80} step={1} value={style.levelsSpines} onChange={v => ss({ levelsSpines: Math.round(v) })} />
                   <InlineSl label="Min depth" help="A spine draws only where the ground above its level is at least this far across, so thin tongues give none." min={1} max={30} step={0.5} value={style.depthSpines} onChange={v => ss({ depthSpines: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail" help="Blur on the ground first. Without it every bump on an edge sprouts a spine." min={0} max={12} step={0.5} value={style.radiusSpines} onChange={v => ss({ radiusSpines: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the ground first. Without it every bump on an edge sprouts a spine." min={0} max={12} step={0.5} value={style.radiusSpines} onChange={v => ss({ radiusSpines: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Spines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -1370,7 +1370,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Cracks from" help="Ice steeper than this gets crevasses, longer as it steepens." min={0} max={60} step={1} value={style.crackGlacier} onChange={v => ss({ crackGlacier: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
                   <InlineSl label="Interval" help="Contours on the ice, in true metres." min={5} max={500} step={5} value={style.intervalGlacier} onChange={v => ss({ intervalGlacier: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
                   <InlineSl label="Spacing" help="The grid the crevasses sit on. The moraine rings use half of it." min={1} max={40} step={0.5} value={style.spacingGlacier} onChange={v => ss({ spacingGlacier: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail" help="Blur on the ice before its edge is drawn." min={0} max={12} step={0.5} value={style.radiusGlacier} onChange={v => ss({ radiusGlacier: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Blur" help="Blur on the ice before its edge is drawn." min={0} max={12} step={0.5} value={style.radiusGlacier} onChange={v => ss({ radiusGlacier: v })} fmt={v => v.toFixed(1)} />
                   <ColorRow label="Ice colour" value={style.iceColorGlacier} onChange={v => ss({ iceColorGlacier: v })} />
                   <Tog label="Moraine" help="Rings along the outside of the ice edge, in the mode's own colour." checked={!!style.moraineGlacier} onChange={v => ss({ moraineGlacier: v })} />
                   {!geoTiffBbox && (
@@ -1395,7 +1395,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Points" min={50} max={12000} step={50} value={style.countRugged} onChange={v => ss({ countRugged: Math.round(v) })} />
                   <InlineSl label="Gamma" help="Above 1, only the roughest ground gets small facets." min={0.2} max={3} step={0.05} value={style.gammaRugged} onChange={v => ss({ gammaRugged: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Floor" help="Point density on smooth ground, as a fraction of the roughest. At 0 the flats get almost no points and a few long triangles span them." min={0} max={1} step={0.01} value={style.floorRugged} onChange={v => ss({ floorRugged: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Smoothing" help="Blur before the ruggedness is measured, so sensor grain does not count as rough ground." min={0} max={8} step={1} value={style.radiusRugged} onChange={v => ss({ radiusRugged: Math.round(v) })} />
+                  <InlineSl label="Blur" help="Blur before the ruggedness is measured, so sensor grain does not count as rough ground." min={0} max={8} step={1} value={style.radiusRugged} onChange={v => ss({ radiusRugged: Math.round(v) })} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRugged} onChange={v => ss({ seedRugged: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Rugged" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />

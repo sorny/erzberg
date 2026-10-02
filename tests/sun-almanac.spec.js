@@ -21,7 +21,7 @@ async function openHillshade(page) {
   await openStage(page, 'surface')
   await page.click('[data-testid="section-hillshade"]')
   await page.waitForTimeout(300)
-  await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+  await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
   await page.waitForTimeout(1200)
 }
 
@@ -187,7 +187,7 @@ test('a georeferenced raster answers the latitude itself', async ({ page }) => {
   await openStage(page, 'surface')
   await page.click('[data-testid="section-hillshade"]')
   await page.waitForTimeout(300)
-  await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+  await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
   await page.waitForTimeout(1200)
   await page.click('[data-testid="sun-mode-almanac"]')
   await page.waitForTimeout(600)

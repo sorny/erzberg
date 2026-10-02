@@ -117,7 +117,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -172,7 +172,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -194,7 +194,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -215,7 +215,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    const enabled = page.locator('input[type=checkbox][aria-label="Enabled"]').first()
+    const enabled = page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]')
     await enabled.click()
     await page.waitForTimeout(1200)
     await expect(enabled).toBeChecked()
@@ -256,7 +256,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('input[type=checkbox][aria-label="Enabled"]').first().click()
+    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
     await page.waitForTimeout(1200)
 
     const azimuth = page.locator('input.hmr[aria-label="Sun azimuth"]')
