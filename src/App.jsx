@@ -9,7 +9,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, MUTED, ON_ACCENT, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -173,19 +173,6 @@ function autoResolution(width, height) {
 }
 
 // ── Floating chrome ───────────────────────────────────────────────────────────
-/*
- * One material for everything that floats over the scene: the hint, the toast,
- * the computing pill, the loading card. Frosted rather than opaque, so the plate
- * stays the subject, and one border, radius and shadow so they read as a set.
- */
-const GLASS = {
-  background: GLASS_BG,
-  backdropFilter:'blur(14px) saturate(1.4)', WebkitBackdropFilter:'blur(14px) saturate(1.4)',
-  border:`1px solid ${GLASS_BORDER}`,
-  boxShadow:'0 8px 28px var(--hm-shadow)',
-  fontFamily: FONT, color: GLASS_TEXT,
-}
-
 /** A key, drawn as a key. */
 function Kbd({ children }) {
   return (
@@ -2497,7 +2484,7 @@ export default function App() {
       />
       </div>
 
-      {/* ── Center guides ────────────────────────────────────────────────── */}
+      {/* ── Centre guides ────────────────────────────────────────────────── */}
       {view.showGuides && <CenterGuides bgColor={bgColor} />}
       {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} rightInset={viewInset} />}
       {/* Ink, unlike the frame above it: a recording is a picture of the plate,

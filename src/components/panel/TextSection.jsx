@@ -197,10 +197,10 @@ export function TextSection({
 
                 <InlineSl label="Size" min={2} max={80} step={0.5} value={l.size}
                   onChange={(v) => set({ size: v })} testId={`text-size-${l.id}`} />
-                <InlineSl label="Offset ↔" min={-200} max={200} step={1} value={l.dx}
+                <InlineSl label="Offset X" min={-200} max={200} step={1} value={l.dx}
                   onChange={(v) => set({ dx: v })}
                   help="Moves the text across its own plane, without moving where it stands." />
-                <InlineSl label="Offset ↕" min={-200} max={200} step={1} value={l.dy}
+                <InlineSl label="Offset Y" min={-200} max={200} step={1} value={l.dy}
                   onChange={(v) => set({ dy: v })}
                   help="Moves the text up its own plane." />
 

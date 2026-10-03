@@ -249,9 +249,9 @@ test.describe('the interval slider says metres', () => {
     const before = parseFloat(await slider.inputValue())
     expect(before, 'the slider holds what it was set to').toBeCloseTo(100, 0)
 
-    // Elev scale is Shape's, and the drill-in above left the panel in Marks.
+    // Height scale is Shape's, and the drill-in above left the panel in Marks.
     await openStage(page, 'terrain')
-    await page.locator('input[aria-label="Elev scale"]').fill('4')
+    await page.locator('input[aria-label="Height scale"]').fill('4')
     await page.waitForTimeout(3000)
     const after = parseFloat(await slider.inputValue())
     expect(after, 'a taller terrain makes a world unit worth fewer metres').toBeLessThan(before)

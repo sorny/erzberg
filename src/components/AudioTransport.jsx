@@ -14,7 +14,7 @@
  * simply reads a different column and the flock reacts to where it landed.
  */
 import { useEffect, useRef } from 'react'
-import { ACCENT, BORDER, DIM, MUTED, SURF } from './panel/ui'
+import { ACCENT, BORDER, DIM, MUTED, ON_ACCENT, SURF } from './panel/ui'
 
 const fmt = (sec) => {
   if (!Number.isFinite(sec) || sec < 0) sec = 0
@@ -60,7 +60,7 @@ export function AudioTransport({ fa }) {
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
         <button data-testid="flock-audio-play" onClick={fa.toggle} title="Play / pause  (space)"
-          style={btn({ background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? '#fff' : DIM,
+          style={btn({ background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? ON_ACCENT : DIM,
                        borderColor: fa.isPlaying ? ACCENT : BORDER, minWidth: 26 })}>
           {fa.isPlaying ? '❚❚' : '▶'}
         </button>
@@ -72,7 +72,7 @@ export function AudioTransport({ fa }) {
           style={btn()}>+5s</button>
         <button data-testid="flock-audio-loop" onClick={() => fa.setLoop?.(!fa.loop)} title="Loop the track"
           style={btn({ marginLeft: 'auto',
-                       background: fa.loop ? ACCENT : SURF, color: fa.loop ? '#fff' : MUTED,
+                       background: fa.loop ? ACCENT : SURF, color: fa.loop ? ON_ACCENT : MUTED,
                        borderColor: fa.loop ? ACCENT : BORDER })}>⟲</button>
       </div>
 

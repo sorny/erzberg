@@ -476,7 +476,7 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ Load audio'),
+    page.click('[data-testid="flock-audio-load"]'),
   ])
   await chooser.setFiles(MP3)
   await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
@@ -516,7 +516,7 @@ test('the flock track has a transport — restart, skip and scrub', async ({ pag
   await toggleFor(page, 'React to audio').click({ force: true })
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ Load audio'),
+    page.click('[data-testid="flock-audio-load"]'),
   ])
   await chooser.setFiles(MP3)
   await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
@@ -576,7 +576,7 @@ test('the audio meter shows what the flock is hearing', async ({ page }) => {
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ Load audio'),
+    page.click('[data-testid="flock-audio-load"]'),
   ])
   await chooser.setFiles(MP3)
   await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })
@@ -622,7 +622,7 @@ test('the beat is visible in the flock, not just present in the numbers', async 
   await toggleFor(page, 'React to audio').click({ force: true })
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.click('text=↑ Load audio'),
+    page.click('[data-testid="flock-audio-load"]'),
   ])
   await chooser.setFiles(MP3)
   await expect(page.locator('[data-testid="flock-audio-play"]')).toBeVisible({ timeout: 30000 })

@@ -10,7 +10,7 @@ import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
 import { BackdropBlock } from './panel/BackdropBlock'
 import { useFeaturePick } from './panel/FeaturePicker'
-import { ACCENT, BG, BORDER, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
+import { ACCENT, BG, BORDER, DANGER_TEXT, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
@@ -211,7 +211,7 @@ export function EditPanel({
             border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
-            <div>Result <span style={{ color: bounds ? ACCENT : '#ef4444', fontVariantNumeric: 'tabular-nums' }} data-testid="edit-result">
+            <div>Result <span style={{ color: bounds ? ACCENT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums' }} data-testid="edit-result">
               {bounds ? `${bounds.w}×${bounds.h}` : 'empty'}
             </span></div>
           </div>

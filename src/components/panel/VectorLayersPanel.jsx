@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, LoadBtn, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -366,11 +366,8 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
         Map &amp; terrain marks. Anything else is an SVG away.
       </div>
 
-      <button className="hmload" onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
-        style={{
-          width: '100%', padding: 4, marginBottom: 8, background: SURF, color: MUTED,
-          border: `1px dashed ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10,
-        }}>↑ Custom SVG</button>
+      <LoadBtn onClick={() => onCustom(layer.id)} data-testid={`icon-upload-${layer.id}`}
+        style={{ marginBottom: 8 }}>Custom SVG</LoadBtn>
 
       {overflowed && (
         <div style={{ fontSize: 10, color: WARN, marginBottom: 4, lineHeight: 1.5 }}>
@@ -528,10 +525,10 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
           <InlineSl label="Size" min={2} max={40} step={0.5} value={layer.labelSize}
             onChange={(v) => set({ labelSize: v })} testId={`label-size-${layer.id}`} />
-          <InlineSl label="Offset ↔" min={-120} max={120} step={1} value={layer.labelDx}
+          <InlineSl label="Offset X" min={-120} max={120} step={1} value={layer.labelDx}
             onChange={(v) => set({ labelDx: v })} testId={`label-dx-${layer.id}`}
             help="Moves the label across its own plane, so it can sit beside a marker rather than on it." />
-          <InlineSl label="Offset ↕" min={-120} max={200} step={1} value={layer.labelDy}
+          <InlineSl label="Offset Y" min={-120} max={200} step={1} value={layer.labelDy}
             onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
             help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
 
@@ -810,11 +807,6 @@ export function VectorLayersPanel({
     }
   }
 
-  const btn = {
-    padding: 8, background: SURF, color: MUTED, border: `1px dashed ${BORDER}`,
-    borderRadius: 5, cursor: 'pointer', fontSize: 11,
-  }
-
   return (
     <>
       {layers?.length > 0 && (
@@ -829,10 +821,8 @@ export function VectorLayersPanel({
                          uploadsOnly={sources?.some((s) => s.kind !== 'osm')} />
 
       <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-        <button className="hmload" onClick={onLoadGeoJson} style={{ ...btn, flex: 1 }}
-                data-testid="load-geojson">↑ GeoJSON</button>
-        <button className="hmload" onClick={onLoadGpx} style={{ ...btn, flex: 1 }}
-                data-testid="load-gpx">↑ GPX</button>
+        <LoadBtn block={false} onClick={onLoadGeoJson} data-testid="load-geojson">GeoJSON</LoadBtn>
+        <LoadBtn block={false} onClick={onLoadGpx} data-testid="load-gpx">GPX</LoadBtn>
       </div>
 
       {/* ── OpenStreetMap ───────────────────────────────────────────────── */}

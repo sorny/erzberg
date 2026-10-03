@@ -81,7 +81,7 @@ two sun sliders, because Hillshade hides them when it is off.
 - `groundAt` returns `NaN` outside the grid and in holes, unlike
   `sampleBilinear`, which clamps. A shadow with no ground gets `aLift < 0`. The
   shader moves it out of clip space, and the exporter skips it.
-- The sprite grows and fades with height. `Sh. spread` sets that growth.
+- The sprite grows and fades with height. `Shadow spread` sets that growth.
 
 Shadows add about a third to the step. 100 000 birds run at 60 fps without
 shadows and about 18 fps with them.

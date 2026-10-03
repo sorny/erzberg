@@ -10,7 +10,7 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { ModeCopiesPanel, PanelStage, SectionFilter, SectionScope, sectionMatches } from './filter'
 import { PRESETS_STAGE, STAGES } from './stages'
-import { HEX, PALETTES } from '../../utils/theme'
+import { GLASS, HEX, PALETTES } from '../../utils/theme'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 /**
@@ -24,7 +24,7 @@ import { HEX, PALETTES } from '../../utils/theme'
  * `HEX` is the live palette as literal colours, for a 2D canvas, which resolves
  * nothing. It changes in place with the theme; read it at draw time.
  */
-export { HEX }
+export { HEX, GLASS }
 
 // Written out rather than generated: fast refresh only carries a module whose
 // non-component exports are literal constants, and `v('bg')` is a call.
@@ -59,8 +59,11 @@ export const WARN_BORDER = 'var(--hm-warn-border)'
 export const GLASS_BG    = 'var(--hm-glass-bg)'
 export const GLASS_BORDER = 'var(--hm-glass-border)'
 export const GLASS_TEXT  = 'var(--hm-glass-text)'
+export const SCRIM       = 'var(--hm-scrim)'
+
 export const FONT        = 'var(--hm-font)'
 export const MONO        = 'var(--hm-mono)'
+
 /*
  * A number, not a colour — it is arithmetic (`right: open ? W : 0`).
  *
@@ -1210,6 +1213,24 @@ export function Sub({ label, children }) {
       )}
       {children}
     </div>
+  )
+}
+
+/**
+ * A button that opens a file picker: a dashed drop-target box, "↑ " and the
+ * name of what it loads — a file type or a thing, never the word "Load".
+ * `block` fills the row; without it the button shares a flex row.
+ */
+export function LoadBtn({ children, block = true, style, ...rest }) {
+  return (
+    <button type="button" className="hmload" {...rest} style={{
+      ...(block ? { width: '100%' } : { flex: 1 }),
+      padding: 8, background: SURF, color: MUTED, border: `1px dashed ${BORDER}`,
+      borderRadius: 5, fontSize: 11, fontFamily: 'inherit',
+      cursor: rest.disabled ? 'default' : 'pointer',
+      ...(rest.disabled && { opacity: 0.5 }),
+      ...style,
+    }}>↑ {children}</button>
   )
 }
 

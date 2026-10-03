@@ -15,7 +15,7 @@
  */
 import { maskCoverage } from '../utils/maskLayers'
 import { BackdropBlock } from './panel/BackdropBlock'
-import { ACCENT, BG, BORDER, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, Tog, W } from './panel/ui'
+import { ACCENT, BG, BORDER, DANGER_TEXT, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, Tog, W } from './panel/ui'
 
 const TOOLS = [
   ['✎ Brush',   'brush'],
@@ -140,7 +140,7 @@ export function MaskPanel({
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
             <div>Covered <span data-testid="studio-coverage" style={{
-              color: covered > 0 ? ACCENT : '#ef4444', fontVariantNumeric: 'tabular-nums',
+              color: covered > 0 ? ACCENT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums',
             }}>{covered > 0 && covered < 1 ? '<1' : Math.round(covered)}%</span></div>
           </div>
         </div>
@@ -220,7 +220,7 @@ function RegionControls({ tool, r, total, btn }) {
                              borderRadius: 5, fontSize: 10, padding: '2px 4px', textAlign: 'right' }} />
                   <span style={{ fontSize: 10, color: MUTED }}>m</span>
                 </div>
-                {!r.featureOk && note('A mask from features needs a georeferenced raster and features with coordinates.', '#ef4444')}
+                {!r.featureOk && note('A mask from features needs a georeferenced raster and features with coordinates.', DANGER_TEXT)}
               </div>
             )}
         </>

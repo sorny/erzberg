@@ -838,7 +838,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uElevScale.value = elevScaleSafe
     surfMat.uniforms.uColorMode.value = { elevation: 0, slope: 1, aspect: 2 }[p.fillHypsoMode] ?? 0
     // These two, by contrast, take 0 as a real value — `||` here meant dragging
-    // Elev max cut to 0 fell back to 100, leaving the fill fully visible while
+    // High cut to 0 fell back to 100, leaving the fill fully visible while
     // every line layer was culled.
     surfMat.uniforms.uElevMinCut.value = p.elevMinCut ?? 0.0
     surfMat.uniforms.uElevMaxCut.value = p.elevMaxCut ?? 100.0

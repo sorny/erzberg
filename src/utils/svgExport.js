@@ -88,7 +88,7 @@ async function buildZBuffer(zGeos, groupMatrix, camera, W, H, elevMinCut, elevMa
   const camInv = camera.matrixWorldInverse
   const wld = new THREE.Vector3()
   const viw = new THREE.Vector3()
-  // `??`, not `||`: 0 is a legitimate cut. With `||`, dragging Elev max cut to 0
+  // `??`, not `||`: 0 is a legitimate cut. With `||`, dragging High cut to 0
   // fell back to 100 and the depth buffer kept every triangle the viewport had
   // discarded, so the export culled lines against terrain that was not there.
   const cutLo = (elevMinCut ?? 0) / 100

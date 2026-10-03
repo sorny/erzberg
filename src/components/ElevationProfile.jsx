@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { PROFILE_A, PROFILE_B } from './ProfileOverlay'
-import { ACCENT, DIM, MUTED } from './panel/ui'
+import { ACCENT, BORDER, Btn, DIM, GLASS, MONO, MUTED } from './panel/ui'
 
 /**
  * Popup chart size. Module scope rather than render scope on purpose: declared
@@ -108,23 +108,21 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
   return (
     <div style={{
       position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-      background: 'rgba(10,10,14,0.92)', borderRadius: 10, padding: '10px 12px 6px',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.6)', zIndex: 100, userSelect: 'none',
+      ...GLASS, borderRadius: 10, padding: '10px 12px 6px',
+      zIndex: 100, userSelect: 'none',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 8 }}>
         <span style={{ color: DIM, fontSize: 12, fontWeight: 600 }}>Elevation profile</span>
-        <button onClick={exportSvg} data-testid="profile-export-svg" title="Save this section as an SVG file"
-          style={{
-            marginLeft: 'auto', background: 'none', border: '1px solid #3f3f46', borderRadius: 4,
-            color: MUTED, cursor: 'pointer', fontSize: 10, padding: '3px 8px', letterSpacing: 0.5,
-          }}>SVG</button>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</button>
+        <Btn onClick={exportSvg} data-testid="profile-export-svg" title="Save this section as an SVG file"
+          style={{ marginLeft: 'auto' }}>SVG</Btn>
+        <Btn variant="ghost" onClick={onClose} aria-label="Close" title="Close"
+          style={{ fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</Btn>
       </div>
       <svg width={W} height={H}>
         {/* Grid lines */}
         {ticks.map(({ y }, i) => (
           <line key={i} x1={PAD.left} y1={y} x2={PAD.left + innerW} y2={y}
-            stroke="#333" strokeWidth={0.5} />
+            style={{ stroke: BORDER }} strokeWidth={0.5} />
         ))}
         {/* Fill area */}
         <path d={fillD} style={{ fill: 'color-mix(in srgb, var(--hm-accent) 18%, transparent)' }} />
@@ -133,16 +131,16 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
         {/* Y-axis labels */}
         {ticks.map(({ y, label }, i) => (
           <text key={i} x={PAD.left - 6} y={y + 4} textAnchor="end"
-            style={{ fill: '#888', fontSize: 9, fontFamily: 'monospace' }}>{label}</text>
+            style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>{label}</text>
         ))}
         {/* X-axis ends, carrying the pin colours from the scene so the chart says
             which end of the line on the terrain it started from. */}
         <circle cx={PAD.left} cy={H - 9} r={3} fill={PROFILE_A} />
         <text x={PAD.left + 8} y={H - 6} textAnchor="start"
-          style={{ fill: '#888', fontSize: 9, fontFamily: 'monospace' }}>A</text>
+          style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>A</text>
         <circle cx={PAD.left + innerW - 8} cy={H - 9} r={3} fill={PROFILE_B} />
         <text x={PAD.left + innerW} y={H - 6} textAnchor="start"
-          style={{ fill: '#888', fontSize: 9, fontFamily: 'monospace' }}>B</text>
+          style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>B</text>
       </svg>
     </div>
   )

@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.50.0] — 2026-10-03
+
+### Fixed
+
+- **The overlays follow the light theme.** The elevation profile, the feature
+  tooltip and the keyboard card had fixed dark backgrounds. In Paper, the
+  tooltip and the card put dark text on a dark ground. All three now use the
+  same frosted material as the hint and the toast (`GLASS`, now in
+  `utils/theme.js`). The audio meter, the play and loop buttons, the "edited"
+  badge on a preset and the red of an empty edit or mask also use the palette.
+
+### Changed
+
+- **The audio meter labels are words in sentence case:** Pace, Pulse,
+  Shimmer, Size and Burst, the names of their sliders. The colour stays in
+  the bar. A coloured label was unreadable on the light ground.
+- **Whole words in labels.** *Shadow size*, *Shadow spread* and *Shadow
+  colour* in Murmuration. *Stroke length* in Swiss. *Height scale*, *Low cut*
+  and *High cut* in Shape. *Strength* and *Rays* under Sky-view factor. The
+  *Heightmap* export button. *Centre guides* in British spelling.
+- **One name for a move along an axis: Offset.** The texture's *Shift X/Y*
+  and the label and text *Offset ↔ / ↕* are now *Offset X* and *Offset Y*,
+  as in the frame. The camera keeps *Pan*, the name of the mouse gesture
+  that moves the same target.
+- **Contours *Interval*** drops "(m)": the value already shows the metres.
+- **Sun angles show whole degrees** in every section. Shadow Hatch keeps its
+  half degrees, but no longer prints ".0".
+- **One load button.** Every button that opens a file picker is a dashed box
+  with "↑" and the name of what it loads: *Audio*, *Image*, *Mask image*,
+  *Cover plate*. No "Load", no ellipsis. Texture *Clear texture* and
+  Symmetry *Reset symmetry* are ordinary buttons in sentence case.
+
+No setting, preset or rendering changed.
+
 ## [1.49.0] — 2026-10-02
 
 ### Changed

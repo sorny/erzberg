@@ -32,11 +32,11 @@ const H = H_SPECTRUM + H_BARS
 // spectrogram, so the picture matches the terrain a Soundscape would make.
 const BAND_COLOURS = ['#f97316', '#22c55e', '#38bdf8']
 const CHANNELS = [
-  ['PACE',  '#a78bfa'],
-  ['PULSE', '#f97316'],
-  ['SHIM',  '#38bdf8'],
-  ['SIZE',  '#facc15'],
-  ['BURST', '#f43f5e'],
+  ['Pace',    '#a78bfa'],
+  ['Pulse',   '#f97316'],
+  ['Shimmer', '#38bdf8'],
+  ['Size',    '#facc15'],
+  ['Burst',   '#f43f5e'],
 ]
 
 export function AudioMeter({ liveRef, points }) {
@@ -80,7 +80,7 @@ export function AudioMeter({ liveRef, points }) {
       const W = cssW
 
       ctx.clearRect(0, 0, W, H)
-      ctx.fillStyle = '#141417'
+      ctx.fillStyle = HEX.desk
       ctx.fillRect(0, 0, W, H)
 
       const p = pRef.current ?? {}
@@ -200,7 +200,7 @@ export function AudioMeter({ liveRef, points }) {
         const v = Math.max(0, Math.min(1, values[i] || 0))
         ctx.fillStyle = colour
         ctx.fillRect(x, top, cw * v, barH)
-        ctx.fillStyle = v > 0.02 ? colour : HEX.muted
+        ctx.fillStyle = v > 0.02 ? HEX.text : HEX.muted
         ctx.fillText(label, x + cw / 2, top + barH + 8)
       })
 
@@ -208,7 +208,7 @@ export function AudioMeter({ liveRef, points }) {
       // broken, so say so instead of drawing a flat line and leaving you to
       // wonder whether the analysis failed.
       if (!playing) {
-        ctx.fillStyle = 'rgba(20,20,23,0.72)'
+        ctx.fillStyle = HEX.scrim
         ctx.fillRect(0, 0, W, H_SPECTRUM)
         ctx.fillStyle = HEX.muted
         ctx.font = '9px system-ui, sans-serif'

@@ -246,7 +246,7 @@ the panel shows the count ("18 of 29 named").
   proportional font, because layout is a monospace cursor.
 - **Single-line faces** come pre-flattened from
   `scripts/build-single-line-fonts.js`. See the README.
-- **Size**, **Offset ↔ / ↕** and **Align** place the text on the label plane,
+- **Size**, **Offset X / Y** and **Align** place the text on the label plane,
   which is the icon plane. A second line sits 1.25 em below.
 - **Fill** draws solid type with counters cut out.
 - A layer whose labels exceed 80 000 segments draws none and says so.

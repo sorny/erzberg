@@ -10,10 +10,7 @@
  * with the handlers.
  */
 import { SHORTCUTS } from '../utils/shortcuts'
-import { DIM, MUTED, TEXT } from './panel/ui'
-
-const CARD   = 'rgba(20,20,24,0.94)'
-const BORDER = 'rgba(255,255,255,0.10)'
+import { BG, DIM, FONT, GLASS_BORDER, MONO, MUTED, SCRIM, TEXT } from './panel/ui'
 
 /** One key, drawn as a key. */
 function Cap({ children }) {
@@ -24,9 +21,9 @@ function Cap({ children }) {
   return (
     <kbd style={{
       display: 'inline-block', minWidth: 20, textAlign: 'center',
-      background: 'rgba(255,255,255,0.07)', border: `1px solid ${BORDER}`,
+      background: 'var(--hm-veil-strong)', border: `1px solid ${GLASS_BORDER}`,
       borderRadius: 4, padding: '2px 6px',
-      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+      fontFamily: MONO,
       fontSize: 11, lineHeight: 1.4, color: TEXT,
     }}>{children}</kbd>
   )
@@ -40,21 +37,21 @@ export function ShortcutsOverlay({ onDismiss }) {
       style={{
         position: 'fixed', inset: 0, zIndex: 4000,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(3px)',
-        fontFamily: 'system-ui, sans-serif',
+        background: SCRIM, backdropFilter: 'blur(3px)',
+        fontFamily: FONT,
       }}
     >
       {/* Stops the click that would dismiss it, so text inside stays selectable. */}
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: CARD, border: `1px solid ${BORDER}`, borderRadius: 8,
+        background: BG, border: `1px solid ${GLASS_BORDER}`, borderRadius: 8,
         padding: '18px 22px 20px', maxHeight: '86vh', overflowY: 'auto',
-        boxShadow: '0 18px 50px rgba(0,0,0,0.5)',
+        boxShadow: '0 18px 50px var(--hm-shadow)',
       }}>
         <div style={{
           display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
           gap: 24, marginBottom: 14,
         }}>
-          <span style={{ fontSize: 13, color: TEXT, letterSpacing: 0.3 }}>Keyboard</span>
+          <span style={{ fontSize: 13, color: TEXT }}>Keyboard</span>
           <button onClick={onDismiss} data-testid="shortcuts-close" aria-label="Close"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
@@ -84,7 +81,7 @@ export function ShortcutsOverlay({ onDismiss }) {
                       <td style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5 }}>
                         {r.label}
                         {r.note && (
-                          <span style={{ color: '#6f6f78' }}>{` — ${r.note}`}</span>
+                          <span style={{ color: MUTED, opacity: 0.75 }}>{` — ${r.note}`}</span>
                         )}
                       </td>
                     </tr>

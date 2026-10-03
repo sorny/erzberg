@@ -49,6 +49,21 @@ export const PALETTES = {
 /** The live palette. Mutated in place by `applyTheme`; read it at draw time. */
 export const HEX = { ...PALETTES.dark }
 
+/*
+ * One material for everything that floats over the scene: the hint, the toast,
+ * the computing pill, the loading card, the profile, the tooltip and the
+ * shortcut card. Frosted rather than opaque, so the plate stays the subject,
+ * and one border and shadow so they read as a set. Here rather than in
+ * `panel/ui.jsx`, which may export only literal constants beside components.
+ */
+export const GLASS = {
+  background: 'var(--hm-glass-bg)',
+  backdropFilter:'blur(14px) saturate(1.4)', WebkitBackdropFilter:'blur(14px) saturate(1.4)',
+  border:'1px solid var(--hm-glass-border)',
+  boxShadow:'0 8px 28px var(--hm-shadow)',
+  fontFamily: 'var(--hm-font)', color: 'var(--hm-glass-text)',
+}
+
 export const THEME_EVENT = 'hm-theme'
 const KEY = 'erzberg.theme'
 

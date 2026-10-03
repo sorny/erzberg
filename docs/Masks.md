@@ -207,7 +207,7 @@ but after that they are independent. A mask of one feature takes its name.
 - **⧉** duplicates a mask under its source. Pixels are copied, not shared. The
   copy takes the next colour and a unique name (`uniqueMaskName`). It does not
   open the Studio.
-- **↑ Import…** takes a PNG, JPG or WebP. Alpha counts first, then luminance
+- **↑ Mask image** takes a PNG, JPG or WebP. Alpha counts first, then luminance
   above the midpoint is inside. The image is resampled nearest-neighbour.
 - Masks live on the **source** raster. `derive()` crops them with the pixels, so
   an Edit Mode clip can change at any time.

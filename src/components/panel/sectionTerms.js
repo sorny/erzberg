@@ -18,7 +18,7 @@
  * in one direction — and then went stale the next time a mode was added.
  */
 export const SECTION_TERMS = {
-  'Shape':            'resolution elevation scale blur jitter min max cut hypsometric integral raw greyscale heightmap',
+  'Shape':            'resolution elevation height scale blur jitter min max low high cut hypsometric integral raw greyscale heightmap',
   'Levels':           'shadows highlights histogram black white point contrast',
   'Camera':           'tilt zoom rotation supersampling auto-rotate spin guides orthographic perspective focal length lens pan dolly view angle',
   'Paper':            'paper frame page sheet margin scale offset aspect ratio portrait landscape a3 a4 letter mount border',

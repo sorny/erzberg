@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
@@ -1639,8 +1639,8 @@ export function Sidebar({
                     {lastPreset === name && presetEdited && (
                       <span data-testid="preset-edited" style={{
                         position:'absolute', top:3, right:3, fontSize:10, lineHeight:1,
-                        padding:'2px 4px', borderRadius:2, background:'rgba(0,0,0,.72)',
-                        color:'#f4f4f5', letterSpacing:'0.06em', textTransform:'uppercase',
+                        padding:'2px 4px', borderRadius:2, background: GLASS_BG,
+                        color: STRONG,
                       }}>edited</span>
                     )}
                     <span style={{
@@ -1664,8 +1664,8 @@ export function Sidebar({
 
           <div style={{ padding:'12px 12px', borderBottom:`1px solid ${BORDER}`, display: q ? 'none' : undefined }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
-              <button className="hmload" data-testid="load-png" onClick={loadFromPicker} style={{ padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ PNG</button>
-              <button className="hmload" data-testid="load-geotiff" onClick={loadGeoTiffFromPicker} style={{ padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>↑ GeoTIFF</button>
+              <LoadBtn data-testid="load-png" onClick={loadFromPicker}>PNG</LoadBtn>
+              <LoadBtn data-testid="load-geotiff" onClick={loadGeoTiffFromPicker}>GeoTIFF</LoadBtn>
             </div>
             {heightmapFilename && (
               <div style={{ marginTop:4, fontSize:10, color: MUTED, textAlign:'center', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
@@ -1755,13 +1755,13 @@ export function Sidebar({
               checked={view.showRawTerrain ?? false} onChange={v => sv({ showRawTerrain: v })} />
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
               <Sl label="Resolution" min={1} max={20} value={terrain.resolution} onChange={v => st({ resolution: v })} />
-              <Sl label="Elev scale" min={-10} max={10} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
+              <Sl label="Height scale" min={-10} max={10} step={0.1} value={terrain.elevScale} onChange={v => st({ elevScale: v })} fmt={v => (v >= 0 ? '+' : '') + v.toFixed(1)} />
               <Sl label="Blur" min={0} max={10} step={0.1} value={terrain.blurRadius} onChange={v => st({ blurRadius: v })} fmt={v => v % 1 ? v.toFixed(1) : v} />
               <Sl label="Jitter" min={0} max={20} step={0.1} value={terrain.jitterAmt} onChange={v => st({ jitterAmt: v })} />
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Elev min cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
-              <Sl label="Elev max cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
+              <Sl label="Low cut" min={0} max={100} step={0.1} value={terrain.elevMinCut} onChange={v => st({ elevMinCut: v })} fmt={v => v.toFixed(1)+'%'} />
+              <Sl label="High cut" min={0} max={100} step={0.1} value={terrain.elevMaxCut} onChange={v => st({ elevMaxCut: v })} fmt={v => v.toFixed(1)+'%'} />
             </div>
           </Section>
 
@@ -1841,7 +1841,7 @@ export function Sidebar({
                   onClick={() => { const m = onAddMask?.(); if (m) onEditMask(m.id) }}>
                   + Draw a mask
                 </Btn>
-                <Btn block onClick={onImportMask} disabled={masks.length >= MAX_MASKS}>↑ Import…</Btn>
+                <Btn block onClick={onImportMask} disabled={masks.length >= MAX_MASKS}>↑ Mask image</Btn>
               </CoverRow>
               <CoverProse caption>
                 Drawing opens the Studio over the viewport, with the satellite
@@ -1884,7 +1884,7 @@ export function Sidebar({
                         : 'The extent of what is on screen, in the lon/lat the flag wants.'}
                     </CoverProse>
                   </div>
-                  <CoverRow><Btn block onClick={onLoadCover}>↑ Load cover plate…</Btn></CoverRow>
+                  <CoverRow><Btn block onClick={onLoadCover}>↑ Cover plate</Btn></CoverRow>
                 </div>
               )
             })()}
@@ -1997,14 +1997,12 @@ export function Sidebar({
           <ErosionSection open={sec.erosion} onToggle={() => tog('erosion')} />
 
           <Section title="Soundscapes" open={sec.soundscapes} onToggle={() => tog('soundscapes')} enabled={snd.active}>
-            <button
-              className="hmload"
-              onClick={() => snd.loadFromPicker(onSoundscapeFit)}
-              style={{ width:'100%', padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}
-            >↑ Audio (MP3 / WAV / OGG / M4A)</button>
+            <LoadBtn onClick={() => snd.loadFromPicker(onSoundscapeFit)} style={{ marginBottom:8 }}>
+              Audio (MP3 / WAV / OGG / M4A)
+            </LoadBtn>
 
             {snd.error && (
-              <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:'1px solid #7f1d1d', borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
+              <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:`1px solid ${DANGER_BORDER}`, borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
                 {snd.error}
               </div>
             )}
@@ -2258,12 +2256,9 @@ export function Sidebar({
             )}
             {style.showTexture && (
               <Sub>
-                <button className="hmload" onClick={handleTexturePicker} style={{ 
-                  width:'100%', padding:8, marginBottom:8, background: SURF, color: DIM, 
-                  border:`1px dashed ${BORDER}`, borderRadius:5, fontSize:11, cursor:'pointer' 
-                }}>
-                  {textureImage ? 'Change Texture' : '↑ Load Image'}
-                </button>
+                <LoadBtn onClick={handleTexturePicker} style={{ marginBottom:8 }}>
+                  {textureImage ? 'Other image' : 'Image'}
+                </LoadBtn>
                 {textureImage && (
                   <>
                     <InlineSl label="Scale" min={0.01} max={10} step={0.01} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
@@ -2275,18 +2270,15 @@ export function Sidebar({
                         <option value="multiply">Multiply</option>
                         <option value="screen">Screen</option>
                         <option value="overlay">Overlay</option>
-                        <option value="softlight">Soft Light</option>
+                        <option value="softlight">Soft light</option>
                         <option value="add">Add</option>
                       </select>
                     </div>
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
-                      <Sl label="Shift X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
-                      <Sl label="Shift Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
+                      <Sl label="Offset X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
+                      <Sl label="Offset Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
                     </div>
-                    <button onClick={() => setTextureImage(null)} style={{ 
-                      width:'100%', padding:'8px 0', background: SURF, color: DIM, 
-                      border:`1px solid ${BORDER}`, borderRadius:5, fontSize:11, fontWeight:600, cursor:'pointer'
-                    }}>Clear Texture</button>
+                    <Btn size="md" onClick={() => setTextureImage(null)} style={{ width:'100%' }}>Clear texture</Btn>
                   </>
                 )}
               </Sub>
@@ -2391,8 +2383,8 @@ export function Sidebar({
                 </>)}
                 <Tog label="Sky-view factor" help="Ray-marches the sky hemisphere to darken valleys and concavities. GPU-intensive; keep Rays ≤ 16 for real-time editing." checked={!!style.showAO} onChange={v => ss({ showAO: v })} />
                 {style.showAO && (<>
-                  <InlineSl label="SVF strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="SVF rays" help="More rays = smoother result at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
+                  <InlineSl label="Strength" min={0} max={1} step={0.05} value={style.aoStrength ?? 0.7} onChange={v => ss({ aoStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Rays" help="More rays = smoother result at higher GPU cost." min={4} max={32} step={4} value={style.aoRays ?? 8} onChange={v => ss({ aoRays: Math.round(v) })} fmt={v => Math.round(v) + '×'} />
                 </>)}
               </Sub>
             )}
@@ -2605,11 +2597,7 @@ export function Sidebar({
                   and GeoJSON are draped over it. All of that needs to know where on
                   earth the terrain is — so it needs a georeferenced raster.
                 </div>
-                <button className="hmload" data-testid="vector-load-geotiff" onClick={loadGeoTiffFromPicker}
-                  style={{ width:'100%', padding:8, background: SURF, color:MUTED,
-                           border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11 }}>
-                  ↑ GeoTIFF
-                </button>
+                <LoadBtn data-testid="vector-load-geotiff" onClick={loadGeoTiffFromPicker}>GeoTIFF</LoadBtn>
                 <div style={{ fontSize:10, color: MUTED, marginTop:4, lineHeight:1.5 }}>
                   A PNG heightmap has no coordinates to hang them on.
                 </div>
@@ -2709,10 +2697,9 @@ export function Sidebar({
                                 No track loaded — the flock has nothing to listen to.
                               </div>
                             )}
-                            <button className="hmload" onClick={fa.loadFromPicker} disabled={fa.isAnalyzing}
-                              style={{ width:'100%', padding:8, background: SURF, color:MUTED, border:`1px dashed ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, marginBottom:8 }}>
-                              ↑ Load audio
-                            </button>
+                            <LoadBtn data-testid="flock-audio-load" onClick={fa.loadFromPicker} disabled={fa.isAnalyzing} style={{ marginBottom:8 }}>
+                              Audio
+                            </LoadBtn>
                           </>
                         )}
                         {/* The meter goes above the sliders on purpose: it is the
@@ -2757,9 +2744,9 @@ export function Sidebar({
                       <Sub>
                         <InlineSl label="Strength" min={0} max={1} step={0.05} value={points.flockShadowOpacity ?? 0.35} onChange={v => sp({ flockShadowOpacity: v })} fmt={v => v.toFixed(2)} testId="flock-shadow-opacity"
                           help="How dark the shadows are where the bird is lowest. They always fade further as it climbs — this sets the near end of that range." />
-                        <InlineSl label="Sh. size" min={0.2} max={6} step={0.1} value={points.flockShadowSize ?? 1} onChange={v => sp({ flockShadowSize: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-size"
+                        <InlineSl label="Shadow size" min={0.2} max={6} step={0.1} value={points.flockShadowSize ?? 1} onChange={v => sp({ flockShadowSize: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-size"
                           help="Shadow diameter as a multiple of the bird's own Size. Above 1 the shadows read as a soft moving stain on the landscape rather than as countable dots." />
-                        <InlineSl label="Sh. spread" min={0} max={5} step={0.1} value={points.flockShadowSpread ?? 1.5} onChange={v => sp({ flockShadowSpread: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-spread"
+                        <InlineSl label="Shadow spread" min={0} max={5} step={0.1} value={points.flockShadowSpread ?? 1.5} onChange={v => sp({ flockShadowSpread: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-spread"
                           help="How much a shadow grows as its bird climbs — the depth cue that makes the flock read as flying rather than pasted onto the terrain. At 0 every shadow is the same size whatever the altitude." />
                         {/* The same two style params the Hillshade section owns, surfaced
                             here because that section hides them unless Hillshade is
@@ -2769,7 +2756,7 @@ export function Sidebar({
                           help="Which way the shadows fall: 0°=N, 90°=E, 315°=NW. This is the Hillshade sun — the same slider, shown here too because Hillshade hides it when it is switched off. Moving it here moves the terrain's shading as well." />
                         <InlineSl label="Sun altitude" min={0} max={90} step={1} value={style.hillshadeAltitude ?? 45} onChange={v => ss({ hillshadeAltitude: v })} fmt={v => Math.round(v) + '°'} testId="flock-sun-altitude"
                           help="Sun height above the horizon. Overhead drops each shadow straight under its bird; low sun throws the whole flock's shadow long across the valley. Clamped at 5° for the shadow maths, since a sun on the horizon casts to infinity." />
-                        <ColorRow label="Sh. colour" value={points.flockShadowColor ?? '#000000'} onChange={v => sp({ flockShadowColor: v })}
+                        <ColorRow label="Shadow colour" value={points.flockShadowColor ?? '#000000'} onChange={v => sp({ flockShadowColor: v })}
                           help="Black reads as shadow; a dark tint of the background reads as haze. It is a flat colour with a soft edge, not a darkening of what is underneath, so on a dark background a shadow lighter than the terrain will look like glow." />
                       </Sub>
                     )}
@@ -2867,7 +2854,7 @@ export function Sidebar({
                 </div>
               </Sub>
             )}
-            <Tog label="Center guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Centre guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
             <Sub>
               <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
               {!view.orthographic && (
@@ -2907,14 +2894,11 @@ export function Sidebar({
             <div style={{ fontSize:10, color:MUTED, textAlign:'center', marginTop:12, opacity:0.7, lineHeight:1.4, marginBottom:8 }}>
               Click arrows to toggle symmetry.<br/>Combine directions for kaleidoscopic effects.
             </div>
-            <button onClick={() => ss({ 
+            <Btn size="md" onClick={() => ss({ 
               showMirrorPlusX:true, showMirrorMinusX:false,
               showMirrorPlusY:true, showMirrorMinusY:false,
               showMirrorPlusZ:true, showMirrorMinusZ:false
-            })} style={{ 
-              width:'100%', padding:'4px 0', background: SURF, color: DIM, 
-              border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, fontWeight:600, cursor:'pointer'
-            }}>Reset Symmetry</button>
+            })} style={{ width:'100%' }}>Reset symmetry</Btn>
           </Section>
 
           {/* ── Anaglyph ─────────────────────────────────────────────────
@@ -3084,7 +3068,7 @@ export function Sidebar({
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Hmap" hint="save" onClick={onHeightmap} />
+              <ExpBtn label="Heightmap" hint="save" onClick={onHeightmap} />
               <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} testId="preset-save" />
               {/* Spends the opening on the *click*, not on the file landing: the
                   picker is a dialog the user sits in front of, and the opening
