@@ -225,11 +225,11 @@ test('a step in the list is a jump, not a press repeated', async ({ page }) => {
   await boot(page)
 
   await enableMode(page, 'stipple-dots')
-  await enableMode(page, 'flow')
+  await enableMode(page, 'Flow')
   await enableMode(page, 'contours')
 
   const stipple = page.locator('[data-section="Mode: Stipple Dots"] input[type=checkbox][aria-label="Enabled"]')
-  const flow = page.locator('[data-section="Mode: Flow"] input[type=checkbox][aria-label="Enabled"]')
+  const flow = page.locator('[data-section="Mode: Flow Lines"] input[type=checkbox][aria-label="Enabled"]')
   const contours = page.locator('[data-section="Mode: Contours"] input[type=checkbox][aria-label="Enabled"]')
   await expect(stipple).toBeChecked()
 

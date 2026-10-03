@@ -810,7 +810,7 @@ export function HeightmapEditor({
       }}>
         <button onClick={fit} data-testid="edit-fit" style={{
           background: VEIL, color: TEXT, border: `1px solid ${GLASS_BORDER}`,
-          borderRadius: 7, padding: '3px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+          borderRadius: 5, padding: '3px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
         <span style={{ padding: '3px 9px' }}>
           {bounds ? `${bounds.w}×${bounds.h} px` : 'empty selection'}

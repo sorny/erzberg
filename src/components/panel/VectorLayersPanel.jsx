@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, FontSelect, GripIcon, InlineSl, LoadBtn, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, HIDDEN_OPACITY, InlineSl, LoadBtn, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -158,25 +158,6 @@ function VectorDiagnostics({ crs, crsName, coverage, error, hasFeatures, uploads
  * Everything here is render-side: the worker never learns that icons exist, so
  * dragging Size or Tilt is a frame, not a rebuild.
  */
-/**
- * Open eye, or struck through when the layer is hidden.
- *
- * Inline rather than one of the files in `public/icons/` — those are data the
- * user draws *with*, fetched at runtime and flattened into terrain geometry.
- * A control in the panel is not that, and routing it through the icon catalogue
- * would make the chrome depend on the content.
- */
-function EyeIcon({ off }) {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
-      <circle cx="12" cy="12" r="2.6" />
-      {off && <path d="M3.5 3.5 20.5 20.5" />}
-    </svg>
-  )
-}
-
 /**
  * One mark's ink: stroke colour, width and opacity, then fill colour and
  * opacity behind its own switch.
@@ -439,28 +420,10 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
    * falls out of both without a fourth button.
    */
   const face = (which, label, active) => (
-    <button key={which}
+    <Btn key={which} variant="toggle" on={active} block
       onClick={() => set(which === 'bold' ? { labelBold: !active } : { labelItalic: !active })}
-      data-testid={`label-${which}-${layer.id}`}
-      style={{
-        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-        fontWeight: which === 'bold' ? 700 : 400,
-        fontStyle: which === 'italic' ? 'italic' : 'normal',
-        background: active ? ACCENT_DEEP : SURF,
-        color: active ? ON_ACCENT : DIM,
-        border: `1px solid ${active ? ACCENT_DEEP : BORDER}`,
-      }}>{label}</button>
-  )
-
-  const align = (value, label) => (
-    <button key={value} onClick={() => set({ labelAlign: value })}
-      data-testid={`label-align-${value}-${layer.id}`}
-      style={{
-        flex: 1, padding: '4px 0', fontSize: 10, cursor: 'pointer', borderRadius: 3,
-        background: layer.labelAlign === value ? ACCENT_DEEP : SURF,
-        color: layer.labelAlign === value ? ON_ACCENT : DIM,
-        border: `1px solid ${layer.labelAlign === value ? ACCENT_DEEP : BORDER}`,
-      }}>{label}</button>
+      data-testid={`label-${which}-${layer.id}`} aria-pressed={!!active}
+      style={{ fontWeight: which === 'bold' ? 700 : 400, fontStyle: which === 'italic' ? 'italic' : 'normal' }}>{label}</Btn>
   )
 
   return (
@@ -496,8 +459,8 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
                bold — falls out of both without a fourth button. They are hidden
                for a stroke face because that is a different typeface with no
                bold to offer; showing them would mean inventing one. */
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
-              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, margin: '2px 0 8px' }}>
+              <span style={{ fontSize: 11, color: MUTED, minWidth: 52 }}>Face</span>
               <div style={{ display: 'flex', gap: 2, flex: 1 }}>
                 {face('bold', 'Bold', layer.labelBold)}
                 {face('italic', 'Italic', layer.labelItalic)}
@@ -514,12 +477,9 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
             onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
             help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '4px 0 4px' }}>
-            <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
-            <div style={{ display: 'flex', gap: 2, flex: 1 }}>
-              {align('left', 'Left')}{align('center', 'Centre')}{align('right', 'Right')}
-            </div>
-          </div>
+          <SegRow label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
+            value={layer.labelAlign} onChange={(v) => set({ labelAlign: v })}
+            testIdOf={(v) => `label-align-${v}-${layer.id}`} />
 
           <Ink layer={layer} set={set} prefix="label" noFill={!!layer.labelSingleLine} help={{
             weight: "The lettering's own line width — the stroke that draws a summit triangle well is the stroke that closes up the counters of small type.",
@@ -822,18 +782,12 @@ export function VectorLayersPanel({
           {OSM_CATEGORIES.map((c) => {
             const on = picked.includes(c.id)
             return (
-              <button key={c.id} onClick={() => toggleCat(c.id)} disabled={!canQuery || fetching}
+              <Btn key={c.id} variant="toggle" on={on} onClick={() => toggleCat(c.id)} disabled={!canQuery || fetching}
                 data-testid={`osm-cat-${c.id}`}
                 title={c.heavy ? 'Large in a populated extent' : undefined}
-                style={{
-                  fontSize: 10, padding: '4px 2px', borderRadius: 3, textAlign: 'left',
-                  cursor: canQuery && !fetching ? 'pointer' : 'default',
-                  opacity: canQuery ? 1 : 0.4,
-                  background: on ? ACCENT_DEEP : SURF, color: on ? ON_ACCENT : MUTED,
-                  border: `1px solid ${on ? ACCENT_DEEP : BORDER}`,
-                }}>
+                style={{ textAlign: 'left', padding: '4px 4px' }}>
                 {c.label}{c.heavy ? ' ⚠' : ''}
-              </button>
+              </Btn>
             )
           })}
         </div>
@@ -846,16 +800,12 @@ export function VectorLayersPanel({
           </div>
         )}
 
-        <button onClick={fetching ? () => abortRef.current?.abort() : runFetch}
-          disabled={!canQuery || !picked.length}
-          data-testid="osm-fetch"
-          style={{
-            width: '100%', padding: 8, borderRadius: 5, fontSize: 10, cursor: canQuery ? 'pointer' : 'default',
-            background: fetching ? SURF : ACCENT, color: fetching ? MUTED : ON_ACCENT,
-            border: `1px solid ${fetching ? BORDER : ACCENT}`, opacity: canQuery && picked.length ? 1 : 0.4,
-          }}>
+        <Btn size="lg" block variant={fetching ? 'quiet' : 'primary'}
+          onClick={fetching ? () => abortRef.current?.abort() : runFetch}
+          disabled={!fetching && (!canQuery || !picked.length)}
+          data-testid="osm-fetch" style={{ width: '100%' }}>
           {fetching ? '✕ Cancel' : 'Fetch from OpenStreetMap'}
-        </button>
+        </Btn>
 
         {fetching && (
           <>
@@ -866,18 +816,18 @@ export function VectorLayersPanel({
                 the end says the wrong thing about which part is slow. */}
             <div data-testid="osm-progress" data-pct={progress == null ? '' : Math.round(progress * 100)}
               style={{
-                height: 3, marginTop: 6, borderRadius: 2, background: SURF,
+                height: 3, marginTop: 6, borderRadius: 3, background: SURF,
                 overflow: 'hidden', position: 'relative',
               }}>
               {progress == null ? (
                 <div className="hm-indet" style={{
                   position: 'absolute', inset: 0, width: '40%',
-                  background: ACCENT, borderRadius: 2,
+                  background: ACCENT, borderRadius: 3,
                 }} />
               ) : (
                 <div style={{
                   height: '100%', width: `${Math.round(progress * 100)}%`,
-                  background: ACCENT, borderRadius: 2, transition: 'width 120ms linear',
+                  background: ACCENT, borderRadius: 3, transition: 'width 120ms linear',
                 }} />
               )}
             </div>
@@ -942,7 +892,7 @@ export function VectorLayersPanel({
               <span data-testid={`vector-swatch-${l.id}`} aria-hidden="true"
                 style={{
                   width: 12, height: 12, borderRadius: 3, flexShrink: 0,
-                  background: l.color, opacity: l.visible ? 1 : 0.35,
+                  background: l.color, opacity: l.visible ? 1 : HIDDEN_OPACITY,
                   border: `1px solid ${BORDER}`,
                 }} />
               <button onClick={() => setExpanded(isOpen ? null : l.id)}
@@ -950,20 +900,17 @@ export function VectorLayersPanel({
                 style={{
                   flex: 1, textAlign: 'left', background: 'none', border: 'none', cursor: 'pointer',
                   color: l.visible ? TEXT : MUTED, fontSize: 10, padding: 0,
+                  display: 'flex', alignItems: 'center', gap: 4, minWidth: 0,
                 }}>
-                {isOpen ? '▾' : '▸'} {l.name}
+                <Chevron dir={isOpen ? 'down' : 'right'} style={{ color: MUTED }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
               </button>
               <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{l.count}</span>
-              <button onClick={() => onPatch(l.id, { visible: !l.visible })}
-                title={l.visible ? 'Hide this layer' : 'Show this layer'}
-                aria-pressed={!l.visible} data-testid={`vector-vis-${l.id}`}
-                style={{
-                  background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex',
-                  color: l.visible ? DIM : MUTED,
-                }}><EyeIcon off={!l.visible} /></button>
-              <button onClick={() => onRemove(l.id)} title="Remove this layer"
-                data-testid={`vector-remove-${l.id}`}
-                style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', fontSize: 10, padding: 0 }}>✕</button>
+              <RowBtn onClick={() => onPatch(l.id, { visible: !l.visible })}
+                label={l.visible ? 'Hide this layer' : 'Show this layer'}
+                aria-pressed={!l.visible} data-testid={`vector-vis-${l.id}`}><EyeIcon off={!l.visible} /></RowBtn>
+              <RowBtn onClick={() => onRemove(l.id)} label={`Remove ${l.name}`} title="Remove"
+                data-testid={`vector-remove-${l.id}`}>✕</RowBtn>
             </div>
 
             {isOpen && (
@@ -1023,10 +970,10 @@ export function VectorLayersPanel({
                         data-testid={`features-toggle-${l.id}`}
                         style={{
                           width: '100%', textAlign: 'left', background: 'none', border: 'none',
-                          cursor: 'pointer', color: MUTED, fontSize: 10, fontWeight: 700,
-                          letterSpacing: 1, padding: 0,
+                          cursor: 'pointer', color: MUTED, fontSize: 10, fontWeight: 600,
+                          padding: 0, display: 'flex', alignItems: 'center', gap: 4,
                         }}>
-                        {open ? '▾' : '▸'} FEATURES ({bucket.count})
+                        <Chevron dir={open ? 'down' : 'right'} /> Features ({bucket.count})
                       </button>
                       {open && <FeatureList layer={l} bucket={bucket} onPatch={onPatch} />}
                     </div>

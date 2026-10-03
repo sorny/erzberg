@@ -168,7 +168,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               key={sortedIdx}
               style={{
                 display: 'flex', alignItems: 'center', gap: 2,
-                background: SURF, border: `1px solid ${BORDER}`, borderRadius: 4, padding: '2px 4px',
+                background: SURF, border: `1px solid ${BORDER}`, borderRadius: 3, padding: '2px 4px',
                 fontSize: 10, color: DIM, fontFamily: MONO,
               }}
             >
@@ -177,7 +177,7 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
                 <div style={{
                   width: '100%', height: '100%',
                   background: stop.color,
-                  borderRadius: 2,
+                  borderRadius: 3,
                   border: '1px solid #555',
                 }} />
                 <input

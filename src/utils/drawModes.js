@@ -25,6 +25,9 @@
  * — today only the cover plate. Such a mode carries no `pick` block and the
  * randomiser skips it, because a roll has to stay a pure function of its seed.
  *
+ * `aliases` are older labels the command line still accepts, so a script
+ * written against them keeps working after a rename.
+ *
  * `roll: false` keeps a mode out of Surprise me although it draws without a
  * file. Five draw from a point or a route the user picks (Route, Isochrones,
  * Viewshed, Panorama, Geodesic fan), and from the default centre they look
@@ -59,11 +62,11 @@ export const DRAW_MODES = [
     pick: { spacing: [4, 20], step: [0.5, 2], maxLen: [40, 200] },
   },
   {
-    id: 'Dag', label: 'Stream network', cost: 2.5, mark: 'network',
+    id: 'Dag', label: 'Network', aliases: ['Stream network'], cost: 2.5, mark: 'network',
     pick: { threshold: [1, 6] },
   },
   {
-    id: 'Pencil', label: 'Pencil shading', cost: 1.5, mark: 'pencil',
+    id: 'Pencil', label: 'Pencil', aliases: ['Pencil shading'], cost: 1.5, mark: 'pencil',
     pick: { spacing: [2, 10], threshold: [0.2, 0.8] },
   },
   {

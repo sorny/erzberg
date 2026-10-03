@@ -15,7 +15,7 @@
  */
 import { maskCoverage } from '../utils/maskLayers'
 import { BackdropBlock } from './panel/BackdropBlock'
-import { ACCENT, BG, BORDER, DANGER_TEXT, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, Tog, W } from './panel/ui'
+import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, HelpBox, InlineSl, MUTED, PanelStyles, STRONG, SUNK, SURF, SegGroup, SegRow, TEXT, Tog, W } from './panel/ui'
 
 const TOOLS = [
   ['✎ Brush',   'brush'],
@@ -49,14 +49,8 @@ export function MaskPanel({
   const covered = mask ? maskCoverage(mask) * 100 : 0
 
   const btn = (label, onClick, kind, testId, disabled = false) => (
-    <button onClick={onClick} data-testid={testId} disabled={disabled} style={{
-      flex: 1, padding: '8px 0', borderRadius: 5, cursor: disabled ? 'default' : 'pointer',
-      opacity: disabled ? 0.45 : 1,
-      fontSize: 11, fontWeight: 600,
-      background: kind === 'primary' ? ACCENT : SURF,
-      color: kind === 'primary' ? ON_ACCENT : DIM,
-      border: `1px solid ${kind === 'primary' ? ACCENT : BORDER}`,
-    }}>{label}</button>
+    <Btn size="lg" block variant={kind === 'primary' ? 'primary' : 'quiet'}
+      onClick={onClick} data-testid={testId} disabled={disabled}>{label}</Btn>
   )
 
   return (
@@ -66,8 +60,8 @@ export function MaskPanel({
         position: 'fixed', right: 0, top: 0, width: W, height: '100%',
         background: BG, color: TEXT, zIndex: 1000,
         display: 'flex', flexDirection: 'column',
-        boxShadow: '-3px 0 16px rgba(0,0,0,.4)',
-        fontFamily: 'system-ui,-apple-system,sans-serif',
+        boxShadow: '-3px 0 16px var(--hm-shadow)',
+        fontFamily: FONT,
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -78,23 +72,15 @@ export function MaskPanel({
             <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6,
                           fontSize: 10, color: MUTED, overflow: 'hidden' }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, flexShrink: 0,
-                             background: mask.color, border: '1px solid rgba(255,255,255,0.3)' }} />
+                             background: mask.color, border: `1px solid ${BORDER}` }} />
               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mask.name}</span>
             </div>
           )}
         </div>
 
         <div id="hm-panel-body" style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '12px 12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, marginBottom: 12 }}>
-            {TOOLS.map(([label, id]) => (
-              <button key={id} data-testid={`studio-tool-${id}`} onClick={() => setTool(id)} style={{
-                fontSize: 10, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
-                background: tool === id ? ACCENT : SURF,
-                color: tool === id ? ON_ACCENT : MUTED,
-                border: `1px solid ${tool === id ? ACCENT : BORDER}`,
-              }}>{label}</button>
-            ))}
-          </div>
+          <SegGroup label="Tool" columns={2} options={TOOLS} value={tool} onChange={setTool}
+            testIdOf={(id) => `studio-tool-${id}`} style={{ marginBottom: 12 }} />
 
           <HelpBox text={HINTS[tool]} />
 
@@ -114,7 +100,7 @@ export function MaskPanel({
             <InlineSl
               label="Size" testId="studio-brush"
               help="The brush radius in raster pixels, so it stays the same size on the ground however far the view is zoomed. [ and ] step it."
-              min={1} max={400} value={brush} onChange={setBrush} fmt={(v) => v + 'px'}
+              min={1} max={400} value={brush} onChange={setBrush} fmt={(v) => v + ' px'}
             />
           )}
             </>}

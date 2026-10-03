@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SelectRow, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Chevron, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, STRONG, SelectRow, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
@@ -194,14 +194,14 @@ function TerrainFetchPanel({ onFetched }) {
       {error && (
         <div data-testid="fetch-error" style={{ marginBottom:6, fontSize:10, lineHeight:1.6,
              color:WARN, background:WARN_BG, border:'1px solid rgba(249,115,22,0.35)',
-             borderRadius:4, padding:'5px 7px' }}>{error}</div>
+             borderRadius:3, padding:'5px 7px' }}>{error}</div>
       )}
       <form onSubmit={search} style={{ display:'flex', gap:4, marginBottom:6 }}>
         <input type="text" value={query} data-testid="place-query"
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Erzberg, Eiger, Snowdon…" aria-label="Place name"
           style={{ flex:1, minWidth:0, background:SURF, color:DIM, fontSize:11,
-                   border:`1px solid ${BORDER}`, borderRadius:4, padding:'4px 6px' }} />
+                   border:`1px solid ${BORDER}`, borderRadius:3, padding:'4px 6px' }} />
         <Btn type="submit" data-testid="place-search" disabled={!!busy || !query.trim()}>
           {busy === 'search' ? '…' : 'Search'}
         </Btn>
@@ -210,7 +210,7 @@ function TerrainFetchPanel({ onFetched }) {
       {busy === 'fetch' ? (
         <div data-testid="dem-progress" style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
           <div style={{ marginBottom:4 }}>{`Fetching terrain… ${Math.round(progress * 100)}%`}</div>
-          <div style={{ height:3, background:BORDER, borderRadius:2, overflow:'hidden' }}>
+          <div style={{ height:3, background:BORDER, borderRadius:3, overflow:'hidden' }}>
             <div style={{ height:'100%', width:`${Math.round(progress * 100)}%`, background:ACCENT }} />
           </div>
           <Btn block onClick={() => abortRef.current?.abort()} style={{ marginTop:6 }}>Cancel</Btn>
@@ -221,7 +221,7 @@ function TerrainFetchPanel({ onFetched }) {
             <button key={i} type="button" data-testid={`place-result-${i}`}
               onClick={() => loadPreview(pl, padBbox(pl.bbox), DEFAULT_SPAN)}
               style={{ display:'block', width:'100%', textAlign:'left', marginBottom:3, cursor:'pointer',
-                       background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:4,
+                       background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:3,
                        padding:'5px 7px', fontSize:11 }}>
               <span style={{ fontWeight:700 }}>{pl.name}</span>
               {pl.kind && <span style={{ color:MUTED }}>{` · ${pl.kind}`}</span>}
@@ -248,7 +248,7 @@ function TerrainFetchPanel({ onFetched }) {
             {aim.preview
               ? <ExtentMap preview={aim.preview} box={aim.box} busy={!!busy} width={MAP_W} height={MAP_H}
                   onChange={(box) => setAim((a) => (a ? { ...a, box } : a))} />
-              : <div data-testid="extent-map-loading" style={{ height:MAP_H, marginBottom:6, borderRadius:4,
+              : <div data-testid="extent-map-loading" style={{ height:MAP_H, marginBottom:6, borderRadius:3,
                      border:`1px solid ${BORDER}`, background:SURF, display:'flex', alignItems:'center',
                      justifyContent:'center', fontSize:10, color:MUTED }}>Drawing the ground…</div>}
 
@@ -256,7 +256,7 @@ function TerrainFetchPanel({ onFetched }) {
                 Every figure comes from `describeFetch`, which is the same
                 arithmetic the fetch itself runs. */}
             <div data-testid="extent-plan" style={{ fontSize:10, color:MUTED, lineHeight:1.7,
-                 border:`1px solid ${BORDER}`, borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
+                 border:`1px solid ${BORDER}`, borderRadius:3, padding:'5px 7px', marginBottom:6 }}>
               {plan ? (<>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
                   <span>Zoom</span><span style={{ color:DIM, fontFamily:'monospace' }}>
@@ -429,7 +429,7 @@ function HeaderIconBtn({ onClick, disabled, testId, title, label, icon }) {
         alignItems:'center', justifyContent:'center', color: MUTED,
         // A disabled control used to keep its border and lose its glyph, which
         // reads as an empty box rather than as unavailable.
-        opacity: disabled ? 0.3 : 1,
+        opacity: disabled ? DISABLED_OPACITY : 1,
         cursor: disabled ? 'default' : 'pointer',
       }}
       onMouseEnter={e => { if (!disabled) e.currentTarget.style.color = STRONG }}
@@ -464,7 +464,7 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
     <button type="button" onClick={onClick} data-testid={testId} style={{
       display:'block', width:'100%', textAlign:'left', background:'none',
       border:'none', cursor:'pointer', padding:'5px 10px',
-      fontSize:11, color: dim ? DIM : MUTED, borderRadius:4,
+      fontSize:11, color: dim ? DIM : MUTED, borderRadius:3,
     }}
       onMouseEnter={(e) => { e.currentTarget.style.background = VEIL }}
       onMouseLeave={(e) => { e.currentTarget.style.background = 'none' }}>
@@ -480,7 +480,7 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
       <div data-testid="history-menu" style={{
         position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:901,
         minWidth:210, maxWidth:260, maxHeight:320, overflowY:'auto',
-        background:BG, border:`1px solid ${BORDER}`, borderRadius:6,
+        background:BG, border:`1px solid ${BORDER}`, borderRadius:5,
         boxShadow:'0 12px 32px var(--hm-shadow)', padding:4,
       }}>
         {/* Newest redo nearest `now`, so the column is chronological throughout
@@ -546,7 +546,7 @@ function CommandLine({ cmd }) {
     <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
       <code style={{
         flex: 1, minWidth: 0, fontSize: 10, lineHeight: 1.6, color: MUTED, background: SURF,
-        border: `1px solid ${BORDER}`, borderRadius: 4, padding: '5px 7px',
+        border: `1px solid ${BORDER}`, borderRadius: 3, padding: '5px 7px',
         fontFamily: 'ui-monospace, monospace', userSelect: 'all', overflowX: 'auto',
       }}>
         {/* The separating space sits *outside* the span. Inside it, the
@@ -1469,9 +1469,9 @@ export function Sidebar({
                 aria-expanded={historyOpen}
                 style={{
                   background:'none', border:'none', padding:'4px 6px', cursor: (canUndo || canRedo) ? 'pointer' : 'default',
-                  color: historyOpen ? STRONG : MUTED, fontSize:10, lineHeight:1,
-                  opacity: (canUndo || canRedo) ? 1 : 0.3,
-                }}>▾</button>
+                  color: historyOpen ? STRONG : MUTED, lineHeight:1, display:'flex', alignItems:'center',
+                  opacity: (canUndo || canRedo) ? 1 : DISABLED_OPACITY,
+                }}><Chevron dir={historyOpen ? 'up' : 'down'} /></button>
               {historyOpen && (
                 <HistoryMenu labels={historyLabels} onUndoTo={onUndoTo} onRedoTo={onRedoTo}
                   onClose={() => setHistoryOpen(false)} />
@@ -1485,7 +1485,7 @@ export function Sidebar({
                 It sits apart from undo because it is a different magnitude of
                 undoing — one step back against everything at once. */}
             <button onClick={handleResetAll} title="Return every setting to its default" className="hmbtn"
-              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:6,
+              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5,
                        color: MUTED, fontSize:10, lineHeight:1, padding:'5px 9px',
                        whiteSpace:'nowrap', cursor:'pointer' }}
               onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
@@ -1537,7 +1537,7 @@ export function Sidebar({
             }}
             placeholder="Find a control…" aria-label="Find a control" aria-keyshortcuts="/"
             style={{
-              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:6,
+              width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:5,
               color: TEXT, fontSize:12, padding:'6px 28px 6px 26px', outline:'none',
               fontFamily:'inherit',
             }}
@@ -1546,7 +1546,7 @@ export function Sidebar({
           {!filter && (
             <kbd aria-hidden="true" className="hmfindkbd" style={{
               position:'absolute', right:20, top:14, pointerEvents:'none',
-              minWidth:15, padding:'0 4px', borderRadius:4, textAlign:'center',
+              minWidth:15, padding:'0 4px', borderRadius:3, textAlign:'center',
               border:`1px solid ${BORDER}`, borderBottomWidth:2, color: MUTED,
               fontFamily:'inherit', fontSize:10, lineHeight:'13px',
             }}>/</kbd>
@@ -1559,7 +1559,7 @@ export function Sidebar({
           {q && (
             <div style={{ fontSize:10, color: MUTED, marginTop:4, display:'flex', justifyContent:'space-between' }}>
               <span data-testid="filter-count">{matchCount === 0 ? 'No section matches' : `${matchCount} section${matchCount === 1 ? '' : 's'}`}</span>
-              <button onClick={() => setFilter('')} style={{ background:'none', border:'none', color: MUTED, cursor:'pointer', fontSize:10, padding:0 }}>clear</button>
+              <MiniBtn testId="filter-clear" onClick={() => setFilter('')}>Clear</MiniBtn>
             </div>
           )}
         </div>
@@ -1601,10 +1601,7 @@ export function Sidebar({
             {/* Roll a look. The seed is shown because it *is* the look — note it
                 down and the same roll comes back. */}
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <button data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise} style={{
-                flex:1, padding:'8px 0', background: ACCENT, color:ON_ACCENT, border:`1px solid ${ACCENT}`,
-                borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
-              }}>🎲 Surprise me</button>
+              <Btn size="lg" variant="primary" block data-testid="surprise-me" ref={surpriseRef} onClick={handleSurprise}>Surprise me</Btn>
               <Btn size="md" data-testid="surprise-back" onClick={() => stepRoll(-1)} disabled={!canBack}
                 title="Back to the previous roll" aria-label="Previous roll" style={{ padding:'8px 8px' }}>↩</Btn>
               <Btn size="md" data-testid="surprise-forward" onClick={() => stepRoll(1)} disabled={!canForward}
@@ -1642,7 +1639,7 @@ export function Sidebar({
                     {lastPreset === name && presetEdited && (
                       <span data-testid="preset-edited" style={{
                         position:'absolute', top:3, right:3, fontSize:10, lineHeight:1,
-                        padding:'2px 4px', borderRadius:2, background: GLASS_BG,
+                        padding:'2px 4px', borderRadius:3, background: GLASS_BG,
                         color: STRONG,
                       }}>edited</span>
                     )}
@@ -1715,20 +1712,15 @@ export function Sidebar({
             )}
 
             {/* Edit Mode: clip the loaded raster before it becomes terrain. */}
-            <button className="hmload" data-testid="edit-heightmap" onClick={onEditHeightmap}
-              disabled={!heightmapPixels}
-              style={{ width:'100%', marginTop:4, padding:8, background: SURF, color: editSummary ? ACCENT : MUTED,
-                border:`1px solid ${editSummary ? ACCENT_DEEP : BORDER}`, borderRadius:5,
-                cursor: heightmapPixels ? 'pointer' : 'default', fontSize:11, opacity: heightmapPixels ? 1 : 0.5 }}>
+            <Btn size="lg" block data-testid="edit-heightmap" onClick={onEditHeightmap} disabled={!heightmapPixels}
+              style={{ width:'100%', marginTop:4, fontWeight:400,
+                ...(editSummary && { color: ACCENT_TEXT, borderColor: ACCENT_DEEP }) }}>
               ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
-            </button>
+            </Btn>
             {editSummary && (
               <div style={{ marginTop:4, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
                 <span data-testid="edit-summary" style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{editSummary}</span>
-                <button data-testid="edit-clear" onClick={onClearEdit} style={{
-                  background:'none', border:`1px solid ${BORDER}`, borderRadius:3, color: MUTED,
-                  fontSize:10, padding:'2px 4px', cursor:'pointer', flexShrink:0,
-                }}>clear</button>
+                <MiniBtn testId="edit-clear" onClick={onClearEdit}>Clear</MiniBtn>
               </div>
             )}
           </div>
@@ -1830,11 +1822,9 @@ export function Sidebar({
                           swatch, a name field, a coverage figure and two buttons
                           in 272 px, and `Copy` would squeeze the name it is
                           named after. */}
-                      <Btn size="xs" onClick={() => onCopyMask?.(m.id)} data-testid={`copy-${m.id}`}
-                        aria-label={`Duplicate ${m.name}`} disabled={masks.length >= MAX_MASKS}
-                        style={{ padding: '0 6px', fontSize: 10 }}>⧉</Btn>
-                      <Btn size="xs" onClick={() => onRemoveMask(m.id)} aria-label={`Delete ${m.name}`}
-                        style={{ padding: '0 6px', fontSize: 10 }}>✕</Btn>
+                      <RowBtn onClick={() => onCopyMask?.(m.id)} data-testid={`copy-${m.id}`}
+                        label={`Duplicate ${m.name}`} title="Duplicate" disabled={masks.length >= MAX_MASKS}>⧉</RowBtn>
+                      <RowBtn onClick={() => onRemoveMask(m.id)} label={`Remove ${m.name}`} title="Remove">✕</RowBtn>
                     </div>
                   ))}
                 </div>
@@ -2019,7 +2009,7 @@ export function Sidebar({
             {snd.isAnalyzing && (
               <div style={{ marginBottom:8 }}>
                 <div style={{ fontSize:10, color: MUTED, marginBottom:4 }}>Analysing spectrogram… {snd.progress}%</div>
-                <div style={{ height:3, background: BORDER, borderRadius:2, overflow:'hidden' }}>
+                <div style={{ height:3, background: BORDER, borderRadius:3, overflow:'hidden' }}>
                   <div style={{ height:'100%', width:`${snd.progress}%`, background: ACCENT, transition:'width .1s' }} />
                 </div>
               </div>
@@ -2199,7 +2189,7 @@ export function Sidebar({
                     {imageryBusy.phase === 'search' ? 'Finding a clear scene…'
                       : `Fetching imagery… ${Math.round((imageryBusy.progress ?? 0) * 100)}%`}
                   </div>
-                  <div style={{ height: 3, background: BORDER, borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: 3, background: BORDER, borderRadius: 3, overflow: 'hidden' }}>
                     <div style={{ height: '100%', background: ACCENT,
                                   width: `${Math.round((imageryBusy.progress ?? 0) * 100)}%` }} />
                   </div>
@@ -2729,7 +2719,7 @@ export function Sidebar({
                           help="Which onsets count. Raw onset values sit low and dense music produces a wall of small ones, so this starts windowed — raise the low handle until only the accents fire, lower it to catch every hi-hat." />
                         <InlineSl label="Startle" min={0} max={2} step={0.05} value={points.flockAudioStartle ?? 1} onChange={v => sp({ flockAudioStartle: v })} fmt={v => v.toFixed(2)} testId="flock-audio-startle"
                           help="On top of Burst, onsets widen the hawk's fear radius so an accented beat tears the same hole a strike does. Shares Burst's range. Needs Predator on; Burst does not." />
-                        <InlineSl label="Sync" min={-0.15} max={0.3} step={0.01} value={points.flockAudioSync ?? 0.04} onChange={v => sp({ flockAudioSync: v })} fmt={v => `${Math.round(v * 1000)}ms`} testId="flock-audio-sync"
+                        <InlineSl label="Sync" min={-0.15} max={0.3} step={0.01} value={points.flockAudioSync ?? 0.04} onChange={v => sp({ flockAudioSync: v })} fmt={v => `${Math.round(v * 1000)} ms`} testId="flock-audio-sync"
                           help="How far ahead of the playhead the flock reads. Steering forces take a few hundred milliseconds to become visible motion, so a little lookahead cancels that and puts the reaction back on the beat. Reading the future is only possible because the whole track is analysed before it plays — raise it if the flock still feels behind, lower it if it anticipates." />
                       </Sub>
                     )}
@@ -3067,7 +3057,7 @@ export function Sidebar({
                   or worse, land after it. */}
               <ExpBtn label="Preset ⬆" hint="open" onClick={() => { spendOpening(); onLoadPreset?.() }} testId="preset-load" />
             </div>
-            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v+'s'} />
+            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
 
             {/* ── The plot ─────────────────────────────────────────────────
                 The stated audience of this whole tool is a pen plotter, and

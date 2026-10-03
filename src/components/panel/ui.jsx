@@ -74,7 +74,12 @@ export const MONO        = 'var(--hm-mono)'
  *   13  dialog and card titles, the wordmark, close glyphs
  *
  * The empty state alone is display type (14, 16, 22, 56).
- * `tests/unit/typeScale.test.js` fails on any other size.
+ *
+ * Corner radii, four of them: 3 for chips, swatches and small buttons, 5 for
+ * controls and boxes, 10 for cards and floating panels, 999 for anything
+ * round (pills, switches).
+ *
+ * `tests/unit/typeScale.test.js` fails on any other size or radius.
  */
 
 /*
@@ -91,6 +96,14 @@ export const MONO        = 'var(--hm-mono)'
  * the panel 28% of its travel, across some 350 of them, to save 40 px of a
  * roughly 1 900 px canvas.
  */
+/*
+ * How a control that cannot be used right now looks: there, but faded. One
+ * value for every button, choice and tab, so "unavailable" reads the same way
+ * everywhere. A layer that is merely hidden fades less (`HIDDEN_OPACITY`).
+ */
+export const DISABLED_OPACITY = 0.5
+export const HIDDEN_OPACITY = 0.45
+
 export const W      = 312   // panel width px, rail included
 export const RAIL_W = 40    // the stage rail
 export const BODY_W = 272   // what the controls get, unchanged
@@ -298,8 +311,9 @@ export function PanelStyles() {
         display:block; padding:0; cursor:pointer; }
       .hmcardhit:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
       .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
-        padding:0; cursor:pointer; border-radius:4px; transition:background .12s; }
+        padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
       .hmpip:hover { background:var(--hm-veil-strong); }
+      .hmrow:hover:not(:disabled) { background:var(--hm-veil-strong); color:${STRONG} !important; }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
       .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
       .hmpipdot { transition:background .12s, border-color .12s, box-shadow .12s; }
@@ -374,12 +388,7 @@ export function Note({ children }) {
  * none. Its siblings are here anyway.
  */
 export function MiniBtn({ onClick, testId, children }) {
-  return (
-    <button onClick={onClick} data-testid={testId} style={{
-      padding: '2px 4px', fontSize: 10, borderRadius: 3, cursor: 'pointer',
-      background: SURF, color: MUTED, border: `1px solid ${BORDER}`,
-    }}>{children}</button>
-  )
+  return <Btn size="xs" onClick={onClick} data-testid={testId} style={{ flexShrink: 0 }}>{children}</Btn>
 }
 
 export function HelpBtn({ label, active, onClick }) {
@@ -462,7 +471,18 @@ function fillOf(value, min, max) {
   return { '--p': `${Math.max(0, Math.min(100, p))}%` }
 }
 
+/*
+ * Help for the labels that mean the same thing wherever they appear. A control
+ * with its own `help` keeps it; one without gets this, so a label never has a
+ * `?` in one section and none in the next.
+ */
+const STOCK_HELP = {
+  Seed: 'Picks the random pattern. The same seed always draws the same pattern.',
+  Opacity: 'How strongly this layer shows: 0% hides it, 100% is full strength.',
+}
+
 export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2, testId }) {
+  help = help ?? STOCK_HELP[label]
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
@@ -521,12 +541,12 @@ export function Switch({ id, label, checked, onChange, testId }) {
         onChange={e => onChange(e.target.checked)}
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
       <span className="hmswtrack" style={{
-        position:'absolute', inset:0, borderRadius:9, pointerEvents:'none',
+        position:'absolute', inset:0, borderRadius:999, pointerEvents:'none',
         background: checked ? ACCENT : BORDER,
         boxShadow: checked ? 'none' : 'inset 0 1px 2px var(--hm-shadow)',
       }}>
         <span className="hmswknob" style={{
-          position:'absolute', width:14, height:14, borderRadius:7, background: checked ? ON_ACCENT : 'var(--hm-thumb)',
+          position:'absolute', width:14, height:14, borderRadius:999, background: checked ? ON_ACCENT : 'var(--hm-thumb)',
           top: 2, left: 2, transform: checked ? 'translateX(16px)' : 'none',
           boxShadow:'0 1px 2px var(--hm-shadow)',
         }} />
@@ -610,6 +630,7 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
 }
 
 export function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId, log = false }) {
+  help = help ?? STOCK_HELP[label]
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
@@ -696,7 +717,7 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
 }
 
 /** Segmented button row — one exclusive choice, laid out like InlineSl. */
-export function SegRow({ label, help, options, value, onChange, testIdPrefix, columns }) {
+export function SegRow({ label, help, options, value, onChange, testIdPrefix, testIdOf, columns }) {
   const [showHelp, setShowHelp] = useState(false)
   return (
     <div style={{ marginBottom: 8 }}>
@@ -706,7 +727,7 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix, co
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <SegGroup label={label} options={options} value={value} onChange={onChange}
-          nameButtons testIdOf={testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined}
+          nameButtons testIdOf={testIdOf ?? (testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined)}
           columns={columns} style={{ flex: 1 }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
@@ -719,15 +740,23 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix, co
  * a feature layer. One look for all of them. `children` are the `<option>`s.
  */
 export function Select({ value, onChange, testId, label, children, style }) {
+  // The browser's own arrow scales with the 10 px text and was a speck; this
+  // one is the panel's chevron, drawn over a select with no arrow of its own.
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}
-      aria-label={label} style={{
-        flex: 1, minWidth: 0, background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-        borderRadius: 5, fontSize: 10, padding: '3px 4px', cursor: 'pointer', fontFamily: 'inherit',
-        ...style,
-      }}>
-      {children}
-    </select>
+    <span style={{ position: 'relative', display: 'flex', flex: 1, minWidth: 0, ...style }}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}
+        aria-label={label} style={{
+          flex: 1, minWidth: 0, background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+          borderRadius: 5, fontSize: 10, padding: '3px 22px 3px 6px', cursor: 'pointer', fontFamily: 'inherit',
+          appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+        }}>
+        {children}
+      </select>
+      <span style={{ position: 'absolute', right: 6, top: 0, bottom: 0, display: 'flex',
+                     alignItems: 'center', pointerEvents: 'none', color: MUTED }}>
+        <Chevron size={12} />
+      </span>
+    </span>
   )
 }
 
@@ -775,7 +804,7 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
     <div role="group" aria-label={label} style={{
       display: columns ? 'grid' : 'flex',
       ...(columns && { gridTemplateColumns: `repeat(${columns}, 1fr)` }),
-      gap: 2, padding: 2, borderRadius: 6,
+      gap: 2, padding: 2, borderRadius: 5,
       background: SUNK, border:`1px solid ${BORDER}`,
       ...style,
     }}>
@@ -789,9 +818,9 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
             data-testid={testIdOf ? testIdOf(v) : undefined} disabled={off} title={opt?.title}
             aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
             style={{
-              flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 4, border:'none',
+              flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 3, border:'none',
               cursor: off ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
-              opacity: off && !on ? 0.4 : 1,
+              opacity: off && !on ? DISABLED_OPACITY : 1,
               ...(capitalize && { textTransform:'capitalize' }),
               fontWeight: on ? 600 : 500,
               background: on ? ACCENT_DEEP : 'transparent',
@@ -953,11 +982,10 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           {/* A drawn chevron in a 22 px box: the header's height and the reset
               button beside it are both measured from that box. */}
           <span aria-hidden="true" className="hmchevron" style={{
-            width:14, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center',
+            width:16, height:22, display:'inline-flex', alignItems:'center', justifyContent:'center',
             color: MUTED, flexShrink:0, transform: isOpen ? 'none' : 'rotate(-90deg)',
           }}>
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor"
-              strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3.5 5 6.5 8 3.5" /></svg>
+            <Chevron size={14} />
           </span>
         </span>
       </button>
@@ -990,7 +1018,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
             position:'absolute', right:30, top:0, width: RESET_W,
             background:'none', border:'none', cursor:'pointer',
             padding:'10px 0', lineHeight:'22px', textAlign:'center',
-            color: MUTED, fontSize:12, borderRadius:4,
+            color: MUTED, fontSize:12, borderRadius:3,
           }}>↺</button>
       </>)}
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
@@ -1172,7 +1200,7 @@ export function StageRail({ stage, onStage, live, hits }) {
             {badge && (
               <span aria-hidden="true" style={{
                 position:'absolute', top:6, right:4,
-                minWidth:13, height:13, borderRadius:7, padding:'0 3px',
+                minWidth:13, height:13, borderRadius:5, padding:'0 3px',
                 background: filtering ? ACCENT : GREEN,
                 color: ON_ACCENT,
                 fontSize:9, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
@@ -1209,6 +1237,8 @@ const BTN_SIZES = {
   xs: { fontSize: 10,  padding: '2px 6px', borderRadius: 3 },
   sm: { fontSize: 10, padding: '3px 6px', borderRadius: 3 },
   md: { fontSize: 11, padding: '5px 7px', borderRadius: 5 },
+  // The main action of a block: Surprise me, Run erosion, Apply.
+  lg: { fontSize: 11, padding: '8px 8px', borderRadius: 5, fontWeight: 600 },
 }
 
 export function Btn({
@@ -1233,7 +1263,7 @@ export function Btn({
       cursor: rest.disabled ? 'default' : 'pointer',
       fontFamily: 'inherit',
       ...(block && { flex: 1 }),
-      ...(rest.disabled && { opacity: 0.5 }),
+      ...(rest.disabled && { opacity: DISABLED_OPACITY }),
       ...style,
     }}>{children}</button>
   )
@@ -1254,6 +1284,51 @@ export function Btn({
  * now — the vector layers and the free text — and a shared control imported
  * from the file that renders both would be a cycle.
  */
+/**
+ * The one disclosure and dropdown arrow. A drawn chevron rather than a text
+ * glyph: ▾ and › at 9–10 px were too small to see, and each font drew them a
+ * different size. `dir` is where it points.
+ */
+const CHEVRON_TURN = { down: 0, right: -90, up: 180, left: 90 }
+export function Chevron({ dir = 'down', size = 12, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 10 10" fill="none" stroke="currentColor"
+      strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"
+      style={{ flexShrink: 0, transform: `rotate(${CHEVRON_TURN[dir]}deg)`, ...style }}>
+      <path d="M2 3.5 5 6.5 8 3.5" />
+    </svg>
+  )
+}
+
+export function EyeIcon({ off }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Z" />
+      <circle cx="12" cy="12" r="2.6" />
+      {off && <path d="M3.5 3.5 20.5 20.5" />}
+    </svg>
+  )
+}
+
+/**
+ * An action on one row of a stack — show or hide, duplicate, remove. A glyph
+ * in a 20 px target, no border, so a row of them stays quiet beside the name.
+ * `label` names it for screen readers and on hover; removing is always
+ * "Remove", in every stack.
+ */
+export function RowBtn({ label, title, children, style, ...rest }) {
+  return (
+    <button type="button" className="hmrow" aria-label={label} title={title ?? label} {...rest} style={{
+      background: 'none', border: 'none', padding: 0, width: 20, height: 20, borderRadius: 3,
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+      color: MUTED, fontSize: 11, lineHeight: 1, fontFamily: 'inherit',
+      cursor: rest.disabled ? 'default' : 'pointer', ...(rest.disabled && { opacity: DISABLED_OPACITY }),
+      ...style,
+    }}>{children}</button>
+  )
+}
+
 export function GripIcon() {
   return (
     <svg width="10" height="13" viewBox="0 0 10 13" fill="currentColor" aria-hidden="true">
@@ -1290,7 +1365,7 @@ export function LoadBtn({ children, block = true, style, ...rest }) {
       padding: 8, background: SURF, color: MUTED, border: `1px dashed ${BORDER}`,
       borderRadius: 5, fontSize: 11, fontFamily: 'inherit',
       cursor: rest.disabled ? 'default' : 'pointer',
-      ...(rest.disabled && { opacity: 0.5 }),
+      ...(rest.disabled && { opacity: DISABLED_OPACITY }),
       ...style,
     }}>↑ {children}</button>
   )

@@ -28,7 +28,7 @@ async function openErosion(page) {
   }
 }
 
-const runBtn    = (page) => page.locator('button', { hasText: /^Run Erosion$|^Eroding…/ })
+const runBtn    = (page) => page.locator('button', { hasText: /^Run erosion$|^Eroding…/ })
 const cancelBtn = (page) => page.locator('[data-testid="erosion-cancel"]')
 const undoBtn   = (page) => page.locator('button', { hasText: /^Undo$/ })
 
@@ -46,7 +46,7 @@ test('a short run completes and arms Undo', async ({ page }) => {
   await runBtn(page).click()
 
   // Back to its resting label once the worker has posted its result.
-  await expect(runBtn(page)).toHaveText('Run Erosion', { timeout: 30_000 })
+  await expect(runBtn(page)).toHaveText('Run erosion', { timeout: 30_000 })
   // Undo is armed only by a run that actually wrote pixels.
   await expect(undoBtn(page)).toBeEnabled()
   // And nothing failed on the way: the error line stays absent.
@@ -73,7 +73,7 @@ test('a long run can be abandoned, and leaves nothing behind', async ({ page }) 
   await cancelBtn(page).click()
 
   // The button comes back, and the row returns to Run + Undo.
-  await expect(runBtn(page)).toHaveText('Run Erosion', { timeout: 10_000 })
+  await expect(runBtn(page)).toHaveText('Run erosion', { timeout: 10_000 })
   await expect(cancelBtn(page)).toHaveCount(0)
   // Abandoning is the user's own decision, so it is not reported as a failure…
   await expect(page.locator('[data-testid="erosion-error"]')).toHaveCount(0)

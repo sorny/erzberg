@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { copyView, makeCopy, patchCopy } from '../../utils/modeCopies'
 import { MODE_ID } from './sectionParams'
-import { BORDER, Btn, DIM, MUTED, SURF, Switch, TEXT } from './ui'
+import { BORDER, Btn, Chevron, DIM, MUTED, SURF, Switch, TEXT } from './ui'
 
 export function ModeCopies({ title, style, ss, renderBody }) {
   const mode = MODE_ID.get(title)
@@ -42,13 +42,13 @@ export function ModeCopies({ title, style, ss, renderBody }) {
         const isOpen = open.has(copy.uid)
         return (
           <div key={copy.uid} data-testid={`mode-copy-${copy.uid}`}
-            style={{ border: `1px solid ${BORDER}`, borderRadius: 6, background: SURF, marginBottom: 6 }}>
+            style={{ border: `1px solid ${BORDER}`, borderRadius: 5, background: SURF, marginBottom: 6 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px' }}>
               <button type="button" onClick={() => toggleOpen(copy.uid)}
                 aria-expanded={isOpen} aria-label={`Open ${copy.name}`}
                 data-testid={`mode-copy-open-${copy.uid}`}
-                style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, width: 14,
-                  transform: isOpen ? 'none' : 'rotate(-90deg)', fontSize: 10 }}>▾</button>
+                style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, width: 16,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Chevron dir={isOpen ? 'down' : 'right'} /></button>
               <input value={copy.name} aria-label="Copy name" data-testid={`mode-copy-name-${copy.uid}`}
                 onChange={(e) => write(all.map((c) => (c.uid === copy.uid ? { ...c, name: e.target.value } : c)))}
                 style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', color: on ? TEXT : MUTED,
@@ -62,7 +62,7 @@ export function ModeCopies({ title, style, ss, renderBody }) {
                 <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
                   <Btn size="xs" onClick={() => add(view)} data-testid={`mode-copy-duplicate-${copy.uid}`}>Duplicate</Btn>
                   <Btn size="xs" onClick={() => write(all.filter((c) => c.uid !== copy.uid))}
-                    data-testid={`mode-copy-delete-${copy.uid}`}>Delete</Btn>
+                    data-testid={`mode-copy-delete-${copy.uid}`}>Remove</Btn>
                 </div>
               </div>
             )}

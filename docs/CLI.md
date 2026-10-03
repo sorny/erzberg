@@ -20,7 +20,7 @@ node scripts/erzberg.js render <heightmap> -o <file> [-o <file>…] [options]
 |---|---|
 | `-o, --out <file>` | `.svg`, `.png` or `.stl`. Repeat it to write several files of one plate. |
 | `-p, --preset <name>` | A bundled preset (`Blueprint`, any case), or a `.json`, `.svg` or `.png` that carries one. |
-| `-m, --mode <ids>` | Switch draw modes on, by id (`Contours`) or label (`Stream network`). Comma list, repeatable. |
+| `-m, --mode <ids>` | Switch draw modes on, by id (`Contours`) or label (`Flow lines`). Comma list, repeatable. |
 | `--only` | Switch every other draw mode off first. |
 | `-s, --set <key=value>` | Any parameter. The type comes from the default: `tilt=35`, `labelContours=on`, `bgColor=#fff`. |
 | `--size <W>x<H>` | Canvas pixels. The default is `1600x1131`. |

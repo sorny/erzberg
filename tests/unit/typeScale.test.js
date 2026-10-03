@@ -33,4 +33,18 @@ describe('type scale', () => {
     }
     expect(off).toEqual([])
   })
+
+  it('uses only the four corner radii', () => {
+    const RADII = new Set([3, 5, 10, 999])
+    const off = []
+    for (const p of [...sources('src/components'), 'src/App.jsx']) {
+      readFileSync(p, 'utf8').split('\n').forEach((line, i) => {
+        for (const m of line.matchAll(/borderRadius:\s*([0-9.]+)\b|border-radius:\s*([0-9.]+)px/g)) {
+          const v = Number(m[1] ?? m[2])
+          if (!RADII.has(v)) off.push(`${p}:${i + 1} ${v}`)
+        }
+      })
+    }
+    expect(off).toEqual([])
+  })
 })

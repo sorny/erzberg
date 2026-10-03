@@ -159,9 +159,10 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           would be a control that changes nothing. */}
       {showColor && (
         <ColorRow label="Base colour" testId={`base-colour-${prefix || 'vector'}`}
+          help="The pen colour while Colour is Line. A gradient, class or plate source colours the layer instead."
           value={style[`color${prefix}`]} onChange={(v) => ss({ [`color${prefix}`]: v })} />
       )}
-      <InlineSl label="Weight" min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
+      <InlineSl label="Weight" help="Line width in screen pixels." min={0.5} max={10} step={0.5} value={style[`weight${prefix}`]} onChange={v => ss({ [`weight${prefix}`]: v })} />
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
 
       {showDash && (
@@ -196,8 +197,8 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
         )}
         {ramp && (
           <Sub>
-            <Tog label="Banded" small checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
-            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band interval" min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
+            <Tog label="Banded" small help="Steps the gradient into flat bands, as on a printed hypsometric map, rather than a smooth ramp." checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
+            {style[`hypsoBanded${prefix}`] && <InlineSl label="Band interval" help="The width of one band, as a percentage of the gradient. 10 gives ten bands." min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
             {/* The gradient is global (shared by every gradient source and the
                 fill), but it must be editable right where a source picks it —
                 not hidden behind enabling fill in Terrain Style. */}

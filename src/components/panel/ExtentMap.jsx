@@ -148,7 +148,7 @@ export function ExtentMap({ preview, box, onChange, width = 240, height = 156, b
   const cursor = busy ? 'progress' : CURSOR[hover] ?? 'default'
 
   return (
-    <div data-testid="extent-map" style={{ position:'relative', marginBottom:6, borderRadius:4,
+    <div data-testid="extent-map" style={{ position:'relative', marginBottom:6, borderRadius:3,
          overflow:'hidden', border:`1px solid ${BORDER}`, background:SURF, lineHeight:0 }}>
       <canvas ref={canvasRef} width={width} height={height}
         style={{ display:'block', width:'100%', height:'auto' }} />

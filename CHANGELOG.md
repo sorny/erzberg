@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.53.0] — 2026-10-03
+
+### Changed
+
+- **One name for each mode.** The section header and Marks tile said *Flow*,
+  *Ridge* and *Valley*; copies, pen layers and the command line said *Flow
+  lines*, *Ridges* and *Valleys*. Both now use the longer names. *Network* and
+  *Pencil* went the other way, because *Stream network* and *Pencil shading*
+  do not fit on a tile; the command line still accepts the old labels.
+  *Mode: Land Cover* is in title case like every other header.
+  `modeNames.test.js` keeps the two lists equal.
+- **One button for a row action.** Masks, text, vector layers and the audio
+  track remove a row with the same small ✕ (`RowBtn`), and every one says
+  *Remove*. Text layers show and hide with the same eye as vector layers.
+- **Help on the rows every mode shares:** Base colour, Weight, Banded and
+  Band interval. *Seed* and *Opacity* get the same help wherever a section
+  gives them none.
+- **Buttons from the shared set.** Surprise me, Edit heightmap, Fetch from
+  OpenStreetMap, Run erosion, the Edit and Mask Studio panels, the audio
+  transport and the OSM categories use `Btn`; the tool pickers in both studios
+  and the vector label *Align* are segmented rows. *Run Erosion* is *Run
+  erosion*; *FEATURES* is *Features*; *all*, *none* and *clear* are
+  capitalised.
+- **Units have a space** before a letter: 12 m, 5 s, 8 px, 40 ms.
+- **One disabled look** (`DISABLED_OPACITY`, 0.5) for every control, and one
+  for a hidden layer. **Four corner radii**: 3, 5, 10 px and round.
+  `typeScale.test.js` now checks the radii too.
+- **Bigger arrows.** Section headers, dropdowns, stack rows, the history menu
+  and the Marks tiles use one drawn chevron. Dropdowns draw it in place of the
+  browser's arrow, which was a speck at 10 px.
+
+### Fixed
+
+- **The drop overlay follows the light theme.** It had dark text on a dark
+  card in Paper.
+
+No setting, preset or rendering changed.
+
 ## [1.52.0] — 2026-10-03
 
 ### Changed

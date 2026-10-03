@@ -76,11 +76,11 @@ export const PANEL_MODES = [
   ['Mode: Pillars',        'enabledPillars',   'Spacing',   (s) => num(s.spacingPillars)],
   ['Mode: Contours',       'enabledContours',  'Interval',  (s) => num(s.intervalContours)],
   ['Mode: Hachure',        'enabledHachure',   'Spacing',   (s) => num(s.spacingHachure)],
-  ['Mode: Flow',           'enabledFlow',      'Spacing',   (s) => num(s.spacingFlow)],
+  ['Mode: Flow Lines',           'enabledFlow',      'Spacing',   (s) => num(s.spacingFlow)],
   ['Mode: Network',        'enabledDag',       'Min order', (s) => num(s.thresholdDag)],
   ['Mode: Pencil',         'enabledPencil',    'Spacing',   (s) => num(s.spacingPencil)],
-  ['Mode: Ridge',          'enabledRidge',     'Spacing',   (s) => num(s.spacingRidge)],
-  ['Mode: Valley',         'enabledValley',    'Spacing',   (s) => num(s.spacingValley)],
+  ['Mode: Ridges',          'enabledRidge',     'Spacing',   (s) => num(s.spacingRidge)],
+  ['Mode: Valleys',         'enabledValley',    'Spacing',   (s) => num(s.spacingValley)],
   ['Mode: Stipple Dots',   'enabledStipple',   'Spacing',   (s) => num(s.spacingStipple)],
   ['Mode: Isophotes',      'enabledIso',       'Levels',    (s) => num(s.levelsIso)],
   ['Mode: Engraving',      'enabledEngrave',   'Spacing',   (s) => num(s.spacingEngrave)],
@@ -100,7 +100,7 @@ export const PANEL_MODES = [
   // about the loaded plate rather than about any setting, so the number would
   // read as a control that is not there. What the shut header can usefully say
   // is which of the two the layer is drawing.
-  ['Mode: Land cover',     'enabledCover',     'Ink',       (s) => (s.sourceCover === 'class' ? 'classes' : 'plate')],
+  ['Mode: Land Cover',     'enabledCover',     'Ink',       (s) => (s.sourceCover === 'class' ? 'classes' : 'plate')],
   ['Mode: Watershed',      'enabledShed',      'Inks',      (s) => num(s.inksShed)],
   ['Mode: Flashbulb',      'enabledFlashbulb', 'Azimuth',   (s) => deg(s.azimuthFlashbulb)],
   ['Mode: Halation',       'enabledHalation',  'Azimuth',   (s) => deg(s.azimuthHalation)],

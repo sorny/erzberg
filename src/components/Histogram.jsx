@@ -115,7 +115,7 @@ export function Histogram({ pixels, blackPoint, whitePoint, onBlackChange, onWhi
       ref={canvasRef}
       width={W}
       height={H}
-      style={{ width: '100%', height: `${H}px`, display: 'block', cursor: 'ew-resize', borderRadius: 4 }}
+      style={{ width: '100%', height: `${H}px`, display: 'block', cursor: 'ew-resize', borderRadius: 3 }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}

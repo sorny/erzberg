@@ -9,7 +9,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, MUTED, ON_ACCENT, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -112,7 +112,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
     }}>
       <div style={{
         display:'flex', flexDirection:'column', alignItems:'center', gap:14,
-        ...GLASS, borderRadius:14, padding:'28px 40px',
+        ...GLASS, borderRadius:10, padding:'28px 40px',
         minWidth: pct == null ? 0 : 260,
       }}>
         <div style={{
@@ -124,7 +124,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
         {pct != null && (
           <>
             {/* Same shape as the spectrogram analyser's bar in the panel. */}
-            <div style={{ width:'100%', height:4, background:BORDER, borderRadius:2, overflow:'hidden' }}>
+            <div style={{ width:'100%', height:4, background:BORDER, borderRadius:3, overflow:'hidden' }}>
               <div data-testid="export-progress-fill"
                    style={{ height:'100%', width:`${pct}%`, background:ACCENT, transition:'width .1s' }} />
             </div>
@@ -177,7 +177,7 @@ function autoResolution(width, height) {
 function Kbd({ children }) {
   return (
     <kbd style={{
-      display:'inline-block', minWidth:16, padding:'1px 5px', borderRadius:4,
+      display:'inline-block', minWidth:16, padding:'1px 5px', borderRadius:3,
       background: VEIL, border:`1px solid ${GLASS_BORDER}`,
       borderBottomWidth:2, fontFamily:'inherit', fontSize:10, lineHeight:'14px',
       color:TEXT, textAlign:'center',
@@ -215,14 +215,14 @@ function Toast({ toast, onDismiss }) {
       <span style={{ flex:1 }}>{toast.msg}</span>
       {toast.action && (
         <button data-testid="toast-action" onClick={() => { toast.onAction?.(); onDismiss() }} style={{
-          background:ACCENT_DEEP, border:'none', borderRadius:6, cursor:'pointer',
+          background:ACCENT_DEEP, border:'none', borderRadius:5, cursor:'pointer',
           color: ON_ACCENT, fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
           whiteSpace:'nowrap',
         }}>{toast.action}</button>
       )}
       <button onClick={onDismiss} aria-label="Dismiss" style={{
         background:'none', border:'none', color:MUTED, cursor:'pointer',
-        fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:6,
+        fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:5,
       }}>✕</button>
     </div>
   )
@@ -265,12 +265,12 @@ function ViewportHint({ onDismiss, onKeys }) {
           that talks about input at all. */}
       <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts"
         className="hm-glassbtn" style={{
-          background:'none', border:'none', borderRadius:7, cursor:'pointer',
+          background:'none', border:'none', borderRadius:5, cursor:'pointer',
           color:MUTED, fontSize:12, padding:'3px 8px', fontFamily:'inherit',
           display:'flex', alignItems:'center', gap:6,
         }}><Kbd>?</Kbd> Shortcuts</button>
       <button onClick={onDismiss} aria-label="Dismiss the viewport hint" className="hm-glassbtn" style={{
-        background:'none', border:'none', borderRadius:7, cursor:'pointer',
+        background:'none', border:'none', borderRadius:5, cursor:'pointer',
         color:MUTED, fontSize:12, lineHeight:1, padding:'6px 8px',
       }}>✕</button>
       <style>{`.hm-glassbtn { transition:background .15s, color .15s }
@@ -295,12 +295,12 @@ function DropTarget() {
     <div data-testid="drop-target" style={{
       position:'fixed', inset:0, zIndex:3800, pointerEvents:'none',
       display:'flex', alignItems:'center', justifyContent:'center',
-      background:'rgba(10,10,14,0.55)', backdropFilter:'blur(2px)',
-      fontFamily:'system-ui,sans-serif',
+      background: SCRIM, backdropFilter:'blur(2px)',
+      fontFamily: FONT,
     }}>
       <div style={{
-        border:'2px dashed rgba(255,255,255,0.28)', borderRadius:12,
-        padding:'26px 38px', textAlign:'center', background:'rgba(20,20,24,0.85)',
+        ...GLASS, border:`2px dashed ${MUTED}`, borderRadius:10,
+        padding:'26px 38px', textAlign:'center',
       }}>
         <div style={{ fontSize:13, color:TEXT, marginBottom:8 }}>Drop to open</div>
         <div style={{ fontSize:12, color:MUTED, lineHeight:1.7 }}>
@@ -2497,7 +2497,7 @@ export default function App() {
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
           background:'rgba(200,0,0,0.85)', color:'#fff',
-          borderRadius:20, padding:'4px 14px', fontSize:13, fontWeight:700,
+          borderRadius:999, padding:'4px 14px', fontSize:13, fontWeight:700,
           zIndex:2000, pointerEvents:'none', display:'flex', alignItems:'center', gap:6,
         }}>
           <span style={{ width:8, height:8, borderRadius:'50%', background:'#fff', display:'inline-block' }} />
@@ -2543,7 +2543,7 @@ export default function App() {
       {loadError && (
         <div style={{
           position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
-          background: BG, border:`1px solid ${DANGER_BORDER}`, borderRadius:8,
+          background: BG, border:`1px solid ${DANGER_BORDER}`, borderRadius:10,
           padding:'12px 16px', zIndex:5000, display:'flex', alignItems:'center', gap:12,
           maxWidth:480, boxShadow:'0 8px 28px var(--hm-shadow)',
           fontFamily: FONT, fontSize:13, color:DANGER_TEXT,

@@ -99,7 +99,7 @@ export function CoverMap({ cover, hovered, onHover }) {
         onPointerLeave={() => onHover(null)}
         style={{
           width: '100%', height: 'auto', display: 'block',
-          border: `1px solid ${BORDER}`, borderRadius: 4,
+          border: `1px solid ${BORDER}`, borderRadius: 3,
           imageRendering: 'pixelated', cursor: 'crosshair',
         }}
       />

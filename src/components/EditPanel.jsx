@@ -10,7 +10,7 @@ import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
 import { BackdropBlock } from './panel/BackdropBlock'
 import { useFeaturePick } from './panel/FeaturePicker'
-import { ACCENT, BG, BORDER, DANGER_TEXT, DIM, HelpBox, InlineSl, MUTED, ON_ACCENT, PanelStyles, STRONG, SUNK, SURF, SegRow, TEXT, W } from './panel/ui'
+import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, HelpBox, InlineSl, MUTED, PanelStyles, STRONG, SUNK, SegGroup, SegRow, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
@@ -80,14 +80,8 @@ export function EditPanel({
   }
 
   const btn = (label, onClick, kind, testId, disabled = false) => (
-    <button onClick={onClick} data-testid={testId} disabled={disabled} style={{
-      flex: 1, padding: '8px 0', borderRadius: 5, cursor: disabled ? 'default' : 'pointer',
-      opacity: disabled ? 0.45 : 1,
-      fontSize: 11, fontWeight: 600,
-      background: kind === 'primary' ? ACCENT : SURF,
-      color: kind === 'primary' ? ON_ACCENT : DIM,
-      border: `1px solid ${kind === 'primary' ? ACCENT : BORDER}`,
-    }}>{label}</button>
+    <Btn size="lg" block variant={kind === 'primary' ? 'primary' : 'quiet'}
+      onClick={onClick} data-testid={testId} disabled={disabled}>{label}</Btn>
   )
 
   return (
@@ -97,8 +91,8 @@ export function EditPanel({
         position: 'fixed', right: 0, top: 0, width: W, height: '100%',
         background: BG, color: TEXT, zIndex: 1000,
         display: 'flex', flexDirection: 'column',
-        boxShadow: '-3px 0 16px rgba(0,0,0,.4)',
-        fontFamily: 'system-ui,-apple-system,sans-serif',
+        boxShadow: '-3px 0 16px var(--hm-shadow)',
+        fontFamily: FONT,
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
@@ -113,16 +107,8 @@ export function EditPanel({
         </div>
 
         <div id="hm-panel-body" style={{ flex: 1, overflowX: 'hidden', overflowY: 'auto', padding: '12px 12px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 2, marginBottom: 12 }}>
-            {TOOLS.map(([label, id]) => (
-              <button key={id} data-testid={`edit-tool-${id}`} onClick={() => setTool(id)} style={{
-                fontSize: 10, padding: '8px 0', borderRadius: 5, cursor: 'pointer',
-                background: tool === id ? ACCENT : SURF,
-                color: tool === id ? ON_ACCENT : MUTED,
-                border: `1px solid ${tool === id ? ACCENT : BORDER}`,
-              }}>{label}</button>
-            ))}
-          </div>
+          <SegGroup label="Tool" columns={2} options={TOOLS} value={tool} onChange={setTool}
+            testIdOf={(id) => `edit-tool-${id}`} style={{ marginBottom: 12 }} />
 
           <HelpBox text={HINTS[tool]} />
 
@@ -145,10 +131,8 @@ export function EditPanel({
             <NumField label="Width"  testId="edit-w" value={rect.w} min={1} max={srcWidth}  onChange={(v) => setRect({ w: v })} />
             <NumField label="Height" testId="edit-h" value={rect.h} min={1} max={srcHeight} onChange={(v) => setRect({ h: v })} />
           </div>
-          <button data-testid="edit-full-extent" onClick={() => setRect({ x: 0, y: 0, w: srcWidth, h: srcHeight })} style={{
-            width: '100%', padding: '4px 0', background: SURF, color: MUTED,
-            border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 12,
-          }}>Full extent</button>
+          <Btn size="md" data-testid="edit-full-extent" onClick={() => setRect({ x: 0, y: 0, w: srcWidth, h: srcHeight })}
+            style={{ width: '100%', marginBottom: 12 }}>Full extent</Btn>
             </>
           )}
           {tool === 'features' && (
@@ -183,10 +167,8 @@ export function EditPanel({
             </span>
           </div>
           {edit?.shape && (
-            <button data-testid="edit-clear-shape" onClick={() => onChange({ rect, shape: null, feather })} style={{
-              width: '100%', padding: '4px 0', background: SURF, color: MUTED,
-              border: `1px solid ${BORDER}`, borderRadius: 5, cursor: 'pointer', fontSize: 10, marginBottom: 8,
-            }}>Clear shape</button>
+            <Btn size="md" data-testid="edit-clear-shape" onClick={() => onChange({ rect, shape: null, feather })}
+              style={{ width: '100%', marginBottom: 8 }}>Clear shape</Btn>
           )}
 
           <InlineSl
@@ -194,7 +176,7 @@ export function EditPanel({
             help="Softens the cut: within this many pixels of the edge the terrain ramps down to its own lowest point instead of ending in a cliff. Also what makes a clipped STL sit flat."
             min={0} max={64} value={feather}
             onChange={(v) => onChange({ rect, shape: edit?.shape ?? null, feather: v })}
-            fmt={(v) => v + 'px'}
+            fmt={(v) => v + ' px'}
           />
 
           <BackdropBlock prefix="edit" backdrop={backdrop} setBackdrop={setBackdrop}

@@ -22,7 +22,7 @@ function Cap({ children }) {
     <kbd style={{
       display: 'inline-block', minWidth: 20, textAlign: 'center',
       background: 'var(--hm-veil-strong)', border: `1px solid ${GLASS_BORDER}`,
-      borderRadius: 4, padding: '2px 6px',
+      borderRadius: 3, padding: '2px 6px',
       fontFamily: MONO,
       fontSize: 11, lineHeight: 1.4, color: TEXT,
     }}>{children}</kbd>
@@ -43,7 +43,7 @@ export function ShortcutsOverlay({ onDismiss }) {
     >
       {/* Stops the click that would dismiss it, so text inside stays selectable. */}
       <div onClick={(e) => e.stopPropagation()} style={{
-        background: BG, border: `1px solid ${GLASS_BORDER}`, borderRadius: 8,
+        background: BG, border: `1px solid ${GLASS_BORDER}`, borderRadius: 10,
         padding: '18px 22px 20px', maxHeight: '86vh', overflowY: 'auto',
         boxShadow: '0 18px 50px var(--hm-shadow)',
       }}>

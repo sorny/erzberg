@@ -225,7 +225,7 @@ export function AudioMeter({ liveRef, points }) {
     <canvas
       ref={canvasRef}
       data-testid="flock-audio-meter"
-      style={{ width: '100%', height: H, display: 'block', borderRadius: 4,
+      style={{ width: '100%', height: H, display: 'block', borderRadius: 3,
                border: `1px solid ${BORDER}`, marginBottom: 8 }}
     />
   )

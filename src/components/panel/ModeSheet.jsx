@@ -47,7 +47,7 @@ import { DRAW_MODES } from '../../utils/drawModes'
 import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
 import { FAMILIES } from './markFamilies'
-import { ACCENT_DEEP, ACCENT_TEXT, BORDER, DIM, GREEN, MONO, MUTED, SURF, TEXT, WARN } from './ui'
+import { ACCENT_DEEP, ACCENT_TEXT, BORDER, Chevron, DIM, DISABLED_OPACITY, GREEN, MONO, MUTED, SURF, TEXT, WARN } from './ui'
 import { useContext } from 'react'
 import { CoverPlate } from './filter'
 
@@ -125,10 +125,10 @@ export function ModeSheet({ style, onToggle, onOpen }) {
            * targets nest visually without nesting in the markup.
            */
           <div key={key} role="group" aria-label={name} className="hmcard" style={{
-            position:'relative', borderRadius:6,
+            position:'relative', borderRadius:5,
             background: on ? 'color-mix(in srgb, var(--hm-accent) 16%, transparent)' : SURF,
             border:`1px solid ${on ? (waiting ? WARN : ACCENT_DEEP) : BORDER}`,
-            opacity: blocked ? 0.5 : 1,
+            opacity: blocked ? DISABLED_OPACITY : 1,
           }} data-needs-plate={waiting ? 'true' : undefined}>
             <button
               type="button"
@@ -162,7 +162,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
                   </span>
                 )}
                 <span aria-hidden="true" className="hmchev"
-                  style={{ flexShrink:0, fontSize:9, lineHeight:1, color: MUTED }}>›</span>
+                  style={{ flexShrink:0, display:'flex', color: MUTED }}><Chevron dir="right" size={10} /></span>
               </span>
             </button>
             {/*
@@ -246,7 +246,7 @@ export function ModeBack({ title, onBack }) {
       }}
       onMouseEnter={(e) => { e.currentTarget.style.color = TEXT }}
       onMouseLeave={(e) => { e.currentTarget.style.color = DIM }}>
-      <span aria-hidden="true" style={{ fontSize:13, lineHeight:1, color: ACCENT_TEXT }}>‹</span>
+      <span aria-hidden="true" style={{ display:'flex', color: ACCENT_TEXT }}><Chevron dir="left" /></span>
       {/* Counted, not written: it said 40 for seventeen releases after there
           were more. */}
       <span>{`All ${PANEL_MODES.length} marks`}</span>

@@ -31,7 +31,7 @@ const SMALL = [15.00, 47.20, 15.10, 47.26]
 const FIXTURE = 'tests/testdata/geotiff.tif'
 
 /** Answers a count with `count`, and geometry with `ways` fat ways. */
-async function routeOverpass(page, { count = 5_000, ways = 400 } = {}) {
+async function routeOverpass(page, { count = 5_000, ways = 400, delay = 0 } = {}) {
   await page.route('**/api/interpreter', async (route) => {
     const body = decodeURIComponent((route.request().postData() ?? '')
       .replace(/^data=/, '').replace(/\+/g, ' '))
@@ -47,6 +47,9 @@ async function routeOverpass(page, { count = 5_000, ways = 400 } = {}) {
             lat: 47.2 + k * 1e-4, lon: 15.0 + i * 1e-4,
           })),
         })) }
+    // A real Overpass takes seconds. Answered at once, the panel's bar lived
+    // for about 20 ms, and whether the check below saw it was down to timing.
+    if (delay) await new Promise((r) => setTimeout(r, delay))
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(json) })
   })
 }
@@ -122,7 +125,7 @@ test('an extent too small to count still reports, without inventing a total', as
 
 test('the panel draws the bar, and takes it away again', async ({ page }) => {
   test.skip(!existsSync(FIXTURE), `${FIXTURE} not present (gitignored) — see tests/testdata/README.md`)
-  await routeOverpass(page, { ways: 60 })
+  await routeOverpass(page, { ways: 60, delay: 800 })
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),

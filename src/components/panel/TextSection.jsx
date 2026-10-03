@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import { BORDER, Btn, ColorRow, DIM, FontSelect, GripIcon, InlineSl, MUTED, SURF, Section, SegGroup, Sub, TEXT, Tog } from './ui'
+import { BORDER, Btn, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, HIDDEN_OPACITY, InlineSl, MUTED, RowBtn, SURF, Section, SegRow, Sub, TEXT, Tog } from './ui'
 import { useStackDrag } from './stackDrag'
 import { makeTextLayer, textLayerName } from '../../utils/textLayers'
 
@@ -105,19 +105,16 @@ export function TextSection({
                 style={{
                   ...rowBtn, flex: 1, minWidth: 0, textAlign: 'left', color: TEXT,
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  opacity: l.visible === false ? 0.45 : 1,
+                  opacity: l.visible === false ? HIDDEN_OPACITY : 1,
                 }}>{textLayerName(l)}</button>
 
-              <button onClick={() => set({ visible: l.visible === false })}
-                data-testid={`text-eye-${l.id}`}
-                aria-label={l.visible === false ? 'Show this text' : 'Hide this text'}
-                title={l.visible === false ? 'Show' : 'Hide'}
-                style={rowBtn}>{l.visible === false ? '◌' : '●'}</button>
+              <RowBtn onClick={() => set({ visible: l.visible === false })}
+                data-testid={`text-eye-${l.id}`} aria-pressed={l.visible === false}
+                label={l.visible === false ? 'Show this text' : 'Hide this text'}><EyeIcon off={l.visible === false} /></RowBtn>
 
-              <button onClick={() => setLayers((cur) => cur.filter((x) => x.id !== l.id))}
+              <RowBtn onClick={() => setLayers((cur) => cur.filter((x) => x.id !== l.id))}
                 data-testid={`text-remove-${l.id}`}
-                aria-label={`Remove ${textLayerName(l)}`} title="Remove"
-                style={rowBtn}>✕</button>
+                label={`Remove ${textLayerName(l)}`} title="Remove">✕</RowBtn>
             </div>
 
             {over && (
@@ -171,7 +168,7 @@ export function TextSection({
                       {[['bold', 'Bold'], ['italic', 'Italic']].map(([k, lbl]) => (
                         <Btn key={k} block variant="toggle" on={!!l[k]}
                           onClick={() => set({ [k]: !l[k] })}
-                          style={{ fontSize: 10, padding: '2px 0', borderRadius: 2 }}>{lbl}</Btn>
+                          style={{ fontSize: 10, padding: '2px 0', borderRadius: 3 }}>{lbl}</Btn>
                       ))}
                     </div>
                   </div>
@@ -186,11 +183,8 @@ export function TextSection({
                   onChange={(v) => set({ dy: v })}
                   help="Moves the text up its own plane." />
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '4px 0' }}>
-                  <span style={{ fontSize: 10, color: DIM, width: 54 }}>Align</span>
-                  <SegGroup label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
-                    value={l.align ?? 'center'} onChange={(k) => set({ align: k })} style={{ flex: 1 }} />
-                </div>
+                <SegRow label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
+                  value={l.align ?? 'center'} onChange={(k) => set({ align: k })} />
 
                 <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '10px 0 4px' }}>Ink</div>
                 <ColorRow label="Colour" value={l.color} testId={`text-color-${l.id}`}

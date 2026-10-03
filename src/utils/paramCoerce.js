@@ -58,7 +58,7 @@ export function coerceParams(raw) {
 /**
  * Mode names as a person types them → mode ids.
  *
- * The id (`Contours`), its label (`Stream network`) and either one in any case
+ * The id (`Contours`), its label (`Network`), an older label (`Stream network`) and either one in any case
  * all name the same mode, because a script author reads labels in the panel and
  * ids in the docs.
  */
@@ -67,6 +67,7 @@ export function resolveModes(names) {
   for (const m of DRAW_MODES) {
     byName.set(m.id.toLowerCase(), m.id)
     byName.set(m.label.toLowerCase(), m.id)
+    for (const a of m.aliases ?? []) byName.set(a.toLowerCase(), m.id)
   }
   const ids = [], errors = []
   for (const n of names ?? []) {

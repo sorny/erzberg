@@ -118,7 +118,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       help="Real ground metres, read through the raster's elevation range, the Shadows/Highlights handles and the current vertical exaggeration. The interval itself is kept in world units, so moving the exaggeration changes what it is worth on the ground — this number follows the lines rather than pinning them."
                       min={intervalMin} max={intervalMax} step={0.1} value={metreInterval}
                       onChange={v => ss({ intervalContours: v / mPerWorld })}
-                      fmt={v => (v >= 100 ? String(Math.round(v)) : v.toFixed(1)) + 'm'} />
+                      fmt={v => (v >= 100 ? String(Math.round(v)) : v.toFixed(1)) + ' m'} />
                   ) : (
                     <InlineSl label="Interval" min={0.1} max={10} step={0.1} value={style.intervalContours} onChange={v => ss({ intervalContours: v })} fmt={v => v.toFixed(1)} />
                   )}
@@ -194,7 +194,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
-          <Section title="Mode: Flow" icon={<ModeMark kind="flow" />} open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow}>
+          <Section title="Mode: Flow Lines" icon={<ModeMark kind="flow" />} open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow}>
             <Tog label="Enabled" checked={style.enabledFlow} onChange={v => ss({ enabledFlow: v })} />
             {style.enabledFlow && (
               <>
@@ -240,7 +240,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
-          <Section title="Mode: Ridge" icon={<ModeMark kind="ridge" />} open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge}>
+          <Section title="Mode: Ridges" icon={<ModeMark kind="ridge" />} open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge}>
             <Tog label="Enabled" checked={style.enabledRidge} onChange={v => ss({ enabledRidge: v })} />
             {style.enabledRidge && (
               <>
@@ -254,7 +254,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
-          <Section title="Mode: Valley" icon={<ModeMark kind="valley" />} open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley}>
+          <Section title="Mode: Valleys" icon={<ModeMark kind="valley" />} open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley}>
             <Tog label="Enabled" checked={style.enabledValley} onChange={v => ss({ enabledValley: v })} />
             {style.enabledValley && (
               <>
@@ -456,7 +456,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
-          <Section title="Mode: Land cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover}>
+          <Section title="Mode: Land Cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover}>
             <Tog label="Enabled" checked={style.enabledCover} onChange={v => ss({ enabledCover: v })} />
             {style.enabledCover && !cover && (
               <Note>No cover plate loaded, so this layer draws nothing. Open one under Land Cover.</Note>

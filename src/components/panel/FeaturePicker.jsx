@@ -95,8 +95,8 @@ export function useFeaturePick(layers = [], sources = [], prefix = 'mask-from') 
               Using {picked.size} of {bucket.count}
             </span>
             <span style={{ display: 'flex', gap: 2 }}>
-              <MiniBtn onClick={() => setPicked(ordered)} testId={`${prefix}-all`}>all</MiniBtn>
-              <MiniBtn onClick={() => setPicked([])} testId={`${prefix}-none`}>none</MiniBtn>
+              <MiniBtn onClick={() => setPicked(ordered)} testId={`${prefix}-all`}>All</MiniBtn>
+              <MiniBtn onClick={() => setPicked([])} testId={`${prefix}-none`}>None</MiniBtn>
             </span>
           </div>
           {bucket.count > 8 && (

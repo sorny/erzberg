@@ -38,7 +38,7 @@ const DOT = { ok: GREEN, busy: '#eab308', off: BORDER }
 function Row({ state, name, value, detail, where }) {
   return (
     <div data-testid={`extent-layer-${name.toLowerCase().replace(/\s+/g, '-')}`}
-      style={{ border:`1px solid ${BORDER}`, borderRadius:4, background:SURF,
+      style={{ border:`1px solid ${BORDER}`, borderRadius:3, background:SURF,
                padding:'6px 8px', marginBottom:4 }}>
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span style={{ width:6, height:6, borderRadius:'50%', flex:'none', background:DOT[state] }} />
@@ -89,7 +89,7 @@ export function ExtentSection() {
 
   return (
     <div data-testid="extent-section">
-      <div style={{ border:`1px solid ${BORDER}`, borderRadius:4, background:SURF,
+      <div style={{ border:`1px solid ${BORDER}`, borderRadius:3, background:SURF,
                     padding:'7px 9px', marginBottom:8 }}>
         <div style={{ fontSize:11, color:DIM, overflow:'hidden', textOverflow:'ellipsis',
                       whiteSpace:'nowrap' }}>{name || 'Untitled raster'}</div>

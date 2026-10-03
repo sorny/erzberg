@@ -159,7 +159,7 @@ export function SpectrogramView({ spec, currentTime, duration, windowFrames, dbF
       onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); seekFromEvent(e) }}
       onPointerMove={(e) => { if (e.buttons === 1) seekFromEvent(e) }}
       style={{
-        width: '100%', height: VIEW_H, borderRadius: 4, overflow: 'hidden',
+        width: '100%', height: VIEW_H, borderRadius: 3, overflow: 'hidden',
         border: '1px solid #3f3f46', background: BG,
         cursor: duration ? 'ew-resize' : 'default', marginBottom: 8,
         touchAction: 'none',

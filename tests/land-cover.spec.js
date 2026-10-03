@@ -209,7 +209,7 @@ test('the Land cover mode inks one layer per class', async ({ page }) => {
   await dropPlate(page, syntheticPlate())
 
   await setSwitch(page, 'Mode: Lines', 'Enabled', false)
-  await setSwitch(page, 'Mode: Land cover', 'Enabled', true)
+  await setSwitch(page, 'Mode: Land Cover', 'Enabled', true)
   await page.waitForTimeout(3500)
 
   const svg = await exportSvg(page)

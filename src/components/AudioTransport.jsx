@@ -14,7 +14,7 @@
  * simply reads a different column and the flock reacts to where it landed.
  */
 import { useEffect, useRef } from 'react'
-import { ACCENT, BORDER, DIM, MUTED, ON_ACCENT, SURF } from './panel/ui'
+import { Btn, MUTED, RowBtn } from './panel/ui'
 
 const fmt = (sec) => {
   if (!Number.isFinite(sec) || sec < 0) sec = 0
@@ -22,11 +22,6 @@ const fmt = (sec) => {
   const s = Math.floor(sec % 60)
   return `${m}:${String(s).padStart(2, '0')}`
 }
-
-const btn = (extra = {}) => ({
-  padding: '4px 8px', background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-  borderRadius: 3, cursor: 'pointer', fontSize: 10, lineHeight: 1, ...extra,
-})
 
 export function AudioTransport({ fa }) {
   const scrubRef = useRef(null)
@@ -59,21 +54,15 @@ export function AudioTransport({ fa }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-        <button data-testid="flock-audio-play" onClick={fa.toggle} title="Play / pause  (space)"
-          style={btn({ background: fa.isPlaying ? ACCENT : SURF, color: fa.isPlaying ? ON_ACCENT : DIM,
-                       borderColor: fa.isPlaying ? ACCENT : BORDER, minWidth: 26 })}>
+        <Btn variant="toggle" on={fa.isPlaying} data-testid="flock-audio-play" onClick={fa.toggle}
+          title="Play / pause  (space)" aria-label={fa.isPlaying ? 'Pause' : 'Play'} style={{ minWidth: 26 }}>
           {fa.isPlaying ? '❚❚' : '▶'}
-        </button>
-        <button data-testid="flock-audio-restart" onClick={fa.restart} title="Back to the start"
-          style={btn()}>⏮</button>
-        <button data-testid="flock-audio-back" onClick={() => fa.skip?.(-5)} title="Back 5 seconds"
-          style={btn()}>−5s</button>
-        <button data-testid="flock-audio-fwd" onClick={() => fa.skip?.(5)} title="Forward 5 seconds"
-          style={btn()}>+5s</button>
-        <button data-testid="flock-audio-loop" onClick={() => fa.setLoop?.(!fa.loop)} title="Loop the track"
-          style={btn({ marginLeft: 'auto',
-                       background: fa.loop ? ACCENT : SURF, color: fa.loop ? ON_ACCENT : MUTED,
-                       borderColor: fa.loop ? ACCENT : BORDER })}>⟲</button>
+        </Btn>
+        <Btn data-testid="flock-audio-restart" onClick={fa.restart} title="Back to the start" aria-label="Back to the start">⏮</Btn>
+        <Btn data-testid="flock-audio-back" onClick={() => fa.skip?.(-5)} title="Back 5 seconds">−5 s</Btn>
+        <Btn data-testid="flock-audio-fwd" onClick={() => fa.skip?.(5)} title="Forward 5 seconds">+5 s</Btn>
+        <Btn variant="toggle" on={fa.loop} data-testid="flock-audio-loop" onClick={() => fa.setLoop?.(!fa.loop)}
+          title="Loop the track" aria-label="Loop" aria-pressed={!!fa.loop} style={{ marginLeft: 'auto' }}>⟲</Btn>
       </div>
 
       <input
@@ -93,10 +82,7 @@ export function AudioTransport({ fa }) {
           style={{ fontSize: 10, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>0:00 / 0:00</span>
         <span style={{ fontSize: 10, color: MUTED, flex: 1, overflow: 'hidden',
                        textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fa.fileName}</span>
-        <button type="button" onClick={fa.release} className="hmi" title="Remove this track"
-          aria-label={`Remove ${fa.fileName}`}>
-          <span aria-hidden="true" style={{ fontSize: 10, border: 'none' }}>✕</span>
-        </button>
+        <RowBtn onClick={fa.release} label={`Remove ${fa.fileName}`} title="Remove">✕</RowBtn>
       </div>
     </div>
   )
