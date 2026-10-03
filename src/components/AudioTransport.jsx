@@ -1,5 +1,8 @@
 /**
- * Transport for the flock's track: play, restart, skip, scrub.
+ * Transport for a track: play, restart, skip, loop, scrub. The flock and the
+ * Soundscape both use it. A button shows only when its handler is there, so a
+ * player with no loop has no loop button, and `scrub={false}` leaves the bar
+ * out for a player that seeks some other way (the spectrogram, for Soundscapes).
  *
  * The playhead is read in an animation frame and written straight to the DOM
  * rather than held in React state. A scrubber backed by state would re-render
@@ -23,7 +26,8 @@ const fmt = (sec) => {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export function AudioTransport({ fa }) {
+export function AudioTransport({ fa, testIdPrefix = 'flock-audio', scrub = true }) {
+  const id = (name) => `${testIdPrefix}-${name}`
   const scrubRef = useRef(null)
   const timeRef = useRef(null)
   // True while the pointer owns the scrubber. Without it the rAF below would
@@ -54,35 +58,37 @@ export function AudioTransport({ fa }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-        <Btn variant="toggle" on={fa.isPlaying} data-testid="flock-audio-play" onClick={fa.toggle}
+        <Btn variant="toggle" on={fa.isPlaying} data-testid={id('play')} onClick={fa.toggle}
           title="Play / pause  (space)" aria-label={fa.isPlaying ? 'Pause' : 'Play'} style={{ minWidth: 26 }}>
           {fa.isPlaying ? '❚❚' : '▶'}
         </Btn>
-        <Btn data-testid="flock-audio-restart" onClick={fa.restart} title="Back to the start" aria-label="Back to the start">⏮</Btn>
-        <Btn data-testid="flock-audio-back" onClick={() => fa.skip?.(-5)} title="Back 5 seconds">−5 s</Btn>
-        <Btn data-testid="flock-audio-fwd" onClick={() => fa.skip?.(5)} title="Forward 5 seconds">+5 s</Btn>
-        <Btn variant="toggle" on={fa.loop} data-testid="flock-audio-loop" onClick={() => fa.setLoop?.(!fa.loop)}
-          title="Loop the track" aria-label="Loop" aria-pressed={!!fa.loop} style={{ marginLeft: 'auto' }}>⟲</Btn>
+        {fa.restart && <Btn data-testid={id('restart')} onClick={fa.restart} title="Back to the start" aria-label="Back to the start">⏮</Btn>}
+        {fa.skip && <><Btn data-testid={id('back')} onClick={() => fa.skip?.(-5)} title="Back 5 seconds">−5 s</Btn>
+        <Btn data-testid={id('fwd')} onClick={() => fa.skip?.(5)} title="Forward 5 seconds">+5 s</Btn></>}
+        {fa.setLoop && <Btn variant="toggle" on={fa.loop} data-testid={id('loop')} onClick={() => fa.setLoop?.(!fa.loop)}
+          title="Loop the track" aria-label="Loop" aria-pressed={!!fa.loop} style={{ marginLeft: 'auto' }}>⟲</Btn>}
       </div>
 
-      <input
-        ref={scrubRef} type="range" className="hmr" data-testid="flock-audio-scrub"
-        min={0} max={1} step={0.0005} defaultValue={0}
-        onPointerDown={() => { draggingRef.current = true }}
-        onPointerUp={() => { draggingRef.current = false }}
-        onPointerCancel={() => { draggingRef.current = false }}
-        // Seeking on `input` rather than on release, so scrubbing is audible and
-        // the flock reacts as you drag — which is how you find the bar you want.
-        onChange={(e) => seekFrac(parseFloat(e.target.value))}
-        style={{ width: '100%' }}
-      />
+      {scrub && (
+        <input
+          ref={scrubRef} type="range" className="hmr" data-testid={id('scrub')}
+          min={0} max={1} step={0.0005} defaultValue={0}
+          onPointerDown={() => { draggingRef.current = true }}
+          onPointerUp={() => { draggingRef.current = false }}
+          onPointerCancel={() => { draggingRef.current = false }}
+          // Seeking on `input` rather than on release, so scrubbing is audible and
+          // the flock reacts as you drag — which is how you find the bar you want.
+          onChange={(e) => seekFrac(parseFloat(e.target.value))}
+          style={{ width: '100%' }}
+        />
+      )}
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-        <span ref={timeRef} data-testid="flock-audio-time"
+        <span ref={timeRef} data-testid={id('time')}
           style={{ fontSize: 10, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>0:00 / 0:00</span>
         <span style={{ fontSize: 10, color: MUTED, flex: 1, overflow: 'hidden',
                        textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fa.fileName}</span>
-        <RowBtn onClick={fa.release} label={`Remove ${fa.fileName}`} title="Remove">✕</RowBtn>
+        {fa.release && <RowBtn onClick={fa.release} label={`Remove ${fa.fileName}`} title="Remove">✕</RowBtn>}
       </div>
     </div>
   )

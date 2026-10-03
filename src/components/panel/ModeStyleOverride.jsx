@@ -13,7 +13,7 @@ import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
 import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
-import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
+import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, Heading, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
 
 /**
  * Which land-cover classes this layer is allowed to mark.
@@ -153,7 +153,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
   const ramp = source === 'elevation' || source === 'slope' || source === 'aspect' || source === 'speed'
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <Heading>{label}</Heading>
       {/* A mode that inks every mark from its own table has no base colour to
           show: Riso's three separations each carry their own, and a swatch here
           would be a control that changes nothing. */}
@@ -204,7 +204,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
                 not hidden behind enabling fill in Terrain Style. */}
             {gradientStops && setGradientStops && (
               <div style={{ marginTop: 8 }}>
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Gradient, shared by every layer that uses one</div>
+                <Heading>Gradient, shared by every layer that uses one</Heading>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>

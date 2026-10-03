@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import { BORDER, Btn, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, HIDDEN_OPACITY, InlineSl, MUTED, RowBtn, SURF, Section, SegRow, Sub, TEXT, Tog } from './ui'
+import { BORDER, Btn, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, Heading, HIDDEN_OPACITY, InlineSl, MUTED, RowBtn, Section, SegRow, Sub, SURF, TEXT, Tog } from './ui'
 import { useStackDrag } from './stackDrag'
 import { makeTextLayer, textLayerName } from '../../utils/textLayers'
 
@@ -136,7 +136,7 @@ export function TextSection({
                     marginBottom: 8,
                   }} />
 
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Place</div>
+                <Heading>Place</Heading>
                 {/* Fractions of the plate rather than world units, so a text
                     stays where it was put when the resolution slider moves the
                     grid under it. */}
@@ -154,7 +154,7 @@ export function TextSection({
                 <Btn size="xs" onClick={() => set({ x: 0, z: 0 })}
                   style={{ width: '100%', padding: 4, marginTop: 2, color: DIM }}>Centre</Btn>
 
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '10px 0 4px' }}>Type</div>
+                <Heading>Type</Heading>
                 <Tog label="Use single-line font" small checked={!!l.singleLine}
                   onChange={(v) => set({ singleLine: v })}
                   help="Letters drawn as a single stroke down the middle of each stem, the way plotter fonts have worked since the 1960s. An outline face plots the *edge* of the letter, so the pen goes round every glyph twice." />
@@ -186,7 +186,7 @@ export function TextSection({
                 <SegRow label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
                   value={l.align ?? 'center'} onChange={(k) => set({ align: k })} />
 
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '10px 0 4px' }}>Ink</div>
+                <Heading>Ink</Heading>
                 <ColorRow label="Colour" value={l.color} testId={`text-color-${l.id}`}
                   onChange={(v) => set({ color: v })} />
                 <InlineSl label="Width" min={0.25} max={8} step={0.25} value={l.weight}
@@ -219,7 +219,7 @@ export function TextSection({
                   </>
                 )}
 
-                <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '10px 0 4px' }}>Plane</div>
+                <Heading>Plane</Heading>
                 <Tog label="Face camera" small checked={!!l.faceCamera}
                   onChange={(v) => set({ faceCamera: v })}
                   help="Keeps the text square to the view as you orbit. Switch it off to aim it by hand — useful when you are composing one frame to export." />

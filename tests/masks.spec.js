@@ -292,6 +292,42 @@ async function setSlider(loc, v) {
   }, v)
 }
 
+test('removing a mask can be undone, pixels and all', async ({ page }) => {
+  /*
+   * The ✕ on a mask row looks like the ✕ on a text or vector row, and those
+   * undo. A mask's did not: masks lived outside the history, so one click
+   * threw away an hour of painting. The coverage figure proves the pixels came
+   * back, not only the row.
+   */
+  await boot(page)
+  await filter(page, 'Masks')
+  await page.click('[data-testid="add-mask"]')
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(800)
+  const canvas = page.locator('[data-testid="mask-studio"] canvas').first()
+  const box = await canvas.boundingBox()
+  await page.mouse.move(box.x + box.width * 0.35, box.y + box.height * 0.4)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.6, { steps: 12 })
+  await page.mouse.up()
+  await page.waitForTimeout(400)
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(600)
+  await filter(page, 'Masks')
+
+  const section = page.locator('[data-section="Masks"]')
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(1)
+  const painted = (await section.innerText()).match(/(\d+)%/)?.[1]
+  expect(Number(painted)).toBeGreaterThan(0)
+
+  await section.locator('[data-testid^="mask-remove-"]').click()
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(0)
+
+  await page.getByRole('button', { name: 'Undo', exact: true }).click()
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(1)
+  expect((await section.innerText()).match(/(\d+)%/)?.[1]).toBe(painted)
+})
+
 test('the Level tool previews a height range live, and Apply keeps it', async ({ page }) => {
   test.setTimeout(150_000)
   await boot(page)

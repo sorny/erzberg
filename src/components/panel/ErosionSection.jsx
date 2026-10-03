@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore'
 import ErosionWorker from '../../utils/erosion.worker?worker'
-import { Btn, DANGER_BG, DANGER_TEXT, InlineSl, Section, Sub } from './ui'
+import { Btn, Callout, InlineSl, Section, Sub } from './ui'
 
 export function ErosionSection({ open, onToggle }) {
   const [eIters,     setEIters]     = useState(50000)
@@ -151,11 +151,9 @@ export function ErosionSection({ open, onToggle }) {
         )}
       </div>
       {erosionError && (
-        <div data-testid="erosion-error" role="status" style={{
-          marginTop: 6, fontSize: 10, lineHeight: 1.45, color: DANGER_TEXT,
-          background: DANGER_BG, border: '1px solid #7f1d1d',
-          borderRadius: 3, padding: '5px 7px',
-        }}>Erosion failed — {erosionError}</div>
+        <Callout kind="danger" testId="erosion-error" role="status" style={{ marginTop: 6 }}>
+          Erosion failed — {erosionError}
+        </Callout>
       )}
     </Section>
   )

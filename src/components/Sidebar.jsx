@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Chevron, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, STRONG, SelectRow, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
@@ -92,14 +92,6 @@ const birdSlider = (n) =>
  * read beautifully at 190 px are a thin scatter across a 1168 px plate.
  */
 const OPENING_PRESET = 'Alpine Survey'
-
-/** m:ss for the Soundscapes transport readout. */
-function fmtTime(sec) {
-  if (!isFinite(sec) || sec < 0) sec = 0
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
 
 // The preview canvas. 240 is what a 272 px panel body leaves once the section
 // keeps its padding, and the height is that on a 3:2 sheet.
@@ -192,9 +184,7 @@ function TerrainFetchPanel({ onFetched }) {
   return (
     <>
       {error && (
-        <div data-testid="fetch-error" style={{ marginBottom:6, fontSize:10, lineHeight:1.6,
-             color:WARN, background:WARN_BG, border:'1px solid rgba(249,115,22,0.35)',
-             borderRadius:3, padding:'5px 7px' }}>{error}</div>
+        <Callout testId="fetch-error" style={{ marginBottom:6 }}>{error}</Callout>
       )}
       <form onSubmit={search} style={{ display:'flex', gap:4, marginBottom:6 }}>
         <input type="text" value={query} data-testid="place-query"
@@ -603,7 +593,7 @@ function CoverProse({ caption = false, children }) {
 /** The small uppercase label the mode sections use for a group, without a rail. */
 function CoverLabel({ children }) {
   return (
-    <div style={{ fontSize: 11, color: DIM, fontWeight: 600 }}>{children}</div>
+    <Heading>{children}</Heading>
   )
 }
 
@@ -1824,7 +1814,8 @@ export function Sidebar({
                           named after. */}
                       <RowBtn onClick={() => onCopyMask?.(m.id)} data-testid={`copy-${m.id}`}
                         label={`Duplicate ${m.name}`} title="Duplicate" disabled={masks.length >= MAX_MASKS}>⧉</RowBtn>
-                      <RowBtn onClick={() => onRemoveMask(m.id)} label={`Remove ${m.name}`} title="Remove">✕</RowBtn>
+                      <RowBtn onClick={() => onRemoveMask(m.id)} label={`Remove ${m.name}`} title="Remove"
+                        data-testid={`mask-remove-${m.id}`}>✕</RowBtn>
                     </div>
                   ))}
                 </div>
@@ -1995,12 +1986,10 @@ export function Sidebar({
             </LoadBtn>
 
             {snd.error && (
-              <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:`1px solid ${DANGER_BORDER}`, borderRadius:5, padding:'4px 8px', marginBottom:8 }}>
-                {snd.error}
-              </div>
+              <Callout kind="danger">{snd.error}</Callout>
             )}
 
-            {snd.fileName && (
+            {snd.fileName && !snd.spec && (
               <div style={{ fontSize:10, color: MUTED, marginBottom:8, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
                 {snd.fileName}
               </div>
@@ -2028,23 +2017,18 @@ export function Sidebar({
                   onSeek={snd.seek}
                 />
 
-                <div style={{ display:'flex', gap:4, alignItems:'center', marginBottom:8 }}>
-                  <button
-                    data-testid="soundscape-play"
-                    onClick={snd.toggle}
-                    style={{ flex:1, padding:'8px 0', background: snd.isPlaying ? SURF : ACCENT, color: snd.isPlaying ? DIM : ON_ACCENT, border:`1px solid ${snd.isPlaying ? BORDER : ACCENT}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                  >{snd.isPlaying ? '❙❙ Pause' : '▶ Play'}</button>
-                  <button
-                    onClick={snd.stop}
-                    style={{ padding:'8px 12px', background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600 }}
-                  >■</button>
-                  <span style={{ fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', minWidth:74, textAlign:'right' }}>
-                    {fmtTime(snd.currentTime)} / {fmtTime(snd.duration)}
-                  </span>
-                </div>
+                {/* The flock's transport, so the two players work alike. The
+                    spectrogram above is the scrubber here, so the bar is left out;
+                    the soundscape has no loop and no remove, so neither shows. */}
+                <AudioTransport testIdPrefix="soundscape" scrub={false} fa={{
+                  ...snd,
+                  restart: () => snd.seek(0),
+                  skip: (d) => snd.seek((snd.liveRef?.current?.getTime?.() ?? snd.currentTime) + d),
+                  release: undefined,
+                }} />
 
                 <Sub>
-                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, marginBottom:4 }}>Analysis</div>
+                  <Heading>Analysis</Heading>
                   <SegGroup label="FFT size" options={[[1024, 1024], [2048, 2048], [4096, 4096]]}
                     value={snd.opts.fftSize} onChange={(n) => snd.setOpts({ fftSize: n })}
                     style={{ marginBottom: 8 }} />
@@ -2054,7 +2038,7 @@ export function Sidebar({
                   <InlineSl label="Bins" hint="↕" help="Frequency rows — also the height of the generated heightmap. Changing this re-runs the analysis."
                     min={32} max={512} step={32} value={snd.opts.bins} onChange={v => snd.setOpts({ bins: v })} />
 
-                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, margin:'8px 0 4px' }}>Stream</div>
+                  <Heading>Stream</Heading>
                   <InlineSl label="Window" hint="↔" help="Time columns held on screen — the width of the generated heightmap. Wider means more history but a heavier rebuild."
                     min={64} max={768} step={32} value={snd.opts.windowFrames} onChange={v => snd.setOpts({ windowFrames: v })} />
                   <InlineSl label="Rate" help="Heightmap pushes per second. Each one is a full geometry rebuild, so lower this if playback stutters on dense draw modes. Above ~30/s the ceiling is usually the rebuild itself rather than this setting."
@@ -2069,7 +2053,7 @@ export function Sidebar({
                     spectrogram is only one answer; the others fold the track so
                     its structure — repeats, sections, groove — becomes relief. */}
                 <Sub>
-                  <div style={{ fontSize: 11, color: DIM, fontWeight:600, marginBottom:4 }}>Whole track</div>
+                  <Heading>Whole track</Heading>
                   <SegGroup label="Projection" columns={3}
                     options={TRACK_PROJECTIONS.map((pj) => [pj.label, pj.id])}
                     value={projection.id} onChange={(id) => snd.setOpts({ projection: id })}
@@ -2243,9 +2227,7 @@ export function Sidebar({
                    enabled={summaries['Texture'] !== '—'}>
             <Tog label="Enabled" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
             {style.showTexture && !style.showFill && (
-              <div style={{ fontSize: 10, color: WARN, background: WARN_BG, border: '1px solid rgba(245,158,11,0.3)', borderRadius: 5, padding: '4px 8px', marginBottom: 4 }}>
-                Fill is disabled — texture will not appear until Fill is enabled.
-              </div>
+              <Callout>Fill is off, so the texture does not show until Fill is on.</Callout>
             )}
             {style.showTexture && (
               <Sub>
@@ -2631,7 +2613,7 @@ export function Sidebar({
                 {(points.particleMode ?? 'hologram') === 'hologram' ? (
                   <>
                     <InlineSl label="Spacing" min={1} max={16} step={1} value={points.particleSpacing ?? 1} onChange={v => sp({ particleSpacing: v })} fmt={v => `${v}`} testId="particle-spacing" />
-                    <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => v.toFixed(2)} testId="holo-shimmer" />
+                    <InlineSl label="Shimmer" min={0} max={1} step={0.05} value={points.holoShimmer ?? 0.4} onChange={v => sp({ holoShimmer: v })} fmt={v => Math.round(v * 100) + '%'} testId="holo-shimmer" />
                     <Tog label="Animate" small checked={points.animateParticles} onChange={v => sp({ animateParticles: v })} />
                     {points.animateParticles && (
                       <Sub>
@@ -2665,9 +2647,7 @@ export function Sidebar({
                         {fa.isAnalyzing ? (
                           <div style={{ fontSize:10, color:MUTED, marginBottom:8 }}>Analysing… {fa.progress}%</div>
                         ) : fa.error ? (
-                          <div style={{ fontSize:10, color:DANGER_TEXT, background:DANGER_BG, border:'1px solid rgba(248,113,113,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
-                            {fa.error}
-                          </div>
+                          <Callout kind="danger">{fa.error}</Callout>
                         ) : null}
                         {fa.ready ? (
                           <AudioTransport fa={fa} />
@@ -2678,9 +2658,7 @@ export function Sidebar({
                                 Following the Soundscape ({snd.fileName}). Load a track here to use a different one.
                               </div>
                             ) : (
-                              <div style={{ fontSize:10, color:WARN, background:WARN_BG, border:'1px solid rgba(245,158,11,0.3)', borderRadius:5, padding:'4px 8px', marginBottom:4 }}>
-                                No track loaded — the flock has nothing to listen to.
-                              </div>
+                              <Callout>No track loaded — the flock has nothing to listen to.</Callout>
                             )}
                             <LoadBtn data-testid="flock-audio-load" onClick={fa.loadFromPicker} disabled={fa.isAnalyzing} style={{ marginBottom:8 }}>
                               Audio
@@ -2727,7 +2705,7 @@ export function Sidebar({
                       help="Drops each bird's shadow onto the terrain. The direction is the Hillshade sun — azimuth and altitude in the Hillshade section — so the flock is lit the same way the ground under it is, and the shadows swing when you move the sun. A low sun throws them long across the valley." />
                     {points.flockShadow !== false && (
                       <Sub>
-                        <InlineSl label="Strength" min={0} max={1} step={0.05} value={points.flockShadowOpacity ?? 0.35} onChange={v => sp({ flockShadowOpacity: v })} fmt={v => v.toFixed(2)} testId="flock-shadow-opacity"
+                        <InlineSl label="Strength" min={0} max={1} step={0.05} value={points.flockShadowOpacity ?? 0.35} onChange={v => sp({ flockShadowOpacity: v })} fmt={v => Math.round(v * 100) + '%'} testId="flock-shadow-opacity"
                           help="How dark the shadows are where the bird is lowest. They always fade further as it climbs — this sets the near end of that range." />
                         <InlineSl label="Shadow size" min={0.2} max={6} step={0.1} value={points.flockShadowSize ?? 1} onChange={v => sp({ flockShadowSize: v })} fmt={v => v.toFixed(1)} testId="flock-shadow-size"
                           help="Shadow diameter as a multiple of the bird's own Size. Above 1 the shadows read as a soft moving stain on the landscape rather than as countable dots." />

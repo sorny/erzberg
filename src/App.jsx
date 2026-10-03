@@ -655,14 +655,20 @@ export default function App() {
    * out would make undo lie: fetch a province, press undo, and the layer records
    * would go while the geometry they name stayed. Reset all already restores
    * both together for the same reason.
+   *
+   * The masks too. They live in the store rather than here, and were left out,
+   * so the ✕ on a mask row deleted painted pixels for good while the same ✕ on
+   * a text or vector row could be undone. The list holds references to the
+   * mask planes, not copies, so a step costs an array, not a raster.
    */
   const historyState = [terrain, style, points, view, gradientStops, bgGradientStops,
-                        textLayers, vectorLayers, vectorSources]
+                        textLayers, vectorLayers, vectorSources, srcMasks]
   const restoreHistory = useCallback((s) => {
     setTerrain(s[0]); setStyle(s[1]); setPoints(s[2]); setView(s[3])
     setGradientStops(s[4]); setBgGradientStops(s[5])
     setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
-  }, [setVectorSources])
+    setMasks(s[9])
+  }, [setVectorSources, setMasks])
   /*
    * The names, derived rather than declared.
    *

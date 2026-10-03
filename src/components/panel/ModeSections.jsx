@@ -275,7 +275,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.05} max={2} step={0.05} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.05} max={2} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 1 = full cell, 0 = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 100% = full cell, 0% = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical dot pattern." min={1} max={999} step={1} value={style.seedStipple ?? 42} onChange={v => ss({ seedStipple: v })} />
                   <div style={{ marginBottom: 4 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
@@ -348,7 +348,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Spacing" help="Grid pitch between strokes/dots." min={0.5} max={10} step={0.5} value={style.spacingSwiss} onChange={v => ss({ spacingSwiss: v })} />
                   <InlineSl label="Cliff" help="Normalised slope above which cells get cliff hachures." min={0.1} max={0.95} step={0.05} value={style.thresholdSwiss} onChange={v => ss({ thresholdSwiss: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Stroke length" help="Cliff hachure length multiplier." min={0.2} max={3} step={0.1} value={style.lengthSwiss} onChange={v => ss({ lengthSwiss: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Scree" help="Debris-dot density on the slope band below the cliffs." min={0} max={1} step={0.05} value={style.screeSwiss} onChange={v => ss({ screeSwiss: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Scree" help="Debris-dot density on the slope band below the cliffs." min={0} max={1} step={0.05} value={style.screeSwiss} onChange={v => ss({ screeSwiss: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Scree size" min={0.5} max={8} step={0.5} value={style.screeWeightSwiss} onChange={v => ss({ screeWeightSwiss: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical stroke wobble and scree pattern." min={1} max={999} step={1} value={style.seedSwiss ?? 42} onChange={v => ss({ seedSwiss: v })} />
                 </Sub>
@@ -364,7 +364,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <InlineSl label="Tiers" help="How many flat plateaus the elevation range is cut into. Anchored to the terrain, so the steps stay put when Elevation Scale moves." min={2} max={40} step={1} value={style.tiersBitplane} onChange={v => ss({ tiersBitplane: v })} />
                   <Tog label="Risers" small help="Close each step with the verticals down to the plateau below — blocks rather than a flat staircase." checked={style.risersBitplane} onChange={v => ss({ risersBitplane: v })} />
-                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen shading each band into the next. 0 leaves the plateaus bare." min={0} max={1} step={0.05} value={style.ditherBitplane} onChange={v => ss({ ditherBitplane: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen shading each band into the next. 0 leaves the plateaus bare." min={0} max={1} step={0.05} value={style.ditherBitplane} onChange={v => ss({ ditherBitplane: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Dot pitch" help="Grid spacing of the dither dots." min={0.5} max={20} step={0.5} value={style.spacingBitplane} onChange={v => ss({ spacingBitplane: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
@@ -380,10 +380,10 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub label="PALETTE">
                   <InlineSl label="Entries" help="How many inks the shared gradient is cut into. This is the palette — 16 is what a 16-colour machine had." min={2} max={16} step={1} value={style.tiersIndexed} onChange={v => ss({ tiersIndexed: v })} />
                   <InlineSl label="Slope bands" help="The second axis of the lookup. A 1D ramp cannot tell a snowfield from the cliff beside it, because both are high." min={1} max={4} step={1} value={style.slopeBandsIndexed} onChange={v => ss({ slopeBandsIndexed: v })} />
-                  <InlineSl label="Steep shift" help="How far a steep cell moves along the palette against a flat one at the same height." min={0} max={1} step={0.05} value={style.steepShiftIndexed} onChange={v => ss({ steepShiftIndexed: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Steep shift" help="How far a steep cell moves along the palette against a flat one at the same height." min={0} max={1} step={0.05} value={style.steepShiftIndexed} onChange={v => ss({ steepShiftIndexed: v })} fmt={v => Math.round(v * 100) + '%'} />
                 </Sub>
                 <Sub label="SCREEN">
-                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen between two adjacent entries. The checkerboard reads as a colour the palette does not contain — that artefact is the point." min={0} max={1} step={0.05} value={style.ditherIndexed} onChange={v => ss({ ditherIndexed: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen between two adjacent entries. The checkerboard reads as a colour the palette does not contain — that artefact is the point." min={0} max={1} step={0.05} value={style.ditherIndexed} onChange={v => ss({ ditherIndexed: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Cell size" help="Lattice pitch of the filled cells. Smaller is finer and much heavier." min={1} max={12} step={0.5} value={style.spacingIndexed} onChange={v => ss({ spacingIndexed: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Indexed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -397,7 +397,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many contour rings are drawn. Where they crowd, the halos sum and the ground between them lifts." min={4} max={40} step={1} value={style.levelsOutrun} onChange={v => ss({ levelsOutrun: v })} />
-                  <InlineSl label="Filament" help="How far the core is pushed toward white. The hue stays in the halo." min={0} max={1} step={0.05} value={style.whitenOutrun} onChange={v => ss({ whitenOutrun: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Filament" help="How far the core is pushed toward white. The hue stays in the halo." min={0} max={1} step={0.05} value={style.whitenOutrun} onChange={v => ss({ whitenOutrun: v })} fmt={v => Math.round(v * 100) + '%'} />
                 </Sub>
                 <Sub label="GLOW">
                   <InlineSl label="Halo width" help="The halo is a second pen over the same path — a fat halo under a thin core is impossible in one layer, because a layer has one width." min={1} max={30} step={0.5} value={style.glowWeightOutrun} onChange={v => ss({ glowWeightOutrun: v })} fmt={v => v.toFixed(1)} />
@@ -448,7 +448,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Steep at" help="Slope above which a cell is rock rather than ground." min={0.05} max={0.95} step={0.01} value={style.steepMineral} onChange={v => ss({ steepMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Broken at" help="Curvature above which rock is a face rather than massive." min={0.05} max={0.95} step={0.01} value={style.brokenMineral} onChange={v => ss({ brokenMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Blur" help="Curvature is a second derivative, so it is taken on a blurred grid. On a raw DEM every pixel of sensor grain becomes its own rock type." min={0} max={8} step={1} value={style.radiusMineral} onChange={v => ss({ radiusMineral: v })} />
-                  <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
@@ -471,7 +471,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       ? 'One flat colour per class, as a printed land-use sheet would have it.'
                       : 'Every cell takes its own colour from the imagery the classes were cut from.'}
                   </Note>
-                  <InlineSl label="Grain" help="A per-cell tooth, seeded by class, so two materials that share a tone still read as two surfaces." min={0} max={1} step={0.02} value={style.grainCover} onChange={v => ss({ grainCover: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Grain" help="A per-cell tooth, seeded by class, so two materials that share a tone still read as two surfaces." min={0} max={1} step={0.02} value={style.grainCover} onChange={v => ss({ grainCover: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingCover} onChange={v => ss({ spacingCover: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Cover" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
@@ -487,7 +487,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Inks" help="How many colours the gradient is cut into before basins are dealt from it." min={2} max={24} step={1} value={style.inksShed} onChange={v => ss({ inksShed: v })} />
                   <InlineSl label="Min basin" help="Percentage of the raster below which a catchment is folded into its largest neighbour. A thousand one-cell basins is noise, not a map." min={0} max={5} step={0.1} value={style.minBasinShed} onChange={v => ss({ minBasinShed: v })} fmt={v => v.toFixed(1) + '%'} />
                   <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingShed} onChange={v => ss({ spacingShed: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Relief" min={0} max={1} step={0.05} value={style.shadeShed} onChange={v => ss({ shadeShed: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Relief" min={0} max={1} step={0.05} value={style.shadeShed} onChange={v => ss({ shadeShed: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Sun azimuth" min={0} max={360} step={5} value={style.azimuthShed} onChange={v => ss({ azimuthShed: v })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Seed" help="Which ink each basin is dealt." min={1} max={999} step={1} value={style.seedShed} onChange={v => ss({ seedShed: v })} />
                 </Sub>
@@ -514,7 +514,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <Tog label="Solarise" small help="Sabattier: folds the tone curve, T → |2T − 1|, so the highlights reverse and a bright rim appears at mid-tone." checked={style.foldFlashbulb} onChange={v => ss({ foldFlashbulb: v })} />
                 </Sub>
                 <Sub label="GRAIN">
-                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainFlashbulb} onChange={v => ss({ grainFlashbulb: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainFlashbulb} onChange={v => ss({ grainFlashbulb: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Pitch" help="Grid spacing of the grain samples. The blue-noise tile is walked per sample, so this thins the grain without patterning it." min={0.5} max={12} step={0.5} value={style.spacingFlashbulb} onChange={v => ss({ spacingFlashbulb: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Seed" help="The same seed always reproduces the identical grain." min={1} max={999} step={1} value={style.seedFlashbulb ?? 42} onChange={v => ss({ seedFlashbulb: v })} />
                 </Sub>
@@ -550,7 +550,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub label="TONE">
                   <InlineSl label="Exposure" min={0.2} max={4} step={0.05} value={style.exposureHalation} onChange={v => ss({ exposureHalation: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Contrast" min={0.2} max={5} step={0.05} value={style.contrastHalation} onChange={v => ss({ contrastHalation: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainHalation} onChange={v => ss({ grainHalation: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainHalation} onChange={v => ss({ grainHalation: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Pitch" min={0.5} max={12} step={0.5} value={style.spacingHalation} onChange={v => ss({ spacingHalation: v })} fmt={v => v.toFixed(1)} />
                   <Tog label="Cast shadows" small checked={style.shadowHalation} onChange={v => ss({ shadowHalation: v })} />
                 </Sub>
@@ -567,7 +567,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Spacing" help="Seed pitch. Tracks claim the ground they cross, so this is how far apart the runs end up." min={2} max={60} step={1} value={style.spacingFallLine} onChange={v => ss({ spacingFallLine: v })} />
                 </Sub>
                 <Sub label="PHYSICS">
-                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveFallLine} onChange={v => ss({ carveFallLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0% welds the rider to the fall line and converges on Flow mode, 100% is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveFallLine} onChange={v => ss({ carveFallLine: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityFallLine} onChange={v => ss({ gravityFallLine: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragFallLine} onChange={v => ss({ dragFallLine: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadFallLine} onChange={v => ss({ dragQuadFallLine: v })} fmt={v => v.toFixed(3)} />
@@ -587,7 +587,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Tick length" help="Ticks scale with the lateral load the rider is holding, so the straights draw nothing." min={0.2} max={10} step={0.1} value={style.lengthBerm} onChange={v => ss({ lengthBerm: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <Sub label="PHYSICS">
-                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveBerm} onChange={v => ss({ carveBerm: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0% welds the rider to the fall line and converges on Flow mode, 100% is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveBerm} onChange={v => ss({ carveBerm: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityBerm} onChange={v => ss({ gravityBerm: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragBerm} onChange={v => ss({ dragBerm: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadBerm} onChange={v => ss({ dragQuadBerm: v })} fmt={v => v.toFixed(3)} />
@@ -608,7 +608,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Run-in weight" min={0.5} max={6} step={0.5} value={style.runInWeightAir} onChange={v => ss({ runInWeightAir: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <Sub label="PHYSICS">
-                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveAir} onChange={v => ss({ carveAir: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0% welds the rider to the fall line and converges on Flow mode, 100% is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveAir} onChange={v => ss({ carveAir: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityAir} onChange={v => ss({ gravityAir: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragAir} onChange={v => ss({ dragAir: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadAir} onChange={v => ss({ dragQuadAir: v })} fmt={v => v.toFixed(3)} />
@@ -632,7 +632,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Best weight" help="The run reaching lowest ground soonest, inked heavier in its own layer." min={0.5} max={10} step={0.5} value={style.bestWeightRaceLine} onChange={v => ss({ bestWeightRaceLine: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <Sub label="PHYSICS">
-                  <InlineSl label="Carve" help="Yaw limit, backwards: 0 welds the rider to the fall line and converges on Flow mode, 1 is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveRaceLine} onChange={v => ss({ carveRaceLine: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Carve" help="Yaw limit, backwards: 0% welds the rider to the fall line and converges on Flow mode, 100% is a big-mountain arc that rides up the far wall of a bowl." min={0} max={1} step={0.05} value={style.carveRaceLine} onChange={v => ss({ carveRaceLine: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Gravity" help="Normalised by the terrain's own steepness, so one setting behaves the same on a quarry and an alp." min={0.1} max={4} step={0.05} value={style.gravityRaceLine} onChange={v => ss({ gravityRaceLine: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Friction" min={0} max={0.6} step={0.01} value={style.dragRaceLine} onChange={v => ss({ dragRaceLine: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Air drag" min={0} max={0.15} step={0.005} value={style.dragQuadRaceLine} onChange={v => ss({ dragQuadRaceLine: v })} fmt={v => v.toFixed(3)} />
@@ -893,7 +893,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <SegGroup label="Tile alignment" options={[['Downhill', 'fall'], ['Across', 'contour'], ['Random', 'random']]}
                     value={style.alignTruchet} onChange={(m) => ss({ alignTruchet: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Tile" help="Tile size. Each tile holds two quarter circles, and the tiles link into chains." min={2} max={60} step={0.5} value={style.spacingTruchet} onChange={v => ss({ spacingTruchet: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Flat below" help="Tiles on ground flatter than this stay blank, so the landform shows as the shape of what is drawn. At 0 every tile is drawn." min={0} max={1} step={0.01} value={style.thresholdTruchet} onChange={v => ss({ thresholdTruchet: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Flat below" help="Tiles on ground flatter than this stay blank, so the landform shows as the shape of what is drawn. At 0% every tile is drawn." min={0} max={1} step={0.01} value={style.thresholdTruchet} onChange={v => ss({ thresholdTruchet: v })} fmt={v => Math.round(v * 100) + '%'} />
                   {style.alignTruchet === 'random' && (
                     <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTruchet} onChange={v => ss({ seedTruchet: v })} />
                   )}
@@ -1003,7 +1003,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                   <InlineSl label="Dip" help="How steep the layers are. At 0 they are level and the lines are contours. Where a layer crosses a valley, its line bends into a V." min={0} max={85} step={1} value={style.dipBedding} onChange={v => ss({ dipBedding: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Dip towards" help="The bearing the layers dip towards. 0° is north, 90° is east." min={0} max={359} step={1} value={style.azimuthBedding} onChange={v => ss({ azimuthBedding: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Beds" help="How many layers across the whole sheet." min={2} max={300} step={1} value={style.bedsBedding} onChange={v => ss({ bedsBedding: Math.round(v) })} />
-                  <InlineSl label="Shift" help="Moves every layer up or down by a part of one bed." min={0} max={1} step={0.01} value={style.offsetBedding} onChange={v => ss({ offsetBedding: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Shift" help="Moves every layer up or down by a part of one bed." min={0} max={1} step={0.01} value={style.offsetBedding} onChange={v => ss({ offsetBedding: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Smoothing" min={0} max={8} step={1} value={style.smoothingBedding} onChange={v => ss({ smoothingBedding: Math.round(v) })} />
                   <InlineSl label="Marker every" help="Every Nth bed as a second pen, as a map picks out a seam. At 0 there is none." min={0} max={20} step={1} value={style.markerBedding} onChange={v => ss({ markerBedding: Math.round(v) })} fmt={v => (v ? `${Math.round(v)}` : 'off')} />
                   {style.markerBedding > 0 && (
@@ -1067,8 +1067,8 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     value={style.strokeWind ?? 'lines'} onChange={(m) => ss({ strokeWind: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="From" help="The bearing the wind blows from. 0° is north, 270° is west." min={0} max={359} step={1} value={style.azimuthWind} onChange={v => ss({ azimuthWind: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Spacing" help="The gap between lines on low ground." min={1} max={40} step={0.5} value={style.spacingWind} onChange={v => ss({ spacingWind: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Crowding" help="How much closer the lines run where the wind is faster, over crests and ridges. At 0 the gap is the same everywhere." min={0} max={1} step={0.05} value={style.crestWind} onChange={v => ss({ crestWind: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Turn" help="How far the air turns along a slope instead of going up it. At 0 the lines are straight." min={0} max={1} step={0.05} value={style.deflectWind} onChange={v => ss({ deflectWind: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Crowding" help="How much closer the lines run where the wind is faster, over crests and ridges. At 0% the gap is the same everywhere." min={0} max={1} step={0.05} value={style.crestWind} onChange={v => ss({ crestWind: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Turn" help="How far the air turns along a slope instead of going up it. At 0% the lines are straight." min={0} max={1} step={0.05} value={style.deflectWind} onChange={v => ss({ deflectWind: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Lee" help="Where the ground falls away along the wind more steeply than this, the air breaks away and the pen lifts. At 0 it never lifts." min={0} max={60} step={1} value={style.leeWind} onChange={v => ss({ leeWind: Math.round(v) })} fmt={v => (v ? `${Math.round(v)}°` : 'off')} />
                   {style.leeWind > 0 && (
                     <Tog label="Eddies" help="Curls in the lee, where the air breaks away. Without them the lee is left blank." checked={!!style.eddiesWind} onChange={v => ss({ eddiesWind: v })} />
@@ -1378,7 +1378,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     value={style.kindRugged} onChange={(m) => ss({ kindRugged: m })} style={{ marginBottom: 8 }} />
                   <InlineSl label="Points" min={50} max={12000} step={50} value={style.countRugged} onChange={v => ss({ countRugged: Math.round(v) })} />
                   <InlineSl label="Gamma" help="Above 1, only the roughest ground gets small facets." min={0.2} max={3} step={0.05} value={style.gammaRugged} onChange={v => ss({ gammaRugged: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Floor" help="Point density on smooth ground, as a fraction of the roughest. At 0 the flats get almost no points and a few long triangles span them." min={0} max={1} step={0.01} value={style.floorRugged} onChange={v => ss({ floorRugged: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Floor" help="Point density on smooth ground, as a fraction of the roughest. At 0% the flats get almost no points and a few long triangles span them." min={0} max={1} step={0.01} value={style.floorRugged} onChange={v => ss({ floorRugged: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Blur" help="Blur before the ruggedness is measured, so sensor grain does not count as rough ground." min={0} max={8} step={1} value={style.radiusRugged} onChange={v => ss({ radiusRugged: Math.round(v) })} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRugged} onChange={v => ss({ seedRugged: v })} />
                 </Sub>

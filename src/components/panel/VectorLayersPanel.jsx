@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, HIDDEN_OPACITY, InlineSl, LoadBtn, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, Heading, HIDDEN_OPACITY, InlineSl, LoadBtn, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, Sub, SUNK, SURF, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -304,7 +304,7 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Icon</div>
+      <Heading>Icon</Heading>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 2, marginBottom: 8 }}>
         {/* Back to a plain dot. */}
@@ -428,7 +428,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
   return (
     <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 4 }}>Labels</div>
+      <Heading>Labels</Heading>
 
       <div data-testid={`label-name-${layer.id}`}>
         <Tog label="Name" small checked={layer.labelName}

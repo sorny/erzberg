@@ -10,13 +10,13 @@
  * is hidden while either view is open.
  */
 import { BACKDROP_OPTIONS } from '../../utils/rasterBackdrop'
-import { DIM, InlineSl, MUTED, SegRow } from './ui'
+import { Heading, InlineSl, MUTED, SegRow } from './ui'
 
 export function BackdropBlock({ prefix, backdrop, setBackdrop, hasPhoto, imagery, style, ss }) {
   if (!setBackdrop) return null
   return (
     <>
-      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Backdrop</div>
+      <Heading>Backdrop</Heading>
       <SegRow
         label="Show"
         testIdPrefix={`${prefix}-backdrop`}

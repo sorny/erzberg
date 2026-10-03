@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.54.0] — 2026-10-04
+
+### Fixed
+
+- **Removing a mask can be undone.** Masks were outside the undo history, so
+  the ✕ on a mask row threw the painted pixels away for good, while the same
+  ✕ on a text or vector row could be undone. The history holds references to
+  the mask planes, so a step costs an array, not a raster.
+
+### Changed
+
+- **One audio player.** Soundscapes uses the flock's transport: play, back to
+  the start and ±5 s, with the same time readout. The spectrogram stays its
+  scrubber. Its own *Play / Pause* button and the unlabelled ■ are gone.
+- **One look for a warning and an error** (`Callout`): brass and red from the
+  palette. Six boxes had hand-set borders, four of them orange or amber.
+- **Every 0–1 amount shows a percentage.** 22 sliders showed a decimal
+  (Strength 0.35 beside Strength 70%). Help that named the ends as 0 and 1
+  now says 0% and 100%.
+- **One group heading** (`Heading`): 12 px above, 4 below, none at the top of
+  a block. 22 headings had four different top margins.
+- **The selected feature is ore** on the plate, as the selected row is. It was
+  the orange of the old palette.
+
+No setting, preset or rendering changed, except the colour of the selection
+highlight.
+
 ## [1.53.0] — 2026-10-03
 
 ### Changed

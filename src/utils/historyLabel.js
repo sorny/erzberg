@@ -37,6 +37,7 @@ const OTHER_SLOTS = [
   [6, 'Text'],
   [7, 'Vector layers'],
   [8, 'Vector layers'],
+  [9, 'Masks'],
 ]
 
 /** `enabledStipple` → `Stipple Dots`. */

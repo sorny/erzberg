@@ -10,7 +10,7 @@ import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
 import { BackdropBlock } from './panel/BackdropBlock'
 import { useFeaturePick } from './panel/FeaturePicker'
-import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, HelpBox, InlineSl, MUTED, PanelStyles, STRONG, SUNK, SegGroup, SegRow, TEXT, W } from './panel/ui'
+import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
@@ -116,7 +116,7 @@ export function EditPanel({
               selection below applies to every tool, so it always shows. */}
           {tool === 'crop' && (
             <>
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Crop</div>
+          <Heading>Crop</Heading>
           <SegRow
             label="Aspect"
             testIdPrefix="edit-aspect"
@@ -150,7 +150,7 @@ export function EditPanel({
             />
           )}
 
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Selection</div>
+          <Heading>Selection</Heading>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10, color: MUTED, marginBottom: 8 }}>
             <span>Shape</span>
             <span style={{ color: edit?.shape ? DIM : MUTED }}>
@@ -182,7 +182,7 @@ export function EditPanel({
           <BackdropBlock prefix="edit" backdrop={backdrop} setBackdrop={setBackdrop}
             hasPhoto={hasImagery} imagery={imagery} style={style} ss={ss} />
 
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>History</div>
+          <Heading>History</Heading>
           <div style={{ display: 'flex', gap: 4 }}>
             {btn('↶ Undo', onUndo, 'ghost', 'edit-undo', !canUndo)}
             {btn('↷ Redo', onRedo, 'ghost', 'edit-redo', !canRedo)}
@@ -254,7 +254,7 @@ function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, 
   if (!usable.length) {
     return (
       <>
-        <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Features</div>
+        <Heading>Features</Heading>
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
           No features are loaded. Add a GeoJSON or GPX file, or OpenStreetMap features, in the Vector section.
         </div>
@@ -274,7 +274,7 @@ function ClipFromFeatures({ layers, sources, bboxSrc, crs, srcWidth, srcHeight, 
 
   return (
     <>
-      <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Features</div>
+      <Heading>Features</Heading>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5, marginBottom: 8 }}>
         {element}
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>

@@ -313,6 +313,7 @@ export function PanelStyles() {
       .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
         padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
       .hmpip:hover { background:var(--hm-veil-strong); }
+      .hmhead:first-child { margin-top:0 !important; }
       .hmrow:hover:not(:disabled) { background:var(--hm-veil-strong); color:${STRONG} !important; }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
       .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
@@ -387,6 +388,23 @@ export function Note({ children }) {
  * hot-reloaded — Fast Refresh needs a module whose exports are all components or
  * none. Its siblings are here anyway.
  */
+/**
+ * A warning or an error, said in the panel. Brass for a warning, red for an
+ * error, both from the palette, so neither reads as ore ("on") and both follow
+ * the theme. Six boxes were drawn by hand before, with four fixed borders.
+ */
+export function Callout({ kind = 'warn', testId, role, style, children }) {
+  const danger = kind === 'danger'
+  return (
+    <div data-testid={testId} role={role ?? (danger ? 'alert' : 'status')} style={{
+      fontSize: 10, lineHeight: 1.5, padding: '5px 8px', borderRadius: 5, marginBottom: 8,
+      color: danger ? DANGER_TEXT : WARN, background: danger ? DANGER_BG : WARN_BG,
+      border: `1px solid ${danger ? DANGER_BORDER : WARN_BORDER}`,
+      ...style,
+    }}>{children}</div>
+  )
+}
+
 export function MiniBtn({ onClick, testId, children }) {
   return <Btn size="xs" onClick={onClick} data-testid={testId} style={{ flexShrink: 0 }}>{children}</Btn>
 }
@@ -1340,13 +1358,24 @@ export function GripIcon() {
 }
 
 
+/**
+ * A group heading inside a section: "Ink", "History", "Labels". One size and
+ * one spacing — 12 px above, 4 below, none above when it opens its block. They
+ * were drawn by hand in 26 places with four different top margins.
+ */
+export function Heading({ children, style }) {
+  return (
+    <div className="hmhead" style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px', ...style }}>
+      {children}
+    </div>
+  )
+}
+
 export function Sub({ label, children }) {
   return (
     <div style={{ marginLeft: 6, borderLeft: `1px solid ${BORDER}`, paddingLeft: 5, marginBottom: 12 }}>
       {label && (
-        <div style={{ fontSize: 11, color: DIM, fontWeight: 600, marginBottom: 5 }}>
-          {label}
-        </div>
+        <Heading>{label}</Heading>
       )}
       {children}
     </div>

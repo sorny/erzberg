@@ -78,7 +78,7 @@ test('playback advances the transport and keeps rebuilding terrain', async ({ pa
 
   const before = rebuilds
   await page.click('[data-testid="soundscape-play"]')
-  await expect(page.locator('[data-testid="soundscape-play"]')).toContainText('Pause')
+  await expect(page.locator('[data-testid="soundscape-play"]')).toHaveAttribute('aria-label', 'Pause')
 
   await page.waitForTimeout(2500)
 
@@ -90,7 +90,7 @@ test('playback advances the transport and keeps rebuilding terrain', async ({ pa
   expect(during).toBeGreaterThan(5)
 
   await page.click('[data-testid="soundscape-play"]')
-  await expect(page.locator('[data-testid="soundscape-play"]')).toContainText('Play')
+  await expect(page.locator('[data-testid="soundscape-play"]')).toHaveAttribute('aria-label', 'Play')
 
   // Pausing must stop the stream.
   const afterPause = rebuilds
@@ -126,7 +126,7 @@ test('loading a PNG releases the soundscape', async ({ page }) => {
   await openSoundscapes(page)
   await uploadTrack(page)
   await page.click('[data-testid="soundscape-play"]')
-  await expect(page.locator('[data-testid="soundscape-play"]')).toContainText('Pause')
+  await expect(page.locator('[data-testid="soundscape-play"]')).toHaveAttribute('aria-label', 'Pause')
 
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
@@ -135,7 +135,7 @@ test('loading a PNG releases the soundscape', async ({ page }) => {
   await chooser.setFiles(path.join(here, '..', 'public', 'Heightmap.png'))
 
   // Playback must stop so audio is not driving a heightmap it no longer owns.
-  await expect(page.locator('[data-testid="soundscape-play"]')).toContainText('Play', { timeout: 15000 })
+  await expect(page.locator('[data-testid="soundscape-play"]')).toHaveAttribute('aria-label', 'Play', { timeout: 15000 })
 })
 
 test('heavy preset streams without latching the computing overlay', async ({ page }) => {

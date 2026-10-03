@@ -15,7 +15,7 @@
  */
 import { maskCoverage } from '../utils/maskLayers'
 import { BackdropBlock } from './panel/BackdropBlock'
-import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, HelpBox, InlineSl, MUTED, PanelStyles, STRONG, SUNK, SURF, SegGroup, SegRow, TEXT, Tog, W } from './panel/ui'
+import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, SURF, TEXT, Tog, W } from './panel/ui'
 
 const TOOLS = [
   ['✎ Brush',   'brush'],
@@ -87,7 +87,7 @@ export function MaskPanel({
           {region && (tool === 'level' || tool === 'features')
             ? <RegionControls tool={tool} r={region} total={srcWidth * srcHeight} btn={btn} />
             : <>
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Paint</div>
+          <Heading>Paint</Heading>
           <SegRow
             label="Mode"
             testIdPrefix="studio-mode"
@@ -108,13 +108,13 @@ export function MaskPanel({
           <BackdropBlock prefix="studio" backdrop={backdrop} setBackdrop={setBackdrop}
             hasPhoto={hasPhoto} imagery={imagery} style={style} ss={ss} />
 
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>Whole mask</div>
+          <Heading>Whole mask</Heading>
           <div style={{ display: 'flex', gap: 4 }}>
             {btn('Fill', onFill, 'ghost', 'studio-fill')}
             {btn('Invert', onInvert, 'ghost', 'studio-invert')}
             {btn('Clear', onClear, 'ghost', 'studio-clear')}
           </div>
-          <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>History</div>
+          <Heading>History</Heading>
           <div style={{ display: 'flex', gap: 4 }}>
             {btn('↶ Undo', onUndo, 'ghost', 'studio-undo', !canUndo)}
             {btn('↷ Redo', onRedo, 'ghost', 'studio-redo', !canRedo)}
@@ -148,7 +148,7 @@ export function MaskPanel({
 }
 
 const heading = (text) => (
-  <div style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px' }}>{text}</div>
+  <Heading>{text}</Heading>
 )
 const note = (text, color = MUTED) => (
   <div style={{ fontSize: 10, color, lineHeight: 1.6, marginBottom: 6 }}>{text}</div>

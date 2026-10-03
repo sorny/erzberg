@@ -26,10 +26,12 @@ import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { useThree } from '@react-three/fiber'
 import { useStore } from '../store/useStore'
 
-// Bright enough to find on any terrain, and the same accent the panel uses for
-// a selected control, so the row and the line read as the same thing.
+// Bright enough to find on any terrain. The selection is ore, the accent the
+// panel uses for a selected row, so the row and the line read as the same
+// thing. Ore as the logo has it, not the theme's: this is drawn on the plate,
+// and the plate does not change with the panel's theme.
 const HOVER_COLOR = '#3b82f6'
-const SELECT_COLOR = '#f97316'
+const SELECT_COLOR = '#E8823A'
 
 /** The segments of one feature, copied out of a layer's draped positions. */
 function extractFeature(layer, feature) {
