@@ -101,6 +101,30 @@ test('Surprise me rolls a look, and the arrow walks back', async ({ page }) => {
   expect(await page.locator('[data-testid="roll-seed"]').innerText()).toBe(firstSeed)
   expect(await signature(page)).toBe(first)
 
+  // ↪ goes forward again: stepping back does not throw the later roll away.
+  const second = await (async () => {
+    await page.locator('[data-testid="surprise-forward"]').click()
+    await page.waitForTimeout(1500)
+    return signature(page)
+  })()
+  expect(await page.locator('[data-testid="roll-seed"]').innerText()).toBe(secondSeed)
+  await expect(page.locator('[data-testid="surprise-forward"]')).toBeDisabled()
+
+  // A new roll made from an earlier one goes on the end, so both older rolls
+  // are still two steps back.
+  await page.locator('[data-testid="surprise-back"]').click()
+  await page.waitForTimeout(1500)
+  await page.locator('[data-testid="surprise-me"]').click()
+  await page.waitForTimeout(1500)
+  await page.locator('[data-testid="surprise-back"]').click()
+  await page.waitForTimeout(1500)
+  expect(await page.locator('[data-testid="roll-seed"]').innerText()).toBe(secondSeed)
+  expect(await signature(page)).toBe(second)
+  await page.locator('[data-testid="surprise-back"]').click()
+  await page.waitForTimeout(1500)
+  expect(await page.locator('[data-testid="roll-seed"]').innerText()).toBe(firstSeed)
+  await expect(page.locator('[data-testid="surprise-back"]')).toBeDisabled()
+
   expect(errors).toEqual([])
 })
 

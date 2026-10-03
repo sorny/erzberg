@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.52.0] — 2026-10-03
+
+### Changed
+
+- **Surprise me skips modes that need your input.** Route, Isochrones,
+  Viewshed, Panorama and Geodesic fan draw from a point or route you pick, and
+  from the default centre they looked arbitrary. Sun hours needs a date and a
+  latitude, Map grid a georeference, and Waveform a chosen line. They carry
+  `roll: false` in `drawModes.js`. A seed that rolled one of them now rolls a
+  different look; every other seed is unchanged.
+
+### Fixed
+
+- **Surprise me can go forward again.** ↩ dropped the roll you left, so it was
+  lost. The panel now keeps the last 50 seeds: ↩ and a new ↪ step through
+  them, and a new roll goes on the end without dropping any.
+
 ## [1.51.0] — 2026-10-03
 
 ### Changed

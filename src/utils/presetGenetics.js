@@ -136,6 +136,8 @@ export function randomPreset(seed) {
     // function cannot be told whether that file is there without giving up the
     // promise that a seed is a look. See `needsData` in drawModes.js.
     if (mode.needsData) continue
+    // A mode that asks for a picked point, a date or a georeference: see `roll`.
+    if (mode.roll === false) continue
     if (mode.cost > budget && chosen.length > 0) continue
     chosen.push(mode)
     budget -= mode.cost

@@ -925,8 +925,12 @@ export function Sidebar({
   // knowing — but it says so rather than claiming the settings still match.
   const [presetEdited, setPresetEdited] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  const [rollSeed,    setRollSeed]    = useState(null)   // seed behind the current roll
-  const [rollHistory, setRollHistory] = useState([])
+  // Every seed rolled this session, oldest first, and which one is showing.
+  // Back and forward walk the list; a new roll goes on the end, so stepping
+  // back never costs the rolls after it.
+  const [rolls,       setRolls]       = useState([])
+  const [rollAt,      setRollAt]      = useState(-1)
+  const rollSeed = rolls[rollAt] ?? null
   // Presets whose thumbnail failed to load, so the tile falls back to a label.
   const [noThumb,     setNoThumb]     = useState(() => new Set())
 
@@ -1037,8 +1041,8 @@ export function Sidebar({
     spendOpening()
     setLastPreset(null)
     setPresetEdited(false)
-    setRollSeed(null)
-    setRollHistory([])
+    setRolls([])
+    setRollAt(-1)
     // The disclosures follow the style back, as they follow it anywhere else.
     // applyPreset has always re-synced them; a reset did not, so a look that had
     // switched Lines off left that section collapsed — and the reset then turned
@@ -1304,27 +1308,29 @@ export function Sidebar({
     return preset
   }
 
+  // The seed *is* the look, so history is a list of integers rather than a
+  // stack of 250-key snapshots. Fifty of them cost nothing.
+  const ROLLS_KEPT = 50
   const handleSurprise = () => {
     const seed = Math.floor(Math.random() * 0xffffffff)
     anchorSurprise()
-    if (rollSeed != null) setRollHistory(h => [...h.slice(-9), rollSeed])
-    setRollSeed(seed)
+    const next = [...rolls, seed].slice(-ROLLS_KEPT)
+    setRolls(next)
+    setRollAt(next.length - 1)
     roll(seed)
   }
 
-  // Step back through recent rolls. The seed *is* the look, so history is a
-  // list of integers rather than a stack of 250-key snapshots.
-  //
-  // Read outside the updater rather than inside it: applying the preset is a
+  // Step through the rolls. Read outside any updater: applying the preset is a
   // side effect, and React is free to call a state updater more than once.
-  const handleUnroll = () => {
-    if (!rollHistory.length) return
+  const stepRoll = (by) => {
+    const at = rollAt + by
+    if (at < 0 || at >= rolls.length) return
     anchorSurprise()
-    const prev = rollHistory[rollHistory.length - 1]
-    setRollHistory(h => h.slice(0, -1))
-    setRollSeed(prev)
-    roll(prev)
+    setRollAt(at)
+    roll(rolls[at])
   }
+  const canBack = rollAt > 0
+  const canForward = rollAt >= 0 && rollAt < rolls.length - 1
 
   // Stats
   let totalLinePos = 0
@@ -1599,13 +1605,10 @@ export function Sidebar({
                 flex:1, padding:'8px 0', background: ACCENT, color:ON_ACCENT, border:`1px solid ${ACCENT}`,
                 borderRadius:5, cursor:'pointer', fontSize:11, fontWeight:600,
               }}>🎲 Surprise me</button>
-              <button data-testid="surprise-back" onClick={handleUnroll} disabled={!rollHistory.length} title="Back to the previous roll"
-                style={{
-                  padding:'8px 8px', background: SURF, color: rollHistory.length ? DIM : MUTED,
-                  border:`1px solid ${BORDER}`, borderRadius:5,
-                  cursor: rollHistory.length ? 'pointer' : 'default', fontSize:11,
-                  opacity: rollHistory.length ? 1 : 0.5,
-                }}>↩</button>
+              <Btn size="md" data-testid="surprise-back" onClick={() => stepRoll(-1)} disabled={!canBack}
+                title="Back to the previous roll" aria-label="Previous roll" style={{ padding:'8px 8px' }}>↩</Btn>
+              <Btn size="md" data-testid="surprise-forward" onClick={() => stepRoll(1)} disabled={!canForward}
+                title="Forward to the next roll" aria-label="Next roll" style={{ padding:'8px 8px' }}>↪</Btn>
             </div>
             {rollSeed != null && (
               <div data-testid="roll-seed" style={{ fontSize:10, color: MUTED, marginBottom:8, textAlign:'center', fontVariantNumeric:'tabular-nums' }}>

@@ -337,7 +337,8 @@ is its own layer and pen, and follows the ground under it.
 
 **Presets.** 65 presets ship as thumbnails. *Surprise me* rolls a seeded look:
 one to three modes, a palette and at most one overlay, with an ink that shows
-against the background. The seed is shown, so you can return to a look.
+against the background. It skips modes that need a file, a picked point, a date
+or a georeference. ↩ and ↪ step through the last 50 seeds of the session.
 
 **Seeds.** Stipple, Rock & Scree, Flashbulb, Halation, Reticulation, Single Line
 and Roughness Mesh carry a seed. The same seed gives the same pattern.

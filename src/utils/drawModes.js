@@ -24,6 +24,14 @@
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
  * randomiser skips it, because a roll has to stay a pure function of its seed.
+ *
+ * `roll: false` keeps a mode out of Surprise me although it draws without a
+ * file. Five draw from a point or a route the user picks (Route, Isochrones,
+ * Viewshed, Panorama, Geodesic fan), and from the default centre they look
+ * arbitrary. Two describe the place or the sheet rather than a look: Sun hours
+ * needs a date and a latitude, and Map grid is true distance, right only on a
+ * GeoTIFF. A roll is a look; these are questions about a place. Waveform
+ * traces a single line, and which line is the user's decision too.
  */
 export const DRAW_MODES = [
   {
@@ -131,7 +139,7 @@ export const DRAW_MODES = [
     // over the whole grid per rebuild. The randomiser spends a budget rather
     // than counting modes, so this cost is what keeps it from rolling a look
     // that takes a second a frame.
-    id: 'SunHours', label: 'Sun hours', cost: 7, mark: 'sunhours',
+    id: 'SunHours', label: 'Sun hours', cost: 7, mark: 'sunhours', roll: false,
     pick: { levels: [4, 10], days: [6, 12], perDay: [8, 16], smoothing: [0, 3], radius: [0, 3] },
   },
   {
@@ -195,7 +203,7 @@ export const DRAW_MODES = [
   {
     // A Dijkstra over the whole grid with sixteen neighbours. The field is
     // cached, so only a new start or a new terrain pays for it again.
-    id: 'Isochrone', label: 'Isochrones', cost: 3, mark: 'isochrone',
+    id: 'Isochrone', label: 'Isochrones', cost: 3, mark: 'isochrone', roll: false,
     pick: { smoothing: [1, 4], radius: [1, 4] },
   },
   {
@@ -204,17 +212,17 @@ export const DRAW_MODES = [
   },
   {
     // One ray per border cell, about four million steps at 1024². Cached.
-    id: 'Viewshed', label: 'Viewshed', cost: 2.5, mark: 'viewshed',
+    id: 'Viewshed', label: 'Viewshed', cost: 2.5, mark: 'viewshed', roll: false,
     pick: { spacing: [2, 8], angle: [20, 70], radius: [0, 3] },
   },
   {
     // The Isochrones search, stopped at the far end. Cached.
-    id: 'Route', label: 'Route', cost: 2, mark: 'route',
+    id: 'Route', label: 'Route', cost: 2, mark: 'route', roll: false,
     pick: { smoothing: [1, 5] },
   },
   {
     // Rays at every bearing from the eye, a cell apart at the far edge. Cached.
-    id: 'Panorama', label: 'Panorama', cost: 2.5, mark: 'panorama',
+    id: 'Panorama', label: 'Panorama', cost: 2.5, mark: 'panorama', roll: false,
     pick: {},
   },
   {
@@ -238,7 +246,7 @@ export const DRAW_MODES = [
   },
   {
     // A few hundred lines at most, and a few hundred ticks.
-    id: 'MapGrid', label: 'Map grid', cost: 1, mark: 'mapgrid',
+    id: 'MapGrid', label: 'Map grid', cost: 1, mark: 'mapgrid', roll: false,
     pick: {},
   },
   {
@@ -257,7 +265,7 @@ export const DRAW_MODES = [
   },
   {
     // One stroke per sample down one line.
-    id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform',
+    id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform', roll: false,
     pick: {},
   },
   {
@@ -267,7 +275,7 @@ export const DRAW_MODES = [
   },
   {
     // One integration per ray, a few thousand half-cell steps each.
-    id: 'Geodesic', label: 'Geodesic fan', cost: 1.5, mark: 'geodesic',
+    id: 'Geodesic', label: 'Geodesic fan', cost: 1.5, mark: 'geodesic', roll: false,
     pick: { radius: [1, 4] },
   },
   {
