@@ -32,7 +32,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, ColorRow, DANGER_BG, DANGER_BORDER, DANGER_TEXT, DIM, DateRow, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, HelpBtn, InlineSl, LoadBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, STRONG, SelectRow, SUNK, SURF, Section, SegGroup, SegRow, Sl, Stage, StageRail, Sub, TEXT, Tog, TogColor, VEIL, W, WARN, WARN_BG } from './panel/ui'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
@@ -225,7 +225,7 @@ function TerrainFetchPanel({ onFetched }) {
                        padding:'5px 7px', fontSize:11 }}>
               <span style={{ fontWeight:700 }}>{pl.name}</span>
               {pl.kind && <span style={{ color:MUTED }}>{` · ${pl.kind}`}</span>}
-              <span style={{ display:'block', fontSize:9.5, color:MUTED, overflow:'hidden',
+              <span style={{ display:'block', fontSize:10, color:MUTED, overflow:'hidden',
                              textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{pl.detail}</span>
             </button>
           ))}
@@ -255,7 +255,7 @@ function TerrainFetchPanel({ onFetched }) {
             {/* What this box costs and produces, before a byte of it is fetched.
                 Every figure comes from `describeFetch`, which is the same
                 arithmetic the fetch itself runs. */}
-            <div data-testid="extent-plan" style={{ fontSize:9.5, color:MUTED, lineHeight:1.7,
+            <div data-testid="extent-plan" style={{ fontSize:10, color:MUTED, lineHeight:1.7,
                  border:`1px solid ${BORDER}`, borderRadius:4, padding:'5px 7px', marginBottom:6 }}>
               {plan ? (<>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
@@ -289,7 +289,7 @@ function TerrainFetchPanel({ onFetched }) {
       })()}
 
       {credit && (
-        <div data-testid="dem-credit" style={{ fontSize:9.5, color:MUTED, lineHeight:1.7, marginBottom:6 }}>
+        <div data-testid="dem-credit" style={{ fontSize:10, color:MUTED, lineHeight:1.7, marginBottom:6 }}>
           <div style={{ color:DIM }}>
             {`${credit.place} · ${credit.tiles} tiles at zoom ${credit.zoom} · ${Math.round(credit.metres)} m per pixel`}
           </div>
@@ -545,7 +545,7 @@ function CommandLine({ cmd }) {
   return (
     <div style={{ display: 'flex', gap: 4, alignItems: 'flex-start' }}>
       <code style={{
-        flex: 1, minWidth: 0, fontSize: 9.5, lineHeight: 1.6, color: MUTED, background: SURF,
+        flex: 1, minWidth: 0, fontSize: 10, lineHeight: 1.6, color: MUTED, background: SURF,
         border: `1px solid ${BORDER}`, borderRadius: 4, padding: '5px 7px',
         fontFamily: 'ui-monospace, monospace', userSelect: 'all', overflowX: 'auto',
       }}>
@@ -594,7 +594,7 @@ function CoverFact({ label, value }) {
 function CoverProse({ caption = false, children }) {
   return (
     <div style={{
-      fontSize: 9.5, color: MUTED, lineHeight: 1.6,
+      fontSize: 10, color: MUTED, lineHeight: 1.6,
       ...(caption ? { paddingLeft: 6, borderLeft: `2px solid ${BORDER}` } : null),
     }}>{children}</div>
   )
@@ -1376,7 +1376,7 @@ export function Sidebar({
           borderRadius:'8px 0 0 8px',
           cursor:'pointer', zIndex:1001, userSelect:'none',
           display:'flex', alignItems:'center', justifyContent:'center',
-          color: MUTED, fontSize:8, boxShadow:'-4px 0 14px var(--hm-shadow)',
+          color: MUTED, fontSize:9, boxShadow:'-4px 0 14px var(--hm-shadow)',
           transition:'right .26s cubic-bezier(.2,.8,.2,1), color .15s',
         }}
         onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
@@ -1532,7 +1532,7 @@ export function Sidebar({
             placeholder="Find a control…" aria-label="Find a control" aria-keyshortcuts="/"
             style={{
               width:'100%', background: SURF, border:`1px solid ${BORDER}`, borderRadius:6,
-              color: TEXT, fontSize:11.5, padding:'6px 28px 6px 26px', outline:'none',
+              color: TEXT, fontSize:12, padding:'6px 28px 6px 26px', outline:'none',
               fontFamily:'inherit',
             }}
           />
@@ -1813,7 +1813,7 @@ export function Sidebar({
                         onChange={(e) => onPatchMask(m.id, { name: e.target.value.slice(0, 32) })}
                         style={{ flex: 1, minWidth: 0, background: SURF, color: MUTED, fontSize: 10,
                                  border: `1px solid ${BORDER}`, borderRadius: 3, padding: '2px 5px' }} />
-                      <span style={{ fontSize: 9.5, color: DIM, fontVariantNumeric: 'tabular-nums',
+                      <span style={{ fontSize: 10, color: DIM, fontVariantNumeric: 'tabular-nums',
                                      minWidth: 30, textAlign: 'right' }}>
                         {(maskCoverage(m) * 100).toFixed(0)}%
                       </span>
@@ -1913,7 +1913,7 @@ export function Sidebar({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                     <CoverLabel>Classes</CoverLabel>
-                    <span style={{ fontSize: 9.5, color: DIM }}>{cover.classes.length}</span>
+                    <span style={{ fontSize: 10, color: DIM }}>{cover.classes.length}</span>
                   </div>
                   {/* The legend says what the classes are; this says where they
                       are, which is the question you ask next and the one that
@@ -1981,7 +1981,7 @@ export function Sidebar({
                 </CoverRow>
 
                 {(cover.attribution || cover.osmCredit) && (
-                  <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
+                  <div style={{ fontSize: 10, color: DIM, lineHeight: 1.7 }}>
                     {cover.attribution && <div>{cover.attribution}</div>}
                     {/* ODbL travels with the work too: a class named from
                         OpenStreetMap is derived from OpenStreetMap. */}
@@ -2225,7 +2225,7 @@ export function Sidebar({
                       <InlineSl label="Saturation" min={0} max={2} step={0.01} value={style.imagerySaturation}
                         onChange={(v) => ss({ imagerySaturation: v })} fmt={(v) => `${v.toFixed(2)}×`} />
                       {imagery?.tone && style.imageryAutoLevels && (
-                        <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>
+                        <div style={{ fontSize: 10, color: DIM, lineHeight: 1.7 }}>
                           Levels {imagery.tone.lo.join('/')} → {imagery.tone.hi.join('/')}
                           {' · '}gamma {imagery.tone.gamma.toFixed(2)}
                         </div>
@@ -2241,7 +2241,7 @@ export function Sidebar({
                 {imagery && <Btn block onClick={onClearImagery}>Clear</Btn>}
               </CoverRow>
               {imagery?.credit && (
-                <div style={{ fontSize: 9.5, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
+                <div style={{ fontSize: 10, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
               )}
             </div>
           </Section>
@@ -2263,17 +2263,9 @@ export function Sidebar({
                   <>
                     <InlineSl label="Scale" min={0.01} max={10} step={0.01} value={style.textureScale} onChange={v => ss({ textureScale: v })} />
                     <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.textureOpacity} onChange={v => ss({ textureOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
-                    <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                      <span style={{ fontSize:10, color:MUTED, minWidth:50 }}>Blend</span>
-                      <select value={style.textureBlendMode} onChange={e => ss({ textureBlendMode: e.target.value })} style={{ flex:1, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
-                        <option value="normal">Normal</option>
-                        <option value="multiply">Multiply</option>
-                        <option value="screen">Screen</option>
-                        <option value="overlay">Overlay</option>
-                        <option value="softlight">Soft light</option>
-                        <option value="add">Add</option>
-                      </select>
-                    </div>
+                    <SegRow label="Blend" columns={3} value={style.textureBlendMode} onChange={v => ss({ textureBlendMode: v })}
+                      options={[['Normal', 'normal'], ['Multiply', 'multiply'], ['Screen', 'screen'],
+                                ['Overlay', 'overlay'], ['Soft light', 'softlight'], ['Add', 'add']]} />
                     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginBottom:8 }}>
                       <Sl label="Offset X" min={-1} max={1} step={0.01} value={style.textureShiftX} onChange={v => ss({ textureShiftX: v })} />
                       <Sl label="Offset Y" min={-1} max={1} step={0.01} value={style.textureShiftY} onChange={v => ss({ textureShiftY: v })} />
@@ -2950,22 +2942,18 @@ export function Sidebar({
               help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
             {view.showFrame && (
               <Sub>
-                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
-                  <span style={{ fontSize:11, color:MUTED, whiteSpace:'nowrap', minWidth:52 }}>Paper</span>
-                  <select data-testid="frame-paper" value={view.framePaper ?? 'iso'}
-                    onChange={e => sv({ framePaper: e.target.value })}
-                    style={{ flex:1, minWidth:0, background:SURF, color:DIM, border:`1px solid ${BORDER}`, borderRadius:5, fontSize:10, padding:'2px 4px', cursor:'pointer' }}>
-                    {['ISO','US','Ratio'].map(group => (
-                      <optgroup key={group} label={group}>
-                        {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
-                          <option key={id} value={id}>
-                            {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </div>
+                <SelectRow label="Paper" testId="frame-paper" value={view.framePaper ?? 'iso'}
+                  onChange={v => sv({ framePaper: v })}>
+                  {['ISO','US','Ratio'].map(group => (
+                    <optgroup key={group} label={group}>
+                      {Object.entries(PAPERS).filter(([, v]) => v.group === group).map(([id, v]) => (
+                        <option key={id} value={id}>
+                          {v.label}{v.custom ? '' : ` — ${paperRatioLabel(id)}`}{v.note ? ` (${v.note})` : ''}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </SelectRow>
                 {(view.framePaper ?? 'iso') === 'custom' && (
                   <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
                     help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />

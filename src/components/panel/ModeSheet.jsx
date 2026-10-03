@@ -91,7 +91,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
           display:'flex', alignItems:'baseline', gap:8,
           margin:'12px 0 6px', paddingBottom:3, borderBottom:`1px solid ${BORDER}`,
         }}>
-          <span style={{ fontSize:11.5, fontWeight:600, color: DIM }}>{family}</span>
+          <span style={{ fontSize:12, fontWeight:600, color: DIM }}>{family}</span>
           <span style={{ flex:1 }} />
           <span style={{ fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
             {names.length}
@@ -213,7 +213,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
       * that explains itself to people who are not reading yet.
       */}
     <div data-testid="mode-sheet-hint" style={{
-      marginTop:8, fontSize:9.5, color: MUTED, lineHeight:1.5,
+      marginTop:8, fontSize:10, color: MUTED, lineHeight:1.5,
       paddingLeft:6, borderLeft:`2px solid ${BORDER}`,
     }}>
       The pip switches a mark on. The rest of the tile opens its settings.
@@ -242,7 +242,7 @@ export function ModeBack({ title, onBack }) {
         display:'flex', alignItems:'center', gap:7, width:'100%',
         padding:'9px 12px', border:'none', borderBottom:`1px solid ${BORDER}`,
         background: SURF, color: DIM, cursor:'pointer', fontFamily:'inherit',
-        fontSize:11.5, fontWeight:500,
+        fontSize:12, fontWeight:500,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.color = TEXT }}
       onMouseLeave={(e) => { e.currentTarget.style.color = DIM }}>

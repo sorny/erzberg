@@ -105,7 +105,7 @@ export function CoverMap({ cover, hovered, onHover }) {
       />
       {/* Holds its height whether or not anything is under the pointer, so the
           legend below does not jump as the cursor crosses the map. */}
-      <div style={{ fontSize: 9.5, lineHeight: 1.4, minHeight: 13,
+      <div style={{ fontSize: 10, lineHeight: 1.4, minHeight: 13,
                     color: named ? MUTED : DIM }}>
         {named ? `${named.name} · ${(named.share * 100).toFixed(1)}%` : 'Point at the map to name a class'}
       </div>

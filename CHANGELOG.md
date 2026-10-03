@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.51.0] — 2026-10-03
+
+### Changed
+
+- **Five font sizes.** The chrome used fourteen, from 8 to 16 px in half-pixel
+  steps. It now uses 9, 10, 11, 12 and 13 px; only the empty state keeps its
+  display sizes. Half pixels rounded up. The scale is written in
+  `panel/ui.jsx`, and `tests/unit/typeScale.test.js` fails on any other size.
+- **Every control label is 11 px.** Slider labels were 10 px and switch and
+  colour labels 12 px. Both kinds of slider now share one grey.
+- **One dropdown.** `Select`, `SelectRow` and `FontSelect` replace six
+  hand-styled menus. The three font pickers share one component. The
+  texture's *Blend* is a segmented row, like every other short choice.
+
+No setting, preset or rendering changed.
+
 ## [1.50.0] — 2026-10-03
 
 ### Fixed

@@ -116,7 +116,7 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
         <Btn onClick={exportSvg} data-testid="profile-export-svg" title="Save this section as an SVG file"
           style={{ marginLeft: 'auto' }}>SVG</Btn>
         <Btn variant="ghost" onClick={onClose} aria-label="Close" title="Close"
-          style={{ fontSize: 14, lineHeight: 1, padding: '0 2px' }}>✕</Btn>
+          style={{ fontSize: 13, lineHeight: 1, padding: '0 2px' }}>✕</Btn>
       </div>
       <svg width={W} height={H}>
         {/* Grid lines */}

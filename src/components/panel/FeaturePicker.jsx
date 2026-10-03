@@ -14,7 +14,7 @@
 import { useMemo, useState } from 'react'
 import { featureLabel } from '../../utils/vectorLayers'
 import { enclosesRegion } from '../../utils/maskFromVector'
-import { ACCENT, BORDER, DIM, MiniBtn, MUTED, SURF, TEXT } from './ui'
+import { ACCENT, BORDER, DIM, MiniBtn, MUTED, Select, SURF, TEXT } from './ui'
 
 const MAX_ROWS = 200
 
@@ -78,22 +78,20 @@ export function useFeaturePick(layers = [], sources = [], prefix = 'mask-from') 
 
   const element = !usable.length ? null : (
     <>
-      <select value={chosen ? String(chosen.id) : ''} data-testid={`${prefix}-layer`}
-        onChange={(e) => onLayerChange(e.target.value)}
-        style={{ background: SURF, color: DIM, border: `1px solid ${BORDER}`,
-                 borderRadius: 5, fontSize: 10, padding: '3px 4px', cursor: 'pointer' }}>
+      <Select value={chosen ? String(chosen.id) : ''} testId={`${prefix}-layer`} label="Layer"
+        onChange={onLayerChange} style={{ flex: 'none' }}>
         {usable.map((l) => (
           <option key={l.id} value={String(l.id)}>
             {l.name} · {l.count} {l.geom === 'area' ? 'area' : l.geom === 'line' ? 'line' : 'point'}
             {l.count === 1 ? '' : 's'}
           </option>
         ))}
-      </select>
+      </Select>
 
       {bucket && bucket.count > 1 && (
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
-            <span style={{ fontSize: 9.5, color: MUTED }} data-testid={`${prefix}-count`}>
+            <span style={{ fontSize: 10, color: MUTED }} data-testid={`${prefix}-count`}>
               Using {picked.size} of {bucket.count}
             </span>
             <span style={{ display: 'flex', gap: 2 }}>
@@ -125,7 +123,7 @@ export function useFeaturePick(layers = [], sources = [], prefix = 'mask-from') 
             ))}
           </div>
           {matches.length > MAX_ROWS && (
-            <div style={{ fontSize: 9.5, color: MUTED, marginTop: 3 }}>
+            <div style={{ fontSize: 10, color: MUTED, marginTop: 3 }}>
               …and {matches.length - MAX_ROWS} more. Filter to narrow.
             </div>
           )}

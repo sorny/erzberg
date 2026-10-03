@@ -120,7 +120,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
           borderTopColor:ACCENT, borderRadius:'50%',
           animation:'hm-spin .7s linear infinite',
         }} />
-        <span style={{ fontSize:14, color:TEXT, fontFamily:'system-ui,sans-serif' }}>{msg}</span>
+        <span style={{ fontSize:13, color:TEXT, fontFamily: FONT }}>{msg}</span>
         {pct != null && (
           <>
             {/* Same shape as the spectrogram analyser's bar in the panel. */}
@@ -250,7 +250,7 @@ function ViewportHint({ onDismiss, onKeys }) {
       // middle. Nothing else claims this corner.
       position:'fixed', left:16, top:16, zIndex:600,
       display:'flex', alignItems:'center', gap:2, padding:3,
-      ...GLASS, borderRadius:10, fontSize:11.5, color:DIM,
+      ...GLASS, borderRadius:10, fontSize:12, color:DIM,
     }}>
       <span style={{ padding:'4px 9px', display:'flex', alignItems:'center', gap:6, whiteSpace:'nowrap' }}>
         <span style={{ color:TEXT }}>Drag</span> to orbit
@@ -266,7 +266,7 @@ function ViewportHint({ onDismiss, onKeys }) {
       <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts"
         className="hm-glassbtn" style={{
           background:'none', border:'none', borderRadius:7, cursor:'pointer',
-          color:MUTED, fontSize:11.5, padding:'3px 8px', fontFamily:'inherit',
+          color:MUTED, fontSize:12, padding:'3px 8px', fontFamily:'inherit',
           display:'flex', alignItems:'center', gap:6,
         }}><Kbd>?</Kbd> Shortcuts</button>
       <button onClick={onDismiss} aria-label="Dismiss the viewport hint" className="hm-glassbtn" style={{
@@ -302,8 +302,8 @@ function DropTarget() {
         border:'2px dashed rgba(255,255,255,0.28)', borderRadius:12,
         padding:'26px 38px', textAlign:'center', background:'rgba(20,20,24,0.85)',
       }}>
-        <div style={{ fontSize:14, color:TEXT, marginBottom:8 }}>Drop to open</div>
-        <div style={{ fontSize:11.5, color:MUTED, lineHeight:1.7 }}>
+        <div style={{ fontSize:13, color:TEXT, marginBottom:8 }}>Drop to open</div>
+        <div style={{ fontSize:12, color:MUTED, lineHeight:1.7 }}>
           PNG or GeoTIFF heightmap · GPX or GeoJSON overlay<br />
           a preset, or any plate this app exported
         </div>
@@ -325,7 +325,7 @@ function ComputingPill() {
       position:'fixed', right:14, bottom:14, zIndex:3600, pointerEvents:'none',
       display:'flex', alignItems:'center', gap:7,
       ...GLASS, borderRadius:999,
-      padding:'6px 13px 6px 10px', fontSize:11.5, color:MUTED,
+      padding:'6px 13px 6px 10px', fontSize:12, color:MUTED,
     }}>
       <span style={{
         width:10, height:10, border:`2px solid ${BORDER}`,
@@ -2552,7 +2552,7 @@ export default function App() {
           <span style={{ flex:1 }}>{loadError}</span>
           <button onClick={clearError} style={{
             background:'none', border:'none', color:DANGER_TEXT, cursor:'pointer',
-            fontSize:16, lineHeight:1, padding:'0 2px', opacity:0.7,
+            fontSize:13, lineHeight:1, padding:'0 2px', opacity:0.7,
           }}>✕</button>
         </div>
       )}

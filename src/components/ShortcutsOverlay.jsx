@@ -68,7 +68,7 @@ export function ShortcutsOverlay({ onDismiss }) {
           {SHORTCUTS.map((g) => (
             <div key={g.group}>
               <div style={{
-                fontSize: 11.5, fontWeight: 600,
+                fontSize: 12, fontWeight: 600,
                 color: DIM, marginBottom: 7,
               }}>{g.group}</div>
               <table style={{ borderCollapse: 'separate', borderSpacing: '0 4px' }}>
@@ -78,7 +78,7 @@ export function ShortcutsOverlay({ onDismiss }) {
                       <td style={{ paddingRight: 12, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
                         {r.keys.map((k) => <Cap key={k}>{k}</Cap>)}
                       </td>
-                      <td style={{ fontSize: 11.5, color: MUTED, lineHeight: 1.5 }}>
+                      <td style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
                         {r.label}
                         {r.note && (
                           <span style={{ color: MUTED, opacity: 0.75 }}>{` — ${r.note}`}</span>
@@ -92,7 +92,7 @@ export function ShortcutsOverlay({ onDismiss }) {
           ))}
         </div>
 
-        <div style={{ marginTop: 16, fontSize: 10.5, color: MUTED }}>
+        <div style={{ marginTop: 16, fontSize: 11, color: MUTED }}>
           Keys are ignored while the cursor is in a text field.
         </div>
       </div>

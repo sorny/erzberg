@@ -544,14 +544,14 @@ export function MaskStudio({
           Mode's. The two views are the same kind of thing and now say so. */}
       <div style={{
         position: 'absolute', left: 16, bottom: 16, display: 'flex', alignItems: 'center', gap: 2,
-        padding: 3, borderRadius: 10, fontFamily: FONT, fontSize: 11.5, color: GLASS_TEXT,
+        padding: 3, borderRadius: 10, fontFamily: FONT, fontSize: 12, color: GLASS_TEXT,
         background: GLASS_BG, border: `1px solid ${GLASS_BORDER}`,
         backdropFilter: 'blur(14px) saturate(1.4)', WebkitBackdropFilter: 'blur(14px) saturate(1.4)',
         boxShadow: '0 8px 28px rgba(0,0,0,.28)',
       }}>
         <button onClick={fit} data-testid="studio-fit" style={{
           background: VEIL, color: TEXT, border: `1px solid ${GLASS_BORDER}`,
-          borderRadius: 7, padding: '3px 10px', fontSize: 11.5, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+          borderRadius: 7, padding: '3px 10px', fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
         }}>Fit</button>
         <span style={{ padding: '3px 9px' }}>
           {srcWidth}×{srcHeight} px

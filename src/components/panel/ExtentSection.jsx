@@ -42,8 +42,8 @@ function Row({ state, name, value, detail, where }) {
                padding:'6px 8px', marginBottom:4 }}>
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span style={{ width:6, height:6, borderRadius:'50%', flex:'none', background:DOT[state] }} />
-        <span style={{ flex:1, fontSize:10.5, color:DIM }}>{name}</span>
-        <span style={{ fontSize:9.5, color:MUTED, fontFamily:'monospace' }}>{value}</span>
+        <span style={{ flex:1, fontSize:11, color:DIM }}>{name}</span>
+        <span style={{ fontSize:10, color:MUTED, fontFamily:'monospace' }}>{value}</span>
       </div>
       <div style={{ fontSize:9, color:MUTED, lineHeight:1.5, marginTop:2 }}>
         {detail}
@@ -91,7 +91,7 @@ export function ExtentSection() {
     <div data-testid="extent-section">
       <div style={{ border:`1px solid ${BORDER}`, borderRadius:4, background:SURF,
                     padding:'7px 9px', marginBottom:8 }}>
-        <div style={{ fontSize:10.5, color:DIM, overflow:'hidden', textOverflow:'ellipsis',
+        <div style={{ fontSize:11, color:DIM, overflow:'hidden', textOverflow:'ellipsis',
                       whiteSpace:'nowrap' }}>{name || 'Untitled raster'}</div>
         {wgs ? (
           <div data-testid="extent-degrees" style={{ fontSize:9, color:MUTED, lineHeight:1.6, marginTop:2 }}>

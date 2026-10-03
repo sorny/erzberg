@@ -8,7 +8,7 @@
  * section is on screen at a time; the mode sheet decides which.
  */
 import { formatClock } from '../../utils/solar'
-import { BORDER, Btn, ColorRow, DIM, DateRow, HelpBox, InlineSl, MUTED, Note, SURF, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
+import { Btn, ColorRow, DIM, DateRow, FontSelect, HelpBox, InlineSl, MUTED, Note, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
 import { ModeStyleOverride } from './ModeStyleOverride'
 import { ModeMark } from './modeMarks'
 import { roundDistance } from '../../utils/builders/mapGrid.js'
@@ -154,23 +154,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                       <Tog label="Major only" small help="Labelling every minor contour is a page of numbers with a drawing behind it. A printed sheet labels the index contours, which is what this does." checked={!!style.labelMajorOnlyContours} onChange={v => ss({ labelMajorOnlyContours: v })} />
                       <Tog label="Use single-line font" small help="Sets the numbers in a stroke face, so the pen draws each digit once instead of tracing its outline." checked={!!style.labelSingleLineContours} onChange={v => ss({ labelSingleLineContours: v })} />
                       {style.labelSingleLineContours && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
-                          <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-                          <select value={style.labelFontContours ?? 'HersheySans1'}
-                            onChange={(e) => ss({ labelFontContours: e.target.value })}
-                            data-testid="contour-label-font"
-                            style={{ flex: 1, minWidth: 0, background: SURF, color: DIM,
-                                     border: `1px solid ${BORDER}`, borderRadius: 3,
-                                     fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit' }}>
-                            {Object.entries(singleLineFonts.reduce((g, f) => {
-                              (g[f.group] ??= []).push(f); return g
-                            }, {})).map(([group, faces]) => (
-                              <optgroup key={group} label={group}>
-                                {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
-                              </optgroup>
-                            ))}
-                          </select>
-                        </div>
+                        <FontSelect fonts={singleLineFonts} value={style.labelFontContours ?? 'HersheySans1'} onChange={(v) => ss({ labelFontContours: v })} testId="contour-label-font" />
                       )}
                     </Sub>
                   )}
@@ -929,7 +913,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     {pick === 'Viewshed' ? 'Click where you stand…' : 'Pick eye on terrain'}
                   </Btn>
                   {viewshedNote && (
-                    <div data-testid="viewshed-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8 }}>
+                    <div data-testid="viewshed-readout" style={{ fontSize:11, color: DIM, marginBottom:8 }}>
                       {`${Math.round(viewshedNote.visible * 100)}% of the ground is in view`}
                     </div>
                   )}
@@ -963,7 +947,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                     onClick={() => onPick?.(pick === 'RouteA' || pick === 'RouteB' ? null : 'RouteA')} style={{ marginBottom:8 }}>
                     {pick === 'RouteA' ? 'Click the start…' : pick === 'RouteB' ? 'Click the end…' : 'Pick start and end'}
                   </Btn>
-                  <div data-testid="route-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                  <div data-testid="route-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                     {!routeNote ? 'No walkable route between the two points.'
                       : `${formatWalk(routeNote.seconds)} · ${(routeNote.metres / 1000).toFixed(1)} km · ↑ ${Math.round(routeNote.climb)} m`}
                   </div>
@@ -1046,7 +1030,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {slopeClassNote && (
-                    <div data-testid="slopeclass-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="slopeclass-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`${Math.round(slopeClassNote.low * 100)}% · ${Math.round(slopeClassNote.mid * 100)}% · ${Math.round(slopeClassNote.high * 100)}% of the ground`}
                     </div>
                   )}
@@ -1075,7 +1059,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {windNote && (
-                    <div data-testid="wind-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="wind-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`${windNote.lines} lines`}
                     </div>
                   )}
@@ -1108,7 +1092,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {runoutNote && (
-                    <div data-testid="runout-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="runout-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {runoutNote.paths ? `${runoutNote.paths} paths · longest ${Math.round(runoutNote.longest)} m` : 'No ground is steep enough to release'}
                     </div>
                   )}
@@ -1219,7 +1203,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
                 <Sub>
                   <Note>A grid at a true distance on the ground, from the south-west corner, and the map sheet's scale round the edge.</Note>
                   {mapGridNote?.stepM > 0 && (
-                    <div data-testid="mapgrid-readout" style={{ fontSize:10.5, color: mapGridNote.raised ? WARN : DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="mapgrid-readout" style={{ fontSize:11, color: mapGridNote.raised ? WARN : DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`a line every ${formatMetres(mapGridNote.stepM)}${mapGridNote.raised ? ' — raised, the interval set would draw too many lines' : ''}`}
                     </div>
                   )}
@@ -1259,7 +1243,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {venationNote && (
-                    <div data-testid="venation-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="venation-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`${venationNote.nodes.toLocaleString()} vein nodes`}
                     </div>
                   )}
@@ -1340,7 +1324,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {coralNote && (
-                    <div data-testid="coral-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="coral-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`${coralNote.nodes.toLocaleString()} nodes`}
                     </div>
                   )}
@@ -1361,7 +1345,7 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
               <>
                 <Sub>
                   {glacierNote && (
-                    <div data-testid="glacier-readout" style={{ fontSize:10.5, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                    <div data-testid="glacier-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
                       {`${Math.round(glacierNote.share * 100)}% of the ground under ice · snowline ${Math.round(glacierNote.snowline)} m`}
                     </div>
                   )}

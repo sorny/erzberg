@@ -65,6 +65,19 @@ export const FONT        = 'var(--hm-font)'
 export const MONO        = 'var(--hm-mono)'
 
 /*
+ * The type scale: five whole-pixel sizes, nothing between them.
+ *
+ *   9   badges, counts on the rail and the sheet, chart ticks
+ *   10  notes, credits, readouts, hints, segmented choices
+ *   11  every control label, buttons, load boxes
+ *   12  section titles, floating chrome (hint, toast, studio toolbars)
+ *   13  dialog and card titles, the wordmark, close glyphs
+ *
+ * The empty state alone is display type (14, 16, 22, 56).
+ * `tests/unit/typeScale.test.js` fails on any other size.
+ */
+
+/*
  * A number, not a colour — it is arithmetic (`right: open ? W : 0`).
  *
  * `W` is what the panel costs the drawing, and every consumer reads it: the
@@ -344,7 +357,7 @@ export function HelpBox({ text }) {
 export function Note({ children }) {
   return (
     <div style={{
-      fontSize: 9.5, color: MUTED, lineHeight: 1.5, marginTop: -4, marginBottom: 10,
+      fontSize: 10, color: MUTED, lineHeight: 1.5, marginTop: -4, marginBottom: 10,
       paddingLeft: 6, borderLeft: `2px solid ${BORDER}`,
     }}>
       {children}
@@ -456,7 +469,7 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
   return (
     <div style={{ marginBottom: 8, ...(col2 && { gridColumn: '1/-1' }) }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginBottom: 3 }}>
-        <span style={{ fontSize: 10, color: DIM, display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: MUTED, display: 'flex', alignItems: 'center' }}>
           {/* The label wraps the text and NOT the help button: a `?` inside a
               `<label>` would toggle the control it explains on every click. */}
           <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
@@ -484,7 +497,7 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
 export function Tog({ label, hint, help, checked, onChange, small, testId }) {
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
-  const fs = small ? 11 : 12
+  const fs = 11
   const tc = small ? MUTED : DIM
   return (
     <div style={{ marginBottom: 8 }}>
@@ -528,7 +541,7 @@ export function ColorRow({ label, help, value, onChange, testId }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize: 12, color: DIM, display:'flex', alignItems:'center' }}>
+        <span style={{ fontSize: 11, color: DIM, display:'flex', alignItems:'center' }}>
           <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
@@ -581,7 +594,7 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 12, color: DIM, display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center' }}>
           {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
@@ -683,7 +696,7 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
 }
 
 /** Segmented button row — one exclusive choice, laid out like InlineSl. */
-export function SegRow({ label, help, options, value, onChange, testIdPrefix }) {
+export function SegRow({ label, help, options, value, onChange, testIdPrefix, columns }) {
   const [showHelp, setShowHelp] = useState(false)
   return (
     <div style={{ marginBottom: 8 }}>
@@ -694,10 +707,59 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix }) 
         </span>
         <SegGroup label={label} options={options} value={value} onChange={onChange}
           nameButtons testIdOf={testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined}
-          style={{ flex: 1 }} />
+          columns={columns} style={{ flex: 1 }} />
       </div>
       {showHelp && help && <HelpBox text={help} />}
     </div>
+  )
+}
+
+/**
+ * A dropdown, for a choice too long for a segmented row: a paper size, a font,
+ * a feature layer. One look for all of them. `children` are the `<option>`s.
+ */
+export function Select({ value, onChange, testId, label, children, style }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} data-testid={testId}
+      aria-label={label} style={{
+        flex: 1, minWidth: 0, background: SURF, color: DIM, border: `1px solid ${BORDER}`,
+        borderRadius: 5, fontSize: 10, padding: '3px 4px', cursor: 'pointer', fontFamily: 'inherit',
+        ...style,
+      }}>
+      {children}
+    </select>
+  )
+}
+
+/** A `Select` with its label on the left, laid out like `InlineSl` and `SegRow`. */
+export function SelectRow({ label, help, value, onChange, testId, children }) {
+  const [showHelp, setShowHelp] = useState(false)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
+          {label}
+          {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
+        </span>
+        <Select value={value} onChange={onChange} testId={testId} label={label}>{children}</Select>
+      </div>
+      {showHelp && help && <HelpBox text={help} />}
+    </div>
+  )
+}
+
+/** The single-line font picker, grouped as `fonts` groups itself. */
+export function FontSelect({ fonts, value, onChange, testId }) {
+  const groups = {}
+  for (const f of fonts ?? []) (groups[f.group] ??= []).push(f)
+  return (
+    <SelectRow label="Font" value={value} onChange={onChange} testId={testId}>
+      {Object.entries(groups).map(([group, faces]) => (
+        <optgroup key={group} label={group}>
+          {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
+        </optgroup>
+      ))}
+    </SelectRow>
   )
 }
 
@@ -1100,10 +1162,10 @@ export function StageRail({ stage, onStage, live, hits }) {
               {/* A lozenge, not `00`. Presets is a destination and not a step
                   the renderer runs, and a digit in the pipeline's own column
                   would claim it was one. */}
-              <span style={{ display:'block', fontSize:9.5, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
+              <span style={{ display:'block', fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
                 {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
               </span>
-              <span style={{ display:'block', fontSize:8.5, fontWeight:600, marginTop:3 }}>
+              <span style={{ display:'block', fontSize:9, fontWeight:600, marginTop:3 }}>
                 {short}
               </span>
             </span>
@@ -1113,7 +1175,7 @@ export function StageRail({ stage, onStage, live, hits }) {
                 minWidth:13, height:13, borderRadius:7, padding:'0 3px',
                 background: filtering ? ACCENT : GREEN,
                 color: ON_ACCENT,
-                fontSize:8, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
+                fontSize:9, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
                 fontVariantNumeric:'tabular-nums',
               }}>{count}</span>
             )}

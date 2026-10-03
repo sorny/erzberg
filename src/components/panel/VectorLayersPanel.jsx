@@ -27,7 +27,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, LoadBtn, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, FontSelect, GripIcon, InlineSl, LoadBtn, MUTED, ON_ACCENT, SegGroup, SUNK, SURF, Sub, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -489,25 +489,7 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
             help="Letters drawn as a single stroke down the middle of each stem, the way plotter fonts have worked since the 1960s. The faces the app otherwise letters in are outline fonts, so a plotted letter is the *edge* of the letter and the pen goes round every glyph twice. A single-line face is the skeleton instead: one pass, half the pen-down distance, and no double line where two strokes meet. It looks thinner on screen for the same reason it plots better." />
 
           {layer.labelSingleLine ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
-              <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-              <select value={layer.labelFont ?? 'ReliefPendot'}
-                onChange={(e) => set({ labelFont: e.target.value })}
-                data-testid={`label-font-${layer.id}`}
-                style={{
-                  flex: 1, minWidth: 0, background: SURF, color: DIM,
-                  border: `1px solid ${BORDER}`, borderRadius: 3,
-                  fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit',
-                }}>
-                {Object.entries(singleLineFonts.reduce((g, f) => {
-                  (g[f.group] ??= []).push(f); return g
-                }, {})).map(([group, faces]) => (
-                  <optgroup key={group} label={group}>
-                    {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
+            <FontSelect fonts={singleLineFonts} value={layer.labelFont ?? 'ReliefPendot'} onChange={(v) => set({ labelFont: v })} testId={`label-font-${layer.id}`} />
           ) : (
             /* Bold and italic as two switches rather than a list of four faces:
                regular is neither, and bold-italic — a real file, not a slanted

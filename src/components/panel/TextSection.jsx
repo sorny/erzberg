@@ -17,7 +17,7 @@
  */
 
 import { useState } from 'react'
-import { BORDER, Btn, ColorRow, DIM, GripIcon, InlineSl, MUTED, SURF, Section, SegGroup, Sub, TEXT, Tog } from './ui'
+import { BORDER, Btn, ColorRow, DIM, FontSelect, GripIcon, InlineSl, MUTED, SURF, Section, SegGroup, Sub, TEXT, Tog } from './ui'
 import { useStackDrag } from './stackDrag'
 import { makeTextLayer, textLayerName } from '../../utils/textLayers'
 
@@ -163,25 +163,7 @@ export function TextSection({
                   help="Letters drawn as a single stroke down the middle of each stem, the way plotter fonts have worked since the 1960s. An outline face plots the *edge* of the letter, so the pen goes round every glyph twice." />
 
                 {l.singleLine ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 8px' }}>
-                    <span style={{ fontSize: 10, color: DIM, width: 54 }}>Font</span>
-                    <select value={l.font ?? 'ReliefPendot'}
-                      onChange={(e) => set({ font: e.target.value })}
-                      data-testid={`text-font-${l.id}`}
-                      style={{
-                        flex: 1, minWidth: 0, background: SURF, color: DIM,
-                        border: `1px solid ${BORDER}`, borderRadius: 3,
-                        fontSize: 10, padding: '4px 4px', cursor: 'pointer', fontFamily: 'inherit',
-                      }}>
-                      {Object.entries((singleLineFonts ?? []).reduce((g, f) => {
-                        (g[f.group] ??= []).push(f); return g
-                      }, {})).map(([group, faces]) => (
-                        <optgroup key={group} label={group}>
-                          {faces.map((f) => <option key={f.id} value={f.id}>{f.family}</option>)}
-                        </optgroup>
-                      ))}
-                    </select>
-                  </div>
+                  <FontSelect fonts={singleLineFonts} value={l.font ?? 'ReliefPendot'} onChange={(v) => set({ font: v })} testId={`text-font-${l.id}`} />
                 ) : (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '2px 0 4px' }}>
                     <span style={{ fontSize: 10, color: DIM, width: 54 }}>Face</span>
