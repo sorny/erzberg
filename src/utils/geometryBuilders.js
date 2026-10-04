@@ -8,7 +8,8 @@
  * never need to know which module a helper moved to.
  */
 import { shadowSun } from './sunHours'
-import { buildCover, buildIndexed, buildMineral, buildOutrun, buildRiso, buildWatershed } from './builders/colour.js'
+import { buildCover, buildIndexed, buildLandform, buildMineral, buildOutrun, buildRiso, buildWatershed, landformGrid, landformInks } from './builders/colour.js'
+import { LANDFORMS } from './landforms'
 import { buildContours, contourExtremes, buildSpines } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
 import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
@@ -132,6 +133,8 @@ export function buildLineGeometry(terrain, p) {
         broken: p.brokenMineral, grain: p.grainMineral,
         colorA: p.colorAMineral, colorB: p.colorBMineral, colorC: p.colorCMineral,
         colorD: p.colorDMineral, colorE: p.colorEMineral, }) },
+    { id:'Landform', builder: (t, ctx) => buildLandform(t, ctx, {
+        spacing: p.spacingLandform, inks: landformInks(p) }) },
     { id:'Cover',   builder: (t, ctx) => buildCover(t, ctx, {
         spacing: p.spacingCover, source: p.sourceCover, grain: p.grainCover,
         color: p.colorCover, }) },
@@ -250,6 +253,18 @@ export function buildLineGeometry(terrain, p) {
     }
   }
 
+  /*
+   * Landforms, once per build, for every layer that reads them: the Landforms
+   * mode, a layer with a landform mask, and a layer coloured by landform. All
+   * three read the one grid, with the Landforms mode's own settings, so a mask
+   * and the mode beside it agree on where the ridges are.
+   */
+  const readsForms = runs.some(({ cfg, p: rp }) => rp[`enabled${cfg.id}`] && (cfg.id === 'Landform'
+    || rp[`formMask${cfg.id}`] || (rp[`hypso${cfg.id}`] && rp[`hypsoMode${cfg.id}`] === 'form')))
+  if (readsForms) terrain = { ...terrain, gridForm: landformGrid(terrain, p) }
+  const formTerrain = readsForms
+    ? { ...terrain, gridClass: terrain.gridForm, gridPlate: null, classColors: landformInks(p) } : null
+
   const finalLayers = []
 
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
@@ -266,7 +281,7 @@ export function buildLineGeometry(terrain, p) {
     // The layer's own view of the ground, with both stencils folded in.
     // Identity when the layer has neither, which is every layer by default.
     const layerTerrain = maskedTerrain(terrain, p[`coverMask${cfg.id}`],
-                                       paintFor(terrain, p[`layerMask${cfg.id}`]))
+                                       paintFor(terrain, p[`layerMask${cfg.id}`]), p[`formMask${cfg.id}`])
 
     // Build the base pass for this layer once
     const baseRes = cfg.builder(layerTerrain, ctx)
@@ -285,6 +300,18 @@ export function buildLineGeometry(terrain, p) {
       const split = {}
       for (const [subId, res] of Object.entries(subLayers)) {
         const parts = res?.positions instanceof Float32Array ? inkByClass(res, terrain, source) : null
+        if (!parts) { split[subId] = res; continue }
+        for (const [suffix, part] of Object.entries(parts)) split[suffix ? `${subId}-${suffix}` : subId] = part
+      }
+      subLayers = split
+    }
+    // Coloured by landform: the same split, over the landform grid, one pen per
+    // landform, named after it.
+    if (source === 'form' && formTerrain && cfg.id !== 'Landform') {
+      const split = {}
+      for (const [subId, res] of Object.entries(subLayers)) {
+        const parts = res?.positions instanceof Float32Array
+          ? inkByClass(res, formTerrain, 'class', (k) => LANDFORMS[k].id) : null
         if (!parts) { split[subId] = res; continue }
         for (const [suffix, part] of Object.entries(parts)) split[suffix ? `${subId}-${suffix}` : subId] = part
       }

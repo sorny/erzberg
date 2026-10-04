@@ -114,7 +114,7 @@ const RENDER_SIDE = [
   /^imagery(Opacity|AutoLevels|Brightness|Contrast|Saturation)$/,
   // The camera, the lens, supersampling, the guides and the paper frame. None of
   // them reaches the worker at all.
-  /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides)/,
+  /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides|planOblique|obliqueAngle)/,
   /^(frame|showFrame)/,
   // Plotter preflight and pen routing. Read by the SVG exporter alone, and it
   // runs on geometry the worker has already built — a decision about the order

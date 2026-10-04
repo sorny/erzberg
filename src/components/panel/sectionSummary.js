@@ -96,6 +96,7 @@ export const PANEL_MODES = [
   // truncated its own name by 4 px.
   ['Mode: Riso',           'enabledRiso',      'Inks',      () => '3 inks'],
   ['Mode: Mineral',        'enabledMineral',   'Inks',      () => '5 inks'],
+  ['Mode: Landforms',      'enabledLandform',  'Search',    (s) => `${Math.round(s.searchLandform ?? 300)} m`],
   // The ink *source*, not a count: how many inks this mode lays down is a fact
   // about the loaded plate rather than about any setting, so the number would
   // read as a control that is not there. What the shut header can usefully say
@@ -183,6 +184,8 @@ export function buildPlateLine({ style = {}, vectorLayers = [], textLayers = [],
     // counted the way Watershed's basins are, from the data rather than from a
     // `color*` key that does not exist.
     if (suffix === 'Cover') { generated += coverClasses; continue }
+    // Landforms inks ten shapes, lettered A to J.
+    if (suffix === 'Landform') { generated += 10; continue }
     const lettered = ['A', 'B', 'C', 'D', 'E']
       .map((l) => style[`color${l}${suffix}`]).filter(Boolean)
     const used = lettered.length ? lettered : [style[`color${suffix}`]].filter(Boolean)
@@ -324,7 +327,7 @@ export function buildSectionSummaries({
   // Tilt and zoom first because they are what a hand moves; the lens follows
   // only when it is not the default perspective.
   out['Camera'] = `${deg(view.tilt)} · ${Math.round(zoomPercent)}%` +
-    (view.orthographic ? ' · ortho' : '') +
+    (view.planOblique ? ' · oblique' : view.orthographic ? ' · ortho' : '') +
     (view.panX || view.panY || view.panZ ? ' · panned' : '')
   // Paper is off until the frame is drawn, so it takes the dash like any other
   // switchable section. The sheet's own name is the fact worth carrying.

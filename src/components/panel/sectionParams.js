@@ -75,7 +75,7 @@ export const SECTION_PARAMS = {
   // everything that describes the sheet is Paper's — the two subjects the one
   // section used to carry between them.
   'Camera': ['tilt', 'rotation', 'zoom', 'renderScale', 'showGuides', /^autoRotate/,
-    'fov', 'orthographic', 'panX', 'panY', 'panZ'],
+    'fov', 'orthographic', 'planOblique', 'obliqueAngle', 'panX', 'panY', 'panZ'],
   'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
   'Anaglyph': [/^anaglyph/],

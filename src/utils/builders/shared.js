@@ -4,6 +4,7 @@
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
+import { ALL_FORMS, formMaskHas } from '../landforms'
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
 import { isVectorLayerId } from '../vectorLayers'
@@ -487,14 +488,16 @@ export function inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut) {
  * same terrain would drift apart on the page and disagree about what colour
  * 1 200 m is. The picture has one coordinate system; only the stencil moves.
  */
-export function maskedTerrain(terrain, classMask, painted) {
+export function maskedTerrain(terrain, classMask, painted, formMask) {
   const byClass = classMask && classMask !== ALL_CLASSES && terrain.gridClass
+  // A landform mask: which of the ten shapes this layer draws on. 0 is none.
+  const byForm = Boolean(formMask) && formMask !== ALL_FORMS && Boolean(terrain.gridForm)
   // `gridPaint` is the union of whichever hand-drawn masks this layer selected,
   // already carried onto the grid. Two independent stencils, and a layer may
   // carry both — cover says what the ground is, a painted mask says which part
   // of the picture you meant. A cell has to satisfy both to be marked.
   const byPaint = Boolean(painted)
-  if (!byClass && !byPaint) return terrain
+  if (!byClass && !byPaint && !byForm) return terrain
 
   const src = terrain.gridMask
   const cls = terrain.gridClass
@@ -503,6 +506,7 @@ export function maskedTerrain(terrain, classMask, painted) {
     if (!src[i]) continue
     if (byClass && !maskHasClass(classMask, cls[i])) continue
     if (byPaint && !painted[i]) continue
+    if (byForm && !formMaskHas(formMask, terrain.gridForm[i])) continue
     out[i] = 1
   }
   // `hasNoData` switches on the mask-aware paths — the normalised blur, the

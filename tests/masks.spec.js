@@ -109,8 +109,10 @@ test('a painted mask stencils an ordinary draw mode', async ({ page }) => {
   await paintBand(page)
 
   await filter(page, 'Mode: Lines')
-  const swatch = page.locator('[data-section="Mode: Lines"] button[aria-label$="drawn"], ' +
-                              '[data-section="Mode: Lines"] button[aria-label$="skipped"]')
+  // The painted-mask swatch, not the landform chips beside it, which share
+  // the drawn/skipped labels.
+  const swatch = page.locator('[data-section="Mode: Lines"] button[aria-label$="drawn"]:not([data-testid^="form-chip-"]), ' +
+                              '[data-section="Mode: Lines"] button[aria-label$="skipped"]:not([data-testid^="form-chip-"])')
   await expect(swatch).toHaveCount(1)
   await swatch.first().click()
   await page.waitForTimeout(2500)

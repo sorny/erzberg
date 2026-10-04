@@ -273,6 +273,55 @@ export function sunHoursTint(g, { elevScale, lat, period, date }) {
 }
 
 /**
+ * Local light: which way the ridges run, for a light that turns to cross them.
+ *
+ * Hand-drawn Swiss relief does not keep one light. Where a ridge runs along the
+ * light, both of its flanks catch the same light and the ridge goes flat, so
+ * the drawer turns the light locally until it crosses the ridge and one flank
+ * is lit, the other in shade (Imhof; Jenny's work on automating it).
+ *
+ * The direction comes from the structure tensor of the ground blurred to
+ * `radius` cells: the averaged outer product of the gradient. Its main axis is
+ * the direction across the ridges at that scale, and its coherence says how
+ * much of a ridge there is at all — none on a dome or a plain.
+ *
+ * Returned as two fields, the doubled angle of that axis as a vector scaled by
+ * the root of the coherence: an axis and its opposite are the same thing, and a
+ * doubled angle is what lets the texture interpolate between two cells without
+ * a seam at 0°/180°. The shader turns the light from it (see SurfaceMesh), so
+ * moving the azimuth or the cap costs no recomputation.
+ */
+export function localLightField(g, radius) {
+  const { rows, cols, mask } = g
+  const r = Math.max(1, radius)
+  const z = boxBlur(boxBlur(g.grid, cols, rows, r, mask), cols, rows, r, mask)
+  const n = rows * cols
+  const jxx = new Float32Array(n), jyy = new Float32Array(n), jxy = new Float32Array(n)
+  for (let y = 0; y < rows; y++) {
+    for (let x = 0; x < cols; x++) {
+      const i = y * cols + x
+      if (!mask[i]) continue
+      const xl = Math.max(0, x - 1), xr = Math.min(cols - 1, x + 1)
+      const yu = Math.max(0, y - 1), yd = Math.min(rows - 1, y + 1)
+      const ge = (z[y * cols + xr] - z[y * cols + xl]) / (xr - xl || 1)   // east
+      const gn = (z[yu * cols + x] - z[yd * cols + x]) / (yd - yu || 1)   // north: row 0 is north
+      jxx[i] = ge * ge; jyy[i] = gn * gn; jxy[i] = ge * gn
+    }
+  }
+  const sxx = boxBlur(jxx, cols, rows, r, mask), syy = boxBlur(jyy, cols, rows, r, mask), sxy = boxBlur(jxy, cols, rows, r, mask)
+  const cos2 = new Float32Array(n), sin2 = new Float32Array(n)
+  for (let i = 0; i < n; i++) {
+    if (!mask[i]) continue
+    const a = sxx[i] - syy[i], b = 2 * sxy[i], tr = sxx[i] + syy[i]
+    const mag = Math.hypot(a, b)
+    if (tr < 1e-12 || mag < 1e-12) continue
+    const k = Math.sqrt(mag / tr) / mag
+    cos2[i] = a * k; sin2[i] = b * k
+  }
+  return [cos2, sin2]
+}
+
+/**
  * Packs up to four fields into an RGBA float array for a DataTexture.
  *
  * Row 0 of a texture is the bottom of the image in UV space, and the surface's

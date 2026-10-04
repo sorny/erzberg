@@ -11,6 +11,7 @@ import { NO_MASKS, describeSelection, selectionHasMask, toggleMaskSelection } fr
 import { CoverPlate, PaintedMasks } from './filter'
 import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
+import { ALL_FORMS, LANDFORMS, formMaskHas } from '../../utils/landforms'
 import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
 import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, Heading, InlineSl, Note, SegGroup, Sub, Tog } from './ui'
@@ -138,6 +139,50 @@ function PaintedMaskRow({ prefix, style, ss }) {
   )
 }
 
+/**
+ * Which landforms this layer marks: hachures only on ridges, contours only in
+ * the valleys. The chips are the Landforms mode's own inks, so the row is also
+ * its legend. Unlike the two rows above it, it needs no loaded data: every
+ * raster has landforms. 0 is every landform.
+ */
+function FormMaskRow({ prefix, style, ss }) {
+  const key = `formMask${prefix}`
+  const mask = style[key] || 0
+  const on = (k) => formMaskHas(mask, k)
+  const toggle = (k) => {
+    const next = (mask || ALL_FORMS) ^ (1 << k)
+    ss({ [key]: next === ALL_FORMS ? 0 : next })
+  }
+  const kept = LANDFORMS.filter((_, k) => on(k))
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+        <Heading style={{ margin: 0 }}>Landforms</Heading>
+        <span data-testid={`form-mask-${prefix}`} style={{ fontSize: 10, color: mask ? ACCENT_DEEP : DIM }}>
+          {!mask ? 'all' : kept.length ? kept.map((f) => f.name.toLowerCase()).join(', ') : 'none'}
+        </span>
+      </div>
+      <div style={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        {LANDFORMS.map((f, k) => (
+          <button key={f.id} type="button" title={f.name}
+            data-testid={`form-chip-${prefix}-${f.id}`}
+            aria-label={`${f.name}, ${on(k) ? 'drawn' : 'skipped'}`} aria-pressed={on(k)}
+            onClick={() => toggle(k)}
+            style={{
+              width: 22, height: 20, borderRadius: 3, padding: 0, cursor: 'pointer',
+              background: style[`color${'ABCDEFGHIJ'[k]}Landform`] ?? f.color,
+              opacity: on(k) ? 1 : 0.25,
+              border: `1px solid ${on(k) ? ACCENT_DEEP : BORDER}`,
+            }} />
+        ))}
+        {mask !== 0 && (
+          <Btn size="xs" onClick={() => ss({ [key]: 0 })} style={{ padding: '0 6px', fontSize: 10 }}>All</Btn>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /** One stated fact about the loaded plate. Label left, value right. */
 
 
@@ -177,6 +222,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           layer is built from, and a road is not built from that grid. */}
       {showCover && <CoverMaskRow prefix={prefix} style={style} ss={ss} />}
       {showCover && <PaintedMaskRow prefix={prefix} style={style} ss={ss} />}
+      {showCover && prefix !== 'Landform' && <FormMaskRow prefix={prefix} style={style} ss={ss} />}
 
       {/* Hypsometric is off the table for vector layers: a road has no elevation
           of its own, so the tint would have to read the ground under it, which

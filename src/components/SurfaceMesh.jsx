@@ -9,7 +9,7 @@ import { TONE_GLSL, toneFor } from '../utils/imageryTone'
 import { useStore } from '../store/useStore'
 import { groundPixelMetres, metresPerWorldUnit } from '../utils/geoCoords'
 import { latitudeFor } from '../utils/sunHours'
-import { curvatureField, fieldGrid, gridKey, localReliefField, packFields, sunHoursTint, textureShadeField, wetnessField } from '../utils/surfaceFields'
+import { curvatureField, fieldGrid, gridKey, localLightField, localReliefField, packFields, sunHoursTint, textureShadeField, wetnessField } from '../utils/surfaceFields'
 
 /** A worker-measured `[cx, cy, cz, r]` as a three Sphere — see sphereOf in geometry.worker.js. */
 const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[3])
@@ -137,6 +137,8 @@ const SURFACE_FRAG = /* glsl */ `
   uniform float     uShadowDarkness;
 
   uniform bool      uHillshadeMultiDir;
+  uniform bool      uHillshadeLocal;
+  uniform float     uHillshadeLocalTurn;
 
   uniform bool      uAO;
   uniform float     uAOStrength;
@@ -421,7 +423,22 @@ ${TONE_GLSL}
         lambert = sumL / 8.0;
         // Cast shadows not applicable in multi-directional mode
       } else {
-        float az = uHillshadeAzimuth * 3.14159265 / 180.0;
+        // With Local light the bearing is the field's, turned at each place to
+        // cross the ridges; the cast-shadow march below follows the same one.
+        float azDeg = uHillshadeAzimuth;
+        if (uHillshadeLocal) {
+          // The ridge axis comes in as a doubled angle scaled by coherence; the
+          // across-ridge bearing is half of it. The turn goes to the nearer end
+          // of that axis, capped, and fades out in the last 15° before the end
+          // it flips to, so neighbouring pixels never jump between the two.
+          vec2 t = fieldAt(uFieldTex2).gb;
+          float coh = length(t);
+          float across = 90.0 - 0.5 * degrees(atan(t.y, t.x));
+          float d = mod(across - azDeg + 75.0, 180.0) - 75.0;
+          float fade = clamp(min((d + 75.0) / 15.0, (105.0 - d) / 15.0), 0.0, 1.0);
+          azDeg += clamp(d, -uHillshadeLocalTurn, uHillshadeLocalTurn) * fade * coh;
+        }
+        float az = azDeg * 3.14159265 / 180.0;
         // A true bearing: 0° north, 90° east. East is +X and north is −Z.
         vec3 lightDir = normalize(vec3(sin(az) * cos(alt), sin(alt), -cos(az) * cos(alt)));
         lambert = clamp(dot(exagNormal, lightDir), 0.0, 1.0);
@@ -646,7 +663,8 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
   // surface arrives on many rebuilds that do not change the ground at all, so
   // each field is cached by a key of the grid's content and its own settings,
   // and a rebuild that only moved a line costs one scan of the grid.
-  const needFields = !!(p.showLocalRelief || p.showCurvShade || p.showTexShade || p.showWetness || p.showSunTint)
+  const localLight = !!(p.showHillshade && p.hillshadeLocal && !p.hillshadeMultiDir)
+  const needFields = !!(p.showLocalRelief || p.showCurvShade || p.showTexShade || p.showWetness || p.showSunTint || localLight)
   const fieldCache = useRef(new Map())
   const fields = useMemo(() => {
     if (!needFields || !surfaceGeo) return null
@@ -671,14 +689,16 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     ]
     const sunKey = `${p.sunTintPeriod}|${p.hillshadeDate}|${lat}|${p.elevScale}`
     const b = [p.showSunTint ? get('sun', sunKey, () => sunHoursTint(g, {
-      elevScale: p.elevScale || 1, lat, period: p.sunTintPeriod ?? 'year', date: p.hillshadeDate })) : null]
+      elevScale: p.elevScale || 1, lat, period: p.sunTintPeriod ?? 'year', date: p.hillshadeDate })) : null,
+      ...(localLight ? get('light', p.hillshadeLocalRadius, () => localLightField(g, cells(p.hillshadeLocalRadius ?? 30))) : [null, null])]
     // Keep only what this build used: the cache holds one grid's fields, not a history.
     for (const k of cache.keys()) if (!used.has(k)) cache.delete(k)
     return { g, a: packFields(g, a), b: packFields(g, b) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needFields, surfaceGeo, p.resolution, p.showLocalRelief, p.localReliefRadius, p.showCurvShade,
       p.curvShadeRadius, p.showTexShade, p.texShadeDetail, p.showWetness, p.showSunTint,
-      p.sunTintPeriod, p.hillshadeDate, p.hillshadeLat, p.elevScale, p.geoTiffBbox, p.geoTiffCRS])
+      p.sunTintPeriod, p.hillshadeDate, p.hillshadeLat, p.elevScale, p.geoTiffBbox, p.geoTiffCRS,
+      localLight, p.hillshadeLocalRadius])
 
   const fieldTexRef = useRef([null, null])
   const fieldTex = useMemo(() => {
@@ -758,6 +778,8 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
       uSlopeColorLow:         { value: new THREE.Vector3(0.525, 0.937, 0.6) },
       uSlopeColorHigh:        { value: new THREE.Vector3(0.863, 0.149, 0.149) },
       uHillshadeMultiDir:     { value: false },
+      uHillshadeLocal:        { value: false },
+      uHillshadeLocalTurn:    { value: 45 },
       uAO:                    { value: false },
       uAOStrength:            { value: 0.7 },
       uAORays:                { value: 8 },
@@ -886,6 +908,8 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     surfMat.uniforms.uSlopeColorHigh.value.set(...hexToRgb(p.slopeColorHigh ?? '#dc2626'))
 
     surfMat.uniforms.uHillshadeMultiDir.value  = !!(p.hillshadeMultiDir)
+    surfMat.uniforms.uHillshadeLocal.value     = !!(p.showHillshade && p.hillshadeLocal && fieldTex)
+    surfMat.uniforms.uHillshadeLocalTurn.value = p.hillshadeLocalTurn ?? 45
     surfMat.uniforms.uAO.value                 = !!(p.showAO)
     surfMat.uniforms.uAOStrength.value         = p.aoStrength   ?? 0.7
     surfMat.uniforms.uAORays.value             = p.aoRays       ?? 8

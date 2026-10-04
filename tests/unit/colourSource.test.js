@@ -42,7 +42,7 @@ describe('colourOptions', () => {
 
   it('is the same row for an ordinary mode', () => {
     expect(values(colourOptions({ prefix: 'Lines', current: 'line', classSource: true, hasPlate: true })))
-      .toEqual(['line', 'elevation', 'slope', 'aspect', 'class', 'plate'])
+      .toEqual(['line', 'elevation', 'slope', 'aspect', 'form', 'class', 'plate'])
   })
 
   it('offers Speed to the descent modes only, unless a mode already has it', () => {

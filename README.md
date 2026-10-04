@@ -291,6 +291,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Outrun | An additive halo under a near-white filament |
 | Riso | Three spot inks screened at 15°, 45° and 75°, multiplied |
 | Mineral | Five materials by slope and curvature, each with its own grain |
+| Landforms | Ten landforms by geomorphons (peak, ridge, spur, hollow, valley …), one ink each. Every mode can also draw only on chosen landforms, or take its colour from them |
 | Land cover | The classes of a loaded cover plate |
 | Watershed | One flat ink per catchment |
 | Single Line | One travelling-salesman tour through a weighted stipple |
@@ -328,6 +329,11 @@ lines hide other lines. Hidden segments can take their own colour and opacity.
 softer on screen. Switch this on in Terrain Style to draw and export every ink
 exactly as picked, so a pen matched to a swatch matches the plot.
 
+**Plan oblique.** A straight-down view in which each point moves up the sheet
+by its height (Jenny and Patterson, 2007), so the mountains stand up while the
+ground keeps its true shape and scale. It is in the Camera section, and the PNG
+and SVG follow it.
+
 **Anaglyph.** Every layer is drawn twice with a real parallax offset, for
 red/cyan glasses. Filled areas take the eye's ink too, with their tone as its
 weight. The SVG writes each eye as its own pen layer.
@@ -349,6 +355,9 @@ and Roughness Mesh carry a seed. The same seed gives the same pattern.
 
 - **Hillshade** with ray-marched cast shadows. Set darkness, softness and
   quality. Multi-directional mode blends several azimuths.
+- **Local light**, as in Swiss hand shading: the light turns at each place to
+  cross the ridges, so a ridge that runs along the light still has a lit and a
+  shaded flank.
 - **Almanac sun.** Set a date, time and zone. The app computes the real solar
   position from the raster's latitude and states sunrise, noon and sunset.
 - **Slope shading** in true degrees, smooth or in bands, and a bivariate

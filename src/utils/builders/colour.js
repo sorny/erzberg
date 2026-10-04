@@ -6,6 +6,8 @@
  */
 import { cellElev, boxBlur, jitterNoise } from '../terrain'
 import { hexToRgb, computeVertexColor, sampleGradient } from '../colorUtils'
+import { LANDFORMS, NO_FORM, geomorphons } from '../landforms'
+import { groundMetres } from './ground.js'
 import { BAYER4, F32List, RISO_TAC_OFF, U32List, inElevCut, lambertDarkness, mulberry32, normElev, quantiseTiers } from './shared.js'
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -825,5 +827,54 @@ export function buildWatershed(terrain, p, o) {
   }, (i) => (label[i] < 0 ? -1 : remap[label[i]]),
      (i) => (label[i] < 0 ? null : pal[pick[remap[label[i]]] % pal.length]))
   void minElev; void maxElev
+  return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
+}
+
+/**
+ * The landform of every cell, for the Landforms mode, the per-mode landform
+ * masks and the Form colour source alike (see utils/landforms.js).
+ *
+ * Read with the Landforms mode's own settings whether or not the mode is on,
+ * so a mask and the mode beside it always agree on where the ridges are. Kept
+ * for the next build while the ground and the settings are the same: a
+ * rebuild that only moved a line should not walk eight lines from every cell.
+ */
+let formCache = { key: null, grid: null, forms: null }
+export function landformGrid(terrain, p) {
+  const { grid, gridMask, rows, cols } = terrain
+  const g = groundMetres(terrain, p, p.cellMetresLandform, p.reliefLandform)
+  const key = `${g.key}|${rows}x${cols}|${p.searchLandform}|${p.flatLandform}|${p.radiusLandform}`
+  if (formCache.grid === grid && formCache.key === key) return formCache.forms
+  // Blurred first, as Mineral and Watershed blur before they classify: on raw
+  // heights every grain of sensor noise turns a cell into a pit or a peak, and
+  // a mask cut from that is confetti.
+  const blur = Math.max(0, Math.round(p.radiusLandform ?? 2))
+  const raw = g.ground().heights
+  const heights = blur ? boxBlur(raw, cols, rows, blur, terrain.hasNoData ? gridMask : null) : raw
+  const forms = geomorphons(heights, gridMask, rows, cols, g.cellX, g.cellY,
+                            p.searchLandform ?? 300, p.flatLandform ?? 1)
+  formCache = { key, grid, forms }
+  return forms
+}
+
+/** The ten landform inks of a style block, lettered A to J. */
+export function landformInks(p) {
+  return LANDFORMS.map((f, k) => p[`color${'ABCDEFGHIJ'[k]}Landform`] ?? f.color)
+}
+
+/**
+ * 58 · LANDFORMS — the ground as ten shapes: flat, peak, ridge, shoulder,
+ * spur, slope, hollow, footslope, valley, pit.
+ *
+ * Classified by geomorphons (utils/landforms.js) and drawn as flat areas, one
+ * ink per landform, the way Mineral draws its materials: the SVG traces each
+ * landform as closed areas that a plotter can hatch.
+ */
+export function buildLandform(terrain, p, o) {
+  const forms = terrain.gridForm
+  if (!forms) return null
+  const inks = o.inks.map(hexToRgb)
+  const inkOf = (i) => (forms[i] === NO_FORM ? null : inks[forms[i]])
+  const cells = fillCells(terrain, p, o.spacing, inkOf, (i) => forms[i], inkOf)
   return { positions: cells.positions, colors: cells.colors, lids: cells.lids, areas: cells.areas }
 }

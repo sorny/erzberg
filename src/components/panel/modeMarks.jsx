@@ -509,6 +509,20 @@ const MARKS = {
       </g>
     </g>
   ),
+  // A ridge and a valley in profile, each shape its own flat tone: the peak
+  // darkest, the slopes lighter, the valley floor and the flat lightest.
+  landform: (
+    <g>
+      <g stroke="none" fill="currentColor">
+        <path d="M1 11.5 L1 9 L5 7 L8 3 L10 1.5 L12 3 L14 6.5 L14 11.5 Z" opacity="0.2" />
+        <path d="M8 3 L10 1.5 L12 3 L11 4.5 L9 4.5 Z" opacity="0.9" />
+        <path d="M5 7 L8 3 L9 4.5 L7 8 Z" opacity="0.5" />
+        <path d="M14 6.5 L17 9.5 L21 8 L21 11.5 L14 11.5 Z" opacity="0.45" />
+      </g>
+      <path d="M1 9 L5 7 L8 3 L10 1.5 L12 3 L14 6.5 L17 9.5 L21 8" fill="none" stroke="currentColor"
+        strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+    </g>
+  ),
   // Catchments: flat areas of colour, divided along the ridges.
   shed: (
     <g>

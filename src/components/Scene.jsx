@@ -16,6 +16,7 @@ import { workAttribution } from '../utils/attribution'
 import { presetComment, presetToText } from '../utils/presetFile'
 import { measureScale, sheetMarks } from '../utils/sheetMarks'
 import { groundPixelMetres } from '../utils/geoCoords'
+import { setPlanOblique } from '../utils/planOblique'
 import { useStore } from '../store/useStore'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { VectorPicker } from './VectorPicker'
@@ -94,14 +95,17 @@ export function Scene({
   const persRef     = useRef()
   const orthoRef    = useRef()
 
-  const activeCamera = p.orthographic ? orthoRef.current : persRef.current
+  // Plan oblique is a parallel projection looking straight down, so it takes
+  // the orthographic camera whatever the Orthographic switch says.
+  const ortho = !!(p.orthographic || p.planOblique)
+  const activeCamera = ortho ? orthoRef.current : persRef.current
   const set = useThree((s) => s.set)
 
   useEffect(() => {
     if (activeCamera) {
       set({ camera: activeCamera })
     }
-  }, [p.orthographic, activeCamera, set])
+  }, [ortho, activeCamera, set])
 
   // We use a spherical coordinate system for the camera to keep it "orbiting" the center
   const BASE_DIST = 800
@@ -114,17 +118,17 @@ export function Scene({
     // For Perspective, distance changes. 
     // For Orthographic, distance should be constant to avoid clipping/z-issues, 
     // but the .zoom property is what actually scales the view.
-    const dist = p.orthographic ? BASE_DIST : (BASE_DIST / zoom)
+    const dist = ortho ? BASE_DIST : (BASE_DIST / zoom)
     // Clamp phi away from 0 to avoid spherical coord singularity at top-down view
     // (setFromSphericalCoords collapses theta when phi=0, making rotation invisible)
-    const phi = THREE.MathUtils.degToRad(Math.max(tiltDeg, 0.001))
+    const phi = THREE.MathUtils.degToRad(Math.max(p.planOblique ? 0 : tiltDeg, 0.001))
     const theta = THREE.MathUtils.degToRad(rotationDeg)
 
     const target = new THREE.Vector3(px || 0, pz || 0, py || 0)
     activeCamera.position.setFromSphericalCoords(dist, phi, theta).add(target)
     activeCamera.lookAt(target)
 
-    if (p.orthographic) {
+    if (ortho) {
       activeCamera.zoom = zoom * 2
       activeCamera.updateProjectionMatrix()
     }
@@ -165,7 +169,20 @@ export function Scene({
     // changes identity every render; listing it would run this on every render and
     // fight the orbit-echo guard above. The camera values it needs are the deps.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ, p.orthographic, activeCamera])
+  }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ, ortho, p.planOblique, activeCamera])
+
+  // The shear, and a straight-down orbit while it is on: tilting a plan oblique
+  // view would mix two projections into something that is neither.
+  useEffect(() => {
+    setPlanOblique(activeCamera, !!p.planOblique, p.obliqueAngle ?? 45, BASE_DIST)
+    const orbit = orbitRef.current
+    if (orbit) {
+      orbit.minPolarAngle = 0
+      orbit.maxPolarAngle = p.planOblique ? 0 : Math.PI
+      orbit.update()
+    }
+    invalidate()
+  }, [activeCamera, p.planOblique, p.obliqueAngle, invalidate, orbitRef])
 
   useFrame(({ invalidate }, delta) => {
     if (!p.autoRotate) return
@@ -263,7 +280,7 @@ export function Scene({
 
     // Calculate zoom based on camera type. Not quantised: the Zoom slider is a
     // derived percentage of a base this component does not know.
-    const zoom = pc.orthographic
+    const zoom = (pc.orthographic || pc.planOblique)
       ? (activeCamera.zoom / 2)
       : (BASE_DIST / sph.radius)
 
@@ -573,7 +590,7 @@ export function Scene({
 
   return (
     <>
-      {p.orthographic ? (
+      {ortho ? (
         <OrthographicCamera 
           ref={orthoRef} 
           makeDefault 

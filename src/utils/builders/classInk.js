@@ -49,7 +49,7 @@ const PER_PART = ['isPoints', 'selfOcclude']
  * The suffix is `Class<k>` for a class and `''` for the strokes on no class
  * (a no-data cell), which keep the builder's own colour and the layer's own id.
  */
-export function inkByClass(res, terrain, source) {
+export function inkByClass(res, terrain, source, nameOf = (k) => `Class${k}`) {
   const { gridClass, gridPlate, gridMask, rows, cols, scl, halfW, halfH } = terrain ?? {}
   if (!gridClass || !CLASS_INK_SOURCES.has(source)) return null
   const P = res?.positions
@@ -98,9 +98,9 @@ export function inkByClass(res, terrain, source) {
     const t = parts.get(k)
     const layer = { positions: t.positions.toArray(), colors: t.colors.toArray() }
     for (const f of PER_PART) if (res[f] !== undefined) layer[f] = res[f]
-    out[k < 0 ? '' : `Class${k}`] = layer
+    out[k < 0 ? '' : nameOf(k)] = layer
   }
-  const first = out[keys[0] < 0 ? '' : `Class${keys[0]}`]
+  const first = out[keys[0] < 0 ? '' : nameOf(keys[0])]
   for (const f of WHOLE_LAYER) if (res[f] !== undefined) first[f] = res[f]
   return out
 }

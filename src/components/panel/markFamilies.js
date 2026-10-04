@@ -41,7 +41,7 @@ export const FAMILIES = [
   ['Relief',   'the ground given thickness',
     ['Pillars', 'Bitplane', 'Sprite Blocks', 'Stems']],
   ['Plate',    'colour rather than mark-making',
-    ['Indexed', 'Riso', 'Mineral', 'Land Cover', 'Watershed', 'Outrun']],
+    ['Indexed', 'Riso', 'Mineral', 'Landforms', 'Land Cover', 'Watershed', 'Outrun']],
   ['Light',    'a lamp, a sun, or a year of one',
     ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama', 'Radar']],
   ['Momentum', 'something with mass went down this slope',

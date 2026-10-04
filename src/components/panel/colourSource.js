@@ -10,8 +10,8 @@ const SPEED_MODES = new Set(['FallLine', 'Berm', 'Air', 'RaceLine'])
  * The Colour row's choices, for one style block.
  *
  * One row for every mode: the line colour, a gradient by height, slope or
- * aspect (and speed for the descent family), or the land cover class or plate
- * colour. The data is unchanged: `hypso<Id>` is whether a source is on, and
+ * aspect (and speed for the descent family), the landform under the stroke
+ * (in the Landforms mode's inks), or the land cover class or plate colour. The data is unchanged: `hypso<Id>` is whether a source is on, and
  * `hypsoMode<Id>` which. `classSource` is false where the mode inks by class
  * itself (Land cover) or has no grid under it (a vector layer).
  */
@@ -20,6 +20,6 @@ export function colourOptions({ prefix, current, classSource, hasPlate }) {
   return [
     ['Line', 'line'], ['Height', 'elevation'], ['Slope', 'slope'], ['Aspect', 'aspect'],
     ...(SPEED_MODES.has(prefix) || current === 'speed' ? [['Speed', 'speed']] : []),
-    ...(classSource ? [['Class', 'class', need], ['Plate', 'plate', need]] : []),
+    ...(classSource ? [['Form', 'form'], ['Class', 'class', need], ['Plate', 'plate', need]] : []),
   ]
 }

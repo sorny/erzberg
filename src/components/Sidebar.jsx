@@ -898,7 +898,7 @@ export function Sidebar({
     modeZeroCross: false,
     modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeWaveform: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
-    modeMineral: false, modeShed: false,
+    modeMineral: false, modeLandform: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     localRelief: false, curvShade: false, openness: false, texShade: false, aerial: false, wetness: false, sunTint: false,
@@ -1156,6 +1156,7 @@ export function Sidebar({
       modeOutrun:   !!newStyle.enabledOutrun,
       modeRiso:     !!newStyle.enabledRiso,
       modeMineral:  !!newStyle.enabledMineral,
+      modeLandform: !!newStyle.enabledLandform,
       modeShed:     !!newStyle.enabledShed,
     }))
   }
@@ -2262,7 +2263,22 @@ export function Sidebar({
             <Tog label="Enabled" checked={style.showHillshade} onChange={v => ss({ showHillshade: v })} />
             {style.showHillshade && (
               <Sub>
-                <Tog label="Multi-direction" help="Average 8 light directions — eliminates directional bias (Swiss-style shading). Hides azimuth and cast shadows." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
+                <Tog label="Multi-direction" help="Averages eight light directions, so no slope is favoured. Hides the azimuth, cast shadows and local light." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
+                {!style.hillshadeMultiDir && (<>
+                  <Tog label="Local light" testId="hillshade-local"
+                    help="Turns the light at each place so that it crosses the ridges, as Swiss hand shading does: where a ridge runs along the light, one flank is lit and the other is in shade, rather than both catching the same light. Domes and plains keep the azimuth. After Imhof."
+                    checked={!!style.hillshadeLocal} onChange={v => ss({ hillshadeLocal: v })} />
+                  {style.hillshadeLocal && (
+                    <Sub>
+                      <InlineSl label="Scale" testId="hillshade-local-radius"
+                        help="The size of ridge the light follows, in world units. Small follows every spur; large follows only the main ranges."
+                        min={4} max={200} step={1} value={style.hillshadeLocalRadius ?? 30} onChange={v => ss({ hillshadeLocalRadius: v })} />
+                      <InlineSl label="Turn up to" testId="hillshade-local-turn"
+                        help="The most the light turns from the azimuth. At 0° it is the ordinary hillshade."
+                        min={0} max={90} step={1} value={style.hillshadeLocalTurn ?? 45} onChange={v => ss({ hillshadeLocalTurn: v })} fmt={v => Math.round(v) + '°'} />
+                    </Sub>
+                  )}
+                </>)}
                 {/* ── Where the light comes from ─────────────────────────
                     Two answers, and the convention is not the lesser one.
                     315°/45° is a bearing the sun never reaches at any latitude
@@ -2820,7 +2836,15 @@ export function Sidebar({
             <Tog label="Centre guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
             <Sub>
               <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
-              {!view.orthographic && (
+              <Tog label="Plan oblique" testId="plan-oblique"
+                help="Looks straight down, and moves every point up the sheet by its height, so the mountains stand up and lean over the ground behind them, as on Imfeld's and Berann's maps. The ground keeps its true shape and scale. After Jenny and Patterson, 2007."
+                checked={!!view.planOblique} onChange={v => sv(v ? { planOblique: true, tilt: 0 } : { planOblique: false })} />
+              {view.planOblique && (
+                <InlineSl label="Inclination" testId="oblique-angle"
+                  help="How far the mountains lean. 90° is a flat map; 45° moves a point up by its own height; lower angles stand the relief up further."
+                  min={20} max={85} step={1} value={view.obliqueAngle ?? 45} onChange={v => sv({ obliqueAngle: v })} fmt={v => Math.round(v) + '°'} />
+              )}
+              {!view.orthographic && !view.planOblique && (
                 <InlineSl label="Focal length" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
               )}
               {/* fmt is not decoration: these mirror the orbit target, which a

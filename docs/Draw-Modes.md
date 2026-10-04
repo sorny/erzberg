@@ -835,6 +835,29 @@ scale only in their length.
 
 ---
 
+## 58. Landforms
+
+Every cell is one of ten landforms by **geomorphons** (Jasiewicz and Stepinski,
+2013, as GRASS `r.geomorphon`): flat, peak, ridge, shoulder, spur, slope,
+hollow, footslope, valley, pit. From each cell, eight compass lines run out to
+the search distance $L$. Along each, with $s = \Delta h / d$ in true metres:
+
+$$
+t = \begin{cases} + & \max s > \tan\theta_f \text{ and it outweighs } |\min s| \\
+ - & \min s < -\tan\theta_f \\ 0 & \text{otherwise} \end{cases}
+$$
+
+The counts of $-$ and $+$ index the GRASS table: eight $-$ is a peak, eight $+$
+a pit, none either way flat. The heights are blurred first (*Blur*), or the grain
+in the data classifies as pits and peaks. `src/utils/landforms.js`.
+
+One flat ink per landform, traced into areas like Mineral. The same grid, with
+this mode's settings, also serves two things in every other mode:
+
+- **Landforms mask** in the style block: draw only on chosen landforms.
+- **Form** colour source: ink each stroke by the landform under it, one pen per
+  landform, in this mode's inks.
+
 ## NoData and clipped edges
 
 NoData cells, transparent PNG pixels and everything outside an Edit Mode

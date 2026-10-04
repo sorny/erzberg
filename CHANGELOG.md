@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.55.0] — 2026-10-04
+
+### Added
+
+- **Plan oblique relief** (Jenny and Patterson, 2007), in Camera. A straight-down
+  parallel view in which each point moves up the sheet by its height over
+  tan(*Inclination*): the mountains stand up and lean over the ground behind
+  them, as on Imfeld's, Raisz's and Berann's maps, while the ground plane keeps
+  its true shape and scale. It is one shear in the orthographic projection
+  matrix (`utils/planOblique.js`), so the viewport, the PNG and the SVG follow
+  it, and picking uses the slanted ray. Tilt is held at straight down while it
+  is on.
+- **Local light** in Hillshade. As in Swiss hand shading, the light turns at
+  each place to cross the ridges, so a ridge that runs along the light gets a
+  lit and a shaded flank instead of two grey ones. The ridge direction is the
+  structure tensor of the blurred ground (`localLightField`); the turn is done in
+  the shader, capped by *Turn up to*, and fades where the ground has no one
+  direction. Moving the azimuth costs no recomputation.
+- **Landforms** draw mode: every cell as one of ten landforms by geomorphons
+  (Jasiewicz and Stepinski, 2013; the GRASS `r.geomorphon` table) — flat, peak,
+  ridge, shoulder, spur, slope, hollow, footslope, valley, pit — one ink each,
+  traced into areas for the SVG. The same grid serves every other mode twice:
+  a **Landforms** mask in the style block (draw only on chosen landforms) and a
+  **Form** colour source (one pen per landform). `utils/landforms.js`.
+
+
+### Fixed
+
+- **Pen layer names with more than one part.** A split layer read "Contours ·
+  Minor- Class3"; each part is now its own word: "Contours · Minor · Class3",
+  "Contours · Minor · Ridge".
+- **Group headings in sentence case.** Nineteen of them, in Indexed, Outrun,
+  Riso, Mineral, Flashbulb, Halation and the four descent modes, were still in
+  capitals ("MATERIALS", "PHYSICS"). `labelCase.test.js` now catches the next.
+No existing setting, preset or rendering changed.
+
 ## [1.54.0] — 2026-10-04
 
 ### Fixed

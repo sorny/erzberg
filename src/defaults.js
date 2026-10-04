@@ -459,6 +459,19 @@ export const STYLE_DEF = {
   colorMineral: '#3e2a1f', weightMineral: 1, opacityMineral: 1, dashMineral: 'solid',
   hypsoMineral: false, hypsoModeMineral: 'elevation', hypsoBandedMineral: false, hypsoIntervalMineral: 10,
 
+  // Landforms — ten shapes by geomorphons (utils/landforms.js), one ink each:
+  // flat, peak, ridge, shoulder, spur, slope, hollow, footslope, valley, pit.
+  // Search in metres and flatness in degrees, so it needs true units; a PNG
+  // gets them from Pixel size and Relief, as Slope Classes does.
+  enabledLandform: false, spacingLandform: 2, searchLandform: 300, flatLandform: 1, radiusLandform: 2,
+  cellMetresLandform: 10, reliefLandform: 1000,
+  colorALandform: '#e9e3d3', colorBLandform: '#4a1a10', colorCLandform: '#a4462a',
+  colorDLandform: '#e0b27a', colorELandform: '#cf8550', colorFLandform: '#cdbf9e',
+  colorGLandform: '#8fb3a6', colorHLandform: '#bed3ae', colorILandform: '#3e7a8a',
+  colorJLandform: '#1b3a55',
+  colorLandform: '#a4462a', weightLandform: 1, opacityLandform: 1, dashLandform: 'solid',
+  hypsoLandform: false, hypsoModeLandform: 'elevation', hypsoBandedLandform: false, hypsoIntervalLandform: 10,
+
   // Land cover — the loaded plate's own classes, inked from the imagery.
   // `sourceCover` picks between the continuous plate and the flat class colours;
   // there is no colour table here because the classes bring their own.
@@ -516,6 +529,10 @@ export const STYLE_DEF = {
 
   // Multi-directional hillshade
   hillshadeMultiDir: false,
+  // Local light: the bearing turned at each place to cross the ridges, as Swiss
+  // hand shading does. Radius in world units is the scale of ridge it reads;
+  // the turn is capped at `hillshadeLocalTurn` degrees. See surfaceFields.js.
+  hillshadeLocal: false, hillshadeLocalRadius: 30, hillshadeLocalTurn: 45,
 
   // Slope & Aspect shading. Slope is in true degrees: full colour at
   // `slopeShadeMax`, in bands of `slopeShadeBand` degrees (0 is smooth).
@@ -597,6 +614,13 @@ export const STYLE_DEF = {
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`layerMask${id}`, 0])),
 
   /*
+   * Which landforms each draw mode marks: a bit set over the ten shapes of
+   * utils/landforms.js, read with the Landforms mode's settings. 0 means every
+   * landform, which is every layer by default and every older preset.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`formMask${id}`, 0])),
+
+  /*
    * Copies of draw modes: one mode, several settings. Each is
    * `{ uid, mode, name, values }`, where `values` is a snapshot of every key the
    * mode's section owns, taken when the copy was made and edited on its own
@@ -673,6 +697,11 @@ export const POINTS_DEF = {
 export const VIEW_DEF = {
   tilt: 50, rotation: 0, zoom: 0.75,
   fov: 60, orthographic: false,
+  // Plan oblique relief (Jenny and Patterson, 2007): a straight-down parallel
+  // view in which each point moves up the sheet by its height over the tangent
+  // of `obliqueAngle`. Mountains stand up and lean over the ground behind
+  // them; the ground plane itself keeps its true shape and scale.
+  planOblique: false, obliqueAngle: 45,
   // Supersampling multiplier on top of the device pixel ratio. Dense 1px line
   // fields are undersampled and "boil" during pan/rotate; 2× rendering cuts
   // hard pixel flips by ~97% (measured) at 4× fragment cost. Render-side only.

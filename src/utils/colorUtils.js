@@ -96,11 +96,11 @@ export function computeVertexColor(normElev, normSlope, aspect, params, speed = 
     lineHypsoMode, lineHypsoInterval, gradientStops 
   } = params
 
-  // Land class and plate are inked after the build, from the cell under each
-  // stroke (builders/classInk.js). Here, and wherever no plate is loaded, they
-  // are the line colour, not a ramp the user did not pick.
+  // Land class, plate and landform are inked after the build, from the cell
+  // under each stroke (builders/classInk.js). Here, and wherever no plate is
+  // loaded, they are the line colour, not a ramp the user did not pick.
   if (!lineHypsometric || !gradientStops || gradientStops.length < 2
-      || lineHypsoMode === 'class' || lineHypsoMode === 'plate') {
+      || lineHypsoMode === 'class' || lineHypsoMode === 'plate' || lineHypsoMode === 'form') {
     return hexToRgb(lineColor)
   }
 

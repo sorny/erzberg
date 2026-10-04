@@ -178,6 +178,11 @@ export const DRAW_MODES = [
             broken: [0.25, 0.65], grain: [0.1, 0.5] },
   },
   {
+    // Eight look-out lines from every cell, as far as the search distance.
+    id: 'Landform', label: 'Landforms', cost: 3.5, mark: 'landform',
+    pick: { spacing: [1.5, 4] },
+  },
+  {
     /*
      * `needsData` keeps this out of the randomiser, and it is the seed contract
      * that decides it rather than taste. A roll is reproducible because
@@ -374,8 +379,17 @@ export function layerDisplayName(id) {
   const cut = id.indexOf('-')
   if (cut < 0) return id
   const base = MODE_LABEL[id.slice(0, cut)] ?? id.slice(0, cut)
-  const part = SUB_LAYER_LABEL[id] ?? id.slice(cut + 1).replace(/([A-Z])/g, ' $1').trim()
-  return `${base} · ${part}`
+  // A split adds parts: Contours-Minor-Ridge is the minor contours, inked by
+  // landform, on the ridges. The longest named sub-layer goes first, and each
+  // part after it is its own word, so the name reads "Contours · Minor · Ridge"
+  // and not "Contours · Minor- Ridge".
+  const segs = id.slice(cut + 1).split('-')
+  const word = (s) => s.replace(/([a-z])([A-Z])/g, '$1 $2')
+  for (let n = segs.length; n > 0; n--) {
+    const named = SUB_LAYER_LABEL[`${id.slice(0, cut)}-${segs.slice(0, n).join('-')}`]
+    if (named) return [base, named, ...segs.slice(n).map(word)].join(' · ')
+  }
+  return [base, ...segs.map(word)].join(' · ')
 }
 
 /** Draw-mode ids in pipeline order. */
