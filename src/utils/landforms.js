@@ -111,3 +111,18 @@ export function formMaskHas(mask, k) {
 
 /** Every class switched on: the value a mask starts from when first touched. */
 export const ALL_FORMS = (1 << LANDFORMS.length) - 1
+
+/**
+ * What a landform mask keeps, in the fewest words: "all", "ridge, valley",
+ * "all but flat, pit", or "6 of 10" when neither list is short.
+ */
+export function formReadout(mask) {
+  if (!mask) return 'all'
+  const name = (f) => f.name.toLowerCase()
+  const kept = LANDFORMS.filter((_, k) => formMaskHas(mask, k))
+  const dropped = LANDFORMS.filter((_, k) => !formMaskHas(mask, k))
+  if (!kept.length) return 'none'
+  if (kept.length <= 3) return kept.map(name).join(', ')
+  if (dropped.length <= 3) return `all but ${dropped.map(name).join(', ')}`
+  return `${kept.length} of ${LANDFORMS.length}`
+}

@@ -314,6 +314,11 @@ export function PanelStyles() {
         padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
       .hmpip:hover { background:var(--hm-veil-strong); }
       .hmhead:first-child { margin-top:0 !important; }
+      /* A mode copy's card has its own on/off switch in its header, so the
+         body's Enabled row under it would be a second switch for the same
+         setting. The body is the mode's own section, scoped (see ModeCopies),
+         and its first row is always Enabled. */
+      [data-copy-body] > div:first-child:has(input[aria-label="Enabled"]) { display:none; }
       .hmrow:hover:not(:disabled) { background:var(--hm-veil-strong); color:${STRONG} !important; }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
       .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }

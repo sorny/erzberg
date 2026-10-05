@@ -13,7 +13,7 @@ See [Land cover](Land-Cover.md#how-masking-works) and
 
 ## Copies
 
-**Duplicate mode**, at the foot of each mode's section, adds a copy of the
+**Duplicate this mode**, in the Copies block at the foot of each mode's section, adds a copy of the
 mode. The copy takes a snapshot of all the mode's settings. After that, the
 original and the copy change independently: each has its own settings, class
 mask, painted mask and colour source. A copy can be on while the original is

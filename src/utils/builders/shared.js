@@ -4,7 +4,9 @@
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
-import { ALL_FORMS, formMaskHas } from '../landforms'
+import { ALL_FORMS, LANDFORMS, formMaskHas } from '../landforms'
+
+const LANDFORM_SUFFIX = new RegExp(`^(.+)-(${LANDFORMS.map((f) => f.id).join('|')})$`)
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
 import { isVectorLayerId } from '../vectorLayers'
@@ -191,6 +193,18 @@ function resolveLayerStyle(id, p) {
     const c = p.cover?.classes?.find((x) => x.index === k)
     const cname = c?.name ?? `Class ${String.fromCharCode(65 + k)}`
     return { ...base, name: `${base.name ?? layerDisplayName(anyClass[1])} · ${cname}${c?.color ? ` ${c.color}` : ''}` }
+  }
+
+  /*
+   * Any mode inked by landform (the Form colour source): styled as the part it
+   * was split from, so its weight, opacity and dash still apply, and named for
+   * the landform. Without this a landform part fell through to the default
+   * style and the mode's own Weight did nothing.
+   */
+  const anyForm = LANDFORM_SUFFIX.exec(id)
+  if (anyForm) {
+    const base = resolveLayerStyle(anyForm[1], p)
+    return { ...base, name: `${base.name ?? layerDisplayName(anyForm[1])} · ${anyForm[2]}` }
   }
 
   switch (id) {

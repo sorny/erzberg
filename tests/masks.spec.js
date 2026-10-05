@@ -216,7 +216,7 @@ test('unpicking the last mask puts the whole raster back', async ({ page }) => {
 
   await filter(page, 'Mode: Lines')
   const section = page.locator('[data-section="Mode: Lines"]')
-  const swatch = section.locator('button[aria-label$="drawn"], button[aria-label$="skipped"]')
+  const swatch = section.locator('button[aria-label$="drawn"]:not([data-testid^="form-chip-"]), button[aria-label$="skipped"]:not([data-testid^="form-chip-"])')
 
   await swatch.first().click()
   await page.waitForTimeout(800)

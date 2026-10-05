@@ -218,8 +218,8 @@ test.describe('a mask from features', () => {
     // Lines knows nothing about masks. If it comes out stencilled, a mask made
     // this way lands in exactly the place a painted one does.
     await filter(page, 'Mode: Lines')
-    const swatch = page.locator('[data-section="Mode: Lines"] button[aria-label$="drawn"], ' +
-                                '[data-section="Mode: Lines"] button[aria-label$="skipped"]')
+    const swatch = page.locator('[data-section="Mode: Lines"] button[aria-label$="drawn"]:not([data-testid^="form-chip-"]), ' +
+                                '[data-section="Mode: Lines"] button[aria-label$="skipped"]:not([data-testid^="form-chip-"])')
     await swatch.first().click()
     await page.waitForTimeout(2500)
     await page.fill('[data-testid="panel-filter"]', '')

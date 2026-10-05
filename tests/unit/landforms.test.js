@@ -45,3 +45,27 @@ describe('landform masks', () => {
     expect(ALL_FORMS).toBe(1023)
   })
 })
+
+describe('a layer inked by landform', () => {
+  it('keeps the weight, opacity and dash of the part it was split from', async () => {
+    const { layerStyle } = await import('../../src/utils/builders/shared.js')
+    const p = { weightContours: 3.5, opacityContours: 0.6, dashContours: 'dashed', majorWeightContours: 5 }
+    const minor = layerStyle('Contours-Minor-Ridge', p)
+    expect([minor.weight, minor.opacity, minor.dash]).toEqual([3.5, 0.6, 'dashed'])
+    expect(layerStyle('Contours-Major-Valley', p).weight).toBe(5)
+    expect(minor.name).toBe('Contours · Minor · Ridge')
+    const p2 = { weightLines: 2.5, opacityLines: 1, dashLines: 'solid' }
+    expect(layerStyle('Lines-Footslope', p2).weight).toBe(2.5)
+  })
+})
+
+describe('formReadout', () => {
+  it('says what a mask keeps in the fewest words', async () => {
+    const { formReadout } = await import('../../src/utils/landforms')
+    const bit = (id) => 1 << LANDFORMS.findIndex((f) => f.id === id)
+    expect(formReadout(0)).toBe('all')
+    expect(formReadout(bit('Ridge') | bit('Valley'))).toBe('ridge, valley')
+    expect(formReadout(ALL_FORMS ^ bit('Flat'))).toBe('all but flat')
+    expect(formReadout(ALL_FORMS ^ bit('Flat') ^ bit('Pit') ^ bit('Peak') ^ bit('Spur'))).toBe('6 of 10')
+  })
+})

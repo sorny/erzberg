@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { copyView, makeCopy, patchCopy } from '../../utils/modeCopies'
 import { MODE_ID } from './sectionParams'
-import { BORDER, Btn, Chevron, DIM, MUTED, SURF, Switch, TEXT } from './ui'
+import { ACCENT_DEEP, BORDER, Btn, Chevron, Heading, MUTED, SURF, Switch, TEXT } from './ui'
 
 export function ModeCopies({ title, style, ss, renderBody }) {
   const mode = MODE_ID.get(title)
@@ -35,7 +35,17 @@ export function ModeCopies({ title, style, ss, renderBody }) {
   const slug = mode.toLowerCase()
 
   return (
-    <div data-testid={`mode-copies-block-${slug}`} style={{ marginTop: 10 }}>
+    <div data-testid={`mode-copies-block-${slug}`} style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      {/* Its own block, like Line style and Masks: the button used to follow the
+          mask rows with no heading, and read as one of them. */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Heading style={{ margin: '0 0 2px' }}>Copies</Heading>
+        <span style={{ fontSize: 10, color: mine.length ? ACCENT_DEEP : MUTED }}>{mine.length || 'none'}</span>
+      </div>
+      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
+        The same mode again, with its own settings, masks and pen layers: dense
+        contours on rock and sparse ones on forest.
+      </div>
       {mine.map((copy) => {
         const view = copyView(style, copy)
         const on = !!view[`enabled${mode}`]
@@ -69,15 +79,10 @@ export function ModeCopies({ title, style, ss, renderBody }) {
           </div>
         )
       })}
-      <Btn size="xs" block onClick={() => add(style)} data-testid={`mode-duplicate-${slug}`}
-        title="Add a copy of this mode with its own settings, for example on another mask">
-        Duplicate mode
+      <Btn size="md" onClick={() => add(style)} data-testid={`mode-duplicate-${slug}`}
+        title="Add a copy of this mode with its own settings" style={{ width: '100%' }}>
+        + Duplicate this mode
       </Btn>
-      {mine.length === 0 && (
-        <div style={{ fontSize: 10, color: DIM, marginTop: 4 }}>
-          A copy has its own settings and mask, and its own pen layers.
-        </div>
-      )}
     </div>
   )
 }

@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.56.0] — 2026-10-05
+
+### Changed
+
+- **Masks have their own block** at the end of every mode's style, apart from
+  "Line style". The three rows — Landforms, Land cover (plate) and Painted
+  (Mask Studio) — sat between Dash and Colour with nothing to say they were
+  masks, so a row of chips read as a palette. The block says what it does
+  ("draw this mode only where the ground passes every mask set here"), counts
+  the masks that are on, and names the two that are not there yet and where to
+  get them. *All* sits in each row's header, and the landform readout uses the
+  fewest words: "ridge, valley", "all but flat", "6 of 10".
+
+- **One structure for every draw mode.** After its own settings, each mode has
+  three headed blocks: **Line style**, **Masks** and **Copies**. Line style
+  starts with *Colour*, now labelled, because the source decides what the rows
+  under it mean: *Base colour* shows for Line, Form, Class and Plate, and the
+  gradient for Height, Slope and Aspect. *Dash* is labelled too; both button
+  rows had no name. *Duplicate this mode* moved into its own Copies block with
+  a count; it used to follow the mask rows with no heading and read as one of
+  them. A copy's card no longer repeats its on/off switch as an Enabled row.
+
+### Fixed
+
+- **Weight, opacity and dash work under the Form colour source.** A layer split
+  by landform (`Contours-Minor-Ridge`) fell through to the default style, so the
+  mode's own Weight did nothing. It now takes the style of the part it was split
+  from, as a layer split by land cover always did.
+
 ## [1.55.0] — 2026-10-04
 
 ### Added
