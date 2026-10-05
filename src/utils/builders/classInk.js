@@ -41,7 +41,7 @@ export const OWN_CLASS_INK = new Set(['Pillars', 'Cover'])
 // drawn once per class.
 const WHOLE_LAYER = ['lids', 'occluder', 'labelAnchors', 'note']
 // What every part must keep, because it says how its strokes are drawn.
-const PER_PART = ['isPoints', 'selfOcclude']
+const PER_PART = ['isPoints', 'selfOcclude', 'insideGround']
 
 /**
  * One builder layer → `{ [suffix]: layer }`, or null when there is nothing to do.

@@ -76,7 +76,8 @@ const RENDER_SIDE = [
   /^(weight|opacity|dash)/,
   // The occlusion *look*. `depthOcclusion` itself is deliberately absent from
   // this list: the curtains are geometry, and building them for a scene that
-  // will not draw them costs ~18 MB a rebuild.
+  // will not draw them costs ~18 MB a rebuild. `occludeBy` and `walls<Id>`
+  // are absent for the same reason: they decide which curtains are built.
   /^occlusion(Bias|Color|Opacity)$/,
   // Surface fill and the mesh overlay — pure uniforms in SurfaceMesh. The one
   // fill-related value that does rebuild reaches the effect as the precomputed
@@ -115,6 +116,9 @@ const RENDER_SIDE = [
   // The camera, the lens, supersampling, the guides and the paper frame. None of
   // them reaches the worker at all.
   /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides|planOblique|obliqueAngle)/,
+  // A halo is a depth-only pass in the viewport and a buffer in the SVG export;
+  // the worker never reads it.
+  /^halo[A-Z]/,
   /^(frame|showFrame)/,
   // Plotter preflight and pen routing. Read by the SVG exporter alone, and it
   // runs on geometry the worker has already built — a decision about the order
@@ -173,6 +177,9 @@ const MODE_SUFFIX_RENDER_SIDE = [
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
   /^(extremeWeightContours|tipWeightStems)$/,
+  // A halo: a depth-only pass in the viewport and a buffer in the SVG, both
+  // drawn from geometry that already exists.
+  /^halo[A-Z]/,
 ]
 
 /**

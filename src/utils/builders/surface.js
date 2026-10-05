@@ -56,6 +56,65 @@ function buildSurfaceUvs(vertexCount, rows, cols) {
 }
 
 /**
+ * The ground's side walls, for occlusion by the ground.
+ *
+ * The surface is a sheet. Seen from above it hides what is behind it, but a
+ * sight line can pass *under* it through the side of the plate: where the plate
+ * edge cuts through a mountain, the valley behind it showed through the cut. A
+ * wall from every boundary edge of the surface — the raster's border and the
+ * rim of every NoData hole — down to a floor under the lowest ground closes the
+ * sheet into a solid. It is depth-only, like the curtains it replaces under the
+ * Ground model, and carries the edge's brightness so the elevation cut treats
+ * it like the ground above it.
+ *
+ * `quadOk(r, c)` is whether the surface has the quad whose top-left corner is
+ * (r, c), the same test the index build uses.
+ */
+function buildSkirt(basePos, baseBright, rows, cols, quadOk, floorY) {
+  const P = [], B = [], I = []
+  const wall = (a, b) => {
+    const v = P.length / 3
+    P.push(basePos[a * 3], basePos[a * 3 + 1], basePos[a * 3 + 2],
+           basePos[b * 3], basePos[b * 3 + 1], basePos[b * 3 + 2],
+           basePos[b * 3], floorY, basePos[b * 3 + 2],
+           basePos[a * 3], floorY, basePos[a * 3 + 2])
+    B.push(baseBright[a], baseBright[b], baseBright[b], baseBright[a])
+    I.push(v, v + 1, v + 2, v, v + 2, v + 3)
+  }
+  for (let r = 0; r < rows - 1; r++) {
+    for (let c = 0; c < cols - 1; c++) {
+      if (!quadOk(r, c)) continue
+      const tl = r * cols + c, tr = tl + 1, bl = tl + cols, br = bl + 1
+      if (r === 0 || !quadOk(r - 1, c)) wall(tl, tr)
+      if (r === rows - 2 || !quadOk(r + 1, c)) wall(bl, br)
+      if (c === 0 || !quadOk(r, c - 1)) wall(tl, bl)
+      if (c === cols - 2 || !quadOk(r, c + 1)) wall(tr, br)
+    }
+  }
+  return { positions: new Float32Array(P), brightnessBuf: new Float32Array(B), indices: new Uint32Array(I) }
+}
+
+/** A mesh's copies in the mirror octants, the way the surface itself is copied. */
+function mirrorMesh(mesh, mX, mY, mZ) {
+  const nOct = mX.length * mY.length * mZ.length
+  const nV = mesh.positions.length / 3
+  const pos = new Float32Array(mesh.positions.length * nOct)
+  const bright = new Float32Array(mesh.brightnessBuf.length * nOct)
+  const ind = new Uint32Array(mesh.indices.length * nOct)
+  let po = 0, bo = 0, io = 0, base = 0
+  for (const sx of mX) for (const sy of mY) for (const sz of mZ) {
+    for (let i = 0; i < mesh.positions.length; i += 3) {
+      pos[po + i] = mesh.positions[i] * sx; pos[po + i + 1] = mesh.positions[i + 1] * sy; pos[po + i + 2] = mesh.positions[i + 2] * sz
+    }
+    po += mesh.positions.length
+    bright.set(mesh.brightnessBuf, bo); bo += mesh.brightnessBuf.length
+    for (let i = 0; i < mesh.indices.length; i++) ind[io + i] = mesh.indices[i] + base
+    io += mesh.indices.length; base += nV
+  }
+  return { positions: pos, brightnessBuf: bright, indices: ind }
+}
+
+/**
  * The triangulated terrain surface: the fill layer, the SVG depth buffer's
  * occluder, and the mesh STL export is built from.
  *
@@ -125,6 +184,16 @@ export function buildSurfaceGeometry(terrain, p) {
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
   const nOct = mX.length * mY.length * mZ.length
 
+  // The side walls the Ground model closes the sheet with. Built only when that
+  // model is in use, though they are cheap: one quad per boundary edge.
+  const quadOk = (r, c) => {
+    const tl = r * cols + c
+    return !!(gridMask[tl] && gridMask[tl + 1] && gridMask[tl + cols] && gridMask[tl + cols + 1])
+  }
+  const floorY = terrain.minElev - Math.max(2, (terrain.maxElev - terrain.minElev) * 0.05)
+  const skirtBase = p.depthOcclusion && p.occludeBy === 'ground'
+    ? buildSkirt(basePos, baseBright, rows, cols, quadOk, floorY) : null
+
   // Fast path: single identity octant — the base buffers are the final mesh.
   if (nOct === 1 && mX[0] === 1 && mY[0] === 1 && mZ[0] === 1) {
     return {
@@ -132,6 +201,7 @@ export function buildSurfaceGeometry(terrain, p) {
       normals: shade ? computeSurfaceNormals(basePos, baseIndices) : NO_F32,
       uvs: shade ? buildSurfaceUvs(vertexCount, rows, cols) : NO_F32,
       metadata: { rows, cols, minB, maxB },
+      skirt: skirtBase,
     }
   }
 
@@ -171,5 +241,6 @@ export function buildSurfaceGeometry(terrain, p) {
     normals: shade ? computeSurfaceNormals(finalPos, finalIndices) : NO_F32,
     uvs: shade ? buildSurfaceUvs(vertexCount * nOct, rows, cols) : NO_F32,
     metadata: { rows, cols, minB, maxB },
+    skirt: skirtBase ? mirrorMesh(skirtBase, mX, mY, mZ) : null,
   }
 }

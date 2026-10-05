@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.57.0] — 2026-10-05
+
+### Added
+
+- **Occluder: Lines · Ground**, in Terrain Style › Occlusion. *Lines*, the
+  default, is the classic ridgeline model: each occluder stroke hangs a wall,
+  and lines hide lines. *Ground* is new: the terrain hides what is behind it,
+  with or without a fill, as a depth-only copy of the surface closed into a
+  solid by a skirt down to the floor along every edge and NoData hole. Under
+  *Lines* with no fill, a plate has only the walls under its own strokes to
+  hide with, so a mode with no walls (stipple dots, vector layers) is hidden by
+  nothing, and a sparse one hides the lines behind it in comb shapes.
+- **An Occlusion block** in every draw mode, after Masks. **Occluder** sets
+  whether the mode hangs walls; it shows under *Lines*, and for Pillars under
+  both. **Halo** (0–6 px) breaks the lines farther away where they pass behind
+  the mode's strokes, as on an engraved map (Appel, Rohlf and Stein, 1979). It
+  sits 1% of the plate's reach behind its stroke, so a line on the same patch
+  of ground does not break, and the SVG cuts the same gaps and leaves them
+  empty, not ghosted.
+
+### Fixed
+
+- **No wall in the air.** Long Hachure ticks on a peak, with no fill, cut white
+  slabs out of the Lines behind them. A tick is a flat stick at the height of
+  its centre cell, so on a convex peak its ends float, and the wall hung under
+  it stood in the air. A wall's top now follows the ground under its stroke,
+  and past the raster's edge there is no wall. A stroke on the ground keeps its
+  wall as it was. Pillars keep their walls whole, because they are the
+  columns' sides (`solid` in `drawModes.js`), under both models.
+
+### Changed
+
+- **Marks are no longer occluders on a new plate**: Hachure, Rock & Scree,
+  Truchet, Slope Classes, Line Printer, Hair, Waveform, Radar, Air, Flashbulb,
+  Halation, Shadow Hatch and Runout. Their walls cut notches into the lines
+  behind them. Presets, sessions and files from before this version keep every
+  mode's walls (`PRESET_FORMAT` 5, `migrateOcclusion`), so they keep their look
+  apart from the walls in the air. Of the 61 bundled presets that draw, 12
+  change, all toward more ink where a floating wall hid it: Chalk Cliff's
+  ridges by 42% and its ticks by 7%, the rest by 2.1% or less.
+- Under *Ground*, Pillars below the ground and Stems are not hidden by the
+  ground, because they stand inside it and the closed ground would hide them
+  whole. A filled surface still hides them, in the viewport and in the SVG.
+
 ## [1.56.0] — 2026-10-05
 
 ### Changed

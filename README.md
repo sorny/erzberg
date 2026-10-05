@@ -252,7 +252,9 @@ at the cut. → [Edit Mode](docs/Edit-Mode.md)
 
 Every mode runs independently, with its own colour, weight, line style (solid,
 dashed, short, long or round dots) and colour: the line colour, a gradient by
-height, slope or aspect, or the land cover class. → [Draw mode mathematics](docs/Draw-Modes.md)
+height, slope or aspect, or the land cover class. Each mode also sets whether it
+is an occluder, and a halo that breaks the lines behind it.
+→ [Draw mode mathematics](docs/Draw-Modes.md) · [Occlusion](docs/Draw-Modes.md#occlusion)
 
 **Duplicate this mode**, in the Copies block at the foot of a mode's section, adds a copy of the mode with
 its own settings, mask and pens: for example, dense contours on forest and
@@ -322,8 +324,12 @@ Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each
 fill becomes hatch strokes a pen can draw, denser for darker inks.
 
-**Ghost occlusion.** Each line makes an invisible curtain that writes depth, so
-lines hide other lines. Hidden segments can take their own colour and opacity.
+**Occlusion.** Under *Occluder: Lines*, the default, each stroke hangs an
+invisible wall down to the base, so lines hide other lines: the classic
+ridgeline look. Each mode can stop being an occluder, and marks such as Hachure
+start that way. Under *Occluder: Ground*, the terrain hides what is behind it,
+with or without a fill. A mode's *Halo* breaks the lines behind its strokes.
+Hidden segments can take their own colour and opacity.
 
 **Inks as picked.** By default inks pass through a filmic tone curve and look
 softer on screen. Switch this on in Terrain Style to draw and export every ink

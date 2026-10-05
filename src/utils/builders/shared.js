@@ -75,7 +75,23 @@ function surfaceField(p) {
  */
 export function layerStyle(id, p) {
   const st = resolveLayerStyle(id, p)
-  return st.name ? st : { ...st, name: layerDisplayName(id) }
+  const out = st.name ? st : { ...st, name: layerDisplayName(id) }
+  const halo = haloOf(id, p)
+  return halo > 0 ? { ...out, halo } : out
+}
+
+/**
+ * A layer's halo, in pixels: the gap lines farther away get where they pass
+ * behind its strokes (`halo<Id>`, per mode). A layer of a mode copy reads the
+ * copy's own value; vector and text layers have none.
+ */
+export function haloOf(id, p) {
+  if (typeof id !== 'string') return 0
+  const copy = /@(\w+)$/.exec(id)
+  const values = copy ? (p.modeCopies?.find((c) => c.uid === copy[1])?.values ?? {}) : null
+  const mode = id.replace(/@\w+$/, '').split('-')[0]
+  const v = values?.[`halo${mode}`] ?? p[`halo${mode}`]
+  return Number.isFinite(v) && v > 0 ? v : 0
 }
 
 function resolveLayerStyle(id, p) {

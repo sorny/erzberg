@@ -29,6 +29,8 @@
  */
 
 /** The `tEXt` keyword, and the marker the SVG comment opens with. */
+import { DRAW_MODE_IDS } from './drawModes'
+
 export const PRESET_KEYWORD = 'erzberg:preset'
 
 /**
@@ -48,11 +50,40 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * old plate looks like, so a payload before 3 gets both switched back to the
  * old reading (`migrateShading`).
  *
+ * 5 is per-mode walls (`walls<Id>`, off for the marks on a new plate) and the
+ * ground as an occluder. A payload before 5 keeps every mode hanging its walls
+ * (`migrateOcclusion`).
+ *
  * 4 is one Colour row for every mode. Pillars had its own `pillarInk` and
  * `pillarAboveInk`, and a payload before 4 has them moved onto each half's
  * colour source (`migratePillarInk`).
  */
-export const PRESET_FORMAT = 4
+export const PRESET_FORMAT = 5
+
+/**
+ * Occlusion as it was, for a plate made before format 5.
+ *
+ * Format 5 let a mode stop hanging walls under its strokes (`walls<Id>`, off
+ * for the marks by default) and added the ground as an occluder (`occludeBy`).
+ * An older plate hid lines with every mode's walls, so it gets the classic model
+ * with every mode's walls on — and renders as it did, except that no wall now
+ * stands in the air above the ground. Only a key the
+ * payload does not already carry is written; mode copies get their own mode's
+ * key. A new object comes back, as `migrateShading` explains.
+ */
+export function migrateOcclusion(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const style = { ...payload.style }
+  if (style.occludeBy === undefined) style.occludeBy = 'lines'
+  for (const id of DRAW_MODE_IDS) if (style[`walls${id}`] === undefined) style[`walls${id}`] = true
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => {
+      if (!c?.values || !c.mode || c.values[`walls${c.mode}`] !== undefined) return c
+      return { ...c, values: { ...c.values, [`walls${c.mode}`]: true } }
+    })
+  }
+  return { ...payload, style }
+}
 
 /**
  * Pillars' own ink rows, onto the Colour row every mode has.
@@ -236,7 +267,8 @@ export function parsePreset(text) {
     const f = d.format ?? 1
     const bearings = f < 2 ? migrateAzimuths(d) : d
     const shading = f < 3 ? migrateShading(bearings) : bearings
-    return f < 4 ? migratePillarInk(shading) : shading
+    const inks = f < 4 ? migratePillarInk(shading) : shading
+    return f < 5 ? migrateOcclusion(inks) : inks
   } catch {
     return null
   }

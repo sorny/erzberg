@@ -7,10 +7,10 @@ import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
 import { LineMaterial } from 'three/examples/jsm/lines/LineMaterial.js'
 import { useThree } from '@react-three/fiber'
-import { SurfaceMesh } from './SurfaceMesh'
+import { GroundOccluder, SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS, dotSpacing } from '../utils/stylePresets'
 import { chainSegments } from '../utils/chainSegments'
-import { layerStyle } from '../utils/geometryBuilders'
+import { haloOf, layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 
@@ -125,6 +125,8 @@ const toSphere = (s) => new THREE.Sphere(new THREE.Vector3(s[0], s[1], s[2]), s[
  * layer, not just their own, so they stay at the default 0 ahead of the lot.
  */
 const SUB_FILL = 0.2, SUB_LID = 0.4, SUB_GHOST = 0.6, SUB_LINE = 0.8
+// After the ground's depth (GROUND_ORDER, 0.5) and before the first layer slot.
+const GHOST_BAND = 0.55, HALO_BAND = 0.7
 // A fill drawn *after* its own layer's lines and before the next layer's
 // anything — which is what turns a centred stroke into an outside one.
 const SUB_FILL_OVER = 0.9
@@ -190,7 +192,7 @@ const BLEND_MODES = {
   normal:   THREE.NormalBlending,
 }
 
-function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, asPicked }) {
+function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, asPicked, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false }) {
   const { positions: srcPositions, colors: srcColors, sphere } = layer
   // Round dots replace the stroke's own segments. Rebuilt with the weight,
   // because the spacing grows with it; cheap next to a worker rebuild.
@@ -207,7 +209,26 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   // Converted once per geometry, and only for "Inks as picked".
   const shownColors = useMemo(() => (asPicked && colors ? srgbToLinear(colors) : colors), [colors, asPicked])
   const featureOfSegment = dots ? dots.features : layer.featureOfSegment
-  const base = (layerIndex ?? 0) + 1
+  /*
+   * A layer that lives inside the ground (Pillars' columns, Stems' stems) is
+   * drawn before the ground's depth under the Ground model, in a band between
+   * the occluders (0) and `GROUND_ORDER`, so the ground cannot hide it. Its own
+   * parts keep their order inside that band at a tenth of the usual spacing.
+   */
+  const inGround = !!(groundOccludes && layer.insideGround)
+  const base = inGround ? 0.1 + (layerIndex ?? 0) * 0.002 : (layerIndex ?? 0) + 1
+  const sub = (f) => base + (inGround ? f * 0.1 : f)
+  /*
+   * Haloes have a band of their own, below every layer slot, and so do the
+   * ghosts while any halo is drawn (`ghostBand`). A halo writes depth that cuts
+   * the lines drawn after it, and a ghost is drawn where a line fails the depth
+   * test, so a ghost drawn after a halo would fill the very gap the halo
+   * opened. Ghosts first, then haloes, then the lines. With no halo each ghost
+   * keeps its layer's slot, which is the order the SVG paints in.
+   */
+  const lineOrder = sub(SUB_LINE)
+  const ghostOrder = inGround || !ghostBand ? sub(SUB_GHOST) : GHOST_BAND + (layerIndex ?? 0) * 0.001
+  const haloOrder = HALO_BAND + (layerIndex ?? 0) * 0.001
   /**
    * A layer either carries per-vertex colour (every draw mode) or takes a flat
    * one from the live params (every vector layer). The second case is what lets
@@ -489,6 +510,51 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     return new LineSegments2(geometry, ghostMaterial)
   }, [geometry, depthOcclusion, occlusionOpacity, ghostMaterial])
 
+  // ── Halo Pass ─────────────────────────────────────────────────────────────
+  /*
+   * The haloed-line effect (Appel, Rohlf and Stein, 1979): lines farther away
+   * break where they pass behind this layer's strokes. The same strokes again,
+   * wider by the halo on each side, writing depth and no colour, before any
+   * line is drawn. They are pushed back by `haloDepth` in view space, so a line
+   * on the same patch of ground — this layer's own, or a neighbour's — passes
+   * the depth test and is not broken; only what lies behind is. Depth-tested
+   * themselves, so a halo behind a hill cuts nothing.
+   */
+  const haloDepthU = useMemo(() => ({ value: 1 }), [])
+  const haloMaterial = useMemo(() => {
+    const m = new LineMaterial({
+      linewidth: 1, resolution, transparent: true,
+      colorWrite: false, depthWrite: true, depthTest: true, depthFunc: THREE.LessEqualDepth,
+    })
+    m.onBeforeCompile = (shader) => {
+      shader.uniforms.uHaloDepth = haloDepthU
+      shader.vertexShader = shader.vertexShader
+        .replace('void main() {', 'uniform float uHaloDepth;\nvoid main() {')
+        .replace('vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );',
+          'vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );\n\t\t\tstart.z -= uHaloDepth;\n\t\t\tend.z -= uHaloDepth;')
+    }
+    m.customProgramCacheKey = () => 'erzberg-halo'
+    return m
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const haloLines = useMemo(() => {
+    if (!geometry || !depthOcclusion || !(halo > 0)) return null
+    return new LineSegments2(geometry, haloMaterial)
+  }, [geometry, depthOcclusion, halo, haloMaterial])
+  useEffect(() => {
+    if (!haloLines) return
+    haloMaterial.linewidth = drawWeight + 2 * halo
+    haloMaterial.resolution.copy(resolution)
+    const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
+    haloMaterial.dashed = d.dashed
+    haloMaterial.dashSize = d.dashSize
+    haloMaterial.gapSize = d.gapSize
+    if (d.dashed && !geometry.attributes.instanceDistanceStart) haloLines.computeLineDistances()
+    haloDepthU.value = haloDepth
+    haloLines.renderOrder = haloOrder
+  }, [haloLines, haloMaterial, haloDepthU, geometry, drawWeight, halo, dash, resolution, haloDepth, haloOrder])
+  useEffect(() => () => haloMaterial.dispose(), [haloMaterial])
+
   useEffect(() => {
     if (!lines) return
     material.linewidth = drawWeight
@@ -543,7 +609,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     // once per geometry (lines and ghostLines share the geometry) — not on
     // every weight/opacity slider tick.
     if (d.dashed && !geometry.attributes.instanceDistanceStart) lines.computeLineDistances()
-    lines.renderOrder = base + SUB_LINE
+    lines.renderOrder = lineOrder
 
     if (ghostLines) {
       // Not `drawWeight`: the doubling only works where a fill covers the
@@ -558,9 +624,9 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostMaterial.dashed = d.dashed
       ghostMaterial.dashSize = d.dashSize
       ghostMaterial.gapSize = d.gapSize
-      ghostLines.renderOrder = base + SUB_GHOST
+      ghostLines.renderOrder = ghostOrder
     }
-  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, base, layer.selfOcclude, asPicked])
+  }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, lineOrder, ghostOrder, layer.selfOcclude, asPicked])
 
   useEffect(() => () => {
     material?.dispose()
@@ -587,9 +653,10 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     <group position={shift}>
       {curtainGeo && depthOcclusion && <mesh geometry={curtainGeo} material={curtainMat} />}
       {fillGeo && <mesh geometry={fillGeo} material={fillMat}
-                        renderOrder={base + (outside ? SUB_FILL_OVER : SUB_FILL)} />}
-      {lidGeo && <mesh geometry={lidGeo} material={lidMat} renderOrder={base + SUB_LID} />}
+                        renderOrder={sub(outside ? SUB_FILL_OVER : SUB_FILL)} />}
+      {lidGeo && <mesh geometry={lidGeo} material={lidMat} renderOrder={sub(SUB_LID)} />}
       {ghostLines && <primitive object={ghostLines} />}
+      {haloLines && <primitive object={haloLines} />}
       {lines && <primitive object={lines} />}
     </group>
   )
@@ -642,6 +709,11 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
    * overlays on one canvas cannot disagree about whether the ground is dark.
    */
   const anaglyphBlend = isDarkBackground(p.bgColor) ? 'additive' : 'multiply'
+  // How far behind its stroke a halo sits: about a hundredth of the plate's
+  // reach, so a line on the same slope is not broken and one behind a ridge is.
+  const haloDepth = Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2) * 0.01
+  // Whether any layer draws a halo, which moves every ghost into its own band.
+  const ghostBand = !!(p.depthOcclusion && Array.isArray(lineGeo) && lineGeo.some((l) => haloOf(l.id, p) > 0))
   const eye = useMemo(() => {
     const th = ((p.rotation ?? 0) * Math.PI) / 180
     const reach = Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2)
@@ -652,6 +724,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   return (
     <group>
       <SurfaceMesh surfaceGeo={surfaceGeo} p={p} profileClickRef={profileClickRef} />
+      <GroundOccluder surfaceGeo={surfaceGeo} p={p} />
 
       {/* Raw terrain view is a look at the source data, so every drawn layer —
           all the modes plus the GPX track, which is just another lineGeo entry —
@@ -663,7 +736,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
       {!p.showRawTerrain && <VectorHighlight lineGeo={lineGeo} resolution={resolution} />}
 
       {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.flatMap((layer, i) => {
-        const { weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside } = layerStyle(layer.id, p)
+        const { weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, halo } = layerStyle(layer.id, p)
         /*
          * An anaglyph draws every layer twice, and that is the whole of it.
          *
@@ -704,6 +777,10 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           resolution={resolution}
           tilt={p.tilt}
           layerIndex={i}
+          groundOccludes={!!(p.depthOcclusion && p.occludeBy === 'ground')}
+          halo={halo ?? 0}
+          haloDepth={haloDepth}
+          ghostBand={ghostBand}
         />
         ))
       })}

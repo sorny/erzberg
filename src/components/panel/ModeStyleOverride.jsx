@@ -12,6 +12,7 @@ import { CoverPlate, PaintedMasks } from './filter'
 import { useContext } from 'react'
 import { GRADIENT_PRESETS } from '../../utils/gradientPresets'
 import { ALL_FORMS, LANDFORMS, formMaskHas, formReadout } from '../../utils/landforms'
+import { DRAW_MODES } from '../../utils/drawModes'
 import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
 import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, Heading, InlineSl, MUTED, Note, SegGroup, Sub, Tog } from './ui'
@@ -203,6 +204,51 @@ function MaskBlock({ prefix, style, ss }) {
   )
 }
 
+/**
+ * What hides this mode, and what it hides: the per-mode half of occlusion.
+ *
+ * *Halo* works under both models: lines farther away break around this mode's
+ * strokes, the haloed-line effect of Appel, Rohlf and Stein (1979). *Occluder*
+ * belongs to the classic model (*Occluder: Lines*), where a mode hangs walls
+ * under its strokes, and to a solid mode under both; under the Ground model the
+ * terrain does the hiding and there is nothing else to choose.
+ */
+function OcclusionBlock({ prefix, style, ss }) {
+  const on = !!style.depthOcclusion
+  const classic = style.occludeBy !== 'ground'
+  // A solid mode's walls are its bodies' sides, so it has them under both models.
+  const solid = !!DRAW_MODES.find((m) => m.id === prefix)?.solid
+  const hasWalls = classic || solid
+  const halo = style[`halo${prefix}`] ?? 0
+  const walls = style[`walls${prefix}`] !== false
+  const readout = !on ? 'off' : [hasWalls && walls && 'occluder', halo > 0 && `halo ${halo} px`].filter(Boolean).join(' · ') || 'none'
+  return (
+    <div data-testid={`occlusion-${prefix}`} style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <Heading style={{ margin: '0 0 4px' }}>Occlusion</Heading>
+        <span style={{ fontSize: 10, color: on && readout !== 'none' ? ACCENT_DEEP : MUTED }}>{readout}</span>
+      </div>
+      {!on ? (
+        <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45 }}>
+          Occlusion is off in Surface › Terrain Style.
+        </div>
+      ) : (<>
+        {hasWalls && (
+          <Tog label="Occluder" testId={`walls-${prefix}`}
+            help={solid
+              ? "The columns get solid sides, so each one hides the lines and columns behind it. This applies with either occluder in Surface › Terrain Style, because the ground cannot stand in for a column."
+              : "Each stroke hangs an invisible wall down to the base, so the lines behind it are hidden: the classic ridgeline look. Off by default for marks such as hachures and ticks, whose walls would cut notches into the lines behind them. Used when the occluder in Surface › Terrain Style is Lines."}
+            checked={walls} onChange={(v) => ss({ [`walls${prefix}`]: v })} />
+        )}
+        <InlineSl label="Halo" testId={`halo-${prefix}`}
+          help="Lines farther away break where they pass behind this mode's strokes, by this many pixels, as on an engraved map. Lines on the same patch of ground never break. 0 is off."
+          min={0} max={6} step={0.5} value={halo} onChange={(v) => ss({ [`halo${prefix}`]: v })}
+          fmt={(v) => (v > 0 ? `${v} px` : 'off')} />
+      </>)}
+    </div>
+  )
+}
+
 /** One stated fact about the loaded plate. Label left, value right. */
 
 
@@ -285,6 +331,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
     {/* Off the table for vector layers: masking thins the terrain grid a layer
         is built from, and a road is not built from that grid. */}
     {showCover && <MaskBlock prefix={prefix} style={style} ss={ss} />}
+    {showCover && <OcclusionBlock prefix={prefix} style={style} ss={ss} />}
   </>)
 }
 

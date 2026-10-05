@@ -520,7 +520,7 @@ async function runExport({
   eye = null, eyeInk = null, partsOnly = false,
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
-  surfaceOccludes,
+  surfaceOccludes, groundOccludes = false, fillOccludes = false, haloDepth = 4,
   depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize, particleSizeMax, particleSegments, particleOpacity,
   particleShadows, particleShadowLift, particleShadowColor, particleShadowOpacity, particleShadowSize,
@@ -667,13 +667,27 @@ async function runExport({
   if (surfaceOccludes && surfaceGeo && groupMatrix) {
     zGeos.push(surfaceGeo)
   }
+  // Under the Ground model the sheet is closed into a solid by its skirt, so a
+  // sight line cannot pass under the plate's edge (builders/surface.js).
+  if (groundOccludes && surfaceGeo?.skirt?.positions?.length && groupMatrix) {
+    zGeos.push(surfaceGeo.skirt)
+  }
+  const curtainGeos = []
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       if (layer.curtains && layer.curtains.positions.length > 0) {
         zGeos.push(layer.curtains)
+        curtainGeos.push(layer.curtains)
       }
     }
   }
+  // Lines that live inside the ground (Pillars' columns, Stems' stems) are not
+  // hidden by it: they test against a second buffer without the ground in it,
+  // as the viewport draws them before the ground's depth. A filled surface is
+  // drawn before every line there, so it stays in that buffer and hides them,
+  // as it did before the Ground model.
+  const needsNoGround = groundOccludes && Array.isArray(lineGeo) && lineGeo.some((l) => l.insideGround)
+  const noGroundGeos = [...(fillOccludes && surfaceGeo && groupMatrix ? [surfaceGeo] : []), ...curtainGeos]
 
   const willBuildZ = !!((depthOcclusion || surfaceOccludes) && zGeos.length > 0 && groupMatrix)
 
@@ -708,6 +722,96 @@ async function runExport({
     ? await buildZBuffer(zGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut,
                          pacer, (f) => report(PHASE.z, f, 'Building depth buffer…'))
     : null
+  const noGroundZ = willBuildZ && needsNoGround
+    ? (noGroundGeos.length
+      ? await buildZBuffer(noGroundGeos, groupMatrix, camera, width, height, elevMinCut, elevMaxCut, pacer, null)
+      : () => -Infinity)
+    : null
+
+  /*
+   * Haloes (Appel, Rohlf and Stein, 1979), as the viewport draws them: lines
+   * farther away break where they pass behind a layer's strokes. Each halo
+   * layer's *visible* runs are rasterised as thick strokes into a buffer of
+   * their own, pushed back by `haloDepth`, so a line on the same patch of
+   * ground is not broken and one behind is. The width maps the way stroke
+   * widths do here: half a weight unit per pixel of the viewport. Like the
+   * viewport's, it needs Occlusion on and nothing else: a plate with no
+   * occluders still has haloes.
+   */
+  const haloLayers = depthOcclusion && Array.isArray(lineGeo)
+    ? lineGeo.filter((l) => (lineStyles[l.id]?.halo ?? 0) > 0 && l.positions?.length >= 6)
+    : []
+  let haloZ = null
+  if (haloLayers.length) {
+    const hbuf = new Float32Array(width * height)
+    const nearH = -(camera.near ?? 0.1)
+    const zs = new Float64Array(N_SAMPLES + 1), xs = new Float64Array(N_SAMPLES + 1), ys = new Float64Array(N_SAMPLES + 1)
+    const vis = new Uint8Array(N_SAMPLES + 1)
+    const thick = (xa, ya, za, xb, yb, zb, half) => {
+      let dx = xb - xa, dy = yb - ya
+      const L = Math.hypot(dx, dy)
+      if (L < 1e-6) { dx = 1; dy = 0 } else { dx /= L; dy /= L }
+      const nx = -dy * half, ny = dx * half, ex = dx * half, ey = dy * half
+      const da = 1 / -(za - haloDepth), db = 1 / -(zb - haloDepth)
+      const ax = xa - ex, ay = ya - ey, bx = xb + ex, by = yb + ey
+      fillTriangle(ax + nx, ay + ny, da, bx + nx, by + ny, db, bx - nx, by - ny, db, hbuf, width, height)
+      fillTriangle(ax + nx, ay + ny, da, bx - nx, by - ny, db, ax - nx, ay - ny, da, hbuf, width, height)
+    }
+    for (const layer of haloLayers) {
+      const st = lineStyles[layer.id] ?? {}
+      const half = (st.weight ?? 1) * 0.25 + st.halo * 0.5
+      const zOf = layer.insideGround && noGroundZ ? noGroundZ : surfViewZ
+      const seen = (sx, sy, vz) => {
+        if (!zOf) return true
+        const sz = zOf(sx, sy)
+        return sz === -Infinity || vz >= sz - bias
+      }
+      const P = layer.positions
+      for (let i = 0; i < P.length; i += 6) {
+        if (pacer && ((i / 6) & STRIDE) === 0 && pacer.due()) await pacer.yield()
+        if (layer.isPoints) {
+          // A dot is kept or dropped by its centre, so its halo is a square
+          // there, as wide as the dot and the halo together.
+          const [sx, sy, vz] = project((P[i] + P[i + 3]) / 2, (P[i + 1] + P[i + 4]) / 2, (P[i + 2] + P[i + 5]) / 2)
+          if (vz <= nearH && !offCanvas1(sx, sy) && seen(sx, sy, vz)) thick(sx, sy, vz, sx, sy, vz, half)
+          continue
+        }
+        let ax = P[i], ay = P[i + 1], az = P[i + 2], bx = P[i + 3], by = P[i + 4], bz = P[i + 5]
+        const za = z0 * ax + z1 * ay + z2 * az + z3, zb = z0 * bx + z1 * by + z2 * bz + z3
+        if (za > nearH && zb > nearH) continue
+        if (za > nearH || zb > nearH) {
+          const t = (nearH - za) / (zb - za)
+          const cx = ax + (bx - ax) * t, cy = ay + (by - ay) * t, cz = az + (bz - az) * t
+          if (za > nearH) { ax = cx; ay = cy; az = cz } else { bx = cx; by = cy; bz = cz }
+        }
+        const q0 = project(ax, ay, az), q1 = project(bx, by, bz)
+        if (offCanvas2(q0, q1)) continue
+        const n = Math.max(2, Math.min(N_SAMPLES, Math.ceil(2 * Math.hypot(q1[0] - q0[0], q1[1] - q0[1]))))
+        for (let t = 0; t <= n; t++) {
+          const f = t / n
+          const x = ax + (bx - ax) * f, y = ay + (by - ay) * f, z = az + (bz - az) * f
+          const cw = 1 / (m[3] * x + m[7] * y + m[11] * z + m[15])
+          xs[t] = ((m[0] * x + m[4] * y + m[8] * z + m[12]) * cw + 1) * hw
+          ys[t] = (-((m[1] * x + m[5] * y + m[9] * z + m[13]) * cw) + 1) * hh
+          zs[t] = z0 * x + z1 * y + z2 * z + z3
+          vis[t] = seen(xs[t], ys[t], zs[t]) ? 1 : 0
+        }
+        // A halo is cut from the visible part of the stroke only: a stroke
+        // behind a hill breaks nothing.
+        let r0 = -1
+        for (let t = 0; t <= n + 1; t++) {
+          if (t <= n && vis[t]) { if (r0 < 0) r0 = t; continue }
+          if (r0 >= 0) { const r1 = Math.max(r0, t - 1); thick(xs[r0], ys[r0], zs[r0], xs[r1], ys[r1], zs[r1], half); r0 = -1 }
+        }
+      }
+    }
+    haloZ = (sx, sy) => {
+      const xi = Math.min(width - 1, Math.max(0, Math.round(sx)))
+      const yi = Math.min(height - 1, Math.max(0, Math.round(sy)))
+      const inv = hbuf[yi * width + xi]
+      return inv > 0 ? -1.0 / inv : -Infinity
+    }
+  }
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
   const expandBB = (x, y) => {
@@ -879,6 +983,8 @@ async function runExport({
             const surfZ = surfViewZ(sx, sy)
             visible = surfZ === -Infinity || lineZ >= surfZ - bias
           }
+          // Behind a halo a dot is gone, not a ghost: the gap is the point.
+          if (visible && haloZ && lineZ < haloZ(sx, sy)) continue
           if (visible) {
             visibleDots.push({ cx: sx, cy: sy, fill })
             expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
@@ -946,6 +1052,7 @@ async function runExport({
       }
 
       // ── Line layers ──────────────────────────────────────────────────────────
+      const layerZ = layer.insideGround && noGroundZ ? noGroundZ : surfViewZ
       const visibleSegs = []
       const ghostSegs = []
       const segCount = positions.length / 6
@@ -1031,7 +1138,7 @@ async function runExport({
           }
         }
 
-        if (!surfViewZ) {
+        if (!layerZ && !haloZ) {
           const p0 = project(ax, ay, az), p1 = project(bx, by, bz)
           if (offCanvas2(p0, p1)) continue
           addSeg(p0[0], p0[1], p1[0], p1[1], true)
@@ -1069,21 +1176,24 @@ async function runExport({
           const sx = ((m[0] * x + m[4] * y + m[8]  * z + m[12]) * cw + 1) * hw
           const sy = (-((m[1] * x + m[5] * y + m[9] * z + m[13]) * cw) + 1) * hh
           const lineZ = z0 * x + z1 * y + z2 * z + z3
-          const surfZ = surfViewZ(sx, sy)
+          const surfZ = layerZ ? layerZ(sx, sy) : -Infinity
           sxBuf[t] = sx; syBuf[t] = sy
-          visBuf[t] = (surfZ === -Infinity || lineZ >= surfZ - bias) ? 1 : 0
+          // 1 visible, 0 hidden (a ghost, if ghosts are on), 2 cut by a halo —
+          // a gap, never a ghost, or the ghost would fill the gap it opened.
+          visBuf[t] = (surfZ === -Infinity || lineZ >= surfZ - bias)
+            ? (haloZ && lineZ < haloZ(sx, sy) ? 2 : 1) : 0
         }
         let runStart = 0
         for (let t = 1; t <= n; t++) {
           if (visBuf[t] !== visBuf[runStart]) {
             const isVisible = visBuf[runStart] === 1
-            if (isVisible || ghostOpac > 0) {
+            if (isVisible || (visBuf[runStart] === 0 && ghostOpac > 0)) {
               addSeg(sxBuf[runStart], syBuf[runStart], sxBuf[t], syBuf[t], isVisible)
             }
             runStart = t
           }
         }
-        if (visBuf[runStart] === 1 || ghostOpac > 0) {
+        if (visBuf[runStart] === 1 || (visBuf[runStart] === 0 && ghostOpac > 0)) {
           addSeg(sxBuf[runStart], syBuf[runStart], sxBuf[n], syBuf[n], visBuf[runStart] === 1)
         }
       }

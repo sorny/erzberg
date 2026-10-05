@@ -2132,6 +2132,10 @@ export function Sidebar({
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
             {style.depthOcclusion && (
               <Sub>
+                <SegRow label="Occluder" testIdPrefix="occlude-by"
+                  help="What hides the lines behind it. Lines: each mode set as an occluder (in its Occlusion block) hangs an invisible wall under its strokes, and only these walls hide what is behind them, the classic ridgeline look. Ground: the terrain surface hides what is behind it, as a solid with side walls, whether or not a fill is shown. Strokes then hang no walls, except Pillars' columns."
+                  options={[['Lines', 'lines'], ['Ground', 'ground']]}
+                  value={style.occludeBy ?? 'lines'} onChange={v => ss({ occludeBy: v })} />
                 <InlineSl label="Depth tolerance" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
                 <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>

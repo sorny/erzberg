@@ -216,9 +216,11 @@ describe('parsePreset', () => {
     // A preset written before this module existed is still a preset. The test is
     // whether the object holds a parameter group, not whether it announces
     // itself.
-    // It is also older than format 3, so it keeps the old slope and aspect reading.
-    expect(parsePreset('{"style":{"enabledLines":true}}'))
-      .toEqual({ style: { enabledLines: true, slopeShadeTrue: false, aspectMapBivariate: false } })
+    // It is also older than format 3, so it keeps the old slope and aspect
+    // reading, and older than 5, so it keeps the classic occlusion with walls.
+    const p = parsePreset('{"style":{"enabledLines":true}}')
+    expect(p.style).toMatchObject({ enabledLines: true, slopeShadeTrue: false, aspectMapBivariate: false,
+      occludeBy: 'lines', wallsLines: true, wallsHachure: true })
   })
 
   it('migrates anything older than the true-bearing scale, once', () => {
@@ -249,5 +251,26 @@ describe('migrateShading', () => {
   it('leaves a current plate and an explicit choice alone', () => {
     expect(parsePreset(`{"format":${PRESET_FORMAT},"style":{"showSlopeShade":true}}`).style.slopeShadeTrue).toBeUndefined()
     expect(parsePreset('{"format":2,"style":{"slopeShadeTrue":true}}').style.slopeShadeTrue).toBe(true)
+  })
+})
+
+describe('migrateOcclusion', () => {
+  it('gives a plate before format 5 the classic model with every wall, and leaves 5 alone', async () => {
+    const { parsePreset, PRESET_FORMAT } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBe(5)
+    const old = parsePreset(JSON.stringify({ format: 4, style: { enabledHachure: true, wallsLines: false } }))
+    expect(old.style.occludeBy).toBe('lines')
+    expect(old.style.wallsHachure).toBe(true)
+    // A key the plate already carries is kept.
+    expect(old.style.wallsLines).toBe(false)
+    const now = parsePreset(JSON.stringify({ format: 5, style: { enabledHachure: true } }))
+    expect(now.style.occludeBy).toBeUndefined()
+    expect(now.style.wallsHachure).toBeUndefined()
+  })
+
+  it('gives a mode copy its own mode\'s wall', async () => {
+    const { migrateOcclusion } = await import('../../src/utils/presetFile')
+    const out = migrateOcclusion({ style: { modeCopies: [{ uid: 'c1', mode: 'Hachure', values: { enabledHachure: true } }] } })
+    expect(out.style.modeCopies[0].values.wallsHachure).toBe(true)
   })
 })

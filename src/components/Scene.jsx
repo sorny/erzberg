@@ -512,7 +512,13 @@ export function Scene({
         // occluder for any fill layer — hillshade, AO, water, slope, raw view —
         // and Fill itself is off by default, so gating the export on it alone
         // shipped SVGs whose lines were not hidden behind the terrain.
-        surfaceOccludes: hasFillLayer(p),
+        surfaceOccludes: hasFillLayer(p) || !!(p.depthOcclusion && p.occludeBy === 'ground' && (p.tilt == null || p.tilt <= 90)),
+        // The Ground model: the skirt closes the sheet into a solid, and the
+        // layers that live inside the ground test against a buffer without it.
+        groundOccludes: !!(p.depthOcclusion && p.occludeBy === 'ground' && (p.tilt == null || p.tilt <= 90)),
+        fillOccludes: hasFillLayer(p),
+        // How far behind its stroke a halo sits; the viewport uses the same.
+        haloDepth: Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2) * 0.01,
         depthOcclusion: p.depthOcclusion,
         occlusionBias: p.occlusionBias, occlusionOpacity: p.occlusionOpacity, occlusionColor: p.occlusionColor,
         elevMinCut: p.elevMinCut, elevMaxCut: p.elevMaxCut,

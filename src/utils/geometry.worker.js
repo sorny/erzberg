@@ -210,6 +210,12 @@ self.onmessage = (e) => {
     xfer(surfaceGeo.indices)
     xfer(surfaceGeo.normals)
     xfer(surfaceGeo.uvs)
+    if (surfaceGeo.skirt) {
+      surfaceGeo.skirt.sphere = sphereOf(surfaceGeo.skirt.positions)
+      xfer(surfaceGeo.skirt.positions)
+      xfer(surfaceGeo.skirt.brightnessBuf)
+      xfer(surfaceGeo.skirt.indices)
+    }
 
     // 3. Terrain grids (consumed on the main thread by particles / sampling).
     //    buildSurfaceGeometry/buildVectorGeometry above already finished reading them.

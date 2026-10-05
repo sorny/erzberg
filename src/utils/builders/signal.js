@@ -157,7 +157,10 @@ export function buildStems(terrain, p, o) {
       }
     }
   }
-  const out = { Stems: { positions: stem.positions.toArray(), colors: stem.colors.toArray() } }
+  // The stems run between the datum and the ground, so where the ground is
+  // above the datum they are inside it: under the Ground model the terrain must
+  // not hide them. The tips sit on the ground and are hidden like any mark.
+  const out = { Stems: { positions: stem.positions.toArray(), colors: stem.colors.toArray(), insideGround: true } }
   if (o.tips) out['Stems-Tips'] = { positions: tips.positions.toArray(), colors: tips.colors.toArray() }
   return out
 }

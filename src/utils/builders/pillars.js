@@ -230,22 +230,27 @@ export function buildPillars(terrain, p, spacing) {
   // `selfOcclude`: the pillars are emitted row by row whatever the camera does,
   // so without depth the last row drawn covered the rest — the far ones, seen
   // from behind. See the renderer.
-  const pack = (t) => ({ positions: t.positions.toArray(), colors: t.colors.toArray(), selfOcclude: true })
+  //
+  // `insideGround`: the lower half stands inside the ground — the columns are
+  // the ground, seen as a field of columns — so under the Ground model the
+  // terrain must not hide them. The upper half stands in the air above it.
+  const pack = (t, inside) => ({ positions: t.positions.toArray(), colors: t.colors.toArray(), selfOcclude: true,
+    ...(inside && { insideGround: true }) })
   const layers = {}
   // One half: a single layer, or one per class in class order. The half's
   // lids and occluder ride on its first layer; both are drawn for every layer.
-  const half = (id, single, split, byClass, extra) => {
+  const half = (id, single, split, byClass, extra, inside = false) => {
     const ids = []
     if (split) {
       for (const k of [...byClass.keys()].sort((a, b) => a - b)) {
-        layers[`${id}-Class${k}`] = pack(byClass.get(k)); ids.push(`${id}-Class${k}`)
+        layers[`${id}-Class${k}`] = pack(byClass.get(k), inside); ids.push(`${id}-Class${k}`)
       }
     } else {
-      layers[id] = pack(single); ids.push(id)
+      layers[id] = pack(single, inside); ids.push(id)
     }
     if (ids.length) Object.assign(layers[ids[0]], extra)
   }
-  half('Pillars', below, splitBelow, belowBy, { lids, occluder: occluderOf(occBelow) })
+  half('Pillars', below, splitBelow, belowBy, { lids, occluder: occluderOf(occBelow) }, true)
   if (above) half('Pillars-Above', upper, splitAbove, upperBy, { occluder: occluderOf(occUpper) })
   return layers
 }

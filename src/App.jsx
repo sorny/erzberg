@@ -47,7 +47,7 @@ import { AUTOMATION, useAutomation } from './automation'
 
 /** Every tweakable key, from the index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
-import { buildPreset, readPresetFile } from './utils/presetFile'
+import { buildPreset, migrateOcclusion, readPresetFile } from './utils/presetFile'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, effectiveClasses, parseCover, suggestInks } from './utils/coverPlate'
 import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, uniqueMaskName } from './utils/maskLayers'
@@ -821,7 +821,11 @@ export default function App() {
           try {
             const presRes = await fetch(`${baseUrl}presets/${file}`)
             if (!presRes.ok) throw new Error(`HTTP ${presRes.status}`)
-            return [file.replace('.json', ''), await presRes.json()]
+            // Bundled presets are migrated on disk and applied as they are,
+            // except for occlusion: one written before format 5 keeps the
+            // classic model with every mode's walls (presetFile.js).
+            const json = await presRes.json()
+            return [file.replace('.json', ''), (json.format ?? 1) < 5 ? migrateOcclusion(json) : json]
           } catch (err) {
             console.warn('[App] Skipped preset', file, err)
             return null

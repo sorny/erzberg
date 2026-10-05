@@ -68,7 +68,9 @@ minus a gap.
 - **Occlusion width.** A vertical line hangs a curtain of no width, so pillars
   hide nothing by themselves. Above 0, each half adds depth-only walls: two
   crossed walls that share of a cell wide for a line, the sides for a cuboid
-  or cylinder. At 1 the pillars are a solid block. The default is 0.
+  or cylinder. At 1 the pillars are a solid block. The default is 0. The rims
+  of a cuboid or cylinder also hang walls, its sides. Pillars keep these under
+  both occluders, and whole where they stand above the ground.
 - **Colour**, for each half, is the same row every mode has. With **Class** or
   **Plate**, a half takes the land cover class of the pillar's own cell, or the
   plate's colour there. It splits into one layer per class (`Pillars-Class3`),
@@ -885,9 +887,28 @@ close along the data edge as shorelines.
 
 ---
 
-## Ghost Occlusion
+## Occlusion
 
-Every line segment gets a thin curtain mesh below it, down to the scene base.
-The curtains write depth only. In the colour pass, a segment behind a curtain is
-hidden, or drawn in the ghost colour and opacity. Lines thus occlude lines,
-without the terrain surface clipping them.
+*Occluder* (Terrain Style › Occlusion) sets what hides a line. In the colour
+pass, a hidden segment is left out, or drawn in the ghost colour and opacity.
+
+- **Lines**, the default and the classic model. Each segment hangs a depth-only
+  wall down to the floor, so lines hide lines. A wall's top follows the ground
+  under its stroke, so no wall stands in the air. A mode's own *Occluder* switch
+  turns its walls off. It starts off for Hachure, Rock & Scree, Truchet, Slope
+  Classes, Line Printer, Hair, Waveform, Radar, Air, Flashbulb, Halation,
+  Shadow Hatch and Runout: marks and overlays, whose walls cut notches into the
+  lines behind.
+- **Ground**. A depth-only copy of the surface hides what is behind it, with or
+  without a fill. A skirt closes it into a solid, down to the floor along every
+  edge and NoData hole. No walls are built, except Pillars' sides. Pillars below
+  the ground and Stems stand inside it, so the ground does not hide them. A
+  filled surface does.
+
+**Halo** (per mode, 0–6 px) breaks the lines farther away where they pass behind
+the mode's strokes (Appel, Rohlf and Stein, 1979). It sits 1% of the plate's
+reach behind its stroke, so a line on the same patch of ground does not break.
+The gap stays empty, with no ghost in it.
+
+Presets, sessions and files from before v1.57.0 open with every mode's walls
+on, as they were drawn.

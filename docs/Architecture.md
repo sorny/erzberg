@@ -119,7 +119,8 @@ relief fields and tints, aerial perspective, raw view).
 
 Two exceptions are argued at `RENDER_SIDE` in `src/params.js`:
 `needsSurfaceShading` (no normals or UVs without a fill layer) and
-`depthOcclusion` (the curtains are geometry).
+`depthOcclusion` (the curtains are geometry). `occludeBy` and `walls<Id>`
+rebuild for the same reason. A halo (`halo<Id>`) does not.
 
 **Tier 3. Nothing.** The canvas uses `frameloop="demand"`. A camera drag moves
 the camera directly and mirrors into React state on a throttled trailing tick.
@@ -171,8 +172,12 @@ and `SurfaceMesh` hands them to the shader as two float textures. Each field is
 cached by a key of the grid's content and its own settings, so a rebuild that
 changes only lines costs one scan of the grid.
 
-**Ghost occlusion.** Each segment also makes an invisible curtain that writes
-depth, so lines hide other lines. Hidden segments can draw in their own colour.
+**Occlusion.** Under *Occluder: Lines*, the default, each segment makes an
+invisible curtain that writes depth, so lines hide other lines. Under *Ground*,
+`GroundOccluder` draws the surface and its skirt depth-only, so the terrain
+hides lines with no fill on. A halo is a wider copy of a layer's lines, depth-only and pushed back.
+Hidden segments can draw in their own colour. Render order: occluders and
+curtains, layers inside the ground, the ground, ghosts, haloes, then the layers.
 
 **Viewport aids** (the profile line and pins in `ProfileOverlay`) live in the
 scene graph. SVG and STL cannot see them. The PNG capture hides them through
@@ -352,7 +357,9 @@ To ink from the plate, read `terrain.gridClass` and `terrain.classColors`. See
 2. Register it in `MODES_CONFIG` in `buildLineGeometry`.
 3. Add a `layerStyle` case for each sub-layer.
 4. Add its params to `STYLE_DEF` in `src/defaults.js`.
-5. Add an entry in `src/utils/drawModes.js`, so the randomiser knows it.
+5. Add an entry in `src/utils/drawModes.js`, so the randomiser knows it. Give
+   it `walls: false` if its strokes are marks or overlays, and `solid: true` if
+   they outline bodies whose walls are their sides.
 6. Add a `<Section>` in `panel/ModeSections.jsx`.
 7. Add a 22×13 mark in `panel/modeMarks.jsx` that shows the mode's gesture.
 8. Add a line in `SECTION_TERMS`.
@@ -366,6 +373,10 @@ Two optional parts:
 - A builder can return `occluder`, depth-only triangles appended to the layer's
   curtains. Use it when the lines alone hang no useful curtain, as Pillars'
   vertical lines do.
+- A builder can return `insideGround: true` for a layer that stands inside the
+  ground, as Pillars' lower half and Stems do. The Ground model then does not
+  hide it: the viewport draws it before the ground, and the SVG tests it
+  against a depth buffer without the ground.
 - A builder can return `selfOcclude: true`. The layer's lines then write depth
   and test against it, so the nearer line covers the farther whatever order
   they were emitted in. Use it for a layer whose lines overlap on screen in

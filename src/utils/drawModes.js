@@ -28,6 +28,17 @@
  * `aliases` are older labels the command line still accepts, so a script
  * written against them keeps working after a rename.
  *
+ * `walls: false` marks a mode whose strokes are marks or overlays rather than
+ * the shape of the ground: ticks, glyphs, hatches, curls, floating spans. Under
+ * the classic occlusion model (*Occluder: Lines*) a mode hangs a wall from
+ * each stroke to hide what is behind it, and a wall under a tick is a white
+ * notch in every line behind it; these start with that off. The Ground model
+ * builds no walls at all. See geometryBuilders.js.
+ *
+ * `solid: true` marks a mode whose strokes outline bodies, not lines on the
+ * ground: Pillars' columns. A wall under them is a column's side, so it is
+ * built under both models and kept whole where it stands in the air.
+ *
  * `roll: false` keeps a mode out of Surprise me although it draws without a
  * file. Five draw from a point or a route the user picks (Route, Isochrones,
  * Viewshed, Panorama, Geodesic fan), and from the default centre they look
@@ -46,7 +57,7 @@ export const DRAW_MODES = [
     pick: { spacing: [3, 16], angle: [0, 90] },
   },
   {
-    id: 'Pillars', label: 'Pillars', cost: 2, mark: 'pillars',
+    id: 'Pillars', label: 'Pillars', cost: 2, mark: 'pillars', solid: true,
     pick: { spacing: [4, 20], pillarGap: [0, 0.4], pillarDepth: [0, 20], pillarSize: [0.3, 1] },
   },
   {
@@ -54,7 +65,7 @@ export const DRAW_MODES = [
     pick: { interval: [2, 12], majorInterval: [4, 12], smoothing: [0, 3] },
   },
   {
-    id: 'Hachure', label: 'Hachure', cost: 1.5, mark: 'hachure',
+    id: 'Hachure', label: 'Hachure', cost: 1.5, mark: 'hachure', walls: false,
     pick: { spacing: [2, 12], length: [0.5, 2.5] },
   },
   {
@@ -94,7 +105,7 @@ export const DRAW_MODES = [
     pick: { spacing: [2, 10], length: [20, 120], threshold: [0.05, 0.4] },
   },
   {
-    id: 'Swiss', label: 'Rock & scree', cost: 3.5, mark: 'swiss',
+    id: 'Swiss', label: 'Rock & scree', cost: 3.5, mark: 'swiss', walls: false,
     pick: { spacing: [1, 6], threshold: [0.25, 0.7], length: [0.5, 2], scree: [0, 1] },
   },
   {
@@ -102,7 +113,7 @@ export const DRAW_MODES = [
     pick: { tiers: [5, 18], dither: [0.4, 1], spacing: [1.5, 5] },
   },
   {
-    id: 'Flashbulb', label: 'Flashbulb', cost: 4.5, mark: 'flashbulb',
+    id: 'Flashbulb', label: 'Flashbulb', cost: 4.5, mark: 'flashbulb', walls: false,
     pick: { azimuth: [0, 360], distance: [0.5, 1.6], height: [1.2, 2.8],
             falloff: [1, 2.2], exposure: [1.4, 2.6], contrast: [1, 1.7], spacing: [1.5, 4] },
   },
@@ -115,7 +126,7 @@ export const DRAW_MODES = [
     pick: { spacing: [5, 16], carve: [0.4, 0.9], length: [1, 4] },
   },
   {
-    id: 'Air', label: 'Air', cost: 3, mark: 'air',
+    id: 'Air', label: 'Air', cost: 3, mark: 'air', walls: false,
     pick: { spacing: [5, 14], carve: [0.15, 0.6], drag: [0.04, 0.12], runIn: [4, 18] },
   },
   {
@@ -153,7 +164,7 @@ export const DRAW_MODES = [
     pick: { detrend: [2, 16], spacing: [1, 6] },
   },
   {
-    id: 'Halation', label: 'Halation', cost: 5, mark: 'halation',
+    id: 'Halation', label: 'Halation', cost: 5, mark: 'halation', walls: false,
     pick: { azimuth: [0, 360], height: [1.2, 2.8], falloff: [1, 2.2],
             exposure: [1.4, 2.6], bloom: [3, 14], bleed: [0.5, 1.4], glow: [0.4, 1.2],
             spacing: [1.5, 4] },
@@ -205,7 +216,7 @@ export const DRAW_MODES = [
     pick: { gamma: [0.9, 2.2] },
   },
   {
-    id: 'ShadowHatch', label: 'Shadow hatch', cost: 2, mark: 'shadowhatch',
+    id: 'ShadowHatch', label: 'Shadow hatch', cost: 2, mark: 'shadowhatch', walls: false,
     pick: { spacing: [2, 6], angle: [20, 70], radius: [0, 2] },
   },
   {
@@ -215,7 +226,7 @@ export const DRAW_MODES = [
     pick: { smoothing: [1, 4], radius: [1, 4] },
   },
   {
-    id: 'Truchet', label: 'Truchet', cost: 1.5, mark: 'truchet',
+    id: 'Truchet', label: 'Truchet', cost: 1.5, mark: 'truchet', walls: false,
     pick: { spacing: [4, 16], threshold: [0.05, 0.3] },
   },
   {
@@ -239,7 +250,7 @@ export const DRAW_MODES = [
     pick: { dip: [10, 60], azimuth: [0, 360], beds: [20, 70] },
   },
   {
-    id: 'SlopeClass', label: 'Slope classes', cost: 2, mark: 'slopeclass',
+    id: 'SlopeClass', label: 'Slope classes', cost: 2, mark: 'slopeclass', walls: false,
     pick: { spacing: [2, 6], angle: [20, 70] },
   },
   {
@@ -249,7 +260,7 @@ export const DRAW_MODES = [
   },
   {
     // One fall-line walk per seed in the release zones, which are few.
-    id: 'Runout', label: 'Runout', cost: 1.5, mark: 'runout',
+    id: 'Runout', label: 'Runout', cost: 1.5, mark: 'runout', walls: false,
     pick: { spacing: [4, 10] },
   },
   {
@@ -259,7 +270,7 @@ export const DRAW_MODES = [
   },
   {
     // One glyph of a few strokes per character cell.
-    id: 'Printer', label: 'Line printer', cost: 1.5, mark: 'printer',
+    id: 'Printer', label: 'Line printer', cost: 1.5, mark: 'printer', walls: false,
     pick: {},
   },
   {
@@ -268,12 +279,12 @@ export const DRAW_MODES = [
   },
   {
     // A few segments per sampled cell; dense at a small spacing.
-    id: 'Hair', label: 'Hair', cost: 3, mark: 'hair',
+    id: 'Hair', label: 'Hair', cost: 3, mark: 'hair', walls: false,
     pick: { spacing: [2, 6] },
   },
   {
     // One stroke per sample down one line.
-    id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform', roll: false,
+    id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform', walls: false, roll: false,
     pick: {},
   },
   {
@@ -287,7 +298,7 @@ export const DRAW_MODES = [
     pick: { radius: [1, 4] },
   },
   {
-    id: 'Radar', label: 'Radar', cost: 1.5, mark: 'radar',
+    id: 'Radar', label: 'Radar', cost: 1.5, mark: 'radar', walls: false,
     pick: { spacing: [2, 6], azimuth: [0, 360] },
   },
   {

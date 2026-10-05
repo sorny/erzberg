@@ -7,7 +7,7 @@
  * App.jsx remains the only place that seeds React state from them.
  */
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
-import { DRAW_MODE_IDS } from './utils/drawModes'
+import { DRAW_MODES, DRAW_MODE_IDS } from './utils/drawModes'
 
 // ── Default param sets ────────────────────────────────────────────────────────
 export const TERRAIN_DEF = {
@@ -22,6 +22,11 @@ export const STYLE_DEF = {
   showMesh: false, meshColor: '#888888', bgColor: '#ffffff',
   bgGradient: false,
   depthOcclusion: true,
+  // What hides a line behind something. 'lines': the classic ridgeline look,
+  // where the walls hung under the strokes of modes that hide (`walls<Id>`) do.
+  // 'ground': the terrain itself, as a solid with side walls, whether or not a
+  // fill is shown.
+  occludeBy: 'lines',
   occlusionBias: 1.0,
   occlusionColor: '#a80000',
   occlusionOpacity: 0.0,
@@ -619,6 +624,17 @@ export const STYLE_DEF = {
    * landform, which is every layer by default and every older preset.
    */
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`formMask${id}`, 0])),
+
+  /*
+   * Occlusion per mode. `walls<Id>`: under *Occluder: Lines*, or under both
+   * models for a solid mode (Pillars), whether the mode hangs a wall under its
+   * strokes that hides what is behind them (off for the marks and overlays
+   * flagged `walls: false` in drawModes.js). `halo<Id>`: a
+   * gap, in pixels, that lines farther away get where they pass behind this
+   * mode's strokes; 0 is none.
+   */
+  ...Object.fromEntries(DRAW_MODES.map((m) => [`walls${m.id}`, m.walls !== false])),
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`halo${id}`, 0])),
 
   /*
    * Copies of draw modes: one mode, several settings. Each is

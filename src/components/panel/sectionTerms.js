@@ -22,7 +22,7 @@ export const SECTION_TERMS = {
   'Levels':           'shadows highlights histogram black white point contrast',
   'Camera':           'tilt zoom rotation supersampling auto-rotate spin guides orthographic perspective focal length lens pan dolly view angle plan oblique relief imfeld raisz berann',
   'Paper':            'paper frame page sheet margin scale offset aspect ratio portrait landscape a3 a4 letter mount border',
-  'Terrain Style':    'fill mesh occlusion ghost x-ray background gradient sky paper colour color inks as picked tone mapping true colours exact pens',
+  'Terrain Style':    'fill mesh occlusion ghost x-ray background gradient sky paper colour color inks as picked tone mapping true colours exact pens occluder hidden by ground lines walls curtains halo',
   'Hillshade':        'sun azimuth altitude shadows relief lambert penumbra softness multidirectional local swiss imhof light almanac ephemeris date time clock solstice equinox sunrise sunset latitude longitude timezone solar',
   'Slope Shading':    'steepness gradient two-colour incline',
   'Water Fill':       'flood level sea lake opacity',

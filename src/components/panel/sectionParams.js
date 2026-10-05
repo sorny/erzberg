@@ -51,7 +51,7 @@ export const SECTION_PARAMS = {
   'Levels': ['blackPoint', 'whitePoint'],
   'Terrain Style': ['showFill', 'fillColor', 'fillHypsometric', 'fillBanded',
     'fillHypsoInterval', 'fillHypsoWeight', 'fillHypsoMode', 'showMesh', 'meshColor',
-    'bgColor', 'bgGradient', 'depthOcclusion', 'occlusionBias', 'occlusionColor',
+    'bgColor', 'bgGradient', 'depthOcclusion', 'occludeBy', 'occlusionBias', 'occlusionColor',
     'occlusionOpacity', 'gradientStops', 'inksAsPicked'],
   'Hillshade': [/^hillshade/, 'showHillshade', 'showSun', 'showAO', 'aoStrength', 'aoRays'],
   'Slope Shading': ['showSlopeShade', 'slopeShadeOpacity', 'slopeColorLow', 'slopeColorHigh',

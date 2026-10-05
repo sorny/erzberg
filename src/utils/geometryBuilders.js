@@ -23,14 +23,19 @@ import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRad
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
 import { buildPillars } from './builders/pillars.js'
 import { buildBitplane } from './builders/relief.js'
-import { maskedTerrain, paintFor } from './builders/shared.js'
+import { F32List, U32List, maskedTerrain, paintFor } from './builders/shared.js'
+import { DRAW_MODES } from './drawModes'
+import { jitterNoise, sampleBilinear } from './terrain'
 import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
 import { buildReticulation, buildRugged, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
-export { F32List, U32List, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
+export { F32List, U32List, haloOf, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
 export { buildSurfaceGeometry } from './builders/surface.js'
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+/** Modes whose walls are the sides of bodies; see `solid` in drawModes.js. */
+const SOLID_MODES = new Set(DRAW_MODES.filter((m) => m.solid).map((m) => m.id))
 
 /**
  * Returns an ARRAY of layers, each with its own geometry and styling.
@@ -267,6 +272,24 @@ export function buildLineGeometry(terrain, p) {
 
   const finalLayers = []
 
+  // The ground's height under a point, as the lines measure it: bilinear on the
+  // grid, plus the same smooth jitter. NaN off the data. For the curtains, so a
+  // wall never stands above the ground (see the curtain loop).
+  const gMask = terrain.hasNoData ? terrain.gridMask : null
+  const gScale = terrain.elevScale ?? p.elevScale ?? 1
+  const groundAt = (x, z) => {
+    const fc = (x + terrain.halfW) / terrain.scl, fr = (z + terrain.halfH) / terrain.scl
+    if (!(fc >= 0 && fr >= 0 && fc <= terrain.cols - 1 && fr <= terrain.rows - 1)) return NaN
+    const b = sampleBilinear(terrain.grid, gMask, terrain.rows, terrain.cols, fr, fc)
+    if (b !== b) return NaN
+    let e = (b - 0.5) * 100 * gScale
+    if (p.jitterAmt > 0) e += jitterNoise(fc, fr) * p.jitterAmt
+    return e
+  }
+  // How far above the ground a stroke may sit and still count as on it: the
+  // grid is sampled a little differently by each builder.
+  const wallTol = Math.max(1e-3, (terrain.maxElev - terrain.minElev) * 0.01)
+
   const mX = [p.showMirrorPlusX ? 1 : null, p.showMirrorMinusX ? -1 : null].filter(v => v !== null)
   const mY = [p.showMirrorPlusY ? 1 : null, p.showMirrorMinusY ? -1 : null].filter(v => v !== null)
   const mZ = [p.showMirrorPlusZ ? 1 : null, p.showMirrorMinusZ ? -1 : null].filter(v => v !== null)
@@ -349,28 +372,66 @@ export function buildLineGeometry(terrain, p) {
       // rebuild — ~18 MB and a 255k-iteration loop at a dense layer, for
       // geometry nothing would look at. Toggling the switch now costs one extra
       // rebuild, which is the right trade against paying for it on every drag.
-      const segCount = (res.isPoints || !p.depthOcclusion) ? 0 : (baseP.length / 6) | 0
-      const cPfull = new Float32Array(segCount * 12)
-      const cIfull = new Uint32Array(segCount * 6)
-      let cPn = 0, cIn = 0, vIdx = 0
+      //
+      // Walls belong to the classic model (*Occluder: Lines*). Under the
+      // Ground model the terrain itself is the occluder, drawn depth-only with a
+      // skirt at its edges, and a wall under a stroke would only stand where the
+      // ground already is — or in the air, under a stroke that floats, which is
+      // the white notch this model exists to remove. In the classic model a mode
+      // can still be told not to hang walls (`walls<Id>`, off for marks).
+      // A solid's walls are its sides (Pillars' columns), which the ground cannot
+      // stand in for, so it keeps them under both models (`solid` in drawModes).
+      const solid = SOLID_MODES.has(cfg.id)
+      const hangsWalls = p.depthOcclusion && (p.occludeBy !== 'ground' || solid) && p[`walls${cfg.id}`] !== false
+      const segCount = (res.isPoints || !hangsWalls) ? 0 : (baseP.length / 6) | 0
+      /*
+       * No wall in the air. A curtain hangs from its stroke to the floor, and
+       * where the stroke floats above the ground — the ends of a long hachure
+       * tick on a convex peak, a jump span, a waveform laid over the plate —
+       * that wall stood in the air and cut a white slab out of every line
+       * behind it. Its top now follows the ground under the stroke instead, so
+       * a wall only ever stands where the ground is. A stroke on the ground (all
+       * but a few) keeps its wall exactly as before; a floating or long one is
+       * split at about a cell, so the top follows the ground between its ends.
+       */
+      const cP = new F32List(Math.max(16, segCount * 12)), cI = new U32List(Math.max(16, segCount * 6))
+      let vIdx = 0
+      const quad = (xa, ya, za, xb, yb, zb) => {
+        cP.push6(xa, ya, za, xb, yb, zb)
+        cP.push6(xb, floorY, zb, xa, floorY, za)
+        cI.push3(vIdx, vIdx + 1, vIdx + 2)
+        cI.push3(vIdx, vIdx + 2, vIdx + 3)
+        vIdx += 4
+      }
+      // No ground under a point — past the raster's edge, or in a NoData hole —
+      // means no wall there: a tick reaching past the plate's edge used to hang
+      // one in the air beyond it.
+      const top = (y, g) => (g !== g ? floorY : y > g + wallTol ? g : y)
       for (let i = 0; i < segCount * 6; i += 6) {
         const x0 = baseP[i], y0 = baseP[i+1], z0 = baseP[i+2]
         const x1 = baseP[i+3], y1 = baseP[i+4], z1 = baseP[i+5]
         // A vertical segment's curtain lies in its own line and has no area.
         // It hides nothing, so it is not built. This also covers a zero-length one.
         if (Math.abs(x0-x1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
-        cPfull[cPn]=x0;   cPfull[cPn+1]=y0;     cPfull[cPn+2]=z0
-        cPfull[cPn+3]=x1; cPfull[cPn+4]=y1;     cPfull[cPn+5]=z1
-        cPfull[cPn+6]=x1; cPfull[cPn+7]=floorY; cPfull[cPn+8]=z1
-        cPfull[cPn+9]=x0; cPfull[cPn+10]=floorY; cPfull[cPn+11]=z0
-        cPn += 12
-        cIfull[cIn]=vIdx; cIfull[cIn+1]=vIdx+1; cIfull[cIn+2]=vIdx+2
-        cIfull[cIn+3]=vIdx; cIfull[cIn+4]=vIdx+2; cIfull[cIn+5]=vIdx+3
-        cIn += 6
-        vIdx += 4
+        if (solid) { quad(x0, y0, z0, x1, y1, z1); continue }
+        const g0 = groundAt(x0, z0), g1 = groundAt(x1, z1)
+        const len = Math.hypot(x1 - x0, z1 - z0)
+        if (top(y0, g0) === y0 && top(y1, g1) === y1 && len <= 2 * terrain.scl) {
+          quad(x0, y0, z0, x1, y1, z1)
+          continue
+        }
+        const k = Math.min(64, Math.max(1, Math.ceil(len / terrain.scl)))
+        let ax = x0, ay = top(y0, g0), az = z0
+        for (let j = 1; j <= k; j++) {
+          const f = j / k
+          const x = x0 + (x1 - x0) * f, y = y0 + (y1 - y0) * f, z = z0 + (z1 - z0) * f
+          const by = j === k ? top(y1, g1) : top(y, groundAt(x, z))
+          quad(ax, ay, az, x, by, z)
+          ax = x; ay = by; az = z
+        }
       }
-      let cPbase = cPn === cPfull.length ? cPfull : cPfull.subarray(0, cPn)
-      let cIbase = cIn === cIfull.length ? cIfull : cIfull.subarray(0, cIn)
+      let cPbase = cP.toArray()
+      let cIbase = cI.toArray()
       /*
        * A builder's own occluder, appended to the curtains.
        *
@@ -429,6 +490,9 @@ export function buildLineGeometry(terrain, p) {
           // Lines that write depth and test against it, so the nearer of two
           // covers the farther whatever order they were emitted in.
           selfOcclude: !!res.selfOcclude,
+          // Lines that live inside the ground — Pillars' columns, Stems' stems —
+          // and so are not hidden by it under the Ground model.
+          insideGround: !!res.insideGround,
         })
         continue
       }
@@ -512,6 +576,7 @@ export function buildLineGeometry(terrain, p) {
         areas: null,
         isPoints: res.isPoints ?? false,
         selfOcclude: !!res.selfOcclude,
+        insideGround: !!res.insideGround,
       })
     }
   }

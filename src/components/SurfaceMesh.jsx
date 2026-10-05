@@ -1037,3 +1037,98 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     </group>
   )
 }
+
+// ── The ground as an occluder ─────────────────────────────────────────────────
+
+const GROUND_VERT = /* glsl */ `
+  attribute float brightness;
+  varying float vBrightness;
+  void main() {
+    vBrightness = brightness;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+// Depth only, with the surface's own elevation cut: ground the cut has removed
+// hides nothing, exactly as the fill would not.
+const GROUND_FRAG = /* glsl */ `
+  uniform float uRawMin;
+  uniform float uRawMax;
+  uniform float uElevMinCut;
+  uniform float uElevMaxCut;
+  varying float vBrightness;
+  void main() {
+    float cut = clamp((vBrightness - uRawMin) / max(uRawMax - uRawMin, 1e-5), 0.0, 1.0);
+    if (cut < uElevMinCut / 100.0 || cut > uElevMaxCut / 100.0) discard;
+    gl_FragColor = vec4(0.0);
+  }
+`
+
+/** The order the ground's depth is written in: after the occluders (0) and the
+ *  layers that live inside the ground, before every other layer (1 and up). */
+export const GROUND_ORDER = 0.5
+
+/**
+ * Occlusion by the ground (*Occluder: Ground*).
+ *
+ * The terrain hides what is behind it whether or not a fill is shown: the
+ * surface is drawn into the depth buffer only, with the skirt that closes it
+ * into a solid at its edges (see `buildSkirt` in builders/surface.js). With a
+ * fill on, the fill already writes the sheet's depth, so only the skirt is
+ * drawn here. Transparent, and at `GROUND_ORDER`, so it lands after Pillars'
+ * and Stems' lines, which live inside the ground and are drawn in a band below
+ * it (HeightmapLines.jsx) — the ground must not hide them.
+ *
+ * Off with the camera underneath (tilt over 90°), as the curtains are, so the
+ * lines can be seen from below.
+ */
+export function GroundOccluder({ surfaceGeo, p }) {
+  const on = !!(p.depthOcclusion && p.occludeBy === 'ground' && !p.showRawTerrain &&
+                (p.tilt == null || p.tilt <= 90))
+  const sheet = on && !hasFillLayer(p)
+  const mat = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader: GROUND_VERT,
+    fragmentShader: GROUND_FRAG,
+    side: THREE.DoubleSide,
+    transparent: true,
+    colorWrite: false,
+    depthWrite: true,
+    depthTest: true,
+    polygonOffset: true,
+    uniforms: {
+      uRawMin: { value: 0 }, uRawMax: { value: 1 },
+      uElevMinCut: { value: 0 }, uElevMaxCut: { value: 100 },
+    },
+  }), [])
+  useEffect(() => {
+    mat.uniforms.uRawMin.value = surfaceGeo?.metadata?.minB ?? 0
+    mat.uniforms.uRawMax.value = surfaceGeo?.metadata?.maxB ?? 1
+    mat.uniforms.uElevMinCut.value = p.elevMinCut ?? 0
+    mat.uniforms.uElevMaxCut.value = p.elevMaxCut ?? 100
+    // The same push back as the surface's, so a line on the ground wins the tie.
+    mat.polygonOffsetFactor = p.occlusionBias ?? 1
+    mat.polygonOffsetUnits = p.occlusionBias ?? 1
+  }, [mat, surfaceGeo, p.elevMinCut, p.elevMaxCut, p.occlusionBias])
+  useEffect(() => () => mat.dispose(), [mat])
+
+  const meshOf = (src) => {
+    if (!src?.positions?.length || !src.indices?.length) return null
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(src.positions, 3))
+    geo.setAttribute('brightness', new THREE.BufferAttribute(src.brightnessBuf, 1))
+    geo.setIndex(new THREE.BufferAttribute(src.indices, 1))
+    if (src.sphere) geo.boundingSphere = toSphere(src.sphere)
+    return geo
+  }
+  const sheetGeo = useMemo(() => meshOf(surfaceGeo), [surfaceGeo])
+  const skirtGeo = useMemo(() => meshOf(surfaceGeo?.skirt), [surfaceGeo])
+  useEffect(() => () => sheetGeo?.dispose(), [sheetGeo])
+  useEffect(() => () => skirtGeo?.dispose(), [skirtGeo])
+
+  if (!on) return null
+  return (
+    <group>
+      {sheet && sheetGeo && <mesh geometry={sheetGeo} material={mat} renderOrder={GROUND_ORDER} />}
+      {skirtGeo && <mesh geometry={skirtGeo} material={mat} renderOrder={GROUND_ORDER} />}
+    </group>
+  )
+}

@@ -29,11 +29,13 @@ describe('migratePillarInk', () => {
   })
 
   it('runs for a payload before format 4, and not after', () => {
-    expect(PRESET_FORMAT).toBe(4)
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(4)
     const old = parsePreset(JSON.stringify({ format: 3, style: { pillarInk: 'plate' } }))
     expect(old.style.hypsoModePillars).toBe('plate')
+    // At format 4 the ink rows are already gone: nothing here moves them.
     const now = parsePreset(JSON.stringify({ format: 4, style: { hypsoPillars: false } }))
-    expect(now.style).toEqual({ hypsoPillars: false })
+    expect(now.style.hypsoPillars).toBe(false)
+    expect(now.style.hypsoModePillars).toBeUndefined()
   })
 })
 
