@@ -79,6 +79,9 @@ const RENDER_SIDE = [
   // will not draw them costs ~18 MB a rebuild. `occludeBy` and `walls<Id>`
   // are absent for the same reason: they decide which curtains are built.
   /^occlusion(Bias|Color|Opacity)$/,
+  // A depth lift on the strokes, a uniform in the viewport and a tolerance in
+  // the SVG walk. No geometry depends on it.
+  /^strokeDepthBias$/,
   // Surface fill and the mesh overlay — pure uniforms in SurfaceMesh. The one
   // fill-related value that does rebuild reaches the effect as the precomputed
   // p.needsSurfaceShading, not from here.
@@ -107,6 +110,8 @@ const RENDER_SIDE = [
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
   /^(extremeWeightContours|tipWeightStems)$/,
+  // A chart's rules and a stereonet's poles, pens of their own.
+  /^(ruleWeight|poleWeight)[A-Z]/,
   // Texture overlay — sampled in the surface shader.
   /^(texture|showTexture)/,
   // The drape's opacity is a shader uniform and nothing else. `showImagery` is
@@ -177,6 +182,8 @@ const MODE_SUFFIX_RENDER_SIDE = [
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
   /^(extremeWeightContours|tipWeightStems)$/,
+  // A chart's rules and a stereonet's poles, pens of their own.
+  /^(ruleWeight|poleWeight)[A-Z]/,
   // A halo: a depth-only pass in the viewport and a buffer in the SVG, both
   // drawn from geometry that already exists.
   /^halo[A-Z]/,

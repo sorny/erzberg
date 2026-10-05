@@ -389,6 +389,43 @@ const MARKS = {
       <path d="M11 1.5 L13 1.5 M10 3 L14 3 M8 4.5 L16 4.5 M9 6 L15 6 M6 7.5 L18 7.5 M7.5 9 L16.5 9 M9.5 10.5 L14.5 10.5 M11 12 L13 12" />
     </g>
   ),
+  // Station rules, crowded where the ground is rough, and profiles rising
+  // across them with a mark on each bend.
+  profileSheet: (
+    <g {...BASE} strokeWidth="0.4">
+      <path d="M1 1 L21 1 M1 12 L21 12 M2 0.5 L2 12.5 M5 0.5 L5 12.5 M6 0.5 L6 12.5 M7 0.5 L7 12.5 M11 0.5 L11 12.5 M16 0.5 L16 12.5 M17 0.5 L17 12.5 M20 0.5 L20 12.5" />
+      <path strokeWidth="0.9" d="M2 10.5 L5 9.5 L6 7.5 L7 7 L11 6 L16 4 L17 2.5 L20 2 M2 11.5 L6 11 L7 10 L11 9.5 L16 8 L17 6.5 L20 6" />
+    </g>
+  ),
+  // An envelope hatched between its highest and lowest line, the mean through it.
+  swathProfile: (
+    <g {...BASE} strokeWidth="0.4">
+      <path d="M1 5 L5 3.5 L9 2 L13 3 L17 1.5 L21 3.5 M1 11 L9 11.5 L21 11 M3 4.3 L3 11.1 M5 3.5 L5 11.2 M7 2.8 L7 11.4 M9 2 L9 11.5 M11 2.5 L11 11.4 M13 3 L13 11.3 M15 2.3 L15 11.2 M17 1.5 L17 11.1 M19 2.5 L19 11" />
+      <path strokeWidth="1" d="M1 8.5 L5 7.5 L9 6.5 L13 7.2 L17 6 L21 7.5" />
+    </g>
+  ),
+  // The area–altitude curve in its frame, and the histogram at its side.
+  hypsometry: (
+    <g {...BASE} strokeWidth="0.5">
+      <path d="M4 1 L4 12 L19 12 L19 1 Z M19 9.5 L16 9.5 L16 12 M19 7 L17.5 7 L17.5 9.5 M19 4.5 L18.3 4.5 L18.3 7" />
+      <path strokeWidth="1" d="M4 1.5 C5 6 9 9.5 18.5 11.5" />
+    </g>
+  ),
+  // Petals of uneven length round a compass ring.
+  aspectRose: (
+    <g {...BASE} strokeWidth="0.5">
+      <circle cx="11" cy="6.5" r="6" strokeWidth="0.35" />
+      <path strokeWidth="0.8" d="M11 6.5 L9.6 1.2 A5.5 5.5 0 0 1 12.4 1.2 Z M11 6.5 L14.3 4.4 A4 4 0 0 1 15 6.5 Z M11 6.5 L12.5 10.6 A4.4 4.4 0 0 1 9.5 10.6 Z M11 6.5 L7.6 8.4 A3.6 3.6 0 0 1 7.4 5.6 Z" />
+    </g>
+  ),
+  // The equal-area net, and a cluster of poles in it.
+  stereonet: (
+    <g {...BASE} strokeWidth="0.4">
+      <circle cx="11" cy="6.5" r="6" />
+      <path d="M11 0.5 L11 12.5 M5 6.5 L17 6.5 M11 0.5 C7.5 3 7.5 10 11 12.5 M11 0.5 C14.5 3 14.5 10 11 12.5" />
+      <path strokeWidth="0.8" d="M13 3.5 L14 3.5 M13.5 3 L13.5 4 M14.5 4.5 L15.5 4.5 M15 4 L15 5 M12.8 5 L13.8 5 M13.3 4.5 L13.3 5.5" />
+    </g>
+  ),
   // Veins that branch up from one root and fine out.
   venation: (
     <g {...BASE} strokeWidth="0.8">

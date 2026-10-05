@@ -860,6 +860,82 @@ this mode's settings, also serves two things in every other mode:
 - **Form** colour source: ink each stroke by the landform under it, one pen per
   landform, in this mode's inks.
 
+---
+
+## 59. Profile Sheet
+
+A surveyor's profile sheet, after the hand-drawn longitudinal profiles of rail
+and road surveys. *Profiles* transects run along the plate's longer side, evenly
+spaced across it. Each is read at one sample per step, a 500th of the sheet's
+width, so the raster's resolution does not change the drawing. After a blur of
+*Smoothing* steps, each plots from its first height as
+
+$$v_i = v_{i-1} + \begin{cases} |\Delta h_i| & \text{Change} \\ \max(0, \Delta h_i) & \text{Climb} \end{cases}$$
+
+or as the height itself. *Change* rises everywhere but on the flat. *Climb*
+stays level on every descent. All profiles in a band share one scale.
+
+A **station** is a vertex that Douglas–Peucker keeps on any profile at a
+*Tolerance* in steps, so the rules crowd where the ground is rough and thin out
+on the flat. Each profile runs straight from station to station, with a level
+mark on its own bends. *Station numbers* count the stations from the left and
+write one under each station there is room for, so a cluster shares one. A
+second band reads half as many cross profiles along the shorter side, at the
+same horizontal scale, so it ends short of the right edge. The rules, the frame,
+the grid and the numbers are one pen, *Rule weight*. The sheet lies flat at the
+highest point, like Waveform, so a plan view shows it alone.
+
+---
+
+## 60–63. Charts: Swath Profile, Hypsometry, Aspect Rose, Stereonet
+
+Each reads the whole plate and draws the chart a geomorphologist would plot
+from it, flat at the highest point like Waveform, north up. Heights, slopes and
+bearings are true metres and degrees, from the GeoTIFF where there is one, else
+from *Pixel size* and *Relief*. The data is the mode's pen. The frame, the grid,
+the ticks and the numbers are a second pen, *Rule weight*. `builders/charts.js`.
+
+### Swath Profile
+
+Along the plate's longer side, at 500 steps, every cell across a strip of
+*Swath width* is read. The chart draws the mean, and the highest and the lowest
+height as the envelope, hatched every *Hatch* steps. *Quartiles* adds the 25th
+and 75th percentiles. Where the mean rides the top of the envelope the ground is
+a plateau. Where it hugs the bottom, valleys cut it.
+
+### Hypsometry
+
+The hypsometric curve (Strahler, 1952). With $h$ the height above the lowest
+point, $H$ the relief and $a$ the area higher than $h$ out of $A$, the curve is
+$h/H$ against $a/A$. The area under it is the hypsometric integral,
+
+$$HI = \frac{\bar h - h_{min}}{h_{max} - h_{min}}$$
+
+written in the frame. A bulging curve is an upland still mostly high; a sagging
+one is ground worn toward its base. *Histogram bins* adds the height histogram
+at the frame's side.
+
+### Aspect Rose
+
+For each cell the downslope bearing is $\operatorname{atan2}(-\partial h/\partial x,\ \partial h/\partial z)$,
+clockwise from north. Cells flatter than *Min slope* are left out. Each of
+*Sectors* sums its cells, weighted by gradient or by area (*Weight*). On the
+equal-area scale a petal's radius is $R\sqrt{s/s_{max}}$, so its area is its
+share $s$. Rings mark shares of the largest petal.
+
+### Stereonet
+
+A slope that dips $\delta$ toward $\alpha$ has its pole plunging $90° - \delta$
+toward $\alpha + 180°$. On the lower-hemisphere equal-area (Schmidt) net it lies
+at
+
+$$r = R\sqrt{2}\,\sin(\delta/2)$$
+
+from the centre: level ground at the centre, a cliff at the rim, on the side
+opposite the way it faces. Up to *Poles read* cells are read, evenly. *Density
+contours* come from a Gaussian count on a 64² grid over the net, in *Contour
+levels* steps up to the peak. *Net* draws the graticule every 10°.
+
 ## NoData and clipped edges
 
 NoData cells, transparent PNG pixels and everything outside an Edit Mode
@@ -893,12 +969,14 @@ close along the data edge as shorelines.
 pass, a hidden segment is left out, or drawn in the ghost colour and opacity.
 
 - **Lines**, the default and the classic model. Each segment hangs a depth-only
-  wall down to the floor, so lines hide lines. A wall's top follows the ground
-  under its stroke, so no wall stands in the air. A mode's own *Occluder* switch
+  wall down to the floor, so lines hide lines. A mode's own *Occluder* switch
   turns its walls off. It starts off for Hachure, Rock & Scree, Truchet, Slope
   Classes, Line Printer, Hair, Waveform, Radar, Air, Flashbulb, Halation,
-  Shadow Hatch and Runout: marks and overlays, whose walls cut notches into the
-  lines behind.
+  Shadow Hatch, Runout and the charts: marks and overlays, whose walls cut
+  notches into the lines behind. Their strokes can float, so when their walls
+  are on, a wall's top follows the ground under its stroke, and no wall stands
+  in the air. The other modes lie on the ground, and their walls hang straight
+  from their strokes.
 - **Ground**. A depth-only copy of the surface hides what is behind it, with or
   without a fill. A skirt closes it into a solid, down to the floor along every
   edge and NoData hole. No walls are built, except Pillars' sides. Pillars below
@@ -910,5 +988,13 @@ the mode's strokes (Appel, Rohlf and Stein, 1979). It sits 1% of the plate's
 reach behind its stroke, so a line on the same patch of ground does not break.
 The gap stays empty, with no ghost in it.
 
+**Stroke depth bias** (0–3 stroke widths, 1 on a new plate) lifts each stroke
+toward the camera by that many of its widths, in depth only. A stroke is drawn
+as a flat band at the depth of its centre line, so on a slope seen at a low
+angle the terrain under its near edge is closer than the stroke, and the depth
+test shaved that edge off. The bias applies where the terrain hides lines: with
+a fill on, or under *Ground*. The SVG lifts each sample by the same amount.
+
 Presets, sessions and files from before v1.57.0 open with every mode's walls
-on, as they were drawn.
+on, and those from before v1.58.0 with a stroke depth bias of 0, as they were
+drawn.

@@ -521,6 +521,9 @@ async function runExport({
   bgColor, bgGradient, bgGradientStops,
   surfaceGeo, groupMatrix,
   surfaceOccludes, groundOccludes = false, fillOccludes = false, haloDepth = 4,
+  // The viewport's stroke lift, in half widths, and the CSS height a stroke's
+  // width is measured against there (see `liftPerW` below).
+  strokeLift = 0, viewHeight = 0,
   depthOcclusion, occlusionBias, occlusionOpacity, occlusionColor,
   particlePositions, particleCount, particleColor, particleSize, particleSizeMax, particleSegments, particleOpacity,
   particleShadows, particleShadowLift, particleShadowColor, particleShadowOpacity, particleShadowSize,
@@ -634,6 +637,18 @@ async function runExport({
   const e = mv.elements
   // Third row of the modelview — view-space z as a plain dot product.
   const z0 = e[2], z1 = e[6], z2 = e[10], z3 = e[14]
+
+  /*
+   * The stroke lift, as the viewport applies it (`patchStrokeDepth` in
+   * HeightmapLines): a stroke is moved toward the camera by `strokeLift` of its
+   * half widths, in world units at its depth. The viewport draws a stroke as a
+   * quad at its centre line's depth, and without the lift the ground under its
+   * near edge thinned it on steep slopes. This walk tests the centre line
+   * alone, so it lifts each sample by the same amount to agree with the screen.
+   * Per unit of clip w, for a stroke of weight 1.
+   */
+  const P11 = camera.projectionMatrix.elements[5]
+  const liftPerW = strokeLift > 0 && viewHeight > 0 && P11 ? strokeLift / (viewHeight * P11) : 0
 
   const hw = 0.5 * width, hh = 0.5 * height
   // Reused across every segment; sized for the sample ceiling.
@@ -760,6 +775,7 @@ async function runExport({
     for (const layer of haloLayers) {
       const st = lineStyles[layer.id] ?? {}
       const half = (st.weight ?? 1) * 0.25 + st.halo * 0.5
+      const liftL = layer.insideGround && groundOccludes && !fillOccludes ? 0 : liftPerW * (st.weight ?? 1)
       const zOf = layer.insideGround && noGroundZ ? noGroundZ : surfViewZ
       const seen = (sx, sy, vz) => {
         if (!zOf) return true
@@ -772,8 +788,10 @@ async function runExport({
         if (layer.isPoints) {
           // A dot is kept or dropped by its centre, so its halo is a square
           // there, as wide as the dot and the halo together.
-          const [sx, sy, vz] = project((P[i] + P[i + 3]) / 2, (P[i + 1] + P[i + 4]) / 2, (P[i + 2] + P[i + 5]) / 2)
-          if (vz <= nearH && !offCanvas1(sx, sy) && seen(sx, sy, vz)) thick(sx, sy, vz, sx, sy, vz, half)
+          const cx = (P[i] + P[i + 3]) / 2, cy = (P[i + 1] + P[i + 4]) / 2, cz = (P[i + 2] + P[i + 5]) / 2
+          const [sx, sy, vz] = project(cx, cy, cz)
+          const lift = liftL * (m[3] * cx + m[7] * cy + m[11] * cz + m[15])
+          if (vz <= nearH && !offCanvas1(sx, sy) && seen(sx, sy, vz + lift)) thick(sx, sy, vz, sx, sy, vz, half)
           continue
         }
         let ax = P[i], ay = P[i + 1], az = P[i + 2], bx = P[i + 3], by = P[i + 4], bz = P[i + 5]
@@ -794,7 +812,7 @@ async function runExport({
           xs[t] = ((m[0] * x + m[4] * y + m[8] * z + m[12]) * cw + 1) * hw
           ys[t] = (-((m[1] * x + m[5] * y + m[9] * z + m[13]) * cw) + 1) * hh
           zs[t] = z0 * x + z1 * y + z2 * z + z3
-          vis[t] = seen(xs[t], ys[t], zs[t]) ? 1 : 0
+          vis[t] = seen(xs[t], ys[t], zs[t] + liftL / cw) ? 1 : 0
         }
         // A halo is cut from the visible part of the stroke only: a stroke
         // behind a hill breaks nothing.
@@ -928,6 +946,8 @@ async function runExport({
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
       const { weight = 1, opacity = 1, dash = 'solid', color, name } = lineStyles[id] ?? {}
+      // Inside the ground, with no fill, nothing the lift answers can hide it.
+      const liftL = layer.insideGround && groundOccludes && !fillOccludes ? 0 : liftPerW * weight
       // Vector layers carry no per-vertex colour buffer unless hypsometric is
       // on; their one colour arrives with the style instead, so it can be
       // changed without a geometry rebuild. A vector layer's *area* fill is
@@ -978,13 +998,15 @@ async function runExport({
           const fill = (!eyeInk && colors && colors.length > i + 2)
             ? inkRGB(colors[i], colors[i+1], colors[i+2])
             : flatStroke
+          // Lifted as the viewport lifts it, by its weight, at its depth.
+          const dotZ = lineZ + liftL * (m[3] * cx3 + m[7] * cy3 + m[11] * cz3 + m[15])
           let visible = true
           if (surfViewZ) {
             const surfZ = surfViewZ(sx, sy)
-            visible = surfZ === -Infinity || lineZ >= surfZ - bias
+            visible = surfZ === -Infinity || dotZ >= surfZ - bias
           }
           // Behind a halo a dot is gone, not a ghost: the gap is the point.
-          if (visible && haloZ && lineZ < haloZ(sx, sy)) continue
+          if (visible && haloZ && dotZ < haloZ(sx, sy)) continue
           if (visible) {
             visibleDots.push({ cx: sx, cy: sy, fill })
             expandBB(sx - dotR, sy - dotR); expandBB(sx + dotR, sy + dotR)
@@ -1175,7 +1197,8 @@ async function runExport({
           const cw = 1 / (m[3] * x + m[7] * y + m[11] * z + m[15])
           const sx = ((m[0] * x + m[4] * y + m[8]  * z + m[12]) * cw + 1) * hw
           const sy = (-((m[1] * x + m[5] * y + m[9] * z + m[13]) * cw) + 1) * hh
-          const lineZ = z0 * x + z1 * y + z2 * z + z3
+          // The sample's depth, lifted as the viewport lifts the stroke.
+          const lineZ = z0 * x + z1 * y + z2 * z + z3 + liftL / cw
           const surfZ = layerZ ? layerZ(sx, sy) : -Infinity
           sxBuf[t] = sx; syBuf[t] = sy
           // 1 visible, 0 hidden (a ghost, if ghosts are on), 2 cut by a halo —

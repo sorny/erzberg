@@ -13,7 +13,8 @@ import { LANDFORMS } from './landforms'
 import { buildContours, contourExtremes, buildSpines } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
 import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
-import { buildBedding, buildGlacier, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildBedding, buildGlacier, buildProfileSheet, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildAspectRose, buildHypsometry, buildStereonet, buildSwathProfile } from './builders/charts.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
 import { buildMapGrid } from './builders/mapGrid.js'
 import { buildHair, buildPrinter, buildStems, buildWaveform } from './builders/signal.js'
@@ -36,6 +37,8 @@ export { buildSurfaceGeometry } from './builders/surface.js'
 
 /** Modes whose walls are the sides of bodies; see `solid` in drawModes.js. */
 const SOLID_MODES = new Set(DRAW_MODES.filter((m) => m.solid).map((m) => m.id))
+/** Marks and overlays, whose strokes can float above the ground (`walls: false`). */
+const FLOATING_MODES = new Set(DRAW_MODES.filter((m) => m.walls === false).map((m) => m.id))
 
 /**
  * Returns an ARRAY of layers, each with its own geometry and styling.
@@ -215,6 +218,23 @@ export function buildLineGeometry(terrain, p) {
         line: p.lineWaveform, angle: p.angleWaveform, place: p.placeWaveform, sides: p.sidesWaveform,
         spacing: p.spacingWaveform, width: p.widthWaveform,
         detail: p.detailWaveform, smooth: p.smoothWaveform, gamma: p.gammaWaveform }) },
+    { id:'ProfileSheet', builder: (t, ctx) => buildProfileSheet(t, ctx, {
+        plot: p.valueProfileSheet, count: p.countProfileSheet, bands: p.bandsProfileSheet,
+        tolerance: p.toleranceProfileSheet, smooth: p.smoothProfileSheet, grid: p.gridProfileSheet,
+        tick: p.tickProfileSheet, node: p.nodeProfileSheet, numbers: p.numbersProfileSheet }) },
+    { id:'SwathProfile', builder: (t, ctx) => buildSwathProfile(t, ctx, {
+        width: p.widthSwathProfile, hatch: p.hatchSwathProfile, quartiles: p.quartilesSwathProfile,
+        cellMetres: p.cellMetresSwathProfile, relief: p.reliefSwathProfile }) },
+    { id:'Hypsometry', builder: (t, ctx) => buildHypsometry(t, ctx, {
+        bins: p.binsHypsometry, cellMetres: p.cellMetresHypsometry, relief: p.reliefHypsometry }) },
+    { id:'AspectRose', builder: (t, ctx) => buildAspectRose(t, ctx, {
+        sectors: p.sectorsAspectRose, by: p.byAspectRose, scale: p.scaleAspectRose, rings: p.ringsAspectRose,
+        minSlope: p.minSlopeAspectRose, hatch: p.hatchAspectRose,
+        cellMetres: p.cellMetresAspectRose, relief: p.reliefAspectRose }) },
+    { id:'Stereonet', builder: (t, ctx) => buildStereonet(t, ctx, {
+        poles: p.polesStereonet, contours: p.contoursStereonet, levels: p.levelsStereonet,
+        sample: p.sampleStereonet, net: p.netStereonet, minSlope: p.minSlopeStereonet,
+        cellMetres: p.cellMetresStereonet, relief: p.reliefStereonet }) },
     { id:'Venation', builder: (t, ctx) => buildVenation(t, ctx, {
         count: p.countVenation, roots: p.rootsVenation, spacing: p.spacingVenation,
         gamma: p.gammaVenation, seed: p.seedVenation }) },
@@ -390,10 +410,16 @@ export function buildLineGeometry(terrain, p) {
        * tick on a convex peak, a jump span, a waveform laid over the plate —
        * that wall stood in the air and cut a white slab out of every line
        * behind it. Its top now follows the ground under the stroke instead, so
-       * a wall only ever stands where the ground is. A stroke on the ground (all
-       * but a few) keeps its wall exactly as before; a floating or long one is
-       * split at about a cell, so the top follows the ground between its ends.
+       * a wall only ever stands where the ground is. A stroke on the ground keeps
+       * its wall exactly as before; a floating or long one is split at about a
+       * cell, so the top follows the ground between its ends.
+       *
+       * Only marks and overlays float (`walls: false`). The line modes lie on the
+       * ground by construction, and reading the ground twice per segment cost
+       * them about 45 ms a rebuild on dense contours for no visible change, so
+       * their walls are built as they always were.
        */
+      const floats = FLOATING_MODES.has(cfg.id)
       const cP = new F32List(Math.max(16, segCount * 12)), cI = new U32List(Math.max(16, segCount * 6))
       let vIdx = 0
       const quad = (xa, ya, za, xb, yb, zb) => {
@@ -413,7 +439,7 @@ export function buildLineGeometry(terrain, p) {
         // A vertical segment's curtain lies in its own line and has no area.
         // It hides nothing, so it is not built. This also covers a zero-length one.
         if (Math.abs(x0-x1)<1e-4 && Math.abs(z0-z1)<1e-4) continue
-        if (solid) { quad(x0, y0, z0, x1, y1, z1); continue }
+        if (solid || !floats) { quad(x0, y0, z0, x1, y1, z1); continue }
         const g0 = groundAt(x0, z0), g1 = groundAt(x1, z1)
         const len = Math.hypot(x1 - x0, z1 - z0)
         if (top(y0, g0) === y0 && top(y1, g1) === y1 && len <= 2 * terrain.scl) {

@@ -608,6 +608,13 @@ function CoverRow({ children }) {
   return <div style={{ display: 'flex', gap: 4 }}>{children}</div>
 }
 
+/** A callback with a fixed identity that always calls the latest `fn`. */
+function useStable(fn) {
+  const ref = useRef(fn)
+  ref.current = fn
+  return useCallback((...args) => ref.current?.(...args), [])
+}
+
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -896,7 +903,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeWaveform: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeWaveform: false, modeProfileSheet: false, modeSwathProfile: false, modeHypsometry: false, modeAspectRose: false, modeStereonet: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeLandform: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1146,6 +1153,11 @@ export function Sidebar({
       modeStems:    !!newStyle.enabledStems,
       modeHair:     !!newStyle.enabledHair,
       modeWaveform: !!newStyle.enabledWaveform,
+      modeProfileSheet: !!newStyle.enabledProfileSheet,
+      modeSwathProfile: !!newStyle.enabledSwathProfile,
+      modeHypsometry: !!newStyle.enabledHypsometry,
+      modeAspectRose: !!newStyle.enabledAspectRose,
+      modeStereonet: !!newStyle.enabledStereonet,
       modeVenation: !!newStyle.enabledVenation,
       modeGeodesic: !!newStyle.enabledGeodesic,
       modeRadar:    !!newStyle.enabledRadar,
@@ -1346,7 +1358,15 @@ export function Sidebar({
   // The props the mode sections take besides the style, for the panel and for a
   // copy's body. The panel's own tag stays where it stands below, because
   // tests/unit/sectionParams.test.js reads the mode bodies in at that place.
-  const modeSectionProps = { mapGridNote, cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan, coralNote, glacierNote, routeNote, runoutNote, slopeClassNote, sec, sg, shadowLineSun, singleLineFonts, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }
+  /*
+   * The mode sections are the bulk of the panel, and they are memoised: while a
+   * soundscape streams, the raster and the geometry change thirty times a
+   * second and the panel was rendered again each time, all sixty sections, for
+   * nothing they show. They skip that render only if their callbacks keep one
+   * identity, so these call the latest of each.
+   */
+  const ssMode = useStable(ss), sgMode = useStable(sg), togMode = useStable(tog), onPickMode = useStable(onPick)
+  const modeSectionProps = { mapGridNote, cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick: onPickMode, pick, plateSpan, coralNote, glacierNote, routeNote, runoutNote, slopeClassNote, sec, sg: sgMode, shadowLineSun, singleLineFonts, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog: togMode, venationNote, viewshedNote, windNote }
   const renderModeSections = (st, setter) => createElement(ModeSections, { ...modeSectionProps, style: st, ss: setter })
   const modeCopiesPanel = {
     render: (title) => (
@@ -2137,6 +2157,7 @@ export function Sidebar({
                   options={[['Lines', 'lines'], ['Ground', 'ground']]}
                   value={style.occludeBy ?? 'lines'} onChange={v => ss({ occludeBy: v })} />
                 <InlineSl label="Depth tolerance" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. 0 is the old depth test, which thins strokes on slopes seen at a low angle. Plates made before v1.58.0 open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v} × width` : 'off')} />
                 <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -2562,7 +2583,7 @@ export function Sidebar({
               otherwise. */}
           {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
 
-          <ModeSections mapGridNote={mapGridNote} cover={cover} geoTiffBbox={geoTiffBbox} gradientStops={gradientStops} hasGeoTiff={hasGeoTiff} intervalMax={intervalMax} intervalMin={intervalMin} mPerWorld={mPerWorld} metreInterval={metreInterval} onPick={onPick} pick={pick} plateSpan={plateSpan} coralNote={coralNote} glacierNote={glacierNote} routeNote={routeNote} runoutNote={runoutNote} slopeClassNote={slopeClassNote} sec={sec} sg={sg} shadowLineSun={shadowLineSun} singleLineFonts={singleLineFonts}  sunHoursGeoreferenced={sunHoursGeoreferenced} sunHoursSeconds={sunHoursSeconds} sunHoursSweeps={sunHoursSweeps} terrain={terrain} tog={tog} venationNote={venationNote} viewshedNote={viewshedNote} windNote={windNote} ss={ss} style={style} />
+          <ModeSections {...modeSectionProps} ss={ssMode} style={style} />
 
           {/* Always here, even with nothing to put in it. Hiding the section
               behind a georeferenced raster meant the app's largest feature —

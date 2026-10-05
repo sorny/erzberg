@@ -10,7 +10,7 @@ import { useThree } from '@react-three/fiber'
 import { GroundOccluder, SurfaceMesh } from './SurfaceMesh'
 import { DASH_CONFIGS, dotSpacing } from '../utils/stylePresets'
 import { chainSegments } from '../utils/chainSegments'
-import { haloOf, layerStyle } from '../utils/geometryBuilders'
+import { haloOf, hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 
@@ -192,8 +192,57 @@ const BLEND_MODES = {
   normal:   THREE.NormalBlending,
 }
 
-function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, asPicked, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false }) {
+/**
+ * One patch for every line pass: a stroke's depth moves, its place on screen
+ * does not.
+ *
+ * `lift.value` moves a stroke toward the camera by that many of its own half
+ * widths, in world units at its depth. LineMaterial draws a stroke as a flat
+ * quad at the depth of its centre line, so on a slope seen at a low angle the
+ * ground under the stroke's near edge is closer than the stroke, and the depth
+ * test shaved that edge off: strokes on steep slopes thinned and broke up
+ * against a fill or the Ground occluder. `push.value` moves it away from the
+ * camera by world units, which is where a halo sits behind its stroke.
+ *
+ * Both act on the clip-space depth alone. Moving the points along view z
+ * instead shifted them on screen in perspective, toward the centre, by about
+ * two pixels at the edges of the view.
+ */
+function patchStrokeDepth(material, lift, push) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uStrokeLift = lift
+    shader.uniforms.uDepthPush = push
+    shader.vertexShader = shader.vertexShader
+      .replace('void main() {', 'uniform float uStrokeLift;\nuniform float uDepthPush;\nvoid main() {')
+      .replace('vec4 clipEnd = projectionMatrix * end;', `vec4 clipEnd = projectionMatrix * end;
+			{
+				float perPx = 2.0 / ( resolution.y * projectionMatrix[ 1 ][ 1 ] );
+				float dS = uStrokeLift * 0.5 * linewidth * perPx * clipStart.w - uDepthPush;
+				float dE = uStrokeLift * 0.5 * linewidth * perPx * clipEnd.w - uDepthPush;
+				// No shift, no arithmetic: a plate at 0 keeps its depths to the bit.
+				if ( dS != 0.0 ) {
+					vec4 cS = projectionMatrix * vec4( start.xy, start.z + dS, 1.0 );
+					clipStart.z = cS.z / cS.w * clipStart.w;
+				}
+				if ( dE != 0.0 ) {
+					vec4 cE = projectionMatrix * vec4( end.xy, end.z + dE, 1.0 );
+					clipEnd.z = cE.z / cE.w * clipEnd.w;
+				}
+			}`)
+  }
+  material.customProgramCacheKey = () => 'erzberg-stroke-depth'
+}
+
+/** A LineMaterial with the stroke depth patch on it. */
+function patchedLine(params, lift, push) {
+  const m = new LineMaterial(params)
+  patchStrokeDepth(m, lift, push)
+  return m
+}
+
+function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, asPicked, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false, strokeLift = 0 }) {
   const { positions: srcPositions, colors: srcColors, sphere } = layer
+  const invalidate = useThree((s) => s.invalidate)
   // Round dots replace the stroke's own segments. Rebuilt with the weight,
   // because the spacing grows with it; cheap next to a worker rebuild.
   // Chained once per geometry; only the spacing follows the weight slider.
@@ -447,7 +496,12 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   // and the effect below keeps them live. Depending on them would rebuild the
   // material on every slider tick — a new LineMaterial per frame of a drag, each
   // one a shader compile, which is exactly what the split into memo + effect buys.
-  const material = useMemo(() => new LineMaterial({
+  //
+  // The visible and ghost passes share one depth lift, so they stay exact
+  // complements: a stroke is drawn by one of the two, never both, never neither.
+  const liftU = useMemo(() => ({ value: 0 }), [])
+  const noPushU = useMemo(() => ({ value: 0 }), [])
+  const material = useMemo(() => patchedLine({
     linewidth: drawWeight,
     vertexColors: !flat,
     resolution,
@@ -465,7 +519,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     polygonOffsetFactor: -MARK_OFFSET,
     polygonOffsetUnits: -MARK_OFFSET,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [])
+  }, liftU, noPushU), [liftU, noPushU])
 
   const lines = useMemo(() => {
     if (!geometry) return null
@@ -487,7 +541,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
 
   // ── Ghost (Hidden) Pass ───────────────────────────────────────────────────
   // Same build-once-then-sync split as the visible pass above.
-  const ghostMaterial = useMemo(() => new LineMaterial({
+  const ghostMaterial = useMemo(() => patchedLine({
     linewidth: weight || 1,
     vertexColors: false,
     color: new THREE.Color(occlusionColor || '#000000'),
@@ -503,7 +557,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     polygonOffsetFactor: -MARK_OFFSET,
     polygonOffsetUnits: -MARK_OFFSET,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [])
+  }, liftU, noPushU), [liftU, noPushU])
 
   const ghostLines = useMemo(() => {
     if (!geometry || !depthOcclusion || (occlusionOpacity ?? 0) <= 0) return null
@@ -521,22 +575,11 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
    * themselves, so a halo behind a hill cuts nothing.
    */
   const haloDepthU = useMemo(() => ({ value: 1 }), [])
-  const haloMaterial = useMemo(() => {
-    const m = new LineMaterial({
-      linewidth: 1, resolution, transparent: true,
-      colorWrite: false, depthWrite: true, depthTest: true, depthFunc: THREE.LessEqualDepth,
-    })
-    m.onBeforeCompile = (shader) => {
-      shader.uniforms.uHaloDepth = haloDepthU
-      shader.vertexShader = shader.vertexShader
-        .replace('void main() {', 'uniform float uHaloDepth;\nvoid main() {')
-        .replace('vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );',
-          'vec4 end = modelViewMatrix * vec4( instanceEnd, 1.0 );\n\t\t\tstart.z -= uHaloDepth;\n\t\t\tend.z -= uHaloDepth;')
-    }
-    m.customProgramCacheKey = () => 'erzberg-halo'
-    return m
+  const haloMaterial = useMemo(() => patchedLine({
+    linewidth: 1, resolution, transparent: true,
+    colorWrite: false, depthWrite: true, depthTest: true, depthFunc: THREE.LessEqualDepth,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, noPushU, haloDepthU), [noPushU, haloDepthU])
   const haloLines = useMemo(() => {
     if (!geometry || !depthOcclusion || !(halo > 0)) return null
     return new LineSegments2(geometry, haloMaterial)
@@ -552,7 +595,11 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (d.dashed && !geometry.attributes.instanceDistanceStart) haloLines.computeLineDistances()
     haloDepthU.value = haloDepth
     haloLines.renderOrder = haloOrder
-  }, [haloLines, haloMaterial, haloDepthU, geometry, drawWeight, halo, dash, resolution, haloDepth, haloOrder])
+    invalidate()
+  }, [haloLines, haloMaterial, haloDepthU, geometry, drawWeight, halo, dash, resolution, haloDepth, haloOrder, invalidate])
+
+  // A uniform, not a prop, so nothing tells the on-demand loop it changed.
+  useEffect(() => { liftU.value = strokeLift; invalidate() }, [liftU, strokeLift, invalidate])
   useEffect(() => () => haloMaterial.dispose(), [haloMaterial])
 
   useEffect(() => {
@@ -712,6 +759,15 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   // How far behind its stroke a halo sits: about a hundredth of the plate's
   // reach, so a line on the same slope is not broken and one behind a ridge is.
   const haloDepth = Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2) * 0.01
+  // Where the terrain hides lines, each stroke is lifted by `strokeDepthBias` of
+  // its own widths, two half widths each (see `patchStrokeDepth`). Walls hang
+  // below their strokes and cannot thin them, so a plate with no fill under the
+  // Lines occluder draws as it always has.
+  // A layer inside the ground is not hidden by the Ground occluder, only by a
+  // fill, so with no fill there is no ground to lift it off.
+  const fillHides = !!(p.depthOcclusion && hasFillLayer(p))
+  const surfaceHides = fillHides || !!(p.depthOcclusion && p.occludeBy === 'ground')
+  const strokeLift = surfaceHides ? 2 * (p.strokeDepthBias ?? 0) : 0
   // Whether any layer draws a halo, which moves every ghost into its own band.
   const ghostBand = !!(p.depthOcclusion && Array.isArray(lineGeo) && lineGeo.some((l) => haloOf(l.id, p) > 0))
   const eye = useMemo(() => {
@@ -781,6 +837,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           halo={halo ?? 0}
           haloDepth={haloDepth}
           ghostBand={ghostBand}
+          strokeLift={layer.insideGround && !fillHides ? 0 : strokeLift}
         />
         ))
       })}

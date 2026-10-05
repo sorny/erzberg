@@ -83,10 +83,12 @@ test('the panel offers an occluder switch where walls mean something, and a halo
   await setMark(page, 'Pillars', true)
   await setMark(page, 'Hachure', true)
 
-  // A new plate is occluded by lines, the classic model.
+  // A new plate is occluded by lines, the classic model, and lifts its strokes
+  // by one width where the terrain hides lines.
   await page.fill('[data-testid="panel-filter"]', 'occluder')
   await page.waitForTimeout(450)
   await expect(page.locator('[data-testid="occlude-by-lines"]:visible')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.locator('[data-testid="stroke-depth-bias"]:visible')).toHaveValue('1')
   await page.fill('[data-testid="panel-filter"]', '')
 
   // Lines is an occluder; the ticks are not, or their walls notch the Lines.
@@ -174,4 +176,21 @@ test('a halo breaks the Lines behind the ticks', async ({ page }) => {
   // one passes behind another: a halo cuts every line farther away.
   expect(l1.strokes).toBeGreaterThan(l0.strokes)
   expect(l1.length).toBeLessThan(l0.length * 0.99)
+})
+
+test('the stroke depth bias keeps strokes whole in front of a fill', async ({ page }) => {
+  test.setTimeout(300_000)
+  await bootAutomation(page)
+
+  // Without the bias the ground under a stroke's near edge shaved it on steep
+  // slopes, and the export broke the same strokes into short pieces. With it,
+  // the pieces join: fewer strokes, a little more ink, and nothing new behind
+  // a ridge, which would show as a large gain in ink.
+  const lines = { spacingLines: '14', occludeBy: 'lines', showFill: 'true' }
+  const old = ink(await plate(page, ['Lines'], { ...lines, strokeDepthBias: '0' }), 'Lines')
+  const lifted = ink(await plate(page, ['Lines'], { ...lines, strokeDepthBias: '1' }), 'Lines')
+  expect(old.strokes).toBeGreaterThan(100)
+  expect(lifted.strokes).toBeLessThan(old.strokes * 0.8)
+  expect(lifted.length).toBeGreaterThan(old.length)
+  expect(lifted.length).toBeLessThan(old.length * 1.1)
 })

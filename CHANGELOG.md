@@ -7,6 +7,90 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.58.0] — 2026-10-05
+
+### Added
+
+- **Four chart modes and a Chart family.** Each reads the whole plate and lies
+  flat above it, north up, in true metres and degrees (`builders/charts.js`):
+  - **Swath Profile**: the mean, highest and lowest height across a strip along
+    the plate, the envelope hatched, labelled in metres and kilometres.
+  - **Hypsometry**: Strahler's hypsometric curve, its histogram, and the
+    hypsometric integral written in the frame.
+  - **Aspect Rose**: a rose diagram of the way the ground faces, weighted by
+    gradient or area, on an equal-area scale, with labelled rings.
+  - **Stereonet**: every slope's pole on a lower-hemisphere Schmidt net, with
+    density contours and the 10° graticule.
+  The Marks sheet has a seventh family, **Chart**, for these four, Waveform
+  and Profile Sheet. Like those two they stay out of Surprise me. A chart's
+  rules and a stereonet's poles are pens of their own, and their weights no
+  longer rebuild the geometry.
+- **Profile Sheet** draw mode, after a hand-drawn surveyor's profile sheet:
+  parallel transects drawn as a stack of profiles over a station rule at every
+  bend. A profile plots the elevation change so far (the default, a line that
+  rises everywhere but on the flat), the climb so far, or the height. Stations
+  are the vertices Douglas–Peucker keeps on any profile, so the rules crowd
+  where the ground is rough, and they are numbered from the left wherever a
+  number fits. A second band holds the cross profiles at the same scale. The
+  sheet lies flat above the plate, like Waveform, and is read at a fixed 500
+  steps across, so the resolution slider does not change it. It stays out of
+  Surprise me: it is a chart of the place, not a look on the ground.
+  `buildProfileSheet` in `builders/survey.js`. The numbers are lettered by
+  `useScaleLabels`, as Map Grid's are.
+- **Stroke depth bias**, in Terrain Style › Occlusion (0–3 stroke widths, 1 on
+  a new plate). It lifts each stroke toward the camera by that many of its own
+  widths, in depth only, where the terrain hides lines: with a fill on, or
+  under *Ground*. The SVG lifts each sample by the same amount.
+
+### Fixed
+
+- **Soundscape streaming is back to its rate.** With Ink Atlas, closed contours
+  and smoothing 3, a stream rebuilt 17–18 times a second, under the 18 the
+  streaming spec asks for. It now rebuilds 22.8 times a second, as it did when
+  that spec was written (22.4). Three causes, measured in the browser:
+  - The worker sat idle for about 11 ms of every build, waiting for the busy
+    main thread to send the next request. While a soundscape plays, the newest
+    request is now posted ahead, and the worker starts it as soon as it
+    finishes (`stream` in `useTerrainGeometry`). A slider drag still waits for
+    one build at most.
+  - Every streamed frame rendered all sixty mode sections of the panel again.
+    They are memoised now, with callbacks of a fixed identity.
+  - Douglas–Peucker divided once per point; it now divides once per span. Stipple
+    computed a power for every cell; it now skips it when the random draw
+    already decides. Neither changes a stroke: 60,000 simplifications and all
+    61 bundled presets compared byte for byte.
+- **Rebuilds with walls are as fast as before v1.57.0 again.** The check that
+  keeps a wall out of the air read the ground twice for every segment of every
+  mode, and split long segments: on a dense contour plate (494,000 segments)
+  the walls took 68 ms a rebuild instead of 21 ms, with 19% more wall quads.
+  Only marks and overlays float, so only their walls are checked now. The line
+  modes build their walls exactly as v1.56.0 did. Nine bundled presets that
+  v1.57.0 changed by 0–1.8% of ink draw as in v1.56.0 again. Only the three with
+  Hachure walls in the air keep the change: Cartographer's Draft, Chalk Cliff
+  and Heart Surgery.
+- **Strokes on steep slopes thinned and broke up** in front of a fill or the
+  Ground occluder. A stroke is drawn as a flat band at the depth of its centre
+  line, so on a slope seen at a low angle the terrain under its near edge was
+  closer than the stroke, and the depth test shaved that edge off. On a filled
+  reference plate the bias brings back 36% of the line ink, and nothing shows
+  through a ridge. The SVG had the same fault in another form: the depth
+  buffer's precision broke strokes into short pieces, and the bias joins them,
+  from 820 Lines strokes to 353 on that plate.
+- **The halo in the viewport** moved its strokes along view depth, which in
+  perspective also moved them on screen, toward the centre, by up to two
+  pixels at the edges. It now moves the depth alone, as the SVG does.
+- **`window.erzberg.settle()`** returned before a rebuild had started when a
+  change was made in the same call, so a script that changed the modes and
+  waited in one `page.evaluate` exported the old plate, about one first change
+  in three after a raster load. The quiet window now starts no earlier than the
+  call. `tests/automation.spec.js` makes that call six times.
+
+### Changed
+
+- Presets, sessions and files from before this version keep the old depth test
+  (`PRESET_FORMAT` 6, `migrateStrokeBias`), so the bias changes none of the 61
+  bundled presets that draw, in the SVG or in the viewport.
+
 ## [1.57.0] — 2026-10-05
 
 ### Added

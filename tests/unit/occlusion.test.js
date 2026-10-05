@@ -63,8 +63,9 @@ describe('which model builds walls', () => {
 
   it('starts the marks and floating overlays with walls off', () => {
     const off = DRAW_MODES.filter((m) => STYLE_DEF[`walls${m.id}`] === false).map((m) => m.id).sort()
-    expect(off).toEqual(['Air', 'Flashbulb', 'Hachure', 'Hair', 'Halation', 'Printer', 'Radar', 'Runout',
-      'ShadowHatch', 'SlopeClass', 'Swiss', 'Truchet', 'Waveform'])
+    expect(off).toEqual(['Air', 'AspectRose', 'Flashbulb', 'Hachure', 'Hair', 'Halation', 'Hypsometry', 'Printer',
+      'ProfileSheet', 'Radar', 'Runout', 'ShadowHatch', 'SlopeClass', 'Stereonet', 'SwathProfile', 'Swiss', 'Truchet',
+      'Waveform'])
     expect(STYLE_DEF.wallsLines).toBe(true)
     expect(STYLE_DEF.occludeBy).toBe('lines')
   })
@@ -218,5 +219,51 @@ describe('the halo in the SVG', () => {
   it('does nothing with Occlusion off', async () => {
     const haloed = await strokes(['Near', 'Far'], 2, { depthOcclusion: false })
     expect(haloed.Far.strokes).toHaveLength(1)
+  })
+})
+
+/*
+ * The stroke lift in the SVG. The viewport lifts each stroke toward the camera
+ * by its own width, in depth only, so the ground under its near edge cannot
+ * shave it on a steep slope; the walk lifts each sample by the same amount. A
+ * ground plane seen from straight above, so its depth is the same across a
+ * pixel, and two lines under it: one a hair below the surface, the other far
+ * below. The lift brings back the first and only the first. At 100 units from
+ * a 40° camera on 400 px, a pixel spans 0.18 units, and so does the lift of a
+ * one-pixel stroke at a bias of one width.
+ */
+describe('the stroke lift in the SVG', () => {
+  const S = 400
+  const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 1000)
+  camera.position.set(0, 100, 0)
+  camera.up.set(0, 0, -1)
+  camera.lookAt(0, 0, 0)
+  camera.updateMatrixWorld()
+  camera.updateProjectionMatrix()
+  const ground = {
+    positions: new Float32Array([-100, 0, -100, 100, 0, -100, 100, 0, 100, -100, 0, 100]),
+    indices: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  }
+  // Across the view at a slant: a drawing of one level line has a bounding box
+  // of no height, which the exporter calls empty.
+  const under = (id, depth) => ({ id, positions: new Float32Array([-20, -depth, -5, 20, -depth, 5]) })
+  const ink = { weight: 1, opacity: 1, dash: 'solid', color: '#000000' }
+
+  async function drawn(strokeLift) {
+    const res = await exportSVG({
+      lineGeo: [under('Hair', 0.05), under('Deep', 2)],
+      lineStyles: { Hair: ink, Deep: ink }, camera, width: S, height: S,
+      groupMatrix: new THREE.Matrix4(), surfaceGeo: ground, surfaceOccludes: true,
+      depthOcclusion: true, occlusionBias: 0.001, occlusionOpacity: 0,
+      bgColor: '#ffffff', partsOnly: true, strokeLift, viewHeight: S,
+    })
+    if (typeof res === 'string') return []
+    return res.parts.map((part) => /id="layer-([^"]+)"/.exec(part)[1])
+  }
+
+  it('brings back a stroke a hair below the ground, and no deeper one', async () => {
+    expect(await drawn(0)).toEqual([])
+    // A bias of one stroke width is a lift of two half widths.
+    expect(await drawn(2)).toEqual(['Hair'])
   })
 })

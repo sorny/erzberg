@@ -57,8 +57,27 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 4 is one Colour row for every mode. Pillars had its own `pillarInk` and
  * `pillarAboveInk`, and a payload before 4 has them moved onto each half's
  * colour source (`migratePillarInk`).
+ *
+ * 6 is the stroke depth bias, which keeps strokes on steep slopes at their full
+ * width in front of a fill or the Ground occluder. A payload before 6 keeps the
+ * old, thinner strokes (`migrateStrokeBias`).
  */
-export const PRESET_FORMAT = 5
+export const PRESET_FORMAT = 6
+
+/**
+ * The old depth test, for a plate made before format 6.
+ *
+ * Format 6 lifts each stroke toward the camera by its own width where the
+ * terrain hides lines (`strokeDepthBias`), so the ground under a stroke's near
+ * edge no longer shaves it on a steep slope. That widens every such stroke, by
+ * about a third of the ink on a filled reference plate, so an older plate gets
+ * 0 and draws as it did. Only a missing key is written; a new object comes back.
+ */
+export function migrateStrokeBias(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  if (payload.style.strokeDepthBias !== undefined) return payload
+  return { ...payload, style: { ...payload.style, strokeDepthBias: 0 } }
+}
 
 /**
  * Occlusion as it was, for a plate made before format 5.
@@ -268,7 +287,8 @@ export function parsePreset(text) {
     const bearings = f < 2 ? migrateAzimuths(d) : d
     const shading = f < 3 ? migrateShading(bearings) : bearings
     const inks = f < 4 ? migratePillarInk(shading) : shading
-    return f < 5 ? migrateOcclusion(inks) : inks
+    const walls = f < 5 ? migrateOcclusion(inks) : inks
+    return f < 6 ? migrateStrokeBias(walls) : walls
   } catch {
     return null
   }

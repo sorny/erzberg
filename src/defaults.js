@@ -28,6 +28,10 @@ export const STYLE_DEF = {
   // fill is shown.
   occludeBy: 'lines',
   occlusionBias: 1.0,
+  // How far each stroke is lifted toward the camera where the terrain hides
+  // lines (a fill, or the Ground occluder), in stroke widths, so a stroke on a
+  // steep slope keeps its full width. Plates made before format 6 keep 0.
+  strokeDepthBias: 1,
   occlusionColor: '#a80000',
   occlusionOpacity: 0.0,
   // Inks exactly as picked: lines and areas skip the viewport's ACES tone curve
@@ -382,6 +386,33 @@ export const STYLE_DEF = {
   detailWaveform: 1.5, smoothWaveform: 4, gammaWaveform: 1,
   colorWaveform: '#1a1a1a', weightWaveform: 0.6, opacityWaveform: 1, dashWaveform: 'solid',
   hypsoWaveform: false, hypsoModeWaveform: 'elevation', hypsoBandedWaveform: false, hypsoIntervalWaveform: 10,
+  // Profile Sheet — a surveyor's profile sheet: parallel transects as a stack of
+  // profiles over a rule at every station, flat above the plate.
+  enabledProfileSheet: false, valueProfileSheet: 'change', countProfileSheet: 12, bandsProfileSheet: 2,
+  toleranceProfileSheet: 1.5, smoothProfileSheet: 8, gridProfileSheet: 4, tickProfileSheet: 5, nodeProfileSheet: 4,
+  colorProfileSheet: '#1a1a1a', weightProfileSheet: 0.8, opacityProfileSheet: 1, dashProfileSheet: 'solid',
+  ruleWeightProfileSheet: 0.35, numbersProfileSheet: true,
+  hypsoProfileSheet: false, hypsoModeProfileSheet: 'elevation', hypsoBandedProfileSheet: false, hypsoIntervalProfileSheet: 10,
+  // Charts — the ground as a diagram, flat above the plate (builders/charts.js).
+  // Swath Profile: mean, highest and lowest height across a strip, along the plate.
+  enabledSwathProfile: false, widthSwathProfile: 1, hatchSwathProfile: 3, quartilesSwathProfile: false,
+  cellMetresSwathProfile: 10, reliefSwathProfile: 1000,
+  colorSwathProfile: '#1a1a1a', weightSwathProfile: 1, opacitySwathProfile: 1, dashSwathProfile: 'solid', ruleWeightSwathProfile: 0.35,
+  hypsoSwathProfile: false, hypsoModeSwathProfile: 'elevation', hypsoBandedSwathProfile: false, hypsoIntervalSwathProfile: 10,
+  // Hypsometry: Strahler's area–altitude curve, with its histogram.
+  enabledHypsometry: false, binsHypsometry: 20, cellMetresHypsometry: 10, reliefHypsometry: 1000,
+  colorHypsometry: '#1a1a1a', weightHypsometry: 1, opacityHypsometry: 1, dashHypsometry: 'solid', ruleWeightHypsometry: 0.35,
+  hypsoHypsometry: false, hypsoModeHypsometry: 'elevation', hypsoBandedHypsometry: false, hypsoIntervalHypsometry: 10,
+  // Aspect Rose: the share of the ground facing each way, as a rose diagram.
+  enabledAspectRose: false, sectorsAspectRose: 36, byAspectRose: 'slope', scaleAspectRose: 'area', ringsAspectRose: 4,
+  minSlopeAspectRose: 2, hatchAspectRose: 0, cellMetresAspectRose: 10, reliefAspectRose: 1000,
+  colorAspectRose: '#1a1a1a', weightAspectRose: 0.8, opacityAspectRose: 1, dashAspectRose: 'solid', ruleWeightAspectRose: 0.35,
+  hypsoAspectRose: false, hypsoModeAspectRose: 'elevation', hypsoBandedAspectRose: false, hypsoIntervalAspectRose: 10,
+  // Stereonet: every slope's pole on an equal-area net, with its density.
+  enabledStereonet: false, polesStereonet: true, contoursStereonet: true, levelsStereonet: 5, sampleStereonet: 3000,
+  netStereonet: true, minSlopeStereonet: 2, cellMetresStereonet: 10, reliefStereonet: 1000, poleWeightStereonet: 0.5,
+  colorStereonet: '#1a1a1a', weightStereonet: 0.8, opacityStereonet: 1, dashStereonet: 'solid', ruleWeightStereonet: 0.35,
+  hypsoStereonet: false, hypsoModeStereonet: 'elevation', hypsoBandedStereonet: false, hypsoIntervalStereonet: 10,
 
   // Venation — leaf veins that grow up the wet ground from the outlets.
   enabledVenation: false, countVenation: 6000, rootsVenation: 6, spacingVenation: 3, gammaVenation: 1.2, seedVenation: 1,

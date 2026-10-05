@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateOcclusion, migratePillarInk, migrateShading } from './presetFile'
+import { migrateAzimuths, migrateOcclusion, migratePillarInk, migrateShading, migrateStrokeBias } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -45,6 +45,9 @@ const PILLAR_SCALE = 2
 
 /** And for occlusion, whose marks stopped hanging walls in v1.57.0. See `migrateOcclusion`. */
 const OCCLUSION_SCALE = 2
+
+/** And for the stroke depth bias of v1.58.0. See `migrateStrokeBias`. */
+const STROKE_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -95,6 +98,7 @@ export function loadSession(defaults) {
     if ((data.shadingScale ?? 1) < SHADING_SCALE) out = migrateShading(out)
     if ((data.pillarScale ?? 1) < PILLAR_SCALE) out = migratePillarInk(out)
     if ((data.occlusionScale ?? 1) < OCCLUSION_SCALE) out = migrateOcclusion(out)
+    if ((data.strokeScale ?? 1) < STROKE_SCALE) out = migrateStrokeBias(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
       out[field] = { ...out[field] }
@@ -137,7 +141,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE }
+    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {

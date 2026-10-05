@@ -85,8 +85,8 @@ different style from the grid, then tune it.
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it.
-- **Marks sheet.** The Marks stage shows the 56 modes as tiles in six families:
-  Line, Tone, Relief, Plate, Light and Momentum. The ring in a tile corner
+- **Marks sheet.** The Marks stage shows the 62 modes as tiles in seven families:
+  Line, Tone, Relief, Plate, Light, Momentum and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls.
 - **Search.** The field at the top filters sections by title and by their own
   terms. Type `azimuth` and only Hillshade remains. The search crosses all
@@ -186,7 +186,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 56 modes.
+  classes you pick. This works for all 62 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -319,6 +319,11 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Stems | A dotted stem from a datum to the ground at each cell, with a dot at the tip |
 | Hair | A short curling stroke at each cell; seen from the side, the overlap is the tone |
 | Waveform | A column of scanlines read along a line through the summit at any direction, mirrored or one-sided, as on a record sleeve |
+| Profile Sheet | A surveyor's profile sheet: parallel transects as rising profiles over a numbered station rule at every bend, with a band of cross profiles |
+| Swath Profile | The mean, highest and lowest height across a strip along the plate, the envelope hatched, in metres and kilometres |
+| Hypsometry | Strahler's hypsometric curve, with its histogram and the hypsometric integral |
+| Aspect Rose | A rose diagram of the way the ground faces, weighted by slope, on an equal-area scale |
+| Stereonet | Every slope's pole on a lower-hemisphere equal-area net, with density contours |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each
@@ -329,7 +334,8 @@ invisible wall down to the base, so lines hide other lines: the classic
 ridgeline look. Each mode can stop being an occluder, and marks such as Hachure
 start that way. Under *Occluder: Ground*, the terrain hides what is behind it,
 with or without a fill. A mode's *Halo* breaks the lines behind its strokes.
-Hidden segments can take their own colour and opacity.
+*Stroke depth bias* keeps strokes on steep slopes at full width in front of the
+terrain. Hidden segments can take their own colour and opacity.
 
 **Inks as picked.** By default inks pass through a filmic tone curve and look
 softer on screen. Switch this on in Terrain Style to draw and export every ink

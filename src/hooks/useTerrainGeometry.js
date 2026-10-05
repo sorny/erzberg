@@ -7,7 +7,7 @@ import { vectorBuildSignature } from '../utils/vectorLayers'
 import { geometryKey } from '../params'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
-export function useTerrainGeometry(p) {
+export function useTerrainGeometry(p, { stream = false } = {}) {
   // Selector-per-field: an unselected useStore() re-renders this hook's owner on
   // every unrelated store write (loading an overlay texture, GeoTIFF metadata, …),
   // and each of those re-renders re-runs the rebuild effect's dependency check.
@@ -77,6 +77,28 @@ export function useTerrainGeometry(p) {
   const buildStartRef = useRef(0)
   const sendRef = useRef(null)
 
+  /*
+   * One request ahead, while a stream plays.
+   *
+   * Normally the newest request waits here until the build in flight comes
+   * back, and is sent from `onmessage`. While a soundscape streams, the main
+   * thread is busy most of the time, and a finished build waited in its queue,
+   * often ten milliseconds or more, before `onmessage` ran and sent the next:
+   * the worker sat idle for a fifth of every build. So while `stream` is on, the
+   * newest request is posted at once, if the worker has none waiting, and the
+   * worker starts it the moment it finishes the one before. Off, as for a slider
+   * drag, the last value waits for one build at most, as it always has.
+   *
+   * With two requests out, a result is shown if it is newer than the last one
+   * shown, not only if it answers the newest request. `minGenRef` keeps out
+   * anything a terminated worker had already sent.
+   */
+  const queuedRef = useRef(false)
+  const shownGenRef = useRef(0)
+  const minGenRef = useRef(0)
+  const streamRef = useRef(false)
+  streamRef.current = !!stream
+
   // Floor for how long an in-flight build may run before a newer request
   // cancels it outright instead of queueing behind it.
   //
@@ -122,9 +144,15 @@ export function useTerrainGeometry(p) {
     workerRef.current.onmessage = (e) => {
       const elapsed = Math.round(performance.now() - startTimeRef.current)
       const { terrain, lineGeo, surfaceGeo, error, _gen } = e.data
-      busyRef.current = false
       lastDurationRef.current = performance.now() - buildStartRef.current
-      if (_gen === genRef.current) {
+      // A request posted ahead started in the worker as this one finished: it
+      // is the build in flight now.
+      const ahead = queuedRef.current
+      queuedRef.current = false
+      busyRef.current = ahead
+      if (ahead) { startTimeRef.current = performance.now(); buildStartRef.current = startTimeRef.current }
+      if (_gen > shownGenRef.current && _gen >= minGenRef.current) {
+        shownGenRef.current = _gen
         if (error) {
           console.error('[GeometryWorker] Error:', error)
           fail(`Geometry rebuild failed: ${error}`)
@@ -147,8 +175,11 @@ export function useTerrainGeometry(p) {
       // faster-than-realtime request stream into steady throughput.
       const next = pendingRef.current
       pendingRef.current = null
-      if (next) sendRef.current(next)
-      else setIsComputing(false)
+      if (next) {
+        if (!busyRef.current) sendRef.current(next)
+        else if (streamRef.current) sendRef.current(next, true)
+        else pendingRef.current = next
+      } else if (!busyRef.current) setIsComputing(false)
     }
 
     /**
@@ -164,6 +195,8 @@ export function useTerrainGeometry(p) {
     const die = (msg) => {
       busyRef.current = false
       pendingRef.current = null
+      queuedRef.current = false
+      minGenRef.current = genRef.current + 1
       setIsComputing(false)
       workerRef.current?.terminate()
       workerRef.current = null
@@ -183,7 +216,8 @@ export function useTerrainGeometry(p) {
     }
   }
 
-  const send = (req) => {
+  // `ahead`: posted while a build is in flight, to start when it finishes.
+  const send = (req, ahead = false) => {
     ensureWorker()
     // Decided at send time, not request time: a queued request may be sent to a
     // different worker than the one that was live when it was created.
@@ -198,9 +232,12 @@ export function useTerrainGeometry(p) {
     workerCoverRef.current = req.cover
     const needsMasks = workerMaskRef.current !== req.masks
     workerMaskRef.current = req.masks
-    startTimeRef.current = performance.now()
-    buildStartRef.current = startTimeRef.current
-    busyRef.current = true
+    if (ahead) queuedRef.current = true
+    else {
+      startTimeRef.current = performance.now()
+      buildStartRef.current = startTimeRef.current
+      busyRef.current = true
+    }
     workerRef.current.postMessage({
       ...(needsPixels
         ? { heightmapPixels: req.pixels, nodataMask: req.mask, heightmapWidth: req.w, heightmapHeight: req.h }
@@ -224,6 +261,8 @@ export function useTerrainGeometry(p) {
       workerMaskRef.current = undefined
       pendingRef.current = null
       busyRef.current = false
+      queuedRef.current = false
+      minGenRef.current = genRef.current + 1
       setTerrain(null); setLineGeo(null); setVectorGeo(null); setSurfaceGeo(null); setIsComputing(false)
       return
     }
@@ -270,7 +309,11 @@ export function useTerrainGeometry(p) {
         workerPixelsRef.current = null
         busyRef.current = false
         pendingRef.current = null
+        queuedRef.current = false
+        minGenRef.current = genRef.current + 1
         send(req)
+      } else if (streamRef.current && !queuedRef.current) {
+        send(req, true)            // ahead, while a stream plays
       } else {
         pendingRef.current = req   // newest wins
       }

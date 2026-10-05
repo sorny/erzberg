@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { loadTextFont, singleLineKey, textPolylines } from '../utils/textGeometry'
 
 /**
- * Letters the numbers of Map Grid's edge scale.
+ * Letters the numbers of Map Grid's edge scale, and the Profile Sheet's
+ * station numbers, which hang off its rules the same way.
  *
  * The worker places them and knows what each one says — a distance from the
  * south-west corner, which it can measure because it has the cell size — but it
@@ -41,8 +42,9 @@ function buildNumbers(host, font) {
   }
   if (!positions.length) return null
   return {
-    // `MapGrid-Scale@c3` → `MapGrid-Numbers@c3` for a mode copy.
-    id: host.id.replace(/-Scale(@\w+)?$/, '-Numbers$1'),
+    // `MapGrid-Scale@c3` → `MapGrid-Numbers@c3` for a mode copy, and the
+    // Profile Sheet's `-Rules` the same way.
+    id: host.id.replace(/-(Scale|Rules)(@\w+)?$/, '-Numbers$2'),
     positions: new Float32Array(positions),
     colors: null, curtains: null, lids: null,
     isPoints: false, isLabelText: true, textRuns: null, textStyle: null, fills: null,

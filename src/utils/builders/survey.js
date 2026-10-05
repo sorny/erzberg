@@ -1,15 +1,18 @@
 /**
- * Map conventions: Bedding, Slope Classes, Runout, Glacier.
+ * Map conventions: Bedding, Slope Classes, Runout, Glacier, and the surveyor's
+ * Profile Sheet.
  *
- * All four read the ground in real metres, through the same `groundMetres` the
- * walking and looking modes use, because each answers in a unit a map reader
- * already knows: a dip, a slope and a reach angle in degrees, and a contour
- * interval on the ice in metres.
+ * The first four read the ground in real metres, through the same
+ * `groundMetres` the walking and looking modes use, because each answers in a
+ * unit a map reader already knows: a dip, a slope and a reach angle in degrees,
+ * and a contour interval on the ice in metres. The Profile Sheet is a drawing
+ * convention rather than a measurement, and reads the plate's own heights.
  */
 import { boxBlur, sampleBilinear } from '../terrain'
 import { smoothField } from '../sunHours'
+import { computeVertexColor, hexToRgb } from '../colorUtils'
 import { groundMetres } from './ground.js'
-import { F32List, drapeEdge, hatchWhere, joinLayers, traceLevelSet } from './shared.js'
+import { F32List, drapeEdge, hatchWhere, joinLayers, simplifyFlat, traceLevelSet } from './shared.js'
 
 const RAD = Math.PI / 180
 
@@ -353,4 +356,194 @@ export function buildGlacier(terrain, p, o) {
   }
   out['Glacier-Moraine'] = { positions: dots.positions.toArray(), colors: dots.colors.toArray(), note }
   return out
+}
+
+// ─── Profile Sheet ───────────────────────────────────────────────────────────
+
+/**
+ * A surveyor's profile sheet: the ground read along parallel transects, drawn
+ * as a stack of profiles over a rule at every station.
+ *
+ * The long band reads `count` transects along the plate's longer side, evenly
+ * spaced across it. With `bands` at 2, a second band below reads half as many
+ * along the shorter side, the cross profiles, at the same horizontal scale, so
+ * it ends as much short of the right edge as the plate is narrower than long.
+ *
+ * What a profile plots, `plot`:
+ *  - `change`: the elevation change so far, up and down alike, from the height
+ *    of its first sample. It rises everywhere but on the flat, and steeply
+ *    where the ground is rough.
+ *  - `climb`: the ascent so far, which stays level on every descent.
+ *  - `height`: the ground itself.
+ * The profiles in a band share one scale, so they cross and bundle as they do
+ * on paper. `smooth` blurs each transect first, so a sum of small steps does
+ * not count the noise in the raster as climb.
+ *
+ * Every length on the sheet is in steps, a 500th of its width, whatever the
+ * raster's resolution: each transect is read at one sample per step, so the
+ * resolution slider does not change the drawing.
+ *
+ * A station is where a profile bends: a vertex that Douglas–Peucker keeps at a
+ * tolerance of `tolerance` steps, gathered over every profile in the band. So the rules crowd where the ground is rough and thin out on the
+ * flat. Each profile is drawn straight from station to station, and a short
+ * level mark (`node`) sits on it wherever it bends itself.
+ *
+ * The rules, the frame, `grid` divisions and the ticks (`tick`) past the frame
+ * are a second pen, `ProfileSheet-Rules`. With `numbers`, the stations are
+ * counted from the left and a number hangs under each one there is room for,
+ * so a cluster of rules shares one, as on a hand-drawn sheet. The rules carry
+ * them as anchors, and `useScaleLabels` letters them as `ProfileSheet-Numbers`.
+ * The sheet lies flat at the height of the highest point, like Waveform, so a
+ * plan view shows it alone.
+ */
+export function buildProfileSheet(terrain, p, o) {
+  const { grid, gridMask, rows, cols, halfW, halfH, maxElev, hasNoData } = terrain
+  if (rows < 3 || cols < 3) return null
+  const sMask = hasNoData ? gridMask : null
+  const plot = o.plot ?? 'change'
+  const smooth = Math.max(0, Math.round(o.smooth ?? 8))
+  const divisions = Math.max(1, Math.round(o.grid ?? 4))
+  const count = Math.max(1, Math.round(o.count ?? 12))
+  const twoBands = (o.bands ?? 2) >= 2
+  // The long side reads first; both bands share its horizontal scale, a step
+  // of the sheet's width, and `per` grid cells of the raster to a step.
+  const STEPS = 500
+  const wide = cols >= rows
+  const nLong = wide ? cols : rows, nShort = wide ? rows : cols
+  const hs = (2 * halfW) / STEPS
+  const per = (nLong - 1) / STEPS
+  const tol = Math.max(0.05, o.tolerance ?? 1.5)
+  const tick = Math.max(0, o.tick ?? 5) * hs
+  const node = Math.max(0, o.node ?? 4) * hs
+  const y = maxElev
+  const ruleInk = hexToRgb(p.lineColor)
+
+  const lines = new F32List(), lineColors = new F32List()
+  const rules = new F32List(), ruleColors = new F32List()
+  const anchors = []
+  const size = 4.5 * hs
+  const rule = (x0, z0, x1, z1) => { rules.push6(x0, y, z0, x1, y, z1); ruleColors.pushRgb2(ruleInk) }
+
+  /**
+   * `k` transects along the long side (`along` true) or the short side, as
+   * plotted values with the samples that have ground. A gap in the data is
+   * held across for the running sum, and left out of the drawing.
+   */
+  const transects = (along, k) => {
+    const n = along ? STEPS + 1 : Math.max(2, Math.round((nShort - 1) / per) + 1)
+    const m = along ? nShort : nLong
+    const out = []
+    for (let j = 0; j < k; j++) {
+      const off = (j + 0.5) / k * (m - 1)
+      const h = new Float32Array(n), ok = new Uint8Array(n)
+      let last = NaN, first = -1
+      for (let i = 0; i < n; i++) {
+        // `along` the long side is along the columns on a wide plate.
+        const at = Math.min(i * per, (along ? nLong : nShort) - 1)
+        const [r, c] = (along === wide) ? [off, at] : [at, off]
+        const v = sampleBilinear(grid, sMask, rows, cols, r, c)
+        if (v === v) { ok[i] = 1; last = v; if (first < 0) first = i }
+        h[i] = last
+      }
+      if (first < 0) continue
+      for (let i = 0; i < first; i++) h[i] = h[first]
+      const s = smooth > 0 ? boxBlur(h, n, 1, smooth) : h
+      const v = new Float32Array(n)
+      if (plot === 'height') v.set(s)
+      else {
+        v[0] = s[0]
+        for (let i = 1; i < n; i++) {
+          const d = s[i] - s[i - 1]
+          v[i] = v[i - 1] + (plot === 'climb' ? Math.max(0, d) : Math.abs(d))
+        }
+      }
+      out.push({ v, ok })
+    }
+    return out
+  }
+
+  /** One band of the sheet, between `zTop` and `zBot`, from the left edge. */
+  const band = (profiles, zTop, zBot) => {
+    if (!profiles.length) return
+    const n = profiles[0].v.length
+    let lo = Infinity, hi = -Infinity
+    for (const { v, ok } of profiles) for (let i = 0; i < n; i++) if (ok[i]) { if (v[i] < lo) lo = v[i]; if (v[i] > hi) hi = v[i] }
+    if (!(hi > lo)) return
+    const pad = (zBot - zTop) * 0.06
+    const zOf = (a) => zBot - pad - (a - lo) / (hi - lo) * (zBot - zTop - 2 * pad)
+    const xOf = (i) => -halfW + i * hs
+    const shade = (a) => computeVertexColor((a - lo) / (hi - lo), 0, 0, p)
+
+    // Stations: the bends of every profile, found per run of data, in cells.
+    const station = new Uint8Array(n)
+    station[0] = 1; station[n - 1] = 1
+    const bends = profiles.map(({ v, ok }) => {
+      const own = new Uint8Array(n)
+      for (let i = 0; i < n;) {
+        while (i < n && !ok[i]) i++
+        let j = i
+        while (j < n && ok[j]) j++
+        if (j - i >= 2) {
+          const pts = new Float64Array((j - i) * 2)
+          for (let q = i; q < j; q++) { pts[2 * (q - i)] = q; pts[2 * (q - i) + 1] = zOf(v[q]) / hs }
+          const kept = simplifyFlat(pts, tol)
+          for (let q = 0; q < kept.length; q += 2) { const at = Math.round(kept[q]); own[at] = 1; station[at] = 1 }
+        }
+        i = j
+      }
+      return own
+    })
+
+    // The rules: a station rule through the frame with a tick past it at each
+    // end, the frame's top and bottom, and the grid between them.
+    const at = []
+    for (let i = 0; i < n; i++) if (station[i]) at.push(i)
+    for (const i of at) rule(xOf(i), zTop - tick, xOf(i), zBot + tick)
+    rule(xOf(0), zTop, xOf(n - 1), zTop)
+    rule(xOf(0), zBot, xOf(n - 1), zBot)
+    for (let g = 1; g < divisions; g++) {
+      const z = zTop + (zBot - zTop) * g / divisions
+      rule(xOf(0), z, xOf(n - 1), z)
+    }
+    if (o.numbers) {
+      let last = -Infinity
+      at.forEach((i, k) => {
+        if (xOf(i) - last < 2.4 * size) return
+        anchors.push({ x: xOf(i), y, z: zBot + tick + 1.5 * hs, text: String(k + 1), size, align: 'middle', valign: 'top' })
+        last = xOf(i)
+      })
+    }
+
+    // Each profile straight from station to station, and a level mark on its
+    // own bends.
+    profiles.forEach(({ v, ok }, k) => {
+      for (let a = 0; a + 1 < at.length; a++) {
+        const i0 = at[a], i1 = at[a + 1]
+        if (!ok[i0] || !ok[i1]) continue
+        lines.push6(xOf(i0), y, zOf(v[i0]), xOf(i1), y, zOf(v[i1]))
+        lineColors.pushRgb(shade(v[i0])); lineColors.pushRgb(shade(v[i1]))
+      }
+      if (node > 0) {
+        for (let i = 0; i < n; i++) {
+          if (!bends[k][i] || !ok[i]) continue
+          const z = zOf(v[i])
+          lines.push6(xOf(i) - node / 2, y, z, xOf(i) + node / 2, y, z)
+          lineColors.pushRgb2(shade(v[i]))
+        }
+      }
+    })
+  }
+
+  const depth = 2 * halfH
+  if (twoBands) {
+    band(transects(true, count), -halfH + depth * 0.04, -halfH + depth * 0.56)
+    band(transects(false, Math.max(1, Math.round(count / 2))), -halfH + depth * 0.64, -halfH + depth * 0.96)
+  } else {
+    band(transects(true, count), -halfH + depth * 0.05, -halfH + depth * 0.95)
+  }
+  if (!lines.length && !rules.length) return null
+  return {
+    ProfileSheet: { positions: lines.toArray(), colors: lineColors.toArray() },
+    'ProfileSheet-Rules': { positions: rules.toArray(), colors: ruleColors.toArray(), scaleAnchors: anchors.length ? anchors : null },
+  }
 }

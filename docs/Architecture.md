@@ -178,6 +178,9 @@ invisible curtain that writes depth, so lines hide other lines. Under *Ground*,
 hides lines with no fill on. A halo is a wider copy of a layer's lines, depth-only and pushed back.
 Hidden segments can draw in their own colour. Render order: occluders and
 curtains, layers inside the ground, the ground, ghosts, haloes, then the layers.
+Every line pass shares one shader patch, `patchStrokeDepth`, which moves a
+stroke's depth and not its place on screen: the stroke depth bias lifts it, and
+a halo pushes it back.
 
 **Viewport aids** (the profile line and pins in `ProfileOverlay`) live in the
 scene graph. SVG and STL cannot see them. The PNG capture hides them through

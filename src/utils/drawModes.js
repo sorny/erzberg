@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all fifty-six at once.
+ * does the index that shows all sixty-two at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -45,7 +45,9 @@
  * arbitrary. Two describe the place or the sheet rather than a look: Sun hours
  * needs a date and a latitude, and Map grid is true distance, right only on a
  * GeoTIFF. A roll is a look; these are questions about a place. Waveform
- * traces a single line, and which line is the user's decision too.
+ * traces a single line, and which line is the user's decision too. Profile
+ * Sheet and the four charts after it are diagrams of the place laid over the
+ * plate, not a look on the ground.
  */
 export const DRAW_MODES = [
   {
@@ -285,6 +287,31 @@ export const DRAW_MODES = [
   {
     // One stroke per sample down one line.
     id: 'Waveform', label: 'Waveform', cost: 1, mark: 'waveform', walls: false, roll: false,
+    pick: {},
+  },
+  {
+    // Transects sampled once per cell, simplified, and drawn as a chart.
+    id: 'ProfileSheet', label: 'Profile Sheet', cost: 1, mark: 'profileSheet', walls: false, roll: false,
+    pick: {},
+  },
+  {
+    // One pass over a strip, 500 steps along it.
+    id: 'SwathProfile', label: 'Swath Profile', cost: 1, mark: 'swathProfile', walls: false, roll: false,
+    pick: {},
+  },
+  {
+    // One sort of every height on the plate.
+    id: 'Hypsometry', label: 'Hypsometry', cost: 1, mark: 'hypsometry', walls: false, roll: false,
+    pick: {},
+  },
+  {
+    // One gradient per cell, into sectors.
+    id: 'AspectRose', label: 'Aspect Rose', cost: 1, mark: 'aspectRose', walls: false, roll: false,
+    pick: {},
+  },
+  {
+    // A gradient per sampled cell, and a Gaussian count on a 64² grid.
+    id: 'Stereonet', label: 'Stereonet', cost: 1, mark: 'stereonet', walls: false, roll: false,
     pick: {},
   },
   {

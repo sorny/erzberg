@@ -60,13 +60,20 @@ export function useAutomation(live) {
      * loading, and the drawing unchanged for `quietMs`. The quiet window is what
      * covers the lettering passes, which finish after the worker does (fonts are
      * fetched) and replace the drawing once more when they land.
+     *
+     * The window starts no earlier than the call. A change made in the same
+     * task, `setModes(…)` and then `settle()` in one `page.evaluate`, starts its
+     * rebuild only once React has rendered and run its effects. Until then the
+     * build flag and `lastChange` still describe the plate before the change, so
+     * a plate that had been still for a while counted as settled at once, and
+     * the export after it drew the old geometry.
      */
     const settle = async ({ quietMs = 600, timeoutMs = 300_000 } = {}) => {
       const t0 = performance.now()
       await frame(); await frame()
       for (;;) {
         const s = L()
-        const quiet = performance.now() - lastChange.current >= quietMs
+        const quiet = performance.now() - Math.max(lastChange.current, t0) >= quietMs
         if (!s.isComputing && !s.isLoading && quiet) break
         if (performance.now() - t0 > timeoutMs) throw new Error(`the plate did not settle within ${timeoutMs / 1000} s`)
         await sleep(50)

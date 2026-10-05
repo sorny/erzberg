@@ -214,8 +214,13 @@ export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
       else if (dm === 'invSlope')  density = 1 - slope
       else                         density = slope
 
-      density = Math.pow(Math.max(0, Math.min(1, density)), gam)
-      if (rng() > density) continue
+      // Kept with probability d^γ. The power is the costly step, and most draws
+      // are decided without it: for γ ≥ 1, d^γ ≤ d, so a draw above d is above
+      // d^γ too; for γ < 1, d^γ ≥ d, so a draw at or below d is kept. Same
+      // draw, same answer, the dot pattern unchanged; only the pow is skipped.
+      const d = Math.max(0, Math.min(1, density))
+      const u = rng()
+      if (gam >= 1 ? (u > d || u > Math.pow(d, gam)) : (u > d && u > Math.pow(d, gam))) continue
 
       const wx = jc * scl - halfW
       const wz = jr * scl - halfH

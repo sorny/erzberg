@@ -8,6 +8,7 @@
  * section is on screen at a time; the mode sheet decides which.
  */
 import { formatClock } from '../../utils/solar'
+import { memo } from 'react'
 import { Btn, ColorRow, DIM, DateRow, FontSelect, HelpBox, InlineSl, MUTED, Note, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
 import { ModeStyleOverride } from './ModeStyleOverride'
 import { ModeMark } from './modeMarks'
@@ -22,7 +23,7 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
+export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1235,6 +1236,121 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
             )}
           </Section>
 
+          <Section title="Mode: Profile Sheet" icon={<ModeMark kind="profileSheet" />} open={sec.modeProfileSheet} onToggle={() => tog('modeProfileSheet')} enabled={style.enabledProfileSheet}>
+            <Tog label="Enabled" testId="mode-profilesheet" checked={style.enabledProfileSheet} onChange={v => ss({ enabledProfileSheet: v })} />
+            {style.enabledProfileSheet && (
+              <>
+                <Sub>
+                  <Note>A surveyor's profile sheet: transects across the plate drawn as a stack of profiles, with a station rule wherever one bends. It lies flat above the ground, so a plan view shows it alone.</Note>
+                  <SegRow label="Plot" help="What each profile shows. Change is the elevation change so far, up and down alike: it rises everywhere but on the flat. Climb is the ascent so far, level on every descent. Height is the ground itself." testIdPrefix="profilesheet-plot" options={[['change', 'change'], ['climb', 'climb'], ['height', 'height']]} value={style.valueProfileSheet ?? 'change'} onChange={v => ss({ valueProfileSheet: v })} />
+                  <InlineSl label="Profiles" help="How many transects the long band reads, evenly spaced across the plate. The cross band reads half as many." testId="profilesheet-count" min={1} max={30} step={1} value={style.countProfileSheet ?? 12} onChange={v => ss({ countProfileSheet: Math.round(v) })} />
+                  <SegRow label="Bands" help="The long profiles alone, or with a band of cross profiles below them, along the plate's shorter side and at the same scale." testIdPrefix="profilesheet-bands" options={[['long', 1], ['long + cross', 2]]} value={style.bandsProfileSheet ?? 2} onChange={v => ss({ bandsProfileSheet: v })} />
+                  <InlineSl label="Tolerance" help="A station rule marks every bend in a profile larger than this, by Douglas–Peucker simplification, in steps of the sheet: a step is a 500th of its width. Lower gives more stations." testId="profilesheet-tolerance" min={0.25} max={10} step={0.25} value={style.toleranceProfileSheet ?? 1.5} onChange={v => ss({ toleranceProfileSheet: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Smoothing" help="The blur on each transect before it is plotted, in steps of the sheet, so the grain of the raster does not count as change." min={0} max={50} step={1} value={style.smoothProfileSheet ?? 8} onChange={v => ss({ smoothProfileSheet: Math.round(v) })} />
+                  <InlineSl label="Grid divisions" help="The horizontal grid divides each band into this many parts." min={1} max={12} step={1} value={style.gridProfileSheet ?? 4} onChange={v => ss({ gridProfileSheet: Math.round(v) })} />
+                  <InlineSl label="Tick" help="How far each station rule reaches past the frame, in steps of the sheet." min={0} max={20} step={0.5} value={style.tickProfileSheet ?? 5} onChange={v => ss({ tickProfileSheet: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Node mark" help="The length of the level mark on each bend of a profile, in steps of the sheet. 0 is none." min={0} max={20} step={0.5} value={style.nodeProfileSheet ?? 4} onChange={v => ss({ nodeProfileSheet: v })} fmt={v => (v > 0 ? v.toFixed(1) : 'none')} />
+                  <Tog label="Station numbers" help="Counts the stations from the left and writes the number under each one there is room for, so a cluster of rules shares one. A pen of its own, in a single-line face." checked={style.numbersProfileSheet !== false} onChange={v => ss({ numbersProfileSheet: v })} />
+                  <InlineSl label="Rule weight" help="The weight of the station rules, the frame, the grid and the numbers, which are a pen of their own." min={0.1} max={4} step={0.05} value={style.ruleWeightProfileSheet ?? 0.35} onChange={v => ss({ ruleWeightProfileSheet: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="ProfileSheet" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Swath Profile" icon={<ModeMark kind="swathProfile" />} open={sec.modeSwathProfile} onToggle={() => tog('modeSwathProfile')} enabled={style.enabledSwathProfile}>
+            <Tog label="Enabled" testId="mode-swathprofile" checked={style.enabledSwathProfile} onChange={v => ss({ enabledSwathProfile: v })} />
+            {style.enabledSwathProfile && (
+              <>
+                <Sub>
+                  <Note>A swath profile: the ground along the plate's longer side, as the mean, the highest and the lowest height across a strip. It lies flat above the ground, so a plan view shows it alone.</Note>
+                  <InlineSl label="Swath width" help="How wide the strip is that each step summarises, as a share of the plate's shorter side." testId="swathprofile-width" min={0.05} max={1} step={0.05} value={style.widthSwathProfile ?? 1} onChange={v => ss({ widthSwathProfile: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Hatch" help="A vertical stroke from the highest to the lowest height every this many steps of 500, so the envelope reads as a tone. 0 is none." min={0} max={20} step={1} value={style.hatchSwathProfile ?? 3} onChange={v => ss({ hatchSwathProfile: Math.round(v) })} fmt={v => (v > 0 ? String(v) : 'none')} />
+                  <Tog label="Quartiles" help="Adds the 25th and 75th percentile across the strip, between the envelope and the mean." checked={!!style.quartilesSwathProfile} onChange={v => ss({ quartilesSwathProfile: v })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresSwathProfile} onChange={v => ss({ cellMetresSwathProfile: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefSwathProfile} onChange={v => ss({ reliefSwathProfile: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <InlineSl label="Rule weight" help="The weight of the frame, the grid, the ticks and the numbers, which are a pen of their own." min={0.1} max={4} step={0.05} value={style.ruleWeightSwathProfile ?? 0.35} onChange={v => ss({ ruleWeightSwathProfile: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="SwathProfile" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Hypsometry" icon={<ModeMark kind="hypsometry" />} open={sec.modeHypsometry} onToggle={() => tog('modeHypsometry')} enabled={style.enabledHypsometry}>
+            <Tog label="Enabled" testId="mode-hypsometry" checked={style.enabledHypsometry} onChange={v => ss({ enabledHypsometry: v })} />
+            {style.enabledHypsometry && (
+              <>
+                <Sub>
+                  <Note>The hypsometric curve (Strahler, 1952): how much of the plate lies above each height, with the hypsometric integral. It lies flat above the ground, so a plan view shows it alone.</Note>
+                  <InlineSl label="Histogram bins" help="The bands of height in the histogram at the frame's right side. 0 is no histogram." min={0} max={60} step={1} value={style.binsHypsometry ?? 20} onChange={v => ss({ binsHypsometry: Math.round(v) })} fmt={v => (v > 0 ? String(v) : 'none')} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresHypsometry} onChange={v => ss({ cellMetresHypsometry: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefHypsometry} onChange={v => ss({ reliefHypsometry: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <InlineSl label="Rule weight" help="The weight of the frame, the grid, the ticks and the numbers, which are a pen of their own." min={0.1} max={4} step={0.05} value={style.ruleWeightHypsometry ?? 0.35} onChange={v => ss({ ruleWeightHypsometry: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="Hypsometry" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Aspect Rose" icon={<ModeMark kind="aspectRose" />} open={sec.modeAspectRose} onToggle={() => tog('modeAspectRose')} enabled={style.enabledAspectRose}>
+            <Tog label="Enabled" testId="mode-aspectrose" checked={style.enabledAspectRose} onChange={v => ss({ enabledAspectRose: v })} />
+            {style.enabledAspectRose && (
+              <>
+                <Sub>
+                  <Note>A rose diagram of the way the ground faces: the share of the ground in each sector of the compass. It lies flat above the ground, so a plan view shows it alone.</Note>
+                  <InlineSl label="Sectors" help="How many sectors the compass is divided into." min={4} max={72} step={1} value={style.sectorsAspectRose ?? 36} onChange={v => ss({ sectorsAspectRose: Math.round(v) })} />
+                  <SegRow label="Weight" help="Slope counts steep ground for more, by its gradient. Area counts every cell alike." testIdPrefix="aspectrose-by" options={[['slope', 'slope'], ['area', 'area']]} value={style.byAspectRose ?? 'slope'} onChange={v => ss({ byAspectRose: v })} />
+                  <SegRow label="Scale" help="Equal area makes a petal's area, not its length, the share, as a rose should. Linear makes its length the share, which overstates the largest petals." testIdPrefix="aspectrose-scale" options={[['equal area', 'area'], ['linear', 'linear']]} value={style.scaleAspectRose ?? 'area'} onChange={v => ss({ scaleAspectRose: v })} />
+                  <InlineSl label="Rings" help="Rings for shares of the largest petal, each labelled with its share." min={1} max={8} step={1} value={style.ringsAspectRose ?? 4} onChange={v => ss({ ringsAspectRose: Math.round(v) })} />
+                  <InlineSl label="Min slope" help="Ground flatter than this faces no way and is left out." min={0} max={30} step={0.5} value={style.minSlopeAspectRose ?? 2} onChange={v => ss({ minSlopeAspectRose: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Petal hatch" help="Fills each petal with arcs this far apart, in hundredths of the rose's radius. 0 is none." min={0} max={10} step={0.5} value={style.hatchAspectRose ?? 0} onChange={v => ss({ hatchAspectRose: v })} fmt={v => (v > 0 ? v.toFixed(1) : 'none')} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresAspectRose} onChange={v => ss({ cellMetresAspectRose: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefAspectRose} onChange={v => ss({ reliefAspectRose: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <InlineSl label="Rule weight" help="The weight of the frame, the grid, the ticks and the numbers, which are a pen of their own." min={0.1} max={4} step={0.05} value={style.ruleWeightAspectRose ?? 0.35} onChange={v => ss({ ruleWeightAspectRose: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="AspectRose" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Stereonet" icon={<ModeMark kind="stereonet" />} open={sec.modeStereonet} onToggle={() => tog('modeStereonet')} enabled={style.enabledStereonet}>
+            <Tog label="Enabled" testId="mode-stereonet" checked={style.enabledStereonet} onChange={v => ss({ enabledStereonet: v })} />
+            {style.enabledStereonet && (
+              <>
+                <Sub>
+                  <Note>Every slope as the pole to its plane on a lower-hemisphere equal-area net, as structural geology plots bedding. Level ground falls at the centre, cliffs at the rim. It lies flat above the ground, so a plan view shows it alone.</Note>
+                  <Tog label="Poles" help="A small cross at each pole, as a pen of its own." checked={style.polesStereonet !== false} onChange={v => ss({ polesStereonet: v })} />
+                  <InlineSl label="Pole weight" min={0.1} max={4} step={0.05} value={style.poleWeightStereonet ?? 0.5} onChange={v => ss({ poleWeightStereonet: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Density contours" help="Lines of equal pole density, from a Gaussian count over the net, in multiples of an even spread." checked={style.contoursStereonet !== false} onChange={v => ss({ contoursStereonet: v })} />
+                  <InlineSl label="Contour levels" min={1} max={10} step={1} value={style.levelsStereonet ?? 5} onChange={v => ss({ levelsStereonet: Math.round(v) })} />
+                  <Tog label="Net" help="The equal-area graticule: great circles through north and south, and small circles about them, every 10°." checked={style.netStereonet !== false} onChange={v => ss({ netStereonet: v })} />
+                  <InlineSl label="Poles read" log help="How many cells are read at most, evenly over the plate." min={200} max={20000} step={100} value={style.sampleStereonet ?? 3000} onChange={v => ss({ sampleStereonet: Math.round(v) })} />
+                  <InlineSl label="Min slope" help="Ground flatter than this is left out, or the centre fills with the flat." min={0} max={30} step={0.5} value={style.minSlopeStereonet ?? 2} onChange={v => ss({ minSlopeStereonet: v })} fmt={v => `${v}°`} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresStereonet} onChange={v => ss({ cellMetresStereonet: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefStereonet} onChange={v => ss({ reliefStereonet: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                  <InlineSl label="Rule weight" help="The weight of the frame, the grid, the ticks and the numbers, which are a pen of their own." min={0.1} max={4} step={0.05} value={style.ruleWeightStereonet ?? 0.35} onChange={v => ss({ ruleWeightStereonet: v })} fmt={v => v.toFixed(2)} />
+                </Sub>
+                <ModeStyleOverride prefix="Stereonet" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           <Section title="Mode: Map Grid" icon={<ModeMark kind="mapgrid" />} open={sec.modeMapGrid} onToggle={() => tog('modeMapGrid')} enabled={style.enabledMapGrid}>
             <Tog label="Enabled" testId="mode-mapgrid" checked={style.enabledMapGrid} onChange={v => ss({ enabledMapGrid: v })} />
             {style.enabledMapGrid && (
@@ -1427,4 +1543,4 @@ export function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glaci
           </Section>
     </>
   )
-}
+})

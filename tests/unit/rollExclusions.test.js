@@ -10,9 +10,10 @@ import { randomPreset } from '../../src/utils/presetGenetics'
 const EXCLUDED = DRAW_MODES.filter((m) => m.needsData || m.roll === false).map((m) => m.id)
 
 describe('rolled modes', () => {
-  it('excludes the eight input modes and the cover plate', () => {
+  it('excludes the eight input modes, the charts and the cover plate', () => {
     expect(EXCLUDED.sort()).toEqual(
-      ['Cover', 'Geodesic', 'Isochrone', 'MapGrid', 'Panorama', 'Route', 'SunHours', 'Viewshed', 'Waveform'])
+      ['AspectRose', 'Cover', 'Geodesic', 'Hypsometry', 'Isochrone', 'MapGrid', 'Panorama', 'ProfileSheet', 'Route',
+        'Stereonet', 'SunHours', 'SwathProfile', 'Viewshed', 'Waveform'])
   })
 
   it('never rolls an excluded mode', () => {

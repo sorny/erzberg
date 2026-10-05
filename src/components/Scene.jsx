@@ -517,6 +517,10 @@ export function Scene({
         // layers that live inside the ground test against a buffer without it.
         groundOccludes: !!(p.depthOcclusion && p.occludeBy === 'ground' && (p.tilt == null || p.tilt <= 90)),
         fillOccludes: hasFillLayer(p),
+        // The stroke lift where the terrain hides lines, in half widths, and
+        // the CSS height the viewport measures stroke widths against.
+        strokeLift: p.depthOcclusion && (hasFillLayer(p) || p.occludeBy === 'ground') ? 2 * (p.strokeDepthBias ?? 0) : 0,
+        viewHeight: gl.getSize(new THREE.Vector2()).y,
         // How far behind its stroke a halo sits; the viewport uses the same.
         haloDepth: Math.max(1, Math.hypot(p.imageWidth ?? 800, p.imageHeight ?? 800) / 2) * 0.01,
         depthOcclusion: p.depthOcclusion,

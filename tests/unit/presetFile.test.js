@@ -257,7 +257,7 @@ describe('migrateShading', () => {
 describe('migrateOcclusion', () => {
   it('gives a plate before format 5 the classic model with every wall, and leaves 5 alone', async () => {
     const { parsePreset, PRESET_FORMAT } = await import('../../src/utils/presetFile')
-    expect(PRESET_FORMAT).toBe(5)
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(5)
     const old = parsePreset(JSON.stringify({ format: 4, style: { enabledHachure: true, wallsLines: false } }))
     expect(old.style.occludeBy).toBe('lines')
     expect(old.style.wallsHachure).toBe(true)
@@ -272,5 +272,20 @@ describe('migrateOcclusion', () => {
     const { migrateOcclusion } = await import('../../src/utils/presetFile')
     const out = migrateOcclusion({ style: { modeCopies: [{ uid: 'c1', mode: 'Hachure', values: { enabledHachure: true } }] } })
     expect(out.style.modeCopies[0].values.wallsHachure).toBe(true)
+  })
+})
+
+describe('migrateStrokeBias', () => {
+  it('gives a plate before format 6 the old depth test, and leaves 6 alone', async () => {
+    const { parsePreset, PRESET_FORMAT } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(6)
+    expect(parsePreset(JSON.stringify({ format: 5, style: { showFill: true } })).style.strokeDepthBias).toBe(0)
+    expect(parsePreset(JSON.stringify({ format: 2, style: {} })).style.strokeDepthBias).toBe(0)
+    expect(parsePreset(JSON.stringify({ format: 6, style: { showFill: true } })).style.strokeDepthBias).toBeUndefined()
+  })
+
+  it('keeps a bias the plate already carries', async () => {
+    const { migrateStrokeBias } = await import('../../src/utils/presetFile')
+    expect(migrateStrokeBias({ style: { strokeDepthBias: 1.5 } }).style.strokeDepthBias).toBe(1.5)
   })
 })

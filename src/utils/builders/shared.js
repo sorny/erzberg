@@ -223,6 +223,17 @@ function resolveLayerStyle(id, p) {
     return { ...base, name: `${base.name ?? layerDisplayName(anyForm[1])} · ${anyForm[2]}` }
   }
 
+  /*
+   * A chart's rules and lettering: the frame, the grid, the ticks and the
+   * numbers, in the line colour at the mode's rule weight.
+   */
+  const chart = /^(ProfileSheet|SwathProfile|Hypsometry|AspectRose|Stereonet)-(Rules|Numbers)$/.exec(id)
+  if (chart) {
+    const m = chart[1]
+    return { weight: p[`ruleWeight${m}`] ?? 0.35, opacity: p[`opacity${m}`], dash: 'solid',
+             ...(chart[2] === 'Numbers' && { color: p[`color${m}`] ?? '#1a1a1a' }) }
+  }
+
   switch (id) {
     case 'Contours-Minor':
       return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }
@@ -301,6 +312,8 @@ function resolveLayerStyle(id, p) {
     // A dot is never dashed.
     case 'Stems-Tips':
       return { weight: p.tipWeightStems ?? 2, opacity: p.opacityStems, dash: 'solid' }
+    case 'Stereonet-Poles':
+      return { weight: p.poleWeightStereonet ?? 0.5, opacity: p.opacityStereonet, dash: 'solid' }
     case 'Bedding-Beds':
       return { weight: p.weightBedding, opacity: p.opacityBedding, dash: p.dashBedding }
     case 'Bedding-Marker':
@@ -737,18 +750,26 @@ export function simplifyFlat(pts, eps, outBuf = null) {
     const ax = pts[2 * lo], ay = pts[2 * lo + 1]
     const dx = pts[2 * hi] - ax, dy = pts[2 * hi + 1] - ay
     const len2 = dx * dx + dy * dy
-    let best = -1, bestD2 = eps2
-    for (let i = lo + 1; i < hi; i++) {
-      const px = pts[2 * i], py = pts[2 * i + 1]
-      let d2
-      if (len2 < 1e-20) {
-        const ex = px - ax, ey = py - ay
-        d2 = ex * ex + ey * ey
-      } else {
-        const cross = dx * (py - ay) - dy * (px - ax)
-        d2 = (cross * cross) / len2
+    let best = -1
+    if (len2 < 1e-20) {
+      // A closed span: the distance is to its one point.
+      let bestD2 = eps2
+      for (let i = lo + 1; i < hi; i++) {
+        const ex = pts[2 * i] - ax, ey = pts[2 * i + 1] - ay
+        const d2 = ex * ex + ey * ey
+        if (d2 > bestD2) { bestD2 = d2; best = i }
       }
-      if (d2 > bestD2) { bestD2 = d2; best = i }
+    } else {
+      // The squared distance to the chord is cross² / len2, and len2 is one
+      // number for the whole span, so the points are compared on cross² and the
+      // tolerance scaled once: a division per span rather than one per point,
+      // which was most of this function's time on dense contours.
+      let bestC2 = eps2 * len2
+      for (let i = lo + 1; i < hi; i++) {
+        const cross = dx * (pts[2 * i + 1] - ay) - dy * (pts[2 * i] - ax)
+        const c2 = cross * cross
+        if (c2 > bestC2) { bestC2 = c2; best = i }
+      }
     }
     if (best >= 0) {
       keep[best] = 1
