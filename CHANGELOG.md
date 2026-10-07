@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.58.1] — 2026-10-07
+
+### Fixed
+
+- **Occlusion no longer drops out until the camera moves.** After a change, the
+  viewport sometimes showed strokes that the ground must hide, until the next
+  orbit or edit. The canvas draws on demand. A layer's draw order, depth state
+  and uniforms were set in passive effects, which can run after the frame that
+  first shows a new line object. That frame drew the object at the default
+  order 0, before the ground's depth, and nothing drew again. These settings
+  are now made in layout effects, inside the commit, and each layer then asks
+  for a frame (`HeightmapLines.jsx`, `SurfaceMesh.jsx`). `tests/redraw.spec.js`
+  slows React's scheduler so the race happens every time. It compares each
+  frame on screen with a fresh one.
+
 ## [1.58.0] — 2026-10-05
 
 ### Added

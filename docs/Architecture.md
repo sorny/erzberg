@@ -124,6 +124,9 @@ rebuild for the same reason. A halo (`halo<Id>`) does not.
 
 **Tier 3. Nothing.** The canvas uses `frameloop="demand"`. A camera drag moves
 the camera directly and mirrors into React state on a throttled trailing tick.
+A change made to a three.js object outside R3F props (draw order, depth state,
+a uniform) goes in a layout effect, and the component then calls `invalidate()`.
+A passive effect can run after the frame, and nothing draws again.
 
 The murmuration is the one thing that runs per frame on purpose. It steps in
 `useFrame` and calls `invalidate()`. `showPoints` gates it, so a hidden flock

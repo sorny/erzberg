@@ -1,7 +1,7 @@
 /**
  * Renders the ridge-line / curve / hachure / contour geometry as GPU line segments.
  */
-import { useMemo, useEffect } from 'react'
+import { useMemo, useEffect, useLayoutEffect } from 'react'
 import * as THREE from 'three'
 import { LineSegments2 } from 'three/examples/jsm/lines/LineSegments2.js'
 import { LineSegmentsGeometry } from 'three/examples/jsm/lines/LineSegmentsGeometry.js'
@@ -369,7 +369,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     fillMat.color.set(fillColor || '#1a78c2')
     if (fillMat.toneMapped === !!asPicked) { fillMat.toneMapped = !asPicked; fillMat.needsUpdate = true }
     const o = fillOpacity ?? 0.45
@@ -454,7 +454,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     polygonOffsetUnits: 1,
   }), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!curtainMat) return
     // If the camera is underneath (tilt > 90), curtains would be between us and the lines.
     // So we disable them to allow the lines to be visible from below.
@@ -472,7 +472,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   useEffect(() => () => lidGeo?.dispose(),     [lidGeo])
   useEffect(() => () => lidMat?.dispose(),     [lidMat])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!lidMat) return
     // opacity is a uniform and depthTest is render state — no recompile needed.
     lidMat.opacity   = opacity ?? 1
@@ -584,7 +584,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     if (!geometry || !depthOcclusion || !(halo > 0)) return null
     return new LineSegments2(geometry, haloMaterial)
   }, [geometry, depthOcclusion, halo, haloMaterial])
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!haloLines) return
     haloMaterial.linewidth = drawWeight + 2 * halo
     haloMaterial.resolution.copy(resolution)
@@ -599,10 +599,10 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
   }, [haloLines, haloMaterial, haloDepthU, geometry, drawWeight, halo, dash, resolution, haloDepth, haloOrder, invalidate])
 
   // A uniform, not a prop, so nothing tells the on-demand loop it changed.
-  useEffect(() => { liftU.value = strokeLift; invalidate() }, [liftU, strokeLift, invalidate])
+  useLayoutEffect(() => { liftU.value = strokeLift; invalidate() }, [liftU, strokeLift, invalidate])
   useEffect(() => () => haloMaterial.dispose(), [haloMaterial])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!lines) return
     material.linewidth = drawWeight
     material.opacity = opacity ?? 1
@@ -674,6 +674,16 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
       ghostLines.renderOrder = ghostOrder
     }
   }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, lineOrder, ghostOrder, layer.selfOcclude, asPicked])
+
+  /*
+   * Every mutation above is a layout effect, so it lands in the commit, before
+   * the next frame can be drawn; this asks for that frame. As passive effects
+   * they could run after the on-demand loop had already drawn the new objects
+   * with the old state, and nothing drew again: a fresh line object kept the
+   * default renderOrder 0, was drawn before the ground's depth (0.5), and lay
+   * over the terrain until the camera moved.
+   */
+  useLayoutEffect(() => { invalidate() })
 
   useEffect(() => () => {
     material?.dispose()

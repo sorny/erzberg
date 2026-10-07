@@ -1,7 +1,8 @@
 /**
  * Terrain surface mesh.
  */
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useLayoutEffect, useRef } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import { hexToRgb, sampleGradient } from '../utils/colorUtils'
 import { hasFillLayer } from '../utils/geometryBuilders'
@@ -559,6 +560,7 @@ ${TONE_GLSL}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
+  const invalidate = useThree((st) => st.invalidate)
   const textureImage     = useStore(s => s.textureImage)
   const heightmapPixels  = useStore(s => s.heightmapPixels)
   const heightmapWidth   = useStore(s => s.heightmapWidth)
@@ -833,7 +835,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!surfMat) return
     const hasHypso = p.fillHypsometric
     const isBanded = hasHypso && p.fillBanded
@@ -980,7 +982,7 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     // (p is a fresh object), so flagging it would re-validate the program per frame.
   }, [surfMat, p, imageryTex, overlayTex, heightmapTex, surfaceGeo, heightmapWidth, heightmapHeight, fieldTex, fields])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!surfMat) return
     surfMat.uniforms.uGradientTex.value = gradientTex
   }, [surfMat, gradientTex])
@@ -1007,9 +1009,13 @@ export function SurfaceMesh({ surfaceGeo, p, profileClickRef }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (wireMat) wireMat.color.set(p.meshColor ?? '#888888')
   }, [wireMat, p.meshColor])
+
+  // The materials' state is set in layout effects above, inside the commit;
+  // this asks for the frame that shows it (see LineLayer in HeightmapLines).
+  useLayoutEffect(() => { invalidate() })
 
   if (!geometry) return null
 
@@ -1082,6 +1088,7 @@ export const GROUND_ORDER = 0.5
  * lines can be seen from below.
  */
 export function GroundOccluder({ surfaceGeo, p }) {
+  const invalidate = useThree((st) => st.invalidate)
   const on = !!(p.depthOcclusion && p.occludeBy === 'ground' && !p.showRawTerrain &&
                 (p.tilt == null || p.tilt <= 90))
   const sheet = on && !hasFillLayer(p)
@@ -1099,7 +1106,7 @@ export function GroundOccluder({ surfaceGeo, p }) {
       uElevMinCut: { value: 0 }, uElevMaxCut: { value: 100 },
     },
   }), [])
-  useEffect(() => {
+  useLayoutEffect(() => {
     mat.uniforms.uRawMin.value = surfaceGeo?.metadata?.minB ?? 0
     mat.uniforms.uRawMax.value = surfaceGeo?.metadata?.maxB ?? 1
     mat.uniforms.uElevMinCut.value = p.elevMinCut ?? 0
@@ -1108,6 +1115,7 @@ export function GroundOccluder({ surfaceGeo, p }) {
     mat.polygonOffsetFactor = p.occlusionBias ?? 1
     mat.polygonOffsetUnits = p.occlusionBias ?? 1
   }, [mat, surfaceGeo, p.elevMinCut, p.elevMaxCut, p.occlusionBias])
+  useLayoutEffect(() => { invalidate() })
   useEffect(() => () => mat.dispose(), [mat])
 
   const meshOf = (src) => {
