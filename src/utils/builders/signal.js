@@ -209,37 +209,22 @@ export function buildHair(terrain, p, o) {
 // ─── Waveform ─────────────────────────────────────────────────────────────
 
 /**
- * One column of a waveform plot, read along a line across the ground.
- *
- * The line runs through the highest point of the terrain, or through its
- * middle, at a *Direction*: 0° reads top to bottom (north to south), 90° left to
- * right, 180° bottom to top, 270° right to left, and anything between is a
- * diagonal. It is clipped to the raster. At each sample the height above the
- * line's own lowest point sets the column's half-width, and the column is drawn
- * as one stroke per sample, across the reading direction: the scanlines of a
- * printed waveform, which a pen fills in one direction. *Detail* adds back the
- * short waves of the profile, the profile minus a blur of itself, so a cliff
- * band shows as a burst.
- *
- * Where the column goes, `place`:
- *  - `column` stands it upright in the middle of the plate, top to bottom, for
- *    a sleeve of one plate per peak;
- *  - `row` lays it left to right through the middle;
- *  - `line` draws it on the line it reads, so it crosses the ground where the
- *    profile was taken.
- * All three lie flat above the ground, so a plan view shows them alone.
- *
- * `sides` mirrors each stroke about the axis (`both`) or draws it from the axis
- * to its left only (`one`), at the same full width.
+ * The line Waveform reads, in grid units: the point it passes through
+ * (`c0`, `r0`), the reading direction (`dc`, `dr`, c right and r down, 0° is
+ * +r), and the run `t0`…`t1` along it that lies on the raster. `from` and `to`
+ * keep a part of that run, as fractions of it, so the reading can start and end
+ * anywhere along the line. The viewport's guide and the panel's preview read
+ * the same line from here, so the three cannot disagree.
  */
-export function buildWaveform(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl, halfW, halfH, maxElev, hasNoData } = terrain
+export function waveformLine(terrain, o) {
+  const { grid, gridMask, rows, cols } = terrain
   let c0 = (cols - 1) / 2, r0 = (rows - 1) / 2
-  if (o.line !== 'centre') {
+  if (o.line === 'point') {
+    c0 = clamp01(o.originX ?? 0.5) * (cols - 1); r0 = clamp01(o.originY ?? 0.5) * (rows - 1)
+  } else if (o.line !== 'centre') {
     let best = -Infinity
     for (let i = 0; i < grid.length; i++) if (gridMask[i] && grid[i] > best) { best = grid[i]; c0 = i % cols; r0 = (i - c0) / cols }
   }
-  // The reading direction in grid units (c right, r down): 0° is +r.
   const a = (o.angle ?? 0) * Math.PI / 180
   const dc = Math.sin(a), dr = Math.cos(a)
   // Clip the line through (c0, r0) to the raster.
@@ -250,6 +235,73 @@ export function buildWaveform(terrain, p, o) {
     t0 = Math.max(t0, Math.min(ta, tb)); t1 = Math.min(t1, Math.max(ta, tb))
   }
   if (!(t1 > t0)) return null
+  const a0 = Math.max(0, Math.min(1, o.from ?? 0)), a1 = Math.max(0, Math.min(1, o.to ?? 1))
+  if (!(a1 > a0)) return null
+  return { c0, r0, dc, dr, t0: t0 + (t1 - t0) * a0, t1: t0 + (t1 - t0) * a1 }
+}
+
+const COMPASS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+
+/**
+ * Where Waveform's line starts and ends, as compass points on a north-up
+ * raster. 0° reads N→S: the reading direction is grid +row, which travels on
+ * the bearing 180° − angle.
+ */
+export function readingEnds(angle) {
+  const to = ((180 - angle) % 360 + 360) % 360
+  const name = (b) => COMPASS[Math.round(b / 22.5) % 16]
+  return [name((to + 180) % 360), name(to)]
+}
+
+const KNEE = 0.7
+
+/**
+ * A soft limit for widths up to `top`: w below KNEE as it is, 0 below 0, and
+ * above KNEE  KNEE + (1 − KNEE) · ln(1 + b·u) / b, with u the distance past the
+ * knee over (1 − KNEE). Its slope is 1 at the knee for any b, so it meets the
+ * straight part without a kink, and b is the root of ln(1 + b·R) = b, R being
+ * `top`'s u, so `top` lands on 1. A logarithm, as a compressor works in
+ * decibels, because it never saturates: tanh put everything past three times
+ * the knee at 0.9999, and a flat edge again. With nothing past 1, the identity.
+ */
+function limiter(top) {
+  const R = (top - KNEE) / (1 - KNEE)
+  if (!(R > 1 + 1e-9)) return (v) => clamp01(v)
+  // b = ln(1 + bR) has one root above 0 for R > 1; iterating from above converges to it.
+  let b = Math.max(1, Math.log(R) * 2)
+  for (let i = 0; i < 80; i++) b = Math.log(1 + b * R)
+  return (v) => (v <= 0 ? 0 : v <= KNEE ? v : KNEE + (1 - KNEE) * Math.log(1 + b * (v - KNEE) / (1 - KNEE)) / b)
+}
+
+/**
+ * What Waveform reads and how wide it draws each sample: a cross-section,
+ * drawn the way a sound editor draws a recording.
+ *
+ *  1. **Read.** Every *Spacing* along the line, the height h. That is the
+ *     profile, the same section a surveyor would draw.
+ *  2. **Normalise.** e = ((h − lo) / (hi − lo))^γ, so the line's lowest point
+ *     is 0 and its highest is 1. *Gamma* above 1 narrows the low ground.
+ *  3. **Sharpen.** w = e + Detail · (h − blur(h)) / (hi − lo). The second term
+ *     is the profile minus a blur of itself over *Detail scale* samples: the
+ *     bumps shorter than that. Adding it back is an unsharp mask, the
+ *     sharpening a photo editor does, so a cliff band shows as a burst.
+ *  4. **Limit.** Sharpening can push w past 1. Up to KNEE nothing changes;
+ *     above it, w bends along a smooth curve that meets the straight part
+ *     without a kink and reaches 1 at the widest sample only, as an audio
+ *     limiter treats a peak. A smaller w stays smaller, so no run of samples
+ *     goes flat. Below 0 there is no stroke. With `clip` (plates before v1.59)
+ *     w was cut at 1 instead, and a run of samples past 1 drew a flat edge at
+ *     full width. A plain rescale was tried and dropped: one spike then
+ *     narrowed the whole column, so Detail made the waveform thinner.
+ *
+ * Returns the samples, `w` as a fraction of the full width, and `e` for the
+ * hypsometric tint, or null where the line has no relief.
+ */
+export function waveformProfile(terrain, o) {
+  const { grid, gridMask, rows, cols, scl, hasNoData } = terrain
+  const line = waveformLine(terrain, o)
+  if (!line) return null
+  const { c0, r0, dc, dr, t0, t1 } = line
   const step = Math.max(scl, o.spacing ?? 1.5) / scl
   const n = Math.max(2, Math.floor((t1 - t0) / step + 1e-9) + 1)
   const sMask = hasNoData ? gridMask : null
@@ -263,8 +315,51 @@ export function buildWaveform(terrain, p, o) {
   if (!(hi > lo)) return null
   const fine = boxBlur(h, n, 1, Math.max(1, o.smooth ?? 4))
   const gain = o.detail ?? 1.5
-  const width = Math.max(1, o.width ?? 120)
   const gamma = Math.max(0.1, o.gamma ?? 1)
+  const e = new Float32Array(n), w = new Float32Array(n)
+  let wHi = -Infinity
+  for (let k = 0; k < n; k++) {
+    if (!ok[k]) continue
+    e[k] = ((h[k] - lo) / (hi - lo)) ** gamma
+    w[k] = e[k] + gain * (h[k] - fine[k]) / (hi - lo)
+    if (w[k] > wHi) wHi = w[k]
+  }
+  if (o.clip) for (let k = 0; k < n; k++) w[k] = clamp01(w[k])
+  else {
+    const limit = limiter(wHi)
+    for (let k = 0; k < n; k++) w[k] = ok[k] ? limit(w[k]) : 0
+  }
+  return { line, step, n, ok, h, lo, hi, e, w }
+}
+
+/**
+ * One column of a waveform plot, read along a line across the ground.
+ *
+ * The line runs through the highest point of the terrain, through its middle,
+ * or through a point picked on it (`originX`, `originY`), at a *Direction*: 0°
+ * reads top to bottom (north to south), 90° left to right, 180° bottom to top,
+ * 270° right to left, and anything between is a diagonal. It is clipped to the
+ * raster. `waveformProfile` says how wide each sample is, and each sample is
+ * one stroke across the reading direction: the scanlines of a printed
+ * waveform, which a pen fills in one direction.
+ *
+ * Where the column goes, `place`:
+ *  - `column` stands it upright in the middle of the plate, top to bottom, for
+ *    a sleeve of one plate per peak;
+ *  - `row` lays it left to right through the middle;
+ *  - `line` draws it on the line it reads, so it crosses the ground where the
+ *    profile was taken.
+ * All three lie flat above the ground, so a plan view shows them alone.
+ *
+ * `sides` mirrors each stroke about the axis (`both`) or draws it from the axis
+ * to its left only (`one`), at the same full width.
+ */
+export function buildWaveform(terrain, p, o) {
+  const { scl, halfW, halfH, maxElev } = terrain
+  const prof = waveformProfile(terrain, o)
+  if (!prof) return null
+  const { line: { c0, r0, dc, dr, t0, t1 }, step, n, ok, e, w } = prof
+  const width = Math.max(1, o.width ?? 120)
   const one = o.sides === 'one'
   const place = o.place ?? 'column'
   const len = (t1 - t0) * scl
@@ -284,12 +379,11 @@ export function buildWaveform(terrain, p, o) {
   const y = maxElev
   for (let k = 0; k < n; k++) {
     if (!ok[k]) continue
-    const base = ((h[k] - lo) / (hi - lo)) ** gamma
-    const hw = clamp01(base + gain * (h[k] - fine[k]) / (hi - lo)) * width / 2
+    const hw = w[k] * width / 2
     if (hw <= 0) continue
     const [x, z, nx, nz] = at(k)
     const from = one ? 0 : -hw, to = one ? 2 * hw : hw
-    const rgb = computeVertexColor(base, 0, 0, p)
+    const rgb = computeVertexColor(e[k], 0, 0, p)
     positions.push6(x + nx * from, y, z + nz * from, x + nx * to, y, z + nz * to); colors.pushRgb2(rgb)
   }
   return { positions: positions.toArray(), colors: colors.toArray() }

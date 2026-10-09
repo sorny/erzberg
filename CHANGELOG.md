@@ -7,6 +7,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.59.0] — 2026-10-09
+
+### Added
+
+- **Waveform shows where it reads.** While its section is open, the read line
+  lies over the terrain in the accent colour, with a bead at its start, a pin
+  where it passes through, and chevrons along it in the reading direction. It is
+  a viewport aid and never exported. *Show line* turns it off, and the browser
+  remembers that switch. *Through* has a third choice, **point**,
+  picked on the terrain, and *Direction* names its compass points
+  (`30° NNW→SSE`).
+- **Waveform's Chainage.** A two-handle slider moves the start and the end of
+  the read line, as fractions of its length, so the waveform can cover one
+  ridge or one valley. The guide marks both ends with a bead and draws the rest
+  of the line faint. The kept part's own lowest and highest points set the
+  widths.
+- **Waveform's preview.** A chart at the top of the section draws the ground's
+  profile along the line in orange beside the scanlines in grey, from the
+  start's compass point to the end's, with the line's length. With Detail at 0
+  and Gamma at 1 the bars end on the line, so what moves them off it is plain.
+
+- **A local Overpass server for Austria.** The public servers can take minutes.
+  `scripts/overpass-austria.sh` runs an Overpass server in Podman or Docker,
+  from Geofabrik's Austria extract, and applies its diffs every hour. Two lines
+  in `.env.development.local` point the dev server at it. The app asks it first,
+  but only for an extent wholly inside the extract's boundary polygon. A
+  bounding box is not enough: the box around Austria holds Munich, where the
+  server would answer with no data and no error. If the server is down, the
+  public servers answer as before (`utils/overpassLocal.js`).
+
+### Changed
+
+- **Waveform no longer goes flat at a high Detail.** Detail sharpens the profile
+  (an unsharp mask), and a sample it pushed past the width was cut there, so a
+  run of samples drew a flat edge. Now the overshoot is compressed on a
+  logarithmic curve, as a limiter treats a peak: below 70 % of the width nothing
+  changes, and only the widest sample reaches it. A plain rescale was tried
+  first and dropped, because one spike then made the whole column thinner.
+  Plates before this keep the cut (*Clip at width*, preset format 7,
+  `migrateWaveformClip`). The help texts now say what each control does to the
+  shape.
+
+### Fixed
+
+- **Waveform's Place › line and Sides › one did nothing.** The two button rows
+  wrote their labels (`on line`, `mirrored`, `one side`) instead of their values,
+  so `line` drew a column, both Sides drew the mirrored shape, and no Sides button
+  showed as pressed. The builder and its unit tests were right; nothing pressed
+  the buttons. `tests/waveform.spec.js` does now. A preset or session that
+  stored a label is read as the value it named (`repairWaveform`).
+
 ## [1.58.1] — 2026-10-07
 
 ### Fixed

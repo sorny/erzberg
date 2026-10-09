@@ -23,3 +23,6 @@ scripts/.ae-index/
 # those files still load, so they are still lying around in working copies.
 *.cover.json
 *.landcover.json
+
+# The local Overpass server's region, fetched by scripts/overpass-austria.sh
+public/overpass-local.poly

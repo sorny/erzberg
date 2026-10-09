@@ -289,3 +289,41 @@ describe('migrateStrokeBias', () => {
     expect(migrateStrokeBias({ style: { strokeDepthBias: 1.5 } }).style.strokeDepthBias).toBe(1.5)
   })
 })
+
+describe('repairWaveform', () => {
+  it('turns the labels the panel wrote into the values they named, in any format', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    for (const format of [2, PRESET_FORMAT]) {
+      const s = parsePreset(JSON.stringify({ format, style: { placeWaveform: 'on line', sidesWaveform: 'one side' } })).style
+      expect(s.placeWaveform).toBe('line')
+      expect(s.sidesWaveform).toBe('one')
+    }
+    expect(parsePreset(JSON.stringify({ format: PRESET_FORMAT, style: { sidesWaveform: 'mirrored' } })).style.sidesWaveform).toBe('both')
+  })
+
+  it('repairs mode copies, and returns a sound payload as it is', async () => {
+    const { repairWaveform } = await import('../../src/utils/presetFile')
+    const sound = { style: { placeWaveform: 'row', modeCopies: [{ mode: 'Waveform', values: { sidesWaveform: 'one' } }] } }
+    expect(repairWaveform(sound)).toBe(sound)
+    const bad = { style: { modeCopies: [{ mode: 'Waveform', values: { placeWaveform: 'on line' } }] } }
+    expect(repairWaveform(bad).style.modeCopies[0].values.placeWaveform).toBe('line')
+    expect(bad.style.modeCopies[0].values.placeWaveform).toBe('on line')
+  })
+})
+
+describe('migrateWaveformClip', () => {
+  it('keeps the cut for a plate before format 7, and leaves 7 alone', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(7)
+    expect(parsePreset(JSON.stringify({ format: 6, style: { enabledWaveform: true } })).style.clipWaveform).toBe(true)
+    expect(parsePreset(JSON.stringify({ format: 7, style: { enabledWaveform: true } })).style.clipWaveform).toBeUndefined()
+  })
+
+  it('reaches Waveform copies, and keeps a value the plate carries', async () => {
+    const { migrateWaveformClip } = await import('../../src/utils/presetFile')
+    const out = migrateWaveformClip({ style: { clipWaveform: false, modeCopies: [{ mode: 'Waveform', values: {} }, { mode: 'Lines', values: {} }] } })
+    expect(out.style.clipWaveform).toBe(false)
+    expect(out.style.modeCopies[0].values.clipWaveform).toBe(true)
+    expect(out.style.modeCopies[1].values.clipWaveform).toBeUndefined()
+  })
+})

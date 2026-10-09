@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateOcclusion, migratePillarInk, migrateShading, migrateStrokeBias } from './presetFile'
+import { migrateAzimuths, migrateOcclusion, migratePillarInk, migrateShading, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -48,6 +48,9 @@ const OCCLUSION_SCALE = 2
 
 /** And for the stroke depth bias of v1.58.0. See `migrateStrokeBias`. */
 const STROKE_SCALE = 2
+
+/** And for Waveform's limiter of v1.59.0. See `migrateWaveformClip`. */
+const WAVE_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -99,6 +102,8 @@ export function loadSession(defaults) {
     if ((data.pillarScale ?? 1) < PILLAR_SCALE) out = migratePillarInk(out)
     if ((data.occlusionScale ?? 1) < OCCLUSION_SCALE) out = migrateOcclusion(out)
     if ((data.strokeScale ?? 1) < STROKE_SCALE) out = migrateStrokeBias(out)
+    if ((data.waveScale ?? 1) < WAVE_SCALE) out = migrateWaveformClip(out)
+    out = repairWaveform(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
       out[field] = { ...out[field] }
@@ -141,7 +146,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE }
+    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE, waveScale: WAVE_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {

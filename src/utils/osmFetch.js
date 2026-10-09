@@ -32,6 +32,7 @@ import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
 import { bucketLabel, bucketStyle, osmCategory, selectorsFor } from './osmCategories'
 import { wgs84ExtentKm } from './geoCoords'
 import { makeSource, packFeatures } from './vectorLayers'
+import { localEndpointFor } from './overpassLocal'
 
 export const OSM_ATTRIBUTION = '© OpenStreetMap contributors'
 
@@ -415,9 +416,10 @@ async function readBody(res, onBytes) {
   return new TextDecoder().decode(buf)
 }
 
-async function fetchOverpassText(query, signal, onBytes) {
+async function fetchOverpassText(query, bboxWgs84, signal, onBytes) {
   let lastError = null
-  for (const url of ENDPOINTS) {
+  const local = await localEndpointFor(bboxWgs84)
+  for (const url of local ? [local, ...ENDPOINTS] : ENDPOINTS) {
     const deadline = AbortSignal.timeout(ATTEMPT_TIMEOUT_MS)
     const attempt = signal ? AbortSignal.any([signal, deadline]) : deadline
     try {
@@ -426,6 +428,17 @@ async function fetchOverpassText(query, signal, onBytes) {
         body: new URLSearchParams({ data: query }),
         signal: attempt,
       })
+      // A local server that is still importing, or cannot reach its database,
+      // answers 200 with an HTML error page, or a 5xx from its proxy. Either way
+      // the public servers can still answer. A 4xx is about the query, as below.
+      if (url === local) {
+        const json = /json/.test(res.headers.get('content-type') ?? '')
+        if (res.ok && json) return await readBody(res, onBytes)
+        if (res.ok || res.status >= 500 || res.status === 429) {
+          lastError = new Error(`The local Overpass server is not ready (${res.status}).`)
+          continue
+        }
+      }
       if (res.ok) return await readBody(res, onBytes)
 
       // 429 is rate limiting and 504 is the query outrunning the server's own
@@ -466,10 +479,10 @@ async function fetchOverpassText(query, signal, onBytes) {
 const countCache = new Map()
 
 /** POST a count query and return its totals, in statement order. */
-async function runCount(query, signal, cacheKey) {
+async function runCount(query, bboxWgs84, signal, cacheKey) {
   const cached = lruGet(countCache, cacheKey)
   if (cached) return cached
-  const text = await fetchOverpassText(query, signal)
+  const text = await fetchOverpassText(query, bboxWgs84, signal)
   let doc
   try {
     doc = JSON.parse(text)
@@ -492,7 +505,7 @@ export async function countOsm(bboxWgs84, categoryIds, { detail = 'full', signal
   const query = buildCountQuery(bboxWgs84, categoryIds, detail, perCategory)
   if (!query) throw new Error('Nothing selected to count.')
   const key = `${cacheKey(bboxWgs84, categoryIds, detail)}|${perCategory ? 'each' : 'all'}`
-  const totals = await runCount(query, signal, key)
+  const totals = await runCount(query, bboxWgs84, signal, key)
   if (!perCategory) return { total: totals[0] ?? 0, byCategory: null }
 
   const cats = categoryIds.map(osmCategory).filter(Boolean)
@@ -597,7 +610,7 @@ export async function fetchOsm(bboxWgs84, categoryIds, { signal, onProgress, sho
 
     let text
     try {
-      text = await fetchOverpassText(query, signal, (received, declared) => {
+      text = await fetchOverpassText(query, bboxWgs84, signal, (received, declared) => {
         const total = declared || (expected ? expected * BYTES_PER_ELEMENT : 0)
         const mb = (received / 1e6).toFixed(1)
         if (!total) { report(null, `Downloading — ${mb} MB`); return }

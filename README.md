@@ -318,7 +318,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Line Printer | A SYMAP line-printer map: one glyph per character cell, from a dot to an overprinted block |
 | Stems | A dotted stem from a datum to the ground at each cell, with a dot at the tip |
 | Hair | A short curling stroke at each cell; seen from the side, the overlap is the tone |
-| Waveform | A column of scanlines read along a line through the summit at any direction, mirrored or one-sided, as on a record sleeve |
+| Waveform | A column of scanlines read along a line through the summit, the middle or a picked point, at any direction, mirrored or one-sided, as on a record sleeve. The line shows on the terrain while its section is open |
 | Profile Sheet | A surveyor's profile sheet: parallel transects as rising profiles over a numbered station rule at every bend, with a band of cross profiles |
 | Swath Profile | The mean, highest and lowest height across a strip along the plate, the envelope hatched, in metres and kilometres |
 | Hypsometry | Strahler's hypsometric curve, with its histogram and the hypsometric integral |

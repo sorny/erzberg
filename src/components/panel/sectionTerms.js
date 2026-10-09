@@ -78,7 +78,7 @@ export const SECTION_TERMS = {
   'Mode: Line Printer': 'line printer symap ascii characters glyphs typewriter overprint classes quantile computer map 1960s harvard',
   'Mode: Stems': 'stems stem plot dotted lines datum mean signal lollipop dots tips side view audio',
   'Mode: Hair': 'hair fur strands random walk cloud density side view noise scribble waveform',
-  'Mode: Waveform': 'waveform audio sound wave column mirrored scanlines record sleeve poster profile transect summit peak',
+  'Mode: Waveform': 'waveform audio sound wave column mirrored scanlines record sleeve poster profile transect summit peak point pick direction compass bearing guide',
   'Mode: Swath Profile': 'swath profile swath envelope mean maximum minimum quartiles strip relief tectonic geomorphology chart',
   'Mode: Hypsometry': 'hypsometry hypsometric curve area altitude integral strahler histogram elevation distribution chart',
   'Mode: Aspect Rose': 'aspect rose diagram compass direction facing orientation sectors petals equal area chart',

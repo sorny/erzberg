@@ -24,6 +24,7 @@ import { frameRect, insetRect, paperAspect } from '../utils/frame'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ProfileOverlay } from './ProfileOverlay'
+import { WaveformGuide } from './WaveformGuide'
 import { ParticleSystem } from './ParticleSystem'
 
 /**
@@ -87,6 +88,8 @@ export function Scene({
   exportBaseName,
   profileClickRef,
   profileAnchors,
+  // A mode's guide on the ground while its section is open: 'Waveform' or null.
+  guide,
   audioLive,
 }) {
   const { camera: currentCamera, gl, scene, invalidate } = useThree()
@@ -654,6 +657,7 @@ export function Scene({
             camera rig move it with them, but outside lineGeo so it never
             reaches an exporter. */}
         {!webmRecording && <ProfileOverlay terrain={terrain} anchors={profileAnchors} />}
+        {!webmRecording && guide === 'Waveform' && <WaveformGuide terrain={terrain} p={p} />}
       </group>
       {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
       {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}

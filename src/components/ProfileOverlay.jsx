@@ -45,7 +45,7 @@ function uvToWorld(terrain, u, v) {
  * to pierce and the whole Canvas throws. The effect runs on every render because
  * drei rebuilds the material when the viewport resolution changes.
  */
-function Overlay2D({ points, color, width, opacity = 1, order }) {
+export function Overlay2D({ points, color, width, opacity = 1, order, segments = false }) {
   const ref = useRef(null)
   const invalidate = useThree((s) => s.invalidate)
   useLayoutEffect(() => {
@@ -59,11 +59,11 @@ function Overlay2D({ points, color, width, opacity = 1, order }) {
     m.opacity = opacity
     invalidate()
   })
-  return <Line ref={ref} points={points} color={color} lineWidth={width} renderOrder={order} />
+  return <Line ref={ref} points={points} color={color} lineWidth={width} renderOrder={order} segments={segments} />
 }
 
 /** A pin: a stalk out of the surface with a bead on top, so it reads at any tilt. */
-function Anchor({ position, color, height, radius }) {
+export function Anchor({ position, color, height, radius }) {
   const [x, y, z] = position
   return (
     <group>

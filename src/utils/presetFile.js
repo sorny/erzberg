@@ -61,8 +61,12 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 6 is the stroke depth bias, which keeps strokes on steep slopes at their full
  * width in front of a fill or the Ground occluder. A payload before 6 keeps the
  * old, thinner strokes (`migrateStrokeBias`).
+ *
+ * 7 is Waveform's limiter. Before, a sample that Detail pushed past the full
+ * width was cut there, and a payload before 7 keeps that cut
+ * (`migrateWaveformClip`).
  */
-export const PRESET_FORMAT = 6
+export const PRESET_FORMAT = 7
 
 /**
  * The old depth test, for a plate made before format 6.
@@ -77,6 +81,25 @@ export function migrateStrokeBias(payload) {
   if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
   if (payload.style.strokeDepthBias !== undefined) return payload
   return { ...payload, style: { ...payload.style, strokeDepthBias: 0 } }
+}
+
+/**
+ * Waveform's cut at full width, for a plate made before format 7.
+ *
+ * Format 7 compresses a sharpened sample past the width. Before, it was cut, and a high Detail drew flat edges at full width. An older
+ * plate keeps the cut (`clipWaveform`). Only a missing key is written, in mode
+ * copies too; a new object comes back.
+ */
+export function migrateWaveformClip(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const style = { ...payload.style }
+  if (style.clipWaveform === undefined) style.clipWaveform = true
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (
+      c?.mode === 'Waveform' && c.values && c.values.clipWaveform === undefined
+        ? { ...c, values: { ...c.values, clipWaveform: true } } : c))
+  }
+  return { ...payload, style }
 }
 
 /**
@@ -102,6 +125,38 @@ export function migrateOcclusion(payload) {
     })
   }
   return { ...payload, style }
+}
+
+/*
+ * Waveform's Place and Sides buttons wrote their labels, not their values,
+ * up to v1.58.1: `on line`, `mirrored` and `one side`. The builder knew none of
+ * them, so `on line` drew a column and both Sides drew mirrored.
+ */
+const WAVEFORM_VALUES = { 'on line': 'line', mirrored: 'both', 'one side': 'one' }
+
+/**
+ * Those labels, as the values they were meant to be. Not tied to a format:
+ * the values are wrong in any file that has them, and a file without them is
+ * returned as it is.
+ */
+export function repairWaveform(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const fix = (values) => {
+    let out = values
+    for (const k of ['placeWaveform', 'sidesWaveform']) {
+      const v = WAVEFORM_VALUES[values?.[k]]
+      if (v) out = { ...out, [k]: v }
+    }
+    return out
+  }
+  const style = fix(payload.style)
+  const copies = Array.isArray(style.modeCopies)
+    ? style.modeCopies.map((c) => {
+      const values = c?.values && fix(c.values)
+      return values && values !== c.values ? { ...c, values } : c
+    }) : null
+  if (style === payload.style && (!copies || copies.every((c, i) => c === style.modeCopies[i]))) return payload
+  return { ...payload, style: copies ? { ...style, modeCopies: copies } : style }
 }
 
 /**
@@ -288,7 +343,8 @@ export function parsePreset(text) {
     const shading = f < 3 ? migrateShading(bearings) : bearings
     const inks = f < 4 ? migratePillarInk(shading) : shading
     const walls = f < 5 ? migrateOcclusion(inks) : inks
-    return f < 6 ? migrateStrokeBias(walls) : walls
+    const bias = f < 6 ? migrateStrokeBias(walls) : walls
+    return repairWaveform(f < 7 ? migrateWaveformClip(bias) : bias)
   } catch {
     return null
   }

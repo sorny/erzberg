@@ -382,8 +382,8 @@ export const STYLE_DEF = {
   hypsoHair: false, hypsoModeHair: 'elevation', hypsoBandedHair: false, hypsoIntervalHair: 10,
 
   // Waveform — one column of a waveform plot, read along a line at any direction.
-  enabledWaveform: false, lineWaveform: 'summit', angleWaveform: 0, placeWaveform: 'column', sidesWaveform: 'both', spacingWaveform: 1.5, widthWaveform: 120,
-  detailWaveform: 1.5, smoothWaveform: 4, gammaWaveform: 1,
+  enabledWaveform: false, lineWaveform: 'summit', originXWaveform: 0.5, originYWaveform: 0.5, angleWaveform: 0, fromWaveform: 0, toWaveform: 1, placeWaveform: 'column', sidesWaveform: 'both', spacingWaveform: 1.5, widthWaveform: 120,
+  detailWaveform: 1.5, smoothWaveform: 4, gammaWaveform: 1, clipWaveform: false,
   colorWaveform: '#1a1a1a', weightWaveform: 0.6, opacityWaveform: 1, dashWaveform: 'solid',
   hypsoWaveform: false, hypsoModeWaveform: 'elevation', hypsoBandedWaveform: false, hypsoIntervalWaveform: 10,
   // Profile Sheet — a surveyor's profile sheet: parallel transects as a stack of

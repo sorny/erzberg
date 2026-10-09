@@ -615,6 +615,8 @@ function useStable(fn) {
   return useCallback((...args) => ref.current?.(...args), [])
 }
 
+const WAVE_GUIDE_KEY = 'erzberg.waveformGuide'
+
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -666,7 +668,7 @@ export function Sidebar({
   lineGeo, surfaceGeo, terrainData,
   hypsometricIntegral,
   lastBuildMs, isComputing,
-  profileMode, profileClicks, onProfileMode, pick, onPick,
+  profileMode, profileClicks, onProfileMode, pick, onPick, onGuide,
   onEditHeightmap, editSummary, onClearEdit,
   open: openProp, onOpenChange, onPristine,
 }) {
@@ -1201,6 +1203,22 @@ export function Sidebar({
    * is about to be the only thing in the pane — there is nothing to scroll past
    * and a smooth scroll to y=0 from y=0 is a no-op that costs a frame.
    */
+  /*
+   * Waveform's line on the ground, while its section is open or its point is
+   * being picked. The section says where the line runs; the guide shows it.
+   * Its switch is a viewing preference, not part of the look, so it stays out
+   * of presets and the session and is kept per browser.
+   */
+  const [waveGuide, setWaveGuide] = useState(() => {
+    try { return localStorage.getItem(WAVE_GUIDE_KEY) !== 'off' } catch { return true }
+  })
+  const onWaveGuide = useCallback((v) => {
+    setWaveGuide(v)
+    try { localStorage.setItem(WAVE_GUIDE_KEY, v ? 'on' : 'off') } catch { /* private window */ }
+  }, [])
+  const guide = waveGuide && style.enabledWaveform && ((open && drill === 'Mode: Waveform') || pick === 'Waveform') ? 'Waveform' : null
+  useEffect(() => { onGuide?.(guide) }, [guide, onGuide])
+
   const openMark = useCallback((title) => {
     setDrill(title)
     document.getElementById('hm-panel-body')?.scrollTo({ top: 0 })
@@ -1366,7 +1384,7 @@ export function Sidebar({
    * identity, so these call the latest of each.
    */
   const ssMode = useStable(ss), sgMode = useStable(sg), togMode = useStable(tog), onPickMode = useStable(onPick)
-  const modeSectionProps = { mapGridNote, cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick: onPickMode, pick, plateSpan, coralNote, glacierNote, routeNote, runoutNote, slopeClassNote, sec, sg: sgMode, shadowLineSun, singleLineFonts, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog: togMode, venationNote, viewshedNote, windNote }
+  const modeSectionProps = { mapGridNote, cover, geoTiffBbox, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick: onPickMode, pick, plateSpan, terrainData, waveGuide, onWaveGuide, coralNote, glacierNote, routeNote, runoutNote, slopeClassNote, sec, sg: sgMode, shadowLineSun, singleLineFonts, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog: togMode, venationNote, viewshedNote, windNote }
   const renderModeSections = (st, setter) => createElement(ModeSections, { ...modeSectionProps, style: st, ss: setter })
   const modeCopiesPanel = {
     render: (title) => (

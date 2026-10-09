@@ -155,6 +155,25 @@ separate header timeout would kill legitimate slow queries.
   overshoots.
 - **`JSON.parse`** blocks. Its label is set before it runs.
 
+#### A local Overpass server
+
+The public servers can take minutes. `scripts/overpass-austria.sh` runs an
+Overpass server for Austria in Podman or Docker, on port 12345. The first start
+downloads about 800 MB and imports it. Later, it applies Geofabrik's diffs every
+hour. The script also saves the extract's boundary as
+`public/overpass-local.poly`. To use the server, put these lines in
+`.env.development.local`:
+
+```
+VITE_OVERPASS_LOCAL=http://localhost:12345/api/interpreter
+VITE_OVERPASS_LOCAL_POLY=overpass-local.poly
+```
+
+The app asks the local server first, but only for an extent wholly inside the
+boundary. Outside its region the server answers with no data and no error. If
+the server is down or fails, the app uses the public servers. A build never
+carries these settings.
+
 OSM data is ODbL. The credit shows in the panel and in every export that
 carries OSM data.
 

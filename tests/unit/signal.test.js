@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildTerrain } from '../../src/utils/terrain'
 import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
-import { PRINTER_RAMP } from '../../src/utils/builders/signal'
+import { PRINTER_RAMP, waveformLine, waveformProfile } from '../../src/utils/builders/signal'
 import { STYLE_DEF, TERRAIN_DEF, VIEW_DEF, POINTS_DEF } from '../../src/defaults'
 
 const W = 96
@@ -111,6 +111,47 @@ describe('Waveform options', () => {
       expect(z0).toBeCloseTo(0, 4)
       expect(z1).toBeLessThanOrEqual(0)
     }
+  })
+
+  it('reads through a picked point, and the guide reads the same line', () => {
+    // The point is a fraction of the raster, x right and y down, as a pick writes it.
+    const o = { line: 'point', originX: 0.75, originY: 0.25, angle: 90 }
+    const l = waveformLine(peak, o)
+    expect(l.c0).toBeCloseTo(0.75 * (peak.cols - 1), 6)
+    expect(l.r0).toBeCloseTo(0.25 * (peak.rows - 1), 6)
+    // At 90° on line, every stroke is centred on the point's row.
+    const s = strokes({ lineWaveform: 'point', originXWaveform: 0.75, originYWaveform: 0.25, angleWaveform: 90, placeWaveform: 'line' })
+    for (const [, z0, , z1] of s) expect((z0 + z1) / 2).toBeCloseTo(l.r0 * peak.scl - peak.halfH, 3)
+  })
+
+  it('compresses a high Detail into the width, where it used to cut it flat', () => {
+    // A rough peak: the sharpened profile overshoots, by a lot at Detail 6.
+    const rough = plate((x, y) => 0.2 + 0.6 * Math.exp(-((x - 30) ** 2 + (y - 60) ** 2) / 300) + 0.03 * Math.sin(x * 1.7 + y * 2.3))
+    const o = { line: 'summit', angle: 0, spacing: 1.5, detail: 6, smooth: 4, gamma: 1 }
+    const full = (w) => Array.from(w).filter((v) => v >= 1 - 1e-6).length
+    const fit = waveformProfile(rough, o), clip = waveformProfile(rough, { ...o, clip: true })
+    expect(full(clip.w), 'the old cut: a run at full width').toBeGreaterThan(3)
+    expect(full(fit.w), 'limited: one widest sample').toBe(1)
+    expect(Math.min(...fit.w)).toBeGreaterThanOrEqual(0)
+    // Below the knee nothing moves, and the limiter keeps the order of the samples.
+    for (let k = 0; k < fit.n; k++) if (clip.w[k] > 0 && clip.w[k] <= 0.7) expect(fit.w[k]).toBeCloseTo(clip.w[k], 6)
+    for (let k = 1; k < fit.n; k++) {
+      const a = fit.w[k] - fit.w[k - 1], b = clip.w[k] - clip.w[k - 1]
+      if (clip.w[k] > 0 && clip.w[k] < 1 && clip.w[k - 1] > 0 && clip.w[k - 1] < 1) expect(Math.sign(a)).toBe(Math.sign(b))
+    }
+  })
+
+  it('reads only the part of the line Chainage keeps', () => {
+    const o = { line: 'summit', angle: 90 }
+    const full = waveformLine(peak, o), part = waveformLine(peak, { ...o, from: 0.25, to: 0.75 })
+    const L = full.t1 - full.t0
+    expect(part.t0).toBeCloseTo(full.t0 + 0.25 * L, 9)
+    expect(part.t1).toBeCloseTo(full.t0 + 0.75 * L, 9)
+    expect(waveformLine(peak, { ...o, from: 0.6, to: 0.6 })).toBeNull()
+    // Half the line, about half the scanlines, all inside the kept part.
+    const all = strokes({ angleWaveform: 90 }), half = strokes({ angleWaveform: 90, fromWaveform: 0.25, toWaveform: 0.75 })
+    expect(half.length / all.length).toBeGreaterThan(0.45)
+    expect(half.length / all.length).toBeLessThan(0.55)
   })
 
   it('draws one side at the same full width', () => {

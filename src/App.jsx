@@ -359,7 +359,11 @@ const PICK_KEYS = {
   RouteB:    ['endXRoute', 'endYRoute'],
   Panorama:  ['originXPanorama', 'originYPanorama'],
   Geodesic:  ['originXGeodesic', 'originYGeodesic'],
+  Waveform:  ['originXWaveform', 'originYWaveform'],
 }
+
+/** What else a pick sets: a picked Waveform point is read through. */
+const PICK_ALSO = { Waveform: { lineWaveform: 'point' } }
 
 export default function App() {
   const { load, loadFromPicker, loadGeoTiff, loadGeoTiffFromPicker, loadDem, isLoading, loadingMsg, loadError, clearError, showError } = useHeightmap()
@@ -728,6 +732,8 @@ export default function App() {
   // A point picked on the terrain for a mode, through the same raycast the
   // profile uses: 'Isochrone', 'Viewshed', 'Panorama', 'Geodesic', or 'RouteA' then 'RouteB'.
   const [pick, setPick] = useState(null)
+  // Which mode's guide the panel asks for, while that mode's section is open.
+  const [guide, setGuide] = useState(null)
   const [profileClicks, setProfileClicks] = useState([])
   const [profileData,   setProfileData]   = useState(null)
   // Where the section was taken, kept for as long as the chart is up so the
@@ -767,7 +773,7 @@ export default function App() {
   const handleProfileClick = useCallback((uv) => {
     if (pick) {
       const keys = PICK_KEYS[pick]
-      setStyle((s) => ({ ...s, [keys[0]]: uv.x, [keys[1]]: 1 - uv.y }))
+      setStyle((s) => ({ ...s, [keys[0]]: uv.x, [keys[1]]: 1 - uv.y, ...PICK_ALSO[pick] }))
       // A route is two clicks: the start, then the end.
       setPick(pick === 'RouteA' ? 'RouteB' : null)
       return
@@ -2321,6 +2327,7 @@ export default function App() {
           p={p}
           profileClickRef={profileClickRef}
           profileAnchors={profileAnchors ?? (profileClicks.length ? profileClicks : null)}
+          guide={guide}
           getParams={getParams}
           setParams={setParams}
           orbitRef={orbitRef}
@@ -2491,6 +2498,7 @@ export default function App() {
         onProfileMode={(v) => { setProfileMode(v); setProfileClicks([]); setPick(null) }}
         pick={pick}
         onPick={(v) => { setPick(v); setProfileMode(false); setProfileClicks([]) }}
+        onGuide={setGuide}
         onEditHeightmap={openEditor}
         editSummary={describeEdit(edit, srcWidth, srcHeight)}
         onClearEdit={clearEdit}

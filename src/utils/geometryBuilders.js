@@ -215,9 +215,10 @@ export function buildLineGeometry(terrain, p) {
         spacing: p.spacingHair, length: p.lengthHair, jitter: p.jitterHair,
         segments: p.segmentsHair, seed: p.seedHair }) },
     { id:'Waveform', builder: (t, ctx) => buildWaveform(t, ctx, {
-        line: p.lineWaveform, angle: p.angleWaveform, place: p.placeWaveform, sides: p.sidesWaveform,
+        line: p.lineWaveform, originX: p.originXWaveform, originY: p.originYWaveform,
+        angle: p.angleWaveform, from: p.fromWaveform, to: p.toWaveform, place: p.placeWaveform, sides: p.sidesWaveform,
         spacing: p.spacingWaveform, width: p.widthWaveform,
-        detail: p.detailWaveform, smooth: p.smoothWaveform, gamma: p.gammaWaveform }) },
+        detail: p.detailWaveform, smooth: p.smoothWaveform, gamma: p.gammaWaveform, clip: p.clipWaveform }) },
     { id:'ProfileSheet', builder: (t, ctx) => buildProfileSheet(t, ctx, {
         plot: p.valueProfileSheet, count: p.countProfileSheet, bands: p.bandsProfileSheet,
         tolerance: p.toleranceProfileSheet, smooth: p.smoothProfileSheet, grid: p.gridProfileSheet,

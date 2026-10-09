@@ -819,16 +819,34 @@ where many cells share a height: the tone is the count.
 
 ## 57. Waveform
 
-One column of a waveform plot, read along a line through the highest cell (or
-the middle) at a *Direction*: 0° top to bottom, 90° left to right, 180° bottom
-to top, 270° right to left. The line is clipped to the raster. The half-width at
-each sample is
+One column of a waveform plot, read along a line through the highest cell, the
+middle, or a point picked on the terrain, at a *Direction*: 0° reads north to
+south, 90° west to east, 180° south to north, 270° east to west. The panel
+writes the compass points beside the angle. The line is clipped to the raster,
+and *Chainage* keeps a part of it, from one fraction of its length to another.
+While the section is open, the viewport drapes the line over the terrain in the
+accent colour, with a bead at each end, a pin where it passes through and
+chevrons along it. The part Chainage leaves out shows faint. The guide is never exported, and *Show line* turns it off.
 
-$$w = \text{clamp}\big(\hat h^{\gamma} + d \cdot (h - \text{blur}(h)) / \Delta h\big) \cdot \tfrac{\text{width}}{2}$$
+The mode is a cross-section drawn the way a sound editor draws a recording:
 
-with $\hat h$ the height normalised to the line's own range $\Delta h$ and $d$ the
-*Detail*. Each sample is one stroke across the reading direction, flat above the
-ground. *Place* puts the column upright in the middle of the plate, as a row
+1. **Read.** Every *Spacing* along the line, the height $h$: the profile.
+2. **Normalise.** $\hat h = (h - h_{min}) / \Delta h$ over the line's own range,
+   bent by *Gamma*: $e = \hat h^{\gamma}$.
+3. **Sharpen.** $w = e + d \cdot (h - \text{blur}(h)) / \Delta h$, with $d$ the
+   *Detail* and the blur over *Detail scale* samples. This is an unsharp mask:
+   bumps shorter than the blur are added back $d$ times over.
+4. **Limit.** Below $0.7$, $w$ is kept. Above, it is compressed,
+   $0.7 + 0.3 \ln(1 + b u) / b$ with $u = (w - 0.7)/0.3$, and $b$ set so that the
+   widest sample lands on 1. The curve meets the straight part with slope 1
+   and never saturates, so no run of samples goes flat. Below 0 there is no
+   stroke.
+
+Each sample is one stroke $w \cdot$ *Width* long across the reading direction,
+flat above the ground. The panel's preview draws the profile ($\hat h$, orange)
+beside the strokes (grey), so the effect of Gamma and Detail shows at once.
+Plates before v1.59 cut $w$ at 1, which drew flat edges at a high Detail. They
+keep that cut (*Clip at width*, format 7). *Place* puts the column upright in the middle of the plate, as a row
 through the middle, or on the line it reads. *Sides* mirrors each stroke or draws
 it to the left of the reading direction at the same full width, so a row rises
 like a profile. One plate per peak, side by side, makes a

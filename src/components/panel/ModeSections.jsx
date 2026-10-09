@@ -9,7 +9,9 @@
  */
 import { formatClock } from '../../utils/solar'
 import { memo } from 'react'
-import { Btn, ColorRow, DIM, DateRow, FontSelect, HelpBox, InlineSl, MUTED, Note, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
+import { WaveformPreview } from './WaveformPreview'
+import { readingEnds } from '../../utils/builders/signal'
+import { Btn, ColorRow, DIM, DateRow, FontSelect, HelpBox, InlineSl, MUTED, Note, RangeSl, Section, SegGroup, SegRow, Sub, Tog, WARN } from './ui'
 import { ModeStyleOverride } from './ModeStyleOverride'
 import { ModeMark } from './modeMarks'
 import { roundDistance } from '../../utils/builders/mapGrid.js'
@@ -23,7 +25,9 @@ const formatWalk = (seconds) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`
 }
 
-export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
+
+
+export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, terrainData, waveGuide = true, onWaveGuide, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
@@ -1221,15 +1225,27 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {style.enabledWaveform && (
               <>
                 <Sub>
-                  <SegRow label="Through" help="The line read passes through the highest point, or through the middle of the terrain." testIdPrefix="waveform-line" options={[['summit', 'summit'], ['centre', 'centre']]} value={style.lineWaveform ?? 'summit'} onChange={v => ss({ lineWaveform: v })} />
-                  <InlineSl label="Direction" help="The direction the line is read in. 0° is top to bottom (north to south), 90° left to right, 180° bottom to top, 270° right to left." testId="waveform-angle" min={0} max={359} step={1} value={style.angleWaveform ?? 0} onChange={v => ss({ angleWaveform: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
-                  <SegRow label="Place" help="Column stands upright in the middle of the plate. Row lies left to right through the middle. On line draws it on the ground, along the line it reads." testIdPrefix="waveform-place" options={[['column', 'column'], ['row', 'row'], ['line', 'on line']]} value={style.placeWaveform ?? 'column'} onChange={v => ss({ placeWaveform: v })} />
-                  <SegRow label="Sides" help="Mirrored about the axis, or drawn from the axis to one side only: up from a row, right from a column." testIdPrefix="waveform-sides" options={[['both', 'mirrored'], ['one', 'one side']]} value={style.sidesWaveform ?? 'both'} onChange={v => ss({ sidesWaveform: v })} />
-                  <InlineSl label="Width" help="The column's full width at the line's highest point, in world units." min={5} max={Math.max(400, Math.round(plateSpan / 2))} step={1} value={style.widthWaveform ?? 120} onChange={v => ss({ widthWaveform: v })} />
-                  <InlineSl label="Spacing" help="The distance between scanlines, in world units." min={0.2} max={10} step={0.1} value={style.spacingWaveform ?? 1.5} onChange={v => ss({ spacingWaveform: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail" help="How much of the short-wave relief is added back to the edge. Cliffs show as bursts." min={0} max={6} step={0.1} value={style.detailWaveform ?? 1.5} onChange={v => ss({ detailWaveform: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Detail scale" help="The blur, in samples, that separates the short waves from the form." min={1} max={30} step={1} value={style.smoothWaveform ?? 4} onChange={v => ss({ smoothWaveform: Math.round(v) })} />
-                  <InlineSl label="Gamma" help="Above 1 narrows the low ground and leaves the summit wide." min={0.2} max={4} step={0.05} value={style.gammaWaveform ?? 1} onChange={v => ss({ gammaWaveform: v })} fmt={v => v.toFixed(2)} />
+                  <WaveformPreview terrain={terrainData} style={style} mPerWorld={mPerWorld} />
+                  <SegRow label="Through" help="The orange line on the terrain is the line read. It shows while this section is open, with a pin where it passes through and an arrow where it ends. Summit: through the highest point. Centre: through the middle of the plate. Point: through a point you pick on the terrain." testIdPrefix="waveform-line" options={[['summit', 'summit'], ['centre', 'centre'], ['point', 'point']]} value={style.lineWaveform ?? 'summit'} onChange={v => { ss({ lineWaveform: v }); if (v === 'point') onPick?.('Waveform') }} />
+                  <Tog label="Show line" help="The read line on the terrain, in orange, while this section is open. It is a guide in the viewport and never exported. Your browser remembers this switch." testId="waveform-guide" checked={waveGuide} onChange={onWaveGuide} />
+                  {style.lineWaveform === 'point' && (
+                    <Btn block variant="toggle" on={pick === 'Waveform'} data-testid="waveform-pick"
+                      onClick={() => onPick?.(pick === 'Waveform' ? null : 'Waveform')} style={{ marginBottom: 8 }}>
+                      {pick === 'Waveform' ? 'Click the point on the terrain…' : 'Pick point on terrain'}
+                    </Btn>
+                  )}
+                  <InlineSl label="Direction" help="The way the line is read, from the start to the arrow. 0° reads north to south, 90° west to east, 180° south to north, 270° east to west. The column's top, or the row's left end, is the start." testId="waveform-angle" min={0} max={359} step={1} value={style.angleWaveform ?? 0} onChange={v => ss({ angleWaveform: Math.round(v) })} fmt={v => `${Math.round(v)}° ${readingEnds(v).join('→')}`} />
+                  <RangeSl label="Chainage" help="Which part of the line is read, as distances along it from its start: the survey term is chainage. Move the left handle to start later and the right one to end sooner. The beads on the terrain mark both ends, and the rest of the line shows faint. The preview and the drawing then cover only that part, and its lowest and highest points set the widths." testId="waveform-chainage" lo={style.fromWaveform ?? 0} hi={style.toWaveform ?? 1} step={0.005} onChange={(lo, hi) => ss({ fromWaveform: lo, toWaveform: hi })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <SegRow label="Place" help="Column: upright in the middle of the plate. Row: across the middle, left to right. Line: on the read line itself, over the ground." testIdPrefix="waveform-place" options={[['column', 'column'], ['row', 'row'], ['line', 'line']]} value={style.placeWaveform ?? 'column'} onChange={v => ss({ placeWaveform: v })} />
+                  <SegRow label="Sides" help="Both: mirrored about the axis, like an audio waveform. One: from the axis to one side only, like a profile, up from a row and right from a column." testIdPrefix="waveform-sides" options={[['both', 'both'], ['one', 'one']]} value={style.sidesWaveform ?? 'both'} onChange={v => ss({ sidesWaveform: v })} />
+                  <InlineSl label="Width" help="The widest scanline, in world units. Where Detail pushes a sample past it, the overshoot is compressed, as a limiter treats a loud peak: only the widest sample reaches this width, and below 70 % of it nothing changes." min={5} max={Math.max(400, Math.round(plateSpan / 2))} step={1} value={style.widthWaveform ?? 120} onChange={v => ss({ widthWaveform: v })} />
+                  <InlineSl label="Spacing" help="The distance between scanlines along the line, in world units. Each scanline is one height sample." min={0.2} max={10} step={0.1} value={style.spacingWaveform ?? 1.5} onChange={v => ss({ spacingWaveform: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail" help="Sharpens the profile, as an unsharp mask sharpens a photo: the bumps shorter than Detail scale are added back on top, this many times over. At 0 the scanlines follow the ground exactly. Higher, crags and cliff bands stand out as bursts. The preview shows the ground in orange and the scanlines in grey." min={0} max={6} step={0.1} value={style.detailWaveform ?? 1.5} onChange={v => ss({ detailWaveform: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Detail scale" help="How long a bump can be and still count as detail, in samples along the line. Small: single crags. Large: whole spurs and benches." min={1} max={30} step={1} value={style.smoothWaveform ?? 4} onChange={v => ss({ smoothWaveform: Math.round(v) })} fmt={v => (mPerWorld ? `${Math.round(v)} · ${Math.round(v * (style.spacingWaveform ?? 1.5) * mPerWorld)} m` : String(Math.round(v)))} />
+                  <InlineSl label="Gamma" help="Bends the heights before they become widths. Above 1 narrows the low ground and keeps the summit wide. Below 1 widens the low ground." min={0.2} max={4} step={0.05} value={style.gammaWaveform ?? 1} onChange={v => ss({ gammaWaveform: v })} fmt={v => v.toFixed(2)} />
+                  {style.clipWaveform && (
+                    <Tog label="Clip at width" help="This plate is from before v1.59, when a sharpened sample wider than Width was cut at Width. A run of cut samples draws a flat edge. Switch it off to compress the overshoot instead." testId="waveform-clip" checked={!!style.clipWaveform} onChange={v => ss({ clipWaveform: v })} />
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Waveform" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
