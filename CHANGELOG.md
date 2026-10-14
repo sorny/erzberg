@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.59.1] — 2026-10-14
+
+### Changed
+
+- **The panel reads as a map sheet.** The summit's contour lines lie faint in
+  ore behind the panel header, in both themes, and fade out before the first
+  control. A stage title is set in spaced capitals over a hairline with ticks,
+  like a scale bar. On first load the header, the finder, the stage tabs and
+  the pane come in one after the other. The entrance plays once, and it does
+  not play when the system asks for reduced motion.
+- **Stroke depth bias reads `0.25×`, not `0.25 × width`.** The label and the
+  help text already name the unit, and the shorter text gives the track 43 px
+  more travel.
+
+### Fixed
+
+- **A slider's track no longer moves while you drag it.** The value field
+  beside a slider was as wide as its current text, so a readout that changed
+  length (`off`, `0.25`, `3`) resized the track under the pointer. The field
+  now takes the width of the widest value that the slider can show
+  (`widestReadout` in `panel/ui.jsx`). A typed value can still widen it.
+
 ## [1.59.0] — 2026-10-09
 
 ### Added

@@ -1419,7 +1419,8 @@ export function Sidebar({
 
       <aside id="hm-panel" aria-label="Controls" style={{
         position:'fixed', right:0, top:0, width:W, height:'100%',
-        background: BG, color: TEXT, zIndex:1000,
+        // The colour alone, so the stylesheet can lay the contour sheet over it.
+        backgroundColor: BG, color: TEXT, zIndex:1000,
         display:'flex', flexDirection:'column',
         transform: open ? 'none' : `translateX(${W}px)`,
         transition:'transform .26s cubic-bezier(.2,.8,.2,1)',
@@ -2175,7 +2176,7 @@ export function Sidebar({
                   options={[['Lines', 'lines'], ['Ground', 'ground']]}
                   value={style.occludeBy ?? 'lines'} onChange={v => ss({ occludeBy: v })} />
                 <InlineSl label="Depth tolerance" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
-                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. 0 is the old depth test, which thins strokes on slopes seen at a low angle. Plates made before v1.58.0 open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v} × width` : 'off')} />
+                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. 0 is the old depth test, which thins strokes on slopes seen at a low angle. Plates made before v1.58.0 open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v}×` : 'off')} />
                 <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}

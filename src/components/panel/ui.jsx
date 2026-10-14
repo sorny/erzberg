@@ -116,6 +116,30 @@ function themeVars(P) {
     ` --hm-accent-ring: ${P.accent}80; --hm-green-glow: ${P.on}88;`
 }
 
+/*
+ * The panel's watermark: a summit drawn as its own contours.
+ *
+ * Nine closed rings around an off-centre peak, each pushed in and out by a few
+ * sines, so the lines crowd on one flank and open on the other the way a real
+ * mountain's do. It is a mask, not an image, so it takes the theme's ore through
+ * `background-color` and needs no second copy for the light panel.
+ */
+function contourMask() {
+  const cx = 236, cy = 34, rings = []
+  for (let k = 1; k <= 9; k++) {
+    const r = 9 + k * 13, pts = []
+    for (let i = 0; i <= 96; i++) {
+      const a = (i / 96) * Math.PI * 2
+      const w = 1 + 0.16 * Math.sin(3 * a + k * 0.5) + 0.09 * Math.sin(5 * a - k) + 0.22 * Math.cos(a - 0.6)
+      pts.push(`${(cx + Math.cos(a) * r * w * 1.25).toFixed(1)},${(cy + Math.sin(a) * r * w).toFixed(1)}`)
+    }
+    rings.push(`<path d="M${pts.join('L')}Z" stroke-width="${k % 5 === 0 ? 1.4 : 0.8}"/>`)
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="312" height="150" fill="none" stroke="#000">${rings.join('')}</svg>`
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
+}
+const CONTOURS = contourMask()
+
 export function PanelStyles() {
   return (
     <style>{`
@@ -124,6 +148,52 @@ export function PanelStyles() {
       @keyframes hm-indet { from { transform: translateX(-40%) } to { transform: translateX(240%) } }
       .hm-indet { animation: hm-indet 1.15s ease-in-out infinite; }
       @media (prefers-reduced-motion: reduce) { .hm-indet { animation: none; opacity: 0.5; } }
+      /*
+       * The head is a corner of a survey sheet: the summit's contours in ore,
+       * faint, fading out before they reach the first control. Behind the
+       * children, which the panel's own stacking context allows (z-index -1).
+       */
+      #hm-panel::before { content:''; position:absolute; inset:0 0 auto 0; height:150px;
+        z-index:-1; pointer-events:none; background-color:var(--hm-accent);
+        -webkit-mask:${CONTOURS} no-repeat top right; mask:${CONTOURS} no-repeat top right;
+        opacity:.16; animation:hm-survey 1.4s var(--hm-ease) both; }
+      :root[data-hm-theme="light"] #hm-panel::before { opacity:.22; }
+      #hm-panel::after { content:''; position:absolute; inset:0 0 auto 0; height:150px; z-index:-1;
+        pointer-events:none; background:linear-gradient(to bottom, transparent 30%, var(--hm-bg) 100%); }
+      @keyframes hm-survey { from { opacity:0; transform:scale(1.06); transform-origin:76% 22% } }
+
+      /*
+       * One entrance, on first load only: the head, then the finder, then the
+       * rail tab by tab, then the pane. The animation is on elements that never
+       * remount, so changing stage or theme does not play it again. The fill
+       * is backwards and never both: a transform that outlives the entrance
+       * makes each block a stacking context, and the head's history menu then
+       * opens underneath the pane.
+       */
+      @keyframes hm-rise { from { opacity:0; transform:translateY(6px) } }
+      @keyframes hm-slide { from { opacity:0; transform:translateX(-6px) } }
+      #hm-panel > div { animation:hm-rise .5s var(--hm-ease) backwards; }
+      #hm-panel > div:nth-of-type(2) { animation-delay:.08s; }
+      #hm-panel > div:nth-of-type(3) { animation:none; }
+      #hm-panel-body { animation:hm-rise .55s var(--hm-ease) .32s backwards; }
+      [data-testid="stage-rail"] .hmtab { animation:hm-slide .4s var(--hm-ease) backwards; }
+      ${[0, 1, 2, 3, 4, 5, 6].map((i) => `[data-testid="stage-rail"] .hmtab:nth-child(${i + 1}) { animation-delay:${(0.14 + i * 0.04).toFixed(2)}s; }`).join('\n      ')}
+
+      /*
+       * A stage title is set like the title block of a map sheet: capitals,
+       * tracked open, over an ore index. The rule under it is a scale bar, a
+       * hairline with a tick every 12 px, in the border's colour.
+       */
+      .hmstagehead .hmstagetitle { text-transform:uppercase; letter-spacing:.14em; font-weight:800; }
+      .hmstagehead::after { content:''; position:absolute; left:14px; right:14px; bottom:-1px; height:4px;
+        pointer-events:none;
+        background:linear-gradient(var(--hm-muted), var(--hm-muted)) left bottom / 100% 1px no-repeat,
+                   repeating-linear-gradient(to right, var(--hm-muted) 0 1px, transparent 1px 12px) left bottom / 100% 4px no-repeat;
+        opacity:.45; }
+
+      @media (prefers-reduced-motion: reduce) {
+        #hm-panel::before, #hm-panel > div, #hm-panel-body, [data-testid="stage-rail"] .hmtab { animation:none !important; }
+      }
       /*
        * Space Mono Bold, self-hosted.
        *
@@ -432,6 +502,26 @@ export function HelpBtn({ label, active, onClick }) {
  * or "50.0°": a formatted string has no reliable inverse, and a field that
  * cannot read back what it prints is worse than one that prints plainly.
  */
+/**
+ * The most characters a slider's readout can print, over the slider's own grid.
+ *
+ * Every grid value when there are few of them, and 64 evenly spaced ones when
+ * there are many, plus both ends. Sixty-four is enough to find the long ones:
+ * a readout's length changes with its digits and its words, and both move
+ * slowly along a track.
+ */
+function widestReadout(fmt, min, max, step) {
+  const grid = step || 1
+  const n = Math.max(0, Math.round((max - min) / grid))
+  const ks = n <= 64 ? Array.from({ length: n + 1 }, (_, i) => i) : Array.from({ length: 65 }, (_, i) => Math.round((i * n) / 64))
+  let most = 0
+  for (const k of ks) {
+    const v = Math.min(max, parseFloat((min + k * grid).toPrecision(12)))
+    most = Math.max(most, String(fmt ? fmt(v) : v).length)
+  }
+  return most
+}
+
 function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
   const [draft, setDraft] = useState(null)
   const ref = useRef(null)
@@ -459,6 +549,11 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
   }
 
   const shown = editing ? draft : (fmt ? String(fmt(value)) : String(value))
+  // The field's width, fixed for the whole travel. Sized to the current text it
+  // grew and shrank while the thumb moved ("off", "0.25 × width", "3 × width"),
+  // and the track beside it, which takes what is left of the row, moved under
+  // the pointer. A draft can still widen it, because typing is not dragging.
+  const widest = Math.max(widestReadout(fmt, min, max, step), String(fmt ? fmt(value) : value).length)
   return (
     <input
       ref={ref}
@@ -466,11 +561,12 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
       type="text"
       inputMode="decimal"
       aria-label={label ? `${label} value` : 'Value'}
-      // Sized to what it prints, floored at the old fixed width: "100.0%" is
-      // wider than "0", and an input does not grow to its content the way the
-      // span this replaced did.
+      // Sized to the widest thing it can print, floored at the old fixed width:
+      // "100.0%" is wider than "0", and an input does not grow to its content
+      // the way the span this replaced did.
       style={{
-        minWidth: width, width: `calc(${Math.max(3, shown.length)}ch + 10px)`,
+        minWidth: width, width: `calc(${Math.max(3, editing ? shown.length : 0, widest)}ch + 10px)`,
+        flexShrink: 0,
         fontSize: 10, color: editing ? TEXT : MUTED,
       }}
       value={shown}
@@ -1111,7 +1207,7 @@ export function Stage({ n, title, children }) {
      */
     <div data-stage={n} data-stage-hidden={shown ? undefined : 'true'}
          style={shown ? undefined : { display:'none' }}>
-      <div data-testid={`stage-${title.toLowerCase()}`} style={{
+      <div data-testid={`stage-${title.toLowerCase()}`} className="hmstagehead" style={{
         position:'sticky', top:0, zIndex:2,
         display:'flex', alignItems:'center', gap:10, padding:'9px 14px',
         background:'var(--hm-stage-bg)', backdropFilter:'blur(10px) saturate(1.2)',
@@ -1124,7 +1220,7 @@ export function Stage({ n, title, children }) {
         <span style={{ fontSize:10, fontWeight:600, color: ACCENT_TEXT, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
         </span>
-        <span style={{ fontSize:13, fontWeight:600, color: TEXT }}>
+        <span className="hmstagetitle" style={{ fontSize:12, fontWeight:600, color: TEXT }}>
           {title}
         </span>
       </div>
