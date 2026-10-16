@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.59.1] — 2026-10-14
+## [1.59.1] — 2026-10-16
 
 ### Changed
 
@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   length (`off`, `0.25`, `3`) resized the track under the pointer. The field
   now takes the width of the widest value that the slider can show
   (`widestReadout` in `panel/ui.jsx`). A typed value can still widen it.
+- **`settle()` waits until the canvas shows the new drawing.** The canvas is a
+  react-three-fiber root with its own scheduler, so it can commit a new
+  geometry after the app does. `settle()` saw no build and a quiet plate, and
+  returned while the canvas still showed the old lines. An export or a test
+  then read the state before the change. `tests/redraw.spec.js` failed every
+  run with this release's heavier panel, which made the gap longer. Now
+  `HeightmapLines` records the `lineGeo` that it committed (`drawn` in
+  `automation.js`), and `settle()` waits until it is the app's current one.
 
 ## [1.59.0] — 2026-10-09
 
