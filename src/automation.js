@@ -22,6 +22,16 @@ import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 export const AUTOMATION = typeof location !== 'undefined'
   && new URLSearchParams(location.search).has('automation')
 
+/**
+ * The `lineGeo` the scene last committed, written by HeightmapLines.
+ *
+ * The canvas is a react-three-fiber root with its own scheduler, so it can
+ * commit a change well after the app has. `settle()` used to see the app's new
+ * drawing and a quiet plate, and returned while the canvas still showed the
+ * old one: an export or a test then read the state before the change.
+ */
+export const drawn = { mounted: false, lineGeo: null }
+
 const EXPORT_KIND = { svg: 'svg', png: 'png', pngAlpha: 'pngAlpha', stl: 'stl' }
 
 const frame = () => new Promise((r) => requestAnimationFrame(() => r()))
@@ -74,7 +84,8 @@ export function useAutomation(live) {
       for (;;) {
         const s = L()
         const quiet = performance.now() - Math.max(lastChange.current, t0) >= quietMs
-        if (!s.isComputing && !s.isLoading && quiet) break
+        const shown = !drawn.mounted || drawn.lineGeo === s.lineGeo
+        if (!s.isComputing && !s.isLoading && quiet && shown) break
         if (performance.now() - t0 > timeoutMs) throw new Error(`the plate did not settle within ${timeoutMs / 1000} s`)
         await sleep(50)
       }

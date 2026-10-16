@@ -13,6 +13,7 @@ import { chainSegments } from '../utils/chainSegments'
 import { haloOf, hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
+import { drawn } from '../automation'
 
 /**
  * A line layer as round dots: one near-zero segment per dot, spaced `spacing`
@@ -721,6 +722,9 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
   const { size, gl } = useThree()
+  // Tells `settle()` which state the canvas has committed (see `drawn`).
+  useLayoutEffect(() => { drawn.mounted = true; drawn.lineGeo = lineGeo })
+  useLayoutEffect(() => () => { drawn.mounted = false }, [])
   // gl.getSize() is the CSS-pixel viewport (getDrawingBufferSize() would be the
   // device-pixel one). That is deliberate: LineMaterial divides linewidth by
   // resolution.y, so a CSS-sized resolution makes `weight` mean CSS pixels and
