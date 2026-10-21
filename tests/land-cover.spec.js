@@ -86,7 +86,10 @@ async function dropPlate(page, text, name = 'bands.landcover.json') {
 async function setSwitch(page, term, label, on) {
   await page.fill('[data-testid="panel-filter"]', term)
   await page.waitForTimeout(450)
-  await page.locator(`input[type=checkbox][aria-label="${label}"]:visible`).first()
+  // A section's own on/off switch sits in its header and answers to the
+  // section's name, so `Enabled` means that switch rather than a label.
+  const input = label === 'Enabled' ? 'input[data-enable]' : `input[type=checkbox][aria-label="${label}"]`
+  await page.locator(`${input}:visible`).first()
     .evaluate((el, want) => { if (el.checked !== want) el.click() }, on)
   await page.waitForTimeout(350)
   await page.fill('[data-testid="panel-filter"]', '')

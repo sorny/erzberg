@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **A mark says "on" once.** The `Enabled` row at the top of every mode and
+  surface layer is gone. The switch now sits in the section header, where the
+  drill-in, a search hit and a shut header all show it. The header's green dot
+  goes with it. Headers drop the `Mode:` prefix. A section that is off says how
+  to turn it on.
+- **A mode opens to its own controls.** Line style, Gradient, Masks, Occlusion
+  and Copies fold to one line that carries their setting, for example
+  `Height · 1 px` or `occluder`. Line style opens open. A search opens every
+  fold that it passes through.
+- **Output puts the SVG first.** The plot settings and Preflight come first,
+  then one full-width SVG button with what it will hold under it (`3 pen layers
+  · 297 mm · 12,400 strokes` after Preflight). PNG, PNG α, STL, WebM and
+  Heightmap follow as other files. Preset save and open moved to Presets.
+- **The rail is a tab list.** Full stage names (`Terrain`, not `Terr`). The
+  arrow keys, Home and End move along it, Tab stops on it once, and `[` `]`
+  change the stage from anywhere. The focus ring is inset in the text colour,
+  so it no longer looks like the ore bar of the selected stage.
+- **Slider fills are iron, not ore.** Ore means "on", and a value is not a
+  state. A slider whose range crosses zero (Height scale, Pan, Rotation) fills
+  outward from zero, so 0 is an empty track.
+- A mode tile's pip says `Draw Contours`, pressed or not, instead of naming
+  the action that it would take.
+- **Type.** The stage title is set at its intended 800. Its `font-weight:800`
+  rule lost to an inline 600, so it differed from a section title only by its
+  capitals. Switch and colour labels take the muted colour of slider labels. The mode back
+  bar uses the 11 px label size. Readouts that were in the browser's own
+  monospace (Zoom, Tiles, Raster, Ground, extent values, feature counts, code)
+  are in Overpass Mono. The `?` glyph is 9 px, not 8. Notes are 10 px with a
+  line height of 1.5. A long slider label truncates and keeps its slider, which
+  used to shrink to 0 px. `index.html` preloads the two panel faces, so labels
+  no longer paint first in the wider system face.
+- **Colour.** The audio meter's hues live in the theme, with a deeper set for
+  paper. The old set was 1.3–2.4:1 there, and the new one clears 4.1:1. Ore
+  text (an active fold readout, Plotter order's saving, Edit Mode's result,
+  the Mask Studio's coverage) uses the text ore, 5.1:1 on paper. The audio
+  meter's canvas labels are set in Overpass at 9 px, not in 7 px system-ui.
+- Section titles are `h3` and stage titles are `h2`, so a screen reader can
+  walk the panel by heading.
+- While a search is typed, a rail tab for a stage with no hits is inactive.
+  It leaves the tab order, the arrows skip it, and a click no longer clears the
+  query to open an empty pane.
+- The panel's base size is 11 px, so an unstyled string lands on the scale and
+  not at 16 px. The only visible change is the Preflight button, which is 2 px
+  shorter. The rail labels stay at 9 px: at 10 px, Surface and Overlay come
+  within 1–2 px of the tab edges.
+
+### Fixed
+
+- Undo after Reset all now also brings back the Surprise-me rolls and the lit
+  preset tile.
+- The gradient stops' colour inputs have names. A movable stop is a slider to
+  the keyboard: the arrows move it 1%, Shift moves it 10%, and Delete removes it.
+- A gradient or histogram drag that the browser cancels ends cleanly. Before
+  this, the gradient bar ignored clicks until a reload.
+- A request that never reaches its server says `Could not reach OpenStreetMap.
+  Check the connection, then try again.` and no longer shows the browser's
+  `Failed to fetch`. This applies to the place search, the tile fetch,
+  Satellite and Vector Layers.
+- A mode copy's name is capped at 60 characters, because it becomes an SVG
+  layer label.
+- `typeScale.test.js` now reads CSS `font-size` as well as JSX `fontSize`, so
+  the injected style sheet cannot leave the scale unseen.
+- The find field's placeholder uses the panel's muted colour (5.2:1, was 4.47:1).
+- `Reset all` and the `Hypso. Integral` label use the 11 px control size of the
+  type scale. Keys printed on buttons (`E`, `1`) are drawn as key caps.
+
 ## [1.59.1] — 2026-10-16
 
 ### Changed

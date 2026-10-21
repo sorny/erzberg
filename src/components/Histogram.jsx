@@ -120,6 +120,8 @@ export function Histogram({ pixels, blackPoint, whitePoint, onBlackChange, onWhi
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
       onPointerLeave={onPointerUp}
+      onPointerCancel={onPointerUp}
+      onLostPointerCapture={onPointerUp}
     />
   )
 }

@@ -39,6 +39,7 @@ export const SHORTCUTS = [
     group: 'The panel',
     rows: [
       { keys: ['\\'], codes: ['Backslash'], label: 'Show or hide the panel' },
+      { keys: ['[', ']'], codes: ['BracketLeft', 'BracketRight'], label: 'Stage up or down', note: 'Presets to Output' },
       /* No `codes`, for the reason `?` has none: keyed on the character. */
       { keys: ['/'],  label: 'Find a control' },
       { keys: ['⌘Z'], codes: ['KeyZ'],      label: 'Undo' },

@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <title>erzberg</title>
+    <!-- The panel's two faces. Their @font-face rules arrive with the bundle,
+         so without this the requests waited for React to mount and the labels
+         painted first in the 7% wider system face. Relative, like the icon, so
+         the base path applies. -->
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/overpass-latin.woff2" />
+    <link rel="preload" as="font" type="font/woff2" crossorigin href="fonts/overpass-mono-latin.woff2" />
 
     <!-- Primary meta -->
     <meta name="description" content="Digital terrain artistry. Load a heightmap or GeoTIFF, apply algorithmic drawing modes, and export to SVG, PNG, STL, or WebM." />

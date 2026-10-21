@@ -177,7 +177,10 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               type="button"
               className="hmpip"
               aria-pressed={on}
-              aria-label={`${name} — ${on ? 'switch off' : 'switch on'}`}
+              // The name and the state, never the action: with `aria-pressed`
+              // a screen reader says "Draw Contours, pressed", where the old
+              // "Contours — switch off" announced the opposite of what was true.
+              aria-label={`Draw ${name}`}
               title={waiting ? `${name} — ${PLATE_HINT}`
                 : `${name} — ${on ? 'drawing, click to switch off' : 'off, click to switch on'}`}
               data-testid={`mode-tile-${id}`}
@@ -242,7 +245,7 @@ export function ModeBack({ title, onBack }) {
         display:'flex', alignItems:'center', gap:7, width:'100%',
         padding:'9px 12px', border:'none', borderBottom:`1px solid ${BORDER}`,
         background: SURF, color: DIM, cursor:'pointer', fontFamily:'inherit',
-        fontSize:12, fontWeight:500,
+        fontSize:11, fontWeight:400,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.color = TEXT }}
       onMouseLeave={(e) => { e.currentTarget.style.color = DIM }}>

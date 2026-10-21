@@ -33,21 +33,18 @@ import { PANEL_MODES } from './sectionSummary'
 /**
  * The rail, in order: the Presets slot, then the six pipeline stages.
  *
- * Each is its number, its name, and the abbreviation the 40 px rail can fit.
- * The short form is stated rather than sliced: `Frame` fits whole, `Overlay`
- * truncates to something that reads as a word, and `title.slice(0, 4)` would
- * give `Outp` for Output and `Grou` for Ground — both worse than a chosen pair
- * of syllables. The full name is still on screen: the rail carries the short
- * form, and the stage rule at the top of the pane carries the whole word.
+ * Each is its number and its name. The rail used to carry a stated
+ * abbreviation (`Terr`, `Surf`, `Pre`) because the name shared its row with the
+ * badge; the badge now sits beside the number only, so the whole word fits.
  */
 export const STAGES = [
-  [0, 'Presets', 'Pre'],
-  [1, 'Terrain', 'Terr'],
-  [2, 'Surface', 'Surf'],
-  [3, 'Marks',   'Mark'],
-  [4, 'Overlay', 'Over'],
-  [5, 'Frame',   'Frame'],
-  [6, 'Output',  'Out'],
+  [0, 'Presets'],
+  [1, 'Terrain'],
+  [2, 'Surface'],
+  [3, 'Marks'],
+  [4, 'Overlay'],
+  [5, 'Frame'],
+  [6, 'Output'],
 ]
 
 /**

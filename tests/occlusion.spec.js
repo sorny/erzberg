@@ -13,7 +13,7 @@
  */
 import { test, expect } from '@playwright/test'
 import { writeFileSync } from 'node:fs'
-import { openMark, resetToDefaults, setMark } from './helpers.js'
+import { openFold, openMark, resetToDefaults, setMark } from './helpers.js'
 
 const APP = 'http://localhost:5173'
 const DEM = `${APP}/tests/testdata/geotiff.tif`
@@ -93,9 +93,11 @@ test('the panel offers an occluder switch where walls mean something, and a halo
 
   // Lines is an occluder; the ticks are not, or their walls notch the Lines.
   await openMark(page, 'Lines')
+  await openFold(page, 'occlusion-Lines')
   await expect(page.locator('[data-testid="walls-Lines"]')).toBeChecked()
   await expect(page.locator('[data-testid="halo-Lines"]')).toBeVisible()
   await openMark(page, 'Hachure')
+  await openFold(page, 'occlusion-Hachure')
   await expect(page.locator('[data-testid="walls-Hachure"]')).not.toBeChecked()
 
   // Under Ground the terrain hides, so Lines has a halo and no switch.
@@ -104,11 +106,13 @@ test('the panel offers an occluder switch where walls mean something, and a halo
   await page.locator('[data-testid="occlude-by-ground"]:visible').click()
   await page.fill('[data-testid="panel-filter"]', '')
   await openMark(page, 'Lines')
+  await openFold(page, 'occlusion-Lines')
   const lines = page.locator('[data-testid="occlusion-Lines"]')
   await expect(lines.locator('[data-testid="halo-Lines"]')).toBeVisible()
   await expect(lines.locator('[data-testid="walls-Lines"]')).toHaveCount(0)
   // Pillars' walls are its columns' sides, which the ground cannot stand in for.
   await openMark(page, 'Pillars')
+  await openFold(page, 'occlusion-Pillars')
   await expect(page.locator('[data-testid="walls-Pillars"]')).toHaveCount(1)
 })
 

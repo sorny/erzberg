@@ -15,7 +15,7 @@
  */
 import { maskCoverage } from '../utils/maskLayers'
 import { BackdropBlock } from './panel/BackdropBlock'
-import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, SURF, TEXT, Tog, W } from './panel/ui'
+import { ACCENT_TEXT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, SURF, TEXT, Tog, W, WORDMARK } from './panel/ui'
 
 const TOOLS = [
   ['✎ Brush',   'brush'],
@@ -65,7 +65,7 @@ export function MaskPanel({
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: STRONG }}>mask</span>
+            <span style={{ fontFamily: WORDMARK, fontSize: 13, fontWeight: 700, color: STRONG }}>mask</span>
             <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>Make a stencil</span>
           </div>
           {mask && (
@@ -126,7 +126,7 @@ export function MaskPanel({
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
             <div>Covered <span data-testid="studio-coverage" style={{
-              color: covered > 0 ? ACCENT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums',
+              color: covered > 0 ? ACCENT_TEXT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums',
             }}>{covered > 0 && covered < 1 ? '<1' : Math.round(covered)}%</span></div>
           </div>
         </div>

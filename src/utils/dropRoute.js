@@ -77,7 +77,7 @@ export function explainDrop(name, tried) {
   if (/\.(jpe?g|webp|gif|bmp|avif)$/i.test(n)) {
     return `${short} is not a heightmap — those are PNG or GeoTIFF. For a photographic texture over the terrain, use Texture under Terrain Style.`
   }
-  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX or GeoJSON overlay, a land cover plate, or a preset — the JSON from Preset ⬇, or any PNG or SVG this app exported.`
+  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX or GeoJSON overlay, a land cover plate, or a preset — the JSON from Presets › Save, or any PNG or SVG this app exported.`
 }
 
 /**

@@ -67,7 +67,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     const sec = page.locator('[data-section="Water Fill"]')
     await page.click('[data-testid="section-water-fill"]')
-    await sec.getByText('Enabled', { exact: true }).click()
+    await sec.locator('input[data-enable]').click()
     await page.click('[data-testid="section-water-fill"]')
     const summary = page.locator('[data-testid="summary-water-fill"]')
     const reset = page.locator('[data-testid="reset-water-fill"]')
@@ -117,7 +117,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
+    await page.locator('[data-section="Hillshade"] input[data-enable]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -172,7 +172,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
+    await page.locator('[data-section="Hillshade"] input[data-enable]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -194,7 +194,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
+    await page.locator('[data-section="Hillshade"] input[data-enable]').click()
     await page.waitForTimeout(1200)
 
     const slider = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -215,7 +215,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    const enabled = page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]')
+    const enabled = page.locator('[data-section="Hillshade"] input[data-enable]')
     await enabled.click()
     await page.waitForTimeout(1200)
     await expect(enabled).toBeChecked()
@@ -240,7 +240,11 @@ test.describe('panel', () => {
     const readout = page.locator('[data-testid="summary-hillshade"]')
 
     await expect(header).toHaveAttribute('aria-expanded', 'false')
-    await expect(readout).toHaveText('—')
+    // Off, the header's own switch says so, and a dash beside it would say it twice.
+    await expect(readout).toHaveCount(0)
+    await page.locator('[data-section="Hillshade"] input[data-enable]').click()
+    await page.waitForTimeout(800)
+    await expect(readout).toHaveText(/° · \d+%/)
 
     await header.click()
     await page.waitForTimeout(300)
@@ -256,7 +260,7 @@ test.describe('panel', () => {
     await openStage(page, 'surface')
     await page.click('[data-testid="section-hillshade"]')
     await page.waitForTimeout(300)
-    await page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]').click()
+    await page.locator('[data-section="Hillshade"] input[data-enable]').click()
     await page.waitForTimeout(1200)
 
     const azimuth = page.locator('input.hmr[aria-label="Sun azimuth"]')
@@ -270,7 +274,10 @@ test.describe('panel', () => {
 
   test('nothing reads out while filtering, because every survivor is open', async ({ page }) => {
     await openApp(page)
-    await expect(page.locator('[data-testid="summary-water-fill"]')).toHaveText('—')
+    await openStage(page, 'surface')
+    await page.locator('[data-section="Water Fill"] input[data-enable]').click()
+    await page.waitForTimeout(800)
+    await expect(page.locator('[data-testid="summary-water-fill"]')).toHaveCount(1)
 
     await page.fill('[data-testid="panel-filter"]', 'flood')
     await page.waitForTimeout(400)
@@ -278,7 +285,7 @@ test.describe('panel', () => {
 
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
-    await expect(page.locator('[data-testid="summary-water-fill"]')).toHaveText('—')
+    await expect(page.locator('[data-testid="summary-water-fill"]')).toHaveCount(1)
   })
 
   test('a section that holds no state stays silent instead of claiming to be off', async ({ page }) => {
@@ -318,7 +325,7 @@ test.describe('panel', () => {
     await openApp(page)
     await openStage(page, 'output')
     const extent = page.locator('[data-testid="export-extent"]')
-    await expect(extent).toHaveText('SVG writes the full canvas')
+    await expect(extent).toHaveText('Writes the full canvas')
 
     // The switch is in Frame and the readout is in Output, which is the whole
     // point of the assertion — and now also two clicks of the rail.
@@ -330,7 +337,7 @@ test.describe('panel', () => {
     await page.locator('input[type=checkbox][aria-label="Paper frame"]').click()
     await page.waitForTimeout(600)
     await openStage(page, 'output')
-    await expect(extent).toHaveText(/^SVG cuts at the frame/)
+    await expect(extent).toHaveText(/^Cuts at the frame/)
 
     // The segment total is the stats block's, and only the stats block's.
     await expect(extent).not.toContainText('segment')
@@ -376,8 +383,8 @@ test.describe('panel', () => {
     await page.fill('[data-testid="panel-filter"]', 'crosshatch')
     await page.waitForTimeout(400)
     // `:visible` because a filtered-out section is hidden rather than
-    // unmounted, so every other mode's Enabled switch is still in the DOM.
-    await page.locator('input[type=checkbox][aria-label="Enabled"]:visible').first().click()
+    // unmounted, so every other mode's header switch is still in the DOM.
+    await page.locator('input[data-enable]:visible').first().click()
     await page.waitForTimeout(900)
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
@@ -520,7 +527,7 @@ test.describe('panel', () => {
     await expect(page.locator('[data-testid="mode-sheet"]')).toBeHidden()
 
     // And the section's own switch agrees, because there is only one switch.
-    const enabled = page.locator('[data-testid="section-mode:-contours"] ~ div input[type=checkbox][aria-label="Enabled"]')
+    const enabled = page.locator('[data-section="Mode: Contours"] input[data-enable]')
     await expect(enabled).toBeChecked()
 
     // Off from the section, and the tile follows.
@@ -597,6 +604,9 @@ test.describe('panel', () => {
     expect(await shownStages()).toEqual([])
     await expect(page.locator('[data-testid="stage-tab-surface"]')).toHaveAttribute('title', /1 match/)
     await expect(page.locator('[data-testid="stage-tab-marks"]')).toHaveAttribute('title', /0 matches/)
+    // A stage the search found nothing in is not somewhere it can take you.
+    await expect(page.locator('[data-testid="stage-tab-marks"]')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('[data-testid="stage-tab-surface"]')).not.toHaveAttribute('aria-disabled', 'true')
 
     // Clearing the field puts the panel back on the pane it was on.
     await page.fill('[data-testid="panel-filter"]', '')

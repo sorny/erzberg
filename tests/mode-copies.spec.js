@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { openMark, openStage, resetToDefaults, setMark } from './helpers.js'
+import { openFold, openMark, openStage, resetToDefaults, setMark } from './helpers.js'
 
 /**
  * Mode copies through the panel: one mode, a second set of settings, its own
@@ -35,6 +35,7 @@ test('a copy of a mode is its own pens, in undo and in the file', async ({ page 
   await openMark(page, 'Contours')
 
   // Duplicate from the section. The new copy opens with the mode's controls.
+  await openFold(page, 'mode-copies-block-contours')
   await page.click('[data-testid="mode-duplicate-contours"]')
   await page.waitForTimeout(800)
   const copy = page.locator('[data-testid="mode-copy-c1"]')

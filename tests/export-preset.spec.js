@@ -77,10 +77,10 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
   await resetToDefaults(page)
   await expect(tiltSlider(page)).not.toHaveValue(String(TILT))
 
-  // Export opens by default, so the section is only clicked when something has
+  // Presets opens by default, so the section is only clicked when something has
   // closed it — clicking an open one collapses it and hides the button below.
-  await openStage(page, 'output')
-  const section = page.locator('[data-testid="section-export"]')
+  await openStage(page, 'presets')
+  const section = page.locator('[data-testid="section-presets"]')
   if ((await section.getAttribute('aria-expanded')) !== 'true') {
     await section.click()
     await page.waitForTimeout(300)

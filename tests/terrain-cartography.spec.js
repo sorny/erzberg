@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { openMark, openStage, resetToDefaults, setMark } from './helpers.js'
+import { openFold, openMark, openStage, resetToDefaults, setMark } from './helpers.js'
 
 /*
  * Plan oblique and Landforms, end to end through the SVG.
@@ -82,6 +82,7 @@ test('a landform mask says what it keeps, and All clears it', async ({ page }) =
   await boot(page)
   await setMark(page, 'Contours', true)
   await openMark(page, 'Contours')
+  await openFold(page, 'masks-Contours')
   const readout = page.locator('[data-testid="form-mask-Contours"]')
   await expect(readout).toHaveText('all')
   for (const f of ['Flat', 'Peak', 'Shoulder', 'Spur', 'Slope', 'Hollow', 'Footslope', 'Pit']) {

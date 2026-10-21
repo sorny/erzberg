@@ -32,8 +32,9 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN } from './panel/ui'
-import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, stageOf } from './panel/stages'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
+import { reachError } from '../utils/netError'
+import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, STAGES, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
 import { ModeSections } from './panel/ModeSections'
 
@@ -136,7 +137,7 @@ function TerrainFetchPanel({ onFetched }) {
       if (ctrl.signal.aborted) return
       setAim((a) => (a && a.place === place ? { ...a, preview } : a))
     } catch (err) {
-      if (err?.name !== 'AbortError') onError(`Could not draw that area: ${err.message}`)
+      if (err?.name !== 'AbortError') onError(`Could not draw that area: ${reachError(err, 'the tile host')}`)
     }
   }
 
@@ -153,7 +154,7 @@ function TerrainFetchPanel({ onFetched }) {
       setPlaces(found)
       if (!found.length) onError(`Nothing found for “${q}”. Try a summit, a valley or a town.`)
     } catch (err) {
-      if (err?.name !== 'AbortError') onError(`Place search failed: ${err.message}`)
+      if (err?.name !== 'AbortError') onError(`Place search failed: ${reachError(err, 'the geocoder')}`)
     } finally {
       setBusy(null)
     }
@@ -175,7 +176,7 @@ function TerrainFetchPanel({ onFetched }) {
       setCredit({ sources: dem.sources, tiles: dem.tiles, zoom: dem.zoom,
                   metres: dem.groundMetres, place: place.name })
     } catch (err) {
-      if (err?.name !== 'AbortError') onError(`Terrain fetch failed: ${err.message}`)
+      if (err?.name !== 'AbortError') onError(`Terrain fetch failed: ${reachError(err, 'the tile host')}`)
     } finally {
       setBusy(null)
     }
@@ -249,16 +250,16 @@ function TerrainFetchPanel({ onFetched }) {
                  border:`1px solid ${BORDER}`, borderRadius:3, padding:'5px 7px', marginBottom:6 }}>
               {plan ? (<>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span>Zoom</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                  <span>Zoom</span><span style={{ color:DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
                     {plan.zoom}{plan.zoom === 14 ? ' · deepest' : ''}</span></div>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span>Tiles</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                  <span>Tiles</span><span style={{ color:DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
                     {`${plan.tiles} / ${plan.maxTiles}`}</span></div>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span>Raster</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                  <span>Raster</span><span style={{ color:DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
                     {`${plan.width} × ${plan.height} px`}</span></div>
                 <div style={{ display:'flex', justifyContent:'space-between' }}>
-                  <span>Ground</span><span style={{ color:DIM, fontFamily:'monospace' }}>
+                  <span>Ground</span><span style={{ color:DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
                     {`${plan.groundMetres < 10 ? plan.groundMetres.toFixed(1) : Math.round(plan.groundMetres)} m / px`}</span></div>
               </>) : <div>That extent is larger than the tile budget allows.</div>}
             </div>
@@ -321,12 +322,12 @@ function HypsometricRow({ value }) {
   const [show, setShow] = useState(false)
   return (
     <div style={{ marginBottom: 4 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:10, color:MUTED }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:11, color:MUTED }}>
         <span style={{ display:'flex', alignItems:'center' }}>
           Hypso. Integral
           <HelpBtn active={show} onClick={() => setShow(s => !s)} />
         </span>
-        <span style={{ color:MUTED, fontFamily:'monospace' }}>{value.toFixed(3)}</span>
+        <span style={{ color:MUTED, fontFamily: MONO, fontSize:10, fontVariantNumeric:'tabular-nums' }}>{value.toFixed(3)}</span>
       </div>
       {show && (
         <div style={{
@@ -537,7 +538,7 @@ function CommandLine({ cmd }) {
       <code style={{
         flex: 1, minWidth: 0, fontSize: 10, lineHeight: 1.6, color: MUTED, background: SURF,
         border: `1px solid ${BORDER}`, borderRadius: 3, padding: '5px 7px',
-        fontFamily: 'ui-monospace, monospace', userSelect: 'all', overflowX: 'auto',
+        fontFamily: MONO, userSelect: 'all', overflowX: 'auto',
       }}>
         {/* The separating space sits *outside* the span. Inside it, the
             span's own `nowrap` swallows the only break opportunity in the
@@ -968,10 +969,23 @@ export function Sidebar({
         setOpen(true)
         requestAnimationFrame(() => filterRef.current?.focus())
       }
+      // The rail, one stage up or down, as in a pager. Physical keys, like `\`:
+      // on a German layout they are Ü and +, and a stage key should not move
+      // with the alphabet. It stops at either end rather than wrapping, because
+      // Presets above Terrain is a destination and not a step after Output.
+      // The Mask Studio sizes its brush on the same two keys, and Edit Mode
+      // owns the keyboard while it is up, so either one being open wins.
+      if ((e.code === 'BracketLeft' || e.code === 'BracketRight')
+          && !document.querySelector('[data-testid="mask-studio"], [data-testid="edit-panel"]')) {
+        e.preventDefault()
+        const last = STAGES[STAGES.length - 1][0]
+        const next = Math.min(last, Math.max(PRESETS_STAGE, stage + (e.code === 'BracketRight' ? 1 : -1)))
+        if (next !== stage) { setOpen(true); goStage(next) }
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [setOpen])
+  }, [setOpen, stage, goStage])
 
   // Soundscapes controller. Aliased because `ss` is already the style setter,
   // and defaulted so the section degrades to an inert upload button if the
@@ -1035,6 +1049,14 @@ export function Sidebar({
   // The panel's own share of a reset: the preset tiles have to stop pointing at
   // a look the settings no longer hold.
   const handleResetAll = () => {
+    // What Undo needs to give back that the App does not hold: the rolls, the
+    // one on show, and which tile is lit. Without it an undone reset restored
+    // the plate and left Back and Forward with nothing behind them.
+    const kept = { rolls, rollAt, lastPreset, presetEdited }
+    const restorePanel = () => {
+      setRolls(kept.rolls); setRollAt(kept.rollAt)
+      setLastPreset(kept.lastPreset); setPresetEdited(kept.presetEdited)
+    }
     // Bare defaults are a look the user asked for, so the opening must not
     // arrive after it and overwrite it.
     spendOpening()
@@ -1048,7 +1070,7 @@ export function Sidebar({
     // Lines back on behind a shut disclosure, which is the one state this panel
     // is not supposed to be able to reach.
     syncSectionsToStyle(STYLE_DEF)
-    onReset?.()
+    onReset?.(restorePanel)
   }
 
   const hasGeoTiff  = geoTiffElevMin != null && geoTiffElevMax != null
@@ -1426,6 +1448,9 @@ export function Sidebar({
         transition:'transform .26s cubic-bezier(.2,.8,.2,1)',
         boxShadow:'-1px 0 0 var(--hm-veil), -12px 0 32px var(--hm-shadow)',
         fontFamily: FONT,
+        // The control-label size as the floor, so a string nobody styled lands
+        // on the scale rather than at the browser's 16 px.
+        fontSize: 11,
         WebkitFontSmoothing:'antialiased', MozOsxFontSmoothing:'grayscale',
       }}>
         {/*
@@ -1445,7 +1470,7 @@ export function Sidebar({
           */}
         <div style={{ padding:'11px 12px 9px', borderBottom:`1px solid ${BORDER}`, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-            <h1 style={{ fontFamily:"'Space Mono', monospace", fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:STRONG, margin:0 }}>erzberg</h1>
+            <h1 style={{ fontFamily: WORDMARK, fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:STRONG, margin:0 }}>erzberg</h1>
             <span style={{ fontSize:10, color: MUTED, fontFamily: MONO }}>v{version}</span>
             <div style={{ flex:1 }} />
             {/* Dark and light. Remembered per browser; the panel has always been
@@ -1516,7 +1541,7 @@ export function Sidebar({
                 undoing — one step back against everything at once. */}
             <button onClick={handleResetAll} title="Return every setting to its default" className="hmbtn"
               style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5,
-                       color: MUTED, fontSize:10, lineHeight:1, padding:'5px 9px',
+                       color: MUTED, fontSize:11, lineHeight:1, padding:'5px 9px',
                        whiteSpace:'nowrap', cursor:'pointer' }}
               onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
               onMouseLeave={e => { e.currentTarget.style.color = MUTED }}>Reset all</button>
@@ -1582,6 +1607,7 @@ export function Sidebar({
             }}>/</kbd>
           )}
           <style>{`.hmfind { transition:border-color .15s, box-shadow .15s, background .15s }
+            .hmfind::placeholder { color:${MUTED}; opacity:1 }
             .hmfind:hover { border-color:${MUTED} }
             .hmfind:focus { border-color:${ACCENT}; box-shadow:0 0 0 3px var(--hm-accent-ring); background:${BG} }
             .hmfind:focus + .hmfindkbd { opacity:0 }
@@ -1686,6 +1712,22 @@ export function Sidebar({
                 )
               })}
             </div>
+            {/* The look as a file, beside the looks the app ships. It sat under
+                Output among the exports, which made a project file one of eight
+                equal buttons next to WebM, and put "open a look" two stages from
+                the looks. */}
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Your preset</div>
+            <div style={{ display:'flex', gap:4 }}>
+              <Btn block onClick={onSavePreset} data-testid="preset-save">Save ⬇</Btn>
+              {/* Spends the opening on the *click*, not on the file landing: the
+                  picker is a dialog the user sits in front of, and the opening
+                  arriving behind it would be overwritten by the load anyway —
+                  or worse, land after it. */}
+              <Btn block onClick={() => { spendOpening(); onLoadPreset?.() }} data-testid="preset-load">Open ⬆</Btn>
+            </div>
+            <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
+              A PNG or SVG from this app opens here too: it carries its preset.
+            </div>
           </Section>
 
           </Stage>
@@ -1745,7 +1787,7 @@ export function Sidebar({
             <Btn size="lg" block data-testid="edit-heightmap" onClick={onEditHeightmap} disabled={!heightmapPixels}
               style={{ width:'100%', marginTop:4, fontWeight:400,
                 ...(editSummary && { color: ACCENT_TEXT, borderColor: ACCENT_DEEP }) }}>
-              ✂ Edit heightmap <span style={{ color: MUTED, fontSize:10 }}>E</span>
+              ✂ Edit heightmap<Key>E</Key>
             </Btn>
             {editSummary && (
               <div style={{ marginTop:4, display:'flex', alignItems:'center', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
@@ -2269,8 +2311,7 @@ export function Sidebar({
           </Section>
 
           <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}
-                   enabled={summaries['Texture'] !== '—'}>
-            <Tog label="Enabled" checked={style.showTexture} onChange={v => ss({ showTexture: v })} />
+                   enabled={!!style.showTexture} onEnabled={v => ss({ showTexture: v })}>
             {style.showTexture && !style.showFill && (
               <Callout>Fill is off, so the texture does not show until Fill is on.</Callout>
             )}
@@ -2303,8 +2344,7 @@ export function Sidebar({
 
           {/* ── Hillshade ──────────────────────────────────────────────────── */}
 
-          <Section title="Hillshade" open={sec.hillshade} onToggle={() => tog('hillshade')} enabled={style.showHillshade}>
-            <Tog label="Enabled" checked={style.showHillshade} onChange={v => ss({ showHillshade: v })} />
+          <Section title="Hillshade" open={sec.hillshade} onToggle={() => tog('hillshade')} enabled={style.showHillshade} onEnabled={v => ss({ showHillshade: v })}>
             {style.showHillshade && (
               <Sub>
                 <Tog label="Multi-direction" help="Averages eight light directions, so no slope is favoured. Hides the azimuth, cast shadows and local light." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
@@ -2418,8 +2458,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Slope Shading ──────────────────────────────────────────────── */}
-          <Section title="Slope Shading" open={sec.slopeShade} onToggle={() => tog('slopeShade')} enabled={style.showSlopeShade}>
-            <Tog label="Enabled" checked={style.showSlopeShade} onChange={v => ss({ showSlopeShade: v })} />
+          <Section title="Slope Shading" open={sec.slopeShade} onToggle={() => tog('slopeShade')} enabled={style.showSlopeShade} onEnabled={v => ss({ showSlopeShade: v })}>
             {style.showSlopeShade && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2443,8 +2482,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Water Fill ─────────────────────────────────────────────────── */}
-          <Section title="Water Fill" open={sec.waterFill} onToggle={() => tog('waterFill')} enabled={style.showWaterFill}>
-            <Tog label="Enabled" checked={!!style.showWaterFill} onChange={v => ss({ showWaterFill: v })} />
+          <Section title="Water Fill" open={sec.waterFill} onToggle={() => tog('waterFill')} enabled={style.showWaterFill} onEnabled={v => ss({ showWaterFill: v })}>
             {style.showWaterFill && (
               <Sub>
                 <InlineSl label="Level" help="Flood threshold — percentage of terrain height." min={0} max={1} step={0.01} value={style.waterLevel ?? 0.3} onChange={v => ss({ waterLevel: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2455,8 +2493,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Aspect Map ──────────────────────────────────────────────────── */}
-          <Section title="Aspect Map" open={sec.aspectMap} onToggle={() => tog('aspectMap')} enabled={style.showAspectMap}>
-            <Tog label="Enabled" checked={!!style.showAspectMap} onChange={v => ss({ showAspectMap: v })} />
+          <Section title="Aspect Map" open={sec.aspectMap} onToggle={() => tog('aspectMap')} enabled={style.showAspectMap} onEnabled={v => ss({ showAspectMap: v })}>
             {style.showAspectMap && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2473,8 +2510,7 @@ export function Sidebar({
 
 
           {/* ── Local Relief ────────────────────────────────────────────────── */}
-          <Section title="Local Relief" open={sec.localRelief} onToggle={() => tog('localRelief')} enabled={style.showLocalRelief}>
-            <Tog label="Enabled" checked={!!style.showLocalRelief} onChange={v => ss({ showLocalRelief: v })} />
+          <Section title="Local Relief" open={sec.localRelief} onToggle={() => tog('localRelief')} enabled={style.showLocalRelief} onEnabled={v => ss({ showLocalRelief: v })}>
             {style.showLocalRelief && (
               <Sub>
                 <Note>The ground minus a blur of itself. The mountain goes, and what sits on it stays: terraces, benches, paths, walls.</Note>
@@ -2488,8 +2524,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Curvature Shading ───────────────────────────────────────────── */}
-          <Section title="Curvature Shading" open={sec.curvShade} onToggle={() => tog('curvShade')} enabled={style.showCurvShade}>
-            <Tog label="Enabled" checked={!!style.showCurvShade} onChange={v => ss({ showCurvShade: v })} />
+          <Section title="Curvature Shading" open={sec.curvShade} onToggle={() => tog('curvShade')} enabled={style.showCurvShade} onEnabled={v => ss({ showCurvShade: v })}>
             {style.showCurvShade && (
               <Sub>
                 <Note>Convex ground in one colour and hollows in the other. The form with no light direction at all.</Note>
@@ -2503,8 +2538,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Openness ────────────────────────────────────────────────────── */}
-          <Section title="Openness" open={sec.openness} onToggle={() => tog('openness')} enabled={style.showOpenness}>
-            <Tog label="Enabled" checked={!!style.showOpenness} onChange={v => ss({ showOpenness: v })} />
+          <Section title="Openness" open={sec.openness} onToggle={() => tog('openness')} enabled={style.showOpenness} onEnabled={v => ss({ showOpenness: v })}>
             {style.showOpenness && (
               <Sub>
                 <Note>Bright where the ground is open to the sky, dark where it is enclosed, with no light direction. With red, steep ground reads red: the Red Relief Image Map of Japanese LiDAR surveys.</Note>
@@ -2523,8 +2557,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Texture Shading ─────────────────────────────────────────────── */}
-          <Section title="Texture Shading" open={sec.texShade} onToggle={() => tog('texShade')} enabled={style.showTexShade}>
-            <Tog label="Enabled" checked={!!style.showTexShade} onChange={v => ss({ showTexShade: v })} />
+          <Section title="Texture Shading" open={sec.texShade} onToggle={() => tog('texShade')} enabled={style.showTexShade} onEnabled={v => ss({ showTexShade: v })}>
             {style.showTexShade && (
               <Sub>
                 <Note>Leland Brown's texture shading: the ridges and canyons at every scale at once, from a fractional Laplacian of the ground.</Note>
@@ -2536,8 +2569,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Aerial Perspective ──────────────────────────────────────────── */}
-          <Section title="Aerial Perspective" open={sec.aerial} onToggle={() => tog('aerial')} enabled={style.showAerial}>
-            <Tog label="Enabled" checked={!!style.showAerial} onChange={v => ss({ showAerial: v })} />
+          <Section title="Aerial Perspective" open={sec.aerial} onToggle={() => tog('aerial')} enabled={style.showAerial} onEnabled={v => ss({ showAerial: v })}>
             {style.showAerial && (
               <Sub>
                 <Note>Low ground fades into haze, so the summits stand in front, as in Imhof's Swiss relief maps.</Note>
@@ -2549,8 +2581,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Wetness ─────────────────────────────────────────────────────── */}
-          <Section title="Wetness" open={sec.wetness} onToggle={() => tog('wetness')} enabled={style.showWetness}>
-            <Tog label="Enabled" checked={!!style.showWetness} onChange={v => ss({ showWetness: v })} />
+          <Section title="Wetness" open={sec.wetness} onToggle={() => tog('wetness')} enabled={style.showWetness} onEnabled={v => ss({ showWetness: v })}>
             {style.showWetness && (
               <Sub>
                 <Note>Where water gathers: a large catchment on flat ground. The topographic wetness index, ln(a / tan β).</Note>
@@ -2562,8 +2593,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Sunlight ────────────────────────────────────────────────────── */}
-          <Section title="Sunlight" open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint}>
-            <Tog label="Enabled" checked={!!style.showSunTint} onChange={v => ss({ showSunTint: v })} />
+          <Section title="Sunlight" open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint} onEnabled={v => ss({ showSunTint: v })}>
             {style.showSunTint && (
               <Sub>
                 <Note>Hours of direct sun, with the shadows of the ridges, from the shaded colour to the sunny one. At the latitude of a GeoTIFF, or the Hillshade's for a plain heightmap.</Note>
@@ -2618,7 +2648,7 @@ export function Sidebar({
                    enabled={vectorLayers?.length > 0}>
             {geoTiffElevMin == null ? (
               <div data-testid="vector-needs-geotiff">
-                <div style={{ fontSize:11, color: MUTED, lineHeight:1.55, marginBottom:8 }}>
+                <div style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:8 }}>
                   Roads, water, rail, landuse, buildings, lifts and peaks are queried
                   from OpenStreetMap for the raster&rsquo;s own extent, and GPX tracks
                   and GeoJSON are draped over it. All of that needs to know where on
@@ -3068,43 +3098,6 @@ export function Sidebar({
           <Stage n={6} title="Output">
 
           <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
-            {/* What the SVG will contain, said as a sentence.
-                It *cuts* at the paper frame rather than hiding what falls outside
-                it, so a switch two stages away in Frame decides what you get —
-                and nothing else in the panel says so. It carries no count: the
-                stats block below prints the segment total already, and one
-                number in two places is one number that can look like two. */}
-            <div data-testid="export-extent" style={{ marginBottom:4, fontSize:10, color: MUTED }}>
-              {view.showFrame
-                ? `SVG cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
-                : 'SVG writes the full canvas'}
-            </div>
-            {/* The second thing a plate carries, and the one nobody would guess
-                at: every PNG and SVG holds the whole parameter set, so the
-                picture opens again through Preset ⬆. Said here because a file
-                that is quietly also a project file is worth exactly nothing if
-                you never learn that it is one. */}
-            <div data-testid="export-carries" style={{ marginBottom:6, fontSize:10, color: MUTED }}>
-              PNG and SVG carry the preset
-            </div>
-            <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              <ExpBtn label="SVG" hint="1" onClick={onSvg} testId="export-svg" />
-              <ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" />
-              <ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" />
-              <ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
-            </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:4, marginBottom:4 }}>
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Heightmap" hint="save" onClick={onHeightmap} />
-              <ExpBtn label="Preset ⬇" hint="save" onClick={onSavePreset} testId="preset-save" />
-              {/* Spends the opening on the *click*, not on the file landing: the
-                  picker is a dialog the user sits in front of, and the opening
-                  arriving behind it would be overwritten by the load anyway —
-                  or worse, land after it. */}
-              <ExpBtn label="Preset ⬆" hint="open" onClick={() => { spendOpening(); onLoadPreset?.() }} testId="preset-load" />
-            </div>
-            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
-
             {/* ── The plot ─────────────────────────────────────────────────
                 The stated audience of this whole tool is a pen plotter, and
                 until now nothing here said what a plot would cost. Two numbers
@@ -3112,7 +3105,10 @@ export function Sidebar({
                 down, which the drawing fixes, and the distance the carriage
                 covers between strokes with the pen in the air, which is an
                 ordering problem nobody had looked at. See utils/penRoute.js. */}
-            <div style={{ marginTop:10, paddingTop:8, borderTop:`1px solid ${BORDER}` }}>
+            {/* The plot first, because it decides the file: the sheet, the order
+                and how areas are filled are all SVG choices, and Preflight
+                measures the result before anything is written. */}
+            <div>
               <InlineSl label="Sheet" testId="plot-width"
                 help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Scale and North."
                 min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
@@ -3164,7 +3160,7 @@ export function Sidebar({
                     </div>
                     {/* The saving, said only while it is still on the table. */}
                     {!view.plotPenOrder && saved > 0.02 && (
-                      <div style={{ color: ACCENT }}>
+                      <div style={{ color: ACCENT_TEXT }}>
                         {`Plotter order would cut the pen-up travel by ${Math.round(saved * 100)}%`}
                       </div>
                     )}
@@ -3173,6 +3169,48 @@ export function Sidebar({
                 })()}
               </div>
             </div>
+
+            {/* ── The file ─────────────────────────────────────────────────
+                SVG is the product, so it is the one primary action here, with
+                what it will hold said under it. Pens are counted by Preflight,
+                which builds the file; before that the line says what is known. */}
+            <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${BORDER}` }}>
+              <Btn size="lg" variant="primary" block onClick={onSvg} data-testid="export-svg" style={{ width:'100%' }}>
+                SVG<Key>1</Key>
+              </Btn>
+              <div data-testid="export-svg-summary" style={{ marginTop:6, fontSize:10, color: DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+                {plotStats
+                  ? `${plotStats.pens} pen layer${plotStats.pens === 1 ? '' : 's'} · ${view.plotWidthMm ?? 297} mm · ${plotStats.strokes.toLocaleString()} strokes`
+                  : `${view.plotWidthMm ?? 297} mm · ${segs} segments`}
+              </div>
+              {/* What the SVG will contain, said as a sentence.
+                  It *cuts* at the paper frame rather than hiding what falls
+                  outside it, so a switch two stages away in Frame decides what
+                  you get — and nothing else in the panel says so. */}
+              <div data-testid="export-extent" style={{ marginTop:2, fontSize:10, color: MUTED }}>
+                {view.showFrame
+                  ? `Cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
+                  : 'Writes the full canvas'}
+              </div>
+              {/* The second thing a plate carries, and the one nobody would
+                  guess at: every PNG and SVG holds the whole parameter set, so
+                  the picture opens again under Presets. */}
+              <div data-testid="export-carries" style={{ marginTop:2, fontSize:10, color: MUTED }}>
+                PNG and SVG carry the preset
+              </div>
+            </div>
+
+            {/* The other files: pictures, a print, a recording and the raster.
+                Equal to each other, and second to the plot. */}
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
+              <ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" />
+              <ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" />
+              <ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label="Heightmap" hint="save" onClick={onHeightmap} />
+            </div>
+            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
           </Section>
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}

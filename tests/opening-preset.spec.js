@@ -43,14 +43,13 @@ async function expectPresetsLoaded(page) {
 
 /** Alpine Survey turns Lines off and Hillshade on; the defaults are the inverse. */
 async function look(page) {
+  // Each section's own switch sits in its header (`input[data-enable]`).
   const enabledIn = async (section) => {
-    const sec = page.locator(`[data-testid="section-${section}"]`)
-    if (!(await sec.count())) return null
-    const box = sec.locator('xpath=following-sibling::div[1]').locator('input[type=checkbox]').first()
+    const box = page.locator(`[data-section="${section}"] input[data-enable]`)
     if (!(await box.count())) return null
     return box.isChecked()
   }
-  return { lines: await enabledIn('mode:-lines'), hillshade: await enabledIn('hillshade') }
+  return { lines: await enabledIn('Mode: Lines'), hillshade: await enabledIn('Hillshade') }
 }
 
 test.describe('opening preset', () => {

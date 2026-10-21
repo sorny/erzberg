@@ -93,7 +93,7 @@ test('a reset puts its own section back and leaves the rest', async ({ page }) =
   // Hillshade only renders once it is on, and a locator for a control that is
   // not there yet times out rather than failing.
   await open(page, 'section-hillshade')
-  const lit = page.locator('[data-section="Hillshade"] input[type=checkbox][aria-label="Enabled"]')
+  const lit = page.locator('[data-section="Hillshade"] input[data-enable]')
   await lit.click()
   await expect(lit).toBeChecked()
 

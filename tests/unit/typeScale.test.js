@@ -25,8 +25,9 @@ describe('type scale', () => {
       const lines = readFileSync(p, 'utf8').split('\n')
       const display = DISPLAY[p.split('/').pop()] ?? new Set()
       lines.forEach((line, i) => {
-        for (const m of line.matchAll(/fontSize:\s*([0-9.]+)/g)) {
-          const v = Number(m[1])
+        // `font-size:` too: the injected style sheet in ui.jsx is CSS, not JSX.
+        for (const m of line.matchAll(/fontSize:\s*([0-9.]+)|font-size:\s*([0-9.]+)px/g)) {
+          const v = Number(m[1] ?? m[2])
           if (!SCALE.has(v) && !display.has(v)) off.push(`${p}:${i + 1} ${v}`)
         }
       })

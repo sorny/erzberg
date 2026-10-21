@@ -15,7 +15,7 @@ import { ALL_FORMS, LANDFORMS, formMaskHas, formReadout } from '../../utils/land
 import { DRAW_MODES } from '../../utils/drawModes'
 import { colourOptions } from './colourSource'
 import { GradientPicker } from '../GradientPicker'
-import { ACCENT_DEEP, BORDER, Btn, ColorRow, DIM, Heading, InlineSl, MUTED, Note, SegGroup, Sub, Tog } from './ui'
+import { ACCENT_DEEP, ACCENT_TEXT, BORDER, Btn, ColorRow, DIM, Fold, InlineSl, MUTED, Note, SegGroup, Sub, Tog } from './ui'
 
 /**
  * One row of the Masks block: a name with where it comes from, what it keeps
@@ -29,7 +29,7 @@ function MaskRow({ title, source, readout, active, testId, children, onAll }) {
         <span style={{ fontSize: 11, color: DIM, whiteSpace: 'nowrap' }}>
           {title}{source && <span style={{ fontSize: 10, color: MUTED }}> · {source}</span>}
         </span>
-        <span data-testid={testId} title={readout} style={{ flex: 1, fontSize: 10, color: active ? ACCENT_DEEP : MUTED,
+        <span data-testid={testId} title={readout} style={{ flex: 1, fontSize: 10, color: active ? ACCENT_TEXT : MUTED,
           textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>{readout}</span>
         {active && (
           <Btn size="xs" onClick={onAll} style={{ padding: '0 6px', fontSize: 10, flexShrink: 0 }}>All</Btn>
@@ -184,11 +184,7 @@ function MaskBlock({ prefix, style, ss }) {
   ].filter(Boolean).length
   const missing = [!hasPainted && 'painted masks (Terrain › Masks)', !hasPlate && 'land cover (Terrain › Land Cover)'].filter(Boolean)
   return (
-    <div data-testid={`masks-${prefix}`} style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <Heading style={{ margin: '0 0 2px' }}>Masks</Heading>
-        <span style={{ fontSize: 10, color: active ? ACCENT_DEEP : MUTED }}>{active ? `${active} on` : 'none'}</span>
-      </div>
+    <Fold testId={`masks-${prefix}`} title="Masks" readout={active ? `${active} on` : 'none'} active={!!active}>
       <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
         Draw this mode only where the ground passes every mask set here.
       </div>
@@ -200,7 +196,7 @@ function MaskBlock({ prefix, style, ss }) {
           Also from {missing.join(' and ')}, once there is one.
         </div>
       )}
-    </div>
+    </Fold>
   )
 }
 
@@ -223,11 +219,7 @@ function OcclusionBlock({ prefix, style, ss }) {
   const walls = style[`walls${prefix}`] !== false
   const readout = !on ? 'off' : [hasWalls && walls && 'occluder', halo > 0 && `halo ${halo} px`].filter(Boolean).join(' · ') || 'none'
   return (
-    <div data-testid={`occlusion-${prefix}`} style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <Heading style={{ margin: '0 0 4px' }}>Occlusion</Heading>
-        <span style={{ fontSize: 10, color: on && readout !== 'none' ? ACCENT_DEEP : MUTED }}>{readout}</span>
-      </div>
+    <Fold testId={`occlusion-${prefix}`} title="Occlusion" readout={readout} active={on && readout !== 'none'}>
       {!on ? (
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45 }}>
           Occlusion is off in Surface › Terrain Style.
@@ -245,7 +237,7 @@ function OcclusionBlock({ prefix, style, ss }) {
           min={0} max={6} step={0.5} value={halo} onChange={(v) => ss({ [`halo${prefix}`]: v })}
           fmt={(v) => (v > 0 ? `${v} px` : 'off')} />
       </>)}
-    </div>
+    </Fold>
   )
 }
 
@@ -269,9 +261,17 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
   const fieldLabel = (text) => (
     <div style={{ fontSize: 11, color: MUTED, margin: '4px 0 4px' }}>{text}</div>
   )
+  // Shut, the block says what the pen is: where its colour comes from and how wide.
+  const sourceName = showHypso
+    ? (colourOptions({ prefix, current: source, classSource, hasPlate }).find(([, v]) => v === source)?.[0] ?? 'Line')
+    : null
+  const weight = style[`weight${prefix}`]
+  const lineReadout = [sourceName, weight != null && `${weight} px`].filter(Boolean).join(' · ')
+  const gradientName = gradientStops
+    ? (Object.keys(GRADIENT_PRESETS).find((k) => JSON.stringify(GRADIENT_PRESETS[k]) === JSON.stringify(gradientStops)) ?? 'custom')
+    : null
   return (<>
-    <div style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      <Heading>{label}</Heading>
+    <Fold title={label} readout={lineReadout} defaultOpen testId={prefix ? `line-style-${prefix}` : undefined}>
       {/* Colour first, because it decides what the rows under it mean: a
           gradient source has no base colour, and Line has no gradient. */}
       {showHypso && (<>
@@ -300,13 +300,15 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
                 fill), but it must be editable right where a source picks it —
                 not hidden behind enabling fill in Terrain Style. */}
             {gradientStops && setGradientStops && (
-              <div style={{ marginTop: 8 }}>
-                <Heading>Gradient, shared by every layer that uses one</Heading>
+              <Fold title="Gradient" readout={gradientName} testId={prefix ? `gradient-${prefix}` : undefined}>
+                <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 6 }}>
+                  Shared by every layer that uses one.
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => setGradientStops(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={setGradientStops} />
-              </div>
+              </Fold>
             )}
           </Sub>
         )}
@@ -327,7 +329,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
           value={style[`dash${prefix}`]} onChange={(d) => ss({ [`dash${prefix}`]: d })} />
       </>)}
-    </div>
+    </Fold>
     {/* Off the table for vector layers: masking thins the terrain grid a layer
         is built from, and a road is not built from that grid. */}
     {showCover && <MaskBlock prefix={prefix} style={style} ss={ss} />}

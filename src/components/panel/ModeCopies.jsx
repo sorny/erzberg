@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { copyView, makeCopy, patchCopy } from '../../utils/modeCopies'
 import { MODE_ID } from './sectionParams'
-import { ACCENT_DEEP, BORDER, Btn, Chevron, Heading, MUTED, SURF, Switch, TEXT } from './ui'
+import { BORDER, Btn, Chevron, Fold, MUTED, SURF, Switch, TEXT } from './ui'
 
 export function ModeCopies({ title, style, ss, renderBody }) {
   const mode = MODE_ID.get(title)
@@ -35,13 +35,9 @@ export function ModeCopies({ title, style, ss, renderBody }) {
   const slug = mode.toLowerCase()
 
   return (
-    <div data-testid={`mode-copies-block-${slug}`} style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
-      {/* Its own block, like Line style and Masks: the button used to follow the
-          mask rows with no heading, and read as one of them. */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <Heading style={{ margin: '0 0 2px' }}>Copies</Heading>
-        <span style={{ fontSize: 10, color: mine.length ? ACCENT_DEEP : MUTED }}>{mine.length || 'none'}</span>
-      </div>
+    // Its own block, like Line style and Masks: the button used to follow the
+    // mask rows with no heading, and read as one of them.
+    <Fold testId={`mode-copies-block-${slug}`} title="Copies" readout={mine.length || 'none'} active={mine.length > 0}>
       <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
         The same mode again, with its own settings, masks and pen layers: dense
         contours on rock and sparse ones on forest.
@@ -59,7 +55,7 @@ export function ModeCopies({ title, style, ss, renderBody }) {
                 data-testid={`mode-copy-open-${copy.uid}`}
                 style={{ background: 'none', border: 'none', color: MUTED, cursor: 'pointer', padding: 0, width: 16,
                   display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Chevron dir={isOpen ? 'down' : 'right'} /></button>
-              <input value={copy.name} aria-label="Copy name" data-testid={`mode-copy-name-${copy.uid}`}
+              <input value={copy.name} aria-label="Copy name" maxLength={60} data-testid={`mode-copy-name-${copy.uid}`}
                 onChange={(e) => write(all.map((c) => (c.uid === copy.uid ? { ...c, name: e.target.value } : c)))}
                 style={{ flex: 1, minWidth: 0, background: 'none', border: 'none', color: on ? TEXT : MUTED,
                   fontSize: 11, fontWeight: 600, padding: 0 }} />
@@ -83,6 +79,6 @@ export function ModeCopies({ title, style, ss, renderBody }) {
         title="Add a copy of this mode with its own settings" style={{ width: '100%' }}>
         + Duplicate this mode
       </Btn>
-    </div>
+    </Fold>
   )
 }
