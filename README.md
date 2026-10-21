@@ -84,10 +84,13 @@ different style from the grid, then tune it.
 - **Stages.** A rail on the panel edge holds six stages in pipeline order:
   *Terrain, Surface, Marks, Overlay, Frame, Output*. The body shows one stage at
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
-  sections that are on inside it.
+  sections that are on inside it. The arrow keys move along the rail, and `[`
+  `]` change the stage from anywhere.
 - **Marks sheet.** The Marks stage shows the 62 modes as tiles in seven families:
   Line, Tone, Relief, Plate, Light, Momentum and Chart. The ring in a tile corner
-  switches the mode on. The rest of the tile opens its controls.
+  switches the mode on. The rest of the tile opens its controls. An open mode
+  has its own switch in its header. Line style, Gradient, Masks, Occlusion and
+  Copies fold to one line that shows their setting.
 - **Search.** The field at the top filters sections by title and by their own
   terms. Type `azimuth` and only Hillshade remains. The search crosses all
   stages.
@@ -434,7 +437,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 `graz-alpha.png`, `graz.stl` and so on.
 
 - **Every plate is a preset.** A PNG carries the parameters in a `tEXt` chunk,
-  an SVG in a comment. Open the file with *Preset ⬆* to restore the look. The
+  an SVG in a comment. Open the file with *Presets › Open* to restore the look. The
   raster and its file name are never written.
 - **Paper frame.** ISO A, US sizes, common ratios or your own, with a margin.
   The SVG is cut at the frame, not clipped.
@@ -467,6 +470,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `Space` | Freeze the particle field |
 | `\` | Show or hide the panel |
 | `/` | Find a control |
+| `[` `]` | Previous or next stage |
 | `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⌘⇧Z` / `Ctrl+Y` | Redo |

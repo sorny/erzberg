@@ -9,7 +9,8 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { reachError } from './utils/netError'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -134,7 +135,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
         )}
         {onCancel && (
           <button data-testid="export-cancel" onClick={onCancel} style={{
-            background:'none', border:'1px solid #3f3f46', borderRadius:5, cursor:'pointer',
+            background:'none', border:`1px solid ${BORDER}`, borderRadius:5, cursor:'pointer',
             color:DIM, fontSize:11, padding:'4px 14px', fontFamily:'system-ui,sans-serif',
           }}>Cancel</button>
         )}
@@ -266,12 +267,14 @@ function ViewportHint({ onDismiss, onKeys }) {
       <button onClick={onKeys} data-testid="hint-keys" aria-label="Show the keyboard shortcuts"
         className="hm-glassbtn" style={{
           background:'none', border:'none', borderRadius:5, cursor:'pointer',
-          color:MUTED, fontSize:12, padding:'3px 8px', fontFamily:'inherit',
+          // The glass's own text colour: MUTED is set for the panel's opaque
+          // surface, and over a light plate behind the glass it read 3.4 : 1.
+          color: GLASS_TEXT, fontSize:12, padding:'3px 8px', fontFamily:'inherit',
           display:'flex', alignItems:'center', gap:6,
         }}><Kbd>?</Kbd> Shortcuts</button>
       <button onClick={onDismiss} aria-label="Dismiss the viewport hint" className="hm-glassbtn" style={{
         background:'none', border:'none', borderRadius:5, cursor:'pointer',
-        color:MUTED, fontSize:12, lineHeight:1, padding:'6px 8px',
+        color: GLASS_TEXT, fontSize:12, lineHeight:1, padding:'6px 8px',
       }}>✕</button>
       <style>{`.hm-glassbtn { transition:background .15s, color .15s }
         .hm-glassbtn:hover { background:var(--hm-veil-strong) !important; color:var(--hm-strong) !important }`}</style>
@@ -1032,7 +1035,7 @@ export default function App() {
       setImagery({ ...got, url: canvas.toDataURL('image/png') })
       notify(`Sentinel-2, ${got.date} · ${Math.round(got.cloud)}% cloud`)
     } catch (err) {
-      if (err?.name !== 'AbortError') showError(`Satellite imagery failed: ${err.message}`)
+      if (err?.name !== 'AbortError') showError(`Satellite imagery failed: ${reachError(err, 'the Sentinel-2 archive')}`)
     } finally {
       setImageryBusy(null)
     }
@@ -1252,7 +1255,9 @@ export default function App() {
    * objects, and the alternative was a control that threw away an hour of work
    * on one click with nothing offered afterwards.
    */
-  const handleResetAll = useCallback(() => {
+  // `restorePanel` puts back what the panel keeps for itself — the rolls and
+  // the lit preset tile — so Undo returns the panel as well as the plate.
+  const handleResetAll = useCallback((restorePanel) => {
     /*
      * Everything, which used to mean six state objects.
      *
@@ -1318,6 +1323,7 @@ export default function App() {
         setCover(before.cover)
         setMasks(before.masks)
         setImagery(before.imagery)
+        if (typeof restorePanel === 'function') restorePanel()
       },
     })
   }, [terrain, style, points, view, gradientStops, bgGradientStops,

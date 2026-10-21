@@ -27,16 +27,21 @@ import { BORDER, HEX } from './panel/ui'
 const H_SPECTRUM = 46
 const H_BARS = 24
 const H = H_SPECTRUM + H_BARS
+// The panel's face at the badge size. A canvas cannot read the CSS variable, so
+// the family is named here; the panel has already loaded it.
+const CANVAS_FONT = "9px Overpass, system-ui, sans-serif"
 
 // Bass, mid, high. Warm to cool, low to high — the same reading direction as a
 // spectrogram, so the picture matches the terrain a Soundscape would make.
-const BAND_COLOURS = ['#f97316', '#22c55e', '#38bdf8']
+// Palette keys rather than hex, read at draw time, so the light theme gets the
+// deeper set its paper needs (see `meter*` in utils/theme.js).
+const BAND_COLOURS = ['meterLow', 'meterMid', 'meterHigh']
 const CHANNELS = [
-  ['Pace',    '#a78bfa'],
-  ['Pulse',   '#f97316'],
-  ['Shimmer', '#38bdf8'],
-  ['Size',    '#facc15'],
-  ['Burst',   '#f43f5e'],
+  ['Pace',    'meterPace'],
+  ['Pulse',   'meterLow'],
+  ['Shimmer', 'meterHigh'],
+  ['Size',    'meterSize'],
+  ['Burst',   'meterBurst'],
 ]
 
 export function AudioMeter({ liveRef, points }) {
@@ -89,7 +94,7 @@ export function AudioMeter({ liveRef, points }) {
 
       if (!spec) {
         ctx.fillStyle = HEX.muted
-        ctx.font = '9px system-ui, sans-serif'
+        ctx.font = CANVAS_FONT
         ctx.textAlign = 'center'
         ctx.fillText('no track', W / 2, H / 2 + 3)
         return
@@ -117,7 +122,7 @@ export function AudioMeter({ liveRef, points }) {
       // Band backgrounds, so the bar heights can be read against where each band
       // actually sits rather than against a guess.
       cache.plan.ranges.forEach(([i0, i1], i) => {
-        ctx.fillStyle = BAND_COLOURS[i] + '14'
+        ctx.fillStyle = HEX[BAND_COLOURS[i]] + '14'
         ctx.fillRect(i0 * bw, 0, (i1 - i0) * bw, H_SPECTRUM)
       })
 
@@ -136,9 +141,9 @@ export function AudioMeter({ liveRef, points }) {
       cache.plan.ranges.forEach(([i0, i1], i) => {
         const [lo, hi] = ranges[BAND_RANGE[i]] ?? [0, 1]
         const x0 = i0 * bw, w = (i1 - i0) * bw
-        ctx.fillStyle = BAND_COLOURS[i] + '30'
+        ctx.fillStyle = HEX[BAND_COLOURS[i]] + '30'
         ctx.fillRect(x0, yOf(hi), w, Math.max(1, yOf(lo) - yOf(hi)))
-        ctx.fillStyle = BAND_COLOURS[i] + '99'
+        ctx.fillStyle = HEX[BAND_COLOURS[i]] + '99'
         ctx.fillRect(x0, yOf(lo), w, 1)
         ctx.fillRect(x0, yOf(hi), w, 1)
       })
@@ -147,7 +152,7 @@ export function AudioMeter({ liveRef, points }) {
       // and auto-gained and so sits nowhere near the raw spectrum's height.
       cache.plan.ranges.forEach(([i0, i1], i) => {
         const y = yOf(f.env[i])
-        ctx.fillStyle = BAND_COLOURS[i]
+        ctx.fillStyle = HEX[BAND_COLOURS[i]]
         ctx.fillRect(i0 * bw, y, (i1 - i0) * bw, 1.5)
       })
 
@@ -191,14 +196,14 @@ export function AudioMeter({ liveRef, points }) {
       const cw = (W - gap * (CHANNELS.length - 1)) / CHANNELS.length
       const top = H_SPECTRUM + 4
       const barH = 8
-      ctx.font = '7px system-ui, sans-serif'
+      ctx.font = CANVAS_FONT
       ctx.textAlign = 'center'
       CHANNELS.forEach(([label, colour], i) => {
         const x = i * (cw + gap)
         ctx.fillStyle = HEX.surf
         ctx.fillRect(x, top, cw, barH)
         const v = Math.max(0, Math.min(1, values[i] || 0))
-        ctx.fillStyle = colour
+        ctx.fillStyle = HEX[colour]
         ctx.fillRect(x, top, cw * v, barH)
         ctx.fillStyle = v > 0.02 ? HEX.text : HEX.muted
         ctx.fillText(label, x + cw / 2, top + barH + 8)
@@ -211,7 +216,7 @@ export function AudioMeter({ liveRef, points }) {
         ctx.fillStyle = HEX.scrim
         ctx.fillRect(0, 0, W, H_SPECTRUM)
         ctx.fillStyle = HEX.muted
-        ctx.font = '9px system-ui, sans-serif'
+        ctx.font = CANVAS_FONT
         ctx.textAlign = 'center'
         ctx.fillText('paused', W / 2, H_SPECTRUM / 2 + 3)
       }

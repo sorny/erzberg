@@ -228,9 +228,9 @@ test('a step in the list is a jump, not a press repeated', async ({ page }) => {
   await enableMode(page, 'Flow')
   await enableMode(page, 'contours')
 
-  const stipple = page.locator('[data-section="Mode: Stipple Dots"] input[type=checkbox][aria-label="Enabled"]')
-  const flow = page.locator('[data-section="Mode: Flow Lines"] input[type=checkbox][aria-label="Enabled"]')
-  const contours = page.locator('[data-section="Mode: Contours"] input[type=checkbox][aria-label="Enabled"]')
+  const stipple = page.locator('[data-section="Mode: Stipple Dots"] input[data-enable]')
+  const flow = page.locator('[data-section="Mode: Flow Lines"] input[data-enable]')
+  const contours = page.locator('[data-section="Mode: Contours"] input[data-enable]')
   await expect(stipple).toBeChecked()
 
   // Back past all three at once. Stepping one at a time would be a loop over an

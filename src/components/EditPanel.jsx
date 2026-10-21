@@ -10,7 +10,7 @@ import { effectiveBounds, shapeRings } from '../utils/heightmapEdit'
 import { featureRings } from '../utils/maskFromVector'
 import { BackdropBlock } from './panel/BackdropBlock'
 import { useFeaturePick } from './panel/FeaturePicker'
-import { ACCENT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, TEXT, W } from './panel/ui'
+import { WORDMARK, ACCENT_TEXT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, TEXT, W } from './panel/ui'
 
 /** Total vertices across every ring of a shape. */
 const ringPoints = (shape) => shapeRings(shape).reduce((n, r) => n + (r.length >> 1), 0)
@@ -96,7 +96,7 @@ export function EditPanel({
       }}>
         <div style={{ padding: '12px 12px 12px', borderBottom: `1px solid ${BORDER}`, flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: STRONG }}>edit</span>
+            <span style={{ fontFamily: WORDMARK, fontSize: 13, fontWeight: 700, color: STRONG }}>edit</span>
             <span style={{ fontSize: 10, color: MUTED, fontWeight: 600 }}>Clip heightmap</span>
           </div>
           {filename && (
@@ -193,7 +193,7 @@ export function EditPanel({
             border: `1px solid ${BORDER}`, borderRadius: 5, fontSize: 10, color: MUTED, lineHeight: 1.6,
           }}>
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
-            <div>Result <span style={{ color: bounds ? ACCENT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums' }} data-testid="edit-result">
+            <div>Result <span style={{ color: bounds ? ACCENT_TEXT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums' }} data-testid="edit-result">
               {bounds ? `${bounds.w}×${bounds.h}` : 'empty'}
             </span></div>
           </div>

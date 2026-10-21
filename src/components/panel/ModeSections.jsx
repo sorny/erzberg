@@ -30,8 +30,7 @@ const formatWalk = (seconds) => {
 export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, terrainData, waveGuide = true, onWaveGuide, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
-          <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines}>
-            <Tog label="Enabled" checked={style.enabledLines} onChange={v => ss({ enabledLines: v })} />
+          <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines} onEnabled={v => ss({ enabledLines: v })}>
             {style.enabledLines && (
               <>
                 <Sub>
@@ -44,8 +43,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Crosshatch" icon={<ModeMark kind="crosshatch" />} open={sec.modeCross} onToggle={() => tog('modeCross')} enabled={style.enabledCross}>
-            <Tog label="Enabled" checked={style.enabledCross} onChange={v => ss({ enabledCross: v })} />
+          <Section title="Mode: Crosshatch" icon={<ModeMark kind="crosshatch" />} open={sec.modeCross} onToggle={() => tog('modeCross')} enabled={style.enabledCross} onEnabled={v => ss({ enabledCross: v })}>
             {style.enabledCross && (
               <>
                 <Sub>
@@ -69,8 +67,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Pillars" icon={<ModeMark kind="pillars" />} open={sec.modePillars} onToggle={() => tog('modePillars')} enabled={style.enabledPillars}>
-            <Tog label="Enabled" checked={style.enabledPillars} onChange={v => ss({ enabledPillars: v })} />
+          <Section title="Mode: Pillars" icon={<ModeMark kind="pillars" />} open={sec.modePillars} onToggle={() => tog('modePillars')} enabled={style.enabledPillars} onEnabled={v => ss({ enabledPillars: v })}>
             {style.enabledPillars && (
               <>
                 <Sub>
@@ -113,8 +110,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Contours" icon={<ModeMark kind="contours" />} open={sec.modeContours} onToggle={() => tog('modeContours')} enabled={style.enabledContours}>
-            <Tog label="Enabled" checked={style.enabledContours} onChange={v => ss({ enabledContours: v })} />
+          <Section title="Mode: Contours" icon={<ModeMark kind="contours" />} open={sec.modeContours} onToggle={() => tog('modeContours')} enabled={style.enabledContours} onEnabled={v => ss({ enabledContours: v })}>
             {style.enabledContours && (
               <>
                 <Sub>
@@ -177,8 +173,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Hachure" icon={<ModeMark kind="hachure" />} open={sec.modeHachure} onToggle={() => tog('modeHachure')} enabled={style.enabledHachure}>
-            <Tog label="Enabled" checked={style.enabledHachure} onChange={v => ss({ enabledHachure: v })} />
+          <Section title="Mode: Hachure" icon={<ModeMark kind="hachure" />} open={sec.modeHachure} onToggle={() => tog('modeHachure')} enabled={style.enabledHachure} onEnabled={v => ss({ enabledHachure: v })}>
             {style.enabledHachure && (
               <>
                 <Sub>
@@ -199,8 +194,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Flow Lines" icon={<ModeMark kind="flow" />} open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow}>
-            <Tog label="Enabled" checked={style.enabledFlow} onChange={v => ss({ enabledFlow: v })} />
+          <Section title="Mode: Flow Lines" icon={<ModeMark kind="flow" />} open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow} onEnabled={v => ss({ enabledFlow: v })}>
             {style.enabledFlow && (
               <>
                 <Sub>
@@ -213,8 +207,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Network" icon={<ModeMark kind="network" />} open={sec.modeDag} onToggle={() => tog('modeDag')} enabled={style.enabledDag}>
-            <Tog label="Enabled" checked={style.enabledDag} onChange={v => ss({ enabledDag: v })} />
+          <Section title="Mode: Network" icon={<ModeMark kind="network" />} open={sec.modeDag} onToggle={() => tog('modeDag')} enabled={style.enabledDag} onEnabled={v => ss({ enabledDag: v })}>
             {style.enabledDag && (
               <>
                 <Sub>
@@ -232,8 +225,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Pencil" icon={<ModeMark kind="pencil" />} open={sec.modePencil} onToggle={() => tog('modePencil')} enabled={style.enabledPencil}>
-            <Tog label="Enabled" checked={style.enabledPencil} onChange={v => ss({ enabledPencil: v })} />
+          <Section title="Mode: Pencil" icon={<ModeMark kind="pencil" />} open={sec.modePencil} onToggle={() => tog('modePencil')} enabled={style.enabledPencil} onEnabled={v => ss({ enabledPencil: v })}>
             {style.enabledPencil && (
               <>
                 <Sub>
@@ -245,8 +237,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Ridges" icon={<ModeMark kind="ridge" />} open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge}>
-            <Tog label="Enabled" checked={style.enabledRidge} onChange={v => ss({ enabledRidge: v })} />
+          <Section title="Mode: Ridges" icon={<ModeMark kind="ridge" />} open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge} onEnabled={v => ss({ enabledRidge: v })}>
             {style.enabledRidge && (
               <>
                 <Sub>
@@ -259,8 +250,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Valleys" icon={<ModeMark kind="valley" />} open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley}>
-            <Tog label="Enabled" checked={style.enabledValley} onChange={v => ss({ enabledValley: v })} />
+          <Section title="Mode: Valleys" icon={<ModeMark kind="valley" />} open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley} onEnabled={v => ss({ enabledValley: v })}>
             {style.enabledValley && (
               <>
                 <Sub>
@@ -273,8 +263,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Stipple Dots" icon={<ModeMark kind="stipple" />} open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple}>
-            <Tog label="Enabled" checked={style.enabledStipple} onChange={v => ss({ enabledStipple: v })} />
+          <Section title="Mode: Stipple Dots" icon={<ModeMark kind="stipple" />} open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple} onEnabled={v => ss({ enabledStipple: v })}>
             {style.enabledStipple && (
               <>
                 <Sub>
@@ -293,8 +282,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Isophotes" icon={<ModeMark kind="isophotes" />} open={sec.modeIso} onToggle={() => tog('modeIso')} enabled={style.enabledIso}>
-            <Tog label="Enabled" checked={style.enabledIso} onChange={v => ss({ enabledIso: v })} />
+          <Section title="Mode: Isophotes" icon={<ModeMark kind="isophotes" />} open={sec.modeIso} onToggle={() => tog('modeIso')} enabled={style.enabledIso} onEnabled={v => ss({ enabledIso: v })}>
             {style.enabledIso && (
               <>
                 <Sub>
@@ -309,8 +297,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Engraving" icon={<ModeMark kind="engraving" />} open={sec.modeEngrave} onToggle={() => tog('modeEngrave')} enabled={style.enabledEngrave}>
-            <Tog label="Enabled" checked={style.enabledEngrave} onChange={v => ss({ enabledEngrave: v })} />
+          <Section title="Mode: Engraving" icon={<ModeMark kind="engraving" />} open={sec.modeEngrave} onToggle={() => tog('modeEngrave')} enabled={style.enabledEngrave} onEnabled={v => ss({ enabledEngrave: v })}>
             {style.enabledEngrave && (
               <>
                 <Sub>
@@ -325,8 +312,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Curvature" icon={<ModeMark kind="curvature" />} open={sec.modeCurv} onToggle={() => tog('modeCurv')} enabled={style.enabledCurv}>
-            <Tog label="Enabled" checked={style.enabledCurv} onChange={v => ss({ enabledCurv: v })} />
+          <Section title="Mode: Curvature" icon={<ModeMark kind="curvature" />} open={sec.modeCurv} onToggle={() => tog('modeCurv')} enabled={style.enabledCurv} onEnabled={v => ss({ enabledCurv: v })}>
             {style.enabledCurv && (
               <>
                 <HelpBox text="Copperplate engraving that follows the form rather than the light: strokes trace the principal-curvature field, so the lines themselves wrap around ridges and hollows." />
@@ -345,8 +331,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Rock & Scree" icon={<ModeMark kind="swiss" />} open={sec.modeSwiss} onToggle={() => tog('modeSwiss')} enabled={style.enabledSwiss}>
-            <Tog label="Enabled" checked={style.enabledSwiss} onChange={v => ss({ enabledSwiss: v })} />
+          <Section title="Mode: Rock & Scree" icon={<ModeMark kind="swiss" />} open={sec.modeSwiss} onToggle={() => tog('modeSwiss')} enabled={style.enabledSwiss} onEnabled={v => ss({ enabledSwiss: v })}>
             {style.enabledSwiss && (
               <>
                 <Sub>
@@ -362,8 +347,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Bitplane" icon={<ModeMark kind="bitplane" />} open={sec.modeBitplane} onToggle={() => tog('modeBitplane')} enabled={style.enabledBitplane}>
-            <Tog label="Enabled" checked={style.enabledBitplane} onChange={v => ss({ enabledBitplane: v })} />
+          <Section title="Mode: Bitplane" icon={<ModeMark kind="bitplane" />} open={sec.modeBitplane} onToggle={() => tog('modeBitplane')} enabled={style.enabledBitplane} onEnabled={v => ss({ enabledBitplane: v })}>
             {style.enabledBitplane && (
               <>
                 <Sub>
@@ -378,8 +362,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Indexed" icon={<ModeMark kind="indexed" />} open={sec.modeIndexed} onToggle={() => tog('modeIndexed')} enabled={style.enabledIndexed}>
-            <Tog label="Enabled" checked={style.enabledIndexed} onChange={v => ss({ enabledIndexed: v })} />
+          <Section title="Mode: Indexed" icon={<ModeMark kind="indexed" />} open={sec.modeIndexed} onToggle={() => tog('modeIndexed')} enabled={style.enabledIndexed} onEnabled={v => ss({ enabledIndexed: v })}>
             {style.enabledIndexed && (
               <>
                 <Sub label="Palette">
@@ -396,8 +379,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Outrun" icon={<ModeMark kind="outrun" />} open={sec.modeOutrun} onToggle={() => tog('modeOutrun')} enabled={style.enabledOutrun}>
-            <Tog label="Enabled" checked={style.enabledOutrun} onChange={v => ss({ enabledOutrun: v })} />
+          <Section title="Mode: Outrun" icon={<ModeMark kind="outrun" />} open={sec.modeOutrun} onToggle={() => tog('modeOutrun')} enabled={style.enabledOutrun} onEnabled={v => ss({ enabledOutrun: v })}>
             {style.enabledOutrun && (
               <>
                 <Sub>
@@ -414,8 +396,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Riso" icon={<ModeMark kind="riso" />} open={sec.modeRiso} onToggle={() => tog('modeRiso')} enabled={style.enabledRiso}>
-            <Tog label="Enabled" checked={style.enabledRiso} onChange={v => ss({ enabledRiso: v })} />
+          <Section title="Mode: Riso" icon={<ModeMark kind="riso" />} open={sec.modeRiso} onToggle={() => tog('modeRiso')} enabled={style.enabledRiso} onEnabled={v => ss({ enabledRiso: v })}>
             {style.enabledRiso && (
               <>
                 <Sub label="Inks">
@@ -438,8 +419,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Mineral" icon={<ModeMark kind="mineral" />} open={sec.modeMineral} onToggle={() => tog('modeMineral')} enabled={style.enabledMineral}>
-            <Tog label="Enabled" checked={style.enabledMineral} onChange={v => ss({ enabledMineral: v })} />
+          <Section title="Mode: Mineral" icon={<ModeMark kind="mineral" />} open={sec.modeMineral} onToggle={() => tog('modeMineral')} enabled={style.enabledMineral} onEnabled={v => ss({ enabledMineral: v })}>
             {style.enabledMineral && (
               <>
                 <Sub label="Materials">
@@ -461,8 +441,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Landforms" icon={<ModeMark kind="landform" />} open={sec.modeLandform} onToggle={() => tog('modeLandform')} enabled={style.enabledLandform}>
-            <Tog label="Enabled" testId="mode-landform" checked={style.enabledLandform} onChange={v => ss({ enabledLandform: v })} />
+          <Section title="Mode: Landforms" icon={<ModeMark kind="landform" />} open={sec.modeLandform} onToggle={() => tog('modeLandform')} enabled={style.enabledLandform} onEnabled={v => ss({ enabledLandform: v })} enableTestId="mode-landform">
             {style.enabledLandform && (
               <>
                 <Sub>
@@ -500,8 +479,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Land Cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover}>
-            <Tog label="Enabled" checked={style.enabledCover} onChange={v => ss({ enabledCover: v })} />
+          <Section title="Mode: Land Cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover} onEnabled={v => ss({ enabledCover: v })}>
             {style.enabledCover && !cover && (
               <Note>No cover plate loaded, so this layer draws nothing. Open one under Land Cover.</Note>
             )}
@@ -523,8 +501,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Watershed" icon={<ModeMark kind="shed" />} open={sec.modeShed} onToggle={() => tog('modeShed')} enabled={style.enabledShed}>
-            <Tog label="Enabled" checked={style.enabledShed} onChange={v => ss({ enabledShed: v })} />
+          <Section title="Mode: Watershed" icon={<ModeMark kind="shed" />} open={sec.modeShed} onToggle={() => tog('modeShed')} enabled={style.enabledShed} onEnabled={v => ss({ enabledShed: v })}>
             {style.enabledShed && (
               <>
                 <Sub>
@@ -541,8 +518,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Flashbulb" icon={<ModeMark kind="flashbulb" />} open={sec.modeFlashbulb} onToggle={() => tog('modeFlashbulb')} enabled={style.enabledFlashbulb}>
-            <Tog label="Enabled" checked={style.enabledFlashbulb} onChange={v => ss({ enabledFlashbulb: v })} />
+          <Section title="Mode: Flashbulb" icon={<ModeMark kind="flashbulb" />} open={sec.modeFlashbulb} onToggle={() => tog('modeFlashbulb')} enabled={style.enabledFlashbulb} onEnabled={v => ss({ enabledFlashbulb: v })}>
             {style.enabledFlashbulb && (
               <>
                 <Sub label="Bulb">
@@ -571,8 +547,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Halation" icon={<ModeMark kind="halation" />} open={sec.modeHalation} onToggle={() => tog('modeHalation')} enabled={style.enabledHalation}>
-            <Tog label="Enabled" checked={style.enabledHalation} onChange={v => ss({ enabledHalation: v })} />
+          <Section title="Mode: Halation" icon={<ModeMark kind="halation" />} open={sec.modeHalation} onToggle={() => tog('modeHalation')} enabled={style.enabledHalation} onEnabled={v => ss({ enabledHalation: v })}>
             {style.enabledHalation && (
               <>
                 <Sub label="Bloom">
@@ -603,8 +578,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Fall Line" icon={<ModeMark kind="fallline" />} open={sec.modeFallLine} onToggle={() => tog('modeFallLine')} enabled={style.enabledFallLine}>
-            <Tog label="Enabled" checked={style.enabledFallLine} onChange={v => ss({ enabledFallLine: v })} />
+          <Section title="Mode: Fall Line" icon={<ModeMark kind="fallline" />} open={sec.modeFallLine} onToggle={() => tog('modeFallLine')} enabled={style.enabledFallLine} onEnabled={v => ss({ enabledFallLine: v })}>
             {style.enabledFallLine && (
               <>
                 <Sub>
@@ -622,8 +596,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Berms" icon={<ModeMark kind="berm" />} open={sec.modeBerm} onToggle={() => tog('modeBerm')} enabled={style.enabledBerm}>
-            <Tog label="Enabled" checked={style.enabledBerm} onChange={v => ss({ enabledBerm: v })} />
+          <Section title="Mode: Berms" icon={<ModeMark kind="berm" />} open={sec.modeBerm} onToggle={() => tog('modeBerm')} enabled={style.enabledBerm} onEnabled={v => ss({ enabledBerm: v })}>
             {style.enabledBerm && (
               <>
                 <Sub>
@@ -642,8 +615,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Air" icon={<ModeMark kind="air" />} open={sec.modeAir} onToggle={() => tog('modeAir')} enabled={style.enabledAir}>
-            <Tog label="Enabled" checked={style.enabledAir} onChange={v => ss({ enabledAir: v })} />
+          <Section title="Mode: Air" icon={<ModeMark kind="air" />} open={sec.modeAir} onToggle={() => tog('modeAir')} enabled={style.enabledAir} onEnabled={v => ss({ enabledAir: v })}>
             {style.enabledAir && (
               <>
                 <Sub>
@@ -663,8 +635,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Race Line" icon={<ModeMark kind="raceline" />} open={sec.modeRaceLine} onToggle={() => tog('modeRaceLine')} enabled={style.enabledRaceLine}>
-            <Tog label="Enabled" checked={style.enabledRaceLine} onChange={v => ss({ enabledRaceLine: v })} />
+          <Section title="Mode: Race Line" icon={<ModeMark kind="raceline" />} open={sec.modeRaceLine} onToggle={() => tog('modeRaceLine')} enabled={style.enabledRaceLine} onEnabled={v => ss({ enabledRaceLine: v })}>
             {style.enabledRaceLine && (
               <>
                 <Sub>
@@ -691,8 +662,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               Where the sunlight stops, at one instant. One call to the same
               shadow sweep Sun Hours sums over a year, traced at the single level
               where lit meets unlit. See utils/sunHours.js. */}
-          <Section title="Mode: Shadow Line" icon={<ModeMark kind="shadowline" />} open={sec.modeShadowLine} onToggle={() => tog('modeShadowLine')} enabled={style.enabledShadowLine}>
-            <Tog label="Enabled" testId="mode-shadowline" checked={style.enabledShadowLine} onChange={v => ss({ enabledShadowLine: v })} />
+          <Section title="Mode: Shadow Line" icon={<ModeMark kind="shadowline" />} open={sec.modeShadowLine} onToggle={() => tog('modeShadowLine')} enabled={style.enabledShadowLine} onEnabled={v => ss({ enabledShadowLine: v })} enableTestId="mode-shadowline">
             {style.enabledShadowLine && (
               <>
                 <Sub>
@@ -742,8 +712,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           {/* ── Sun hours ────────────────────────────────────────────────
               The one field in the app that measures the ground rather than the
               picture. See utils/sunHours.js. */}
-          <Section title="Mode: Sun Hours" icon={<ModeMark kind="sunhours" />} open={sec.modeSunHours} onToggle={() => tog('modeSunHours')} enabled={style.enabledSunHours}>
-            <Tog label="Enabled" testId="mode-sunhours" checked={style.enabledSunHours} onChange={v => ss({ enabledSunHours: v })} />
+          <Section title="Mode: Sun Hours" icon={<ModeMark kind="sunhours" />} open={sec.modeSunHours} onToggle={() => tog('modeSunHours')} enabled={style.enabledSunHours} onEnabled={v => ss({ enabledSunHours: v })} enableTestId="mode-sunhours">
             {style.enabledSunHours && (
               <>
                 <Sub>
@@ -811,8 +780,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross}>
-            <Tog label="Enabled" checked={style.enabledZeroCross} onChange={v => ss({ enabledZeroCross: v })} />
+          <Section title="Mode: Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross} onEnabled={v => ss({ enabledZeroCross: v })}>
             {style.enabledZeroCross && (
               <>
                 <Sub>
@@ -826,8 +794,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Sprite Blocks" icon={<ModeMark kind="sprite" />} open={sec.modeSprite} onToggle={() => tog('modeSprite')} enabled={style.enabledSprite}>
-            <Tog label="Enabled" checked={style.enabledSprite} onChange={v => ss({ enabledSprite: v })} />
+          <Section title="Mode: Sprite Blocks" icon={<ModeMark kind="sprite" />} open={sec.modeSprite} onToggle={() => tog('modeSprite')} enabled={style.enabledSprite} onEnabled={v => ss({ enabledSprite: v })}>
             {style.enabledSprite && (
               <>
                 <Sub>
@@ -842,8 +809,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Reticulation" icon={<ModeMark kind="retic" />} open={sec.modeRetic} onToggle={() => tog('modeRetic')} enabled={style.enabledRetic}>
-            <Tog label="Enabled" checked={style.enabledRetic} onChange={v => ss({ enabledRetic: v })} />
+          <Section title="Mode: Reticulation" icon={<ModeMark kind="retic" />} open={sec.modeRetic} onToggle={() => tog('modeRetic')} enabled={style.enabledRetic} onEnabled={v => ss({ enabledRetic: v })}>
             {style.enabledRetic && (
               <>
                 <Sub>
@@ -860,8 +826,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Single Line" icon={<ModeMark kind="tsp" />} open={sec.modeTsp} onToggle={() => tog('modeTsp')} enabled={style.enabledTsp}>
-            <Tog label="Enabled" testId="mode-tsp" checked={style.enabledTsp} onChange={v => ss({ enabledTsp: v })} />
+          <Section title="Mode: Single Line" icon={<ModeMark kind="tsp" />} open={sec.modeTsp} onToggle={() => tog('modeTsp')} enabled={style.enabledTsp} onEnabled={v => ss({ enabledTsp: v })} enableTestId="mode-tsp">
             {style.enabledTsp && (
               <>
                 <Sub>
@@ -880,8 +845,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Shadow Hatch" icon={<ModeMark kind="shadowhatch" />} open={sec.modeShadowHatch} onToggle={() => tog('modeShadowHatch')} enabled={style.enabledShadowHatch}>
-            <Tog label="Enabled" testId="mode-shadowhatch" checked={style.enabledShadowHatch} onChange={v => ss({ enabledShadowHatch: v })} />
+          <Section title="Mode: Shadow Hatch" icon={<ModeMark kind="shadowhatch" />} open={sec.modeShadowHatch} onToggle={() => tog('modeShadowHatch')} enabled={style.enabledShadowHatch} onEnabled={v => ss({ enabledShadowHatch: v })} enableTestId="mode-shadowhatch">
             {style.enabledShadowHatch && (
               <>
                 <Sub>
@@ -898,8 +862,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Isochrones" icon={<ModeMark kind="isochrone" />} open={sec.modeIsochrone} onToggle={() => tog('modeIsochrone')} enabled={style.enabledIsochrone}>
-            <Tog label="Enabled" testId="mode-isochrone" checked={style.enabledIsochrone} onChange={v => ss({ enabledIsochrone: v })} />
+          <Section title="Mode: Isochrones" icon={<ModeMark kind="isochrone" />} open={sec.modeIsochrone} onToggle={() => tog('modeIsochrone')} enabled={style.enabledIsochrone} onEnabled={v => ss({ enabledIsochrone: v })} enableTestId="mode-isochrone">
             {style.enabledIsochrone && (
               <>
                 <Sub>
@@ -929,8 +892,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Truchet" icon={<ModeMark kind="truchet" />} open={sec.modeTruchet} onToggle={() => tog('modeTruchet')} enabled={style.enabledTruchet}>
-            <Tog label="Enabled" testId="mode-truchet" checked={style.enabledTruchet} onChange={v => ss({ enabledTruchet: v })} />
+          <Section title="Mode: Truchet" icon={<ModeMark kind="truchet" />} open={sec.modeTruchet} onToggle={() => tog('modeTruchet')} enabled={style.enabledTruchet} onEnabled={v => ss({ enabledTruchet: v })} enableTestId="mode-truchet">
             {style.enabledTruchet && (
               <>
                 <Sub>
@@ -947,8 +909,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Viewshed" icon={<ModeMark kind="viewshed" />} open={sec.modeViewshed} onToggle={() => tog('modeViewshed')} enabled={style.enabledViewshed}>
-            <Tog label="Enabled" testId="mode-viewshed" checked={style.enabledViewshed} onChange={v => ss({ enabledViewshed: v })} />
+          <Section title="Mode: Viewshed" icon={<ModeMark kind="viewshed" />} open={sec.modeViewshed} onToggle={() => tog('modeViewshed')} enabled={style.enabledViewshed} onEnabled={v => ss({ enabledViewshed: v })} enableTestId="mode-viewshed">
             {style.enabledViewshed && (
               <>
                 <Sub>
@@ -982,8 +943,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Route" icon={<ModeMark kind="route" />} open={sec.modeRoute} onToggle={() => tog('modeRoute')} enabled={style.enabledRoute}>
-            <Tog label="Enabled" testId="mode-route" checked={style.enabledRoute} onChange={v => ss({ enabledRoute: v })} />
+          <Section title="Mode: Route" icon={<ModeMark kind="route" />} open={sec.modeRoute} onToggle={() => tog('modeRoute')} enabled={style.enabledRoute} onEnabled={v => ss({ enabledRoute: v })} enableTestId="mode-route">
             {style.enabledRoute && (
               <>
                 <Sub>
@@ -1010,8 +970,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Panorama" icon={<ModeMark kind="panorama" />} open={sec.modePanorama} onToggle={() => tog('modePanorama')} enabled={style.enabledPanorama}>
-            <Tog label="Enabled" testId="mode-panorama" checked={style.enabledPanorama} onChange={v => ss({ enabledPanorama: v })} />
+          <Section title="Mode: Panorama" icon={<ModeMark kind="panorama" />} open={sec.modePanorama} onToggle={() => tog('modePanorama')} enabled={style.enabledPanorama} onEnabled={v => ss({ enabledPanorama: v })} enableTestId="mode-panorama">
             {style.enabledPanorama && (
               <>
                 <Sub>
@@ -1039,8 +998,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Bedding" icon={<ModeMark kind="bedding" />} open={sec.modeBedding} onToggle={() => tog('modeBedding')} enabled={style.enabledBedding}>
-            <Tog label="Enabled" testId="mode-bedding" checked={style.enabledBedding} onChange={v => ss({ enabledBedding: v })} />
+          <Section title="Mode: Bedding" icon={<ModeMark kind="bedding" />} open={sec.modeBedding} onToggle={() => tog('modeBedding')} enabled={style.enabledBedding} onEnabled={v => ss({ enabledBedding: v })} enableTestId="mode-bedding">
             {style.enabledBedding && (
               <>
                 <Sub>
@@ -1068,8 +1026,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Slope Classes" icon={<ModeMark kind="slopeclass" />} open={sec.modeSlopeClass} onToggle={() => tog('modeSlopeClass')} enabled={style.enabledSlopeClass}>
-            <Tog label="Enabled" testId="mode-slopeclass" checked={style.enabledSlopeClass} onChange={v => ss({ enabledSlopeClass: v })} />
+          <Section title="Mode: Slope Classes" icon={<ModeMark kind="slopeclass" />} open={sec.modeSlopeClass} onToggle={() => tog('modeSlopeClass')} enabled={style.enabledSlopeClass} onEnabled={v => ss({ enabledSlopeClass: v })} enableTestId="mode-slopeclass">
             {style.enabledSlopeClass && (
               <>
                 <Sub>
@@ -1097,8 +1054,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Wind" icon={<ModeMark kind="wind" />} open={sec.modeWind} onToggle={() => tog('modeWind')} enabled={style.enabledWind}>
-            <Tog label="Enabled" testId="mode-wind" checked={style.enabledWind} onChange={v => ss({ enabledWind: v })} />
+          <Section title="Mode: Wind" icon={<ModeMark kind="wind" />} open={sec.modeWind} onToggle={() => tog('modeWind')} enabled={style.enabledWind} onEnabled={v => ss({ enabledWind: v })} enableTestId="mode-wind">
             {style.enabledWind && (
               <>
                 <Sub>
@@ -1130,8 +1086,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Runout" icon={<ModeMark kind="runout" />} open={sec.modeRunout} onToggle={() => tog('modeRunout')} enabled={style.enabledRunout}>
-            <Tog label="Enabled" testId="mode-runout" checked={style.enabledRunout} onChange={v => ss({ enabledRunout: v })} />
+          <Section title="Mode: Runout" icon={<ModeMark kind="runout" />} open={sec.modeRunout} onToggle={() => tog('modeRunout')} enabled={style.enabledRunout} onEnabled={v => ss({ enabledRunout: v })} enableTestId="mode-runout">
             {style.enabledRunout && (
               <>
                 <Sub>
@@ -1167,8 +1122,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Line Printer" icon={<ModeMark kind="printer" />} open={sec.modePrinter} onToggle={() => tog('modePrinter')} enabled={style.enabledPrinter}>
-            <Tog label="Enabled" testId="mode-printer" checked={style.enabledPrinter} onChange={v => ss({ enabledPrinter: v })} />
+          <Section title="Mode: Line Printer" icon={<ModeMark kind="printer" />} open={sec.modePrinter} onToggle={() => tog('modePrinter')} enabled={style.enabledPrinter} onEnabled={v => ss({ enabledPrinter: v })} enableTestId="mode-printer">
             {style.enabledPrinter && (
               <>
                 <Sub>
@@ -1184,8 +1138,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Stems" icon={<ModeMark kind="stems" />} open={sec.modeStems} onToggle={() => tog('modeStems')} enabled={style.enabledStems}>
-            <Tog label="Enabled" testId="mode-stems" checked={style.enabledStems} onChange={v => ss({ enabledStems: v })} />
+          <Section title="Mode: Stems" icon={<ModeMark kind="stems" />} open={sec.modeStems} onToggle={() => tog('modeStems')} enabled={style.enabledStems} onEnabled={v => ss({ enabledStems: v })} enableTestId="mode-stems">
             {style.enabledStems && (
               <>
                 <Sub>
@@ -1204,8 +1157,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Hair" icon={<ModeMark kind="hair" />} open={sec.modeHair} onToggle={() => tog('modeHair')} enabled={style.enabledHair}>
-            <Tog label="Enabled" testId="mode-hair" checked={style.enabledHair} onChange={v => ss({ enabledHair: v })} />
+          <Section title="Mode: Hair" icon={<ModeMark kind="hair" />} open={sec.modeHair} onToggle={() => tog('modeHair')} enabled={style.enabledHair} onEnabled={v => ss({ enabledHair: v })} enableTestId="mode-hair">
             {style.enabledHair && (
               <>
                 <Sub>
@@ -1220,8 +1172,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Waveform" icon={<ModeMark kind="waveform" />} open={sec.modeWaveform} onToggle={() => tog('modeWaveform')} enabled={style.enabledWaveform}>
-            <Tog label="Enabled" testId="mode-waveform" checked={style.enabledWaveform} onChange={v => ss({ enabledWaveform: v })} />
+          <Section title="Mode: Waveform" icon={<ModeMark kind="waveform" />} open={sec.modeWaveform} onToggle={() => tog('modeWaveform')} enabled={style.enabledWaveform} onEnabled={v => ss({ enabledWaveform: v })} enableTestId="mode-waveform">
             {style.enabledWaveform && (
               <>
                 <Sub>
@@ -1252,8 +1203,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Profile Sheet" icon={<ModeMark kind="profileSheet" />} open={sec.modeProfileSheet} onToggle={() => tog('modeProfileSheet')} enabled={style.enabledProfileSheet}>
-            <Tog label="Enabled" testId="mode-profilesheet" checked={style.enabledProfileSheet} onChange={v => ss({ enabledProfileSheet: v })} />
+          <Section title="Mode: Profile Sheet" icon={<ModeMark kind="profileSheet" />} open={sec.modeProfileSheet} onToggle={() => tog('modeProfileSheet')} enabled={style.enabledProfileSheet} onEnabled={v => ss({ enabledProfileSheet: v })} enableTestId="mode-profilesheet">
             {style.enabledProfileSheet && (
               <>
                 <Sub>
@@ -1274,8 +1224,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Swath Profile" icon={<ModeMark kind="swathProfile" />} open={sec.modeSwathProfile} onToggle={() => tog('modeSwathProfile')} enabled={style.enabledSwathProfile}>
-            <Tog label="Enabled" testId="mode-swathprofile" checked={style.enabledSwathProfile} onChange={v => ss({ enabledSwathProfile: v })} />
+          <Section title="Mode: Swath Profile" icon={<ModeMark kind="swathProfile" />} open={sec.modeSwathProfile} onToggle={() => tog('modeSwathProfile')} enabled={style.enabledSwathProfile} onEnabled={v => ss({ enabledSwathProfile: v })} enableTestId="mode-swathprofile">
             {style.enabledSwathProfile && (
               <>
                 <Sub>
@@ -1296,8 +1245,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Hypsometry" icon={<ModeMark kind="hypsometry" />} open={sec.modeHypsometry} onToggle={() => tog('modeHypsometry')} enabled={style.enabledHypsometry}>
-            <Tog label="Enabled" testId="mode-hypsometry" checked={style.enabledHypsometry} onChange={v => ss({ enabledHypsometry: v })} />
+          <Section title="Mode: Hypsometry" icon={<ModeMark kind="hypsometry" />} open={sec.modeHypsometry} onToggle={() => tog('modeHypsometry')} enabled={style.enabledHypsometry} onEnabled={v => ss({ enabledHypsometry: v })} enableTestId="mode-hypsometry">
             {style.enabledHypsometry && (
               <>
                 <Sub>
@@ -1316,8 +1264,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Aspect Rose" icon={<ModeMark kind="aspectRose" />} open={sec.modeAspectRose} onToggle={() => tog('modeAspectRose')} enabled={style.enabledAspectRose}>
-            <Tog label="Enabled" testId="mode-aspectrose" checked={style.enabledAspectRose} onChange={v => ss({ enabledAspectRose: v })} />
+          <Section title="Mode: Aspect Rose" icon={<ModeMark kind="aspectRose" />} open={sec.modeAspectRose} onToggle={() => tog('modeAspectRose')} enabled={style.enabledAspectRose} onEnabled={v => ss({ enabledAspectRose: v })} enableTestId="mode-aspectrose">
             {style.enabledAspectRose && (
               <>
                 <Sub>
@@ -1341,8 +1288,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Stereonet" icon={<ModeMark kind="stereonet" />} open={sec.modeStereonet} onToggle={() => tog('modeStereonet')} enabled={style.enabledStereonet}>
-            <Tog label="Enabled" testId="mode-stereonet" checked={style.enabledStereonet} onChange={v => ss({ enabledStereonet: v })} />
+          <Section title="Mode: Stereonet" icon={<ModeMark kind="stereonet" />} open={sec.modeStereonet} onToggle={() => tog('modeStereonet')} enabled={style.enabledStereonet} onEnabled={v => ss({ enabledStereonet: v })} enableTestId="mode-stereonet">
             {style.enabledStereonet && (
               <>
                 <Sub>
@@ -1367,8 +1313,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Map Grid" icon={<ModeMark kind="mapgrid" />} open={sec.modeMapGrid} onToggle={() => tog('modeMapGrid')} enabled={style.enabledMapGrid}>
-            <Tog label="Enabled" testId="mode-mapgrid" checked={style.enabledMapGrid} onChange={v => ss({ enabledMapGrid: v })} />
+          <Section title="Mode: Map Grid" icon={<ModeMark kind="mapgrid" />} open={sec.modeMapGrid} onToggle={() => tog('modeMapGrid')} enabled={style.enabledMapGrid} onEnabled={v => ss({ enabledMapGrid: v })} enableTestId="mode-mapgrid">
             {style.enabledMapGrid && (
               <>
                 <Sub>
@@ -1408,8 +1353,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Venation" icon={<ModeMark kind="venation" />} open={sec.modeVenation} onToggle={() => tog('modeVenation')} enabled={style.enabledVenation}>
-            <Tog label="Enabled" testId="mode-venation" checked={style.enabledVenation} onChange={v => ss({ enabledVenation: v })} />
+          <Section title="Mode: Venation" icon={<ModeMark kind="venation" />} open={sec.modeVenation} onToggle={() => tog('modeVenation')} enabled={style.enabledVenation} onEnabled={v => ss({ enabledVenation: v })} enableTestId="mode-venation">
             {style.enabledVenation && (
               <>
                 <Sub>
@@ -1429,8 +1373,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Geodesic Fan" icon={<ModeMark kind="geodesic" />} open={sec.modeGeodesic} onToggle={() => tog('modeGeodesic')} enabled={style.enabledGeodesic}>
-            <Tog label="Enabled" testId="mode-geodesic" checked={style.enabledGeodesic} onChange={v => ss({ enabledGeodesic: v })} />
+          <Section title="Mode: Geodesic Fan" icon={<ModeMark kind="geodesic" />} open={sec.modeGeodesic} onToggle={() => tog('modeGeodesic')} enabled={style.enabledGeodesic} onEnabled={v => ss({ enabledGeodesic: v })} enableTestId="mode-geodesic">
             {style.enabledGeodesic && (
               <>
                 <Sub>
@@ -1454,8 +1397,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Radar" icon={<ModeMark kind="radar" />} open={sec.modeRadar} onToggle={() => tog('modeRadar')} enabled={style.enabledRadar}>
-            <Tog label="Enabled" testId="mode-radar" checked={style.enabledRadar} onChange={v => ss({ enabledRadar: v })} />
+          <Section title="Mode: Radar" icon={<ModeMark kind="radar" />} open={sec.modeRadar} onToggle={() => tog('modeRadar')} enabled={style.enabledRadar} onEnabled={v => ss({ enabledRadar: v })} enableTestId="mode-radar">
             {style.enabledRadar && (
               <>
                 <Sub>
@@ -1475,8 +1417,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Spines" icon={<ModeMark kind="spines" />} open={sec.modeSpines} onToggle={() => tog('modeSpines')} enabled={style.enabledSpines}>
-            <Tog label="Enabled" testId="mode-spines" checked={style.enabledSpines} onChange={v => ss({ enabledSpines: v })} />
+          <Section title="Mode: Spines" icon={<ModeMark kind="spines" />} open={sec.modeSpines} onToggle={() => tog('modeSpines')} enabled={style.enabledSpines} onEnabled={v => ss({ enabledSpines: v })} enableTestId="mode-spines">
             {style.enabledSpines && (
               <>
                 <Sub>
@@ -1489,8 +1430,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Coral" icon={<ModeMark kind="coral" />} open={sec.modeCoral} onToggle={() => tog('modeCoral')} enabled={style.enabledCoral}>
-            <Tog label="Enabled" testId="mode-coral" checked={style.enabledCoral} onChange={v => ss({ enabledCoral: v })} />
+          <Section title="Mode: Coral" icon={<ModeMark kind="coral" />} open={sec.modeCoral} onToggle={() => tog('modeCoral')} enabled={style.enabledCoral} onEnabled={v => ss({ enabledCoral: v })} enableTestId="mode-coral">
             {style.enabledCoral && (
               <>
                 <Sub>
@@ -1510,8 +1450,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Glacier" icon={<ModeMark kind="glacier" />} open={sec.modeGlacier} onToggle={() => tog('modeGlacier')} enabled={style.enabledGlacier}>
-            <Tog label="Enabled" testId="mode-glacier" checked={style.enabledGlacier} onChange={v => ss({ enabledGlacier: v })} />
+          <Section title="Mode: Glacier" icon={<ModeMark kind="glacier" />} open={sec.modeGlacier} onToggle={() => tog('modeGlacier')} enabled={style.enabledGlacier} onEnabled={v => ss({ enabledGlacier: v })} enableTestId="mode-glacier">
             {style.enabledGlacier && (
               <>
                 <Sub>
@@ -1540,8 +1479,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
-          <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged}>
-            <Tog label="Enabled" testId="mode-rugged" checked={style.enabledRugged} onChange={v => ss({ enabledRugged: v })} />
+          <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged} onEnabled={v => ss({ enabledRugged: v })} enableTestId="mode-rugged">
             {style.enabledRugged && (
               <>
                 <Sub>

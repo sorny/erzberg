@@ -205,6 +205,16 @@ export async function openMark(page, mark) {
  * None of them asserts anything about the wordmark — it is a "the app has
  * rendered" sentinel — so the heading is what they all actually mean.
  */
+/**
+ * Opens a shut block inside a mark's section: Line style, Gradient, Masks,
+ * Occlusion or Copies (`Fold` in panel/ui.jsx). Only the drilled-in mark's
+ * blocks are on screen, so the first match is the one in view.
+ */
+export async function openFold(page, testId) {
+  const fold = page.locator(`[data-testid="${testId}"]:visible`).first()
+  if ((await fold.getAttribute('data-fold')) === 'shut') await fold.locator(`[data-testid="${testId}-fold"]`).click()
+}
+
 export async function waitForApp(page, timeout = 30_000) {
   await page.getByRole('heading', { name: 'erzberg' }).waitFor({ state: 'visible', timeout })
 }

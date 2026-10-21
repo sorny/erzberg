@@ -28,7 +28,7 @@
  */
 import { useStore } from '../../store/useStore'
 import { bboxToWgs84, crsDisplayName, groundPixelMetres, wgs84ExtentKm } from '../../utils/geoCoords'
-import { BORDER, DIM, GREEN, MUTED, SURF } from './ui'
+import { BORDER, DIM, GREEN, MONO, MUTED, SURF } from './ui'
 
 /** A lon/lat pair, at the precision a four-kilometre window actually has. */
 const deg = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`
@@ -43,11 +43,11 @@ function Row({ state, name, value, detail, where }) {
       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
         <span style={{ width:6, height:6, borderRadius:'50%', flex:'none', background:DOT[state] }} />
         <span style={{ flex:1, fontSize:11, color:DIM }}>{name}</span>
-        <span style={{ fontSize:10, color:MUTED, fontFamily:'monospace' }}>{value}</span>
+        <span style={{ fontSize:10, color:MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>{value}</span>
       </div>
-      <div style={{ fontSize:9, color:MUTED, lineHeight:1.5, marginTop:2 }}>
+      <div style={{ fontSize:10, color:MUTED, lineHeight:1.5, marginTop:2 }}>
         {detail}
-        {where && <span style={{ opacity:.75 }}>{` · ${where}`}</span>}
+        {where && <span>{` · ${where}`}</span>}
       </div>
     </div>
   )
@@ -98,7 +98,7 @@ export function ExtentSection() {
             {`${deg(wgs[0], 'E', 'W')} – ${deg(wgs[2], 'E', 'W')} · ${deg(wgs[1], 'N', 'S')} – ${deg(wgs[3], 'N', 'S')}`}
           </div>
         ) : (
-          <div style={{ fontSize:9, color:MUTED, lineHeight:1.6, marginTop:2 }}>
+          <div style={{ fontSize:10, color:MUTED, lineHeight:1.5, marginTop:2 }}>
             Not georeferenced — no extent to state.
           </div>
         )}

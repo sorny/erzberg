@@ -1892,11 +1892,11 @@ test.describe('vector layers', () => {
     await page.waitForTimeout(1000)
 
     await page.evaluate(() => document.activeElement?.blur())
-    // Preset ⬇ is the Export section's, in Output.
-    await openStage(page, 'output')
+    // Save sits under Presets, beside the looks the app ships.
+    await openStage(page, 'presets')
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 30000 }),
-      page.click('button:has-text("Preset ⬇")'),
+      page.click('[data-testid="preset-save"]'),
     ])
     let text = ''
     for await (const chunk of await download.createReadStream()) text += chunk

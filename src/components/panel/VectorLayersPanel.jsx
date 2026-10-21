@@ -13,6 +13,7 @@
  * cluster that had not joined them.
  */
 import { ModeStyleOverride } from './ModeStyleOverride'
+import { reachError } from '../../utils/netError'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { useStore } from '../../store/useStore'
@@ -27,7 +28,7 @@ import { iconUrl, loadIconManifest } from '../../utils/iconCatalogue'
 
 import { loadSingleLineManifest } from '../../utils/textGeometry'
 
-import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, Heading, HIDDEN_OPACITY, InlineSl, LoadBtn, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, Sub, SUNK, SURF, TEXT, Tog, WARN } from './ui'
+import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, Heading, HIDDEN_OPACITY, InlineSl, LoadBtn, MONO, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, Sub, SUNK, SURF, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
 
@@ -620,7 +621,7 @@ function FeatureList({ layer, bucket, onPatch }) {
                 flex: 1, fontSize: 10, color: hidden.has(i) ? MUTED : DIM,
                 overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
               }}>{featureLabel(bucket, i)}</span>
-              {note && <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{note}</span>}
+              {note && <span style={{ fontSize: 10, color: MUTED, fontFamily: MONO, fontVariantNumeric: 'tabular-nums' }}>{note}</span>}
             </div>
           )
         })}
@@ -739,7 +740,7 @@ export function VectorLayersPanel({
       // An abort is the user's own decision and needs no error box.
       if (err?.name !== 'AbortError' && err !== CANCELLED) {
         console.error('[OSM] Fetch failed:', err)
-        onError(err?.message || 'Could not reach OpenStreetMap.')
+        onError(reachError(err, 'OpenStreetMap'))
       }
     } finally {
       abortRef.current = null
@@ -772,7 +773,7 @@ export function VectorLayersPanel({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
           <span style={{ fontSize: 10, color: DIM, fontWeight: 600 }}>OpenStreetMap</span>
           {size && (
-            <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }} data-testid="osm-extent">
+            <span style={{ fontSize: 10, color: MUTED, fontFamily: MONO, fontVariantNumeric: 'tabular-nums' }} data-testid="osm-extent">
               {size.w.toFixed(1)} × {size.h.toFixed(1)} km
             </span>
           )}
@@ -905,7 +906,7 @@ export function VectorLayersPanel({
                 <Chevron dir={isOpen ? 'down' : 'right'} style={{ color: MUTED }} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
               </button>
-              <span style={{ fontSize: 10, color: MUTED, fontFamily: 'monospace' }}>{l.count}</span>
+              <span style={{ fontSize: 10, color: MUTED, fontFamily: MONO, fontVariantNumeric: 'tabular-nums' }}>{l.count}</span>
               <RowBtn onClick={() => onPatch(l.id, { visible: !l.visible })}
                 label={l.visible ? 'Hide this layer' : 'Show this layer'}
                 aria-pressed={!l.visible} data-testid={`vector-vis-${l.id}`}><EyeIcon off={!l.visible} /></RowBtn>

@@ -81,7 +81,7 @@ export function ShortcutsOverlay({ onDismiss }) {
                       <td style={{ fontSize: 12, color: MUTED, lineHeight: 1.5 }}>
                         {r.label}
                         {r.note && (
-                          <span style={{ color: MUTED, opacity: 0.75 }}>{` — ${r.note}`}</span>
+                          <span style={{ color: MUTED }}>{` — ${r.note}`}</span>
                         )}
                       </td>
                     </tr>

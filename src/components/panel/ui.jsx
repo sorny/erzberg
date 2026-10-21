@@ -63,6 +63,8 @@ export const SCRIM       = 'var(--hm-scrim)'
 
 export const FONT        = 'var(--hm-font)'
 export const MONO        = 'var(--hm-mono)'
+// The wordmark's face, as the logo and the 3D text set it. One name for three headers.
+export const WORDMARK    = "'Space Mono', monospace"
 
 /*
  * The type scale: five whole-pixel sizes, nothing between them.
@@ -247,14 +249,19 @@ export function PanelStyles() {
          pointer can actually land on — the old 3 px box left the thumb's 13 px
          of overflow as the entire target. */
       /* The filled part of the track is the value, readable at a glance down a
-         column of sliders. \`--p\` is set per slider (0–100%); the thumb is a
-         white disc on a hairline shadow, which reads on any accent. */
-      .hmr { --p:0%; -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:0;
+         column of sliders. It runs from \`--a\` to \`--p\` (0–100%): from the left
+         end, or from zero on a slider whose range crosses it, so a Pan at 0 is
+         an empty track rather than a half-full one. Iron, not ore: ore means
+         "on", and a value is not a state. The thumb is a disc on a hairline
+         shadow, which reads on either. */
+      .hmr { --a:0%; --p:0%; -webkit-appearance:none; appearance:none; flex:1; min-width:0; width:0;
         height:20px; padding:0; background:none; outline:none; cursor:pointer; }
+      /* Two rules, not one list: an engine drops a whole rule over one pseudo-
+         element it does not know, so a shared list would style neither. */
       .hmr::-webkit-slider-runnable-track { height:4px; border-radius:999px;
-        background:linear-gradient(to right, var(--hm-accent) 0 var(--p), var(--hm-border) var(--p) 100%); }
-      .hmr::-moz-range-track { height:4px; background:${BORDER}; border-radius:999px; }
-      .hmr::-moz-range-progress { height:4px; background:${ACCENT}; border-radius:999px; }
+        background:linear-gradient(to right, var(--hm-border) 0 var(--a), var(--hm-fill) var(--a) var(--p), var(--hm-border) var(--p) 100%); }
+      .hmr::-moz-range-track { height:4px; border-radius:999px;
+        background:linear-gradient(to right, var(--hm-border) 0 var(--a), var(--hm-fill) var(--a) var(--p), var(--hm-border) var(--p) 100%); }
       .hmr::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px;
         margin-top:-5px; border-radius:50%; background:var(--hm-thumb); border:none; cursor:grab;
         box-shadow:0 0 0 1px var(--hm-shadow), 0 1px 3px var(--hm-shadow);
@@ -294,7 +301,7 @@ export function PanelStyles() {
         display:inline-flex; align-items:center; justify-content:center; }
       .hmi > span { display:inline-flex; align-items:center; justify-content:center;
         width:12px; height:12px; border-radius:50%; border:1px solid ${BORDER};
-        font-size:8px; line-height:1; color:${MUTED}; transition:all .1s; }
+        font-size:9px; line-height:12px; color:${MUTED}; transition:all .1s; }
       .hmi:hover > span { color:${TEXT}; border-color:${MUTED}; }
       .hmi.on > span { background:${BORDER}; color:${TEXT}; }
       .hmnum { background:${SURF}; border:1px solid ${BORDER}; color:${DIM}; border-radius:3px;
@@ -321,7 +328,12 @@ export function PanelStyles() {
 
       /* Stage tabs: a quiet hover, and the selected tab joined to its pane. */
       .hmtab { transition:background .15s var(--hm-ease), color .15s var(--hm-ease); }
-      .hmtab:hover:not([aria-pressed="true"]) { background:${VEIL}; color:${DIM} !important; }
+      .hmtab:hover:not([aria-selected="true"]):not([aria-disabled="true"]) { background:${VEIL}; color:${DIM} !important; }
+      /* The rail's own ring: inset, in the text colour. The global ore outline
+         read as a second selected tab, because ore on this edge already means
+         "the pane on screen". Doubled class, because the global ring's \`:is()\`
+         carries the weight of \`input[type=search]\` and outranks one class. */
+      .hmtab.hmtab:focus-visible { outline:2px solid ${TEXT}; outline-offset:-4px; border-radius:3px; }
 
       /* Switch: the input is the hit target, the two spans are the picture. */
       .hmsw .hmswtrack { transition:background .2s var(--hm-ease), box-shadow .2s var(--hm-ease); }
@@ -333,6 +345,15 @@ export function PanelStyles() {
       .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
       .hmseg:hover:not([aria-pressed="true"]) { color:${DIM} !important; background:${VEIL} !important; }
       .hmseg:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
+      .hmfold { -webkit-appearance:none; appearance:none; background:none; border:none; font:inherit;
+        display:flex; align-items:baseline; gap:6px; width:100%; padding:0; margin:0 0 2px; cursor:pointer; text-align:left; }
+      .hmfold:focus-visible { outline:2px solid ${ACCENT}; outline-offset:2px; border-radius:3px; }
+      /* A gradient stop the keyboard can move. It is a div, so the global ring
+         does not reach it. */
+      /* Code in the panel is set in the panel's mono, not the browser's. */
+      #hm-panel code { font-family:var(--hm-mono); }
+      .hmstop:focus-visible { outline:2px solid var(--hm-text); outline-offset:1px; border-radius:3px; }
+      .hmfold .hmfoldchev { transition:transform .2s var(--hm-ease); }
 
       /* Buttons: one response to hover and press, whatever their colours. */
       .hmbtn { transition:filter .12s var(--hm-ease), transform .08s var(--hm-ease), border-color .15s, color .15s; }
@@ -342,7 +363,7 @@ export function PanelStyles() {
       .hmeb:active, .hmsb:active, .sym-btn:active { transform:scale(.97); }
 
       @media (prefers-reduced-motion: reduce) {
-        .hmsec, .hmtab, .hmsw *, .hmseg, .hmbtn, .hmeb, .hmsb, .hmr::-webkit-slider-thumb { transition:none !important; }
+        .hmsec, .hmfoldchev, .hmtab, .hmsw *, .hmseg, .hmbtn, .hmeb, .hmsb, .hmr::-webkit-slider-thumb { transition:none !important; }
       }
       .hmsec:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
       /* The per-section reset. Revealed on hover rather than drawn outright,
@@ -384,11 +405,6 @@ export function PanelStyles() {
         padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
       .hmpip:hover { background:var(--hm-veil-strong); }
       .hmhead:first-child { margin-top:0 !important; }
-      /* A mode copy's card has its own on/off switch in its header, so the
-         body's Enabled row under it would be a second switch for the same
-         setting. The body is the mode's own section, scoped (see ModeCopies),
-         and its first row is always Enabled. */
-      [data-copy-body] > div:first-child:has(input[aria-label="Enabled"]) { display:none; }
       .hmrow:hover:not(:disabled) { background:var(--hm-veil-strong); color:${STRONG} !important; }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
       .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
@@ -428,7 +444,7 @@ export function HelpBox({ text }) {
     <div style={{
       fontSize: 10, color: MUTED, background: SUNK,
       padding: '6px 8px', borderRadius: 5, marginBottom: 8,
-      border: `1px solid ${BORDER}`, lineHeight: 1.45
+      border: `1px solid ${BORDER}`, lineHeight: 1.5
     }}>
       {text}
     </div>
@@ -584,10 +600,17 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
   )
 }
 
-/** How far along its track a slider sits, for the filled part of the track. */
+/**
+ * The filled part of a slider's track, as two stops along it.
+ *
+ * From the left end, or from zero when the range crosses zero: Height scale,
+ * Pan and the like are signed, and their neutral is the middle of the track.
+ */
 function fillOf(value, min, max) {
-  const p = max > min ? ((value - min) / (max - min)) * 100 : 0
-  return { '--p': `${Math.max(0, Math.min(100, p))}%` }
+  const at = (v) => Math.max(0, Math.min(100, max > min ? ((v - min) / (max - min)) * 100 : 0))
+  const p = at(value)
+  const zero = min < 0 && max > 0 ? at(0) : 0
+  return { '--a': `${Math.min(zero, p)}%`, '--p': `${Math.max(zero, p)}%` }
 }
 
 /*
@@ -633,17 +656,19 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
   )
 }
 
-export function Tog({ label, hint, help, checked, onChange, small, testId }) {
+export function Tog({ label, hint, help, checked, onChange, small: _small, testId }) {
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const fs = 11
-  const tc = small ? MUTED : DIM
+  // Muted, as a slider's label is: both are control labels, and a switch read
+  // brighter than the slider above it. `small` no longer changes the colour.
+  const tc = MUTED
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
         <span style={{ fontSize: fs, color: tc, display: 'flex', alignItems: 'center' }}>
           <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
-          {hint && <span style={{ fontSize: fs - 1, color: MUTED, marginLeft: 6 }}> {hint}</span>}
+          {hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 6 }}> {hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <Switch id={id} label={label} checked={checked} onChange={onChange} testId={testId} />
@@ -653,10 +678,11 @@ export function Tog({ label, hint, help, checked, onChange, small, testId }) {
   )
 }
 
-export function Switch({ id, label, checked, onChange, testId }) {
+export function Switch({ id, label, checked, onChange, testId, enable }) {
   return (
     <label className="hmsw" style={{ position:'relative', display:'inline-block', width:34, height:18, flexShrink:0, cursor:'pointer' }}>
       <input type="checkbox" id={id} checked={checked} aria-label={label} data-testid={testId}
+        data-enable={enable ? 'true' : undefined}
         onChange={e => onChange(e.target.checked)}
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
       <span className="hmswtrack" style={{
@@ -680,7 +706,7 @@ export function ColorRow({ label, help, value, onChange, testId }) {
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontSize: 11, color: DIM, display:'flex', alignItems:'center' }}>
+        <span style={{ fontSize: 11, color: MUTED, display:'flex', alignItems:'center' }}>
           <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
@@ -733,7 +759,7 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 11, color: DIM, display: 'flex', alignItems: 'center' }}>
+        <span style={{ fontSize: 11, color: MUTED, display: 'flex', alignItems: 'center' }}>
           {label}{hint && <span style={{ fontSize: 10, color: MUTED }}> {hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
@@ -767,8 +793,10 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display: 'flex', alignItems: 'center' }}>
-          <label htmlFor={id} style={{ cursor: 'pointer' }}>{label}</label>
+        {/* Capped, so a long label truncates and the slider keeps the rest of
+            the row; without the cap the range input collapsed to 0 px. */}
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, maxWidth:'55%', display: 'flex', alignItems: 'center' }}>
+          <label htmlFor={id} title={label} style={{ cursor: 'pointer', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 }}>{label}</label>
           {hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
@@ -809,13 +837,13 @@ export function RangeSl({ label, hint, help, lo, hi, onChange, fmt, min = 0, max
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7, marginBottom: showHelp ? 4 : 0 }}>
-        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
-          {label}{hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, maxWidth:'55%', display:'flex', alignItems:'center' }}>
+          <span title={label} style={{ overflow:'hidden', textOverflow:'ellipsis', minWidth:0 }}>{label}</span>{hint && <span style={{ fontSize: 10, color: MUTED, marginLeft: 3 }}>{hint}</span>}
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <div style={{ position:'relative', flex:1, height:13, minWidth:0 }}>
           <div style={{ position:'absolute', top:4.5, left:0, right:0, height:4, background: BORDER, borderRadius:999 }} />
-          <div style={{ position:'absolute', top:4.5, height:4, borderRadius:999, background: ACCENT,
+          <div style={{ position:'absolute', top:4.5, height:4, borderRadius:999, background: 'var(--hm-fill)',
                         left:`${pct(lo)}%`, width:`${Math.max(0, pct(hi) - pct(lo))}%` }} />
           <input type="range" className="hmrr" data-testid={testId && `${testId}-lo`}
             aria-label={`${label} lower bound`} aria-valuetext={String(f(lo))}
@@ -841,8 +869,8 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix, te
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display:'flex', alignItems:'center', gap: 7 }}>
-        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, display:'flex', alignItems:'center' }}>
-          {label}
+        <span style={{ fontSize: 11, color: MUTED, whiteSpace:'nowrap', minWidth: 52, maxWidth:'55%', display:'flex', alignItems:'center' }}>
+          <span title={label} style={{ overflow:'hidden', textOverflow:'ellipsis', minWidth:0 }}>{label}</span>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
         <SegGroup label={label} options={options} value={value} onChange={onChange}
@@ -968,16 +996,31 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
  * `sectionSummary.js`. Like `terms` it arrives through the context rather than
  * as a prop, so the fifty call sites in Sidebar.jsx are untouched; passing it
  * directly still works, for a section whose state the panel cannot see.
+ *
+ * `onEnabled` puts the section's on/off switch in its header. A mark or a
+ * surface layer used to carry it as an `Enabled` row at the top of its body, so
+ * the drilled-in pane said "on" three times: the tile's pip, the header's dot
+ * and the row. The header is the one place that is on screen in every view of
+ * the section — the sheet's drill-in, a search hit, a shut header in Surface —
+ * so the switch lives there and the dot goes. `enableTestId` is the handle the
+ * old row carried, where it had one.
  */
 /** The reset button's width, and the room the header row keeps free for it. */
 const RESET_W = 20
+/** The header switch's width, and the gap that keeps it off the reset mark. */
+const SWITCH_W = 34
 
-export function Section({ title, terms, summary, open, onToggle, enabled, icon, children }) {
+/** What a header prints. `Mode: ` is a key the panel files marks under, not a word. */
+const sectionName = (title) => (title.startsWith('Mode: ') ? title.slice(6) : title)
+
+export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, children }) {
   const ctx = useContext(SectionFilter)
   const scope = useContext(SectionScope)
   const copies = useContext(ModeCopiesPanel)
   // A mode copy's body: only the scoped section, with no header. See filter.js.
+  // The copy's card carries the switch, so the body is the controls alone.
   if (scope) return title === scope ? <div data-copy-body={title}>{children}</div> : null
+  const name = sectionName(title)
   const q = ctx?.q ?? ''
   /**
    * A filtered-out section is *hidden*, never unmounted.
@@ -1029,7 +1072,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
   // A summary is a string, or `{ text, hint }` where the hint names the
   // parameter the number came from — a bare `10` is short enough to fit beside
   // MODE: CROSSHATCH, and the label it lost comes back on hover.
-  const readout = typeof raw === 'string' ? { text: raw } : raw
+  // `—` says "off", which a header with its own switch already shows.
+  const shown = typeof raw === 'string' ? { text: raw } : raw
+  const readout = onEnabled && shown?.text === '—' ? null : shown
   /*
    * The reset, and why it is not on every header.
    *
@@ -1063,6 +1108,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
       {/* Inert while filtering: the filter already forces every survivor open, so
           a click here changed only the state behind it — and the section it had
           silently collapsed reappeared that way once the field was cleared. */}
+      {/* A heading, so a screen reader can walk the panel section by section;
+          the button inside it is the disclosure. */}
+      <h3 style={{ margin:0, fontSize:12, fontWeight:600 }}>
       <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
         aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
@@ -1076,9 +1124,11 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           cursor: q ? 'default' : 'pointer',
         }}>
         <span className="hmsectitle" style={{ fontSize:12, fontWeight:600, color: DIM, display:'flex', alignItems:'center', minWidth:0 }}>
-          {enabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
+          {/* The dot says "on" for a section whose switch is somewhere else. A
+              section with its own switch in the header has said it already. */}
+          {enabled && !onEnabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
-          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{title}</span>
+          <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</span>
         </span>
         <span style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, minWidth:0 }}>
           {/* The same role a slider's own readout uses — 10 px, MUTED, tabular
@@ -1098,6 +1148,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
               button. Reserved whenever the button can appear, not only on
               hover, so the readout does not jump sideways under the pointer. */}
           {canReset && <span aria-hidden="true" style={{ width: RESET_W, flexShrink:0 }} />}
+          {onEnabled && <span aria-hidden="true" style={{ width: SWITCH_W, flexShrink:0 }} />}
           {/* A drawn chevron in a 22 px box: the header's height and the reset
               button beside it are both measured from that box. */}
           <span aria-hidden="true" className="hmchevron" style={{
@@ -1108,6 +1159,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
           </span>
         </span>
       </button>
+      </h3>
       {/* Two marks, both siblings of the header rather than children of it. The
           header is a button — it has to be, or a collapsed section is
           unreachable from the keyboard — and a button inside a button is
@@ -1131,17 +1183,33 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
         <button type="button" className="hmreset"
           data-testid={`reset-${title.toLowerCase().replace(/\s+/g, '-')}`}
           onClick={() => ctx.onReset(title)}
-          title={`Reset ${title} to its defaults`}
-          aria-label={`Reset ${title} to its defaults`}
+          title={`Reset ${name} to its defaults`}
+          aria-label={`Reset ${name} to its defaults`}
           style={{
-            position:'absolute', right:30, top:0, width: RESET_W,
+            position:'absolute', right: onEnabled ? 30 + SWITCH_W + 8 : 30, top:0, width: RESET_W,
             background:'none', border:'none', cursor:'pointer',
             padding:'10px 0', lineHeight:'22px', textAlign:'center',
             color: MUTED, fontSize:12, borderRadius:3,
           }}>↺</button>
       </>)}
+      {/* The switch, a sibling for the same reason as the reset: it cannot sit
+          inside the header button. It answers to the section's name, so a
+          screen reader says "Contours, on" rather than "Enabled, on" in a pane
+          of sixty identical labels. */}
+      {onEnabled && (
+        <span style={{ position:'absolute', right:38, top:12, display:'flex' }}
+          title={enabled ? `${name} is drawing` : `${name} is off`}>
+          <Switch label={name} checked={!!enabled} onChange={onEnabled}
+            testId={enableTestId ?? `enable-${name.toLowerCase().replace(/\s+/g, '-')}`} enable />
+        </span>
+      )}
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
         <div style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
+          {onEnabled && !enabled && (
+            <div data-testid="off-note" style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:4 }}>
+              Off. The switch in the header turns it on.
+            </div>
+          )}
           {children}
           {copies && title.startsWith('Mode: ') && copies.render(title)}
         </div>
@@ -1183,8 +1251,8 @@ export function Section({ title, terms, summary, open, onToggle, enabled, icon, 
  * throw all of it away on a click of the rail.
  *
  * The rule stays on screen above the sections even though the rail already names
- * the stage. The rail has 40 px and carries `Mark`; this carries `MARKS`, and it
- * is the only place the whole word appears.
+ * the stage. The rail names it in 9 px; this rule names it where the pane
+ * starts, at the size of a heading.
  */
 export function Stage({ n, title, children }) {
   const q = useContext(SectionFilter)?.q ?? ''
@@ -1220,9 +1288,9 @@ export function Stage({ n, title, children }) {
         <span style={{ fontSize:10, fontWeight:600, color: ACCENT_TEXT, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
         </span>
-        <span className="hmstagetitle" style={{ fontSize:12, fontWeight:600, color: TEXT }}>
+        <h2 className="hmstagetitle" style={{ margin:0, fontSize:12, color: TEXT }}>
           {title}
-        </span>
+        </h2>
       </div>
       {children}
     </div>
@@ -1261,6 +1329,39 @@ export function Stage({ n, title, children }) {
  */
 export function StageRail({ stage, onStage, live, hits }) {
   const filtering = !!hits
+  const refs = useRef({})
+  /*
+   * A tab list, read the way a tab list reads: one stop in the tab order, on the
+   * selected stage, and the arrows walk the rail from there. It was seven plain
+   * buttons with `aria-pressed`, so Tab went through all seven to reach the pane
+   * and the arrows did nothing. Moving selects, as `[` and `]` do: a pane is
+   * shown by `display`, so selecting one on the way past costs nothing.
+   */
+  // While a search is typed, a stage it found nothing in is not a place it can
+  // take you: inactive, out of the tab order, and skipped by the arrows. It was
+  // only faded, and a click on it cleared the query and opened an empty pane.
+  const reachable = (n) => !filtering || (hits[n] || 0) > 0
+  const stops = STAGES.map(([n]) => n).filter(reachable)
+  // The one tab stop: the pane on screen, or while searching the first stage
+  // with a hit in it.
+  const stop = filtering ? (stops[0] ?? null) : stage
+  const onKeyDown = (e) => {
+    const order = stops
+    // Searching, nothing is selected, so the walk starts from the focused tab.
+    const from = filtering ? Number(e.target.dataset.tabStage) : stage
+    const at = Math.max(0, order.indexOf(from))
+    const to = e.key === 'ArrowDown' ? order[Math.min(order.length - 1, at + 1)]
+      : e.key === 'ArrowUp' ? order[Math.max(0, at - 1)]
+      : e.key === 'Home' ? order[0]
+      : e.key === 'End' ? order[order.length - 1]
+      : null
+    if (to == null) return
+    e.preventDefault()
+    // While searching, the arrows move focus between the stages with hits and
+    // leave the query alone; Enter or a click is what goes there.
+    if (!filtering) onStage(to)
+    refs.current[to]?.focus()
+  }
   return (
     <nav data-testid="stage-rail" aria-label="Pipeline stage"
       style={{
@@ -1268,7 +1369,9 @@ export function StageRail({ stage, onStage, live, hits }) {
         background: SUNK, borderRight:`1px solid ${BORDER}`,
         overflow:'hidden',
       }}>
-      {STAGES.map(([n, title, short]) => {
+      <div role="tablist" aria-orientation="vertical" aria-label="Pipeline stage" onKeyDown={onKeyDown}
+        style={{ display:'flex', flexDirection:'column' }}>
+      {STAGES.map(([n, title]) => {
         const sel   = !filtering && stage === n
         const count = filtering ? (hits[n] || 0) : (live[n] || 0)
         // Two different numbers wear two different colours, because they answer
@@ -1277,10 +1380,15 @@ export function StageRail({ stage, onStage, live, hits }) {
         // is what every other "this is what you searched for" wears.
         const badge = count > 0
         return (
-          <button key={n} type="button" className="hmtab"
+          <button key={n} type="button" className="hmtab" role="tab"
+            ref={(el) => { refs.current[n] = el }}
             data-testid={`stage-tab-${title.toLowerCase()}`}
-            onClick={() => onStage(n)}
-            aria-pressed={sel}
+            data-tab-stage={n}
+            onClick={reachable(n) ? () => onStage(n) : undefined}
+            aria-selected={sel}
+            aria-disabled={reachable(n) ? undefined : true}
+            aria-controls="hm-panel-body"
+            tabIndex={stop === n ? 0 : -1}
             aria-label={`${title}${count > 0 ? `, ${count} ${filtering ? 'found' : 'on'}` : ''}`}
             title={filtering
               ? `${title} — ${count} match${count === 1 ? '' : 'es'}`
@@ -1296,25 +1404,27 @@ export function StageRail({ stage, onStage, live, hits }) {
               // rather than six buttons one of which is highlighted.
               boxShadow: sel ? `inset -2px 0 0 ${ACCENT}` : 'none',
               color: sel ? TEXT : MUTED,
-              cursor:'pointer', textAlign:'center', fontFamily:'inherit',
+              cursor: reachable(n) ? 'pointer' : 'default', textAlign:'center', fontFamily:'inherit',
               // A pane with nothing on, while the query found nothing in it, is
               // not a place this search can take you.
               opacity: filtering && !badge ? 0.35 : 1,
             }}>
-            {/* The badge gets its own lane on the right, and the number and the
-                name centre in what is left. Centred across the whole 40 px they
-                ran under the badge — `02` and a green `2` on top of each other,
-                which is two counts pretending to be one. */}
-            <span style={{ display:'block', paddingRight:11 }}>
-              {/* A lozenge, not `00`. Presets is a destination and not a step
-                  the renderer runs, and a digit in the pipeline's own column
-                  would claim it was one. */}
-              <span style={{ display:'block', fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
-                {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
-              </span>
-              <span style={{ display:'block', fontSize:9, fontWeight:600, marginTop:3 }}>
-                {short}
-              </span>
+            {/* The badge gets its own lane on the right of the number, and the
+                number centres in what is left. Centred across the whole 40 px
+                they ran under the badge — `02` and a green `2` on top of each
+                other, which is two counts pretending to be one. */}
+            {/* A lozenge, not `00`. Presets is a destination and not a step
+                the renderer runs, and a digit in the pipeline's own column
+                would claim it was one. */}
+            <span style={{ display:'block', paddingRight:11, fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
+              {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
+            </span>
+            {/* The whole word, across the whole tab. `Terr`, `Surf` and `Pre`
+                were clipped to clear the badge lane, and the lane is only in
+                the way of the number above. At 9 px the longest name, Surface,
+                is 32 px of the tab's 39. */}
+            <span style={{ display:'block', fontSize:9, fontWeight:600, marginTop:3, letterSpacing:'-0.01em', whiteSpace:'nowrap' }}>
+              {title}
             </span>
             {badge && (
               <span aria-hidden="true" style={{
@@ -1329,6 +1439,7 @@ export function StageRail({ stage, onStage, live, hits }) {
           </button>
         )
       })}
+      </div>
     </nav>
   )
 }
@@ -1464,6 +1575,64 @@ export function GripIcon() {
  * one spacing — 12 px above, 4 below, none above when it opens its block. They
  * were drawn by hand in 26 places with four different top margins.
  */
+/**
+ * A block inside a section that shuts to one line: its name, its readout and a
+ * chevron.
+ *
+ * A mark's section is its own controls and then four blocks every mark shares —
+ * Line style, the gradient, Masks, Occlusion — and Copies. Open, Contours ran to
+ * some twenty-five rows in one column, and the shared four were most of them.
+ * Each block already printed its own readout beside its heading (`none`,
+ * `occluder · halo 2 px`), so shut, the readout is the block: what it is set to,
+ * on the line where you would look for it.
+ *
+ * Open while a search is typed, for the reason a section is: a hit behind a
+ * second click is half an answer. The body stays mounted and goes `inert` when
+ * shut, so a tab never lands on a control nobody can see.
+ */
+export function Fold({ title, readout, active, defaultOpen = false, testId, children }) {
+  const [open, setOpen] = useState(defaultOpen)
+  const q = useContext(SectionFilter)?.q ?? ''
+  const isOpen = open || !!q
+  return (
+    <div data-testid={testId} data-fold={isOpen ? 'open' : 'shut'}
+      style={{ marginTop: 8, borderTop: `1px solid ${BORDER}`, paddingTop: 8 }}>
+      <button type="button" className="hmfold" aria-expanded={isOpen}
+        data-testid={testId ? `${testId}-fold` : undefined}
+        onClick={q ? undefined : () => setOpen(!open)}>
+        <span style={{ fontSize: 11, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'right', fontSize: 10, fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
+          // ACCENT_TEXT, not the ore fill: 10 px text on paper needs the deeper ore.
+          color: active ? ACCENT_TEXT : MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{readout}</span>
+        <span aria-hidden="true" className="hmfoldchev" style={{ display: 'flex', color: MUTED, alignSelf: 'center',
+          transform: isOpen ? 'none' : 'rotate(-90deg)' }}><Chevron size={10} /></span>
+      </button>
+      <div style={{ display: 'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', transition: 'grid-template-rows .2s var(--hm-ease)' }}>
+        <div inert={!isOpen} style={{ minHeight: 0, overflow: 'hidden', paddingTop: isOpen ? 4 : 0 }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A key, drawn as the find field draws `/`: a hairline cap with a heavier
+ * bottom edge. A bare letter after a label read as part of the label —
+ * "Edit heightmap E" — and a cap says it is something to press.
+ */
+export function Key({ children }) {
+  return (
+    <kbd aria-hidden="true" style={{
+      display:'inline-block', minWidth:15, padding:'0 4px', borderRadius:3, textAlign:'center',
+      // The button's own colour, at full strength: a faded cap read 2.7 : 1.
+      border:'1px solid currentColor', borderBottomWidth:2,
+      fontFamily:'inherit', fontSize:10, fontWeight:400, lineHeight:'13px', marginLeft:6,
+      verticalAlign:'1px',
+    }}>{children}</kbd>
+  )
+}
+
 export function Heading({ children, style }) {
   return (
     <div className="hmhead" style={{ fontSize: 11, color: DIM, fontWeight: 600, margin: '12px 0 4px', ...style }}>

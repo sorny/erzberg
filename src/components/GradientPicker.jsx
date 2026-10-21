@@ -74,6 +74,28 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
     }
   }
 
+  // A drag the browser takes away — a cancel, a lost capture — ends here and
+  // opens nothing. Without it `dragging` stayed set, and `onBarClick` then
+  // refused every click on the bar until a reload.
+  const onHandleDragLost = () => { dragging.current = null }
+
+  // The keyboard's way to move a stop: the arrows by 1 %, with Shift by 10 %,
+  // Delete to remove it, Enter or Space for its colour.
+  const onHandleKeyDown = (e, idx) => {
+    const step = e.shiftKey ? 0.1 : 0.01
+    const by = { ArrowLeft: -step, ArrowDown: -step, ArrowRight: step, ArrowUp: step }[e.key]
+    if (by != null) {
+      e.preventDefault()
+      updateStop(idx, { pos: Math.max(0.01, Math.min(0.99, Math.round((stops[idx].pos + by) * 100) / 100)) })
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      e.preventDefault()
+      removeStop(e, idx)
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      barInputs.current[idx]?.click()
+    }
+  }
+
   const removeStop = (e, idx) => {
     e.stopPropagation()
     if (stops[idx].pos === 0 || stops[idx].pos === 1) return
@@ -93,12 +115,15 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
           background: cssGradient(stops),
           cursor: isSimple ? 'default' : 'crosshair',
           marginBottom: 8,
-          border: '1px solid #333',
+          border: '1px solid var(--hm-border)',
         }}
       >
         {stops.map((stop, idx) => {
           const isAnchor = stop.pos === 0 || stop.pos === 1
           if (isSimple && !isAnchor) return null
+          // A stop that can move is a slider to the keyboard. An anchor cannot
+          // move, and its colour is in the list under the bar.
+          const movable = !isAnchor && !isSimple
           return (
             <div
               key={idx}
@@ -106,6 +131,14 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               onPointerDown={(e) => onHandlePointerDown(e, idx)}
               onPointerMove={(e) => onHandlePointerMove(e, idx)}
               onPointerUp={() => onHandlePointerUp(idx)}
+              onPointerCancel={onHandleDragLost}
+              onLostPointerCapture={onHandleDragLost}
+              {...(movable && {
+                role: 'slider', tabIndex: 0, className: 'hmstop',
+                'aria-label': 'Gradient stop', 'aria-valuemin': 1, 'aria-valuemax': 99,
+                'aria-valuenow': Math.round(stop.pos * 100), 'aria-valuetext': `${Math.round(stop.pos * 100)}%`,
+                onKeyDown: (e) => onHandleKeyDown(e, idx),
+              })}
               style={{
                 position: 'absolute',
                 left:  `${stop.pos * 100}%`,
@@ -136,6 +169,9 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               <input
                 ref={el => { barInputs.current[idx] = el }}
                 type="color"
+                // Opened by a click on the handle; the list under the bar holds
+                // the same colour as a control the keyboard can reach.
+                tabIndex={-1} aria-hidden="true"
                 value={stop.color}
                 onChange={(e) => updateStop(idx, { color: e.target.value })}
                 style={{
@@ -178,10 +214,11 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
                   width: '100%', height: '100%',
                   background: stop.color,
                   borderRadius: 3,
-                  border: '1px solid #555',
+                  border: '1px solid var(--hm-border)',
                 }} />
                 <input
                   type="color"
+                  aria-label={`Colour of the stop at ${Math.round(stop.pos * 100)}%`}
                   value={stop.color}
                   onChange={(e) => updateStop(origIdx, { color: e.target.value })}
                   title="Click to change"
@@ -194,11 +231,13 @@ export function GradientPicker({ stops, onChange, isSimple = false }) {
               </div>
               <span>{label}</span>
               {!isAnchor && !isSimple && (
-                <span
+                <button type="button"
                   onClick={(e) => removeStop(e, origIdx)}
-                  style={{ cursor: 'pointer', color: MUTED, lineHeight: 1 }}
+                  aria-label={`Remove the stop at ${label}`}
+                  style={{ cursor: 'pointer', color: MUTED, lineHeight: 1, background: 'none', border: 'none',
+                           padding: 0, font: 'inherit' }}
                   title="Remove stop"
-                >✕</span>
+                >✕</button>
               )}
             </div>
           )
