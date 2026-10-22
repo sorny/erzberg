@@ -7,7 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Pen layers under the SVG button.** One row per Inkscape layer the file
+  will hold, with its ink as the file writes it. A layer coloured per vertex
+  (Height, Slope, a gradient) says `mixed` and draws one ramp chip: it is one
+  layer, and one pen cannot draw it as shown. An area layer shows a chip per
+  ink. The count is exact unless filled areas or hidden lines are drawing. Then
+  it says `up to N`, and Preflight counts exactly. On the default plate the
+  strip says 3, and Preflight counts 3. Inks as picked is mirrored under it.
+  The rows come from `pensOf` (`utils/pens.js`), which reads the geometry the
+  exporter is handed. The tone curve moved to `utils/screenInk.js`, so the
+  panel does not load the exporter.
+
 ### Changed
+
+- **Ore means "on" again.** The primary buttons (SVG, Surprise me, Fetch, Run
+  erosion) are the panel inverted, paper on iron, instead of ore. The search
+  badge on the rail and the stage numbers are iron as well. The export tiles
+  no longer turn ore on hover. Ore stays on switches, pips, selected segments,
+  the "on" count badges and the modified bar. `--hm-green-glow` is now
+  `--hm-on-glow`.
+- **Camera › Projection.** Perspective, Orthographic and Plan oblique are one
+  3-way choice, under their own heading. They were two switches indented under
+  Centre guides, and both could be on. The choice writes the same two flags,
+  so presets reopen unchanged. Pan X, Y and Z are under Target. The view Reset
+  left the Top / Front / Iso row and is now `↺ Reset view` at the foot of the
+  section.
+- **Type.** Mode-tile names, small buttons and segment labels are 11 px, the
+  label size. A two-word tile name wraps to a second line instead of losing its
+  end. Sentences in Output are 11 px. The 9 and 10 px sizes stay for what is
+  only read: the version, indexes and readouts. The stage title is 13 px, one
+  step above the 12 px section titles.
+- The panel's collapse handle sits beside the header. Half-way down it touched
+  the Overlay and Frame tabs and read as part of the rail.
+- The Auto-rotate key is drawn as a key cap, like E and /.
+- Help texts no longer cite version numbers. Depth tolerance explains itself
+  instead of repeating its label.
 
 - **A mark says "on" once.** The `Enabled` row at the top of every mode and
   surface layer is gone. The switch now sits in the section header, where the
@@ -56,6 +92,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   within 1–2 px of the tab edges.
 
 ### Fixed
+
+- **Shortcuts work after a slider.** Clicking a slider focuses it, and every
+  key handler stepped aside for any `<input>`. So `[` `]` `/` `\`, the export
+  keys, `E`, `Q` and ⌘Z did nothing until a click elsewhere. Only fields that
+  take characters (text, search, number, select, textarea) are skipped now
+  (`isTyping`, `utils/shortcuts.js`).
+- The panel body is the rail's `tabpanel`, labelled by the selected tab. The
+  mode pip's target is 24 px, the WCAG 2.5.8 minimum.
 
 - **The wheel zoom is smooth again.** OrbitControls' wheel zoom (three-stdlib,
   through drei) moved a fixed 5% per wheel event and ignored the delta. It

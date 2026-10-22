@@ -45,6 +45,7 @@ import { MaskPanel } from './MaskPanel'
 import { useBackdrop } from '../hooks/useBackdrop'
 import { DESK, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, TEXT, VEIL } from './panel/ui'
 import { THEME_EVENT } from '../utils/theme'
+import { isTyping } from '../utils/shortcuts'
 
 /** Tools, and the one letter each answers to. The panel draws the buttons;
  *  this is only the keyboard map. */
@@ -499,7 +500,7 @@ export function MaskStudio({
   // ── Keys ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target?.tagName === 'INPUT' || e.target?.tagName === 'TEXTAREA') return
+      if (isTyping(e.target)) return
       const k = e.key.toLowerCase()
       if ((e.metaKey || e.ctrlKey) && (e.code === 'KeyZ' || e.code === 'KeyY')) {
         e.preventDefault()

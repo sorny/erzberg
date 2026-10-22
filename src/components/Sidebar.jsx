@@ -54,6 +54,9 @@ import { SECTION_TERMS } from './panel/sectionTerms'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { applyTheme, storedTheme } from '../utils/theme'
 import { AUTOMATION } from '../automation'
+import { isTyping } from '../utils/shortcuts'
+import { pensOf } from '../utils/pens'
+import { PenStrip } from './panel/PenStrip'
 
 /**
  * Square-law mapping for the flock-size slider.
@@ -878,6 +881,10 @@ export function Sidebar({
   const plate = useMemo(
     () => buildPlateLine({ style, vectorLayers, textLayers, coverClasses: cover?.classes?.length ?? 0 }),
     [style, vectorLayers, textLayers, cover])
+  /** The pen layers the SVG will hold, from the geometry it will be written from. */
+  const pens = useMemo(
+    () => pensOf(lineGeo, { ...terrain, ...style, ...view, vectorLayers, textLayers }),
+    [lineGeo, terrain, style, view, vectorLayers, textLayers])
   // Counted with the same predicate each Section uses, over the same index it
   // reads — so the number and the list cannot disagree. A section whose title is
   // missing from SECTION_TERMS would still slip past this, which is what the
@@ -956,12 +963,12 @@ export function Sidebar({
   useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
-      const tag = e.target.tagName
       // Fields only. Excluding BUTTON as well — which Controls.jsx does, because
       // Space activates a focused button — killed this shortcut outright once
       // section headers became buttons: clicking one left it focused, and `\`
-      // stayed dead until focus moved. Backslash activates nothing.
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return
+      // stayed dead until focus moved. Backslash activates nothing. Sliders
+      // pass too — see `isTyping`.
+      if (isTyping(e.target)) return
       if (e.code === 'Backslash') { e.preventDefault(); setOpen(o => !o) }
       // Keyed on the character, like `?`: `/` is Shift+7 on a German layout.
       if (e.key === '/') {
@@ -1426,7 +1433,9 @@ export function Sidebar({
         title={open ? 'Hide the panel  \\' : 'Show the panel  \\'}
         aria-label={open ? 'Hide the panel' : 'Show the panel'}
         style={{
-          position:'fixed', right: open ? W : 0, top:'50%', transform:'translateY(-50%)',
+          // Beside the header, not half-way down: there it butted against the
+          // Overlay and Frame tabs and read as a piece of the rail.
+          position:'fixed', right: open ? W : 0, top:20,
           width:18, height:56, background: GLASS_BG,
           backdropFilter:'blur(10px)', WebkitBackdropFilter:'blur(10px)',
           border:`1px solid ${GLASS_BORDER}`, borderRight:'none',
@@ -1631,7 +1640,7 @@ export function Sidebar({
           */}
         <div style={{ flex:1, display:'flex', minHeight:0 }}>
         <StageRail stage={stage} onStage={goStage} live={live} hits={hits} />
-        <div id="hm-panel-body" style={{ flex:1, minWidth:0, width: BODY_W, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
+        <div id="hm-panel-body" role="tabpanel" aria-labelledby={`hm-tab-${stage}`} style={{ flex:1, minWidth:0, width: BODY_W, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
           <PanelStage.Provider value={stageCtx}>
           <SectionFilter.Provider value={filterCtx}>
           <CoverPlate.Provider value={cover}>
@@ -2217,8 +2226,8 @@ export function Sidebar({
                   help="What hides the lines behind it. Lines: each mode set as an occluder (in its Occlusion block) hangs an invisible wall under its strokes, and only these walls hide what is behind them, the classic ridgeline look. Ground: the terrain surface hides what is behind it, as a solid with side walls, whether or not a fill is shown. Strokes then hang no walls, except Pillars' columns."
                   options={[['Lines', 'lines'], ['Ground', 'ground']]}
                   value={style.occludeBy ?? 'lines'} onChange={v => ss({ occludeBy: v })} />
-                <InlineSl label="Depth tolerance" help="Depth tolerance. Higher values allow lines to peek through the surface, by pushing the terrain surface further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
-                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. 0 is the old depth test, which thins strokes on slopes seen at a low angle. Plates made before v1.58.0 open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v}×` : 'off')} />
+                <InlineSl label="Depth tolerance" help="How far behind the ground a line can be and still show. Higher values let lines peek through the surface: the terrain is pushed further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
+                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. At 0, strokes on slopes seen at a low angle come out thinner. Older plates open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v}×` : 'off')} />
                 <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -2462,7 +2471,7 @@ export function Sidebar({
             {style.showSlopeShade && (
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
-                <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off is the old reading, from the normal as drawn, which moves with the height slider; plates made before v1.39.0 open with it off, so they look as they did." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
+                <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off reads the slope from the normal as drawn, so it moves with the height slider. Older plates open with it off, so they look as they did." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
                 <ColorRow label="Flat colour" value={style.slopeColorLow} onChange={v => ss({ slopeColorLow: v })} />
                 <ColorRow label="Steep colour" value={style.slopeColorHigh} onChange={v => ss({ slopeColorHigh: v })} />
                 {style.slopeShadeTrue !== false && (<>
@@ -2879,14 +2888,14 @@ export function Sidebar({
               failed the drift check for Texture, four hundred lines away. */}
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
-              {/* Four camera presets. The last one is the *view* Reset, which is
-                  not the panel header's "Reset all" — the label is short because
-                  the row is, so the scope lives in the title and the name. */}
+              {/* Three aims. The view Reset used to be a fourth button here, but
+                  it is not an aim: it puts back the lens and the pan as well. It
+                  sits at the foot of the section, under everything it resets. */}
               {[['Top', 'top', 'Look straight down'], ['Front', 'front', 'Look from the front'],
-                ['Iso', 'iso', 'Isometric three-quarter view'], ['Reset', 'reset', 'Reset the view only']]
+                ['Iso', 'iso', 'Isometric three-quarter view']]
                 .map(([label, name, hint]) => (
                 <Btn key={name} block onClick={() => onCameraPreset(name)}
-                  title={hint} aria-label={name === 'reset' ? 'Reset view' : hint}
+                  title={hint} aria-label={hint}
                   style={{ padding:'2px 0' }}>{label}</Btn>
               ))}
             </div>
@@ -2896,7 +2905,7 @@ export function Sidebar({
             </div>
             <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
             <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
-            <Tog label="Auto-rotate" hint="q" checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
+            <Tog label="Auto-rotate" hint={<Key>Q</Key>} checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
                 <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
@@ -2908,28 +2917,45 @@ export function Sidebar({
               </Sub>
             )}
             <Tog label="Centre guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
-            <Sub>
-              <Tog label="Orthographic" help="Architectural projection with no perspective distortion." checked={view.orthographic} onChange={v => sv({ orthographic: v })} />
-              <Tog label="Plan oblique" testId="plan-oblique"
-                help="Looks straight down, and moves every point up the sheet by its height, so the mountains stand up and lean over the ground behind them, as on Imfeld's and Berann's maps. The ground keeps its true shape and scale. After Jenny and Patterson, 2007."
-                checked={!!view.planOblique} onChange={v => sv(v ? { planOblique: true, tilt: 0 } : { planOblique: false })} />
-              {view.planOblique && (
-                <InlineSl label="Inclination" testId="oblique-angle"
-                  help="How far the mountains lean. 90° is a flat map; 45° moves a point up by its own height; lower angles stand the relief up further."
-                  min={20} max={85} step={1} value={view.obliqueAngle ?? 45} onChange={v => sv({ obliqueAngle: v })} fmt={v => Math.round(v) + '°'} />
-              )}
-              {!view.orthographic && !view.planOblique && (
-                <InlineSl label="Focal length" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
-              )}
-              {/* fmt is not decoration: these mirror the orbit target, which a
-                  mouse pan moves continuously, and without it a drag left the
-                  field reading `-247.38194837`. Scene.jsx rounds at the source
-                  now; this keeps any stray float legible if one ever arrives. */}
-              <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
-              <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
-              <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
-                help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
-            </Sub>
+
+            {/* One choice, not two switches. Orthographic and Plan oblique sat
+                indented under Centre guides, as if they were guide options, and
+                could both be on. The segment writes the same two flags, so a
+                preset reopens as it was; with both set, plan oblique wins, as
+                it always did (it takes the parallel camera either way). */}
+            <Heading>Projection</Heading>
+            <SegGroup label="Projection" nameButtons testIdOf={(v) => `camera-projection-${v}`}
+              options={[['Perspective', 'persp'], ['Orthographic', 'ortho'], ['Plan oblique', 'oblique']]}
+              value={view.planOblique ? 'oblique' : view.orthographic ? 'ortho' : 'persp'}
+              onChange={(v) => sv(v === 'oblique' ? { planOblique: true, orthographic: false, tilt: 0 }
+                : { planOblique: false, orthographic: v === 'ortho' })}
+              style={{ marginBottom: 8 }} />
+            {view.planOblique && (
+              <InlineSl label="Inclination" testId="oblique-angle"
+                help="Plan oblique looks straight down, and moves every point up the sheet by its height, so the mountains stand up and lean over the ground behind them, as on Imfeld's and Berann's maps. The ground keeps its true shape and scale (after Jenny and Patterson, 2007). This sets how far they lean: 90° is a flat map, 45° moves a point up by its own height, and lower angles stand the relief up further."
+                min={20} max={85} step={1} value={view.obliqueAngle ?? 45} onChange={v => sv({ obliqueAngle: v })} fmt={v => Math.round(v) + '°'} />
+            )}
+            {view.orthographic && !view.planOblique && (
+              <Note>A parallel projection: no perspective distortion, as in an architectural drawing.</Note>
+            )}
+            {!view.orthographic && !view.planOblique && (
+              <InlineSl label="Focal length" min={10} max={120} value={view.fov} onChange={v => sv({ fov: v })} fmt={v => Math.round(v)} />
+            )}
+
+            <Heading>Target</Heading>
+            {/* fmt is not decoration: these mirror the orbit target, which a
+                mouse pan moves continuously, and without it a drag left the
+                field reading `-247.38194837`. Scene.jsx rounds at the source
+                now; this keeps any stray float legible if one ever arrives. */}
+            <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
+            <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
+            <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
+              help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
+            <div style={{ display:'flex', justifyContent:'flex-end', marginTop:4 }}>
+              <Btn variant="ghost" size="xs" onClick={() => onCameraPreset('reset')}
+                title="Reset the view only: aim, zoom, lens and pan" aria-label="Reset view"
+                data-testid="camera-reset">↺ Reset view</Btn>
+            </div>
           </Section>
 
           <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
@@ -3137,7 +3163,7 @@ export function Sidebar({
                 </div>
               )}
               <Btn block onClick={onPreflight} data-testid="preflight">Preflight</Btn>
-              <div data-testid="preflight-readout" style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.8 }}>
+              <div data-testid="preflight-readout" style={{ marginTop:6, fontSize:11, color: MUTED, lineHeight:1.6 }}>
                 {!plotStats ? (
                   'Measures the file a plotter would be given — after occlusion and the frame.'
                 ) : (() => {
@@ -3187,7 +3213,7 @@ export function Sidebar({
                   It *cuts* at the paper frame rather than hiding what falls
                   outside it, so a switch two stages away in Frame decides what
                   you get — and nothing else in the panel says so. */}
-              <div data-testid="export-extent" style={{ marginTop:2, fontSize:10, color: MUTED }}>
+              <div data-testid="export-extent" style={{ marginTop:2, fontSize:11, color: MUTED }}>
                 {view.showFrame
                   ? `Cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
                   : 'Writes the full canvas'}
@@ -3195,9 +3221,10 @@ export function Sidebar({
               {/* The second thing a plate carries, and the one nobody would
                   guess at: every PNG and SVG holds the whole parameter set, so
                   the picture opens again under Presets. */}
-              <div data-testid="export-carries" style={{ marginTop:2, fontSize:10, color: MUTED }}>
+              <div data-testid="export-carries" style={{ marginTop:2, fontSize:11, color: MUTED }}>
                 PNG and SVG carry the preset
               </div>
+              <PenStrip pens={pens} inksAsPicked={style.inksAsPicked} onInksAsPicked={(v) => ss({ inksAsPicked: v })} />
             </div>
 
             {/* The other files: pictures, a print, a recording and the raster.
@@ -3215,7 +3242,7 @@ export function Sidebar({
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}
           <Section title="Analysis" open={sec.analysis} onToggle={() => tog('analysis')}>
-            <div style={{ fontSize:10, color:MUTED, marginBottom:4 }}>
+            <div style={{ fontSize:11, color:MUTED, marginBottom:4 }}>
               Click two points on the terrain to sample a cross-section.
             </div>
             <button

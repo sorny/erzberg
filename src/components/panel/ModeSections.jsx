@@ -1195,7 +1195,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Detail scale" help="How long a bump can be and still count as detail, in samples along the line. Small: single crags. Large: whole spurs and benches." min={1} max={30} step={1} value={style.smoothWaveform ?? 4} onChange={v => ss({ smoothWaveform: Math.round(v) })} fmt={v => (mPerWorld ? `${Math.round(v)} · ${Math.round(v * (style.spacingWaveform ?? 1.5) * mPerWorld)} m` : String(Math.round(v)))} />
                   <InlineSl label="Gamma" help="Bends the heights before they become widths. Above 1 narrows the low ground and keeps the summit wide. Below 1 widens the low ground." min={0.2} max={4} step={0.05} value={style.gammaWaveform ?? 1} onChange={v => ss({ gammaWaveform: v })} fmt={v => v.toFixed(2)} />
                   {style.clipWaveform && (
-                    <Tog label="Clip at width" help="This plate is from before v1.59, when a sharpened sample wider than Width was cut at Width. A run of cut samples draws a flat edge. Switch it off to compress the overshoot instead." testId="waveform-clip" checked={!!style.clipWaveform} onChange={v => ss({ clipWaveform: v })} />
+                    <Tog label="Clip at width" help="This plate comes from an older version, which cut a sharpened sample wider than Width at Width. A run of cut samples draws a flat edge. Switch it off to compress the overshoot instead." testId="waveform-clip" checked={!!style.clipWaveform} onChange={v => ss({ clipWaveform: v })} />
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Waveform" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />

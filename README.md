@@ -340,14 +340,20 @@ with or without a fill. A mode's *Halo* breaks the lines behind its strokes.
 *Stroke depth bias* keeps strokes on steep slopes at full width in front of the
 terrain. Hidden segments can take their own colour and opacity.
 
+**Pen layers.** Output lists the layers the SVG will hold under the SVG
+button: one row per pen, with its ink. A layer coloured by height or slope says
+`mixed`, because one pen cannot draw it as shown. Preflight counts exactly when
+filled areas or hidden lines are drawing.
+
 **Inks as picked.** By default inks pass through a filmic tone curve and look
-softer on screen. Switch this on in Terrain Style to draw and export every ink
-exactly as picked, so a pen matched to a swatch matches the plot.
+softer on screen. Switch this on in Terrain Style, or under the pen layers, to
+draw and export every ink exactly as picked, so a pen matched to a swatch
+matches the plot.
 
 **Plan oblique.** A straight-down view in which each point moves up the sheet
 by its height (Jenny and Patterson, 2007), so the mountains stand up while the
-ground keeps its true shape and scale. It is in the Camera section, and the PNG
-and SVG follow it.
+ground keeps its true shape and scale. Pick it under Camera › Projection, and
+the PNG and SVG follow it.
 
 **Anaglyph.** Every layer is drawn twice with a real parallax offset, for
 red/cyan glasses. Filled areas take the eye's ink too, with their tone as its

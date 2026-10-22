@@ -115,7 +115,7 @@ export const BODY_W = 272   // what the controls get, unchanged
 function themeVars(P) {
   const kebab = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
   return Object.entries(P).map(([k, v]) => `--hm-${kebab(k)}: ${v};`).join(' ') +
-    ` --hm-accent-ring: ${P.accent}80; --hm-green-glow: ${P.on}88;`
+    ` --hm-accent-ring: ${P.accent}80; --hm-on-glow: ${P.on}88;`
 }
 
 /*
@@ -284,8 +284,8 @@ export function PanelStyles() {
       .hmc::-webkit-color-swatch-wrapper { padding:0; }
       .hmc::-webkit-color-swatch { border:none; border-radius:3px; }
       .hmc:focus-visible { outline:2px solid ${ACCENT}; outline-offset:1px; }
-      .hmeb:hover { background:${ACCENT_DEEP} !important; border-color:${ACCENT_DEEP} !important; color:${ON_ACCENT} !important; }
-      .hmeb:hover .hmeh { color:${ON_ACCENT} !important; opacity:.75; }
+      /* Iron, not ore: a hover is not a state, and ore means "on". */
+      .hmeb:hover { border-color:${MUTED} !important; color:${TEXT} !important; }
       .hmsb.on { background:${ACCENT_DEEP} !important; color:${ON_ACCENT} !important; border-color:${ACCENT_DEEP} !important; }
       .hmsb:hover:not(.on) { background:${BORDER} !important; color:${DIM} !important; }
       .hmload:hover { background:${SURF} !important; color:${TEXT} !important; }
@@ -358,6 +358,7 @@ export function PanelStyles() {
       /* Buttons: one response to hover and press, whatever their colours. */
       .hmbtn { transition:filter .12s var(--hm-ease), transform .08s var(--hm-ease), border-color .15s, color .15s; }
       .hmbtn:not(:disabled):hover { filter:brightness(1.2); }
+      .hmbtn.hmprimary:not(:disabled):hover { filter:none; background:var(--hm-dim) !important; border-color:var(--hm-dim) !important; }
       .hmbtn:not(:disabled):active { transform:translateY(.5px) scale(.985); }
       .hmeb, .hmsb, .sym-btn, .hmload { transition:background .15s var(--hm-ease), border-color .15s var(--hm-ease), color .15s var(--hm-ease), transform .08s; }
       .hmeb:active, .hmsb:active, .sym-btn:active { transform:scale(.97); }
@@ -399,7 +400,7 @@ export function PanelStyles() {
       .hmcard:hover .hmchev { color:${TEXT}; }
       .hmcardhit { -webkit-appearance:none; appearance:none; background:none;
         border:none; font:inherit; color:inherit; text-align:left; width:100%;
-        display:block; padding:0; cursor:pointer; }
+        height:100%; display:flex; flex-direction:column; padding:0; cursor:pointer; }
       .hmcardhit:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
       .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
         padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
@@ -965,7 +966,7 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
             data-testid={testIdOf ? testIdOf(v) : undefined} disabled={off} title={opt?.title}
             aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
             style={{
-              flex: 1, fontSize: 10, padding:'3px 2px', borderRadius: 3, border:'none',
+              flex: 1, fontSize: 11, padding:'2px 2px', borderRadius: 3, border:'none',
               cursor: off ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
               opacity: off && !on ? DISABLED_OPACITY : 1,
               ...(capitalize && { textTransform:'capitalize' }),
@@ -1126,7 +1127,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         <span className="hmsectitle" style={{ fontSize:12, fontWeight:600, color: DIM, display:'flex', alignItems:'center', minWidth:0 }}>
           {/* The dot says "on" for a section whose switch is somewhere else. A
               section with its own switch in the header has said it already. */}
-          {enabled && !onEnabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-green-glow)' }} />}
+          {enabled && !onEnabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-on-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</span>
         </span>
@@ -1285,10 +1286,12 @@ export function Stage({ n, title, children }) {
         {/* The lozenge again, for the reason the rail carries one: Presets is a
             destination and not a step, and `00` in the pipeline's own column
             would say it was the step before Ground. */}
-        <span style={{ fontSize:10, fontWeight:600, color: ACCENT_TEXT, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+        {/* Muted, not ore: a stage number is an index, and ore means "on". */}
+        <span style={{ fontSize:10, fontWeight:600, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
         </span>
-        <h2 className="hmstagetitle" style={{ margin:0, fontSize:12, color: TEXT }}>
+        {/* 13, a step above the 12 px section titles under it. */}
+        <h2 className="hmstagetitle" style={{ margin:0, fontSize:13, color: TEXT }}>
           {title}
         </h2>
       </div>
@@ -1380,7 +1383,7 @@ export function StageRail({ stage, onStage, live, hits }) {
         // is what every other "this is what you searched for" wears.
         const badge = count > 0
         return (
-          <button key={n} type="button" className="hmtab" role="tab"
+          <button key={n} type="button" className="hmtab" role="tab" id={`hm-tab-${n}`}
             ref={(el) => { refs.current[n] = el }}
             data-testid={`stage-tab-${title.toLowerCase()}`}
             data-tab-stage={n}
@@ -1416,7 +1419,7 @@ export function StageRail({ stage, onStage, live, hits }) {
             {/* A lozenge, not `00`. Presets is a destination and not a step
                 the renderer runs, and a digit in the pipeline's own column
                 would claim it was one. */}
-            <span style={{ display:'block', paddingRight:11, fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums', color: sel ? ACCENT_TEXT : undefined }}>
+            <span style={{ display:'block', paddingRight:11, fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
               {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
             </span>
             {/* The whole word, across the whole tab. `Terr`, `Surf` and `Pre`
@@ -1430,8 +1433,10 @@ export function StageRail({ stage, onStage, live, hits }) {
               <span aria-hidden="true" style={{
                 position:'absolute', top:6, right:4,
                 minWidth:13, height:13, borderRadius:5, padding:'0 3px',
-                background: filtering ? ACCENT : GREEN,
-                color: ON_ACCENT,
+                // Marks that are on are live state, so ore. Search hits are
+                // not, so they take the inverse, like a primary button.
+                background: filtering ? STRONG : GREEN,
+                color: filtering ? BG : ON_ACCENT,
                 fontSize:9, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
                 fontVariantNumeric:'tabular-nums',
               }}>{count}</span>
@@ -1460,12 +1465,16 @@ export function StageRail({ stage, onStage, live, hits }) {
  *
  *   quiet    the default — a surface with an edge
  *   ghost    no ground of its own; for dismissers and inline actions
- *   primary  the accent, under white text
+ *   primary  the panel inverted: paper on iron in the light theme, iron on
+ *            paper in the dark. Not ore — ore means "on", and an action is
+ *            not a state.
  *   toggle   `on` decides which of the two it is
  */
+// 11 px from xs up: a control you click takes the label size. 9 and 10 px are
+// for what you only read — indexes, readouts, the version.
 const BTN_SIZES = {
-  xs: { fontSize: 10,  padding: '2px 6px', borderRadius: 3 },
-  sm: { fontSize: 10, padding: '3px 6px', borderRadius: 3 },
+  xs: { fontSize: 11, padding: '1px 6px', borderRadius: 3 },
+  sm: { fontSize: 11, padding: '3px 6px', borderRadius: 3 },
   md: { fontSize: 11, padding: '5px 7px', borderRadius: 5 },
   // The main action of a block: Surprise me, Run erosion, Apply.
   lg: { fontSize: 11, padding: '8px 8px', borderRadius: 5, fontWeight: 600 },
@@ -1482,13 +1491,13 @@ export function Btn({
     ? (on ? { background: ACCENT_DEEP, color: ON_ACCENT, border: `1px solid ${ACCENT_DEEP}` }
           : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` })
     : variant === 'primary'
-      ? { background: ACCENT_DEEP, color: ON_ACCENT, border: `1px solid ${ACCENT_DEEP}` }
+      ? { background: STRONG, color: BG, border: `1px solid ${STRONG}` }
       : variant === 'ghost'
         ? { background: 'none', color: MUTED, border: 'none' }
         : { background: SURF, color: MUTED, border: `1px solid ${BORDER}` }
 
   return (
-    <button type="button" {...rest} className={`hmbtn${rest.className ? ` ${rest.className}` : ''}`} style={{
+    <button type="button" {...rest} className={`hmbtn${variant === 'primary' ? ' hmprimary' : ''}${rest.className ? ` ${rest.className}` : ''}`} style={{
       ...BTN_SIZES[size], ...look,
       cursor: rest.disabled ? 'default' : 'pointer',
       fontFamily: 'inherit',

@@ -291,7 +291,12 @@ screen: Jet's `#800000` renders as `#ca0006`. Two facts were measured:
 
 `tests/unit/screen-ink.test.js` pins four pairs read from the running app.
 
-**Inks as picked** (`inksAsPicked`, Surface → Terrain Style) turns both steps
+The curve itself is in `utils/screenInk.js`, so the panel's pen strip
+(`utils/pens.js`) can show an ink as the file will write it without loading the
+exporter.
+
+**Inks as picked** (`inksAsPicked`, Surface → Terrain Style, mirrored under the
+pen layers in Output) turns both steps
 off for inks. The line, ghost, lid and fill materials skip tone mapping, and
 vertex colours are converted from sRGB to linear before upload, so the output
 encode returns the picked hex. The SVG then writes the picked hex instead of

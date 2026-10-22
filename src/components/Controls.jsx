@@ -11,6 +11,7 @@
  */
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
+import { isTyping } from '../utils/shortcuts'
 
 export function Controls({ getParams, setParams, orbitRef }) {
   const { camera } = useThree()
@@ -20,8 +21,9 @@ export function Controls({ getParams, setParams, orbitRef }) {
       // BUTTON as well as the text fields: Space is this component's pause key
       // and also the browser's "press the focused button", so without it a
       // click on any panel button leaves Space toggling that button instead.
+      // A focused checkbox answers Space the same way. `q` passes a slider.
       const tag = e.target.tagName
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return
+      if (isTyping(e.target) || tag === 'BUTTON' || (e.code === 'Space' && tag === 'INPUT')) return
       // Bare keys only — see the same guard in App.jsx.
       if (e.metaKey || e.ctrlKey || e.altKey) return
 

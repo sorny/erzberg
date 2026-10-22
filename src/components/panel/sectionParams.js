@@ -108,7 +108,9 @@ export const ALSO_READS = {
   'Anaglyph': ['bgColor', 'orthographic'],
   'Export': ['frameLandscape', 'showFrame', 'plotWidthMm',
     // The hatch controls show only while a mode that exports filled areas is on.
-    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
+    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed',
+    // Mirrored under the pen layers: it changes every ink in the file.
+    'inksAsPicked'],
   'Scale and North': ['orthographic', 'plotWidthMm', 'tilt'],
   'Texture': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],
