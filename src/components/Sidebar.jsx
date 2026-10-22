@@ -894,6 +894,16 @@ export function Sidebar({
   const plate = useMemo(
     () => buildPlateLine({ style, vectorLayers, textLayers, coverClasses: cover?.classes?.length ?? 0 }),
     [style, vectorLayers, textLayers, cover])
+  /*
+   * The Camera sliders: live while dragged, committed when let go. `camLive`
+   * moves the camera without a render (see `cameraLive` in the store); the
+   * commit writes the view and ends the live state, which also lets the orbit
+   * sync back in.
+   */
+  const camLive = useStore((s) => s.setCameraLive)
+  const endCamLive = useStore((s) => s.clearCameraLive)
+  const camCommit = (patch) => { sv(patch); endCamLive() }
+
   /** The pen layers the SVG will hold, from the geometry it will be written from. */
   const pens = useMemo(
     () => pensOf(lineGeo, { ...terrain, ...style, ...view, vectorLayers, textLayers }),
@@ -2921,10 +2931,10 @@ export function Sidebar({
               ))}
             </div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => sv({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => sv({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
+              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => camCommit({ tilt: v })} onLive={v => camLive({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => camCommit({ zoom: (v / 100) * baseZoom })} onLive={v => camLive({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => sv({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
             <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
             <Tog label="Auto-rotate" hint={<Key>Q</Key>} checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
@@ -2968,9 +2978,9 @@ export function Sidebar({
                 mouse pan moves continuously, and without it a drag left the
                 field reading `-247.38194837`. Scene.jsx rounds at the source
                 now; this keeps any stray float legible if one ever arrives. */}
-            <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => sv({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
-            <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => sv({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
-            <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => sv({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
+            <InlineSl label="Pan X" min={-1000} max={1000} value={Math.round(view.panX ?? 0)} onChange={v => camCommit({ panX: v })} onLive={v => camLive({ panX: v })} fmt={v => Math.round(v)} testId="pan-x" />
+            <InlineSl label="Pan Y" min={-1000} max={1000} value={Math.round(view.panY ?? 0)} onChange={v => camCommit({ panY: v })} onLive={v => camLive({ panY: v })} fmt={v => Math.round(v)} testId="pan-y" />
+            <InlineSl label="Pan Z" min={-1000} max={1000} value={Math.round(view.panZ ?? 0)} onChange={v => camCommit({ panZ: v })} onLive={v => camLive({ panZ: v })} fmt={v => Math.round(v)} testId="pan-z"
               help="Raises or lowers the point the camera orbits. Pan X and Y slide it across the ground; this one lifts it into the air — useful for framing something above the terrain, such as a murmuration, without tilting the horizon." />
             <div style={{ display:'flex', justifyContent:'flex-end', marginTop:4 }}>
               <Btn variant="ghost" size="xs" onClick={() => onCameraPreset('reset')}

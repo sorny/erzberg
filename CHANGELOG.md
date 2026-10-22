@@ -124,6 +124,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Camera sliders are smooth.** Tilt, Zoom, Rotation and Pan X, Y and Z
+  wrote the view into App state at every step, and every step re-rendered the
+  whole panel. A drag ran at a few frames a second, with gaps of 100–130 ms in
+  a headed Chromium, while the wheel, which moves the camera directly, was
+  smooth. Now a dragged camera slider moves the camera through the store
+  (`cameraLive`) and writes state once, when it is let go, or after 250 ms
+  without a step. During a drag every frame takes about 18 ms. The slider
+  shows a local draft while it moves (`onLive` on `Sl` and `InlineSl`).
+
 - **Shortcuts work after a slider.** Clicking a slider focuses it, and every
   key handler stepped aside for any `<input>`. So `[` `]` `/` `\`, the export
   keys, `E`, `Q` and ⌘Z did nothing until a click elsewhere. Only fields that

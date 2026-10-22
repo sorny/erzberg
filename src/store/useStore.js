@@ -308,6 +308,21 @@ export const useStore = create((set) => ({
       return { mapScale: next }
     }),
 
+  /**
+   * The camera while a Camera slider is being dragged: `{ tilt, rotation, zoom,
+   * panX, panY, panZ }`, any subset, or null.
+   *
+   * The wheel was smooth and the sliders were not, and the difference was one
+   * React round trip. The wheel moves the camera directly; a slider wrote the
+   * view into App state on every step, and every step re-rendered the whole
+   * panel. Now a slider writes here while it moves — Scene subscribes and
+   * moves the camera, and nothing re-renders — and writes App state once, when
+   * it is let go. Nothing reads this in render, so it re-renders nothing.
+   */
+  cameraLive: null,
+  setCameraLive: (patch) => set((s) => ({ cameraLive: { ...s.cameraLive, ...patch } })),
+  clearCameraLive: () => set((s) => (s.cameraLive ? { cameraLive: null } : {})),
+
   setVectorHover: (h) => set({ vectorHover: h }),
   setVectorSelected: (v) => set({ vectorSelected: v }),
 

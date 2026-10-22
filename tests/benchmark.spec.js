@@ -134,8 +134,8 @@ test('performance benchmark', async ({ page }) => {
   await openStage(page, 'surface')
 
   // Ensure "Terrain Style" section is open
-  const styleHeader = page.locator('div:has-text("Terrain Style")').last()
-  await styleHeader.click()
+  const styleHeader = page.locator('[data-testid="section-terrain-style"]')
+  if ((await styleHeader.getAttribute('aria-expanded')) !== 'true') await styleHeader.click()
   await page.waitForTimeout(500)
 
   const fillColorRow = page.locator('div:has(> span:text-is("Fill"))')
