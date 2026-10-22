@@ -251,7 +251,7 @@ test('the panel says when the camera cannot give it depth', async ({ page }) => 
     await camera.click()
     await page.waitForTimeout(300)
   }
-  await page.locator('input[type=checkbox][aria-label="Orthographic"]').click()
+  await page.locator('[data-testid="camera-projection-ortho"]').click()
   await page.waitForTimeout(1200)
   await openAnaglyph(page)
   await expect(note).toContainText('Orthographic — no depth')

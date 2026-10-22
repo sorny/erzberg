@@ -1,6 +1,9 @@
-# Pens: brief (shape, not built)
+# Pens: brief
 
-Status: plan only, 2026-10-21. Nothing in this brief changes how a plate renders.
+Status: the pen strip is built (2026-10-22): `src/utils/pens.js` (`pensOf`) and
+`src/components/panel/PenStrip.jsx`, under the SVG button in Output. The Pen row
+in the Line style fold and the ink list from "N inks" are not built yet.
+Nothing in this brief changes how a plate renders.
 Assumptions that were not confirmed with the user are marked *(assumed)*.
 
 ## Job and audience
@@ -58,9 +61,27 @@ Assumptions that were not confirmed with the user are marked *(assumed)*.
 - Pen counts that only Preflight can know (for example the Watershed basins) show
   as "counted at Preflight", not as a guess.
 
-## Open decisions (do not invent)
+## Decisions (settled 2026-10-22)
 
-1. Is the ink list read-only, or can a swatch recolour every mark that shares it?
-2. Does a gradient source on a line mode stay one layer? Splitting it per band is
-   a render change, so it needs the preset rule above.
-3. Do vector layers and text join the same list, or does the list show marks only?
+1. **Read-only.** A swatch does not recolour. An ink is changed in its own
+   mode, and two marks in one colour stay two layers, because the file writes
+   two.
+2. **A gradient source on a line mode stays one layer.** The strip says
+   `mixed` and draws one ramp chip, and its tooltip names Line colour as the
+   way to one ink. Splitting per band is a render change and is not planned.
+3. **Vector layers and text join the list.** Each is a pen layer in the file,
+   so each is a row. The flock and the scale and north layers are not pen
+   layers (`plot.pens` does not count them), so they are not rows.
+
+## As built
+
+- `pensOf(lineGeo, p)` reads the geometry the exporter is handed and the same
+  `layerStyle` names, not the settings. A line, dot or text layer is one row in
+  its ink. A per-vertex layer is one `mixed` row. An area layer is one row with
+  a chip per ink.
+- The count is exact unless an area layer is drawing or hidden lines are drawn
+  (Depth occlusion on and Hidden opacity above 0). Then it says `up to N`
+  (`+ hidden`), and Preflight counts exactly.
+- Inks show as the file writes them: through the tone curve, unless Inks as
+  picked is on. That switch is mirrored under the strip.
+- The default plate: the strip says 3, and Preflight counts 3.

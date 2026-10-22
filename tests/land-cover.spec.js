@@ -315,7 +315,7 @@ test('with Inks as picked, the pens are the class inks exactly', async ({ page }
   await page.click('[data-testid="cover-palette-distinct"]')
   await page.fill('[data-testid="panel-filter"]', 'Inks as picked')
   await page.waitForTimeout(500)
-  await page.locator('input[type=checkbox][aria-label="Inks as picked"]').evaluate((el) => { if (!el.checked) el.click() })
+  await page.locator('[data-testid="inks-as-picked"]').evaluate((el) => { if (!el.checked) el.click() })
   await page.fill('[data-testid="panel-filter"]', '')
   await page.waitForTimeout(300)
 

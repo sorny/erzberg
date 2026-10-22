@@ -43,7 +43,7 @@ test('plan oblique moves the strokes the SVG writes', async ({ page }) => {
   const flat = await exportSvg(page)
 
   await openStage(page, 'frame')
-  await page.locator('[data-testid="plan-oblique"]').check({ force: true })
+  await page.locator('[data-testid="camera-projection-oblique"]').click()
   await page.waitForTimeout(1500)
   await expect(page.locator('[data-section="Camera"]')).toContainText('oblique')
   const oblique = await exportSvg(page)

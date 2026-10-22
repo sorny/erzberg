@@ -87,3 +87,21 @@ export const SHORTCUTS = [
 
 /** Every `e.code` the card accounts for. The drift test compares against this. */
 export const CODES = new Set(SHORTCUTS.flatMap((g) => g.rows.flatMap((r) => r.codes ?? [])))
+
+/**
+ * Whether a key pressed with `el` focused is typing, so a shortcut must leave
+ * it alone.
+ *
+ * The handlers used to step aside for every `<input>`. A slider is an input,
+ * and clicking one focuses it, so after a drag `[` `]` `/` `\` and the export
+ * keys did nothing until a click somewhere else — in a tool whose loop is drag,
+ * then move on. A range, a checkbox or a colour well takes no characters, so
+ * only fields that do are excluded. A `<select>` counts: letters jump its
+ * options.
+ */
+const TYPED = new Set(['text', 'search', 'number', 'email', 'url', 'tel', 'password'])
+export function isTyping(el) {
+  if (!el) return false
+  if (el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable) return true
+  return el.tagName === 'INPUT' && TYPED.has(el.type)
+}

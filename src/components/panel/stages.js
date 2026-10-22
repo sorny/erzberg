@@ -51,16 +51,14 @@ export const STAGES = [
  * Presets is a destination, not a step.
  *
  * It writes style, particles and view in one act, so it belongs to every pane
- * downstream and to none of them — it sat in Source only because the load block
- * did. A slot above the pipeline, set apart by a rule and numbered with a
+ * downstream and to none of them — it sat in the first stage only because the
+ * load block did. A slot above the pipeline, set apart by a rule and numbered with a
  * lozenge rather than a digit, says plainly that it is somewhere you go rather
  * than a stage the renderer runs.
  *
- * Named for the one section it holds, and abbreviated `Pre` because the rail
- * has about 29 px once the badge lane is taken out. The alternative was a
- * second word for the same thing, and the panel already carries two — the line
- * under the load block reads `Style  Alpine Survey`, and the grid inside says
- * `STYLES (56)`.
+ * Named for the one section it holds. A second word for the same thing was
+ * the alternative, and the panel already carries two: the line under the load
+ * block reads `Style  Alpine Survey`, and the grid inside says `STYLES (56)`.
  */
 export const PRESETS_STAGE = 0
 
@@ -139,14 +137,14 @@ const STATED = {
 /**
  * Sections that always carry a value, and so are never "on".
  *
- * The rail badge counts lit sections, and "lit" is what the green dot means: a
- * section whose on/off state the panel can see. These four always state a
+ * The rail badge counts lit sections: a section whose on/off state the panel
+ * can see, shown by the ore dot or the header switch. These four always state a
  * setting — a resolution, a black point, a lens, a mode count — so they pass no
  * `enabled`, carry no dot, and would otherwise make Ground read `2` and Frame
  * read `1` on a panel where nothing at all is switched on.
  *
  * Paper is not among them: it says `—` until the frame is switched on, which is
- * exactly what a dot is for.
+ * exactly what an on state is for.
  * `panel.spec.js` holds this to the rendered panel: every title here must be a
  * section that renders no dot.
  */

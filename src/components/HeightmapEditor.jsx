@@ -19,6 +19,7 @@ import { effectiveBounds, isUsableShape, shapeRings } from '../utils/heightmapEd
 // HEX for the canvas passes below — a 2D context cannot resolve var().
 import { DESK, FONT, GLASS_BG, GLASS_BORDER, GLASS_TEXT, HEX, TEXT, VEIL } from './panel/ui'
 import { THEME_EVENT } from '../utils/theme'
+import { isTyping } from '../utils/shortcuts'
 
 const HANDLE = 8          // handle hit radius / half-size, screen px
 const MIN_RECT = 4        // smallest crop, source px
@@ -759,7 +760,7 @@ export function HeightmapEditor({
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (isTyping(e.target)) return
       if (!polyRef.current) return
       if (e.code === 'Backspace') {
         e.preventDefault()

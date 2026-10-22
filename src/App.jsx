@@ -57,6 +57,7 @@ import { toneFor } from './utils/imageryTone'
 import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
+import { isTyping } from './utils/shortcuts'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 function BgSync({ color, gradient }) {
@@ -2190,7 +2191,7 @@ export default function App() {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (isTyping(e.target)) return
 
       /*
        * The one chord, and why it is the exception.

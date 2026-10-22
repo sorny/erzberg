@@ -138,18 +138,26 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               data-testid={`mode-open-${id}`}
               onClick={() => onOpen(title)}>
               <span style={{
-                display:'flex', alignItems:'center', justifyContent:'center',
+                display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
                 height:28, color: on ? DIM : MUTED, opacity: on ? 1 : 0.62,
               }}>
                 <ModeMark kind={MARK_FOR[id]} />
               </span>
+              {/* 11 px, the label size: this is the panel's main picker, and
+                  at 9 px it was the smallest text in it. A two-word name wraps
+                  to a second line instead of losing its end — `Roughness Mesh`
+                  was cut at 9 px already. A row of tiles takes the height of
+                  its tallest, and the name strip fills it. */}
               <span style={{
-                display:'flex', alignItems:'center', gap:1,
-                padding:'3px 2px 4px 5px', borderTop:`1px solid ${BORDER}`,
-                fontSize:9, letterSpacing:0,
+                flex:1, display:'flex', alignItems:'center', gap:0,
+                padding:'3px 1px 4px 4px', borderTop:`1px solid ${BORDER}`,
+                // A hair of tracking back, so the longest single words
+                // (Reticulation, Hypsometry) fit a third of the body whole.
+                fontSize:11, lineHeight:1.15, letterSpacing:'-0.01em',
                 color: on ? DIM : MUTED, minWidth:0, fontWeight: on ? 600 : 500,
               }}>
-                <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                <span style={{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis',
+                  display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', hyphens:'auto' }}>
                   {name}
                 </span>
                 {/* The chevron is what says the card goes somewhere. It is the
@@ -157,7 +165,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
                     second target was invisible. */}
                 {copies.length > 0 && (
                   <span data-testid={`mode-copies-${id}`} title={`${copies.length + 1} copies of ${name}`}
-                    style={{ flexShrink:0, fontSize:9, fontFamily: MONO, color: MUTED, marginRight:2 }}>
+                    style={{ flexShrink:0, fontSize:10, fontFamily: MONO, color: MUTED, marginRight:2 }}>
                     ×{copies.length + 1}
                   </span>
                 )}
@@ -166,7 +174,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               </span>
             </button>
             {/*
-              * The switch. Over the card's top-left corner, so it takes a 20 px
+              * The switch. Over the card's top-left corner, so it takes a 24 px
               * target out of a 28 px glyph row and costs the tile no height.
               *
               * It writes the same `enabled<Id>` the section's own switch writes,
@@ -188,14 +196,15 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               onClick={blocked ? undefined : () => onToggle(key, !on)}
               style={{
                 cursor: blocked ? 'not-allowed' : undefined,
-                position:'absolute', left:0, top:0, width:20, height:20, zIndex:1,
+                // 24 px, the WCAG 2.5.8 minimum target. The dot inside stays 9.
+                position:'absolute', left:0, top:0, width:24, height:24, zIndex:1,
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>
               <span aria-hidden="true" className="hmpipdot" style={{
                 width:9, height:9, borderRadius:'50%',
                 border:`1.5px solid ${on ? (waiting ? WARN : GREEN) : MUTED}`,
                 background: on ? (waiting ? WARN : GREEN) : 'transparent',
-                boxShadow: on ? '0 0 6px var(--hm-green-glow)' : 'none',
+                boxShadow: on ? '0 0 6px var(--hm-on-glow)' : 'none',
               }} />
             </button>
           </div>
