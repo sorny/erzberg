@@ -15,7 +15,7 @@ import { openStage, resetToDefaults } from './helpers.js'
 
 async function boot(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
   await resetToDefaults(page)
   await openStage(page, 'overlay')   // the Text section is in Overlay
   await page.getByText('Text', { exact: true }).first().click()

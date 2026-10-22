@@ -374,7 +374,7 @@ test('a continuous stroke exports as one polyline, losing nothing', async ({ pag
    * count and the same total drawn length.
    */
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await setTilt(page)
 
@@ -405,7 +405,7 @@ test('a dashed layer still exports as separate pieces', async ({ page }) => {
   // so they are genuinely disconnected and must not be rejoined — doing so would
   // draw the gaps back in.
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await setTilt(page)
 

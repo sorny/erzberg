@@ -18,14 +18,14 @@ test('the app loads without contacting anyone', async ({ page }) => {
     }
   })
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
   await page.waitForTimeout(2500)
   expect(external, `contacted: ${external.join(', ')}`).toEqual([])
 })
 
 test('the self-hosted face is the one that renders', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
   const r = await page.evaluate(async () => {
     await document.fonts.ready
     const loaded = [...document.fonts].map((f) => `${f.family} ${f.weight} ${f.status}`)

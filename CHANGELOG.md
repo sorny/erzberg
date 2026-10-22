@@ -19,8 +19,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The rows come from `pensOf` (`utils/pens.js`), which reads the geometry the
   exporter is handed. The tone curve moved to `utils/screenInk.js`, so the
   panel does not load the exporter.
+- **A warning for a layer in many colours.** When a pen layer is `mixed`, a
+  brass line under the strip says so ("Contours has 2 layers in many colours.
+  One pen cannot draw them.") with a **One ink** button that sets that mode's
+  Colour to Line. The opening plate is such a case: before, its only warning
+  was a tooltip. A mode copy's layer is named, but has no button.
+- **One count for pens.** The standing line and the strip both print
+  `3 layers · 1 ink · 2 mixed`, from the same `penLine`, so they cannot
+  disagree. The standing line counted `color*` settings before ("2 inks")
+  while the strip counted layers. A mixed layer has no one ink, so it is
+  counted apart. Vector and text layers are pen layers, so they are in the
+  layer count.
+- Empty Overlay sections say what they hold under their header: Vector
+  Layers, Text and Particles. Overlay was three headers that each said `–`.
 
 ### Changed
+
+- **Reasons are text, not tooltips.** A segment option that cannot be picked
+  (Colour › Class and Plate without a cover plate) stays in the tab order as
+  `aria-disabled`, and its reason is a line under the group that the option
+  points to (`aria-describedby`). Pen rows say their ink to a screen reader
+  ("Crosshatch, ink #c0d5db").
+- The Reset all and section-reset toasts say `or ⌘Z`, stay open while the
+  pointer or the keyboard is in them, and their Undo button is paper on iron.
+- The stats footer (segments, grid, rebuild time) shows on Output only.
+  Under every stage it read as part of the open pane.
+- The mode pip is a square check box with a tick, not a round dot: any
+  number of marks can be on. The glow is gone.
+- The Presets stage has no second "Presets" header under its title.
+- The hypsometric integral sits in a sunk well with its full name, as a
+  measurement rather than a control row. Its help marks the band it falls in.
+- The `Style · Alpine Survey` line is 11 px: the name is a button. The
+  wordmark and the stage title stay at 13 px; face and case set them apart.
+- `GREEN` is now `ON`: the token renders ore.
 
 - **Ore means "on" again.** The primary buttons (SVG, Surprise me, Fetch, Run
   erosion) are the panel inverted, paper on iron, instead of ore. The search

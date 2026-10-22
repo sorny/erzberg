@@ -16,7 +16,7 @@ import { openStage, resetToDefaults } from './helpers.js'
 
 async function openHillshade(page) {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openStage(page, 'surface')
   await page.click('[data-testid="section-hillshade"]')
@@ -174,7 +174,7 @@ test('the almanac never writes to the sliders it replaces', async ({ page }) => 
 
 test('a georeferenced raster answers the latitude itself', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const [chooser] = await Promise.all([

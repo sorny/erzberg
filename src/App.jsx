@@ -10,7 +10,7 @@ import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { reachError } from './utils/netError'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { ACCENT, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -198,14 +198,22 @@ function Kbd({ children }) {
  * dialog taxes the deliberate case to protect the accidental one.
  */
 function Toast({ toast, onDismiss }) {
+  // Held open while the pointer or the keyboard is in it. Nine seconds is long
+  // enough to read and click, and not long enough to Tab to from the panel:
+  // a toast that closes under a keyboard user's focus takes its Undo with it.
+  const [held, setHeld] = useState(false)
   useEffect(() => {
-    if (!toast) return
+    if (!toast || held) return
     const t = setTimeout(onDismiss, toast.action ? 9000 : 4500)
     return () => clearTimeout(t)
-  }, [toast, onDismiss])
+  }, [toast, onDismiss, held])
+  useEffect(() => { setHeld(false) }, [toast])
   if (!toast) return null
   return (
-    <div data-testid="toast" role="status" aria-live="polite" style={{
+    <div data-testid="toast" role="status" aria-live="polite"
+      onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)}
+      onFocus={() => setHeld(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHeld(false) }}
+      style={{
       position:'fixed', bottom:24, left:'50%', transform:'translateX(-50%)',
       ...GLASS, borderRadius:10,
       padding:'9px 10px 9px 16px', zIndex:4500, display:'flex', alignItems:'center', gap:12,
@@ -216,12 +224,17 @@ function Toast({ toast, onDismiss }) {
         @media (prefers-reduced-motion: reduce) { [data-testid="toast"] { animation:none !important } }`}</style>
       <span style={{ flex:1 }}>{toast.msg}</span>
       {toast.action && (
+        // Paper on iron, like the panel's primary buttons: an action, not a state.
         <button data-testid="toast-action" onClick={() => { toast.onAction?.(); onDismiss() }} style={{
-          background:ACCENT_DEEP, border:'none', borderRadius:5, cursor:'pointer',
-          color: ON_ACCENT, fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
+          background: STRONG, border:'none', borderRadius:5, cursor:'pointer',
+          color: BG, fontSize:12, fontWeight:600, padding:'5px 12px', fontFamily:'inherit',
           whiteSpace:'nowrap',
         }}>{toast.action}</button>
       )}
+      {/* Both Undo toasts (Reset all, a section reset) are history steps, so
+          the app's own undo key takes them back from anywhere — said here,
+          because it is the way back that needs no Tab at all. */}
+      {toast.action === 'Undo' && <span style={{ fontSize:11, color: MUTED, whiteSpace:'nowrap' }}>or <Kbd>⌘Z</Kbd></span>}
       <button onClick={onDismiss} aria-label="Dismiss" style={{
         background:'none', border:'none', color:MUTED, cursor:'pointer',
         fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:5,

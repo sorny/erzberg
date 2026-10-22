@@ -32,9 +32,6 @@ async function openSoundscapes(page) {
  */
 async function applyPreset(page, name) {
   await openStage(page, 'presets')
-  // Idempotent — the section ships open, so an unconditional click closes it.
-  const header = page.locator('[data-testid="section-presets"]')
-  if ((await header.getAttribute('aria-expanded')) !== 'true') await header.click()
   await page.waitForTimeout(300)
   await page.click(`[data-testid="preset-${name}"]`)
   await openStage(page, 'terrain')

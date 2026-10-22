@@ -80,7 +80,7 @@ async function boot(page) {
     page.click('[data-testid="load-geotiff"]'),
   ])
   await chooser.setFiles(FIXTURE)
-  await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30_000 })
+  await page.waitForFunction(() => !!(document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Elevation:\s*\d/), { timeout: 30_000 })
   await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.waitForSelector('[data-testid="osm-fetch"]')

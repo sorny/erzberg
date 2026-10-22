@@ -45,7 +45,7 @@ test('the window says what it takes, and only for files', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
 
   const dt = await fileTransfer(page, path.join(process.cwd(), 'public', 'presets', 'Blueprint.json'))
   await page.dispatchEvent('body', 'dragenter', { dataTransfer: dt })
@@ -69,7 +69,7 @@ test('a dropped preset is applied', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   await openStage(page, 'surface')   // the background is Terrain Style's
@@ -97,7 +97,7 @@ test('a dropped plate restores its look and leaves the ground alone', async ({ p
   test.setTimeout(300_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const bg = page.locator('[data-testid="bg-color"]')
@@ -143,7 +143,7 @@ test('a file nothing takes says where it does go', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
 
   await dropOn(page, await fileTransfer(page,
     path.join(process.cwd(), 'tests', 'testdata', 'sweep.mp3'), 'audio/mpeg'))

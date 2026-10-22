@@ -29,11 +29,11 @@ test('the panel reports how long the last rebuild took', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const readout = page.locator('[data-testid="build-time"]')
-  await expect(readout).toBeVisible({ timeout: 30_000 })
+  await expect(readout).toBeAttached({ timeout: 30_000 })
   const before = ms(await readout.textContent())
   expect(before).toBeGreaterThan(0)
   expect(before).toBeLessThan(1000)
@@ -56,7 +56,7 @@ test('a slow rebuild says so, and a fast one stays quiet', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const pill = page.locator('[data-testid="computing-pill"]')

@@ -42,7 +42,7 @@ async function loadGeoTiff(page) {
 test('a georeferenced raster draws its own sun hours', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await loadGeoTiff(page)
   await openMode(page)
@@ -65,7 +65,7 @@ test('a georeferenced raster draws its own sun hours', async ({ page }) => {
 test('a period is a measurement, and changing it changes the answer', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await loadGeoTiff(page)
   await openMode(page)
@@ -94,7 +94,7 @@ test('the panel says what the field is about to cost', async ({ page }) => {
   // reads as a hang rather than as work.
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openMode(page)
   await page.locator('[data-testid="mode-sunhours"]').click()
@@ -119,7 +119,7 @@ test('the panel says what the field is about to cost', async ({ page }) => {
 test('a plain PNG has to be told where it is', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openMode(page)
   await page.locator('[data-testid="mode-sunhours"]').click()

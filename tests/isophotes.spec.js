@@ -51,7 +51,7 @@ test('isophotes trace the light, and it is not a level set of the ground', async
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const base = await isoStats(page)
@@ -76,7 +76,7 @@ test('moving the sun moves the lines', async ({ page }) => {
   // No other isoline in this app does this: contours are indifferent to the
   // light. If this ever passes trivially, the field is not being recomputed.
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const nw = await isoStats(page, { sunAzimuthIso: 315 })
@@ -89,7 +89,7 @@ test('moving the sun moves the lines', async ({ page }) => {
 
 test('flat ground has no isophotes, and raw ground has too many', async ({ page }) => {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   // With no relief every face points the same way, so the field is constant and

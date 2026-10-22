@@ -125,7 +125,7 @@ async function openVectorPanel(page) {
     page.click('[data-testid="load-geotiff"]'),
   ])
   await chooser.setFiles(FIXTURE)
-  await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30000 })
+  await page.waitForFunction(() => !!(document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Elevation:\s*\d/), { timeout: 30000 })
   await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.waitForSelector('[data-testid="osm-fetch"]')
@@ -133,7 +133,8 @@ async function openVectorPanel(page) {
 
 /** Segment count from the stats footer — what actually reached the GPU. */
 async function segments(page) {
-  const body = await page.innerText('body')
+  // The stats footer shows on Output only, so read its text directly.
+  const body = (await page.textContent('[data-testid="panel-stats"]')) ?? ''
   const m = body.match(/Segments:\s*([\d,]+)/)
   return m ? Number(m[1].replace(/,/g, '')) : null
 }
@@ -738,7 +739,7 @@ test.describe('vector layers', () => {
     const labelSegments = async () => page.evaluate(() => {
       // The label layers carry their own ids; count what they contribute.
       const el = document.querySelector('canvas[data-engine]')
-      return el ? Number(document.body.innerText.match(/Segments:\s*([\d,]+)/)[1].replace(/,/g, '')) : 0
+      return el ? Number((document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Segments:\s*([\d,]+)/)[1].replace(/,/g, '')) : 0
     })
     const withOutline = await labelSegments()
 

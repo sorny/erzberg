@@ -122,7 +122,7 @@ test('nothing is sent until the button is pressed', async ({ page }) => {
   })
   await stubTheWorld(page)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openFetch(page)
 
@@ -144,7 +144,7 @@ test('a typed place becomes ground you can draw', async ({ page }) => {
   test.setTimeout(180_000)
   await stubTheWorld(page)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openFetch(page)
 
@@ -198,7 +198,7 @@ test('the box can be dragged, and the plan follows it', async ({ page }) => {
   test.setTimeout(180_000)
   await stubTheWorld(page)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openFetch(page)
 
@@ -249,7 +249,7 @@ test('the extent names the ground, and what is on it', async ({ page }) => {
   test.setTimeout(180_000)
   await stubTheWorld(page)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const open = async (id) => {

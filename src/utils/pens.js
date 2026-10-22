@@ -57,12 +57,22 @@ export function pensOf(lineGeo, p = {}) {
     // Sampled: a dense layer carries millions of floats, and a few thousand
     // vertices are enough to tell one ink from several.
     const inks = L.colors?.length ? distinct(L.colors, rgb, MAX_SWATCHES + 1, 4096) : []
-    if (inks.length > 1) rows.push({ id: L.id, name, kind: 'mixed', inks, count: 1 })
+    if (inks.length > 1) rows.push({ id: L.id, name, kind: 'mixed', inks, count: 1, ...modeOf(L.id) })
     else rows.push({ id: L.id, name, kind: 'line', inks: [inks[0] ?? hex(st.color)], count: 1 })
   }
 
   const layers = rows.reduce((n, r) => n + r.count, 0)
   return { rows, layers, exact: !hidden && !rows.some((r) => r.kind === 'areas'), hidden }
+}
+
+/**
+ * The draw mode a layer id belongs to, and whether it is a mode copy's:
+ * `Contours-Minor@c3` is Contours, in a copy. What the strip needs to offer
+ * the fix in the right mode.
+ */
+function modeOf(id) {
+  const s = String(id)
+  return { mode: s.replace(/@\w+$/, '').split('-')[0], copy: /@\w+$/.test(s) }
 }
 
 /**
@@ -80,3 +90,29 @@ function distinct(buf, rgb, max = Infinity, samples = Infinity) {
 }
 
 export { MAX_SWATCHES }
+
+/**
+ * The pens in one line: `3 layers · 1 ink · 2 mixed`.
+ *
+ * The standing line at the top of the panel and the strip under the SVG button
+ * both print this, from the same `pensOf`, so they cannot disagree. They used
+ * to: the top line counted the `color*` settings ("2 inks") while the strip
+ * counted layers ("3"), and a mixed layer has no one ink to count at all — so
+ * it is counted apart. `up to` where an area layer may write fewer, `+ hidden`
+ * where hidden lines may add layers; Preflight counts both exactly.
+ */
+export function penLine({ rows, layers, hidden }) {
+  const inks = new Set()
+  let mixed = 0
+  for (const r of rows) {
+    if (r.kind === 'mixed') mixed++
+    else for (const h of r.inks) inks.add(h)
+  }
+  const n = (k, word) => `${k} ${word}${k === 1 ? '' : 's'}`
+  const upTo = rows.some((r) => r.kind === 'areas') ? 'up to ' : ''
+  return [
+    `${upTo}${n(layers, 'layer')}${hidden && rows.length ? ' + hidden' : ''}`,
+    n(inks.size, 'ink'),
+    mixed > 0 && `${mixed} mixed`,
+  ].filter(Boolean).join(' · ')
+}

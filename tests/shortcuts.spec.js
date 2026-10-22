@@ -17,7 +17,7 @@ test('the card opens on ? and closes three ways', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
 
   await expect(card(page)).toHaveCount(0)
 
@@ -47,7 +47,7 @@ test('the viewport hint offers a way in', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
 
   // The hint is dismissed for good once dismissed, so this is a fresh profile.
   const hint = page.locator('[data-testid="viewport-hint"]')
@@ -60,7 +60,7 @@ test('the export keys do not fire underneath the card', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
 
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   await page.keyboard.press('?')

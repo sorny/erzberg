@@ -590,12 +590,14 @@ test.describe('GeoTIFF load path', () => {
     ])
     await chooser.setFiles(FIXTURE)
     await page.waitForFunction(
-      () => !!document.body.innerText.match(/Elevation:\s*\d/),
+      () => !!(document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Elevation:\s*\d/),
       { timeout: 30000 },
     )
   })
 
   test('reports the projection in the sidebar metadata', async ({ page }) => {
+    // The metadata is in the stats footer, which shows on Output only.
+    await openStage(page, 'output')
     const meta = await page.innerText('body')
     // The whole point of the readout: the real CRS, named, with its code.
     expect(meta).toContain('WGS 84 / UTM zone 33N (EPSG:32633)')
@@ -608,6 +610,7 @@ test.describe('GeoTIFF load path', () => {
   test('reads the elevation range from the raster', async ({ page }) => {
     // 641.36–2349.51 per gdalinfo, rounded for display. Wrong NoData handling
     // would drag the floor to -3.4e38 and show a nonsense range.
+    await openStage(page, 'output')
     expect(await page.innerText('body')).toContain('Elevation: 641 – 2350 m')
   })
 

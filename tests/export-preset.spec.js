@@ -58,7 +58,7 @@ async function exportTo(page, key, filename) {
 
 test('a PNG carries the look, and opens it again', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await setTilt(page, TILT)
 
@@ -77,14 +77,9 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
   await resetToDefaults(page)
   await expect(tiltSlider(page)).not.toHaveValue(String(TILT))
 
-  // Presets opens by default, so the section is only clicked when something has
-  // closed it — clicking an open one collapses it and hides the button below.
+  // The Presets section is the whole of its stage, with no header to open.
   await openStage(page, 'presets')
-  const section = page.locator('[data-testid="section-presets"]')
-  if ((await section.getAttribute('aria-expanded')) !== 'true') {
-    await section.click()
-    await page.waitForTimeout(300)
-  }
+  await page.waitForTimeout(300)
   const open = page.locator('[data-testid="preset-load"]')
   await open.scrollIntoViewIfNeeded()
   const [chooser] = await Promise.all([
@@ -98,7 +93,7 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
 
 test('an SVG carries the look as a comment a plotter never draws', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await setTilt(page, TILT)
 

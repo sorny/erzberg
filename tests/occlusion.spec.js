@@ -76,7 +76,7 @@ function ink(svg, label) {
 test('the panel offers an occluder switch where walls mean something, and a halo everywhere', async ({ page }) => {
   test.setTimeout(120_000)
   await page.goto(APP)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   // A mode's style rows show once it draws. From the sheet, before any mode's
   // own section is open over it.

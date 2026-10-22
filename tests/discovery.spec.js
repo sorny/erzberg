@@ -19,7 +19,7 @@ const PRESETS_DIR = path.resolve(here, '../public/presets')
 async function boot(page) {
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
   await resetToDefaults(page)
 }
 
@@ -27,10 +27,7 @@ async function openPresets(page) {
   // Presets is its own destination now, so reaching the grid means going there
   // first. A whole configuration applied at once is not a step in the pipeline.
   await openStage(page, 'presets')
-  // Idempotent: the section ships open, and clicking it unconditionally used to
-  // close it — leaving every tile inside a zero-height row and unclickable.
-  const header = page.locator('[data-testid="section-presets"]')
-  if ((await header.getAttribute('aria-expanded')) !== 'true') await header.click()
+  // The section has no header to open: it is the whole of its stage.
   await page.waitForTimeout(300)
 }
 
@@ -251,8 +248,7 @@ test('the app opens on a style, not on bare defaults', async ({ page }) => {
   // so the 2 346 px of thumbnails that once justified shutting it cost nobody
   // any scrolling now.
   await expect(page.locator('[data-testid="section-presets"]')).toBeHidden()
-  await expect(page.locator('[data-testid="section-presets"]'))
-    .toHaveAttribute('aria-expanded', 'true')
+  // No header to be shut: the section is the whole of its stage.
 
   // And the link goes there. One click from anywhere in the panel.
   await page.click('[data-testid="jump-to-presets"]')

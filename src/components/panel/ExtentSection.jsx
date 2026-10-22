@@ -28,12 +28,12 @@
  */
 import { useStore } from '../../store/useStore'
 import { bboxToWgs84, crsDisplayName, groundPixelMetres, wgs84ExtentKm } from '../../utils/geoCoords'
-import { BORDER, DIM, GREEN, MONO, MUTED, SURF } from './ui'
+import { BORDER, DIM, MONO, MUTED, ON, SURF } from './ui'
 
 /** A lon/lat pair, at the precision a four-kilometre window actually has. */
 const deg = (v, pos, neg) => `${Math.abs(v).toFixed(3)}° ${v >= 0 ? pos : neg}`
 
-const DOT = { ok: GREEN, busy: '#eab308', off: BORDER }
+const DOT = { ok: ON, busy: '#eab308', off: BORDER }
 
 function Row({ state, name, value, detail, where }) {
   return (
