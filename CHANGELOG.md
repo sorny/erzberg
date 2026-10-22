@@ -57,6 +57,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The wheel zoom is smooth again.** OrbitControls' wheel zoom (three-stdlib,
+  through drei) moved a fixed 5% per wheel event and ignored the delta. It
+  jumped in one step and wrote the camera into state at each event, which
+  re-rendered the whole app. In a headed Chromium, a fast scroll gave a
+  55–120 ms React render about every 250 ms. The scene now zooms by the
+  wheel delta (5% per 100 px, so a mouse notch is unchanged). It eases over
+  about 130 ms and writes state once, 200 ms after the wheel stops. A fast
+  flick now zooms farther than a slow one, and a trackpad zooms in small steps.
 - Undo after Reset all now also brings back the Surprise-me rolls and the lit
   preset tile.
 - The gradient stops' colour inputs have names. A movable stop is a slider to
