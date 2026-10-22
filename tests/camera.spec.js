@@ -124,3 +124,28 @@ test('auto-rotate starts turning rather than jumping', async ({ page }) => {
     `first step ${firstStep}° must be in scale with the steady ${perSecond}°/s`)
     .toBeLessThan(perSecond)
 })
+
+test('the wheel zooms by how far it turns', async ({ page }) => {
+  // OrbitControls' own wheel zoom stepped a fixed 5 % per event whatever the
+  // delta, so a fast flick zoomed no faster than a slow one, and every event
+  // wrote the camera into state. The zoom now scales with the delta.
+  await openApp(page)
+  const zoom = page.locator('input.hmr[aria-label="Zoom"]')
+  const value = async () => Number(await zoom.inputValue())
+
+  await page.mouse.move(500, 380)
+  const start = await value()
+  for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, -100); await page.waitForTimeout(16) }
+  await page.waitForTimeout(800)
+  const fiveNotches = await value()
+
+  // One event that turns five notches' worth.
+  await page.mouse.wheel(0, -500)
+  await page.waitForTimeout(800)
+  const oneFlick = await value()
+
+  const step = 1 / Math.pow(0.95, 5)   // 5 % per 100 px, five times
+  expect(fiveNotches / start).toBeCloseTo(step, 1)
+  expect(oneFlick / fiveNotches, 'a large delta must zoom as far as the notches it sums')
+    .toBeCloseTo(step, 1)
+})

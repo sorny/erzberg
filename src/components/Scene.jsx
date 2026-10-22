@@ -160,6 +160,7 @@ export function Scene({
   useEffect(() => {
     const echo = orbitEchoRef.current
     orbitEchoRef.current = null // single-use: only the commit it announced may skip
+    heldZoom.current = 0        // p.zoom has caught up with the wheel, or moved on
     if (echo && echo.cam === activeCamera &&
         echo.tilt === p.tilt && echo.rotation === p.rotation && echo.zoom === p.zoom &&
         echo.panX === (p.panX ?? 0) && echo.panY === (p.panY ?? 0) &&
@@ -199,7 +200,8 @@ export function Scene({
     // auto-rotate on used to spend the whole idle in one step — 96° after nine
     // seconds of stillness. See frameClock.
     autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * frameDelta(delta) * 40 * (p.autoRotateDir ?? 1)
-    updateCameraFromSliders(p.tilt, autoRotRef.current, p.zoom, p.panX, p.panY, p.panZ)
+    const zoom = wheelZoom.current.now || heldZoom.current || p.zoom
+    updateCameraFromSliders(p.tilt, autoRotRef.current, zoom, p.panX, p.panY, p.panZ)
     invalidate()  // keep the on-demand loop running while auto-rotating
   })
 
@@ -307,9 +309,10 @@ export function Scene({
   }
 
   // change fires every frame during a drag (and during the damping tail) —
-  // schedule a trailing sync instead of pushing state per event.
+  // schedule a trailing sync instead of pushing state per event. Not while the
+  // wheel zoom eases: that writes state once, when it comes to rest.
   const handleOrbitChange = () => {
-    if (orbitSyncTimer.current) return
+    if (orbitSyncTimer.current || wheelZoom.current.now || wheelRest.current) return
     orbitSyncTimer.current = setTimeout(() => {
       orbitSyncTimer.current = 0
       syncOrbitToState()
@@ -320,7 +323,91 @@ export function Scene({
     orbitSyncTimer.current = 0
     syncOrbitToState()
   }
-  useEffect(() => () => clearTimeout(orbitSyncTimer.current), [])
+  useEffect(() => () => { clearTimeout(orbitSyncTimer.current); clearTimeout(wheelRest.current) }, [])
+
+  // ── Wheel zoom ───────────────────────────────────────────────────────────
+  // Ours, not OrbitControls'. Its wheel dolly (three-stdlib, through drei) is a
+  // fixed 5 % per event whatever the delta, applied in one jump. A fast flick
+  // zoomed no faster than a slow one, a trackpad's stream of small deltas
+  // zoomed far too fast, and every event ended a "gesture" whose sync
+  // re-rendered the whole app — a fast scroll queued renders faster than they
+  // finished, and the zoom stuttered. Here the delta sets the step, the camera
+  // eases towards the goal over a few frames, and state is written once, when
+  // the wheel has rested. `now` is 0 while no zoom is in flight.
+  const wheelZoom = useRef({ goal: 0, now: 0 })
+  // A trackpad's small deltas reach their goal between two events, so arriving
+  // is not resting: the sync waits for the wheel to stay quiet this long.
+  const WHEEL_REST_MS = 200
+  const wheelRest = useRef(0)
+  // The zoom the last wheel gesture came to rest at, until React commits it.
+  // Auto-rotate rewrites the camera from `p.zoom` every frame, and without
+  // this it would put the old distance back in the frames before the commit.
+  const heldZoom = useRef(0)
+  const wheelTarget = useThree((s) => s.events.connected) || gl.domElement
+
+  const liveZoom = () => ortho
+    ? activeCamera.zoom / 2
+    : BASE_DIST / activeCamera.position.distanceTo(orbitRef.current.target)
+
+  const applyZoom = (zoom) => {
+    const orbit = orbitRef.current
+    if (ortho) {
+      activeCamera.zoom = zoom * 2
+      activeCamera.updateProjectionMatrix()
+    } else {
+      const offset = activeCamera.position.clone().sub(orbit.target)
+      activeCamera.position.copy(orbit.target).add(offset.setLength(BASE_DIST / zoom))
+    }
+    orbit.update()
+  }
+
+  const zoomFns = useRef()
+  zoomFns.current = { liveZoom, applyZoom }
+
+  useEffect(() => {
+    if (!wheelTarget || !activeCamera) return
+    const onWheel = (e) => {
+      const orbit = orbitRef.current
+      if (!orbit || orbit.enabled === false) return
+      e.preventDefault()
+      // Lines and pages to pixels, and a pinch (ctrl + wheel) ten times over:
+      // the normalisation three.js's own OrbitControls applies.
+      let dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1)
+      if (e.ctrlKey) dy *= 10
+      // 5 % per 100 px, the step a mouse-wheel notch took before.
+      const w = wheelZoom.current
+      if (!w.now) w.now = w.goal = zoomFns.current.liveZoom()
+      const goal = w.goal * Math.pow(0.95, dy * 0.01 * orbit.zoomSpeed)
+      w.goal = ortho
+        ? Math.min(orbit.maxZoom / 2, Math.max(orbit.minZoom / 2, goal, 1e-3))
+        : Math.min(BASE_DIST / orbit.minDistance, Math.max(BASE_DIST / orbit.maxDistance, goal))
+      clearTimeout(orbitSyncTimer.current)
+      orbitSyncTimer.current = 0
+      clearTimeout(wheelRest.current)
+      wheelRest.current = 0
+      invalidate()
+    }
+    wheelTarget.addEventListener('wheel', onWheel, { passive: false })
+    return () => wheelTarget.removeEventListener('wheel', onWheel)
+  }, [wheelTarget, activeCamera, ortho, orbitRef, invalidate])
+
+  useFrame((_, delta) => {
+    const w = wheelZoom.current
+    if (!w.now || !activeCamera || !orbitRef.current) return
+    // Eased in log space, so zooming in and out feel alike: about 90 % of the
+    // way in 130 ms, whatever the frame rate.
+    const k = 1 - Math.exp(-frameDelta(delta) * 18)
+    let zoom = w.now * Math.pow(w.goal / w.now, k)
+    if (Math.abs(Math.log(w.goal / zoom)) < 0.002) zoom = w.goal
+    zoomFns.current.applyZoom(zoom)
+    if (zoom !== w.goal) { w.now = zoom; invalidate(); return }
+    w.now = 0
+    heldZoom.current = zoom
+    wheelRest.current = setTimeout(() => {
+      wheelRest.current = 0
+      syncOrbitToState()
+    }, WHEEL_REST_MS)
+  })
 
 
   // ── High-Res Offscreen Render Pass ──────────────────────────────────────────
@@ -628,7 +715,7 @@ export function Scene({
           occlusion curtains z-fight (sparkle at crossings while orbiting).
           near=5 is 5× finer; the zoom slider bottoms out at ~50 units distance
           and minDistance keeps free scroll-zoom clear of the near plane. */}
-      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
+      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} enableZoom={false} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
       <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
       {/*
         * The orientation gizmo, and the two things that take the corner from it.
