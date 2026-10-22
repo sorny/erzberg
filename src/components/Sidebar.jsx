@@ -55,7 +55,7 @@ import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { applyTheme, storedTheme } from '../utils/theme'
 import { AUTOMATION } from '../automation'
 import { isTyping } from '../utils/shortcuts'
-import { pensOf } from '../utils/pens'
+import { penLine, pensOf } from '../utils/pens'
 import { PenStrip } from './panel/PenStrip'
 
 /**
@@ -321,16 +321,29 @@ function GroundScale({ style, ss, geoTiffBbox, hasGeoTiff }) {
   )
 }
 
+/**
+ * The hypsometric integral, as a measurement of the ground.
+ *
+ * It sat among the Shape sliders styled like one of them, under a clipped
+ * label ("Hypso. Integral"), so it read as a control that had lost its track.
+ * It is a fact about the raster, so it is set apart in a sunk well, with its
+ * name in full. The help table marks the band the number falls in.
+ */
 function HypsometricRow({ value }) {
   const [show, setShow] = useState(false)
+  const band = value > 0.6 ? 'young' : value < 0.4 ? 'mature' : 'equilibrium'
+  const mark = (b) => ({ color: band === b ? TEXT : MUTED })
   return (
-    <div style={{ marginBottom: 4 }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:11, color:MUTED }}>
-        <span style={{ display:'flex', alignItems:'center' }}>
-          Hypso. Integral
-          <HelpBtn active={show} onClick={() => setShow(s => !s)} />
+    <div data-testid="hypsometric-integral" style={{ marginBottom: 10 }}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8,
+        fontSize:11, color:MUTED, background: SUNK, border:`1px solid ${BORDER}`, borderRadius:5, padding:'4px 8px' }}>
+        <span style={{ display:'flex', alignItems:'center', minWidth:0, whiteSpace:'nowrap' }}>
+          Hypsometric integral
+          <HelpBtn label="Hypsometric integral" active={show} onClick={() => setShow(s => !s)} />
         </span>
-        <span style={{ color:MUTED, fontFamily: MONO, fontSize:10, fontVariantNumeric:'tabular-nums' }}>{value.toFixed(3)}</span>
+        <span style={{ color: DIM, fontFamily: MONO, fontSize:11, fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
+          {value.toFixed(3)}
+        </span>
       </div>
       {show && (
         <div style={{
@@ -340,9 +353,9 @@ function HypsometricRow({ value }) {
         }}>
           <div style={{ marginBottom: 4 }}>HI = (mean − min) / (max − min)</div>
           <div style={{ display:'grid', gridTemplateColumns:'auto 1fr', columnGap: 8, rowGap: 2 }}>
-            <span style={{ color:MUTED }}>&gt; 0.6</span><span>young / rugged — most area is high</span>
-            <span style={{ color:MUTED }}>≈ 0.5</span><span>equilibrium</span>
-            <span style={{ color:MUTED }}>&lt; 0.4</span><span>mature / eroded — few peaks remain</span>
+            <span style={mark('young')}>&gt; 0.6</span><span style={mark('young')}>young / rugged — most area is high</span>
+            <span style={mark('equilibrium')}>≈ 0.5</span><span style={mark('equilibrium')}>equilibrium</span>
+            <span style={mark('mature')}>&lt; 0.4</span><span style={mark('mature')}>mature / eroded — few peaks remain</span>
           </div>
         </div>
       )}
@@ -846,7 +859,7 @@ export function Sidebar({
   /**
    * What each rail tab counts.
    *
-   * `live` is lit sections per stage, read off the same summaries the green dots
+   * `live` is lit sections per stage, read off the same summaries the "on" dots
    * are, so the rail and the dots cannot disagree. `hits` replaces it while a
    * query is typed, because the question changes: not "what is on in there" but
    * "did my search find anything in there".
@@ -1479,6 +1492,11 @@ export function Sidebar({
           */}
         <div style={{ padding:'11px 12px 9px', borderBottom:`1px solid ${BORDER}`, flexShrink:0 }}>
           <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            {/* 13 px, the same size as a stage title, on purpose: the scale
+                stops at 13, and the two never meet — this is Space Mono in
+                lowercase at the top of the panel, a stage title is Overpass in
+                tracked capitals at 800 inside the pane. Face and case part them;
+                a size step would only push the wordmark off the scale. */}
             <h1 style={{ fontFamily: WORDMARK, fontSize:13, fontWeight:700, letterSpacing:'-0.02em', color:STRONG, margin:0 }}>erzberg</h1>
             <span style={{ fontSize:10, color: MUTED, fontFamily: MONO }}>v{version}</span>
             <div style={{ flex:1 }} />
@@ -1573,12 +1591,10 @@ export function Sidebar({
             marginTop:8, fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>
-            {[
-              `${plate.marks} mark${plate.marks === 1 ? '' : 's'}`,
-              `${plate.inks} ink${plate.inks === 1 ? '' : 's'}`,
-              plate.layers && `${plate.layers} layer${plate.layers === 1 ? '' : 's'}`,
-              plate.text && `${plate.text} text`,
-            ].filter(Boolean).join(', ')}
+            {/* The pens come from the same `penLine` the strip under the SVG
+                button prints, so the two can never give different counts.
+                Vector and text layers are pen layers, so they are in it. */}
+            {`${plate.marks} mark${plate.marks === 1 ? '' : 's'} · ${penLine(pens)}`}
           </div>
         </div>
 
@@ -1662,7 +1678,9 @@ export function Sidebar({
               and to none of them, and why it is a destination rather than a
               step in the pipeline. */}
 
-          <Section title="Presets" open={sec.presets} onToggle={() => tog('presets')}>
+          {/* Headless: the stage title already says "Presets", and a header
+              under it saying it again was one row of nothing. */}
+          <Section title="Presets" headless open={sec.presets} onToggle={() => tog('presets')}>
             {/* Roll a look. The seed is shown because it *is* the look — note it
                 down and the same roll comes back. */}
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
@@ -1760,7 +1778,8 @@ export function Sidebar({
                 thing it is meant to be discovered from. This is the one line in
                 the panel that always says what you are looking at. */}
             {lastPreset && (
-              <div style={{ marginTop:4, display:'flex', alignItems:'baseline', justifyContent:'center', gap:4, fontSize:10, color: MUTED }}>
+              // 11 px: the preset's name is a button, and a control takes the label size.
+              <div style={{ marginTop:4, display:'flex', alignItems:'baseline', justifyContent:'center', gap:4, fontSize:11, color: MUTED }}>
                 <span>Style</span>
                 <button data-testid="jump-to-presets"
                   onClick={() => {
@@ -2233,7 +2252,7 @@ export function Sidebar({
             )}
             
             <Tog label="Inks as picked" testId="inks-as-picked"
-              help="Draws every line and area in exactly the colour you picked, as its swatch shows it. Off, colours pass through the viewport's filmic tone curve and come out lighter and softer. Also sets the colours written to the SVG."
+              help="Draws every line and area in exactly the colour you picked, as its swatch shows it. Off, colours pass through the viewport's filmic tone curve and come out lighter and softer. Also sets the colours written to the SVG. The same switch sits under the pen layers in Output."
               checked={!!style.inksAsPicked} onChange={v => ss({ inksAsPicked: v })} />
 
             <ColorRow label="Background" testId="bg-color" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
@@ -2654,7 +2673,8 @@ export function Sidebar({
           <Stage n={4} title="Overlay">
 
           <Section title="Vector Layers" open={sec.vectorLayers} onToggle={() => tog('vectorLayers')}
-                   enabled={vectorLayers?.length > 0}>
+                   enabled={vectorLayers?.length > 0}
+                   blurb="Roads, rivers and peaks from OpenStreetMap, and GPX or GeoJSON of your own.">
             {geoTiffElevMin == null ? (
               <div data-testid="vector-needs-geotiff">
                 <div style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:8 }}>
@@ -2694,7 +2714,8 @@ export function Sidebar({
             viewTilt={view.tilt} viewSpin={view.rotation}
           />
 
-          <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}>
+          <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}
+                   blurb="A flock of points over the ground. It can hold still, move, or follow a sound track.">
             <TogColor label="Particles" checked={points.showPoints} onToggle={v => sp({ showPoints: v })} color={points.pointColor} onColor={v => sp({ pointColor: v })} />
             {points.showPoints && (
               <Sub>
@@ -3224,7 +3245,8 @@ export function Sidebar({
               <div data-testid="export-carries" style={{ marginTop:2, fontSize:11, color: MUTED }}>
                 PNG and SVG carry the preset
               </div>
-              <PenStrip pens={pens} inksAsPicked={style.inksAsPicked} onInksAsPicked={(v) => ss({ inksAsPicked: v })} />
+              <PenStrip pens={pens} style={style} onInksAsPicked={(v) => ss({ inksAsPicked: v })}
+                onOneInk={(mode) => ss({ [`hypso${mode}`]: false })} />
             </div>
 
             {/* The other files: pictures, a print, a recording and the raster.
@@ -3262,8 +3284,13 @@ export function Sidebar({
 
           </Stage>
 
-          {/* ── Stats ─────────────────────────────────────────────────────── */}
-          <div style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9 }}>
+          {/* ── Stats ───────────────────────────────────────────────────────
+              Output only. Under every stage it read as part of whatever pane
+              was open — on Overlay it floated in empty space and looked like
+              the pane's content. It stays in the DOM elsewhere, hidden, so the
+              numbers are always current and a script can still read them. */}
+          <div data-testid="panel-stats" style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9,
+            ...(stage === 6 && !q ? null : { display:'none' }) }}>
             <div>Segments: {segs} · Verts: {verts}</div>
             <div>Triangles: {tris} · Grid: {grid}</div>
             {/* Measured, not estimated. `drawModes.js` carries a cost per mode,

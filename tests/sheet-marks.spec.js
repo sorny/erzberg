@@ -46,7 +46,7 @@ async function barMetres(page) {
 
 test('a heightmap with no georeference gets no bar, and is told why', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openMarks(page)
 
@@ -61,7 +61,7 @@ test('a heightmap with no georeference gets no bar, and is told why', async ({ p
 
 test('the bar measures the raster, and follows the camera', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await loadGeoTiff(page)
   await openMarks(page)
@@ -96,7 +96,7 @@ test('the SVG carries the marks as their own plotter layer', async ({ page }) =>
   // A full GeoTIFF's SVG is a slower export than the sample plate's.
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await loadGeoTiff(page)
   await openMarks(page)

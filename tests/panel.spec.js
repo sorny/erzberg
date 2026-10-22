@@ -378,7 +378,7 @@ test.describe('panel', () => {
     // mean scrolling 2 239 px past the thirty that were off.
     await openApp(page)
     const line = page.locator('[data-testid="standing-line"]')
-    await expect(line).toHaveText('1 mark, 1 ink')
+    await expect(line).toHaveText('1 mark · 1 layer · 1 ink', { timeout: 15_000 })
 
     await page.fill('[data-testid="panel-filter"]', 'crosshatch')
     await page.waitForTimeout(400)
@@ -389,8 +389,10 @@ test.describe('panel', () => {
     await page.fill('[data-testid="panel-filter"]', '')
     await page.waitForTimeout(400)
 
-    // Two marks, still one pen: both draw in the same black.
-    await expect(line).toHaveText('2 marks, 1 ink')
+    // Two marks, two layers, still one ink: both draw in the same black. The
+    // line counts what the SVG will hold, from the same source as the pens
+    // under the SVG button.
+    await expect(line).toHaveText(/^2 marks · \d+ layers · 1 ink$/, { timeout: 15_000 })
   })
 
   test('the index shows every draw mode, and which are drawing', async ({ page }) => {

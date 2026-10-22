@@ -26,7 +26,7 @@ const setSlider = (loc, v) => loc.evaluate((el, val) => {
 
 test('Highlights cannot be dragged past Shadows, or the other way', async ({ page }) => {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await page.fill('[data-testid="panel-filter"]', 'Levels')
   await page.waitForTimeout(500)

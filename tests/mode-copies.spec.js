@@ -29,7 +29,7 @@ const lookOf = (svg) => JSON.parse(/<!-- erzberg:preset (.*?) -->/.exec(svg)[1])
 test('a copy of a mode is its own pens, in undo and in the file', async ({ page }) => {
   test.setTimeout(300_000)
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await setMark(page, 'Contours', true)
   await openMark(page, 'Contours')

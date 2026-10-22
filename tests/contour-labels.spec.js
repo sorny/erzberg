@@ -19,7 +19,7 @@ const PAGE = 'http://localhost:5173'
 
 async function contoursOnly(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   // The pip on the sheet, which writes the same `enabled<Id>` the section's own
   // switch does. A mark's section is behind the sheet now, so reaching in for
@@ -45,7 +45,7 @@ async function exportSvg(page) {
 
 test('the worker places labels and breaks the line to fit them', async ({ page }) => {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const r = await page.evaluate(async () => {
@@ -164,7 +164,7 @@ test('no contour is drawn through a label, and clearance is adjustable', async (
    * elevation may cross the box the digits occupy.
    */
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   const measure = async (pad) => page.evaluate(async (pad) => {

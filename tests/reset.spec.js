@@ -24,7 +24,7 @@ const vectorRows = (page) => page.locator('[data-testid^="vector-layer-"]')
 
 async function boot(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 }
 
@@ -104,14 +104,14 @@ test('a reset clears fetched layers, and Undo restores their geometry too', asyn
   }))
 
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.click('[data-testid="load-geotiff"]'),
   ])
   await chooser.setFiles(FIXTURE)
-  await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30_000 })
+  await page.waitForFunction(() => !!(document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Elevation:\s*\d/), { timeout: 30_000 })
   await openStage(page, 'overlay')
   await page.click('[data-testid="section-vector-layers"]')
   await page.click('[data-testid="osm-fetch"]')
@@ -129,7 +129,7 @@ test('a reset clears fetched layers, and Undo restores their geometry too', asyn
   // coordinates came back with them.
   await expect(vectorRows(page)).toHaveCount(had)
   const drew = await page.evaluate(() => {
-    const m = document.body.innerText.match(/Segments:\s*([\d,]+)/)
+    const m = (document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Segments:\s*([\d,]+)/)
     return m ? Number(m[1].replace(/,/g, '')) : 0
   })
   expect(drew, 'the geometry came back, not just the layer list').toBeGreaterThan(0)

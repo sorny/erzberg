@@ -135,7 +135,7 @@ async function boot(page) {
   await captureRenderer(page)
   await page.goto(PAGE)
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await page.waitForTimeout(1500)
   expect(await page.evaluate(() => !!window.__gl),

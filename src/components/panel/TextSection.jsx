@@ -52,7 +52,8 @@ export function TextSection({
   }
 
   return (
-    <Section title="Text" open={open} onToggle={onToggle} enabled={list.length > 0}>
+    <Section title="Text" open={open} onToggle={onToggle} enabled={list.length > 0}
+      blurb="Titles and labels, set on the ground in single-line or outline type.">
       <Btn block onClick={add} data-testid="text-add"
         style={{ padding: '6px 0', marginBottom: list.length ? 8 : 0 }}>+ Add text</Btn>
 

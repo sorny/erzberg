@@ -44,7 +44,7 @@ test('the mark appears where the work is, and nowhere else', async ({ page }) =>
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   /*
@@ -81,7 +81,7 @@ test('a reset puts its own section back and leaves the rest', async ({ page }) =
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   await open(page, 'section-terrain-style')
@@ -111,7 +111,7 @@ test('the toast takes the reset back', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 
   await open(page, 'section-terrain-style')

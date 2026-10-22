@@ -20,7 +20,7 @@ const GEOTIFF = 'tests/testdata/geotiff.tif'
 async function boot(page) {
   await page.goto('http://localhost:5173')
   await waitForApp(page)
-  await expect(page.locator('text=Grid: 1024×1024')).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('text=Grid: 1024×1024')).toBeAttached({ timeout: 20000 })
 }
 
 async function openEditor(page) {
@@ -50,7 +50,7 @@ test('crop applies, survives as a re-editable clip, and clears', async ({ page }
 
   await page.locator('[data-testid="edit-apply"]').click()
   await expect(page.locator('[data-testid="heightmap-editor"]')).toHaveCount(0)
-  await expect(page.locator('text=Grid: 512×512')).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('text=Grid: 512×512')).toBeAttached({ timeout: 20000 })
   await expect(page.locator('[data-testid="edit-summary"]')).toContainText('512×512 of 1024×1024')
 
   // Re-entering shows the *full* raster with the clip still set — the whole
@@ -58,10 +58,10 @@ test('crop applies, survives as a re-editable clip, and clears', async ({ page }
   await openEditor(page)
   await expect(page.locator('[data-testid="edit-w"]')).toHaveValue('512')
   await page.locator('[data-testid="edit-cancel"]').click()
-  await expect(page.locator('text=Grid: 512×512')).toBeVisible()
+  await expect(page.locator('text=Grid: 512×512')).toBeAttached()
 
   await page.locator('[data-testid="edit-clear"]').click()
-  await expect(page.locator('text=Grid: 1024×1024')).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('text=Grid: 1024×1024')).toBeAttached({ timeout: 20000 })
 
   expect(errors).toEqual([])
 })
@@ -76,7 +76,7 @@ test('Escape leaves Edit Mode without applying the draft', async ({ page }) => {
   await page.locator('[data-testid="heightmap-editor"]').click({ position: { x: 5, y: 5 } })
   await page.keyboard.press('Escape')
   await expect(page.locator('[data-testid="heightmap-editor"]')).toHaveCount(0)
-  await expect(page.locator('text=Grid: 1024×1024')).toBeVisible()
+  await expect(page.locator('text=Grid: 1024×1024')).toBeAttached()
   await expect(page.locator('[data-testid="edit-summary"]')).toHaveCount(0)
 })
 
@@ -182,19 +182,19 @@ test('a clip holds while a Soundscape streams new frames under it', async ({ pag
   await chooser.setFiles(MP3)
   await expect(page.locator('[data-testid="soundscape-play"]')).toBeVisible({ timeout: 30000 })
   // The streaming window is 512 frames × 512 bins.
-  await expect(page.locator('text=Grid: 512×512')).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('text=Grid: 512×512')).toBeAttached({ timeout: 20000 })
 
   await page.locator('[data-testid="edit-heightmap"]').click()
   await setCrop(page, { x: 0, y: 0, w: 256, h: 128 })
   await page.locator('[data-testid="edit-apply"]').click()
-  await expect(page.locator('text=Grid: 256×128')).toBeVisible({ timeout: 20000 })
+  await expect(page.locator('text=Grid: 256×128')).toBeAttached({ timeout: 20000 })
 
   // Playback pushes a fresh raster ~30×/s. Each one is a new *source*, so the
   // clip has to be re-applied on the way through rather than dropped.
   await page.locator('[data-testid="soundscape-play"]').click()
   await page.waitForTimeout(1500)
   await page.locator('[data-testid="soundscape-play"]').click()
-  await expect(page.locator('text=Grid: 256×128')).toBeVisible()
+  await expect(page.locator('text=Grid: 256×128')).toBeAttached()
 
   // Freezing changes the raster's dimensions, which is what drops the clip.
   await page.locator('[data-testid="soundscape-freeze"]').click()
@@ -212,18 +212,19 @@ test.describe('GeoTIFF', () => {
       page.click('[data-testid="load-geotiff"]'),
     ])
     await chooser.setFiles(GEOTIFF)
-    await page.waitForFunction(() => !!document.body.innerText.match(/Elevation:\s*\d/), { timeout: 30000 })
-    const before = await page.innerText('body')
-    expect(before).toContain('Elevation: 641 – 2350 m')
+    await page.waitForFunction(() => !!(document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '').match(/Elevation:\s*\d/), { timeout: 30000 })
+    // The stats footer shows on Output only, so read its text directly.
+    const stats = () => page.textContent('[data-testid="panel-stats"]')
+    expect(await stats()).toContain('Elevation: 641 – 2350 m')
 
     await page.locator('[data-testid="edit-heightmap"]').click()
     await setCrop(page, { x: 200, y: 100, w: 400, h: 300 })
     await page.locator('[data-testid="edit-apply"]').click()
-    await expect(page.locator('text=Grid: 400×300')).toBeVisible({ timeout: 20000 })
+    await expect(page.locator('text=Grid: 400×300')).toBeAttached({ timeout: 20000 })
 
     // Pixels are normalised against the file's own min/max at load. A crop must
     // not renormalise, or every elevation readout and cut would drift with it.
-    expect(await page.innerText('body')).toContain('Elevation: 641 – 2350 m')
+    expect(await stats()).toContain('Elevation: 641 – 2350 m')
   })
 })
 

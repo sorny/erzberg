@@ -14,7 +14,7 @@ const PAGE = 'http://localhost:5173'
 
 async function boot(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 }
 
@@ -60,8 +60,8 @@ test('Landforms exports areas, and Form inks a mode by landform', async ({ page 
   await setMark(page, 'Lines', false)
   await setMark(page, 'Landform', true)
   await page.waitForTimeout(3000)
-  // The plate line counts the ten landform inks.
-  await expect(page.getByText(/1 mark, 10 inks/)).toBeVisible({ timeout: 60_000 })
+  // The standing line counts the ten landform inks, from the built areas.
+  await expect(page.locator('[data-testid="standing-line"]')).toHaveText(/^1 mark · up to \d+ layers · 10 inks$/, { timeout: 60_000 })
   const areas = await exportSvg(page)
   const areaLayers = labelsOf(areas).filter((l) => l.startsWith('Landforms'))
   expect(areaLayers.length).toBeGreaterThanOrEqual(4)

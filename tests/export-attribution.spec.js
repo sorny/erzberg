@@ -19,7 +19,7 @@ import { test, expect } from '@playwright/test'
  */
 test('the WebM credit is written where a demuxer will find it', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
 
   const r = await page.evaluate(async () => {
     const { withWebmTag } = await import('/src/utils/webmRecorder.js')
@@ -116,7 +116,7 @@ test('the WebM credit is written where a demuxer will find it', async ({ page })
 
 test('an untagged recording is handed back byte for byte', async ({ page }) => {
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30000 })
 
   const same = await page.evaluate(async () => {
     const { withWebmTag } = await import('/src/utils/webmRecorder.js')

@@ -18,7 +18,7 @@ test('grid size matches resolution for the default 1024px image', async ({ page 
 
   // --- Check default (Resolution 1 → 1024×1024) ---
   console.log('Checking default resolution...')
-  await expect(page.locator('text=Grid: 1024×1024')).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('text=Grid: 1024×1024')).toBeAttached({ timeout: 10000 })
   console.log('Default matches 1024×1024 ✓')
 
   const resolutionSlider = page.locator('input[type="range"][min="1"][max="20"]').first()
@@ -26,12 +26,12 @@ test('grid size matches resolution for the default 1024px image', async ({ page 
   // --- Change to Resolution 2 → 512×512 ---
   console.log('Switching to Resolution 2...')
   await resolutionSlider.fill('2')
-  await expect(page.locator('text=Grid: 512×512')).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('text=Grid: 512×512')).toBeAttached({ timeout: 15000 })
   console.log('Resolution 2 matches 512×512 ✓')
 
   // --- Change to Resolution 4 → 256×256 ---
   console.log('Switching to Resolution 4...')
   await resolutionSlider.fill('4')
-  await expect(page.locator('text=Grid: 256×256')).toBeVisible({ timeout: 15000 })
+  await expect(page.locator('text=Grid: 256×256')).toBeAttached({ timeout: 15000 })
   console.log('Resolution 4 matches 256×256 ✓')
 })

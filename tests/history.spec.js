@@ -27,7 +27,7 @@ const redoBtn = (page) => page.locator('[data-testid="redo"]')
 
 async function boot(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await page.waitForTimeout(600)
 }
@@ -128,7 +128,7 @@ test('a fresh load has nothing to undo', async ({ page }) => {
    * would hide exactly the thing this is checking.
    */
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await page.waitForSelector('[data-testid="jump-to-presets"]', { timeout: 20_000 }).catch(() => {})
   await page.waitForTimeout(2500)
   await expect(undoBtn(page), 'the opening preset is not an edit').toBeDisabled()

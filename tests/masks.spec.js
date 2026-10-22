@@ -29,7 +29,7 @@ const PAGE = 'http://localhost:5173'
 
 async function boot(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 }
 

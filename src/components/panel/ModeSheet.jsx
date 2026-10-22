@@ -21,9 +21,9 @@
  *
  * The fix is shape, not labels:
  *
- *   • The **pip** switches the mark on. A 9 px ring that fills green when lit,
- *     in a 20 px target in the corner. It is the shape every switch in this
- *     panel already has, and it is the only thing on the tile that has it.
+ *   • The **pip** switches the mark on: an 11 px check box that fills ore
+ *     and takes a tick when lit, in a 24 px target in the corner. Square,
+ *     because any number of marks can be on at once.
  *   • The **card** — the glyph, the name, the space around them — opens the
  *     mark. It carries a chevron, and a chevron means it goes somewhere.
  *
@@ -32,7 +32,7 @@
  * is the deliberate one. Hover separates them again — the card lifts as one
  * piece and the pip lights its own target inside it.
  *
- * The pip does the work the name row's green dot used to do, so there is one
+ * The pip does the work the name row's dot used to do, so there is one
  * lit thing on a tile rather than two.
  *
  * ── Why three columns ────────────────────────────────────────────────────────
@@ -47,7 +47,7 @@ import { DRAW_MODES } from '../../utils/drawModes'
 import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
 import { FAMILIES } from './markFamilies'
-import { ACCENT_DEEP, ACCENT_TEXT, BORDER, Chevron, DIM, DISABLED_OPACITY, GREEN, MONO, MUTED, SURF, TEXT, WARN } from './ui'
+import { ACCENT_DEEP, ACCENT_TEXT, BORDER, Chevron, DIM, DISABLED_OPACITY, MONO, MUTED, ON, ON_ACCENT, SURF, TEXT, WARN } from './ui'
 import { useContext } from 'react'
 import { CoverPlate } from './filter'
 
@@ -196,16 +196,26 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               onClick={blocked ? undefined : () => onToggle(key, !on)}
               style={{
                 cursor: blocked ? 'not-allowed' : undefined,
-                // 24 px, the WCAG 2.5.8 minimum target. The dot inside stays 9.
+                // 24 px, the WCAG 2.5.8 minimum target. The box inside is 11.
                 position:'absolute', left:0, top:0, width:24, height:24, zIndex:1,
                 display:'flex', alignItems:'center', justifyContent:'center',
               }}>
+              {/* A check box, not a radio dot: any number of marks can be on
+                  at once, and a round pip said "pick one". Square, with a tick
+                  when lit, and no glow — the fill says it. */}
               <span aria-hidden="true" className="hmpipdot" style={{
-                width:9, height:9, borderRadius:'50%',
-                border:`1.5px solid ${on ? (waiting ? WARN : GREEN) : MUTED}`,
-                background: on ? (waiting ? WARN : GREEN) : 'transparent',
-                boxShadow: on ? '0 0 6px var(--hm-on-glow)' : 'none',
-              }} />
+                width:11, height:11, borderRadius:3, boxSizing:'border-box',
+                display:'flex', alignItems:'center', justifyContent:'center',
+                border:`1.5px solid ${on ? (waiting ? WARN : ON) : MUTED}`,
+                background: on ? (waiting ? WARN : ON) : 'transparent',
+                color: ON_ACCENT,
+              }}>
+                {on && (
+                  <svg width="7" height="7" viewBox="0 0 7 7" fill="none">
+                    <path d="M1 3.6 2.8 5.3 6 1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
             </button>
           </div>
         )

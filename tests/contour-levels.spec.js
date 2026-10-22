@@ -21,7 +21,7 @@ const PAGE = 'http://localhost:5173'
 /** A cone spanning the full brightness range, plus a page with the app on it. */
 async function ready(page) {
   await page.goto(PAGE)
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
 }
 
@@ -173,7 +173,7 @@ test.describe('the interval slider says metres', () => {
   test('a 100 m interval prints elevations 100 m apart', async ({ page }) => {
     test.setTimeout(240_000)
     await page.goto(PAGE)
-    await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+    await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
     await resetToDefaults(page)
 
     const [chooser] = await Promise.all([
@@ -181,7 +181,7 @@ test.describe('the interval slider says metres', () => {
       page.click('[data-testid="load-geotiff"]'),
     ])
     await chooser.setFiles(GEOTIFF)
-    await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
+    await page.waitForFunction(() => /Elevation:\s*\d/.test((document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '')), null, { timeout: 60_000 })
 
     await setMode(page, 'Mode: Lines', false)
     await setMode(page, 'Mode: Contours', true)
@@ -229,7 +229,7 @@ test.describe('the interval slider says metres', () => {
   test('the metre readout follows the exaggeration', async ({ page }) => {
     test.setTimeout(120_000)
     await page.goto(PAGE)
-    await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+    await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
     await resetToDefaults(page)
 
     const [chooser] = await Promise.all([
@@ -237,7 +237,7 @@ test.describe('the interval slider says metres', () => {
       page.click('[data-testid="load-geotiff"]'),
     ])
     await chooser.setFiles(GEOTIFF)
-    await page.waitForFunction(() => /Elevation:\s*\d/.test(document.body.innerText), null, { timeout: 60_000 })
+    await page.waitForFunction(() => /Elevation:\s*\d/.test((document.querySelector('[data-testid="panel-stats"]')?.textContent ?? '')), null, { timeout: 60_000 })
 
     await setMode(page, 'Mode: Contours', true)
     await page.waitForTimeout(1500)

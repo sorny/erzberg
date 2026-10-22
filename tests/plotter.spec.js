@@ -46,7 +46,7 @@ const markCount = (svg) => (svg.match(/<(line|polyline|path)\b/g) ?? []).length
 test('the preflight says what the plot costs before the pen touches paper', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openExport(page)
 
@@ -64,7 +64,7 @@ test('the preflight says what the plot costs before the pen touches paper', asyn
 test('the numbers go stale rather than lie', async ({ page }) => {
   test.setTimeout(180_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openExport(page)
   await preflight(page)
@@ -80,7 +80,7 @@ test('the numbers go stale rather than lie', async ({ page }) => {
 test('plotter order cuts the travel, and loses no stroke doing it', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('http://localhost:5173')
-  await page.waitForSelector('text=Grid:', { timeout: 30_000 })
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
   await resetToDefaults(page)
   await openExport(page)
 

@@ -342,8 +342,10 @@ terrain. Hidden segments can take their own colour and opacity.
 
 **Pen layers.** Output lists the layers the SVG will hold under the SVG
 button: one row per pen, with its ink. A layer coloured by height or slope says
-`mixed`, because one pen cannot draw it as shown. Preflight counts exactly when
-filled areas or hidden lines are drawing.
+`mixed`, because one pen cannot draw it as shown; **One ink** sets that mode's
+Colour to Line. The line at the top of the panel gives the same count
+(`3 layers · 1 ink · 2 mixed`). Preflight counts exactly when filled areas or
+hidden lines are drawing.
 
 **Inks as picked.** By default inks pass through a filmic tone curve and look
 softer on screen. Switch this on in Terrain Style, or under the pen layers, to

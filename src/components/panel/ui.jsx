@@ -41,7 +41,7 @@ export const ON_ACCENT   = 'var(--hm-on-accent)'
 /** The accent as a text colour, which on light paper has to be deeper than the fill. */
 export const ACCENT_TEXT = 'var(--hm-accent-text)'
 /** "Switched on". Ore, like every other on-state: one colour means on. */
-export const GREEN       = 'var(--hm-on)'
+export const ON       = 'var(--hm-on)'
 /** The wordmark and anything else set in the strongest ink. */
 export const STRONG      = 'var(--hm-strong)'
 /** A well sunk into the panel: segmented choices, the rail, help boxes. */
@@ -343,7 +343,7 @@ export function PanelStyles() {
 
       /* Segmented control: one well, the choice a raised pill inside it. */
       .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
-      .hmseg:hover:not([aria-pressed="true"]) { color:${DIM} !important; background:${VEIL} !important; }
+      .hmseg:hover:not([aria-pressed="true"]):not([aria-disabled]) { color:${DIM} !important; background:${VEIL} !important; }
       .hmseg:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
       .hmfold { -webkit-appearance:none; appearance:none; background:none; border:none; font:inherit;
         display:flex; align-items:baseline; gap:6px; width:100%; padding:0; margin:0 0 2px; cursor:pointer; text-align:left; }
@@ -383,11 +383,10 @@ export function PanelStyles() {
        * and the first build gave them one look. People found the second by
        * accident, which is not finding it.
        *
-       * The fix is shape. The pip is round, small and lights green, which is
-       * what every other switch in this panel looks like. Everything else is a
-       * card with a chevron on it, and a chevron means it goes somewhere. Hover
-       * separates them again: the card lifts as one piece, and the pip lights
-       * its own 20 px target inside it. Nobody has to be told which is which,
+       * The fix is shape. The pip is a small check box that fills ore when
+       * lit. Everything else is a card with a chevron on it, and a chevron
+       * means it goes somewhere. Hover separates them again: the card lifts as
+       * one piece, and the pip lights its own 24 px target inside it. Nobody has to be told which is which,
        * because they no longer look alike.
        *
        * Styles rather than inline hover handlers: this is forty tiles with
@@ -874,9 +873,11 @@ export function SegRow({ label, help, options, value, onChange, testIdPrefix, te
           <span title={label} style={{ overflow:'hidden', textOverflow:'ellipsis', minWidth:0 }}>{label}</span>
           {help && <HelpBtn label={label} active={showHelp} onClick={() => setShowHelp(!showHelp)} />}
         </span>
-        <SegGroup label={label} options={options} value={value} onChange={onChange}
-          nameButtons testIdOf={testIdOf ?? (testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined)}
-          columns={columns} style={{ flex: 1 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <SegGroup label={label} options={options} value={value} onChange={onChange}
+            nameButtons testIdOf={testIdOf ?? (testIdPrefix ? (v) => `${testIdPrefix}-${v}` : undefined)}
+            columns={columns} />
+        </div>
       </div>
       {showHelp && help && <HelpBox text={help} />}
     </div>
@@ -948,22 +949,33 @@ export function FontSelect({ fonts, value, onChange, testId }) {
  * options out as a grid instead of one row, for sets too long to fit.
  */
 export function SegGroup({ options, value, onChange, label, capitalize = false, columns, testIdOf, style, nameButtons = false }) {
-  return (
+  /*
+   * An option can be shown but not pickable: `{ disabled, title }` as its third
+   * element. It used to be a `disabled` button with the reason in `title`, so a
+   * keyboard skipped it and a screen reader never heard why it was there. Now it
+   * stays in the tab order as `aria-disabled`, and the reason is a line under
+   * the group that the option points to with `aria-describedby`. Options that
+   * share a reason share the line.
+   */
+  const noteId = useId()
+  const reasons = [...new Set(options.filter(([, , o]) => o?.disabled && o?.title).map(([, , o]) => o.title))]
+  const group = (
     <div role="group" aria-label={label} style={{
       display: columns ? 'grid' : 'flex',
       ...(columns && { gridTemplateColumns: `repeat(${columns}, 1fr)` }),
       gap: 2, padding: 2, borderRadius: 5,
       background: SUNK, border:`1px solid ${BORDER}`,
       ...style,
+      ...(reasons.length && { marginBottom: 4 }),
     }}>
-      {/* An option may carry `{ disabled, title }` as a third element: shown, so
-          the choice is visible, but not pickable, with the reason on hover. */}
       {options.map(([lbl, v, opt]) => {
         const on = value === v
         const off = !!opt?.disabled
+        const why = off && opt?.title ? `${noteId}-${reasons.indexOf(opt.title)}` : undefined
         return (
           <button key={String(v)} onClick={off ? undefined : () => onChange(v)} type="button" className="hmseg"
-            data-testid={testIdOf ? testIdOf(v) : undefined} disabled={off} title={opt?.title}
+            data-testid={testIdOf ? testIdOf(v) : undefined} aria-disabled={off || undefined}
+            aria-describedby={why}
             aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
             style={{
               flex: 1, fontSize: 11, padding:'2px 2px', borderRadius: 3, border:'none',
@@ -978,6 +990,19 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
         )
       })}
     </div>
+  )
+  if (!reasons.length) return group
+  const names = (r) => options.filter(([, , o]) => o?.disabled && o?.title === r).map(([l]) => l).join(' and ')
+  return (
+    <>
+      {group}
+      {reasons.map((r, i) => (
+        <div key={r} id={`${noteId}-${i}`} data-testid="seg-reason"
+          style={{ fontSize: 11, color: MUTED, lineHeight: 1.5, marginBottom: 8 }}>
+          {names(r)}: {r}
+        </div>
+      ))}
+    </>
   )
 }
 
@@ -1014,7 +1039,7 @@ const SWITCH_W = 34
 /** What a header prints. `Mode: ` is a key the panel files marks under, not a word. */
 const sectionName = (title) => (title.startsWith('Mode: ') ? title.slice(6) : title)
 
-export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, children }) {
+export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, blurb, headless = false, children }) {
   const ctx = useContext(SectionFilter)
   const scope = useContext(SectionScope)
   const copies = useContext(ModeCopiesPanel)
@@ -1060,7 +1085,11 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
   // While filtering, a surviving section is open: the point of finding it is to
   // reach the control inside, and a hit that still needs a click is half an answer.
   // A drilled-in mode is open for the same reason — you asked for its controls.
-  const isOpen = q || (drill && title === drill) ? true : open
+  // `headless`: a section that is the whole of its stage, and so needs no
+  // header of its own — Presets, whose stage title already says "Presets".
+  // It keeps everything else a section has (search, the stage index, the
+  // handle specs reach it by) and is always open.
+  const isOpen = headless || q || (drill && title === drill) ? true : open
   /**
    * The readout, and only while the section is shut.
    *
@@ -1075,7 +1104,14 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
   // MODE: CROSSHATCH, and the label it lost comes back on hover.
   // `—` says "off", which a header with its own switch already shows.
   const shown = typeof raw === 'string' ? { text: raw } : raw
-  const readout = onEnabled && shown?.text === '—' ? null : shown
+  /*
+   * What an empty section is for, said under its header while it is shut and
+   * holds nothing. Overlay was three headers that each said `–` over empty
+   * space, which read as a pane that had failed to load. The line replaces the
+   * dash: both say "nothing here", and only one says what could be.
+   */
+  const showBlurb = !!blurb && !isOpen && !enabled && !q
+  const readout = (onEnabled || showBlurb) && shown?.text === '—' ? null : shown
   /*
    * The reset, and why it is not on every header.
    *
@@ -1097,7 +1133,8 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
      * seven specs went red on a change that altered nothing they were testing.
      */
     <div data-section={title}
-         style={{ position: 'relative', borderBottom: `1px solid ${BORDER}`,
+         data-testid={headless ? `section-${title.toLowerCase().replace(/\s+/g, '-')}` : undefined}
+         style={{ position: 'relative', borderBottom: `1px solid ${BORDER}`, ...(headless && { paddingTop: 12 }),
                   ...(matches && !sheetOut ? null : { display: 'none' }) }}
          data-filtered-out={matches ? undefined : 'true'}
          data-sheet-out={sheetOut ? 'true' : undefined}>
@@ -1111,6 +1148,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
           silently collapsed reappeared that way once the field was cleared. */}
       {/* A heading, so a screen reader can walk the panel section by section;
           the button inside it is the disclosure. */}
+      {!headless && (<>
       <h3 style={{ margin:0, fontSize:12, fontWeight:600 }}>
       <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
         aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
@@ -1127,7 +1165,7 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         <span className="hmsectitle" style={{ fontSize:12, fontWeight:600, color: DIM, display:'flex', alignItems:'center', minWidth:0 }}>
           {/* The dot says "on" for a section whose switch is somewhere else. A
               section with its own switch in the header has said it already. */}
-          {enabled && !onEnabled && <span style={{ width:6, height:6, borderRadius:'50%', background: GREEN, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-on-glow)' }} />}
+          {enabled && !onEnabled && <span style={{ width:6, height:6, borderRadius:'50%', background: ON, marginRight:8, flexShrink:0, boxShadow:'0 0 6px var(--hm-on-glow)' }} />}
           {icon && <span aria-hidden="true" style={{ display:'flex', marginRight:8, flexShrink:0, opacity: enabled ? 1 : 0.75 }}>{icon}</span>}
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</span>
         </span>
@@ -1161,6 +1199,12 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         </span>
       </button>
       </h3>
+      {showBlurb && (
+        <div data-testid="section-blurb" style={{ fontSize:11, color: MUTED, lineHeight:1.4, padding:'0 14px 10px', marginTop:-4 }}>
+          {blurb}
+        </div>
+      )}
+      </>)}
       {/* Two marks, both siblings of the header rather than children of it. The
           header is a button — it has to be, or a collapsed section is
           unreachable from the keyboard — and a button inside a button is
@@ -1311,7 +1355,7 @@ export function Stage({ n, title, children }) {
  * Overlay 145, Frame 180 and Output two sections.
  *
  * ── Why the badge is a count of lit sections ─────────────────────────────────
- * A pane you cannot see is a pane whose green dots you cannot count, and
+ * A pane you cannot see is a pane whose "on" marks you cannot count, and
  * "something is switched on somewhere I am not looking" is the one thing hiding
  * five sixths of the panel could genuinely cost. The badge is that cost paid
  * back: it reads the same `enabled` the dots read, so the rail and the dots
@@ -1378,9 +1422,9 @@ export function StageRail({ stage, onStage, live, hits }) {
         const sel   = !filtering && stage === n
         const count = filtering ? (hits[n] || 0) : (live[n] || 0)
         // Two different numbers wear two different colours, because they answer
-        // two different questions. Lit sections are the panel's green, the same
-        // green as the dots they are counting. Filter hits are the accent, which
-        // is what every other "this is what you searched for" wears.
+        // two different questions. Lit sections are ore, the colour of the "on"
+        // they are counting. Filter hits are not a state, so they take the
+        // inverse, as a primary button does.
         const badge = count > 0
         return (
           <button key={n} type="button" className="hmtab" role="tab" id={`hm-tab-${n}`}
@@ -1414,7 +1458,7 @@ export function StageRail({ stage, onStage, live, hits }) {
             }}>
             {/* The badge gets its own lane on the right of the number, and the
                 number centres in what is left. Centred across the whole 40 px
-                they ran under the badge — `02` and a green `2` on top of each
+                they ran under the badge — `02` and an ore `2` on top of each
                 other, which is two counts pretending to be one. */}
             {/* A lozenge, not `00`. Presets is a destination and not a step
                 the renderer runs, and a digit in the pipeline's own column
@@ -1435,7 +1479,7 @@ export function StageRail({ stage, onStage, live, hits }) {
                 minWidth:13, height:13, borderRadius:5, padding:'0 3px',
                 // Marks that are on are live state, so ore. Search hits are
                 // not, so they take the inverse, like a primary button.
-                background: filtering ? STRONG : GREEN,
+                background: filtering ? STRONG : ON,
                 color: filtering ? BG : ON_ACCENT,
                 fontSize:9, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
                 fontVariantNumeric:'tabular-nums',
