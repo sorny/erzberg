@@ -623,8 +623,54 @@ const STOCK_HELP = {
   Opacity: 'How strongly this layer shows: 0% hides it, 100% is full strength.',
 }
 
-export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt, col2, testId }) {
+/**
+ * A slider that moves something while it is dragged, and writes it once.
+ *
+ * Without `onLive` a slider is a plain controlled input: every step calls
+ * `onChange`. That is right for almost everything, and wrong for the camera —
+ * a step re-renders the whole panel, and a camera drag stuttered at a few
+ * frames a second while the wheel, which moves the camera directly, was smooth.
+ *
+ * With `onLive` the thumb follows a local draft, each step calls `onLive` (which
+ * moves the thing directly), and `onChange` is called once: when the pointer or
+ * key is let go, on blur, or after a quarter of a second without a step, so a
+ * pause mid-drag or a run of arrow keys still lands in state.
+ */
+function useLiveSlider(value, onChange, onLive) {
+  const [draft, setDraft] = useState(null)
+  const timer = useRef(0)
+  const last = useRef(null)
+  const pending = useRef(false)
+  // The committed value has arrived: let go of the draft. Keyed on the value,
+  // so the thumb never shows the old number for a frame in between.
+  useEffect(() => { if (pending.current) { pending.current = false; setDraft(null) } }, [value])
+  useEffect(() => () => clearTimeout(timer.current), [])
+  if (!onLive) return { shown: value, step: onChange, end: undefined }
+  const end = () => {
+    clearTimeout(timer.current)
+    timer.current = 0
+    if (last.current == null) return
+    const v = last.current
+    last.current = null
+    // No change to wait for when the value is already in state.
+    if (v === value) setDraft(null)
+    else pending.current = true
+    onChange(v)
+  }
+  const step = (v) => {
+    last.current = v
+    setDraft(v)
+    onLive(v)
+    clearTimeout(timer.current)
+    timer.current = setTimeout(end, 250)
+  }
+  return { shown: draft ?? value, step, end }
+}
+
+export function Sl({ label, hint, help, min, max, step = 1, value: committed, onChange, onLive, fmt, col2, testId }) {
   help = help ?? STOCK_HELP[label]
+  const live = useLiveSlider(committed, onChange, onLive)
+  const value = live.shown
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
@@ -648,7 +694,8 @@ export function Sl({ label, hint, help, min, max, step = 1, value, onChange, fmt
         <input type="range" className="hmr" id={id} data-testid={testId} aria-label={label}
           aria-valuetext={fmt ? String(fmt(value)) : undefined}
           min={min} max={max} step={step} value={value} style={fillOf(value, min, max)}
-          onChange={e => onChange(parsed(e.target.value))} />
+          onChange={e => live.step(parsed(e.target.value))}
+          onPointerUp={live.end} onKeyUp={live.end} onBlur={live.end} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
           min={min} max={max} step={step} width={36} />
       </div>
@@ -774,8 +821,10 @@ export function TogColor({ label, hint, help, checked, onToggle, color, onColor 
   )
 }
 
-export function InlineSl({ label, hint, help, min, max, step = 1, value, onChange, fmt, testId, log = false }) {
+export function InlineSl({ label, hint, help, min, max, step = 1, value: committed, onChange, onLive, fmt, testId, log = false }) {
   help = help ?? STOCK_HELP[label]
+  const live = useLiveSlider(committed, onChange, onLive)
+  const value = live.shown
   const [showHelp, setShowHelp] = useState(false)
   const id = useId()
   const parsed = (v) => step < 1 ? parseFloat(v) : parseInt(v)
@@ -808,7 +857,8 @@ export function InlineSl({ label, hint, help, min, max, step = 1, value, onChang
           aria-valuetext={fmt ? String(fmt(value)) : undefined}
           min={L ? 0 : min} max={L ? 1000 : max} step={L ? 1 : step} value={toTrack(value)}
           style={L ? fillOf(toTrack(value), 0, 1000) : fillOf(value, min, max)}
-          onChange={e => onChange(fromTrack(e.target.value))} />
+          onChange={e => live.step(fromTrack(e.target.value))}
+          onPointerUp={live.end} onKeyUp={live.end} onBlur={live.end} />
         <ValueField label={label} value={value} onChange={onChange} fmt={fmt}
           min={min} max={max} step={step} width={32} />
       </div>

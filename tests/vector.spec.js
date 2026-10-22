@@ -141,7 +141,8 @@ async function segments(page) {
 
 /** Triangle count from the stats footer — the surface plus any area fills. */
 async function triangles(page) {
-  const body = await page.innerText('body')
+  // The stats footer shows on Output only, so read its text directly.
+  const body = (await page.textContent('[data-testid="panel-stats"]')) ?? ''
   const m = body.match(/Triangles:\s*([\d,]+)/)
   return m ? Number(m[1].replace(/,/g, '')) : null
 }

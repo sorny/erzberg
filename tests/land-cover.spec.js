@@ -262,7 +262,10 @@ test('without a plate, land cover is shown but cannot be picked', async ({ page 
   await page.waitForTimeout(450)
   const cls = page.locator('[data-testid="colour-Lines-class"]:visible').first()
   await expect(cls).toBeDisabled()
-  await expect(cls).toHaveAttribute('title', /Needs a land cover plate/)
+  // The reason is a line under the group that the option points to, so a
+  // keyboard and a screen reader get it too, not only a hover.
+  const why = await cls.getAttribute('aria-describedby')
+  await expect(page.locator(`[id="${why}"]`)).toContainText('Needs a land cover plate')
   await page.fill('[data-testid="panel-filter"]', '')
   await page.waitForTimeout(250)
 

@@ -175,6 +175,22 @@ export function Scene({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.tilt, p.rotation, p.zoom, p.panX, p.panY, p.panZ, ortho, p.planOblique, activeCamera])
 
+  // A Camera slider being dragged moves the camera from here, not through App
+  // state — see `cameraLive` in the store. Subscribed rather than selected, so
+  // a drag re-renders nothing; the slider writes state once, when let go, and
+  // the effect above then finds the camera already where state puts it.
+  const moveCamera = useRef(null)
+  moveCamera.current = (live) => {
+    const pc = pRef.current
+    updateCameraFromSliders(live.tilt ?? pc.tilt, live.rotation ?? pc.rotation, live.zoom ?? pc.zoom,
+      live.panX ?? pc.panX, live.panY ?? pc.panY, live.panZ ?? pc.panZ)
+    if (live.rotation != null) autoRotRef.current = live.rotation
+    invalidate()
+  }
+  useEffect(() => useStore.subscribe((s, prev) => {
+    if (s.cameraLive && s.cameraLive !== prev.cameraLive) moveCamera.current(s.cameraLive)
+  }), [])
+
   // The shear, and a straight-down orbit while it is on: tilting a plan oblique
   // view would mix two projections into something that is neither.
   useEffect(() => {
@@ -312,7 +328,10 @@ export function Scene({
   // schedule a trailing sync instead of pushing state per event. Not while the
   // wheel zoom eases: that writes state once, when it comes to rest.
   const handleOrbitChange = () => {
+    // Nor while a Camera slider drags: the slider is the source then, and a
+    // sync would write a rounded copy of its own value back into state.
     if (orbitSyncTimer.current || wheelZoom.current.now || wheelRest.current) return
+    if (useStore.getState().cameraLive) return
     orbitSyncTimer.current = setTimeout(() => {
       orbitSyncTimer.current = 0
       syncOrbitToState()
