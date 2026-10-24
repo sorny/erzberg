@@ -6,17 +6,17 @@ licence file. This file records the fourth group and points at the others.
 
 ## `Heightmap.png` — original
 
-Gerald Reisinger painted this file by hand in Photoshop. He did not trace,
-sample or derive it from an elevation dataset. Thus it owes attribution to
-nobody, and the usual DEM terms do not apply to it. These are the DEM terms that
-do not apply: Copernicus, SRTM, swisstopo and ALOS. The repository's MIT licence
-covers this file with the rest of the work.
+`scripts/build-heightmap.js` generated this file (`npm run heightmap`, seed
+1913). The script builds a massif from seeded noise, carves it with simulated
+rain and settles it by slope. It reads no elevation dataset. Thus the file owes
+attribution to nobody, and the usual DEM terms do not apply to it. These are the
+DEM terms that do not apply: Copernicus, SRTM, swisstopo and ALOS. The
+repository's MIT licence covers this file with the rest of the work.
 
 This file has a record because a real DEM export looks exactly the same: a
 greyscale plate of 1024×1024 px at 16 bits. The file's own metadata cannot tell
-the two apart, because its XMP says only that Photoshop created it. Without this
-record, a person who audits the repository must ask. The answer disappears when
-there is nobody left to ask.
+the two apart. The same seed always gives the same file, so anyone can run the
+script and compare the result.
 
 ## `logo.svg`, `favicon.svg`, `og-image.svg`, `og-image.png` — original
 

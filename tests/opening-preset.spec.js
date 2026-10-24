@@ -37,11 +37,11 @@ async function holdPresets(page, ms = HOLD_MS) {
 
 /** Guards against the above regressing: the presets must genuinely turn up. */
 async function expectPresetsLoaded(page) {
-  await expect(page.locator('[data-testid="preset-Alpine Survey"]'))
+  await expect(page.locator('[data-testid="preset-First Light"]'))
     .toHaveCount(1, { timeout: 20_000 })
 }
 
-/** Alpine Survey turns Lines off and Hillshade on; the defaults are the inverse. */
+/** First Light turns Flow Lines and Shadow Hatch on; the defaults have both off. */
 async function look(page) {
   // Each section's own switch sits in its header (`input[data-enable]`).
   const enabledIn = async (section) => {
@@ -49,7 +49,7 @@ async function look(page) {
     if (!(await box.count())) return null
     return box.isChecked()
   }
-  return { lines: await enabledIn('Mode: Lines'), hillshade: await enabledIn('Hillshade') }
+  return { flow: await enabledIn('Mode: Flow Lines'), hatch: await enabledIn('Mode: Shadow Hatch') }
 }
 
 test.describe('opening preset', () => {
@@ -71,8 +71,8 @@ test.describe('opening preset', () => {
     await page.waitForTimeout(1500)
 
     const after = await look(page)
-    expect(after.lines, 'defaults draw Lines; Alpine Survey turns them off').toBe(true)
-    expect(after.hillshade, 'defaults have no hillshade; Alpine Survey does').toBe(false)
+    expect(after.flow, 'defaults draw no Flow Lines; First Light does').toBe(false)
+    expect(after.hatch, 'defaults draw no Shadow Hatch; First Light does').toBe(false)
   })
 
   test('a rolled look is not overwritten either', async ({ page }) => {
@@ -97,14 +97,14 @@ test.describe('opening preset', () => {
 
   test('and it still applies when nothing was touched', async ({ page }) => {
     // The guard must not have turned the opening off altogether: with no input,
-    // Alpine Survey is exactly what should arrive.
+    // First Light is exactly what should arrive.
     await holdPresets(page, 1200)
     await page.goto(PAGE)
     await page.waitForSelector('canvas', { timeout: 30_000 })
     await expectPresetsLoaded(page)
     await page.waitForTimeout(2000)
     const after = await look(page)
-    expect(after.lines, 'the opening preset turns Lines off').toBe(false)
-    expect(after.hillshade, 'and hillshade on').toBe(true)
+    expect(after.flow, 'the opening preset turns Flow Lines on').toBe(true)
+    expect(after.hatch, 'and Shadow Hatch on').toBe(true)
   })
 })

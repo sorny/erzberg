@@ -95,7 +95,7 @@ const birdSlider = (n) =>
  * once. Checked at full size rather than by its thumbnail — several presets that
  * read beautifully at 190 px are a thin scatter across a 1168 px plate.
  */
-const OPENING_PRESET = 'Alpine Survey'
+const OPENING_PRESET = 'First Light'
 
 // The preview canvas. 240 is what a 272 px panel body leaves once the section
 // keeps its padding, and the height is that on a 3:2 sheet.
@@ -205,7 +205,7 @@ function TerrainFetchPanel({ onFetched }) {
         <div data-testid="dem-progress" style={{ fontSize:10, color:MUTED, marginBottom:6 }}>
           <div style={{ marginBottom:4 }}>{`Fetching terrain… ${Math.round(progress * 100)}%`}</div>
           <div style={{ height:3, background:BORDER, borderRadius:3, overflow:'hidden' }}>
-            <div style={{ height:'100%', width:`${Math.round(progress * 100)}%`, background:ACCENT }} />
+            <div style={{ height:'100%', width:`${Math.round(progress * 100)}%`, background:TEXT }} />
           </div>
           <Btn block onClick={() => abortRef.current?.abort()} style={{ marginTop:6 }}>Cancel</Btn>
         </div>
@@ -655,7 +655,7 @@ export function Sidebar({
   // and the line that describes it read the same number.
   sun,
   textLayers, setTextLayers, textOverflow,
-  onUndo, onRedo, canUndo, canRedo,
+  onUndo, onRedo, canUndo, canRedo, onPresetPicked,
   onUndoTo, onRedoTo, historyLabels,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
@@ -1530,6 +1530,7 @@ export function Sidebar({
               target="_blank"
               rel="noopener noreferrer"
               title="View on GitHub"
+              aria-label="erzberg on GitHub"
               style={{ display:'flex', alignItems:'center', color: MUTED, opacity:0.75, textDecoration:'none' }}
               onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = STRONG }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.color = MUTED }}
@@ -1597,7 +1598,11 @@ export function Sidebar({
             * already has a filter for going somewhere, and this is for knowing
             * where you are.
             */}
-          <div data-testid="standing-line" style={{
+          <div data-testid="standing-line"
+            title={pens.rows.some((r) => r.kind === 'mixed')
+              ? 'Multicolour: a layer drawn in many colours, which one pen cannot plot. Output › Pens lists them.'
+              : undefined}
+            style={{
             marginTop:8, fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>
@@ -1644,7 +1649,7 @@ export function Sidebar({
           <style>{`.hmfind { transition:border-color .15s, box-shadow .15s, background .15s }
             .hmfind::placeholder { color:${MUTED}; opacity:1 }
             .hmfind:hover { border-color:${MUTED} }
-            .hmfind:focus { border-color:${ACCENT}; box-shadow:0 0 0 3px var(--hm-accent-ring); background:${BG} }
+            .hmfind:focus { border-color:${DIM}; box-shadow:0 0 0 3px var(--hm-focus-ring); background:${BG} }
             .hmfind:focus + .hmfindkbd { opacity:0 }
             .hmfind::-webkit-search-cancel-button { -webkit-appearance:none }`}</style>
           {q && (
@@ -1714,7 +1719,12 @@ export function Sidebar({
                 const showThumb = !noThumb.has(name)
                 return (
                   <button key={name} data-testid={`preset-${name}`} title={name}
-                    onClick={() => applyPreset(preset, name)}
+                    onClick={() => {
+                      // Named before it lands, so the history row reads
+                      // `Preset · Name` rather than the diff's `8 sections`.
+                      onPresetPicked?.(name, presetEdited || lastPreset == null)
+                      applyPreset(preset, name)
+                    }}
                     style={{
                       position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
                       background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT_DEEP : BORDER}`,
@@ -1803,7 +1813,7 @@ export function Sidebar({
                         ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
                     })
                   }}
-                  title="Show all 56 styles"
+                  title={`Show all ${presetNames.length} styles`}
                   style={{ background:'none', border:'none', padding:0, cursor:'pointer',
                            color: DIM, fontSize:10, fontFamily:'inherit',
                            borderBottom:`1px solid ${BORDER}` }}>
@@ -2119,7 +2129,7 @@ export function Sidebar({
               <div style={{ marginBottom:8 }}>
                 <div style={{ fontSize:10, color: MUTED, marginBottom:4 }}>Analysing spectrogram… {snd.progress}%</div>
                 <div style={{ height:3, background: BORDER, borderRadius:3, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${snd.progress}%`, background: ACCENT, transition:'width .1s' }} />
+                  <div style={{ height:'100%', width:`${snd.progress}%`, background: TEXT, transition:'width .1s' }} />
                 </div>
               </div>
             )}
@@ -2299,7 +2309,7 @@ export function Sidebar({
                       : `Fetching imagery… ${Math.round((imageryBusy.progress ?? 0) * 100)}%`}
                   </div>
                   <div style={{ height: 3, background: BORDER, borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', background: ACCENT,
+                    <div style={{ height: '100%', background: TEXT,
                                   width: `${Math.round((imageryBusy.progress ?? 0) * 100)}%` }} />
                   </div>
                 </div>
@@ -2990,7 +3000,8 @@ export function Sidebar({
           </Section>
 
           <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}
-                   enabled={summaries['Mirror'] !== '—'}>
+                   enabled={summaries['Mirror'] !== '—'}
+                   blurb="Copies of the terrain, reflected across any of its three axes.">
             <div style={{ fontSize:11, color:DIM, fontWeight:600, marginBottom:12, textAlign:'center' }}>3D symmetry, six ways</div>
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, maxWidth:180, margin:'0 auto' }}>
               <div />
@@ -3023,7 +3034,8 @@ export function Sidebar({
               A modifier, not a mode: it takes whatever the fifty-six modes
               are drawing and makes it stereo. See defaults.js. */}
           <Section title="Anaglyph" open={sec.anaglyph} onToggle={() => tog('anaglyph')}
-                   enabled={summaries['Anaglyph'] !== '—'}>
+                   enabled={summaries['Anaglyph'] !== '—'}
+                   blurb="Every layer twice, in red and cyan, so the plate stands up through 3D glasses.">
             <Tog label="Enabled" testId="anaglyph-on"
                  help="Draws every layer twice, offset sideways and inked in the two filter colours. Through red/cyan glasses the plate stands up off the paper. It is a modifier rather than a mode, so it works on whatever is already drawing."
                  checked={!!view.anaglyph} onChange={v => sv({ anaglyph: v })} />
@@ -3063,7 +3075,8 @@ export function Sidebar({
               The other half of what `View` carried. A sheet is not a camera: it
               has a shape, a scale and a margin, and none of them move the eye.
               It takes a dot, because it is off until the frame is drawn. */}
-          <Section title="Paper" open={sec.paper} onToggle={() => tog('paper')} enabled={!!view.showFrame}>
+          <Section title="Paper" open={sec.paper} onToggle={() => tog('paper')} enabled={!!view.showFrame}
+                   blurb="A frame in the shape of a sheet. The SVG cuts at it.">
             <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
               help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
             {view.showFrame && (
@@ -3084,7 +3097,7 @@ export function Sidebar({
                   <InlineSl label="Ratio" min={1} max={4} step={0.001} value={view.frameCustomRatio ?? 1.414} onChange={v => sv({ frameCustomRatio: v })} fmt={v => `1:${v.toFixed(3)}`} testId="frame-ratio"
                     help="Long side ÷ short side. 1.414 is ISO, 1.294 US Letter, 1.618 the golden ratio." />
                 )}
-                <SegRow label="Format" testIdPrefix="frame-orient"
+                <SegRow label="Orientation" testIdPrefix="frame-orient"
                   options={[['Portrait', false],['Landscape', true]]}
                   value={!!view.frameLandscape} onChange={v => sv({ frameLandscape: v })}
                   help="Only the shape is used — the export carries pixel dimensions, so scale it to the sheet in your plotting software. That is also why the list is by ratio: every ISO A size is the same 1:√2 rectangle, so A3 and A4 would have drawn an identical frame." />
@@ -3105,7 +3118,8 @@ export function Sidebar({
               the SVG as their own Inkscape layer, so a plotter can put them in a
               different pen. See utils/sheetMarks.js. */}
           <Section title="Scale and North" open={sec.sheetMarks} onToggle={() => tog('sheetMarks')}
-                   enabled={summaries['Scale and North'] !== '—'}>
+                   enabled={summaries['Scale and North'] !== '—'}
+                   blurb="A scale bar and a grid north arrow on the sheet, from a georeferenced GeoTIFF.">
             <Tog label="Scale bar" testId="mark-bar"
                  help="A bar of round length — 200 m, 500 m, 1 km — measured from this raster's own bounding box. Needs a georeferenced GeoTIFF: a PNG heightmap has no ground to measure."
                  checked={!!view.frameScaleBar} onChange={v => sv({ frameScaleBar: v })} />
@@ -3244,11 +3258,26 @@ export function Sidebar({
                   It *cuts* at the paper frame rather than hiding what falls
                   outside it, so a switch two stages away in Frame decides what
                   you get — and nothing else in the panel says so. */}
-              <div data-testid="export-extent" style={{ marginTop:2, fontSize:11, color: MUTED }}>
+              {/* And the sheet it cuts at, as a way there: the paper's shape
+                  lives in Frame and its width up here, and a plot is one
+                  decision about both. */}
+              <button type="button" data-testid="export-extent"
+                onClick={() => {
+                  goStage(5)
+                  setSec(prev => ({ ...prev, paper: true }))
+                  requestAnimationFrame(() => {
+                    document.querySelector('[data-testid="section-paper"]')
+                      ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                  })
+                }}
+                title="Open Frame › Paper"
+                style={{ display:'block', marginTop:2, background:'none', border:'none', padding:0, cursor:'pointer',
+                         fontFamily:'inherit', fontSize:11, color: MUTED, textAlign:'left' }}>
                 {view.showFrame
-                  ? `Cuts at the frame ${view.frameLandscape ? '→' : '↑'}`
-                  : 'Writes the full canvas'}
-              </div>
+                  ? `Cuts at the frame: ${PAPERS[view.framePaper ?? 'iso']?.label ?? 'custom'}, ${view.frameLandscape ? 'landscape' : 'portrait'}`
+                  : 'Writes the full canvas (no paper frame)'}
+                <span style={{ color: DIM, borderBottom:`1px solid ${BORDER}`, marginLeft:6, whiteSpace:'nowrap' }}>Frame › Paper</span>
+              </button>
               {/* The second thing a plate carries, and the one nobody would
                   guess at: every PNG and SVG holds the whole parameter set, so
                   the picture opens again under Presets. */}
@@ -3263,11 +3292,12 @@ export function Sidebar({
                 Equal to each other, and second to the plot. */}
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
-              <ExpBtn label="PNG" hint="2" onClick={onPng} testId="export-png" />
-              <ExpBtn label="PNG α" hint="3" onClick={onPngAlpha} testId="export-png-alpha" />
-              <ExpBtn label="STL" hint="4" onClick={onStl} testId="export-stl" />
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} hint={webmActive ? '' : '5'} onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Heightmap" hint="save" onClick={onHeightmap} />
+              <ExpBtn label="PNG" shortcut="2" onClick={onPng} testId="export-png" />
+              <ExpBtn label="PNG α" shortcut="3" onClick={onPngAlpha} testId="export-png-alpha" />
+              <ExpBtn label="STL" shortcut="4" onClick={onStl} testId="export-stl" />
+              {/* The cap stays while recording: 5 is also how it stops. */}
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} shortcut="5" onClick={onWebmToggle} active={webmActive} />
+              <ExpBtn label="Heightmap" onClick={onHeightmap} />
             </div>
             <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
           </Section>

@@ -325,7 +325,9 @@ test.describe('panel', () => {
     await openApp(page)
     await openStage(page, 'output')
     const extent = page.locator('[data-testid="export-extent"]')
-    await expect(extent).toHaveText('Writes the full canvas')
+    await expect(extent).toHaveText(/^Writes the full canvas/)
+    // It is also the way to the sheet that decides it.
+    await expect(extent).toContainText('Frame › Paper')
 
     // The switch is in Frame and the readout is in Output, which is the whole
     // point of the assertion — and now also two clicks of the rail.

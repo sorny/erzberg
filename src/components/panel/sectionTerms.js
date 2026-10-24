@@ -21,7 +21,7 @@ export const SECTION_TERMS = {
   'Shape':            'resolution elevation height scale blur jitter min max low high cut hypsometric integral raw greyscale heightmap',
   'Levels':           'shadows highlights histogram black white point contrast',
   'Camera':           'tilt zoom rotation supersampling auto-rotate spin guides orthographic perspective focal length lens pan dolly view angle plan oblique relief imfeld raisz berann',
-  'Paper':            'paper frame page sheet margin scale offset aspect ratio portrait landscape a3 a4 letter mount border',
+  'Paper':            'paper frame page sheet margin scale offset aspect ratio orientation format portrait landscape a3 a4 letter mount border',
   'Terrain Style':    'fill mesh occlusion ghost x-ray background gradient sky paper colour color inks as picked tone mapping true colours exact pens occluder hidden by ground lines walls curtains halo stroke depth bias',
   'Hillshade':        'sun azimuth altitude shadows relief lambert penumbra softness multidirectional local swiss imhof light almanac ephemeris date time clock solstice equinox sunrise sunset latitude longitude timezone solar',
   'Slope Shading':    'steepness gradient two-colour incline',

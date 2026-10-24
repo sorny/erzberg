@@ -145,8 +145,9 @@ test('switching occlusion off exports whole areas instead of what the camera see
    * fill. Off, every catchment comes out whole — a map rather than a view, which
    * is the file to plot from.
    *
-   * The plate is convex from this angle, so the difference is small. What is
-   * asserted is the direction, not a size.
+   * Which file has more points depends on the terrain: cut rings gain points
+   * along silhouettes and lose the parts behind them. What is asserted is that
+   * the switch reaches the fills at all.
    */
   const cut = await exportSvg(page)
   await setSwitch(page, 'Occlusion', 'Occlusion', false)
@@ -157,9 +158,7 @@ test('switching occlusion off exports whole areas instead of what the camera see
     .reduce((n, m) => n + (m[1].match(/[ML]/g) || []).length, 0)
   expect(points(whole)).toBeGreaterThan(0)
   expect(points(cut)).toBeGreaterThan(0)
-  // Nothing hidden means fewer places for a ring to be cut open and closed
-  // again along a silhouette.
-  expect(points(whole)).toBeLessThan(points(cut))
+  expect(points(whole)).not.toBe(points(cut))
 })
 
 test('hatch turns every fill into strokes a pen can draw', async ({ page }) => {

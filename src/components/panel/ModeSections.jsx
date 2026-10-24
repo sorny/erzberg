@@ -6,6 +6,9 @@
  * the values passed in here: the style and its setter, the open sections, and
  * a few readouts the Sidebar measures (the sun, the route, the view). Only one
  * section is on screen at a time; the mode sheet decides which.
+ *
+ * A section's controls render whether its mark is on or off. Section dims and
+ * locks them while it is off, so an opened mark always shows what it can do.
  */
 import { formatClock } from '../../utils/solar'
 import { memo } from 'react'
@@ -31,7 +34,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines} onEnabled={v => ss({ enabledLines: v })}>
-            {style.enabledLines && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingLines} onChange={v => ss({ spacingLines: v })} />
@@ -44,7 +47,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Crosshatch" icon={<ModeMark kind="crosshatch" />} open={sec.modeCross} onToggle={() => tog('modeCross')} enabled={style.enabledCross} onEnabled={v => ss({ enabledCross: v })}>
-            {style.enabledCross && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" log help="The gap between lines. It runs up to the width of the terrain, where only the lines along its edges are left: a frame." min={1} max={Math.max(100, plateSpan)} step={0.5} value={style.spacingCross} onChange={v => ss({ spacingCross: v })} fmt={v => (v >= 10 ? Math.round(v) : v.toFixed(1))} />
@@ -68,7 +71,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Pillars" icon={<ModeMark kind="pillars" />} open={sec.modePillars} onToggle={() => tog('modePillars')} enabled={style.enabledPillars} onEnabled={v => ss({ enabledPillars: v })}>
-            {style.enabledPillars && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPillars} onChange={v => ss({ spacingPillars: v })} />
@@ -111,7 +114,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Contours" icon={<ModeMark kind="contours" />} open={sec.modeContours} onToggle={() => tog('modeContours')} enabled={style.enabledContours} onEnabled={v => ss({ enabledContours: v })}>
-            {style.enabledContours && (
+            {(
               <>
                 <Sub>
                   {mPerWorld ? (
@@ -174,7 +177,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Hachure" icon={<ModeMark kind="hachure" />} open={sec.modeHachure} onToggle={() => tog('modeHachure')} enabled={style.enabledHachure} onEnabled={v => ss({ enabledHachure: v })}>
-            {style.enabledHachure && (
+            {(
               <>
                 <Sub>
                   <SegGroup label="Hachure style" options={[['Ticks', 'tick'], ['Lehmann', 'lehmann']]} testIdOf={(m) => `hachure-style-${m}`}
@@ -195,7 +198,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Flow Lines" icon={<ModeMark kind="flow" />} open={sec.modeFlow} onToggle={() => tog('modeFlow')} enabled={style.enabledFlow} onEnabled={v => ss({ enabledFlow: v })}>
-            {style.enabledFlow && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
@@ -208,7 +211,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Network" icon={<ModeMark kind="network" />} open={sec.modeDag} onToggle={() => tog('modeDag')} enabled={style.enabledDag} onEnabled={v => ss({ enabledDag: v })}>
-            {style.enabledDag && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Threshold" min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
@@ -226,7 +229,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Pencil" icon={<ModeMark kind="pencil" />} open={sec.modePencil} onToggle={() => tog('modePencil')} enabled={style.enabledPencil} onEnabled={v => ss({ enabledPencil: v })}>
-            {style.enabledPencil && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={100} value={style.spacingPencil} onChange={v => ss({ spacingPencil: v })} />
@@ -238,7 +241,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Ridges" icon={<ModeMark kind="ridge" />} open={sec.modeRidge} onToggle={() => tog('modeRidge')} enabled={style.enabledRidge} onEnabled={v => ss({ enabledRidge: v })}>
-            {style.enabledRidge && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={10} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
@@ -251,7 +254,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Valleys" icon={<ModeMark kind="valley" />} open={sec.modeValley} onToggle={() => tog('modeValley')} enabled={style.enabledValley} onEnabled={v => ss({ enabledValley: v })}>
-            {style.enabledValley && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={1} max={10} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
@@ -264,7 +267,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Stipple Dots" icon={<ModeMark kind="stipple" />} open={sec.modeStipple} onToggle={() => tog('modeStipple')} enabled={style.enabledStipple} onEnabled={v => ss({ enabledStipple: v })}>
-            {style.enabledStipple && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.05} max={2} step={0.05} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(2)} />
@@ -283,7 +286,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Isophotes" icon={<ModeMark kind="isophotes" />} open={sec.modeIso} onToggle={() => tog('modeIso')} enabled={style.enabledIso} onEnabled={v => ss({ enabledIso: v })}>
-            {style.enabledIso && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many lines of constant light to trace. A contour joins points of equal height; an isophote joins points of equal illumination, so the lines bunch where the surface turns away from the sun and open out where it faces it." min={1} max={24} step={1} value={style.levelsIso} onChange={v => ss({ levelsIso: v })} />
@@ -298,7 +301,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Engraving" icon={<ModeMark kind="engraving" />} open={sec.modeEngrave} onToggle={() => tog('modeEngrave')} enabled={style.enabledEngrave} onEnabled={v => ss({ enabledEngrave: v })}>
-            {style.enabledEngrave && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="Pitch between hatch strokes." min={1} max={20} step={0.5} value={style.spacingEngrave} onChange={v => ss({ spacingEngrave: v })} />
@@ -313,7 +316,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Curvature" icon={<ModeMark kind="curvature" />} open={sec.modeCurv} onToggle={() => tog('modeCurv')} enabled={style.enabledCurv} onEnabled={v => ss({ enabledCurv: v })}>
-            {style.enabledCurv && (
+            {(
               <>
                 <HelpBox text="Copperplate engraving that follows the form rather than the light: strokes trace the principal-curvature field, so the lines themselves wrap around ridges and hollows." />
                 <Sub>
@@ -332,7 +335,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Rock & Scree" icon={<ModeMark kind="swiss" />} open={sec.modeSwiss} onToggle={() => tog('modeSwiss')} enabled={style.enabledSwiss} onEnabled={v => ss({ enabledSwiss: v })}>
-            {style.enabledSwiss && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="Grid pitch between strokes/dots." min={0.5} max={10} step={0.5} value={style.spacingSwiss} onChange={v => ss({ spacingSwiss: v })} />
@@ -348,7 +351,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Bitplane" icon={<ModeMark kind="bitplane" />} open={sec.modeBitplane} onToggle={() => tog('modeBitplane')} enabled={style.enabledBitplane} onEnabled={v => ss({ enabledBitplane: v })}>
-            {style.enabledBitplane && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Tiers" help="How many flat plateaus the elevation range is cut into. Anchored to the terrain, so the steps stay put when Elevation Scale moves." min={2} max={40} step={1} value={style.tiersBitplane} onChange={v => ss({ tiersBitplane: v })} />
@@ -363,7 +366,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Indexed" icon={<ModeMark kind="indexed" />} open={sec.modeIndexed} onToggle={() => tog('modeIndexed')} enabled={style.enabledIndexed} onEnabled={v => ss({ enabledIndexed: v })}>
-            {style.enabledIndexed && (
+            {(
               <>
                 <Sub label="Palette">
                   <InlineSl label="Entries" help="How many inks the shared gradient is cut into. This is the palette — 16 is what a 16-colour machine had." min={2} max={16} step={1} value={style.tiersIndexed} onChange={v => ss({ tiersIndexed: v })} />
@@ -380,7 +383,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Outrun" icon={<ModeMark kind="outrun" />} open={sec.modeOutrun} onToggle={() => tog('modeOutrun')} enabled={style.enabledOutrun} onEnabled={v => ss({ enabledOutrun: v })}>
-            {style.enabledOutrun && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many contour rings are drawn. Where they crowd, the halos sum and the ground between them lifts." min={4} max={40} step={1} value={style.levelsOutrun} onChange={v => ss({ levelsOutrun: v })} />
@@ -397,7 +400,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Riso" icon={<ModeMark kind="riso" />} open={sec.modeRiso} onToggle={() => tog('modeRiso')} enabled={style.enabledRiso} onEnabled={v => ss({ enabledRiso: v })}>
-            {style.enabledRiso && (
+            {(
               <>
                 <Sub label="Inks">
                   <ColorRow label="Ink A · elevation" value={style.colorARiso} onChange={v => ss({ colorARiso: v })} />
@@ -420,7 +423,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Mineral" icon={<ModeMark kind="mineral" />} open={sec.modeMineral} onToggle={() => tog('modeMineral')} enabled={style.enabledMineral} onEnabled={v => ss({ enabledMineral: v })}>
-            {style.enabledMineral && (
+            {(
               <>
                 <Sub label="Materials">
                   <ColorRow label="Rock face" value={style.colorAMineral} onChange={v => ss({ colorAMineral: v })} />
@@ -442,7 +445,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Landforms" icon={<ModeMark kind="landform" />} open={sec.modeLandform} onToggle={() => tog('modeLandform')} enabled={style.enabledLandform} onEnabled={v => ss({ enabledLandform: v })} enableTestId="mode-landform">
-            {style.enabledLandform && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Search" testId="landform-search"
@@ -480,10 +483,10 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Land Cover" icon={<ModeMark kind="cover" />} open={sec.modeCover} onToggle={() => tog('modeCover')} enabled={style.enabledCover} onEnabled={v => ss({ enabledCover: v })}>
-            {style.enabledCover && !cover && (
+            {!cover && (
               <Note>No cover plate loaded, so this layer draws nothing. Open one under Land Cover.</Note>
             )}
-            {style.enabledCover && cover && (
+            {cover && (
               <>
                 <Sub label="Ink">
                   <SegGroup label="Land cover ink" options={[['Plate', 'plate'], ['Class', 'class']]}
@@ -502,7 +505,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Watershed" icon={<ModeMark kind="shed" />} open={sec.modeShed} onToggle={() => tog('modeShed')} enabled={style.enabledShed} onEnabled={v => ss({ enabledShed: v })}>
-            {style.enabledShed && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Inks" help="How many colours the gradient is cut into before basins are dealt from it." min={2} max={24} step={1} value={style.inksShed} onChange={v => ss({ inksShed: v })} />
@@ -519,7 +522,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Flashbulb" icon={<ModeMark kind="flashbulb" />} open={sec.modeFlashbulb} onToggle={() => tog('modeFlashbulb')} enabled={style.enabledFlashbulb} onEnabled={v => ss({ enabledFlashbulb: v })}>
-            {style.enabledFlashbulb && (
+            {(
               <>
                 <Sub label="Bulb">
                   <InlineSl label="Azimuth" help="Bearing of the bulb, same convention as the hillshade sun. 315° is NW." min={0} max={360} step={5} value={style.azimuthFlashbulb} onChange={v => ss({ azimuthFlashbulb: v })} fmt={v => Math.round(v) + '°'} />
@@ -548,7 +551,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Halation" icon={<ModeMark kind="halation" />} open={sec.modeHalation} onToggle={() => tog('modeHalation')} enabled={style.enabledHalation} onEnabled={v => ss({ enabledHalation: v })}>
-            {style.enabledHalation && (
+            {(
               <>
                 <Sub label="Bloom">
                   <InlineSl label="Radius" help="How far the glow spreads from a lit edge, in world units." min={1} max={40} step={0.5} value={style.bloomHalation} onChange={v => ss({ bloomHalation: v })} fmt={v => v.toFixed(1)} />
@@ -579,7 +582,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Fall Line" icon={<ModeMark kind="fallline" />} open={sec.modeFallLine} onToggle={() => tog('modeFallLine')} enabled={style.enabledFallLine} onEnabled={v => ss({ enabledFallLine: v })}>
-            {style.enabledFallLine && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="Seed pitch. Tracks claim the ground they cross, so this is how far apart the runs end up." min={2} max={60} step={1} value={style.spacingFallLine} onChange={v => ss({ spacingFallLine: v })} />
@@ -597,7 +600,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Berms" icon={<ModeMark kind="berm" />} open={sec.modeBerm} onToggle={() => tog('modeBerm')} enabled={style.enabledBerm} onEnabled={v => ss({ enabledBerm: v })}>
-            {style.enabledBerm && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={2} max={60} step={1} value={style.spacingBerm} onChange={v => ss({ spacingBerm: v })} />
@@ -616,7 +619,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Air" icon={<ModeMark kind="air" />} open={sec.modeAir} onToggle={() => tog('modeAir')} enabled={style.enabledAir} onEnabled={v => ss({ enabledAir: v })}>
-            {style.enabledAir && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" min={2} max={60} step={1} value={style.spacingAir} onChange={v => ss({ spacingAir: v })} />
@@ -636,7 +639,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Race Line" icon={<ModeMark kind="raceline" />} open={sec.modeRaceLine} onToggle={() => tog('modeRaceLine')} enabled={style.enabledRaceLine} onEnabled={v => ss({ enabledRaceLine: v })}>
-            {style.enabledRaceLine && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Drop-ins" help="How many summits get a braid. Each one blanks a radius of Spacing around itself so the braids do not all start on one summit, so a high count needs a low Spacing to have anywhere to put them — ask for more than the terrain has room for and you get what fits." min={1} max={250} step={1} value={style.dropsRaceLine} onChange={v => ss({ dropsRaceLine: v })} />
@@ -663,7 +666,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               shadow sweep Sun Hours sums over a year, traced at the single level
               where lit meets unlit. See utils/sunHours.js. */}
           <Section title="Mode: Shadow Line" icon={<ModeMark kind="shadowline" />} open={sec.modeShadowLine} onToggle={() => tog('modeShadowLine')} enabled={style.enabledShadowLine} onEnabled={v => ss({ enabledShadowLine: v })} enableTestId="mode-shadowline">
-            {style.enabledShadowLine && (
+            {(
               <>
                 <Sub>
                   <DateRow label="Date" testId="shadowline-date"
@@ -713,7 +716,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               The one field in the app that measures the ground rather than the
               picture. See utils/sunHours.js. */}
           <Section title="Mode: Sun Hours" icon={<ModeMark kind="sunhours" />} open={sec.modeSunHours} onToggle={() => tog('modeSunHours')} enabled={style.enabledSunHours} onEnabled={v => ss({ enabledSunHours: v })} enableTestId="mode-sunhours">
-            {style.enabledSunHours && (
+            {(
               <>
                 <Sub>
                   <SegRow label="Period" testIdPrefix="sunhours-period"
@@ -781,7 +784,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Crossings" icon={<ModeMark kind="zerocross" />} open={sec.modeZeroCross} onToggle={() => tog('modeZeroCross')} enabled={style.enabledZeroCross} onEnabled={v => ss({ enabledZeroCross: v })}>
-            {style.enabledZeroCross && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Detrend" help="Blur radius subtracted first. Without it a scanline crosses its own mean twice on a whole mountain and the mode draws two dots." min={1} max={40} step={1} value={style.detrendZeroCross} onChange={v => ss({ detrendZeroCross: v })} />
@@ -795,7 +798,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Sprite Blocks" icon={<ModeMark kind="sprite" />} open={sec.modeSprite} onToggle={() => tog('modeSprite')} enabled={style.enabledSprite} onEnabled={v => ss({ enabledSprite: v })}>
-            {style.enabledSprite && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Tiers" min={2} max={40} step={1} value={style.tiersSprite} onChange={v => ss({ tiersSprite: v })} />
@@ -810,7 +813,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Reticulation" icon={<ModeMark kind="retic" />} open={sec.modeRetic} onToggle={() => tog('modeRetic')} enabled={style.enabledRetic} onEnabled={v => ss({ enabledRetic: v })}>
-            {style.enabledRetic && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Cell size" help="Spacing of the feature points. The crazing is the boundary between their cells, not the cells themselves." min={2} max={80} step={1} value={style.cellRetic} onChange={v => ss({ cellRetic: v })} />
@@ -827,7 +830,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Single Line" icon={<ModeMark kind="tsp" />} open={sec.modeTsp} onToggle={() => tog('modeTsp')} enabled={style.enabledTsp} onEnabled={v => ss({ enabledTsp: v })} enableTestId="mode-tsp">
-            {style.enabledTsp && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Points" help="Dots the line must visit. The tour gets two seconds, so very high counts can keep a few crossings." min={100} max={8000} step={100} value={style.countTsp} onChange={v => ss({ countTsp: Math.round(v) })} />
@@ -846,7 +849,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Shadow Hatch" icon={<ModeMark kind="shadowhatch" />} open={sec.modeShadowHatch} onToggle={() => tog('modeShadowHatch')} enabled={style.enabledShadowHatch} onEnabled={v => ss({ enabledShadowHatch: v })} enableTestId="mode-shadowhatch">
-            {style.enabledShadowHatch && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Sun azimuth" min={0} max={360} step={1} value={style.azimuthShadowHatch} onChange={v => ss({ azimuthShadowHatch: v })} fmt={v => Math.round(v) + '°'} />
@@ -863,7 +866,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Isochrones" icon={<ModeMark kind="isochrone" />} open={sec.modeIsochrone} onToggle={() => tog('modeIsochrone')} enabled={style.enabledIsochrone} onEnabled={v => ss({ enabledIsochrone: v })} enableTestId="mode-isochrone">
-            {style.enabledIsochrone && (
+            {(
               <>
                 <Sub>
                   <Btn block variant="toggle" on={pick === 'Isochrone'} data-testid="isochrone-pick"
@@ -893,7 +896,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Truchet" icon={<ModeMark kind="truchet" />} open={sec.modeTruchet} onToggle={() => tog('modeTruchet')} enabled={style.enabledTruchet} onEnabled={v => ss({ enabledTruchet: v })} enableTestId="mode-truchet">
-            {style.enabledTruchet && (
+            {(
               <>
                 <Sub>
                   <SegGroup label="Tile alignment" options={[['Downhill', 'fall'], ['Across', 'contour'], ['Random', 'random']]}
@@ -910,7 +913,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Viewshed" icon={<ModeMark kind="viewshed" />} open={sec.modeViewshed} onToggle={() => tog('modeViewshed')} enabled={style.enabledViewshed} onEnabled={v => ss({ enabledViewshed: v })} enableTestId="mode-viewshed">
-            {style.enabledViewshed && (
+            {(
               <>
                 <Sub>
                   <Btn block variant="toggle" on={pick === 'Viewshed'} data-testid="viewshed-pick"
@@ -944,7 +947,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Route" icon={<ModeMark kind="route" />} open={sec.modeRoute} onToggle={() => tog('modeRoute')} enabled={style.enabledRoute} onEnabled={v => ss({ enabledRoute: v })} enableTestId="mode-route">
-            {style.enabledRoute && (
+            {(
               <>
                 <Sub>
                   <Btn block variant="toggle" on={pick === 'RouteA' || pick === 'RouteB'} data-testid="route-pick"
@@ -971,7 +974,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Panorama" icon={<ModeMark kind="panorama" />} open={sec.modePanorama} onToggle={() => tog('modePanorama')} enabled={style.enabledPanorama} onEnabled={v => ss({ enabledPanorama: v })} enableTestId="mode-panorama">
-            {style.enabledPanorama && (
+            {(
               <>
                 <Sub>
                   <Btn block variant="toggle" on={pick === 'Panorama'} data-testid="panorama-pick"
@@ -999,7 +1002,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Bedding" icon={<ModeMark kind="bedding" />} open={sec.modeBedding} onToggle={() => tog('modeBedding')} enabled={style.enabledBedding} onEnabled={v => ss({ enabledBedding: v })} enableTestId="mode-bedding">
-            {style.enabledBedding && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Dip" help="How steep the layers are. At 0 they are level and the lines are contours. Where a layer crosses a valley, its line bends into a V." min={0} max={85} step={1} value={style.dipBedding} onChange={v => ss({ dipBedding: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
@@ -1027,7 +1030,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Slope Classes" icon={<ModeMark kind="slopeclass" />} open={sec.modeSlopeClass} onToggle={() => tog('modeSlopeClass')} enabled={style.enabledSlopeClass} onEnabled={v => ss({ enabledSlopeClass: v })} enableTestId="mode-slopeclass">
-            {style.enabledSlopeClass && (
+            {(
               <>
                 <Sub>
                   {slopeClassNote && (
@@ -1055,7 +1058,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Wind" icon={<ModeMark kind="wind" />} open={sec.modeWind} onToggle={() => tog('modeWind')} enabled={style.enabledWind} onEnabled={v => ss({ enabledWind: v })} enableTestId="mode-wind">
-            {style.enabledWind && (
+            {(
               <>
                 <Sub>
                   {windNote && (
@@ -1087,7 +1090,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Runout" icon={<ModeMark kind="runout" />} open={sec.modeRunout} onToggle={() => tog('modeRunout')} enabled={style.enabledRunout} onEnabled={v => ss({ enabledRunout: v })} enableTestId="mode-runout">
-            {style.enabledRunout && (
+            {(
               <>
                 <Sub>
                   {runoutNote && (
@@ -1123,7 +1126,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Line Printer" icon={<ModeMark kind="printer" />} open={sec.modePrinter} onToggle={() => tog('modePrinter')} enabled={style.enabledPrinter} onEnabled={v => ss({ enabledPrinter: v })} enableTestId="mode-printer">
-            {style.enabledPrinter && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Pitch" help="The width of one character cell, in world units. Rows are taller by the aspect, as on a line printer." min={2} max={Math.max(40, Math.round(plateSpan / 20))} step={0.5} value={style.pitchPrinter ?? 8} onChange={v => ss({ pitchPrinter: v })} fmt={v => v.toFixed(1)} />
@@ -1139,7 +1142,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Stems" icon={<ModeMark kind="stems" />} open={sec.modeStems} onToggle={() => tog('modeStems')} enabled={style.enabledStems} onEnabled={v => ss({ enabledStems: v })} enableTestId="mode-stems">
-            {style.enabledStems && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="The distance between stems, in world units." min={1} max={40} step={0.5} value={style.spacingStems ?? 6} onChange={v => ss({ spacingStems: v })} fmt={v => v.toFixed(1)} />
@@ -1158,7 +1161,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Hair" icon={<ModeMark kind="hair" />} open={sec.modeHair} onToggle={() => tog('modeHair')} enabled={style.enabledHair} onEnabled={v => ss({ enabledHair: v })} enableTestId="mode-hair">
-            {style.enabledHair && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="The distance between hairs, in world units. Small values are dense and slow." min={1} max={20} step={0.5} value={style.spacingHair ?? 3} onChange={v => ss({ spacingHair: v })} fmt={v => v.toFixed(1)} />
@@ -1173,7 +1176,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Waveform" icon={<ModeMark kind="waveform" />} open={sec.modeWaveform} onToggle={() => tog('modeWaveform')} enabled={style.enabledWaveform} onEnabled={v => ss({ enabledWaveform: v })} enableTestId="mode-waveform">
-            {style.enabledWaveform && (
+            {(
               <>
                 <Sub>
                   <WaveformPreview terrain={terrainData} style={style} mPerWorld={mPerWorld} />
@@ -1204,7 +1207,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Profile Sheet" icon={<ModeMark kind="profileSheet" />} open={sec.modeProfileSheet} onToggle={() => tog('modeProfileSheet')} enabled={style.enabledProfileSheet} onEnabled={v => ss({ enabledProfileSheet: v })} enableTestId="mode-profilesheet">
-            {style.enabledProfileSheet && (
+            {(
               <>
                 <Sub>
                   <Note>A surveyor's profile sheet: transects across the plate drawn as a stack of profiles, with a station rule wherever one bends. It lies flat above the ground, so a plan view shows it alone.</Note>
@@ -1225,7 +1228,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Swath Profile" icon={<ModeMark kind="swathProfile" />} open={sec.modeSwathProfile} onToggle={() => tog('modeSwathProfile')} enabled={style.enabledSwathProfile} onEnabled={v => ss({ enabledSwathProfile: v })} enableTestId="mode-swathprofile">
-            {style.enabledSwathProfile && (
+            {(
               <>
                 <Sub>
                   <Note>A swath profile: the ground along the plate's longer side, as the mean, the highest and the lowest height across a strip. It lies flat above the ground, so a plan view shows it alone.</Note>
@@ -1246,7 +1249,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Hypsometry" icon={<ModeMark kind="hypsometry" />} open={sec.modeHypsometry} onToggle={() => tog('modeHypsometry')} enabled={style.enabledHypsometry} onEnabled={v => ss({ enabledHypsometry: v })} enableTestId="mode-hypsometry">
-            {style.enabledHypsometry && (
+            {(
               <>
                 <Sub>
                   <Note>The hypsometric curve (Strahler, 1952): how much of the plate lies above each height, with the hypsometric integral. It lies flat above the ground, so a plan view shows it alone.</Note>
@@ -1265,7 +1268,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Aspect Rose" icon={<ModeMark kind="aspectRose" />} open={sec.modeAspectRose} onToggle={() => tog('modeAspectRose')} enabled={style.enabledAspectRose} onEnabled={v => ss({ enabledAspectRose: v })} enableTestId="mode-aspectrose">
-            {style.enabledAspectRose && (
+            {(
               <>
                 <Sub>
                   <Note>A rose diagram of the way the ground faces: the share of the ground in each sector of the compass. It lies flat above the ground, so a plan view shows it alone.</Note>
@@ -1289,7 +1292,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Stereonet" icon={<ModeMark kind="stereonet" />} open={sec.modeStereonet} onToggle={() => tog('modeStereonet')} enabled={style.enabledStereonet} onEnabled={v => ss({ enabledStereonet: v })} enableTestId="mode-stereonet">
-            {style.enabledStereonet && (
+            {(
               <>
                 <Sub>
                   <Note>Every slope as the pole to its plane on a lower-hemisphere equal-area net, as structural geology plots bedding. Level ground falls at the centre, cliffs at the rim. It lies flat above the ground, so a plan view shows it alone.</Note>
@@ -1314,7 +1317,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Map Grid" icon={<ModeMark kind="mapgrid" />} open={sec.modeMapGrid} onToggle={() => tog('modeMapGrid')} enabled={style.enabledMapGrid} onEnabled={v => ss({ enabledMapGrid: v })} enableTestId="mode-mapgrid">
-            {style.enabledMapGrid && (
+            {(
               <>
                 <Sub>
                   <Note>A grid at a true distance on the ground, from the south-west corner, and the map sheet's scale round the edge.</Note>
@@ -1354,7 +1357,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Venation" icon={<ModeMark kind="venation" />} open={sec.modeVenation} onToggle={() => tog('modeVenation')} enabled={style.enabledVenation} onEnabled={v => ss({ enabledVenation: v })} enableTestId="mode-venation">
-            {style.enabledVenation && (
+            {(
               <>
                 <Sub>
                   {venationNote && (
@@ -1374,7 +1377,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Geodesic Fan" icon={<ModeMark kind="geodesic" />} open={sec.modeGeodesic} onToggle={() => tog('modeGeodesic')} enabled={style.enabledGeodesic} onEnabled={v => ss({ enabledGeodesic: v })} enableTestId="mode-geodesic">
-            {style.enabledGeodesic && (
+            {(
               <>
                 <Sub>
                   <Btn block variant="toggle" on={pick === 'Geodesic'} data-testid="geodesic-pick"
@@ -1398,7 +1401,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Radar" icon={<ModeMark kind="radar" />} open={sec.modeRadar} onToggle={() => tog('modeRadar')} enabled={style.enabledRadar} onEnabled={v => ss({ enabledRadar: v })} enableTestId="mode-radar">
-            {style.enabledRadar && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Looks toward" help="The bearing the radar looks toward. At 90° it sits in the west and looks east, and slopes that face west come back brightest." min={0} max={359} step={1} value={style.azimuthRadar} onChange={v => ss({ azimuthRadar: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
@@ -1418,7 +1421,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Spines" icon={<ModeMark kind="spines" />} open={sec.modeSpines} onToggle={() => tog('modeSpines')} enabled={style.enabledSpines} onEnabled={v => ss({ enabledSpines: v })} enableTestId="mode-spines">
-            {style.enabledSpines && (
+            {(
               <>
                 <Sub>
                   <InlineSl label="Levels" help="How many heights get a skeleton, evenly spaced from low to high." min={1} max={80} step={1} value={style.levelsSpines} onChange={v => ss({ levelsSpines: Math.round(v) })} />
@@ -1431,7 +1434,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Coral" icon={<ModeMark kind="coral" />} open={sec.modeCoral} onToggle={() => tog('modeCoral')} enabled={style.enabledCoral} onEnabled={v => ss({ enabledCoral: v })} enableTestId="mode-coral">
-            {style.enabledCoral && (
+            {(
               <>
                 <Sub>
                   {coralNote && (
@@ -1451,7 +1454,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Glacier" icon={<ModeMark kind="glacier" />} open={sec.modeGlacier} onToggle={() => tog('modeGlacier')} enabled={style.enabledGlacier} onEnabled={v => ss({ enabledGlacier: v })} enableTestId="mode-glacier">
-            {style.enabledGlacier && (
+            {(
               <>
                 <Sub>
                   {glacierNote && (
@@ -1480,7 +1483,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
           </Section>
 
           <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged} onEnabled={v => ss({ enabledRugged: v })} enableTestId="mode-rugged">
-            {style.enabledRugged && (
+            {(
               <>
                 <Sub>
                   <SegGroup label="Mesh" options={[['Delaunay', 'delaunay'], ['Voronoi', 'voronoi'], ['Both', 'both']]}

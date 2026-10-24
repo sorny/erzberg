@@ -13,6 +13,11 @@ import { openStage, switchMarkOn } from './helpers.js'
  */
 const KEY = 'erzberg.session.v1'
 
+// Terrain's own Blur. Shadow Hatch, which the opening preset draws, has a Blur
+// of its own, so the label alone names two fields.
+const BLUR = '[data-section="Shape"] input.hmval[aria-label="Blur value"]'
+const BLUR_RANGE = '[data-section="Shape"] input.hmr[aria-label="Blur"]'
+
 const session = (page) => page.evaluate((k) => localStorage.getItem(k), KEY)
 
 async function openApp(page) {
@@ -29,7 +34,7 @@ async function reload(page) {
 
 test('a change survives a reload', async ({ page }) => {
   await openApp(page)
-  await page.locator('input.hmval[aria-label="Blur value"]').fill('6')
+  await page.locator(BLUR).fill('6')
   await page.keyboard.press('Enter')
   // Blur is in Terrain, in Source; Tilt is in View, in Frame.
   await openStage(page, 'frame')
@@ -37,7 +42,7 @@ test('a change survives a reload', async ({ page }) => {
   await page.keyboard.press('Enter')
   await page.waitForTimeout(1200)
   await reload(page)
-  await expect(page.locator('input.hmr[aria-label="Blur"]')).toHaveValue('6')
+  await expect(page.locator(BLUR_RANGE)).toHaveValue('6')
   await expect(page.locator('input.hmr[aria-label="Tilt"]')).toHaveValue('22')
   await expect(page.locator('[data-testid="session-restored"]')).toHaveCount(1)
 })
@@ -52,7 +57,7 @@ test('auto-rotate does not starve the write', async ({ page }) => {
   await page.locator('input[type=checkbox][aria-label="Auto-rotate"]').click()
   await page.waitForTimeout(500)
   await openStage(page, 'terrain')   // Blur is in Terrain
-  await page.locator('input.hmval[aria-label="Blur value"]').fill('5')
+  await page.locator(BLUR).fill('5')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(3000)
 
@@ -77,7 +82,7 @@ test('Reset all clears the session rather than rewriting it', async ({ page }) =
   // Clearing alone did nothing: the six setState calls in the reset re-ran the
   // save effect, which wrote the defaults straight back a moment later.
   await openApp(page)
-  await page.locator('input.hmval[aria-label="Blur value"]').fill('7')
+  await page.locator(BLUR).fill('7')
   await page.keyboard.press('Enter')
   await page.waitForTimeout(1200)
   expect(await session(page)).not.toBeNull()
@@ -95,7 +100,7 @@ test('a stored resolution is not carried onto a different raster', async ({ page
   await page.evaluate((k) => localStorage.setItem(k,
     JSON.stringify({ terrain: { blurRadius: 3, resolution: 12 } })), KEY)
   await reload(page)
-  await expect(page.locator('input.hmr[aria-label="Blur"]')).toHaveValue('3')
+  await expect(page.locator(BLUR_RANGE)).toHaveValue('3')
   await expect(page.locator('input.hmr[aria-label="Resolution"]')).not.toHaveValue('12')
 })
 
@@ -104,9 +109,9 @@ test('a restored mode comes back with its section open', async ({ page }) => {
   // straight into React state at mount skipped it, so a reload left a mode
   // drawing with its controls behind a collapsed disclosure.
   await openApp(page)
-  // Pillars rather than Contours: the opening preset already draws contours, so
-  // toggling that one would be switching a mode *off* and asserting the section
-  // opened for a mode that is not running.
+  // Pillars, which the opening preset does not draw: toggling a mark it already
+  // draws would switch it *off* and assert the section opened for a mode that
+  // is not running.
   const section = page.locator('[data-testid="section-mode:-pillars"]')
   await switchMarkOn(page, 'pillars')
 
@@ -125,6 +130,6 @@ test('a restored mode comes back with its section open', async ({ page }) => {
    * underneath the drill rather than the drill's own override of it.
    */
   await reload(page)
-  await expect(page.locator('input.hmr[aria-label="Blur"]')).toBeVisible()
+  await expect(page.locator(BLUR_RANGE)).toBeVisible()
   await expect(section).toHaveAttribute('aria-expanded', 'true')
 })
