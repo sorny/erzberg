@@ -45,7 +45,9 @@ async function openApp(page) {
 test.describe('panel', () => {
   test('the filter narrows to the sections that answer to it', async ({ page }) => {
     await openApp(page)
-    await page.fill('[data-testid="panel-filter"]', 'azimuth')
+    // A word only Hillshade answers to. "azimuth" no longer is: it names a
+    // slider in ten sections, which the next test is about.
+    await page.fill('[data-testid="panel-filter"]', 'penumbra')
     await page.waitForTimeout(400)
 
     const visible = page.locator('[data-testid^="section-"]:visible')
@@ -60,6 +62,23 @@ test.describe('panel', () => {
     // Back to one pane, not to all sixty sections: clearing the field returns
     // the panel to the stage it was on, which is the one it opened on.
     await expect(page.locator('[data-testid^="section-"]:visible')).toHaveCount(TERRAIN_COUNT)
+  })
+
+  test('the filter finds a control by its own label, in marks that are off', async ({ page }) => {
+    // Section terms say what a section is about, not what it holds: "azimuth"
+    // found Hillshade and none of the marks with an Azimuth slider. The labels
+    // are read from the source (sectionLabels.js), so a mark that is off is
+    // found too, and shows the control the search was for.
+    await openApp(page)
+    await page.fill('[data-testid="panel-filter"]', 'azimuth')
+    await page.waitForTimeout(400)
+    for (const t of ['hillshade', 'mode:-isophotes', 'mode:-engraving']) {
+      await expect(page.locator(`[data-testid="section-${t}"]`)).toBeVisible()
+    }
+    await expect(page.locator('[data-testid="filter-count"]')).not.toHaveText('1 section')
+    const iso = page.locator('[data-section="Mode: Isophotes"]')
+    await expect(iso.locator('[data-testid="off-controls"]')).toBeVisible()
+    await expect(iso.locator('input.hmr[aria-label="Sun azimuth"]')).toBeVisible()
   })
 
   test('a shut header keeps its readout clear of the reset button', async ({ page }) => {
@@ -84,7 +103,7 @@ test.describe('panel', () => {
     // the controller that can cancel it, the category ticks, a feature filter —
     // survived being closed. Returning null on a keystroke threw all of it away.
     await openApp(page)
-    await page.fill('[data-testid="panel-filter"]', 'azimuth')
+    await page.fill('[data-testid="panel-filter"]', 'penumbra')
     await page.waitForTimeout(400)
     const inDom = await page.locator('[data-testid^="section-"]').count()
     const onScreen = await page.locator('[data-testid^="section-"]:visible').count()
@@ -603,7 +622,7 @@ test.describe('panel', () => {
     // A search is flat and crosses every pane, so there are no rules at all
     // while one is typed — a stage heading over none of its own sections is
     // furniture pointing nowhere. The rail becomes a tally instead.
-    await page.fill('[data-testid="panel-filter"]', 'azimuth')
+    await page.fill('[data-testid="panel-filter"]', 'penumbra')
     await page.waitForTimeout(400)
     expect(await shownStages()).toEqual([])
     await expect(page.locator('[data-testid="stage-tab-surface"]')).toHaveAttribute('title', /1 match/)

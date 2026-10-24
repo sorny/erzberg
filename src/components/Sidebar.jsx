@@ -51,6 +51,7 @@ import { VectorLayersPanel } from './panel/VectorLayersPanel'
 /** Every tweakable key, from the one index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
+import { SECTION_LABELS } from './panel/sectionLabels'
 import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
 import { applyTheme, storedTheme } from '../utils/theme'
 import { AUTOMATION } from '../automation'
@@ -95,6 +96,14 @@ const birdSlider = (n) =>
  * once. Checked at full size rather than by its thumbnail — several presets that
  * read beautifully at 190 px are a thin scatter across a 1168 px plate.
  */
+/**
+ * What the filter matches: each section's stated terms plus the labels of the
+ * controls it holds, so "azimuth" finds every mark with an Azimuth slider and
+ * not only the section whose terms happen to say so.
+ */
+const FILTER_TERMS = Object.fromEntries(Object.entries(SECTION_TERMS)
+  .map(([title, words]) => [title, SECTION_LABELS[title] ? `${words} ${SECTION_LABELS[title]}` : words]))
+
 const OPENING_PRESET = 'First Light'
 
 // The preview canvas. 240 is what a 272 px panel body leaves once the section
@@ -879,7 +888,7 @@ export function Sidebar({
   const hits = useMemo(() => {
     if (!q) return null
     const out = {}
-    for (const [title, words] of Object.entries(SECTION_TERMS)) {
+    for (const [title, words] of Object.entries(FILTER_TERMS)) {
       if (!sectionMatches(title, words, q)) continue
       const n = stageOf(title)
       if (n) out[n] = (out[n] || 0) + 1
@@ -888,7 +897,7 @@ export function Sidebar({
   }, [q])
 
   const filterCtx = useMemo(
-    () => ({ q, terms: SECTION_TERMS, summaries, modified, drill, onReset: onResetSection }),
+    () => ({ q, terms: FILTER_TERMS, summaries, modified, drill, onReset: onResetSection }),
     [q, summaries, modified, drill, onResetSection])
   /** The same reading one level up: the whole plate, for the standing line. */
   const plate = useMemo(
@@ -913,7 +922,7 @@ export function Sidebar({
   // missing from SECTION_TERMS would still slip past this, which is what the
   // development warning in `Section` is for.
   const matchCount = useMemo(
-    () => (q ? Object.entries(SECTION_TERMS).filter(([t, w]) => sectionMatches(t, w, q)).length : 0),
+    () => (q ? Object.entries(FILTER_TERMS).filter(([t, w]) => sectionMatches(t, w, q)).length : 0),
     [q]
   )
   const [sec, setSec]       = useState({
@@ -2392,8 +2401,8 @@ export function Sidebar({
 
           {/* ── Hillshade ──────────────────────────────────────────────────── */}
 
-          <Section title="Hillshade" open={sec.hillshade} onToggle={() => tog('hillshade')} enabled={style.showHillshade} onEnabled={v => ss({ showHillshade: v })}>
-            {style.showHillshade && (
+          <Section title="Hillshade" preview open={sec.hillshade} onToggle={() => tog('hillshade')} enabled={style.showHillshade} onEnabled={v => ss({ showHillshade: v })}>
+            {(
               <Sub>
                 <Tog label="Multi-direction" help="Averages eight light directions, so no slope is favoured. Hides the azimuth, cast shadows and local light." checked={!!style.hillshadeMultiDir} onChange={v => ss({ hillshadeMultiDir: v })} />
                 {!style.hillshadeMultiDir && (<>
@@ -2506,8 +2515,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Slope Shading ──────────────────────────────────────────────── */}
-          <Section title="Slope Shading" open={sec.slopeShade} onToggle={() => tog('slopeShade')} enabled={style.showSlopeShade} onEnabled={v => ss({ showSlopeShade: v })}>
-            {style.showSlopeShade && (
+          <Section title="Slope Shading" preview open={sec.slopeShade} onToggle={() => tog('slopeShade')} enabled={style.showSlopeShade} onEnabled={v => ss({ showSlopeShade: v })}>
+            {(
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off reads the slope from the normal as drawn, so it moves with the height slider. Older plates open with it off, so they look as they did." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
@@ -2530,8 +2539,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Water Fill ─────────────────────────────────────────────────── */}
-          <Section title="Water Fill" open={sec.waterFill} onToggle={() => tog('waterFill')} enabled={style.showWaterFill} onEnabled={v => ss({ showWaterFill: v })}>
-            {style.showWaterFill && (
+          <Section title="Water Fill" preview open={sec.waterFill} onToggle={() => tog('waterFill')} enabled={style.showWaterFill} onEnabled={v => ss({ showWaterFill: v })}>
+            {(
               <Sub>
                 <InlineSl label="Level" help="Flood threshold — percentage of terrain height." min={0} max={1} step={0.01} value={style.waterLevel ?? 0.3} onChange={v => ss({ waterLevel: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style.waterOpacity ?? 0.82} onChange={v => ss({ waterOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2541,8 +2550,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Aspect Map ──────────────────────────────────────────────────── */}
-          <Section title="Aspect Map" open={sec.aspectMap} onToggle={() => tog('aspectMap')} enabled={style.showAspectMap} onEnabled={v => ss({ showAspectMap: v })}>
-            {style.showAspectMap && (
+          <Section title="Aspect Map" preview open={sec.aspectMap} onToggle={() => tog('aspectMap')} enabled={style.showAspectMap} onEnabled={v => ss({ showAspectMap: v })}>
+            {(
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of the aspect hue-wheel over the fill." min={0} max={1} step={0.01} value={style.aspectMapOpacity ?? 0.8} onChange={v => ss({ aspectMapOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
                 <Tog label="Fade on flat ground" help="A bivariate map: the hue fades to grey as the ground flattens, because level ground faces no direction." checked={style.aspectMapBivariate !== false} onChange={v => ss({ aspectMapBivariate: v })} />
@@ -2558,8 +2567,8 @@ export function Sidebar({
 
 
           {/* ── Local Relief ────────────────────────────────────────────────── */}
-          <Section title="Local Relief" open={sec.localRelief} onToggle={() => tog('localRelief')} enabled={style.showLocalRelief} onEnabled={v => ss({ showLocalRelief: v })}>
-            {style.showLocalRelief && (
+          <Section title="Local Relief" preview open={sec.localRelief} onToggle={() => tog('localRelief')} enabled={style.showLocalRelief} onEnabled={v => ss({ showLocalRelief: v })}>
+            {(
               <Sub>
                 <Note>The ground minus a blur of itself. The mountain goes, and what sits on it stays: terraces, benches, paths, walls.</Note>
                 <InlineSl label="Radius" help="The largest feature kept. Anything wider is part of the mountain and is taken away." min={4} max={400} step={1} value={style.localReliefRadius ?? 40} onChange={v => ss({ localReliefRadius: Math.round(v) })} />
@@ -2572,8 +2581,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Curvature Shading ───────────────────────────────────────────── */}
-          <Section title="Curvature Shading" open={sec.curvShade} onToggle={() => tog('curvShade')} enabled={style.showCurvShade} onEnabled={v => ss({ showCurvShade: v })}>
-            {style.showCurvShade && (
+          <Section title="Curvature Shading" preview open={sec.curvShade} onToggle={() => tog('curvShade')} enabled={style.showCurvShade} onEnabled={v => ss({ showCurvShade: v })}>
+            {(
               <Sub>
                 <Note>Convex ground in one colour and hollows in the other. The form with no light direction at all.</Note>
                 <InlineSl label="Scale" help="The size of the forms it reads. Small values show the grain of the ground, large ones its main ridges and valleys." min={1} max={100} step={1} value={style.curvShadeRadius ?? 8} onChange={v => ss({ curvShadeRadius: Math.round(v) })} />
@@ -2586,8 +2595,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Openness ────────────────────────────────────────────────────── */}
-          <Section title="Openness" open={sec.openness} onToggle={() => tog('openness')} enabled={style.showOpenness} onEnabled={v => ss({ showOpenness: v })}>
-            {style.showOpenness && (
+          <Section title="Openness" preview open={sec.openness} onToggle={() => tog('openness')} enabled={style.showOpenness} onEnabled={v => ss({ showOpenness: v })}>
+            {(
               <Sub>
                 <Note>Bright where the ground is open to the sky, dark where it is enclosed, with no light direction. With red, steep ground reads red: the Red Relief Image Map of Japanese LiDAR surveys.</Note>
                 <Tog label="Red relief" help="Red in proportion to the slope, over the grey." checked={style.opennessRed !== false} onChange={v => ss({ opennessRed: v })} />
@@ -2605,8 +2614,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Texture Shading ─────────────────────────────────────────────── */}
-          <Section title="Texture Shading" open={sec.texShade} onToggle={() => tog('texShade')} enabled={style.showTexShade} onEnabled={v => ss({ showTexShade: v })}>
-            {style.showTexShade && (
+          <Section title="Texture Shading" preview open={sec.texShade} onToggle={() => tog('texShade')} enabled={style.showTexShade} onEnabled={v => ss({ showTexShade: v })}>
+            {(
               <Sub>
                 <Note>Leland Brown's texture shading: the ridges and canyons at every scale at once, from a fractional Laplacian of the ground.</Note>
                 <InlineSl label="Detail" help="The order of the Laplacian. Low values keep the big forms, high values the fine grain. On a mountain range 0.7 to 1 shows the ridge network best." min={0.1} max={1.5} step={0.05} value={style.texShadeDetail ?? 0.8} onChange={v => ss({ texShadeDetail: v })} fmt={v => v.toFixed(2)} />
@@ -2617,8 +2626,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Aerial Perspective ──────────────────────────────────────────── */}
-          <Section title="Aerial Perspective" open={sec.aerial} onToggle={() => tog('aerial')} enabled={style.showAerial} onEnabled={v => ss({ showAerial: v })}>
-            {style.showAerial && (
+          <Section title="Aerial Perspective" preview open={sec.aerial} onToggle={() => tog('aerial')} enabled={style.showAerial} onEnabled={v => ss({ showAerial: v })}>
+            {(
               <Sub>
                 <Note>Low ground fades into haze, so the summits stand in front, as in Imhof's Swiss relief maps.</Note>
                 <InlineSl label="Strength" help="How far the lowest ground fades." min={0} max={1} step={0.01} value={style.aerialStrength ?? 0.6} onChange={v => ss({ aerialStrength: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2629,8 +2638,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Wetness ─────────────────────────────────────────────────────── */}
-          <Section title="Wetness" open={sec.wetness} onToggle={() => tog('wetness')} enabled={style.showWetness} onEnabled={v => ss({ showWetness: v })}>
-            {style.showWetness && (
+          <Section title="Wetness" preview open={sec.wetness} onToggle={() => tog('wetness')} enabled={style.showWetness} onEnabled={v => ss({ showWetness: v })}>
+            {(
               <Sub>
                 <Note>Where water gathers: a large catchment on flat ground. The topographic wetness index, ln(a / tan β).</Note>
                 <InlineSl label="From" help="Only the wettest ground is tinted. Lower this to spread the tint up the valleys." min={0} max={0.95} step={0.01} value={style.wetnessFrom ?? 0.45} onChange={v => ss({ wetnessFrom: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -2641,8 +2650,8 @@ export function Sidebar({
           </Section>
 
           {/* ── Sunlight ────────────────────────────────────────────────────── */}
-          <Section title="Sunlight" open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint} onEnabled={v => ss({ showSunTint: v })}>
-            {style.showSunTint && (
+          <Section title="Sunlight" preview open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint} onEnabled={v => ss({ showSunTint: v })}>
+            {(
               <Sub>
                 <Note>Hours of direct sun, with the shadows of the ridges, from the shaded colour to the sunny one. At the latitude of a GeoTIFF, or the Hillshade's for a plain heightmap.</Note>
                 <SegGroup label="Over" options={[['A year', 'year'], ["The Hillshade's date", 'day']]}

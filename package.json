@@ -19,6 +19,7 @@
     "test:ui": "playwright test --ui",
     "update-presets": "node scripts/update-presets.js",
     "heightmap": "node scripts/build-heightmap.js",
+    "section-labels": "node scripts/build-section-labels.js",
     "font": "node scripts/build-font.js",
     "logo": "node scripts/build-logo.js",
     "thumbs": "node scripts/generate-thumbs.js",
