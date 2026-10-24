@@ -1138,7 +1138,12 @@ function OffMark({ name, icon, onDraw }) {
   )
 }
 
-export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, blurb, headless = false, children }) {
+/**
+ * `preview`: the section's controls show dimmed while it is off, as every
+ * mark's do. Only for sections whose controls are hidden while off; a section
+ * whose controls stay live when off (Texture) must not set it.
+ */
+export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, blurb, preview = false, headless = false, children }) {
   const ctx = useContext(SectionFilter)
   const scope = useContext(SectionScope)
   const copies = useContext(ModeCopiesPanel)
@@ -1369,9 +1374,10 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
               mark says what it can be tuned for before it is switched on. Only
               for the one mark on screen: sixty hidden copies of every control
               would put sixty "Blur" fields in the page for a screen reader and
-              a selector alike. */}
-          {onEnabled && !enabled && title.startsWith('Mode: ')
-            ? (isOpen && !sheetOut && !q && <div data-testid="off-controls" inert style={{ opacity: DISABLED_OPACITY }}>{children}</div>)
+              a selector alike. While filtering, every section that matches is
+              on screen, so each one shows the controls the search found. */}
+          {onEnabled && !enabled && (preview || title.startsWith('Mode: '))
+            ? ((q ? matches : isOpen && !sheetOut) && <div data-testid="off-controls" inert style={{ opacity: DISABLED_OPACITY }}>{children}</div>)
             : children}
           {copies && title.startsWith('Mode: ') && enabled && copies.render(title)}
         </div>
