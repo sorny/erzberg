@@ -92,7 +92,7 @@ function distinct(buf, rgb, max = Infinity, samples = Infinity) {
 export { MAX_SWATCHES }
 
 /**
- * The pens in one line: `3 layers · 1 ink · 2 mixed`.
+ * The pens in one line: `3 layers · 1 ink · 2 multicolour`.
  *
  * The standing line at the top of the panel and the strip under the SVG button
  * both print this, from the same `pensOf`, so they cannot disagree. They used
@@ -110,9 +110,11 @@ export function penLine({ rows, layers, hidden }) {
   }
   const n = (k, word) => `${k} ${word}${k === 1 ? '' : 's'}`
   const upTo = rows.some((r) => r.kind === 'areas') ? 'up to ' : ''
+  // `0 inks · 1 mixed` read as a broken plate. With every layer multicolour
+  // there is no single ink to count, so the ink count steps aside.
   return [
     `${upTo}${n(layers, 'layer')}${hidden && rows.length ? ' + hidden' : ''}`,
-    n(inks.size, 'ink'),
-    mixed > 0 && `${mixed} mixed`,
+    (inks.size > 0 || mixed === 0) && n(inks.size, 'ink'),
+    mixed > 0 && `${mixed} multicolour`,
   ].filter(Boolean).join(' · ')
 }

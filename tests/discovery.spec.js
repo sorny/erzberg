@@ -241,7 +241,7 @@ test('the app opens on a style, not on bare defaults', async ({ page }) => {
   // of its own and the grid is shut inside it, because 2 346 px of thumbnails
   // is a high price for a label. The label is the link, and the link is in the
   // load block where the opening state is — one click from anywhere.
-  await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveText('Alpine Survey')
+  await expect(page.locator('[data-testid="jump-to-presets"]')).toHaveText('First Light')
   await expect(page.locator('[data-testid="preset-edited"]')).toHaveCount(0)
   // Hidden, because Presets is a destination of its own and the panel opens on
   // Terrain. The grid inside it is expanded — it shares its pane with nothing,

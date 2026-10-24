@@ -823,12 +823,12 @@ export function VectorLayersPanel({
               {progress == null ? (
                 <div className="hm-indet" style={{
                   position: 'absolute', inset: 0, width: '40%',
-                  background: ACCENT, borderRadius: 3,
+                  background: TEXT, borderRadius: 3,
                 }} />
               ) : (
                 <div style={{
                   height: '100%', width: `${Math.round(progress * 100)}%`,
-                  background: ACCENT, borderRadius: 3, transition: 'width 120ms linear',
+                  background: TEXT, borderRadius: 3, transition: 'width 120ms linear',
                 }} />
               )}
             </div>

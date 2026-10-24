@@ -4,13 +4,14 @@
  * All tweakable params live in plain React state (no Leva).
  * The custom <Sidebar> renders the right-hand control panel.
  */
+import { version } from '../package.json'
 import { Canvas, useThree } from '@react-three/fiber'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { reachError } from './utils/netError'
-import { ACCENT, ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, ON_ACCENT, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -119,7 +120,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
       }}>
         <div style={{
           width:32, height:32, border:`3px solid ${BORDER}`,
-          borderTopColor:ACCENT, borderRadius:'50%',
+          borderTopColor:TEXT, borderRadius:'50%',
           animation:'hm-spin .7s linear infinite',
         }} />
         <span style={{ fontSize:13, color:TEXT, fontFamily: FONT }}>{msg}</span>
@@ -128,7 +129,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
             {/* Same shape as the spectrogram analyser's bar in the panel. */}
             <div style={{ width:'100%', height:4, background:BORDER, borderRadius:3, overflow:'hidden' }}>
               <div data-testid="export-progress-fill"
-                   style={{ height:'100%', width:`${pct}%`, background:ACCENT, transition:'width .1s' }} />
+                   style={{ height:'100%', width:`${pct}%`, background:TEXT, transition:'width .1s' }} />
             </div>
             <span data-testid="export-progress" data-pct={pct}
                   style={{ fontSize:11, color:MUTED, fontFamily:'system-ui,sans-serif' }}>{pct}%</span>
@@ -164,6 +165,20 @@ const EXPORT_KINDS = {
   // SVG pipeline and throws the file away, which is the only honest way to
   // measure what a plot will cost.
   preflight: [null, 'Preflight'],
+}
+
+/**
+ * The line a failed export leaves: what failed, the reason in the error's own
+ * words, and the one change that most often gets the file out.
+ */
+function exportFailure(name, err) {
+  const raw = String(err?.message || '').trim().replace(/\.$/, '')
+  const memory = err instanceof RangeError || /memory|allocation|array length/i.test(raw)
+  const reason = memory ? 'it ran out of memory' : raw || 'the writer stopped'
+  const next = name.includes('PNG')
+    ? 'Try again, or reload the page if the view went blank.'
+    : 'Lower Resolution or switch off a dense mark, then try again.'
+  return `${name} export failed: ${reason}. ${next}`
 }
 
 // ── Auto-resolution: keep the geometry grid within 1024×1024 ─────────────────
@@ -203,7 +218,7 @@ function Toast({ toast, onDismiss }) {
   // a toast that closes under a keyboard user's focus takes its Undo with it.
   const [held, setHeld] = useState(false)
   useEffect(() => {
-    if (!toast || held) return
+    if (!toast || held || toast.sticky) return
     const t = setTimeout(onDismiss, toast.action ? 9000 : 4500)
     return () => clearTimeout(t)
   }, [toast, onDismiss, held])
@@ -330,26 +345,47 @@ function DropTarget() {
 }
 
 /**
- * The quiet half of the two-tier progress signal.
+ * The two-tier progress signal, both tiers in one place.
  *
- * Bottom right, out of the way of the hint at top left, the toast up the middle
- * and the gizmo at bottom left. `pointerEvents: none` — a rebuild is not modal
- * and this must not behave as though it were.
+ * Bottom right of the view, clear of the panel, the hint at top left, the toast
+ * up the middle and the gizmo at bottom left. Tier 1 is the quiet pill. Tier 2
+ * used to be a full-screen dim with a modal card, which put the way out of a
+ * slow mark — its switch, or Undo — behind the very thing that was slow. It
+ * stays out of the way now and grows a clock and an Undo instead: a change
+ * that arrives while a build overruns its budget terminates that build, so
+ * Undo is the cancel.
  */
-function ComputingPill() {
+function ComputingPill({ tier, right = 14, onUndo = null }) {
+  const [secs, setSecs] = useState(0)
+  useEffect(() => {
+    if (tier < 2) { setSecs(0); return }
+    const t0 = performance.now()
+    const id = setInterval(() => setSecs(Math.round((performance.now() - t0) / 1000) + 1), 500)
+    return () => clearInterval(id)
+  }, [tier])
+  const loud = tier >= 2
   return (
-    <div data-testid="computing-pill" style={{
-      position:'fixed', right:14, bottom:14, zIndex:3600, pointerEvents:'none',
+    <div data-testid="computing-pill" data-tier={tier} role="status" style={{
+      position:'fixed', right, bottom:14, zIndex:3600, pointerEvents:'none',
       display:'flex', alignItems:'center', gap:7,
       ...GLASS, borderRadius:999,
-      padding:'6px 13px 6px 10px', fontSize:12, color:MUTED,
+      padding: loud && onUndo ? '4px 4px 4px 10px' : '6px 13px 6px 10px',
+      fontSize:12, color: loud ? TEXT : MUTED,
     }}>
       <span style={{
         width:10, height:10, border:`2px solid ${BORDER}`,
-        borderTopColor:ACCENT, borderRadius:'50%',
+        borderTopColor: loud ? TEXT : MUTED, borderRadius:'50%',
         animation:'hm-spin .7s linear infinite',
       }} />
       Computing
+      {loud && <span style={{ fontVariantNumeric:'tabular-nums', color: MUTED }}>{secs} s</span>}
+      {loud && onUndo && (
+        <button type="button" data-testid="computing-undo" onClick={onUndo} style={{
+          pointerEvents:'auto', marginLeft:4,
+          background:'none', border:`1px solid ${BORDER}`, borderRadius:999, cursor:'pointer',
+          color: TEXT, fontSize:11, fontFamily: FONT, padding:'3px 10px',
+        }} title="Undo the last change (⌘Z). The slow build stops.">Undo</button>
+      )}
       <style>{`@keyframes hm-spin { to { transform:rotate(360deg) } }`}</style>
     </div>
   )
@@ -1150,7 +1186,7 @@ export default function App() {
 
   // How a scripted export hears that it finished. See src/automation.js.
   const automationDoneRef = useRef(null)
-  const finishExport = useCallback((status = 'done') => {
+  const finishExport = useCallback((status = 'done', failure = null) => {
     automationDoneRef.current?.(status)
     const [ext, name] = EXPORT_KINDS[exportKindRef.current] ?? ['file', 'Export']
     exportBusyRef.current = false
@@ -1162,7 +1198,14 @@ export default function App() {
     // once it has: the overlay used to just vanish and leave the download shelf
     // as the only evidence anything happened.
     if (status === 'cancelled')   notify(`${name} export cancelled.`)
-    else if (status === 'failed')  notify(`${name} export failed — see the console.`)
+    else if (status === 'failed')  notify(exportFailure(name, failure), {
+      // Held until dismissed, and the details one click from a bug report:
+      // the console is not a place this panel can send anybody.
+      sticky: true,
+      action: 'Copy details',
+      onAction: () => navigator.clipboard?.writeText(
+        `${name} export failed\n${failure?.stack || failure?.message || 'No error detail.'}\nerzberg ${version}`),
+    })
     else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
     else if (status === 'measured' || ext === null) notify('Preflight done — see the Export section.')
     else                          notify(`Wrote ${exportBaseName}${ext.startsWith('-') ? '' : '.'}${ext}`)
@@ -1377,6 +1420,19 @@ export default function App() {
    * is captured, not just the keys about to move, so the restore is exact even
    * if something else changed in the same tick.
    */
+  /**
+   * A bundled preset picked in the panel. The panel spreads it itself, so this
+   * only names the step and says it happened: a tile click replaces every mark
+   * at once, and the work it replaced must be one visible click from coming
+   * back, the way Reset all is.
+   */
+  const presetPicked = useCallback((name, edited) => {
+    tagHistory(`Preset · ${name}`)
+    notify(edited ? `Applied ${name}. Your edits are in Undo.` : `Applied ${name}.`, {
+      action: 'Undo', onAction: undo,
+    })
+  }, [tagHistory, notify, undo])
+
   const resetSection = useCallback((title) => {
     const keys = paramsForSection(title, PARAM_KEYS)
     if (!keys.length) return
@@ -2120,8 +2176,8 @@ export default function App() {
    *
    * So: a small pill in the corner at 250 ms, which is about where a pause
    * stops reading as responsiveness and starts reading as a hang; and the
-   * blocking overlay only once nothing has come back for 1.2 s, by which point
-   * something really is wrong and covering the screen is the honest signal.
+   * louder pill — a clock and an Undo — once nothing has come back for 1.2 s.
+   * It does not cover the screen: the way out of a slow build is the panel.
    *
    * Both timers restart on `resultCount`. Rebuild requests queue back to back,
    * so `isComputing` never falls under a continuous stream and keying on it
@@ -2154,7 +2210,7 @@ export default function App() {
     // A tick before the work starts, so the overlay is on screen rather than
     // queued behind it — the same reason the SVG trigger defers.
     setTimeout(async () => {
-      let status = 'done'
+      let status = 'done', failure = null
       try {
         // On demand, for the same reason as the SVG exporter above it.
         const { exportSTL } = await import('./utils/stlExport')
@@ -2164,10 +2220,14 @@ export default function App() {
           onProgress: handleExportProgress,
           shouldCancel: exportCancelRef.current,
         })
+      } catch (err) {
+        console.error('[STL] Export failed:', err)
+        status = 'failed'
+        failure = err
       } finally {
         // finally, not after: a throw here would otherwise leave the overlay up
         // with no way to dismiss it.
-        finishExport(status)
+        finishExport(status, failure)
       }
     }, 0)
   }, [surfaceGeo, terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p, exportBaseName,
@@ -2280,6 +2340,9 @@ export default function App() {
       if (studioMaskId) return
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]); setPick(null) }
       if (e.code === 'KeyE')   openEditor()
+      // A slider with focus ignores digits, so a stray one there was a whole
+      // export: the panel is where hands rest, and the files stay a click away.
+      if (/^Digit[1-5]$/.test(e.code) && e.target?.type === 'range') return
       if (e.code === 'Digit1') beginSvgExport()
       if (e.code === 'Digit2') beginPngExport(false)
       if (e.code === 'Digit3') beginPngExport(true)
@@ -2465,6 +2528,7 @@ export default function App() {
         setTextLayers={setTextLayers}
         textOverflow={textOverflow}
         onUndo={undo}
+        onPresetPicked={presetPicked}
         onUndoTo={undoTo}
         onRedoTo={redoTo}
         historyLabels={historyLabels} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
@@ -2548,8 +2612,9 @@ export default function App() {
 
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
-      {computingTier === 1 && !isLoading && !exportJob && <ComputingPill />}
-      {computingTier === 2 && !isLoading && <LoadingOverlay msg="Computing geometry…" />}
+      {computingTier > 0 && !isLoading && !exportJob && (
+        <ComputingPill tier={computingTier} right={viewInset + 14} onUndo={canUndo ? undo : null} />
+      )}
       {exportJob && !isLoading && (() => {
         // The PNG capture is one synchronous pass: there is no progress to
         // report and nothing to interrupt, so it gets the plain spinner the
@@ -2661,7 +2726,7 @@ function EmptyState({ onLoad, onLoadGeoTiff }) {
           PNG / Image
         </button>
         <button onClick={onLoadGeoTiff} style={{
-          background: ACCENT, color: ON_ACCENT, border:'none', borderRadius:10,
+          background: STRONG, color: BG, border:'none', borderRadius:10,
           padding:'13px 32px', fontSize:16, cursor:'pointer', fontWeight:700,
         }}>
           GeoTIFF

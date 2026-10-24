@@ -10,6 +10,7 @@
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { ModeCopiesPanel, PanelStage, SectionFilter, SectionScope, sectionMatches } from './filter'
 import { PRESETS_STAGE, STAGES } from './stages'
+import { FAMILIES } from './markFamilies'
 import { GLASS, HEX, PALETTES } from '../../utils/theme'
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export const BODY_W = 272   // what the controls get, unchanged
 function themeVars(P) {
   const kebab = (k) => k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
   return Object.entries(P).map(([k, v]) => `--hm-${kebab(k)}: ${v};`).join(' ') +
-    ` --hm-accent-ring: ${P.accent}80; --hm-on-glow: ${P.on}88;`
+    ` --hm-focus-ring: ${P.text}66; --hm-on-glow: ${P.on}88;`
 }
 
 /*
@@ -240,9 +241,12 @@ export function PanelStyles() {
         src:url('${import.meta.env.BASE_URL}fonts/overpass-mono-latin.woff2') format('woff2'); }
 
       /* A focus ring on everything the keyboard can reach, at zero specificity
-         so a control with its own ring keeps it. */
-      :where(#hm-panel, [data-testid="edit-panel"], [data-testid="mask-panel"]) :is(button, a, input[type=search], input[type=text], select):focus-visible {
-        outline:2px solid var(--hm-accent); outline-offset:1px; }
+         so a control with its own ring keeps it. In the text colour, not ore:
+         ore means "on", and a ring in it read as one more lit control. The
+         panel toggle sits outside the panel and is named on its own. */
+      :where(#hm-panel, [data-testid="edit-panel"], [data-testid="mask-panel"]) :is(button, a, input[type=search], input[type=text], select):focus-visible,
+      [data-testid="sidebar-toggle"]:focus-visible {
+        outline:2px solid var(--hm-text); outline-offset:1px; }
 
       /* The element is 19 px tall and transparent; the 3 px track is drawn by the
          track pseudo-element inside it. Same hairline as before, in a band a
@@ -275,15 +279,15 @@ export function PanelStyles() {
          the click — and :focus-visible withholds the ring until the first
          keypress, which hides it for exactly as long as it is the only thing
          telling you which of thirty-one sliders an arrow key will move. */
-      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-accent-ring); }
-      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-accent-ring); }
+      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-focus-ring); }
+      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-focus-ring); }
       .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
         border:1px solid ${BORDER}; border-radius:5px; cursor:pointer;
         padding:2px; background:${SURF}; transition:border-color .15s var(--hm-ease); }
       .hmc:hover { border-color:${MUTED}; }
       .hmc::-webkit-color-swatch-wrapper { padding:0; }
       .hmc::-webkit-color-swatch { border:none; border-radius:3px; }
-      .hmc:focus-visible { outline:2px solid ${ACCENT}; outline-offset:1px; }
+      .hmc:focus-visible { outline:2px solid ${TEXT}; outline-offset:1px; }
       /* Iron, not ore: a hover is not a state, and ore means "on". */
       .hmeb:hover { border-color:${MUTED} !important; color:${TEXT} !important; }
       .hmsb.on { background:${ACCENT_DEEP} !important; color:${ON_ACCENT} !important; border-color:${ACCENT_DEEP} !important; }
@@ -307,7 +311,7 @@ export function PanelStyles() {
       .hmnum { background:${SURF}; border:1px solid ${BORDER}; color:${DIM}; border-radius:3px;
                font-size:10px; padding:3px 5px; width:100%; outline:none;
                font-family:var(--hm-mono); font-variant-numeric:tabular-nums; }
-      .hmnum:focus { border-color:${ACCENT}; }
+      .hmnum:focus { border-color:${DIM}; }
       /* The readout beside a slider, once it accepts a typed value. Reads as a
          label until it is hovered or focused — the panel would be a wall of
          boxes otherwise. */
@@ -316,7 +320,7 @@ export function PanelStyles() {
         color:${MUTED}; cursor:text; text-align:right;
         font:inherit; font-family:var(--hm-mono); font-variant-numeric:tabular-nums; outline:none; }
       .hmval:hover { border-color:${BORDER}; }
-      .hmval:focus { border-color:${ACCENT}; color:${TEXT}; background:${SURF}; }
+      .hmval:focus { border-color:${DIM}; color:${TEXT}; background:${SURF}; }
       /* Disclosure header. A button, so the keyboard can open a section — every
          control in a collapsed one is otherwise unreachable. */
       .hmsec { -webkit-appearance:none; appearance:none; background:none; border:none;
@@ -325,13 +329,27 @@ export function PanelStyles() {
       .hmsec:hover { background:${VEIL}; }
       .hmsec .hmsectitle, .hmsec .hmchevron { transition:color .15s var(--hm-ease), transform .2s var(--hm-ease); }
       .hmsec:hover .hmsectitle, .hmsec:hover .hmchevron { color:${DIM}; }
+      /* A shut, empty section's blurb is part of its header: one veil over both,
+         and a click on either opens it. The veil sat on the button alone and
+         stopped at the blurb's top edge, cutting the header off its own line. */
+      .hmsechead { cursor:pointer; transition:background .15s var(--hm-ease); }
+      .hmsechead:hover { background:${VEIL}; }
+      .hmsechead .hmsec:hover { background:none; }
+      .hmsechead:hover .hmsectitle, .hmsechead:hover .hmchevron { color:${DIM}; }
+      /* An open header has its body straight under it, so a veil there is a band
+         cut off on the body's first line — it only closes cleanly on the rule
+         under a shut section. Open, the hover is the ink alone. Important,
+         because the title and chevron carry their colours inline. */
+      .hmsec[aria-expanded="true"]:hover { background:none; }
+      .hmsec[aria-expanded="true"]:not([aria-disabled]):hover .hmsectitle,
+      .hmsec[aria-expanded="true"]:not([aria-disabled]):hover .hmchevron { color:${TEXT} !important; }
 
       /* Stage tabs: a quiet hover, and the selected tab joined to its pane. */
       .hmtab { transition:background .15s var(--hm-ease), color .15s var(--hm-ease); }
       .hmtab:hover:not([aria-selected="true"]):not([aria-disabled="true"]) { background:${VEIL}; color:${DIM} !important; }
-      /* The rail's own ring: inset, in the text colour. The global ore outline
-         read as a second selected tab, because ore on this edge already means
-         "the pane on screen". Doubled class, because the global ring's \`:is()\`
+      /* The rail's own ring: inset, in the text colour. The global outline
+         read as a second selected tab, because a bar on this edge already
+         means "the pane on screen". Doubled class, because the global ring's \`:is()\`
          carries the weight of \`input[type=search]\` and outranks one class. */
       .hmtab.hmtab:focus-visible { outline:2px solid ${TEXT}; outline-offset:-4px; border-radius:3px; }
 
@@ -339,15 +357,16 @@ export function PanelStyles() {
       .hmsw .hmswtrack { transition:background .2s var(--hm-ease), box-shadow .2s var(--hm-ease); }
       .hmsw .hmswknob { transition:transform .22s var(--hm-ease); }
       .hmsw:hover .hmswtrack { filter:brightness(1.12); }
-      .hmsw input:focus-visible + .hmswtrack { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmsw input:focus-visible { outline:none; }
+      .hmsw input:focus-visible + .hmswtrack { box-shadow:0 0 0 3px var(--hm-focus-ring); }
 
       /* Segmented control: one well, the choice a raised pill inside it. */
       .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
       .hmseg:hover:not([aria-pressed="true"]):not([aria-disabled]) { color:${DIM} !important; background:${VEIL} !important; }
-      .hmseg:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
+      .hmseg:focus-visible { outline:2px solid ${TEXT}; outline-offset:-1px; }
       .hmfold { -webkit-appearance:none; appearance:none; background:none; border:none; font:inherit;
         display:flex; align-items:baseline; gap:6px; width:100%; padding:0; margin:0 0 2px; cursor:pointer; text-align:left; }
-      .hmfold:focus-visible { outline:2px solid ${ACCENT}; outline-offset:2px; border-radius:3px; }
+      .hmfold:focus-visible { outline:2px solid ${TEXT}; outline-offset:2px; border-radius:3px; }
       /* A gradient stop the keyboard can move. It is a div, so the global ring
          does not reach it. */
       /* Code in the panel is set in the panel's mono, not the browser's. */
@@ -364,9 +383,9 @@ export function PanelStyles() {
       .hmeb:active, .hmsb:active, .sym-btn:active { transform:scale(.97); }
 
       @media (prefers-reduced-motion: reduce) {
-        .hmsec, .hmfoldchev, .hmtab, .hmsw *, .hmseg, .hmbtn, .hmeb, .hmsb, .hmr::-webkit-slider-thumb { transition:none !important; }
+        .hmsec, .hmsechead, .hmfoldchev, .hmtab, .hmsw *, .hmseg, .hmbtn, .hmeb, .hmsb, .hmr::-webkit-slider-thumb { transition:none !important; }
       }
-      .hmsec:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
+      .hmsec:focus-visible { outline:2px solid ${TEXT}; outline-offset:-2px; }
       /* The per-section reset. Revealed on hover rather than drawn outright,
          and that is a width decision rather than a taste one: a header is at
          its tightest when its mode is on and the section is shut, and reserving
@@ -400,14 +419,14 @@ export function PanelStyles() {
       .hmcardhit { -webkit-appearance:none; appearance:none; background:none;
         border:none; font:inherit; color:inherit; text-align:left; width:100%;
         height:100%; display:flex; flex-direction:column; padding:0; cursor:pointer; }
-      .hmcardhit:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-2px; }
+      .hmcardhit:focus-visible { outline:2px solid ${TEXT}; outline-offset:-2px; }
       .hmpip { -webkit-appearance:none; appearance:none; background:none; border:none;
         padding:0; cursor:pointer; border-radius:3px; transition:background .12s; }
       .hmpip:hover { background:var(--hm-veil-strong); }
       .hmhead:first-child { margin-top:0 !important; }
       .hmrow:hover:not(:disabled) { background:var(--hm-veil-strong); color:${STRONG} !important; }
       .hmpip:hover .hmpipdot { border-color:${TEXT}; }
-      .hmpip:focus-visible { outline:2px solid ${ACCENT}; outline-offset:-1px; }
+      .hmpip:focus-visible { outline:2px solid ${TEXT}; outline-offset:-1px; }
       .hmpipdot { transition:background .12s, border-color .12s, box-shadow .12s; }
 
       /* Dual-handle range. Two native inputs stacked: the tracks are inert and
@@ -422,8 +441,8 @@ export function PanelStyles() {
       .hmrr:hover::-webkit-slider-thumb { transform:scale(1.12); }
       .hmrr::-moz-range-thumb { pointer-events:auto; width:13px; height:13px; border-radius:50%;
         background:#fafafa; border:none; cursor:grab; box-shadow:0 0 0 1px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5); }
-      .hmrr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-accent-ring); }
-      .hmrr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-accent-ring); }
+      .hmrr:focus::-webkit-slider-thumb { box-shadow:0 0 0 3px var(--hm-focus-ring); }
+      .hmrr:focus::-moz-range-thumb     { box-shadow:0 0 0 3px var(--hm-focus-ring); }
       .hmrr::-webkit-slider-runnable-track { background:none; border:none; }
       .hmrr::-moz-range-track { background:none; border:none; }
 
@@ -734,7 +753,7 @@ export function Switch({ id, label, checked, onChange, testId, enable }) {
         style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
       <span className="hmswtrack" style={{
         position:'absolute', inset:0, borderRadius:999, pointerEvents:'none',
-        background: checked ? ACCENT : BORDER,
+        background: checked ? ON : BORDER,
         boxShadow: checked ? 'none' : 'inset 0 1px 2px var(--hm-shadow)',
       }}>
         <span className="hmswknob" style={{
@@ -1033,8 +1052,10 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
               opacity: off && !on ? DISABLED_OPACITY : 1,
               ...(capitalize && { textTransform:'capitalize' }),
               fontWeight: on ? 600 : 500,
-              background: on ? ACCENT_DEEP : 'transparent',
-              color: on ? ON_ACCENT : MUTED,
+              // Paper on iron, not ore: the picked option is a choice, and ore
+              // means "on". A segment can be picked on a mark that is off.
+              background: on ? STRONG : 'transparent',
+              color: on ? BG : MUTED,
               boxShadow: on ? '0 1px 2px var(--hm-shadow)' : 'none',
             }}>{lbl}</button>
         )
@@ -1088,6 +1109,34 @@ const SWITCH_W = 34
 
 /** What a header prints. `Mode: ` is a key the panel files marks under, not a word. */
 const sectionName = (title) => (title.startsWith('Mode: ') ? title.slice(6) : title)
+
+/**
+ * What an opened mark says while it is off: its glyph at size, the family it
+ * belongs to, and the one button that turns it on. The tile that opened it is
+ * the large target in the sheet, so the pane it opens must not be empty.
+ */
+const FAMILY_OF = new Map(FAMILIES.flatMap(([fam, gloss, names]) => names.map((n) => [n, [fam, gloss]])))
+function OffMark({ name, icon, onDraw }) {
+  const [fam, gloss] = FAMILY_OF.get(name) ?? []
+  return (
+    <div data-testid="off-note" style={{ display:'flex', alignItems:'center', gap:14, margin:'2px 0 12px' }}>
+      {icon && (
+        <span aria-hidden="true" style={{ flexShrink:0, width:56, height:34, display:'flex', alignItems:'center', justifyContent:'center',
+          background: SURF, border:`1px solid ${BORDER}`, borderRadius:5, color: DIM }}>
+          <span style={{ transform:'scale(2)', display:'flex' }}>{icon}</span>
+        </span>
+      )}
+      <div style={{ minWidth:0 }}>
+        {fam && (
+          <div style={{ fontSize:11, color: DIM, lineHeight:1.4, marginBottom:6 }}>
+            <span style={{ color: TEXT, fontWeight:600 }}>{fam}</span>{' · '}{gloss}
+          </div>
+        )}
+        <Btn variant="primary" data-testid="off-draw" onClick={onDraw}>Draw {name}</Btn>
+      </div>
+    </div>
+  )
+}
 
 export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, blurb, headless = false, children }) {
   const ctx = useContext(SectionFilter)
@@ -1198,10 +1247,11 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
           silently collapsed reappeared that way once the field was cleared. */}
       {/* A heading, so a screen reader can walk the panel section by section;
           the button inside it is the disclosure. */}
-      {!headless && (<>
+      {!headless && (<div className={showBlurb ? 'hmsechead' : undefined}>
       <h3 style={{ margin:0, fontSize:12, fontWeight:600 }}>
       <button type="button" onClick={q ? undefined : onToggle} className="hmsec"
         aria-expanded={!!isOpen} aria-disabled={q ? true : undefined}
+        aria-describedby={showBlurb ? `blurb-${title.toLowerCase().replace(/\s+/g, '-')}` : undefined}
         data-testid={`section-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{
           display:'flex', justifyContent:'space-between', alignItems:'center', gap:10,
           padding:'10px 14px', userSelect:'none', width:'100%',
@@ -1249,12 +1299,16 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         </span>
       </button>
       </h3>
+      {/* The keyboard opens the section from the button, which the blurb
+          describes, so the blurb's own click is for the pointer alone. */}
       {showBlurb && (
-        <div data-testid="section-blurb" style={{ fontSize:11, color: MUTED, lineHeight:1.4, padding:'0 14px 10px', marginTop:-4 }}>
+        <div data-testid="section-blurb" id={`blurb-${title.toLowerCase().replace(/\s+/g, '-')}`}
+             onClick={onToggle}
+             style={{ fontSize:11, color: MUTED, lineHeight:1.4, padding:'0 14px 10px', marginTop:-4 }}>
           {blurb}
         </div>
       )}
-      </>)}
+      </div>)}
       {/* Two marks, both siblings of the header rather than children of it. The
           header is a button — it has to be, or a collapsed section is
           unreachable from the keyboard — and a button inside a button is
@@ -1273,7 +1327,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
           data-testid={`modified-${title.toLowerCase().replace(/\s+/g, '-')}`}
           style={{
             position:'absolute', left:0, top:0, width:2, height:42,
-            background: ACCENT, opacity:0.55, pointerEvents:'none',
+            // Muted, not ore: modified is not "on", and an ore bar on an off
+            // mark (or on Camera, which has no switch) read as a lit one.
+            background: MUTED, opacity:0.7, pointerEvents:'none',
           }} />
         <button type="button" className="hmreset"
           data-testid={`reset-${title.toLowerCase().replace(/\s+/g, '-')}`}
@@ -1299,14 +1355,25 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         </span>
       )}
       <div style={{ display:'grid', gridTemplateRows: isOpen ? '1fr' : '0fr', overflow:'hidden', transition:'grid-template-rows .2s ease' }}>
-        <div style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
-          {onEnabled && !enabled && (
-            <div data-testid="off-note" style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:4 }}>
-              Off. The switch in the header turns it on.
-            </div>
-          )}
-          {children}
-          {copies && title.startsWith('Mode: ') && copies.render(title)}
+        {/* Inert while shut, as a Fold is: a zero-height body still took Tab,
+            so focus walked into fields nobody could see. */}
+        <div inert={!isOpen} style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
+          {onEnabled && !enabled && (title.startsWith('Mode: ')
+            ? <OffMark name={name} icon={icon} onDraw={() => onEnabled(true)} />
+            : (
+              <div data-testid="off-note" style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:4 }}>
+                Off. The switch in the header turns it on.
+              </div>
+            ))}
+          {/* Off, the controls still show — dimmed and locked — so an opened
+              mark says what it can be tuned for before it is switched on. Only
+              for the one mark on screen: sixty hidden copies of every control
+              would put sixty "Blur" fields in the page for a screen reader and
+              a selector alike. */}
+          {onEnabled && !enabled && title.startsWith('Mode: ')
+            ? (isOpen && !sheetOut && !q && <div data-testid="off-controls" inert style={{ opacity: DISABLED_OPACITY }}>{children}</div>)
+            : children}
+          {copies && title.startsWith('Mode: ') && enabled && copies.render(title)}
         </div>
       </div>
     </div>
@@ -1499,7 +1566,7 @@ export function StageRail({ stage, onStage, live, hits }) {
               // The selected tab is marked on the edge it shares with the body,
               // so the rail reads as a set of tabs handing over to one pane
               // rather than six buttons one of which is highlighted.
-              boxShadow: sel ? `inset -2px 0 0 ${ACCENT}` : 'none',
+              boxShadow: sel ? `inset -2px 0 0 ${TEXT}` : 'none',
               color: sel ? TEXT : MUTED,
               cursor: reachable(n) ? 'pointer' : 'default', textAlign:'center', fontFamily:'inherit',
               // A pane with nothing on, while the query found nothing in it, is
@@ -1773,7 +1840,8 @@ export function LoadBtn({ children, block = true, style, ...rest }) {
   )
 }
 
-export function ExpBtn({ label, hint, onClick, active, testId }) {
+/** `shortcut` is a key, drawn as the SVG button draws its `1`; `hint` is a line of text under the label. */
+export function ExpBtn({ label, hint, shortcut, onClick, active, testId }) {
   return (
     <button className="hmeb" onClick={onClick} data-testid={testId} type="button" style={{
       flex:1, padding:'8px 0', textAlign:'center',
@@ -1783,6 +1851,7 @@ export function ExpBtn({ label, hint, onClick, active, testId }) {
       cursor:'pointer', fontSize:11, fontWeight:600,
     }}>
       {label}
+      {shortcut && <Key>{shortcut}</Key>}
       {hint && <span className="hmeh" style={{ display:'block', fontSize:10, color: active ? ON_ACCENT : MUTED, opacity: active ? .75 : 1, fontWeight:400, marginTop:2, fontFamily: MONO }}>{hint}</span>}
     </button>
   )

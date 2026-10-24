@@ -61,7 +61,10 @@ describe('penLine', () => {
   })
   it('counts a mixed layer apart, since it has no one ink', () => {
     expect(penLine(rows({ kind: 'line', inks: ['#c0d5db'], count: 1 }, { kind: 'mixed', inks: ['#a', '#b'], count: 1 })))
-      .toBe('2 layers · 1 ink · 1 mixed')
+      .toBe('2 layers · 1 ink · 1 multicolour')
+  })
+  it('drops the ink count when every layer is multicolour', () => {
+    expect(penLine(rows({ kind: 'mixed', inks: ['#a', '#b'], count: 1 }))).toBe('1 layer · 1 multicolour')
   })
   it('says up to while an area layer draws, and + hidden while hidden lines do', () => {
     expect(penLine(rows({ kind: 'areas', inks: ['#a', '#b'], count: 2 }))).toBe('up to 2 layers · 2 inks')

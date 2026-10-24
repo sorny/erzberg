@@ -81,6 +81,19 @@ export function ModeSheet({ style, onToggle, onOpen }) {
   const hasPlate = !!useContext(CoverPlate)?.classes?.length
   return (
     <>
+    {/*
+      * One line, because a tile with two targets has to say so once.
+      *
+      * Above the sheet, not under it. Under, it sat below sixty-two tiles, so
+      * the people it was for — the ones who had not learned the pip yet — met
+      * it last, after a tile body had already opened an off mark for them.
+      */}
+    <div data-testid="mode-sheet-hint" style={{
+      margin:'0 0 8px', fontSize:10, color: MUTED, lineHeight:1.5,
+      paddingLeft:6, borderLeft:`1px solid ${BORDER}`,
+    }}>
+      The pip switches a mark on. The rest of the tile opens its settings.
+    </div>
     <div data-testid="mode-sheet">
     {FAMILIES.map(([family, gloss, names]) => (
       <div key={family}>
@@ -223,22 +236,6 @@ export function ModeSheet({ style, onToggle, onOpen }) {
         </div>
       </div>
     ))}
-    </div>
-    {/*
-      * One line, because a tile with two targets has to say so once.
-      *
-      * The shapes carry it after the first read — a pip looks like a switch and
-      * a chevron points somewhere — but nothing on screen taught it, and that
-      * is exactly how the first build went wrong. It sits under the sheet
-      * rather than over it: this is a caption for what you just looked at, and
-      * a panel that explains itself before you have seen anything is a panel
-      * that explains itself to people who are not reading yet.
-      */}
-    <div data-testid="mode-sheet-hint" style={{
-      marginTop:8, fontSize:10, color: MUTED, lineHeight:1.5,
-      paddingLeft:6, borderLeft:`2px solid ${BORDER}`,
-    }}>
-      The pip switches a mark on. The rest of the tile opens its settings.
     </div>
     </>
   )

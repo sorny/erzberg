@@ -915,9 +915,10 @@ test('SVG export carries the live flock, birds and streaks', async ({ page }) =>
   // One segment per bird — a streak is only ever drawn with the bird it hangs
   // off, so the two counts track each other.
   expect(Math.abs(circles - streaks)).toBeLessThan(circles * 0.25)
-  // Shadows are the one part of the field the exporter genuinely depth-culls —
-  // those on the far slope are hidden by the ridge — so expect fewer than birds,
-  // but not none.
+  // Shadows are depth-culled like the birds — those on the far slope are hidden
+  // by the ridge — so they track the birds, and how many of each a ridge hides
+  // depends on the terrain. One shadow per bird at most, with room for the
+  // birds a peak hides while their shadows stay in view.
   expect(shadows, 'shadows must reach the SVG in their own layer').toBeGreaterThan(100)
-  expect(shadows).toBeLessThanOrEqual(circles)
+  expect(shadows).toBeLessThanOrEqual(circles * 1.25)
 })

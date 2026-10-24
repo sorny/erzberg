@@ -591,8 +591,12 @@ export function Scene({
       // Export should not pay for them on first paint. Safe here because the
       // work is already deferred behind the overlay `beginExport` put up — there
       // is no user gesture left to lose.
+      // A throw used to skip the done call entirely, which left the overlay up
+      // with no file and no word. Caught, it ends like any other export.
+      let status = 'done', failure = null
+      try {
       const { exportSVG } = await import('../utils/svgExport')
-      const status = await exportSVG({
+      status = await exportSVG({
         // The export paces itself and reports where it is; both are how the page
         // survives a dense plate that used to block the main thread outright.
         onProgress: onSvgProgress,
@@ -664,7 +668,13 @@ export function Scene({
         particleSegments:  p.showPoints && particleRef.current ? particleRef.current.getSegments() : null,
         baseName:          exportBaseName,
       })
-      onSvgDone?.(status)
+      } catch (err) {
+        console.error('[SVG] Export failed:', err)
+        status = 'failed'
+        failure = err
+      } finally {
+        onSvgDone?.(status, failure)
+      }
     }, 0)
   }
 
@@ -689,7 +699,7 @@ export function Scene({
   // and that is why deferredCapture is excluded too: it is rebuilt every render
   // and listing it would defeat the trigger-counter shape entirely.
   const deferredCapture = (isAlpha) => setTimeout(() => {
-    let status = 'done'
+    let status = 'done', failure = null
     try {
       performHighResCapture(isAlpha)
     } catch (err) {
@@ -698,8 +708,9 @@ export function Scene({
       // the two apart.
       console.error('[PNG] Capture failed:', err)
       status = 'failed'
+      failure = err
     } finally {
-      onPngDone?.(status)
+      onPngDone?.(status, failure)
     }
   }, 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps

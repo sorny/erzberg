@@ -44,7 +44,7 @@ function Swatches({ row }) {
 /** What a row says on its right: the hex of one ink, or why there is no one hex. */
 function readoutOf(row) {
   if (row.kind === 'areas') return `${row.count} ink${row.count === 1 ? '' : 's'}`
-  if (row.kind === 'mixed') return 'mixed'
+  if (row.kind === 'mixed') return 'multicolour'
   return row.inks[0]
 }
 

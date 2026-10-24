@@ -123,12 +123,16 @@ test('Through point picks on the terrain, and the guide follows', async ({ page 
   // Picking makes the surface the click target; give it a frame or two.
   await page.waitForTimeout(1500)
   const box = await page.locator('canvas[data-engine]').boundingBox()
-  await page.mouse.click(box.x + box.width * 0.28, box.y + box.height * 0.62)
+  // On the far side of the summit the guide starts through, whichever side of
+  // the plate the default terrain puts it on.
+  const left = before.x / width > 0.45
+  await page.mouse.click(box.x + box.width * (left ? 0.2 : 0.72), box.y + box.height * 0.62)
   await expect(page.locator('[data-testid="waveform-pick"]')).toHaveText(/Pick point/)
   await expect(page.locator('[data-testid="waveform-line-point"]')).toHaveAttribute('aria-pressed', 'true')
 
   const after = orange(await pixels(page), width)
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/waveform-point.png` })
   expect(after.n).toBeGreaterThan(300)
-  expect(after.x, 'the guide moved toward the click').toBeLessThan(before.x - 50)
+  if (left) expect(after.x, 'the guide moved toward the click').toBeLessThan(before.x - 50)
+  else expect(after.x, 'the guide moved toward the click').toBeGreaterThan(before.x + 50)
 })
