@@ -48,8 +48,9 @@ import { ModeMark } from './modeMarks'
 import { PANEL_MODES } from './sectionSummary'
 import { FAMILIES } from './markFamilies'
 import { ACCENT_DEEP, ACCENT_TEXT, BORDER, Chevron, DIM, DISABLED_OPACITY, MONO, MUTED, ON, ON_ACCENT, SURF, TEXT, WARN } from './ui'
-import { useContext } from 'react'
+import { useContext, useState } from 'react'
 import { CoverPlate } from './filter'
+import { ARROWS, nextCard } from './roving'
 
 // The modes that draw nothing without a file: `needsData` in drawModes.js.
 const NEEDS_PLATE = new Set(DRAW_MODES.filter((m) => m.needsData).map((m) => m.id))
@@ -77,23 +78,70 @@ const ROW_BY_NAME = new Map(PANEL_MODES.map((row) => [markName(row[0]), row]))
  * @param {Function} props.onToggle  (enabledKey, next) => void
  * @param {Function} props.onOpen    (sectionTitle) => void
  */
+
+/** Whether a mark draws: the mode itself, or any copy of it (ModeCopies.jsx). */
+function isOn(style, key) {
+  const id = key.slice('enabled'.length)
+  return !!style[key] || (style.modeCopies ?? []).some((c) => c.mode === id && c.values?.[key])
+}
+
 export function ModeSheet({ style, onToggle, onOpen }) {
   const hasPlate = !!useContext(CoverPlate)?.classes?.length
+  // What Space just did, said aloud: the tile's label changes, but a screen
+  // reader does not re-read a focused button on its own.
+  const [said, setSaid] = useState('')
+  const toggle = (key, next) => {
+    onToggle(key, next)
+    const row = PANEL_MODES.find((r) => r[1] === key)
+    if (row) setSaid(`${markName(row[0])} ${next ? 'on' : 'off'}`)
+  }
+  /*
+   * One Tab stop for the whole sheet. Sixty-two tiles with two buttons each
+   * were 124 stops between the panel's header and whatever came after Marks.
+   * The card in focus is the stop; the arrows move it, Space switches its mark
+   * and Enter opens it. The pips stay clickable and stay in the accessibility
+   * tree, out of the Tab order.
+   */
+  const firstKey = ROW_BY_NAME.get(FAMILIES[0][2][0])[1]
+  const [activeKey, setActiveKey] = useState(firstKey)
+  // The marks that draw, in sheet order. A session is about these few, and the
+  // sheet scattered them over 1 700 px: one could sit under Light, a screen down.
+  const lit = FAMILIES.flatMap(([, , names]) => names).filter((n) => isOn(style, ROW_BY_NAME.get(n)[1]))
   return (
     <>
     {/*
-      * One line, because a tile with two targets has to say so once.
-      *
-      * Above the sheet, not under it. Under, it sat below sixty-two tiles, so
-      * the people it was for — the ones who had not learned the pip yet — met
-      * it last, after a tile body had already opened an off mark for them.
+      * The marks that are on, as one row of names above everything else. Each
+      * opens its mark, the way its tile does. It repeats the tiles rather than
+      * moving them: a tile that jumped to the top when switched on would leave
+      * the pointer over a different mark.
       */}
-    <div data-testid="mode-sheet-hint" style={{
-      margin:'0 0 8px', fontSize:10, color: MUTED, lineHeight:1.5,
-      paddingLeft:6, borderLeft:`1px solid ${BORDER}`,
+    <div data-testid="mode-lit" role="group" aria-label="Marks that are on" style={{
+      display:'flex', flexWrap:'wrap', alignItems:'center', gap:4, margin:'0 0 10px',
     }}>
-      The pip switches a mark on. The rest of the tile opens its settings.
+      <span style={{ fontSize:11, fontWeight:600, color: DIM, marginRight:4 }}>
+        On
+      </span>
+      {lit.length === 0 && <span style={{ fontSize:11, color: MUTED }}>No mark draws. Tick a pip below.</span>}
+      {lit.map((name) => {
+        const [title, key] = ROW_BY_NAME.get(name)
+        return (
+          <button key={key} type="button" className="hmbtn" data-testid={`mode-lit-${key.slice('enabled'.length)}`}
+            title={`${name} — open its controls`} onClick={() => onOpen(title)}
+            style={{
+              display:'flex', alignItems:'center', gap:5, padding:'3px 6px 3px 5px',
+              fontSize:11, color: DIM, background: SURF, border:`1px solid ${BORDER}`,
+              borderRadius:3, cursor:'pointer', fontFamily:'inherit',
+            }}>
+            <span aria-hidden="true" style={{ width:6, height:6, borderRadius:3, background: ON, flexShrink:0 }} />
+            {name}
+            <span aria-hidden="true" style={{ display:'flex', color: MUTED }}><Chevron dir="right" size={9} /></span>
+          </button>
+        )
+      })}
     </div>
+    <div role="status" aria-live="polite" data-testid="mode-said" style={{
+      position:'absolute', width:1, height:1, overflow:'hidden', clip:'rect(0 0 0 0)', whiteSpace:'nowrap',
+    }}>{said}</div>
     <div data-testid="mode-sheet">
     {FAMILIES.map(([family, gloss, names]) => (
       <div key={family}>
@@ -106,7 +154,10 @@ export function ModeSheet({ style, onToggle, onOpen }) {
         }}>
           <span style={{ fontSize:12, fontWeight:600, color: DIM }}>{family}</span>
           <span style={{ flex:1 }} />
-          <span style={{ fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+          {/* The family's size only. What is on is said once, by the chips
+              above the sheet; a per-family "2 on" was the fourth count of it. */}
+          <span data-testid={`family-count-${family.toLowerCase()}`}
+            style={{ fontSize:11, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
             {names.length}
           </span>
         </div>
@@ -119,7 +170,7 @@ export function ModeSheet({ style, onToggle, onOpen }) {
         // Copies of this mode (see ModeCopies.jsx): the tile is lit when the
         // mode or any copy draws, and it counts the copies.
         const copies = (style.modeCopies ?? []).filter((c) => c.mode === id)
-        const on = !!style[key] || copies.some((c) => c.values?.[key])
+        const on = isOn(style, key)
         /*
          * A mode that needs a plate, without one: it cannot be switched on, and
          * says why. If it is already on (a preset or a session arrived before the
@@ -146,9 +197,29 @@ export function ModeSheet({ style, onToggle, onOpen }) {
             <button
               type="button"
               className="hmcardhit"
-              aria-label={`Open ${name}`}
+              // The state with the name: this is the button that holds focus,
+              // and the pip that carries `aria-pressed` is out of the Tab order.
+              aria-label={`${name}, ${on ? 'on' : 'off'}. Open its controls`}
               title={`${name} — open its controls`}
               data-testid={`mode-open-${id}`}
+              data-mode-title={title}
+              tabIndex={key === activeKey ? 0 : -1}
+              aria-keyshortcuts="Space"
+              onFocus={() => setActiveKey(key)}
+              onKeyDown={(e) => {
+                const dir = ARROWS[e.key]
+                if (dir) {
+                  e.preventDefault()
+                  nextCard(e.currentTarget, dir)?.focus()
+                } else if (e.key === ' ') {
+                  // On keydown, and the keyup's click is cancelled below: a
+                  // button clicks on Space's release, which would open the mark
+                  // it has just switched.
+                  e.preventDefault()
+                  if (!blocked) toggle(key, !on)
+                }
+              }}
+              onKeyUp={(e) => { if (e.key === ' ') e.preventDefault() }}
               onClick={() => onOpen(title)}>
               <span style={{
                 display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0,
@@ -205,8 +276,9 @@ export function ModeSheet({ style, onToggle, onOpen }) {
               title={waiting ? `${name} — ${PLATE_HINT}`
                 : `${name} — ${on ? 'drawing, click to switch off' : 'off, click to switch on'}`}
               data-testid={`mode-tile-${id}`}
+              tabIndex={-1}
               disabled={blocked}
-              onClick={blocked ? undefined : () => onToggle(key, !on)}
+              onClick={blocked ? undefined : () => toggle(key, !on)}
               style={{
                 cursor: blocked ? 'not-allowed' : undefined,
                 // 24 px, the WCAG 2.5.8 minimum target. The box inside is 11.

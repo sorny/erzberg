@@ -6,7 +6,7 @@ import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
-import { HYPSO_LAYER_IDS } from '../utils/drawModes'
+import { DRAW_MODES, HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
 import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '../utils/geoCoords'
 
@@ -32,16 +32,17 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, ON_IMAGE, ON_IMAGE_SCRIM, ON_IMAGE_SHADOW, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
 import { reachError } from '../utils/netError'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, STAGES, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
+import { ARROWS, nextCard } from './panel/roving'
 import { ModeSections } from './panel/ModeSections'
 
 import { TextSection } from './panel/TextSection'
 import { CoverMap } from './panel/CoverMap'
 import { paletteInks, setCoverInk } from '../utils/coverPlate'
-import { CoverPlate, ModeCopiesPanel, PaintedMasks, PanelStage, SectionFilter, SectionScope, sectionMatches } from './panel/filter'
+import { CoverPlate, ModeCopiesPanel, PaintedMasks, PanelStage, SectionFilter, SectionScope, sectionMatches, suggestTerms } from './panel/filter'
 import { ModeCopies } from './panel/ModeCopies'
 
 import { MAX_MASKS, maskCoverage } from '../utils/maskLayers'
@@ -52,7 +53,7 @@ import { VectorLayersPanel } from './panel/VectorLayersPanel'
 const PARAM_KEYS = [...GROUP_OF.keys()]
 import { SECTION_TERMS } from './panel/sectionTerms'
 import { SECTION_LABELS } from './panel/sectionLabels'
-import { buildPlateLine, buildSectionSummaries } from './panel/sectionSummary'
+import { buildPlateLine, buildSectionSummaries, PANEL_MODES } from './panel/sectionSummary'
 import { applyTheme, storedTheme } from '../utils/theme'
 import { AUTOMATION } from '../automation'
 import { isTyping } from '../utils/shortcuts'
@@ -476,8 +477,29 @@ function HeaderIconBtn({ onClick, disabled, testId, title, label, icon }) {
 function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
   const undo = labels?.undo ?? []
   const redo = labels?.redo ?? []
+  const menuRef = useRef(null)
+  /*
+   * A menu the keyboard can leave. Focus moves in when it opens, the arrows
+   * walk the rows, and Escape or Tab closes it — Escape hands focus back to the
+   * button that opened it. Its backdrop used to swallow the next click after
+   * any close that was not a click, because nothing but a click closed it.
+   */
+  useEffect(() => {
+    menuRef.current?.querySelector('[role="menuitem"]')?.focus()
+  }, [])
+  const onKeyDown = (e) => {
+    const items = [...(menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [])]
+    const at = items.indexOf(document.activeElement)
+    const go = (i) => { e.preventDefault(); items[(i + items.length) % items.length]?.focus() }
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onClose(true) }
+    else if (e.key === 'Tab') onClose(false)
+    else if (e.key === 'ArrowDown') go(at + 1)
+    else if (e.key === 'ArrowUp') go(at - 1)
+    else if (e.key === 'Home') go(0)
+    else if (e.key === 'End') go(items.length - 1)
+  }
   const Row = ({ children, onClick, testId, dim }) => (
-    <button type="button" onClick={onClick} data-testid={testId} style={{
+    <button type="button" role="menuitem" tabIndex={-1} onClick={onClick} data-testid={testId} style={{
       display:'block', width:'100%', textAlign:'left', background:'none',
       border:'none', cursor:'pointer', padding:'5px 10px',
       fontSize:11, color: dim ? DIM : MUTED, borderRadius:3,
@@ -492,8 +514,9 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
       {/* Catches the click that closes it, under the card and over everything
           else — a menu that only closes on its own button is a menu people
           leave open. */}
-      <div onClick={onClose} style={{ position:'fixed', inset:0, zIndex:900 }} />
-      <div data-testid="history-menu" style={{
+      <div onClick={() => onClose(false)} style={{ position:'fixed', inset:0, zIndex:900 }} />
+      <div data-testid="history-menu" ref={menuRef} role="menu" aria-label="History"
+        onKeyDown={onKeyDown} style={{
         position:'absolute', top:'calc(100% + 6px)', left:0, zIndex:901,
         minWidth:210, maxWidth:260, maxHeight:320, overflowY:'auto',
         background:BG, border:`1px solid ${BORDER}`, borderRadius:5,
@@ -503,11 +526,11 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
             rather than two lists that happen to touch. */}
         {[...redo].reverse().map((label, i) => (
           <Row key={`r${i}`} dim testId={`history-redo-${redo.length - 1 - i}`}
-            onClick={() => { onRedoTo(redo.length - i); onClose() }}>
+            onClick={() => { onRedoTo(redo.length - i); onClose(true) }}>
             ↷ {label}
           </Row>
         ))}
-        <div style={{
+        <div role="separator" style={{
           display:'flex', alignItems:'center', gap:8, padding:'4px 10px',
           fontSize:10, fontFamily: MONO, color: ACCENT_TEXT,
         }}>
@@ -516,7 +539,7 @@ function HistoryMenu({ labels, onUndoTo, onRedoTo, onClose }) {
         </div>
         {undo.map((label, i) => (
           <Row key={`u${i}`} testId={`history-undo-${i}`}
-            onClick={() => { onUndoTo(i + 1); onClose() }}>
+            onClick={() => { onUndoTo(i + 1); onClose(true) }}>
             {label}
           </Row>
         ))}
@@ -664,7 +687,7 @@ export function Sidebar({
   // and the line that describes it read the same number.
   sun,
   textLayers, setTextLayers, textOverflow,
-  onUndo, onRedo, canUndo, canRedo, onPresetPicked,
+  onUndo, onRedo, canUndo, canRedo, onPresetPicked, pendingPreset, onLookChange, plateName,
   onUndoTo, onRedoTo, historyLabels,
   loadGpxFromPicker, loadGeoJsonFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
@@ -925,6 +948,83 @@ export function Sidebar({
     () => (q ? Object.entries(FILTER_TERMS).filter(([t, w]) => sectionMatches(t, w, q)).length : 0),
     [q]
   )
+  const suggestions = useMemo(() => (q && matchCount === 0 ? suggestTerms(q, FILTER_TERMS) : []), [q, matchCount])
+  /*
+   * The controls a search found, marked inside the sections it opened. The
+   * filter opened all of Camera for "focal" and left Focal length to be found
+   * by eye; "azimuth" opened ten sections with no row saying which it was.
+   * Read from the rendered labels, which are the words the index was built from.
+   */
+  /*
+   * A search starts at the top of its results. The pane kept the scroll of
+   * whatever was open before, so "contour" opened 129 px into Contours with its
+   * header out of sight. Clearing the search puts the old scroll back.
+   */
+  /*
+   * Enter on a slider opens its value field, which is out of the Tab order so a
+   * slider costs one stop. One listener for every slider in the panel rather
+   * than a handler on each of the thirty-odd slider rows.
+   */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key !== 'Enter' || !e.target?.matches?.('#hm-panel-body input.hmr')) return
+      const field = e.target.parentElement?.querySelector('input.hmval')
+      if (!field) return
+      e.preventDefault()
+      field.focus()
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [])
+  const scrollBeforeFind = useRef(null)
+  useEffect(() => {
+    const body = document.getElementById('hm-panel-body')
+    if (!body) return
+    if (q) {
+      if (scrollBeforeFind.current == null) scrollBeforeFind.current = body.scrollTop
+      body.scrollTop = 0
+    } else if (scrollBeforeFind.current != null) {
+      const top = scrollBeforeFind.current
+      scrollBeforeFind.current = null
+      requestAnimationFrame(() => { body.scrollTop = top })
+    }
+  }, [q])
+  const [hitCount, setHitCount] = useState(0)
+  const [hitLocked, setHitLocked] = useState(0)
+  useEffect(() => {
+    const body = document.getElementById('hm-panel-body')
+    if (!body) return
+    body.querySelectorAll('[data-hit]').forEach((el) => el.removeAttribute('data-hit'))
+    if (!q) { setHitCount(0); return }
+    let n = 0, locked = 0
+    body.querySelectorAll('label[for]').forEach((el) => {
+      if (el.offsetParent && sectionMatches(el.textContent, '', q)) {
+        el.setAttribute('data-hit', ''); n++
+        if (el.closest('[inert]')) locked++
+      }
+    })
+    setHitCount(n); setHitLocked(locked)
+  }, [q, stage, drill, style])
+  /**
+   * Enter in the field: to the first control found that can take focus. A hit
+   * inside a mark that is off is locked (`inert`) and cannot, so Enter lands on
+   * that mark's Draw button instead: one more Enter turns it on, and the
+   * control unlocks where the caret already is.
+   */
+  const goToFirstHit = () => {
+    const body = document.getElementById('hm-panel-body')
+    if (!body) return
+    const shown = '[data-section]:not([style*="display: none"])'
+    const hits = [...body.querySelectorAll('label[data-hit]')].map((l) => document.getElementById(l.htmlFor)).filter(Boolean)
+    const live = hits.find((el) => !el.closest('[inert]'))
+    const locked = !live && hits[0]?.closest('[data-section]')
+    const target = live
+      ?? (locked && (locked.querySelector('[data-testid="off-draw"]') ?? locked.querySelector('input[data-enable]') ?? locked.querySelector('.hmsec')))
+      ?? body.querySelector(`${shown} .hmsec`)
+    if (!target) return
+    target.scrollIntoView({ block: 'center' })
+    target.focus({ preventScroll: true })
+  }
   const [sec, setSec]       = useState({
     // Presets open, Levels closed: the grid of 56 looks is the most persuasive
     // thing in the panel and it used to be the tenth section down, collapsed,
@@ -964,6 +1064,12 @@ export function Sidebar({
   // knowing — but it says so rather than claiming the settings still match.
   const [presetEdited, setPresetEdited] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const historyBtnRef = useRef(null)
+  const [showCut, setShowCut] = useState(false)
+  // The preset tile that holds the grid's one Tab stop, once focus has moved it.
+  const [presetStop, setPresetStop] = useState(null)
+  // The App names drawings after the look they started from.
+  useEffect(() => { onLookChange?.(lastPreset) }, [lastPreset, onLookChange])
   // Every seed rolled this session, oldest first, and which one is showing.
   // Back and forward walk the list; a new roll goes on the end, so stepping
   // back never costs the rolls after it.
@@ -992,6 +1098,42 @@ export function Sidebar({
   // "Show me the plate with nothing over it" is the most-wanted action in a tool
   // that makes pictures, and it used to mean aiming at an unlabelled 22 px glyph.
   // Backslash is unclaimed by the rest of the app and by the browser.
+  /*
+   * Out of a mark and back onto its tile, from the button or from Escape. Focus
+   * lands on the tile it came from, so the arrows carry on from there rather
+   * than from the top of the panel.
+   */
+  const backToSheet = useCallback(() => {
+    const from = drill
+    setDrill(null)
+    requestAnimationFrame(() => {
+      document.querySelector(`.hmcardhit[data-mode-title="${CSS.escape(from ?? '')}"]`)?.focus()
+    })
+  }, [drill])
+  /*
+   * Into a mark from the keyboard: focus goes to the way back, at the top of
+   * the pane it opened. The tile it left unmounts from view, and focus fell to
+   * the page, so the next Tab started from the panel's header again.
+   */
+  useEffect(() => {
+    if (!drill) return
+    const el = document.activeElement
+    if (el && el !== document.body && !el.classList?.contains('hmcardhit') && !el.closest?.('[data-testid="mode-lit"]')) return
+    requestAnimationFrame(() => document.querySelector('[data-testid="mode-back"]')?.focus({ preventScroll: true }))
+  }, [drill])
+  useEffect(() => {
+    if (!drill) return
+    const onKey = (e) => {
+      if (e.key !== 'Escape' || isTyping(e.target)) return
+      // Something on top of the panel answers Escape first.
+      if (document.querySelector('[role="dialog"], [data-testid="history-menu"], [data-testid="shortcuts-overlay"]')) return
+      e.preventDefault()
+      backToSheet()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [drill, backToSheet])
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -1522,11 +1664,15 @@ export function Sidebar({
             {/* Dark and light. Remembered per browser; the panel has always been
                 dark, so dark is where a first visit starts. */}
             <button type="button" data-testid="theme-toggle" className="hmbtn"
-              onClick={() => setTheme((t) => applyTheme(t === 'light' ? 'dark' : 'light'))}
+              // Applied here and then stored, not inside the updater: applyTheme
+              // tells the canvases, and an updater runs during render, so the
+              // Histogram was being set while the Sidebar rendered.
+              onClick={() => setTheme(applyTheme(theme === 'light' ? 'dark' : 'light'))}
               title={theme === 'light' ? 'Switch to dark' : 'Switch to light'}
               aria-label={theme === 'light' ? 'Switch to dark' : 'Switch to light'}
-              style={{ background:'none', border:'none', padding:2, cursor:'pointer', color: MUTED,
-                       display:'flex', alignItems:'center', marginRight:4 }}>
+              // 24 px square, the WCAG 2.5.8 target; the glyph stays 13–14 px.
+              style={{ background:'none', border:'none', padding:0, width:24, height:24, cursor:'pointer', color: MUTED,
+                       display:'flex', alignItems:'center', justifyContent:'center', marginRight:2 }}>
               {theme === 'light'
                 ? <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                     <path d="M6 .3a.7.7 0 0 1 .2.8A6.3 6.3 0 0 0 14.9 9.8a.7.7 0 0 1 1 .8A8 8 0 1 1 5.3.1.7.7 0 0 1 6 .3z" /></svg>
@@ -1540,7 +1686,7 @@ export function Sidebar({
               rel="noopener noreferrer"
               title="View on GitHub"
               aria-label="erzberg on GitHub"
-              style={{ display:'flex', alignItems:'center', color: MUTED, opacity:0.75, textDecoration:'none' }}
+              style={{ display:'flex', alignItems:'center', justifyContent:'center', width:24, height:24, color: MUTED, opacity:0.75, textDecoration:'none' }}
               onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = STRONG }}
               onMouseLeave={e => { e.currentTarget.style.opacity = '0.75'; e.currentTarget.style.color = MUTED }}
             >
@@ -1564,10 +1710,14 @@ export function Sidebar({
                   them rather than anywhere else in the panel, because it is the
                   same mechanism and not a new one. */}
               <div style={{ width:1, background: BORDER }} aria-hidden="true" />
-              <button type="button" data-testid="history-open"
+              <button type="button" data-testid="history-open" ref={historyBtnRef}
+                aria-haspopup="menu"
                 onClick={() => setHistoryOpen((v) => !v)}
                 disabled={!canUndo && !canRedo}
-                title="History" aria-label="Show the history"
+                // Said why when it is greyed out: a disabled button with no
+                // reason reads as broken.
+                title={!canUndo && !canRedo ? 'History: nothing changed yet' : 'History'}
+                aria-label={!canUndo && !canRedo ? 'Show the history, nothing changed yet' : 'Show the history'}
                 aria-expanded={historyOpen}
                 style={{
                   background:'none', border:'none', padding:'4px 6px', cursor: (canUndo || canRedo) ? 'pointer' : 'default',
@@ -1576,7 +1726,7 @@ export function Sidebar({
                 }}><Chevron dir={historyOpen ? 'up' : 'down'} /></button>
               {historyOpen && (
                 <HistoryMenu labels={historyLabels} onUndoTo={onUndoTo} onRedoTo={onRedoTo}
-                  onClose={() => setHistoryOpen(false)} />
+                  onClose={(refocus) => { setHistoryOpen(false); if (refocus) historyBtnRef.current?.focus() }} />
               )}
             </div>
             <div style={{ flex:1 }} />
@@ -1586,8 +1736,8 @@ export function Sidebar({
                 stops it breaking across two lines again if the row ever tightens.
                 It sits apart from undo because it is a different magnitude of
                 undoing — one step back against everything at once. */}
-            <button onClick={handleResetAll} title="Return every setting to its default" className="hmbtn"
-              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5,
+            <button type="button" onClick={handleResetAll} title="Return every setting to its default" className="hmbtn"
+              style={{ background:'none', border:`1px solid ${BORDER}`, borderRadius:5, minHeight:24,
                        color: MUTED, fontSize:11, lineHeight:1, padding:'5px 9px',
                        whiteSpace:'nowrap', cursor:'pointer' }}
               onMouseEnter={e => { e.currentTarget.style.color = STRONG }}
@@ -1612,7 +1762,7 @@ export function Sidebar({
               ? 'Multicolour: a layer drawn in many colours, which one pen cannot plot. Output › Pens lists them.'
               : undefined}
             style={{
-            marginTop:8, fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
+            marginTop:8, fontSize:11, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>
             {/* The pens come from the same `penLine` the strip under the SVG
@@ -1638,6 +1788,7 @@ export function Sidebar({
             onChange={(e) => setFilter(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Escape') { e.stopPropagation(); if (filter) setFilter(''); else e.currentTarget.blur() }
+              else if (e.key === 'Enter' && q) { e.preventDefault(); goToFirstHit() }
             }}
             placeholder="Find a control…" aria-label="Find a control" aria-keyshortcuts="/"
             style={{
@@ -1660,11 +1811,29 @@ export function Sidebar({
             .hmfind:hover { border-color:${MUTED} }
             .hmfind:focus { border-color:${DIM}; box-shadow:0 0 0 3px var(--hm-focus-ring); background:${BG} }
             .hmfind:focus + .hmfindkbd { opacity:0 }
-            .hmfind::-webkit-search-cancel-button { -webkit-appearance:none }`}</style>
+            .hmfind::-webkit-search-cancel-button { -webkit-appearance:none }
+            #hm-panel-body label[data-hit] { color:${TEXT} !important; font-weight:600; background:var(--hm-veil-strong);
+              box-shadow:inset 2px 0 0 ${TEXT}; border-radius:0 3px 3px 0; padding:0 4px 0 6px; margin-left:-6px }`}</style>
           {q && (
-            <div style={{ fontSize:10, color: MUTED, marginTop:4, display:'flex', justifyContent:'space-between' }}>
-              <span data-testid="filter-count">{matchCount === 0 ? 'No section matches' : `${matchCount} section${matchCount === 1 ? '' : 's'}`}</span>
+            <div style={{ fontSize:11, color: MUTED, marginTop:4, display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+              {/* Polite, so a screen reader hears the count settle as the query grows. */}
+              <span data-testid="filter-count" role="status" aria-live="polite" style={{ flex:1, minWidth:0 }}>
+                {matchCount === 0 ? `Nothing answers to “${filter.trim()}”.`
+                  : `${matchCount} section${matchCount === 1 ? '' : 's'}`
+                    + (hitCount ? ` · ${hitCount} control${hitCount === 1 ? '' : 's'}` : '')
+                    + (hitCount && hitLocked === hitCount ? ', all in marks that are off · Enter offers to draw' : '')
+                    + (hitCount && hitLocked && hitLocked < hitCount ? ` (${hitLocked} locked) · Enter goes to the first live one` : '')
+                    + (hitCount && !hitLocked ? ' · Enter goes to the first' : '')}
+              </span>
               <MiniBtn testId="filter-clear" onClick={() => setFilter('')}>Clear</MiniBtn>
+              {suggestions.length > 0 && (
+                <div data-testid="filter-suggest" style={{ flexBasis:'100%', display:'flex', alignItems:'center', gap:4, flexWrap:'wrap' }}>
+                  Try
+                  {suggestions.map((w) => (
+                    <MiniBtn key={w} testId={`filter-suggest-${w.replace(/\s+/g, '-')}`} onClick={() => setFilter(w)}>{w}</MiniBtn>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1681,6 +1850,13 @@ export function Sidebar({
         <div style={{ flex:1, display:'flex', minHeight:0 }}>
         <StageRail stage={stage} onStage={goStage} live={live} hits={hits} />
         <div id="hm-panel-body" role="tabpanel" aria-labelledby={`hm-tab-${stage}`} style={{ flex:1, minWidth:0, width: BODY_W, overflowX:'hidden', overflowY:'auto', scrollbarWidth:'thin', scrollbarColor:`${BORDER} transparent` }}>
+          {/* A search hides the stage heads, so its sections' h3s need an h2 over
+              them, or a screen reader's outline jumps from the wordmark to them. */}
+          {q && (
+            <h2 style={{ position:'absolute', width:1, height:1, overflow:'hidden', clip:'rect(0 0 0 0)', whiteSpace:'nowrap', margin:0 }}>
+              Search results
+            </h2>
+          )}
           <PanelStage.Provider value={stageCtx}>
           <SectionFilter.Provider value={filterCtx}>
           <CoverPlate.Provider value={cover}>
@@ -1723,21 +1899,45 @@ export function Sidebar({
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'8px 0 4px' }}>
               Styles <span style={{ color: MUTED, fontWeight:400, fontFamily: MONO }}>{presetNames.length}</span>
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+            {/* One Tab stop for the grid, walked with the arrows, the way the
+                Marks sheet is: sixty-six tiles were sixty-six stops before
+                anything else in the panel. The stop sits on the picked style. */}
+            <div data-testid="preset-grid" role="group" aria-label="Styles"
+              style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
               {Object.entries(externalPresets || {}).map(([name, preset]) => {
                 const showThumb = !noThumb.has(name)
+                const picked = lastPreset === name
+                const stop = name === ([presetStop, lastPreset].find((n) => n && externalPresets?.[n]) ?? presetNames[0])
                 return (
                   <button key={name} data-testid={`preset-${name}`} title={name}
+                    className="hmpreset"
+                    aria-label={picked && presetEdited ? `${name}, edited` : name}
+                    aria-pressed={picked}
+                    aria-busy={pendingPreset === name || undefined}
+                    tabIndex={stop ? 0 : -1}
+                    onFocus={() => setPresetStop(name)}
+                    onKeyDown={(e) => {
+                      const dir = ARROWS[e.key]
+                      if (!dir) return
+                      e.preventDefault()
+                      nextCard(e.currentTarget, dir, '[data-testid="preset-grid"]', '.hmpreset')?.focus()
+                    }}
                     onClick={() => {
                       // Named before it lands, so the history row reads
                       // `Preset · Name` rather than the diff's `8 sections`.
-                      onPresetPicked?.(name, presetEdited || lastPreset == null)
+                      onPresetPicked?.(name, presetEdited || lastPreset == null, preset)
                       applyPreset(preset, name)
                     }}
                     style={{
                       position:'relative', padding: showThumb ? 0 : '6px 4px', fontSize:10,
-                      background: SURF, color: DIM, border:`1px solid ${lastPreset === name ? ACCENT_DEEP : BORDER}`,
-                      borderRadius:5, cursor:'pointer', overflow:'hidden', lineHeight:0,
+                      // The picked style in the text colour, not ore: picked is not "on".
+                      // A check in the corner tells it from the focus ring, which is
+                      // the same colour.
+                      background: SURF, color: DIM, border:`1px solid ${picked ? TEXT : BORDER}`,
+                      borderRadius:5, overflow:'hidden', lineHeight:0,
+                      // Dimmed while its rebuild runs, so the click shows before the plate does.
+                      cursor: pendingPreset === name ? 'progress' : 'pointer',
+                      opacity: pendingPreset === name ? 0.55 : 1, transition:'opacity .15s',
                     }}>
                     {showThumb && (
                       <img
@@ -1747,6 +1947,17 @@ export function Sidebar({
                         onError={() => setNoThumb(s => new Set(s).add(name))}
                         style={{ display:'block', width:'100%', aspectRatio:'16/10', objectFit:'cover' }}
                       />
+                    )}
+                    {picked && (
+                      <span data-testid="preset-picked" aria-hidden="true" style={{
+                        position:'absolute', top:3, left:3, width:14, height:14, borderRadius:3,
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        background: TEXT, color: BG, lineHeight:0,
+                      }}>
+                        <svg width="8" height="8" viewBox="0 0 7 7" fill="none">
+                          <path d="M1 3.6 2.8 5.3 6 1.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
                     )}
                     {lastPreset === name && presetEdited && (
                       <span data-testid="preset-edited" style={{
@@ -1758,9 +1969,11 @@ export function Sidebar({
                     <span style={{
                       display:'block', lineHeight:1.2,
                       ...(showThumb ? {
-                        position:'absolute', left:0, right:0, bottom:0, padding:'8px 4px 2px',
-                        background:'linear-gradient(to top, rgba(0,0,0,.85), rgba(0,0,0,0))',
-                        color:'#f4f4f5', fontSize:10, textShadow:'0 1px 2px rgba(0,0,0,.9)',
+                        // A taller, darker foot: white names on pale plates
+                        // (Stone Relief, Cartographer's Draft) were lost at 10 px.
+                        position:'absolute', left:0, right:0, bottom:0, padding:'16px 5px 3px',
+                        background: ON_IMAGE_SCRIM,
+                        color: ON_IMAGE, fontSize:11, textShadow: ON_IMAGE_SHADOW,
                         overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
                       } : {}),
                     }}>{name}</span>
@@ -1922,9 +2135,7 @@ export function Sidebar({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 2 }}>
               {!masks.length && (
                 <CoverProse>
-                  A mask is a region you draw. Any layer can be restricted to one,
-                  the same way it can be restricted to a land cover class — and a
-                  layer may carry both at once.
+                  A region you draw. Any layer can be limited to it.
                 </CoverProse>
               )}
               {masks.length > 0 && (
@@ -1966,12 +2177,9 @@ export function Sidebar({
                 </Btn>
                 <Btn block onClick={onImportMask} disabled={masks.length >= MAX_MASKS}>↑ Mask image</Btn>
               </CoverRow>
+              {/* One line under the buttons; the Studio says the rest itself. */}
               <CoverProse caption>
-                Drawing opens the Studio over the viewport, with the satellite
-                imagery behind it when there is some. Its Level and Features tools
-                make a mask from heights or from loaded map features. Import takes
-                a black-and-white PNG or JPG — white is inside, and transparent is
-                outside.
+                An image mask is black and white: white is inside.
               </CoverProse>
             </div>
           </Section>
@@ -1993,21 +2201,29 @@ export function Sidebar({
               })
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
+                  {/* One line and the button. How to cut a plate is a recipe
+                      for the terminal, so it waits behind its own fold rather
+                      than standing in the pane as a paragraph and a command. */}
                   <CoverProse>
-                    A cover plate gives every pixel a class — worked rock, conifer, water —
-                    so a layer can draw on one material and skip the rest. Nothing here
-                    contacts a server: cut a plate first, then load it.
+                    A cover plate gives every pixel a class (rock, conifer, water), so a
+                    layer can draw on one material.
                   </CoverProse>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                    <CoverLabel>Cut one</CoverLabel>
-                    <CommandLine cmd={cmd} />
-                    <CoverProse caption>
-                      {exact
-                        ? 'Cut for this raster exactly — the extent and the projection both come from the file.'
-                        : 'The extent of what is on screen, in the lon/lat the flag wants.'}
-                    </CoverProse>
-                  </div>
                   <CoverRow><Btn block onClick={onLoadCover}>↑ Cover plate</Btn></CoverRow>
+                  <div style={{ display: 'flex' }}>
+                    <MiniBtn testId="cover-howto" onClick={() => setShowCut((v) => !v)}>
+                      {showCut ? 'Hide how to cut one' : 'How to cut one'}
+                    </MiniBtn>
+                  </div>
+                  {showCut && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                      <CommandLine cmd={cmd} />
+                      <CoverProse caption>
+                        {exact
+                          ? 'Cut for this raster exactly: the extent and the projection come from the file. The source server does not allow a browser to read it, so the cut runs in a terminal.'
+                          : 'The extent on screen, in lon/lat. The source server does not allow a browser to read it, so the cut runs in a terminal.'}
+                      </CoverProse>
+                    </div>
+                  )}
                 </div>
               )
             })()}
@@ -2257,14 +2473,27 @@ export function Sidebar({
             {/* Shared gradient editor: visible whenever ANY hypsometric consumer is
                 active — fill or any draw mode. (The old `style.lineHypsometric`
                 check was a dead legacy key, so this only ever showed for fill.) */}
-            {style.fillHypsometric || HYPSO_LAYER_IDS.some(id => style[`hypso${id}`]) ? (
+            {/* Only for a ramp something draws with, and said by whom. A mark
+                that is off kept its hypso flag, so the editor showed with Fill
+                off and nothing on screen using it. */}
+            {(() => {
+              const users = [
+                ...(style.showFill && style.fillHypsometric ? ['Fill'] : []),
+                ...HYPSO_LAYER_IDS.filter(id => style[`hypso${id}`] && style[`enabled${id}`])
+                  .map(id => DRAW_MODES.find(m => m.id === id)?.label ?? id),
+              ]
+              return users.length ? (
               <div style={{ marginBottom: 8, marginTop: 8 }}>
+                <div data-testid="ramp-users" style={{ fontSize: 11, color: MUTED, marginBottom: 6 }}>
+                  Height ramp, used by {users.join(', ')}
+                </div>
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:4, marginBottom:8 }}>
                   {Object.keys(GRADIENT_PRESETS).map(name => <Btn key={name} size="xs" onClick={() => sg(GRADIENT_PRESETS[name])} style={{ padding:'2px 0' }}>{name}</Btn>)}
                 </div>
                 <GradientPicker stops={gradientStops} onChange={sg} />
               </div>
-            ) : null}
+              ) : null
+            })()}
 
             <TogColor label="Mesh" checked={style.showMesh} onToggle={v => ss({ showMesh: v })} color={style.meshColor} onColor={v => ss({ meshColor: v })} />
             <TogColor label="Occlusion" help="Hide or ghost lines behind terrain. Set opacity to 0% to hide completely." checked={style.depthOcclusion} onToggle={v => ss({ depthOcclusion: v })} color={style.occlusionColor} onColor={v => ss({ occlusionColor: v })} />
@@ -2687,7 +2916,7 @@ export function Sidebar({
           {/* The way back, above the one section that is on screen. Rendered
               only while drilled in, because there is nothing to come back from
               otherwise. */}
-          {drill && <ModeBack title={drill} onBack={() => setDrill(null)} />}
+          {drill && <ModeBack title={drill} onBack={backToSheet} />}
 
           <ModeSections {...modeSectionProps} ss={ssMode} style={style} />
 
@@ -3258,10 +3487,16 @@ export function Sidebar({
               <Btn size="lg" variant="primary" block onClick={onSvg} data-testid="export-svg" style={{ width:'100%' }}>
                 SVG<Key>1</Key>
               </Btn>
-              <div data-testid="export-svg-summary" style={{ marginTop:6, fontSize:10, color: DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+              <div data-testid="export-svg-summary" style={{ marginTop:6, fontSize:11, color: DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
                 {plotStats
                   ? `${plotStats.pens} pen layer${plotStats.pens === 1 ? '' : 's'} · ${view.plotWidthMm ?? 297} mm · ${plotStats.strokes.toLocaleString()} strokes`
                   : `${view.plotWidthMm ?? 297} mm · ${segs} segments`}
+              </div>
+              {/* The name it lands under, before it lands: the look is in it, so
+                  two looks of one terrain are two files. */}
+              <div data-testid="export-name" title="SVG, PNG and WebM take the preset's name. STL and the raster keep the source's."
+                style={{ marginTop:2, fontSize:11, color: MUTED, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                Saves as <span style={{ color: DIM, fontFamily: MONO }}>{plateName ?? 'heightmap'}.svg</span>
               </div>
               {/* What the SVG will contain, said as a sentence.
                   It *cuts* at the paper frame rather than hiding what falls
@@ -3283,9 +3518,12 @@ export function Sidebar({
                 style={{ display:'block', marginTop:2, background:'none', border:'none', padding:0, cursor:'pointer',
                          fontFamily:'inherit', fontSize:11, color: MUTED, textAlign:'left' }}>
                 {view.showFrame
-                  ? `Cuts at the frame: ${PAPERS[view.framePaper ?? 'iso']?.label ?? 'custom'}, ${view.frameLandscape ? 'landscape' : 'portrait'}`
-                  : 'Writes the full canvas (no paper frame)'}
-                <span style={{ color: DIM, borderBottom:`1px solid ${BORDER}`, marginLeft:6, whiteSpace:'nowrap' }}>Frame › Paper</span>
+                  ? `Cuts at the frame: ${PAPERS[view.framePaper ?? 'iso']?.label ?? 'custom'}, ${view.frameLandscape ? 'landscape' : 'portrait'}.`
+                  : 'Writes the full canvas (no paper frame).'}
+                {/* Said as the action it is, in the text colour and underlined,
+                    so it reads as a way somewhere and not as the caption's end. */}
+                <span style={{ color: TEXT, textDecoration:'underline', textUnderlineOffset:3,
+                  textDecorationColor: MUTED, marginLeft:6, whiteSpace:'nowrap' }}>Frame › Paper</span>
               </button>
               {/* The second thing a plate carries, and the one nobody would
                   guess at: every PNG and SVG holds the whole parameter set, so
@@ -3294,7 +3532,12 @@ export function Sidebar({
                 PNG and SVG carry the preset
               </div>
               <PenStrip pens={pens} style={style} onInksAsPicked={(v) => ss({ inksAsPicked: v })}
-                onOneInk={(mode) => ss({ [`hypso${mode}`]: false })} />
+                onOneInk={(mode) => ss({ [`hypso${mode}`]: false })}
+                onOpenMark={(mode) => {
+                  const row = PANEL_MODES.find((r) => r[1] === `enabled${mode}`)
+                  if (!row) return
+                  goStage(3); setDrill(row[0])
+                }} />
             </div>
 
             {/* The other files: pictures, a print, a recording and the raster.

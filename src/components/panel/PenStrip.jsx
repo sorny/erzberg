@@ -10,14 +10,14 @@
  * `pensOf`, which reads the geometry the exporter is handed.
  */
 import { MODE_LABEL } from '../../utils/drawModes'
-import { MAX_SWATCHES, penLine } from '../../utils/pens'
+import { MAX_SWATCHES, modeOf, penLine } from '../../utils/pens'
 import { BORDER, Btn, DIM, MONO, MUTED, Tog, WARN } from './ui'
 
 /** One ink, drawn as a chip. */
 function Swatch({ hex }) {
   return (
     <span aria-hidden="true" style={{
-      width:10, height:10, borderRadius:3, flexShrink:0, background:hex,
+      width:12, height:12, borderRadius:3, flexShrink:0, background:hex,
       boxShadow:`inset 0 0 0 1px ${BORDER}`,
     }} />
   )
@@ -32,7 +32,7 @@ function Swatches({ row }) {
   if (row.kind === 'mixed') {
     return (
       <span aria-hidden="true" style={{
-        width:22, height:10, borderRadius:3, flexShrink:0,
+        width:24, height:12, borderRadius:3, flexShrink:0,
         background:`linear-gradient(90deg, ${row.inks.join(', ')})`,
         boxShadow:`inset 0 0 0 1px ${BORDER}`,
       }} />
@@ -41,11 +41,22 @@ function Swatches({ row }) {
   return row.inks.slice(0, MAX_SWATCHES).map((hex) => <Swatch key={hex} hex={hex} />)
 }
 
-/** What a row says on its right: the hex of one ink, or why there is no one hex. */
-function readoutOf(row) {
+/**
+ * Each one-ink layer's ink, numbered in the order the list meets it. Layers in
+ * one colour share a number, so "3 layers · 2 inks" can be read off the rows:
+ * three black rows were three identical hex strings to compare by eye.
+ */
+function inkNumbers(rows) {
+  const n = new Map()
+  for (const r of rows) if (r.kind === 'line' && !n.has(r.inks[0])) n.set(r.inks[0], n.size + 1)
+  return n
+}
+
+/** What a row says on its right: the ink of one-ink layer, or why there is no one ink. */
+function readoutOf(row, inks) {
   if (row.kind === 'areas') return `${row.count} ink${row.count === 1 ? '' : 's'}`
   if (row.kind === 'mixed') return 'multicolour'
-  return row.inks[0]
+  return `ink ${inks.get(row.inks[0])} · ${row.inks[0]}`
 }
 
 /**
@@ -74,14 +85,43 @@ function mixedMarks(rows, style) {
   return [...out.values()]
 }
 
-export function PenStrip({ pens, style, onInksAsPicked, onOneInk }) {
+/** WCAG relative luminance of a `#rrggbb`, for the paper check below. */
+function luminance(hex) {
+  const v = /^#?([0-9a-f]{6})$/i.exec(hex ?? '')?.[1]
+  if (!v) return null
+  const c = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255)
+    .map((x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4))
+  return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+
+/**
+ * The one-ink layers whose ink is close to the paper, by contrast ratio. A pale
+ * pen on cream paper is a plot that looks blank, and the hex alone did not say so.
+ */
+function faintOnPaper(rows, paper) {
+  const lp = luminance(paper)
+  if (lp == null) return []
+  return rows.filter((r) => {
+    if (r.kind !== 'line') return false
+    const li = luminance(r.inks[0])
+    if (li == null) return false
+    const [a, b] = li > lp ? [li, lp] : [lp, li]
+    // 2:1 and under reads as faint on paper; #c2b2a3 on #f4f1ea is 1.8.
+    return (a + 0.05) / (b + 0.05) < 2
+  })
+}
+
+export function PenStrip({ pens, style, onInksAsPicked, onOneInk, onOpenMark }) {
   const { rows } = pens
   const mixed = mixedMarks(rows, style)
+  // Against the base colour, gradient or not: a gradient starts from it.
+  const faint = faintOnPaper(rows, style.bgColor)
+  const inks = inkNumbers(rows)
   return (
     <div data-testid="pen-strip" style={{ marginTop:8 }}>
       <div style={{ display:'flex', alignItems:'baseline', gap:8, marginBottom:4 }}>
         <span style={{ fontSize:11, color: DIM, fontWeight:600, flexShrink:0 }}>Pens</span>
-        <span data-testid="pen-strip-count" style={{ flex:1, textAlign:'right', fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+        <span data-testid="pen-strip-count" style={{ flex:1, textAlign:'right', fontSize:11, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
           {penLine(pens)}
         </span>
       </div>
@@ -95,8 +135,9 @@ export function PenStrip({ pens, style, onInksAsPicked, onOneInk }) {
           maxHeight: 8 * 20, overflowY:'auto',
         }}>
           {rows.map((row) => (
-            <li key={row.id} data-pen-kind={row.kind} aria-label={spokenOf(row)}
-              style={{ display:'flex', alignItems:'center', gap:6, height:20 }}>
+            <li key={row.id} data-pen-kind={row.kind} aria-label={row.kind === "line" ? `${row.name}, ink ${inks.get(row.inks[0])}, ${row.inks[0]}` : spokenOf(row)}
+              style={{ display:'flex', alignItems:'center', gap:6, height:20 }}
+              title={row.kind === 'line' ? `Ink ${inks.get(row.inks[0])} · ${row.inks[0]}` : undefined}>
               <span style={{ display:'flex', gap:2, flexShrink:0 }}>
                 <Swatches row={row} />
               </span>
@@ -104,7 +145,7 @@ export function PenStrip({ pens, style, onInksAsPicked, onOneInk }) {
                 {row.name}
               </span>
               <span aria-hidden="true" style={{ fontSize:10, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums', flexShrink:0 }}>
-                {readoutOf(row)}
+                {readoutOf(row, inks)}
               </span>
             </li>
           ))}
@@ -129,6 +170,24 @@ export function PenStrip({ pens, style, onInksAsPicked, onOneInk }) {
           )}
         </div>
       ))}
+      {/* A note, not a warning: a pale ink on tinted paper can be the look
+          (First Light draws its flow lines that way). It says what the sheet
+          will show, and each name opens the mark where its colour is set. */}
+      {faint.length > 0 && (
+        <div data-testid="pen-faint" role="note" style={{ marginTop:4, fontSize:11, color: MUTED, lineHeight:1.5 }}>
+          {faint.map((r, i) => (
+            <span key={r.id}>
+              {i > 0 && ', '}
+              {onOpenMark && !modeOf(r.id).copy ? (
+                <button type="button" data-testid={`pen-faint-open-${modeOf(r.id).mode}`} onClick={() => onOpenMark(modeOf(r.id).mode)}
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit', fontSize:11,
+                    color: DIM, textDecoration:'underline', textUnderlineOffset:3, textDecorationColor: MUTED }}>{r.name}</button>
+              ) : r.name}
+            </span>
+          ))}
+          {` ${faint.length === 1 ? 'is' : 'are'} close to the paper colour and will plot faint.`}
+        </div>
+      )}
       {pens.hidden && rows.length > 0 && (
         <div style={{ fontSize:11, color: MUTED, marginTop:2 }}>
           Plus a hidden layer for each mark whose lines pass behind the ground.

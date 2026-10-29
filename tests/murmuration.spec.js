@@ -22,6 +22,17 @@ const toggleFor = (page, label) =>
 const togColorFor = (page, label) =>
   page.locator(`input[type=checkbox][aria-label="${label}"]`)
 
+/**
+ * Opens Particles and waits for its body to finish opening. The switch is
+ * force-clicked, which skips Playwright's visibility wait, so a click inside
+ * the 0.2 s open animation landed on the section instead of the switch.
+ */
+async function openParticles(page) {
+  await page.locator('[data-testid="section-particles"]').click()
+  await expect(page.locator('[data-testid="section-particles"]')).toHaveAttribute('aria-expanded', 'true')
+  await page.waitForTimeout(350)
+}
+
 async function openApp(page) {
   await page.goto('http://localhost:5173')
   await waitForApp(page)
@@ -157,7 +168,7 @@ test('murmuration mode animates on screen, and freezes when told to', async ({ p
   await openApp(page)
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
   await expect(on).toBeChecked()
@@ -466,7 +477,7 @@ test('the flock listens to its own track and leaves the terrain alone', async ({
   const gridBefore = await grid.textContent()
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1500)
@@ -509,7 +520,7 @@ test('the flock track has a transport — restart, skip and scrub', async ({ pag
   await openApp(page)
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1200)
@@ -565,7 +576,7 @@ test('the audio meter shows what the flock is hearing', async ({ page }) => {
   await openApp(page)
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1200)
@@ -615,7 +626,7 @@ test('the beat is visible in the flock, not just present in the numbers', async 
   await page.locator('[data-section="Mode: Lines"]')
     .locator('label').first().click({ force: true })
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1500)
@@ -712,7 +723,7 @@ test('the beat is visible in the flock, not just present in the numbers', async 
 test('Space pauses and resumes the flock, and the button follows', async ({ page }) => {
   await openApp(page)
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(1500)
@@ -756,7 +767,7 @@ test('the particle field paints over the draw modes, not under them', async ({ p
   // spacing, so this frame is bit-reproducible — unlike a flock, whose pose
   // depends on how many substeps happened to run before the screenshot.
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   const on = togColorFor(page, 'Particles')
   await on.click({ force: true })
   await expect(on).toBeChecked()
@@ -795,7 +806,7 @@ test('the field survives switching modes back and forth', async ({ page }) => {
   await openApp(page)
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-size"]').fill('9')
 
@@ -833,7 +844,7 @@ test('exported sprites are no bigger than the GPU will draw', async ({ page }) =
   })
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-spacing"]').fill('16')
   await page.locator('[data-testid="particle-size"]').fill('250')
@@ -874,7 +885,7 @@ test('SVG export carries the live flock, birds and streaks', async ({ page }) =>
   await openApp(page)
 
   await openStage(page, 'overlay')
-  await page.locator('[data-testid="section-particles"]').click()
+  await openParticles(page)
   await togColorFor(page, 'Particles').click({ force: true })
   await page.locator('[data-testid="particle-mode-murmuration"]').click()
   await page.waitForTimeout(2000)

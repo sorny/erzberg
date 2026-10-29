@@ -380,7 +380,7 @@ test.describe('panel', () => {
     await page.click(head)
     await page.waitForTimeout(400)
     // Bare defaults: fill and mesh are both off.
-    await expect(readout).toHaveText('—')
+    await expect(readout).toHaveText('off')
     await expect(lamp).toHaveCount(0)
 
     await page.click(head)

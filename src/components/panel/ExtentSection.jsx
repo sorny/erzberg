@@ -132,7 +132,8 @@ export function ExtentSection() {
         value={cover ? `${cover.classes?.length ?? 0} classes` : 'offline only'}
         detail={cover
           ? `${cover.name ?? 'Plate'}${cover.year ? ` · ${cover.year}` : ''}`
-          : 'That bucket sends no CORS header, so a browser cannot read it. Cut a plate with scripts/embed-window.js and drop it in.'} />
+          : 'Not loaded'}
+        where={cover ? null : 'Terrain › Land Cover'} />
     </div>
   )
 }
