@@ -7,7 +7,7 @@
  * on the first tweak. Nothing here knows about terrain — it is the panel's
  * design system and nothing else.
  */
-import { useContext, useEffect, useId, useRef, useState } from 'react'
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { ModeCopiesPanel, PanelStage, SectionFilter, SectionScope, sectionMatches } from './filter'
 import { PRESETS_STAGE, STAGES } from './stages'
 import { FAMILIES } from './markFamilies'
@@ -61,6 +61,12 @@ export const GLASS_BG    = 'var(--hm-glass-bg)'
 export const GLASS_BORDER = 'var(--hm-glass-border)'
 export const GLASS_TEXT  = 'var(--hm-glass-text)'
 export const SCRIM       = 'var(--hm-scrim)'
+// Text laid over a picture (the preset thumbnails). Fixed in both themes on
+// purpose: the picture does not change with the theme, so neither can the
+// scrim that keeps the name readable over it.
+export const ON_IMAGE       = '#f4f4f5'
+export const ON_IMAGE_SCRIM = 'linear-gradient(to top, rgba(0,0,0,.92) 0%, rgba(0,0,0,.78) 45%, rgba(0,0,0,0) 100%)'
+export const ON_IMAGE_SHADOW = '0 1px 2px rgba(0,0,0,.9)'
 
 export const FONT        = 'var(--hm-font)'
 export const MONO        = 'var(--hm-mono)'
@@ -70,9 +76,10 @@ export const WORDMARK    = "'Space Mono', monospace"
 /*
  * The type scale: five whole-pixel sizes, nothing between them.
  *
- *   9   badges, counts on the rail and the sheet, chart ticks
- *   10  notes, credits, readouts, hints, segmented choices
- *   11  every control label, buttons, load boxes
+ *   9   badges, chart ticks
+ *   10  notes, credits, hints, segmented choices, the rail's stage names
+ *   11  every control label, buttons, load boxes, and the readouts a plot
+ *       depends on (the standing line, fold summaries, the SVG and pen counts)
  *   12  section titles, floating chrome (hint, toast, studio toolbars)
  *   13  dialog and card titles, the wordmark, close glyphs
  *
@@ -279,9 +286,11 @@ export function PanelStyles() {
          the click — and :focus-visible withholds the ring until the first
          keypress, which hides it for exactly as long as it is the only thing
          telling you which of thirty-one sliders an arrow key will move. */
-      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-focus-ring); }
-      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 1px var(--hm-shadow), 0 0 0 4px var(--hm-focus-ring); }
-      .hmc { -webkit-appearance:none; appearance:none; width:32px; height:20px;
+      /* A solid ring with a gap, in the text colour: the translucent halo was
+         nearly the thumb's own colour and barely showed. */
+      .hmr:focus::-webkit-slider-thumb { box-shadow:0 0 0 2px ${BG}, 0 0 0 4px ${TEXT}; }
+      .hmr:focus::-moz-range-thumb     { box-shadow:0 0 0 2px ${BG}, 0 0 0 4px ${TEXT}; }
+      .hmc { -webkit-appearance:none; appearance:none; width:32px; height:24px;
         border:1px solid ${BORDER}; border-radius:5px; cursor:pointer;
         padding:2px; background:${SURF}; transition:border-color .15s var(--hm-ease); }
       .hmc:hover { border-color:${MUTED}; }
@@ -301,7 +310,9 @@ export function PanelStyles() {
       /* A 20 px hit box around a 12 px ring: the padding is transparent, so the
          mark keeps its size and only the target grows. */
       .hmi { -webkit-appearance:none; appearance:none; background:none; border:none;
-        padding:0; width:20px; height:20px; margin-left:2px; cursor:pointer; flex-shrink:0;
+        /* 24 px, the WCAG 2.5.8 target, with the extra 4 px given back in
+           margin so the label row keeps its height. The glyph inside is unchanged. */
+        padding:0; width:24px; height:24px; margin:-2px 0 -2px 0; cursor:pointer; flex-shrink:0;
         display:inline-flex; align-items:center; justify-content:center; }
       .hmi > span { display:inline-flex; align-items:center; justify-content:center;
         width:12px; height:12px; border-radius:50%; border:1px solid ${BORDER};
@@ -358,9 +369,22 @@ export function PanelStyles() {
       .hmsw .hmswknob { transition:transform .22s var(--hm-ease); }
       .hmsw:hover .hmswtrack { filter:brightness(1.12); }
       .hmsw input:focus-visible { outline:none; }
-      .hmsw input:focus-visible + .hmswtrack { box-shadow:0 0 0 3px var(--hm-focus-ring); }
+      /* An outline, not a box-shadow: the track's inline inset shadow won over
+         the old focus shadow, and a switch took focus with nothing to show it. */
+      .hmsw input:focus-visible + .hmswtrack { outline:2px solid ${TEXT}; outline-offset:2px; }
 
       /* Segmented control: one well, the choice a raised pill inside it. */
+      /* A locked block dims what you would move, not what it is called: at
+         half opacity the labels fell to 2.4:1, and they are what a search
+         lands on. */
+      .hmlocked :is(input, button, select, svg, .hmsw, [role="group"]) { opacity:${DISABLED_OPACITY}; }
+      .hmlocked [role="group"] :is(button, svg) { opacity:1; }
+      /* A fold's header is a name, so it stays readable; its chevron dims. */
+      .hmlocked .hmfold { opacity:1; }
+      .hmlocked .hmfold svg { opacity:${DISABLED_OPACITY}; }
+      /* A section scrolled into view lands below the sticky stage head, not
+         under it, where its first line was hidden. */
+      [data-section] { scroll-margin-top:44px; }
       .hmseg { transition:background .15s var(--hm-ease), color .15s var(--hm-ease), box-shadow .15s var(--hm-ease); }
       .hmseg:hover:not([aria-pressed="true"]):not([aria-disabled]) { color:${DIM} !important; background:${VEIL} !important; }
       .hmseg:focus-visible { outline:2px solid ${TEXT}; outline-offset:-1px; }
@@ -521,7 +545,10 @@ export function MiniBtn({ onClick, testId, children }) {
 
 export function HelpBtn({ label, active, onClick }) {
   return (
-    <button type="button" className={`hmi${active ? ' on' : ''}`} onClick={onClick}
+    // Out of the Tab order: on a slider row it was the third stop after the
+    // range and its value. `?` on the control opens it instead (App.jsx).
+    <button type="button" className={`hmi${active ? ' on' : ''}`} onClick={onClick} tabIndex={-1}
+      title={label ? `What ${label} does. Or press ? on the control.` : 'What this does'}
       aria-expanded={!!active} aria-label={label ? `What ${label} does` : 'What this does'}>
       <span aria-hidden="true">?</span>
     </button>
@@ -571,7 +598,11 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
   const commit = () => {
     const n = parseFloat(draft)
     setDraft(null)
-    if (!isFinite(n)) return
+    // Untouched, nothing is written. Tab passes through this field on its way
+    // down the panel, and a blur that committed the value it already had
+    // logged a history step and marked the preset edited, or snapped an
+    // off-grid preset value to the slider's grid.
+    if (draft === String(value) || !isFinite(n)) return
     // Snapped to the slider's own grid, counted from `min` the way an
     // `<input type=range>` counts. Only sub-1 steps used to snap, so typing 37
     // into a step-5 Azimuth stored 37 while the thumb — which cannot represent
@@ -580,7 +611,8 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
     const snapped = Math.round((n - min) / grid) * grid + min
     const clamped = Math.min(max, Math.max(min, snapped))
     // Float steps land on 0.30000000000000004 without this.
-    onChange(Number.isInteger(grid) ? Math.round(clamped) : parseFloat(clamped.toPrecision(12)))
+    const next = Number.isInteger(grid) ? Math.round(clamped) : parseFloat(clamped.toPrecision(12))
+    if (next !== value) onChange(next)
   }
 
   const shown = editing ? draft : (fmt ? String(fmt(value)) : String(value))
@@ -595,6 +627,9 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
       className="hmval"
       type="text"
       inputMode="decimal"
+      // One Tab stop per slider: the range takes Tab and the arrows, and Enter
+      // on it opens this field (Sidebar.jsx). Every slider used to cost two.
+      tabIndex={-1}
       aria-label={label ? `${label} value` : 'Value'}
       // Sized to the widest thing it can print, floored at the old fixed width:
       // "100.0%" is wider than "0", and an input does not grow to its content
@@ -612,8 +647,14 @@ function ValueField({ value, onChange, fmt, min, max, step, width, label }) {
         if (editing) commit()
       }}
       onKeyDown={(e) => {
-        if (e.key === 'Enter')  { e.preventDefault(); commit(); e.currentTarget.blur() }
-        if (e.key === 'Escape') { abandoned.current = true; setDraft(null); e.currentTarget.blur() }
+        // Back to the slider it belongs to, so the keyboard does not fall out
+        // of the panel after typing a value.
+        const back = (el) => {
+          const range = el.parentElement?.querySelector('input.hmr')
+          if (range) range.focus(); else el.blur()
+        }
+        if (e.key === 'Enter')  { e.preventDefault(); commit(); back(e.currentTarget) }
+        if (e.key === 'Escape') { e.stopPropagation(); abandoned.current = true; setDraft(null); back(e.currentTarget) }
       }}
     />
   )
@@ -750,7 +791,9 @@ export function Switch({ id, label, checked, onChange, testId, enable }) {
       <input type="checkbox" id={id} checked={checked} aria-label={label} data-testid={testId}
         data-enable={enable ? 'true' : undefined}
         onChange={e => onChange(e.target.checked)}
-        style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
+        // The hit area runs 3 px past the 18 px track above and below, for a
+        // 24 px target (WCAG 2.5.8); the track drawn under it is unchanged.
+        style={{ position:'absolute', top:-3, bottom:-3, left:0, right:0, width:'100%', height:'calc(100% + 6px)', opacity:0, margin:0, cursor:'pointer', zIndex:1 }} />
       <span className="hmswtrack" style={{
         position:'absolute', inset:0, borderRadius:999, pointerEvents:'none',
         background: checked ? ON : BORDER,
@@ -1047,16 +1090,17 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
             aria-describedby={why}
             aria-label={nameButtons && label ? `${label}: ${lbl}` : undefined} aria-pressed={on}
             style={{
-              flex: 1, fontSize: 11, padding:'2px 2px', borderRadius: 3, border:'none',
+              flex: 1, fontSize: 11, padding:'2px 2px', minHeight: 24, borderRadius: 3, border:'none',
               cursor: off ? 'not-allowed' : 'pointer', fontFamily:'inherit', whiteSpace:'nowrap',
               opacity: off && !on ? DISABLED_OPACITY : 1,
               ...(capitalize && { textTransform:'capitalize' }),
               fontWeight: on ? 600 : 500,
-              // Paper on iron, not ore: the picked option is a choice, and ore
-              // means "on". A segment can be picked on a mark that is off.
-              background: on ? STRONG : 'transparent',
-              color: on ? BG : MUTED,
-              boxShadow: on ? '0 1px 2px var(--hm-shadow)' : 'none',
+              // A raised tile in the text colour, not ore: the picked option is
+              // a choice, and ore means "on". Not the paper fill either, which
+              // is the panel's action (SVG, Draw): a choice is not a command.
+              background: on ? SURF : 'transparent',
+              color: on ? TEXT : MUTED,
+              boxShadow: on ? `inset 0 0 0 1px ${MUTED}, 0 1px 2px var(--hm-shadow)` : 'none',
             }}>{lbl}</button>
         )
       })}
@@ -1103,7 +1147,7 @@ export function SegGroup({ options, value, onChange, label, capitalize = false, 
  * old row carried, where it had one.
  */
 /** The reset button's width, and the room the header row keeps free for it. */
-const RESET_W = 20
+const RESET_W = 24
 /** The header switch's width, and the gap that keeps it off the reset mark. */
 const SWITCH_W = 34
 
@@ -1139,12 +1183,49 @@ function OffMark({ name, icon, onDraw }) {
 }
 
 /**
+ * A block of controls that cannot be used while their section is off.
+ *
+ * `inert`, so nothing in it takes focus or a click. That also hid it from a
+ * screen reader, while the search count said "1 locked", so a hidden line
+ * before it reads out what is in it: each control's name and value, from the
+ * rendered labels.
+ */
+function LockedControls({ children }) {
+  const ref = useRef(null)
+  const [said, setSaid] = useState('')
+  // After every render, because any render can change a value inside; the
+  // comparison below is what stops it looping.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const parts = [...el.querySelectorAll('label[for]')].map((l) => {
+      const c = document.getElementById(l.htmlFor)
+      const v = !c ? '' : c.type === 'checkbox' ? (c.checked ? 'on' : 'off')
+        : (c.getAttribute('aria-valuetext') ?? c.value ?? '')
+      return v ? `${l.textContent.trim()} ${v}` : l.textContent.trim()
+    }).filter(Boolean)
+    const next = parts.length ? `Locked: ${parts.join(', ')}.` : ''
+    if (next !== said) setSaid(next)
+  })
+  return (
+    <>
+      {said && <div data-testid="off-controls-said" style={{
+        position:'absolute', width:1, height:1, overflow:'hidden', clip:'rect(0 0 0 0)', whiteSpace:'nowrap',
+      }}>{said}</div>}
+      <div ref={ref} data-testid="off-controls" className="hmlocked" inert>{children}</div>
+    </>
+  )
+}
+
+/**
  * `preview`: the section's controls show dimmed while it is off, as every
  * mark's do. Only for sections whose controls are hidden while off; a section
  * whose controls stay live when off (Texture) must not set it.
  */
 export function Section({ title, terms, summary, open, onToggle, enabled, onEnabled, enableTestId, icon, blurb, preview = false, headless = false, children }) {
   const ctx = useContext(SectionFilter)
+  const [showLocked, setShowLocked] = useState(false)
   const scope = useContext(SectionScope)
   const copies = useContext(ModeCopiesPanel)
   // A mode copy's body: only the scoped section, with no header. See filter.js.
@@ -1215,7 +1296,13 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
    * dash: both say "nothing here", and only one says what could be.
    */
   const showBlurb = !!blurb && !isOpen && !enabled && !q
-  const readout = (onEnabled || showBlurb) && shown?.text === '—' ? null : shown
+  // Where it stays, the dash is said as a word. A bare `—` beside a header read
+  // as "not loaded" as easily as "off", and the mark rows already say `none`.
+  // A section with a switch says "off" by the switch. Every other one says it
+  // in words in the same slot, blurb or not, so "is this on?" reads one way in
+  // every pane.
+  const readout = onEnabled && shown?.text === '—' ? null
+    : shown?.text === '—' ? { ...shown, text: 'off' } : shown
   /*
    * The reset, and why it is not on every header.
    *
@@ -1275,15 +1362,15 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
           <span style={{ overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{name}</span>
         </span>
         <span style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0, minWidth:0 }}>
-          {/* The same role a slider's own readout uses — 10 px, MUTED, tabular
-              — because it is the same thing one level up, and the panel runs on
-              four type roles rather than five. Capped so a long line truncates
+          {/* 11 px, MUTED, tabular: the header's state ("off", "none", a value)
+              is what a scan down the pane reads, so it takes the readout size
+              the fold summaries use, not the 10 px of a note. Capped so a long line truncates
               rather than pushing a section's name off its header; with the
               readouts as short as they are, nothing reaches the cap. */}
           {readout && (
             <span data-testid={`summary-${title.toLowerCase().replace(/\s+/g, '-')}`}
               title={readout.hint} style={{
-                fontSize:10, fontWeight:400, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
+                fontSize:11, fontWeight:400, color: MUTED, fontFamily: MONO, fontVariantNumeric:'tabular-nums',
                 maxWidth:104, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
               }}>{readout.text}</span>
           )}
@@ -1355,7 +1442,9 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
       {onEnabled && (
         <span style={{ position:'absolute', right:38, top:12, display:'flex' }}
           title={enabled ? `${name} is drawing` : `${name} is off`}>
-          <Switch label={name} checked={!!enabled} onChange={onEnabled}
+          {/* "Draw Contours" for a mark, so the switch is not a second
+              control named "Contours" beside the header button. */}
+          <Switch label={title.startsWith('Mode: ') ? `Draw ${name}` : name} checked={!!enabled} onChange={onEnabled}
             testId={enableTestId ?? `enable-${name.toLowerCase().replace(/\s+/g, '-')}`} enable />
         </span>
       )}
@@ -1365,8 +1454,12 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
         <div inert={!isOpen} style={{ minHeight:0, overflow:'hidden', padding: isOpen ? '0 14px 12px' : '0 14px' }}>
           {onEnabled && !enabled && (title.startsWith('Mode: ')
             ? <OffMark name={name} icon={icon} onDraw={() => onEnabled(true)} />
-            : (
-              <div data-testid="off-note" style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:4 }}>
+            // The header switch is the one way on for any other section: a
+            // second, larger "Turn on" button under it asked the same question
+            // twice. A section that previews its controls says "off" in the
+            // locked line below instead, so this line is for the rest.
+            : !preview && (
+              <div data-testid="off-note" style={{ fontSize:11, color: MUTED, lineHeight:1.5, marginBottom:4 }}>
                 Off. The switch in the header turns it on.
               </div>
             ))}
@@ -1377,7 +1470,27 @@ export function Section({ title, terms, summary, open, onToggle, enabled, onEnab
               a selector alike. While filtering, every section that matches is
               on screen, so each one shows the controls the search found. */}
           {onEnabled && !enabled && (preview || title.startsWith('Mode: '))
-            ? ((q ? matches : isOpen && !sheetOut) && <div data-testid="off-controls" inert style={{ opacity: DISABLED_OPACITY }}>{children}</div>)
+            ? ((q ? matches : isOpen && !sheetOut) && (<>
+                {/* Said, not only dimmed, and folded until asked for: a page of
+                    faded sliders under every mark that is off was noise, and
+                    the button above is what that pane is for. A search opens
+                    the fold, because the control it found is in there. */}
+                <div data-testid="off-controls-note" style={{ display:'flex', alignItems:'center', gap:8, fontSize:11, color: MUTED, lineHeight:1.5, margin:'0 0 6px' }}>
+                  <span style={{ flex:1 }}>Its controls are locked while it is off.</span>
+                  {/* A text link, not a button: it is a look, not a decision,
+                      and a third button beside the switch and Draw asked the
+                      same question again. */}
+                  {!q && (
+                    <button type="button" data-testid="off-controls-toggle" onClick={() => setShowLocked((v) => !v)}
+                      aria-expanded={showLocked}
+                      style={{ background:'none', border:'none', padding:0, cursor:'pointer', fontFamily:'inherit',
+                        fontSize:11, color: DIM, textDecoration:'underline', textUnderlineOffset:3, textDecorationColor: MUTED }}>
+                      {showLocked ? 'Hide them' : 'Show them'}
+                    </button>
+                  )}
+                </div>
+                {(q || showLocked) && <LockedControls>{children}</LockedControls>}
+              </>))
             : children}
           {copies && title.startsWith('Mode: ') && enabled && copies.render(title)}
         </div>
@@ -1593,17 +1706,19 @@ export function StageRail({ stage, onStage, live, hits }) {
                 were clipped to clear the badge lane, and the lane is only in
                 the way of the number above. At 9 px the longest name, Surface,
                 is 32 px of the tab's 39. */}
-            <span style={{ display:'block', fontSize:9, fontWeight:600, marginTop:3, letterSpacing:'-0.01em', whiteSpace:'nowrap' }}>
+            <span style={{ display:'block', fontSize:10, fontWeight:600, marginTop:3, letterSpacing:'-0.03em', whiteSpace:'nowrap' }}>
               {title}
             </span>
             {badge && (
               <span aria-hidden="true" style={{
                 position:'absolute', top:6, right:4,
                 minWidth:13, height:13, borderRadius:5, padding:'0 3px',
-                // Marks that are on are live state, so ore. Search hits are
-                // not, so they take the inverse, like a primary button.
-                background: filtering ? STRONG : ON,
-                color: filtering ? BG : ON_ACCENT,
+                // Marks that are on are live state, so a filled ore chip.
+                // Search hits are not a state, so they are a different shape:
+                // an outlined count in the text colour, which no "on" ever wears.
+                background: filtering ? 'transparent' : ON,
+                color: filtering ? TEXT : ON_ACCENT,
+                boxShadow: filtering ? `inset 0 0 0 1px ${TEXT}` : 'none',
                 fontSize:9, fontWeight:700, lineHeight:'13px', fontFamily: MONO,
                 fontVariantNumeric:'tabular-nums',
               }}>{count}</span>
@@ -1639,9 +1754,11 @@ export function StageRail({ stage, onStage, live, hits }) {
  */
 // 11 px from xs up: a control you click takes the label size. 9 and 10 px are
 // for what you only read — indexes, readouts, the version.
+// The two small sizes keep their look and take a 24 px minimum height, the WCAG
+// 2.5.8 target size: `xs` was about 17 px tall and `sm` about 20.
 const BTN_SIZES = {
-  xs: { fontSize: 11, padding: '1px 6px', borderRadius: 3 },
-  sm: { fontSize: 11, padding: '3px 6px', borderRadius: 3 },
+  xs: { fontSize: 11, padding: '1px 6px', borderRadius: 3, minHeight: 24 },
+  sm: { fontSize: 11, padding: '3px 6px', borderRadius: 3, minHeight: 24 },
   md: { fontSize: 11, padding: '5px 7px', borderRadius: 5 },
   // The main action of a block: Surprise me, Run erosion, Apply.
   lg: { fontSize: 11, padding: '8px 8px', borderRadius: 5, fontWeight: 600 },
@@ -1777,7 +1894,7 @@ export function Fold({ title, readout, active, defaultOpen = false, testId, chil
         data-testid={testId ? `${testId}-fold` : undefined}
         onClick={q ? undefined : () => setOpen(!open)}>
         <span style={{ fontSize: 11, color: DIM, fontWeight: 600, whiteSpace: 'nowrap' }}>{title}</span>
-        <span style={{ flex: 1, minWidth: 0, textAlign: 'right', fontSize: 10, fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
+        <span style={{ flex: 1, minWidth: 0, textAlign: 'right', fontSize: 11, fontFamily: MONO, fontVariantNumeric: 'tabular-nums',
           // ACCENT_TEXT, not the ore fill: 10 px text on paper needs the deeper ore.
           color: active ? ACCENT_TEXT : MUTED, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{readout}</span>
         <span aria-hidden="true" className="hmfoldchev" style={{ display: 'flex', color: MUTED, alignSelf: 'center',

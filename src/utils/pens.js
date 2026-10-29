@@ -70,7 +70,7 @@ export function pensOf(lineGeo, p = {}) {
  * `Contours-Minor@c3` is Contours, in a copy. What the strip needs to offer
  * the fix in the right mode.
  */
-function modeOf(id) {
+export function modeOf(id) {
   const s = String(id)
   return { mode: s.replace(/@\w+$/, '').split('-')[0], copy: /@\w+$/.test(s) }
 }

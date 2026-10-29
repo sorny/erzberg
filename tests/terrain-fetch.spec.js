@@ -295,5 +295,5 @@ test('the extent names the ground, and what is on it', async ({ page }) => {
   // control lives rather than leaving a gap.
   await expect(page.locator('[data-testid="extent-layer-imagery"]')).toContainText('Surface')
   await expect(page.locator('[data-testid="extent-layer-map-features"]')).toContainText('Overlay')
-  await expect(page.locator('[data-testid="extent-layer-land-cover"]')).toContainText('CORS')
+  await expect(page.locator('[data-testid="extent-layer-land-cover"]')).toContainText('Land Cover')
 })

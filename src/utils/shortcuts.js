@@ -42,11 +42,23 @@ export const SHORTCUTS = [
       { keys: ['[', ']'], codes: ['BracketLeft', 'BracketRight'], label: 'Stage up or down', note: 'Presets to Output' },
       /* No `codes`, for the reason `?` has none: keyed on the character. */
       { keys: ['/'],  label: 'Find a control' },
+      /* No `codes`: the panel reads it on a focused slider only. */
+      { keys: ['Enter'], label: 'Type a slider’s value', note: 'on a slider; Enter again sets it' },
       { keys: ['⌘Z'], codes: ['KeyZ'],      label: 'Undo' },
       { keys: ['⌘⇧Z'], codes: ['KeyY'],     label: 'Redo', note: '⌘Y as well' },
       /* No `codes`: this one is keyed on the character rather than the physical
          key, because `?` is Shift+/ here and Shift+ß on a German layout. */
-      { keys: ['?'],  label: 'This card' },
+      { keys: ['?'],  label: 'This card', note: 'on a control with help, its help' },
+    ],
+  },
+  {
+    /* No `codes`: the tiles read `e.key` on themselves, and only while focused. */
+    group: 'Marks and Styles',
+    rows: [
+      { keys: ['←', '→', '↑', '↓'], label: 'Move between tiles', note: 'Tab enters the grid once' },
+      { keys: ['Space'], label: 'Switch the mark in focus on or off', note: 'or click its pip' },
+      { keys: ['Enter'], label: 'Open the mark, or apply the style' },
+      { keys: ['Esc'],   label: 'Back to all marks', note: 'and closes the history menu' },
     ],
   },
   {

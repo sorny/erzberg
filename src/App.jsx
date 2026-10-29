@@ -11,7 +11,7 @@ import { ElevationProfile } from './components/ElevationProfile'
 import { Scene } from './components/Scene'
 import { Sidebar } from './components/Sidebar'
 import { reachError } from './utils/netError'
-import { ACCENT_TEXT, BG, BORDER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
+import { ACCENT_TEXT, BG, BORDER, DANGER, DANGER_BORDER, DANGER_TEXT, DIM, FONT, GLASS, GLASS_BG, GLASS_BORDER, GLASS_TEXT, MUTED, SCRIM, STRONG, SURF, TEXT, VEIL, W as PANEL_W } from './components/panel/ui'
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
@@ -45,6 +45,7 @@ import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache } from './utils/osmFetch'
 import { workAttribution } from './utils/attribution'
 import { GROUP_OF, presetStyle } from './params'
+import { PANEL_MODES } from './components/panel/sectionSummary'
 import { AUTOMATION, useAutomation } from './automation'
 
 /** Every tweakable key, from the index that already enumerates them. */
@@ -109,7 +110,7 @@ function LoadingOverlay({ msg, progress = null, onCancel = null }) {
   const pct = progress == null ? null : Math.round(Math.min(1, Math.max(0, progress)) * 100)
   return (
     <div data-testid="loading-overlay" style={{
-      position:'fixed', inset:0, background:'rgba(8,8,10,0.45)',
+      position:'fixed', inset:0, background: SCRIM,
       backdropFilter:'blur(3px)', WebkitBackdropFilter:'blur(3px)',
       display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000,
     }}>
@@ -225,6 +226,11 @@ function Toast({ toast, onDismiss }) {
   useEffect(() => { setHeld(false) }, [toast])
   if (!toast) return null
   return (
+    <>
+    {/* Beside the toast, not in it: inside, the keyframes were part of what
+        the live region read out. */}
+    <style>{`@keyframes hm-rise { from { opacity:0; transform:translate(-50%, 8px) } to { opacity:1; transform:translate(-50%, 0) } }
+      @media (prefers-reduced-motion: reduce) { [data-testid="toast"] { animation:none !important } }`}</style>
     <div data-testid="toast" role="status" aria-live="polite"
       onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)}
       onFocus={() => setHeld(true)} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setHeld(false) }}
@@ -235,8 +241,6 @@ function Toast({ toast, onDismiss }) {
       maxWidth:480, fontSize:13, color:TEXT,
       animation:'hm-rise .28s cubic-bezier(.2,.8,.2,1)',
     }}>
-      <style>{`@keyframes hm-rise { from { opacity:0; transform:translate(-50%, 8px) } to { opacity:1; transform:translate(-50%, 0) } }
-        @media (prefers-reduced-motion: reduce) { [data-testid="toast"] { animation:none !important } }`}</style>
       <span style={{ flex:1 }}>{toast.msg}</span>
       {toast.action && (
         // Paper on iron, like the panel's primary buttons: an action, not a state.
@@ -255,6 +259,7 @@ function Toast({ toast, onDismiss }) {
         fontSize:13, lineHeight:1, padding:'6px 7px', borderRadius:5,
       }}>✕</button>
     </div>
+    </>
   )
 }
 
@@ -355,7 +360,7 @@ function DropTarget() {
  * that arrives while a build overruns its budget terminates that build, so
  * Undo is the cancel.
  */
-function ComputingPill({ tier, right = 14, onUndo = null }) {
+function ComputingPill({ tier, right = 14, onUndo = null, label = 'Computing' }) {
   const [secs, setSecs] = useState(0)
   useEffect(() => {
     if (tier < 2) { setSecs(0); return }
@@ -377,7 +382,7 @@ function ComputingPill({ tier, right = 14, onUndo = null }) {
         borderTopColor: loud ? TEXT : MUTED, borderRadius:'50%',
         animation:'hm-spin .7s linear infinite',
       }} />
-      Computing
+      {label}
       {loud && <span style={{ fontVariantNumeric:'tabular-nums', color: MUTED }}>{secs} s</span>}
       {loud && onUndo && (
         <button type="button" data-testid="computing-undo" onClick={onUndo} style={{
@@ -628,6 +633,17 @@ export default function App() {
   const exportBaseName = heightmapFilename
     ? heightmapFilename.replace(/\.[^.]+$/, '')
     : 'heightmap'
+  /*
+   * A drawing (SVG, PNG, WebM) also carries the preset it started from, because
+   * five looks of one terrain all landed as `Heightmap.svg`, `Heightmap (1).svg`
+   * and on, and a plotter queue cannot tell them apart. The raster, the STL and
+   * the profile depend on the terrain only, so they keep the raster's name.
+   */
+  const [lookName, setLookName] = useState(null)
+  const lookSlug = lookName
+    ? lookName.toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+    : ''
+  const plateBaseName = lookSlug ? `${exportBaseName}-${lookSlug}` : exportBaseName
 
   // ── Update document title ─────────────────────────────────────────────────
   useEffect(() => {
@@ -681,6 +697,13 @@ export default function App() {
   // is no longer what is on screen.
 
   const [sessionRestored, setSessionRestored] = useState(() => restored != null)
+  /*
+   * The opening look, held back until it is drawn. The first frames were bare
+   * defaults (black Lines, "1 layer · 1 ink"), and the plate then changed by
+   * itself when First Light landed, which read as a glitch. `waiting` until the
+   * panel applies it, `applied` until the rebuild it caused is drawn, then null.
+   */
+  const [opening, setOpening] = useState(() => (restored == null && !AUTOMATION ? 'waiting' : null))
   // Largest drawing buffer this context has been observed to actually deliver.
   // Infinity until DprGuard catches a clamp; only ever ratchets downward.
   const [maxBufferPx, setMaxBufferPx] = useState(Infinity)
@@ -1133,6 +1156,7 @@ export default function App() {
    * have opened with anyway — the exact fault v1.0.1 fixed.
    */
   const markPristine = useCallback(() => {
+    setOpening((o) => (o ? 'applied' : o))
     skipNextSave.current = true
     savePendingSince.current = 0
     /*
@@ -1208,8 +1232,11 @@ export default function App() {
     })
     else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
     else if (status === 'measured' || ext === null) notify('Preflight done — see the Export section.')
-    else                          notify(`Wrote ${exportBaseName}${ext.startsWith('-') ? '' : '.'}${ext}`)
-  }, [notify, exportBaseName])
+    else {
+      const base = ext === 'stl' ? exportBaseName : plateBaseName
+      notify(`Wrote ${base}${ext.startsWith('-') ? '' : '.'}${ext}`)
+    }
+  }, [notify, exportBaseName, plateBaseName])
 
   /**
    * Claim the single export slot, or refuse.
@@ -1425,13 +1452,26 @@ export default function App() {
    * only names the step and says it happened: a tile click replaces every mark
    * at once, and the work it replaced must be one visible click from coming
    * back, the way Reset all is.
+   *
+   * The toast waits for the rebuild. Said at the click, it announced a look
+   * that was not on screen yet, over a frame with the old marks still in it.
+   * The marks the preset switches off are named, because "your edits" did not
+   * say what had gone.
    */
-  const presetPicked = useCallback((name, edited) => {
+  const [pendingPreset, setPendingPreset] = useState(null)
+  const presetPicked = useCallback((name, edited, preset) => {
     tagHistory(`Preset · ${name}`)
-    notify(edited ? `Applied ${name}. Your edits are in Undo.` : `Applied ${name}.`, {
-      action: 'Undo', onAction: undo,
-    })
-  }, [tagHistory, notify, undo])
+    const next = preset?.style ? presetStyle(style, preset.style) : null
+    const gone = next
+      // The panel's own names, as the tiles print them.
+      ? PANEL_MODES.filter(([, key]) => style[key] && !next[key]).map(([title]) => title.replace(/^Mode:\s*/, ''))
+      : []
+    const list = gone.length > 3 ? `${gone.slice(0, 3).join(', ')} and ${gone.length - 3} more` : gone.join(', ')
+    const msg = gone.length
+      ? `Applied ${name}. Switched off ${list}.`
+      : edited ? `Applied ${name}. Your edits are in Undo.` : `Applied ${name}.`
+    setPendingPreset({ name, msg, at: performance.now() })
+  }, [tagHistory, style])
 
   const resetSection = useCallback((title) => {
     const keys = paramsForSection(title, PARAM_KEYS)
@@ -1905,15 +1945,15 @@ export default function App() {
 
   const handleWebmState = useCallback((active) => {
     setWebmActive(active)
-    if (!active) notify(`Wrote ${exportBaseName}.webm`)
-  }, [exportBaseName, notify])
+    if (!active) notify(`Wrote ${plateBaseName}.webm`)
+  }, [plateBaseName, notify])
 
   const handleWebmToggle = useCallback(() => {
     const canvas = document.querySelector('canvas')
     if (!canvas) return
     if (isRecording()) {
       stopWebM(handleWebmState)
-    } else if (startWebM(canvas, webmDuration, handleWebmState, exportBaseName, workCredit)) {
+    } else if (startWebM(canvas, webmDuration, handleWebmState, plateBaseName, workCredit)) {
       // Said out loud as well as written into the file. A Matroska tag is read
       // by ffprobe and by nothing a viewer is likely to open, so for video —
       // unlike an SVG or a PNG somebody edits — the metadata alone is a weak
@@ -1924,7 +1964,7 @@ export default function App() {
     } else {
       notify('Could not start recording — this browser refused the canvas stream.')
     }
-  }, [webmDuration, exportBaseName, notify, handleWebmState, workCredit])
+  }, [webmDuration, plateBaseName, notify, handleWebmState, workCredit])
 
   // ── Canvas pixel ratio ────────────────────────────────────────────────────
   // The canvas fills the window, so its CSS size is the window size. Supersampling
@@ -2183,6 +2223,40 @@ export default function App() {
    * so `isComputing` never falls under a continuous stream and keying on it
    * alone latches the overlay on permanently while frames arrive 30× a second.
    */
+  // The preset toast, once the rebuild it caused is drawn. A preset that moves
+  // no geometry (a colour, a background) starts no rebuild, so the wait gives
+  // up after a moment and says it anyway.
+  const presetBuildSeen = useRef(false)
+  useEffect(() => {
+    if (!pendingPreset) { presetBuildSeen.current = false; return }
+    if (isComputing) { presetBuildSeen.current = true; return }
+    const say = () => {
+      notify(pendingPreset.msg, { action: 'Undo', onAction: undo })
+      setPendingPreset(null)
+    }
+    if (presetBuildSeen.current) { say(); return }
+    const t = setTimeout(say, 1200)
+    return () => clearTimeout(t)
+  }, [pendingPreset, isComputing, resultCount, notify, undo])
+
+  // The veil lifts once the opening's own rebuild is drawn, after a moment if
+  // it started none, and in any case after 15 s, so a stalled fetch never
+  // leaves the plate covered.
+  const openingBuildSeen = useRef(false)
+  const openingOn = opening != null
+  useEffect(() => {
+    if (!openingOn) return
+    const cap = setTimeout(() => setOpening(null), 15000)
+    return () => clearTimeout(cap)
+  }, [openingOn])
+  useEffect(() => {
+    if (opening !== 'applied') return
+    if (isComputing) { openingBuildSeen.current = true; return }
+    if (openingBuildSeen.current) { setOpening(null); return }
+    const t = setTimeout(() => setOpening(null), 1200)
+    return () => clearTimeout(t)
+  }, [opening, isComputing, resultCount])
+
   const [computingTier, setComputingTier] = useState(0)
   useEffect(() => {
     if (!isComputing) { setComputingTier(0); return }
@@ -2315,7 +2389,21 @@ export default function App() {
        * the profile tool: a card over the screen is the thing Escape means
        * while it is up, whatever else that key does underneath.
        */
-      if (e.key === '?') { e.preventDefault(); setShowKeys((v) => !v); return }
+      if (e.key === '?') {
+        e.preventDefault()
+        // On a control with its own help, `?` opens that help: the help
+        // buttons left the Tab order, where each cost a stop on every row.
+        if (!showKeys) {
+          let row = document.activeElement?.closest?.('#hm-panel-body') ? document.activeElement : null
+          for (let i = 0; row && i < 4; i++, row = row.parentElement) {
+            const helps = row.querySelectorAll('.hmi')
+            if (helps.length === 1) { helps[0].click(); return }
+            if (helps.length > 1) break
+          }
+        }
+        setShowKeys((v) => !v)
+        return
+      }
       if (showKeys) {
         if (e.code === 'Escape') { e.preventDefault(); setShowKeys(false) }
         return
@@ -2427,7 +2515,7 @@ export default function App() {
           exportPreset={exportPreset}
           cameraPreset={cameraPreset}
           webmRecording={webmActive}
-          exportBaseName={exportBaseName}
+          exportBaseName={plateBaseName}
           audioLive={flockAudio.liveRef}
         />
       </Canvas>
@@ -2528,7 +2616,8 @@ export default function App() {
         setTextLayers={setTextLayers}
         textOverflow={textOverflow}
         onUndo={undo}
-        onPresetPicked={presetPicked}
+        onPresetPicked={presetPicked} pendingPreset={pendingPreset?.name ?? null}
+        onLookChange={setLookName} plateName={plateBaseName}
         onUndoTo={undoTo}
         onRedoTo={redoTo}
         historyLabels={historyLabels} onRedo={redo} canUndo={canUndo} canRedo={canRedo}
@@ -2601,19 +2690,29 @@ export default function App() {
       {webmActive && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)',
-          background:'rgba(200,0,0,0.85)', color:'#fff',
+          // The danger token, so the badge follows the theme like every other
+          // alarm in the app.
+          background: DANGER, color: BG,
           borderRadius:999, padding:'4px 14px', fontSize:13, fontWeight:700,
           zIndex:2000, pointerEvents:'none', display:'flex', alignItems:'center', gap:6,
         }}>
-          <span style={{ width:8, height:8, borderRadius:'50%', background:'#fff', display:'inline-block' }} />
+          <span style={{ width:8, height:8, borderRadius:'50%', background: BG, display:'inline-block' }} />
           REC
         </div>
       )}
 
       {/* ── Loading overlays ─────────────────────────────────────────────── */}
       {isLoading  && <LoadingOverlay msg={loadingMsg} />}
+      {opening && !isLoading && (
+        <div data-testid="opening-veil" aria-live="polite" style={{
+          position:'fixed', top:0, bottom:0, left:0, right:viewInset, zIndex:5,
+          display:'flex', alignItems:'center', justifyContent:'center', pointerEvents:'none',
+          background:'var(--hm-bg)', color:MUTED, fontFamily:FONT, fontSize:12, letterSpacing:'.02em',
+        }}>Opening First Light</div>
+      )}
       {computingTier > 0 && !isLoading && !exportJob && (
-        <ComputingPill tier={computingTier} right={viewInset + 14} onUndo={canUndo ? undo : null} />
+        <ComputingPill tier={computingTier} right={viewInset + 14} onUndo={canUndo ? undo : null}
+          label={pendingPreset ? `Applying ${pendingPreset.name}` : 'Computing'} />
       )}
       {exportJob && !isLoading && (() => {
         // The PNG capture is one synchronous pass: there is no progress to

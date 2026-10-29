@@ -82,7 +82,7 @@ export const SECTION_LABELS = {
   "Openness": "red relief full at reach gain opacity",
   "Paper": "paper frame ratio orientation scale offset margin",
   "Particles": "particles field size opacity glow spacing shimmer animate float noise scale flow speed reveal birds seed trail react to audio drive pace range pulse burst startle sync shadow strength spread sun azimuth altitude colour cohesion alignment separation neighbours turbulence roost height clearance ridge lift predator fear",
-  "Presets": "previous roll next",
+  "Presets": "previous roll next styles",
   "Satellite": "scene cloud size drape on terrain opacity auto levels brightness contrast saturation",
   "Scale and North": "scale bar north arrow size ink",
   "Shape": "raw terrain view resolution height scale blur jitter low cut high",

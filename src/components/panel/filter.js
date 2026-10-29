@@ -43,9 +43,69 @@ export const PanelStage = createContext(null)
  */
 export const CoverPlate = createContext(null)
 
-/** Does a section survive the current filter? Exported so the panel can count. */
+/**
+ * Does a section survive the current filter? Exported so the panel can count.
+ *
+ * The query has to start a word. Anywhere in a word, "pen" found "open" and
+ * "OpenStreetMap" and put Fetch and Land Cover above the pen strip.
+ */
 export function sectionMatches(title, terms, q) {
-  return !q || `${title} ${terms || ''}`.toLowerCase().includes(q)
+  if (!q) return true
+  const text = `${title} ${terms || ''}`.toLowerCase()
+  const starts = (w) => {
+    for (let at = text.indexOf(w); at !== -1; at = text.indexOf(w, at + 1)) {
+      if (at === 0 || !/[a-z0-9]/.test(text[at - 1])) return true
+    }
+    return false
+  }
+  // Each word on its own, in any order. The label index is a bag of words, so
+  // "sun altitude" as one string found nothing where both words were there.
+  return q.trim().split(/\s+/).every(starts)
+}
+
+/**
+ * Up to `n` words from the index close to a query that found nothing: the ones
+ * it starts, then the ones a typo or two away. A miss used to leave a blank pane
+ * and "No section matches", with nowhere to go from there.
+ */
+export function suggestTerms(q, index, n = 3) {
+  if (!q || q.length < 2) return []
+  const words = new Set()
+  for (const [title, terms] of Object.entries(index)) {
+    for (const w of `${title.replace(/^Mode:\s*/, '')} ${terms || ''}`.toLowerCase().split(/[^a-z0-9]+/)) {
+      if (w.length > 2) words.add(w)
+    }
+  }
+  const dist = (a, b) => {
+    const row = Array.from({ length: b.length + 1 }, (_, j) => j)
+    for (let i = 1; i <= a.length; i++) {
+      let prev = row[0]; row[0] = i
+      for (let j = 1; j <= b.length; j++) {
+        const t = row[j]
+        row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + (a[i - 1] === b[j - 1] ? 0 : 1))
+        prev = t
+      }
+    }
+    return row[b.length]
+  }
+  // The word to repair is the first one that finds nothing; the rest stand.
+  const all = Object.entries(index).map(([t, w]) => `${t} ${w || ''}`).join(' ')
+  const head = q.trim().split(/\s+/).find((w) => !sectionMatches(all, '', w)) ?? q.trim().split(/\s+/)[0]
+  const limit = head.length < 5 ? 1 : 2
+  // A plural rides on its singular: "contour" and "contours" are one offer.
+  for (const w of [...words]) if (w.endsWith('s') && words.has(w.slice(0, -1))) words.delete(w)
+  // Against the whole word, or its start at the typed length give or take one,
+  // so a dropped letter ("contur") costs one edit and not two.
+  const cost = (w) => Math.min(dist(head, w),
+    ...[-1, 0, 1].map((k) => (w.length > head.length + k ? dist(head, w.slice(0, head.length + k)) : Infinity)))
+  return [...words]
+    .map((w) => [w, cost(w)])
+    .filter(([, d]) => d <= limit)
+    .sort((a, b) => a[1] - b[1] || a[0].length - b[0].length || a[0].localeCompare(b[0]))
+    .slice(0, n)
+    // The whole query back, with only the failing word swapped, so "sun altitdue"
+    // offers "sun altitude" and not "altitude" alone.
+    .map(([w]) => q.trim().split(/\s+/).map((t) => (t === head ? w : t)).join(' '))
 }
 
 /**

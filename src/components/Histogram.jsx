@@ -30,10 +30,12 @@ export function Histogram({ pixels, blackPoint, whitePoint, onBlackChange, onWhi
     for (let i = 0; i < pixels.length; i++) {
       b[Math.min(255, pixels[i] * 255 | 0)]++
     }
-    // Normalise to [0, 1] — ignore the very highest spike (often at 0 or 255)
+    // Normalise to [0, 1] — ignore the very highest spike (often at 0 or 255).
+    // On a square-root scale: one tall bin near black (a sea, a flat valley
+    // floor) set the height linearly and left the rest of the box empty.
     let max = 0
     for (let i = 1; i < 255; i++) if (b[i] > max) max = b[i]
-    if (max > 0) for (let i = 0; i < 256; i++) b[i] = Math.min(1, b[i] / max)
+    if (max > 0) for (let i = 0; i < 256; i++) b[i] = Math.min(1, Math.sqrt(b[i] / max))
     return b
   }, [pixels])
 
