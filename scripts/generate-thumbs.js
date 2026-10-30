@@ -33,23 +33,6 @@ function loadManifest() {
   return JSON.parse(readFileSync(resolve(PRESETS_DIR, 'manifest.json'), 'utf8'))
 }
 
-/** Click a button by its exact visible label — the sidebar is a fixed overlay
- *  with its own scroll container, so JS clicks bypass viewport checks. */
-async function clickByText(page, text) {
-  await page.evaluate((t) => {
-    const btn = [...document.querySelectorAll('button')].find((el) => el.textContent.trim() === t)
-    btn?.click()
-  }, text)
-}
-
-async function openSection(page, title) {
-  await page.evaluate((t) => {
-    const heading = [...document.querySelectorAll('span')].find((el) => el.textContent.trim() === t)
-    heading?.click()
-  }, title)
-  await page.waitForTimeout(150)
-}
-
 /** Scale a PNG buffer to exactly THUMB_W×THUMB_H, cropping to fill. */
 async function shrink(page, buffer) {
   return await page.evaluate(async ({ b64, w, h }) => {
@@ -72,13 +55,22 @@ async function shrink(page, buffer) {
 }
 
 async function shoot(page, name) {
-  await clickByText(page, name)
-  await page.waitForTimeout(2200)   // let the geometry rebuild settle
+  // The tile itself, as a click on it would: bundled presets are applied as
+  // they are, not through parsePreset, so window.erzberg.applyPreset would
+  // migrate them a second time.
+  const found = await page.evaluate((n) => {
+    const tile = document.querySelector(`[data-testid="preset-${CSS.escape(n)}"]`)
+    tile?.click()
+    return !!tile
+  }, name)
+  if (!found) throw new Error('no such style tile')
+  await page.evaluate(() => window.erzberg.settle())
 
-  const [download] = await Promise.all([
+  const [download, status] = await Promise.all([
     page.waitForEvent('download', { timeout: 60000 }),
-    page.keyboard.press('Digit2'),  // PNG export
+    page.evaluate(() => window.erzberg.export('png')),
   ])
+  if (status !== 'done') throw new Error(`export ended "${status}"`)
   const stream = await download.createReadStream()
   const chunks = []
   for await (const chunk of stream) chunks.push(chunk)
@@ -101,17 +93,12 @@ async function main() {
   const context = await browser.newContext({ viewport: { width: 1400, height: 900 }, acceptDownloads: true })
   const page = await context.newPage()
 
-  await page.goto(APP_URL, { waitUntil: 'domcontentloaded' })
-  await page.waitForSelector('text=erzberg', { timeout: 30000 })
-  await page.waitForSelector('text=Grid:', { timeout: 30000 })
-  await page.waitForTimeout(2500)
-
-  // Three-quarter view: the default head-on camera flattens the relief.
-  await openSection(page, 'Camera')
-  await clickByText(page, 'Iso')
-  await page.waitForTimeout(1000)
-  await openSection(page, 'Camera')
-  await openSection(page, 'Presets')
+  // ?automation for window.erzberg: settle() and the PNG export. Each preset
+  // carries its own camera, so the tile shows the view the preset opens with.
+  await page.goto(`${APP_URL}/?automation`, { waitUntil: 'domcontentloaded' })
+  await page.waitForFunction(() => window.erzberg?.version === 1, null, { timeout: 30000 })
+  await page.waitForSelector('[data-testid="preset-grid"] .hmpreset', { state: 'attached', timeout: 30000 })
+  await page.evaluate(() => window.erzberg.settle())
 
   let total = 0
   for (const name of names) {

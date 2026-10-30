@@ -285,15 +285,15 @@
   "points": {
     "showPoints": true,
     "pointColor": "#000000",
-    "pointSize": 6.5,
+    "pointSize": 20,
     "particleSpacing": 1,
     "animateParticles": true,
     "holoGlowColor": "#dd8d8d",
-    "holoFloat": 0.1,
-    "holoNoiseAmt": 0.5,
-    "holoNoiseScale": 1,
-    "holoFlowSpeed": 0.5,
-    "holoMaskContrast": 2,
+    "holoFloat": 0.3,
+    "holoNoiseAmt": 2,
+    "holoNoiseScale": 0.4,
+    "holoFlowSpeed": 0.6,
+    "holoMaskContrast": 0.5,
     "holoShimmer": 1
   },
   "view": {
