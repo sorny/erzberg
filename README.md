@@ -49,17 +49,17 @@ Each sends a place name or a bounding box. None sends a file or needs a key.
   </tr>
   <tr>
     <td><img src="docs/images/preset-thermal-camera.png" alt="Thermal Camera preset"></td>
-    <td><img src="docs/images/preset-copper-plate.png" alt="Copper Plate preset"></td>
+    <td><img src="docs/images/preset-spectral-ridge.png" alt="Spectral Ridge preset"></td>
     <td><img src="docs/images/preset-x-ray.png" alt="X-Ray preset"></td>
   </tr>
   <tr>
     <td align="center"><sub><b>Thermal Camera</b> — hypsometric fill + sky-view AO</sub></td>
-    <td align="center"><sub><b>Copper Plate</b> — curvature engraving</sub></td>
+    <td align="center"><sub><b>Spectral Ridge</b> — ridgelines coloured by height</sub></td>
     <td align="center"><sub><b>X-Ray</b> — lines and crosshatch, ghost-occluded</sub></td>
   </tr>
 </table>
 
-<sub>Six of the 65 bundled presets, rendered by the app's own PNG exporter from
+<sub>Six of the 42 bundled presets, rendered by the app's own PNG exporter from
 the sample heightmap.</sub>
 
 ---
@@ -364,7 +364,7 @@ weight. The SVG writes each eye as its own pen layer.
 **Text layers.** Place your own words on the plate, in any label font. Each text
 is its own layer and pen, and follows the ground under it.
 
-**Presets.** 65 presets ship as thumbnails. *Surprise me* rolls a seeded look:
+**Presets.** 42 presets ship as thumbnails. *Surprise me* rolls a seeded look:
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. It skips modes that need a file, a picked point, a date
 or a georeference. ↩ and ↪ step through the last 50 seeds of the session.

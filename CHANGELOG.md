@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.61.0] — 2026-10-30
+
+### Added
+
+- **Ten new presets.** Each one uses a draw mode that no other preset used,
+  draws with an occluder and has no mirroring. The mode is in brackets.
+  - Foehn (Wind)
+  - Side-Looking Radar (Radar)
+  - Triangulated (Roughness mesh)
+  - Geodesic Fan (Geodesic fan)
+  - Strata (Bedding)
+  - Drainage Spines (Spines)
+  - Isophote Night (Isophotes)
+  - Spectral Ridge (Lines coloured by height)
+  - Mineral Plate (Mineral)
+  - Lava Field (Flow Lines, Ridges and Network)
+
+### Changed
+
+- **Stone Relief** uses Openness without the red tint, over a warm hillshade
+  lit from 315°, with a blur radius of 1. It reads as carved stone.
+- **Coral Bloom** draws pale coral contours with a heavier line every fifth,
+  thinner coral ridges and only the strong teal valleys.
+- **Particles** uses larger points (20) with less float (0.3), more noise (2)
+  at a scale of 0.4, a flow speed of 0.6 and a reveal of 0.5.
+- **The preset library went from 66 to 42.** The two-column style grid now
+  fills every row.
+- `scripts/generate-thumbs.js` clicks each style tile by its test id and
+  exports through `window.erzberg`. It waited for a "Grid:" readout and for
+  section headings that the panel no longer has.
+- The README gallery shows Spectral Ridge in place of Copper Plate.
+
+### Removed
+
+- 34 presets. A plate saved with one of these looks still opens, because
+  every plate carries its own settings.
+  - Aurora, Bathymetric, Catchments, Ceramic Glaze, Chalk Cliff
+  - Circuit Board, Copper Plate, Crystal Lattice, Dotted Survey
+  - Etched Glass, Heart Surgery, Hologram Drift, Hut Walk, Iron Oxide
+  - Long Exposure, Lunar Survey, Magma Chamber, Moss and Granite
+  - Nocturne, Obsidian, One Stroke, Origami, Rainfall, Riverbed
+  - Sandstorm, Scree Net, Scree Slope, Solar Wind, Sonar Sweep
+  - Sun Year, Tide Line, Truchet Weave, Wireframe Ghost, Woodcut
+
 ## [1.60.0] — 2026-10-29
 
 ### Added
