@@ -11,6 +11,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { frameDelta } from '../utils/frameClock'
 import { useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
+import { gradientTexture } from '../utils/bgTexture'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { workAttribution } from '../utils/attribution'
 import { presetComment, presetToText } from '../utils/presetFile'
@@ -492,24 +493,62 @@ export function Scene({
     // and the camera's aspect — so the restore belongs in a finally. A throw in
     // the middle used to leave the live viewport rendering at the capture's
     // dimensions, with hairlines the wrong width, until the page was reloaded.
+    const liveBackground = scene.background
     try {
 
       // Render into the offscreen target
       const oldClearColor = new THREE.Color()
       gl.getClearColor(oldClearColor)
       const oldAlpha = gl.getClearAlpha()
+      // The live gradient paper (see BgSync) stays out of this pass, or it
+      // would fill the alpha the trim reads; the export lays its own paper.
+      scene.background = null
       gl.setRenderTarget(rt)
       gl.setClearColor(0x000000, 0)
       gl.clear()
       gl.render(scene, cam)
-      gl.setRenderTarget(null)
-      for (const obj of hidden) obj.visible = true
-      gl.setClearColor(oldClearColor, oldAlpha)
 
       // Read pixels from the render target.
       // WebGL origin is bottom-left; flip vertically so (0,0) is top-left.
       const raw = new Uint8Array(targetW * targetH * 4)
       gl.readRenderTargetPixels(rt, 0, 0, targetW, targetH, raw)
+
+      // A multiplied layer (Riso's overprint, an anaglyph on paper) can only
+      // darken what is under it, and over the transparent clear above there is
+      // nothing: it vanished from the file while the viewport showed it. The
+      // scene is rendered again on the paper, solid or gradient, and the paper
+      // alone once more; wherever the two differ, the pixel with the layer
+      // is taken whole. A transparent export has no paper and keeps the first pass.
+      let multiplies = false
+      scene.traverse((obj) => {
+        if (obj.visible && obj.material?.blending === THREE.MultiplyBlending) multiplies = true
+      })
+      if (multiplies && !isAlpha) {
+        const paper = p.bgGradient && bgGradientStops?.length > 1
+          ? gradientTexture(bgGradientStops) : new THREE.Color(p.bgColor)
+        // Fresh targets: the first one, once read, does not take a second pass
+        // and drew all zeros.
+        const pass = (target, what) => {
+          const out = new Uint8Array(targetW * targetH * 4)
+          what.background = paper
+          gl.setRenderTarget(target)
+          gl.render(what, cam)
+          gl.readRenderTargetPixels(target, 0, 0, targetW, targetH, out)
+          what.background = null
+          target.dispose()
+          return out
+        }
+        const over = pass(rt.clone(), scene)
+        const bare = pass(rt.clone(), new THREE.Scene())
+        if (paper.isTexture) paper.dispose()
+        for (let i = 0; i < over.length; i += 4) {
+          if (Math.abs(over[i] - bare[i]) + Math.abs(over[i + 1] - bare[i + 1]) + Math.abs(over[i + 2] - bare[i + 2]) <= 3) continue
+          raw[i] = over[i]; raw[i + 1] = over[i + 1]; raw[i + 2] = over[i + 2]; raw[i + 3] = 255
+        }
+      }
+      gl.setRenderTarget(null)
+      for (const obj of hidden) obj.visible = true
+      gl.setClearColor(oldClearColor, oldAlpha)
       rt.dispose()
 
       const flipped = new Uint8Array(targetW * targetH * 4)
@@ -544,6 +583,7 @@ export function Scene({
         exportPreset ? presetToText(exportPreset) : null,
         marks ? { ...marks, color: p.frameMarkColor ?? '#000000' } : null)
     } finally {
+      scene.background = liveBackground
       // Restore materials and camera
       lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
       if (cam.isPerspectiveCamera && oldAspect !== null) {

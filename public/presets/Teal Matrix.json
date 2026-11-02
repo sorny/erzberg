@@ -163,7 +163,7 @@
     "hypsoBandedValley": false,
     "hypsoIntervalValley": 10,
     "enabledStipple": true,
-    "spacingStipple": 0.5,
+    "spacingStipple": 1,
     "weightStipple": 1,
     "opacityStipple": 1,
     "colorStipple": "#10d0a0",

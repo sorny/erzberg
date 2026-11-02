@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 9,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -22,6 +22,7 @@
     "enabledRiso": true,
     "occludeBy": "ground",
     "opacityRiso": 0.85,
+    "overprintRiso": true,
     "weightRiso": 2
   },
   "points": {

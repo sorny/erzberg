@@ -24,7 +24,7 @@
     "opacityFlow": 0.8,
     "opacityStipple": 0.5,
     "spacingFlow": 4,
-    "spacingStipple": 0.4,
+    "spacingStipple": 1,
     "weightFlow": 0.6,
     "weightStipple": 1.6
   },
