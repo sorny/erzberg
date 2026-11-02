@@ -274,6 +274,12 @@ function resolveLayerStyle(id, p) {
     // stroke width, and it is never dashed — a dashed point is a point.
     case 'Bitplane-Screen':
       return { weight: p.screenWeightBitplane ?? 3, opacity: p.opacityBitplane, dash: 'solid' }
+    // The three separations share the mode's dot size and opacity. Each carries
+    // its own ink in its colour buffer, so only the weight and opacity are read.
+    case 'Riso-A':
+    case 'Riso-B':
+    case 'Riso-C':
+      return { weight: p.weightRiso, opacity: p.opacityRiso, dash: 'solid' }
     case 'Halation-Grain':
       return { weight: p.weightHalation, opacity: p.opacityHalation, dash: 'solid' }
     // The halo is a second ink on the same plate, so it carries its own radius

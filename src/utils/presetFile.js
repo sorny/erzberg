@@ -65,8 +65,33 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 7 is Waveform's limiter. Before, a sample that Detail pushed past the full
  * width was cut there, and a payload before 7 keeps that cut
  * (`migrateWaveformClip`).
+ *
+ * 8 is Riso's dot size and opacity. Before, the three separations ignored both
+ * and drew at a size of 1 and full opacity, and a payload before 8 keeps that
+ * (`migrateRisoDots`).
  */
-export const PRESET_FORMAT = 7
+export const PRESET_FORMAT = 8
+
+/**
+ * Riso's dots as they drew, for a plate made before format 8.
+ *
+ * The separations are layers `Riso-A`, `Riso-B` and `Riso-C`, and until format
+ * 8 nothing mapped them to `weightRiso` and `opacityRiso`. They drew at the
+ * renderer's fallback, a size of 1 at full opacity, whatever the plate stored.
+ * The default stored size is 3, so reading it now would triple every dot. An
+ * older plate gets the values it drew with, in mode copies too, and they are
+ * written over what it carries because what it carries never applied. A new
+ * object comes back.
+ */
+export function migrateRisoDots(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const style = { ...payload.style, weightRiso: 1, opacityRiso: 1 }
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (
+      c?.mode === 'Riso' && c.values ? { ...c, values: { ...c.values, weightRiso: 1, opacityRiso: 1 } } : c))
+  }
+  return { ...payload, style }
+}
 
 /**
  * The old depth test, for a plate made before format 6.
@@ -344,7 +369,8 @@ export function parsePreset(text) {
     const inks = f < 4 ? migratePillarInk(shading) : shading
     const walls = f < 5 ? migrateOcclusion(inks) : inks
     const bias = f < 6 ? migrateStrokeBias(walls) : walls
-    return repairWaveform(f < 7 ? migrateWaveformClip(bias) : bias)
+    const wave = f < 7 ? migrateWaveformClip(bias) : bias
+    return repairWaveform(f < 8 ? migrateRisoDots(wave) : wave)
   } catch {
     return null
   }
