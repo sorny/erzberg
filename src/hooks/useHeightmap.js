@@ -3,9 +3,10 @@
  */
 import { useCallback, useState } from 'react'
 import { useStore } from '../store/useStore'
-import { groundPixelSize, squareGroundShape, suggestElevScale } from '../utils/geoCoords'
+import { classifyCRS, crsFromGeoKeys, groundPixelSize, loadProjections, needsProjections, squareGroundShape, suggestElevScale } from '../utils/geoCoords'
 import { demToHeightmap } from '../utils/demFetch'
 import { areaResample } from '../utils/terrain'
+import { windowBbox, windowForArea } from '../utils/rasterWindow'
 
 // ── Image (PNG / JPG) loader ─────────────────────────────────────────────────
 
@@ -262,6 +263,8 @@ function detectCrsCode(gk, bbox) {
   const geogCS = gk.GeographicTypeGeoKey
 
   if (projCS && projCS !== USER_DEFINED) return `EPSG:${projCS}`
+  // A user-defined grid states its parameters key by key. proj4 can use them.
+  if (projCS === USER_DEFINED) { const own = crsFromGeoKeys(gk); if (own) return own }
   if (gk.GTModelTypeGeoKey === 1) return 'EPSG:projected-unknown'
   if (geogCS && geogCS !== USER_DEFINED) return `EPSG:${geogCS}`
   if (gk.GTModelTypeGeoKey === 2) return 'EPSG:geographic-unknown'
@@ -298,7 +301,7 @@ export function isEmbeddingCube(samples, bitsPerSample, sampleFormat) {
   return samples >= 8 && bitsPerSample?.[0] === 8 && sampleFormat?.[0] === 2
 }
 
-async function loadGeoTiffPixels(file) {
+async function loadGeoTiffPixels(file, band = 0, area = null) {
   const { fromArrayBuffer } = await import('geotiff')
   const arrayBuffer = await file.arrayBuffer()
   const tiff   = await fromArrayBuffer(arrayBuffer)
@@ -306,7 +309,8 @@ async function loadGeoTiffPixels(file) {
   let width  = image.getWidth()
   let height = image.getHeight()
   /*
-   * Band 0, and a guard for the file that makes band 0 a lie.
+   * One band, band 0 unless the panel picked another, and a guard for the file
+   * that makes band 0 a lie.
    *
    * Reading one sample is the point: without `samples`, geotiff decodes and
    * allocates every band in the file — free on the single-band DEMs this is
@@ -337,8 +341,8 @@ async function loadGeoTiffPixels(file) {
       `which writes a terrain .tif and a land cover plate from the same window.`)
   }
 
-  const rasters = await image.readRasters({ samples: [0] })
-  let band      = rasters[0]
+  if (!(band >= 0 && band < samples)) band = 0
+  const bandIndex = band
   // The file's declared NoData value, which the sentinel list cannot stand in
   // for: GDAL writes float DEMs with -3.4028235e+38, and only the *positive*
   // float max is a sentinel, so a void in such a raster would otherwise be read
@@ -367,6 +371,26 @@ async function loadGeoTiffPixels(file) {
       crsName = citationName(geoKeys)
     }
   } catch (_) { bbox = null; crs = 'EPSG:none'; crsName = null }
+  // A national grid, or a projection the file defines itself, needs proj4.
+  // Load it now, so that every reader of the CRS after this one can place it.
+  if (bbox && (needsProjections(crs) || geoKeys.ProjectedCSTypeGeoKey === USER_DEFINED)) {
+    try { await loadProjections(); crs = detectCrsCode(geoKeys, bbox) } catch (_) { /* stays unsupported */ }
+  }
+
+  // An area in longitude and latitude reads only the window that covers it.
+  // The atlas uses this to cut many sheets from one large file.
+  let win = null
+  if (area) {
+    if (!bbox || !classifyCRS(crs).supported) throw new Error('This GeoTIFF has no projection that can be placed, so it cannot be cut to an area.')
+    const grid = { origin: image.getOrigin(), resolution: image.getResolution(), width, height }
+    win = windowForArea(area, crs, grid)
+    if (!win) throw new Error('The area lies outside this GeoTIFF.')
+    bbox = windowBbox(win, grid)
+    width = win[2] - win[0]
+    height = win[3] - win[1]
+  }
+  const rasters = await image.readRasters(win ? { samples: [bandIndex], window: win } : { samples: [bandIndex] })
+  band          = rasters[0]
 
   const metresPerUnit = LINEAR_UNITS[geoKeys.ProjLinearUnitsGeoKey] ?? 1   // feet → metres
   let resolution
@@ -457,8 +481,62 @@ async function loadGeoTiffPixels(file) {
     realElevMin: min, realElevMax: max, suggestedElevScale,
     dataWidth: hasValid ? (maxX - minX + 1) : width,
     dataHeight: hasValid ? (maxY - minY + 1) : height,
-    bbox, crs, crsName,
+    bbox, crs, crsName, bandCount: samples, band: bandIndex,
   }
+}
+
+// The thumbnail edge, in pixels, for the band picker.
+const BAND_THUMB = 56
+// More bands than this are listed without previews: each preview reads a band.
+const BAND_PREVIEW_LIMIT = 12
+
+/**
+ * One summary per band, for the band picker: the value range and a small
+ * greyscale preview as a data URL. Reads the bands one at a time, so the peak
+ * memory is one band, not the whole file.
+ */
+export async function describeBands(file) {
+  const { fromArrayBuffer } = await import('geotiff')
+  const image = await (await fromArrayBuffer(await file.arrayBuffer())).getImage()
+  const count = image.getSamplesPerPixel()
+  const w = image.getWidth(), h = image.getHeight()
+  const rawNodata = tiffTag(image.fileDirectory, 'GDAL_NODATA')
+  const nodata = rawNodata != null ? parseFloat(rawNodata) : NaN
+  const isVoid = (v) => !isFinite(v) || Math.abs(v) >= FLOAT_VOID || v === nodata || NODATA_SENTINELS.has(v)
+  const tw = w >= h ? BAND_THUMB : Math.max(1, Math.round(BAND_THUMB * w / h))
+  const th = h >= w ? BAND_THUMB : Math.max(1, Math.round(BAND_THUMB * h / w))
+  const out = []
+  for (let b = 0; b < Math.min(count, BAND_PREVIEW_LIMIT); b++) {
+    const [data] = await image.readRasters({ samples: [b] })
+    let min = Infinity, max = -Infinity
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i]
+      if (isVoid(v)) continue
+      if (v < min) min = v
+      if (v > max) max = v
+    }
+    let thumb = null
+    if (max > min) {
+      const canvas = document.createElement('canvas')
+      canvas.width = tw; canvas.height = th
+      const ctx = canvas.getContext('2d')
+      const img = ctx.createImageData(tw, th)
+      for (let y = 0; y < th; y++) {
+        const sy = Math.min(h - 1, Math.floor((y + 0.5) * h / th))
+        for (let x = 0; x < tw; x++) {
+          const v = data[sy * w + Math.min(w - 1, Math.floor((x + 0.5) * w / tw))]
+          const o = (y * tw + x) * 4
+          const g = isVoid(v) ? 0 : Math.round(255 * (v - min) / (max - min))
+          img.data[o] = img.data[o + 1] = img.data[o + 2] = g
+          img.data[o + 3] = isVoid(v) ? 0 : 255
+        }
+      }
+      ctx.putImageData(img, 0, 0)
+      thumb = canvas.toDataURL()
+    }
+    out.push({ min: isFinite(min) ? min : null, max: isFinite(max) ? max : null, thumb })
+  }
+  return out
 }
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
@@ -476,6 +554,7 @@ export function useHeightmap() {
   const setGeoTiffMeta  = useStore((s) => s.setGeoTiffMeta)
   const setTerrainProvenance = useStore((s) => s.setTerrainProvenance)
   const clearGeoTiffMeta = useStore((s) => s.clearGeoTiffMeta)
+  const setGeoTiffBands  = useStore((s) => s.setGeoTiffBands)
   const [isLoading,  setIsLoading]  = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
   const [loadError,  setLoadError]  = useState(null)
@@ -517,15 +596,25 @@ export function useHeightmap() {
   // The two [Benchmark] lines below are load telemetry parsed by
   // tests/benchmark.spec.js, which times upload → parse → first render. They
   // read as debug leftovers and are not; deleting them silently guts that spec.
-  const loadGeoTiff = useCallback((file) => {
+  const loadGeoTiff = useCallback((file, band = 0, area = null) => {
     console.log('[Benchmark] GeoTIFF Upload Started: ' + Date.now())
     setIsLoading(true); setLoadingMsg('Parsing GeoTIFF…'); setLoadError(null)
-    return loadGeoTiffPixels(file)
-      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs, crsName }) => {
+    const previous = useStore.getState().geoTiffBands
+    return loadGeoTiffPixels(file, band, area)
+      .then(({ pixels, nodataMask, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight, bbox, crs, crsName, bandCount, band: read }) => {
         console.log('[Benchmark] GeoTIFF Parsed: ' + Date.now())
         setGeoTiffMeta(realElevMin, realElevMax, bbox, crs, crsName)
-        setTerrainProvenance(`${file.name} · opened from this machine`)
+        setTerrainProvenance(`${file.name} · opened from this machine${bandCount > 1 ? ` · band ${read + 1}` : ''}${area ? ' · cut to an area' : ''}`)
         setHeightmap(pixels, nodataMask, width, height, file.name)
+        if (bandCount > 1) {
+          // Another band of the same file keeps the summaries already made.
+          const same = previous?.file === file ? previous.summaries : null
+          setGeoTiffBands({ file, count: bandCount, band: read, summaries: same })
+          if (!same) describeBands(file).then((summaries) => {
+            const now = useStore.getState().geoTiffBands
+            if (now?.file === file) setGeoTiffBands({ ...now, summaries })
+          }).catch(() => { /* the picker still works without previews */ })
+        }
         setIsLoading(false); setLoadingMsg('')
         return { pixels, width, height, realElevMin, realElevMax, suggestedElevScale, dataWidth, dataHeight }
       })
@@ -535,7 +624,7 @@ export function useHeightmap() {
         console.error(err)
         return null   // signals failure to callers; see loadGeoTiffFromPicker
       })
-  }, [setHeightmap, setGeoTiffMeta, setTerrainProvenance])
+  }, [setHeightmap, setGeoTiffMeta, setTerrainProvenance, setGeoTiffBands])
 
   /**
    * Take a DEM the app fetched rather than one somebody opened.

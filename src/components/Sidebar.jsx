@@ -5,6 +5,7 @@ import { createElement, useCallback, useEffect, useLayoutEffect, useMemo, useRef
 import { version } from '../../package.json'
 import { useStore } from '../store/useStore'
 import { ErosionSection } from './panel/ErosionSection'
+import { BandPicker } from './panel/BandPicker'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import { DRAW_MODES, HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
@@ -666,6 +667,9 @@ function useStable(fn) {
 
 const WAVE_GUIDE_KEY = 'erzberg.waveformGuide'
 
+// The stages that show the build readout under their pane.
+const STATS_STAGES = [1, 2, 3, 6]
+
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -689,7 +693,7 @@ export function Sidebar({
   textLayers, setTextLayers, textOverflow,
   onUndo, onRedo, canUndo, canRedo, onPresetPicked, pendingPreset, onLookChange, plateName,
   onUndoTo, onRedoTo, historyLabels,
-  loadGpxFromPicker, loadGeoJsonFromPicker,
+  loadGpxFromPicker, loadGeoJsonFromPicker, loadShapefileFromPicker, loadKmlFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
   onAdoptVectorSource, onVectorError, vectorIdentify, onVectorIdentify,
@@ -701,7 +705,7 @@ export function Sidebar({
   imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
-  onSvg, onPng, onPngAlpha, onStl, onHeightmap,
+  onSvg, onPng, onPngAlpha, onStl, onHeightmap, onGeoTiff, onGeoTiffBand,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
@@ -2013,6 +2017,7 @@ export function Sidebar({
                 {heightmapFilename}
               </div>
             )}
+            <BandPicker onPick={onGeoTiffBand} />
 
             {/* Which look is on, and a way to the other 55.
                 Opening the Presets section is not enough on its own: it is the
@@ -2932,13 +2937,13 @@ export function Sidebar({
 
           <Section title="Vector Layers" open={sec.vectorLayers} onToggle={() => tog('vectorLayers')}
                    enabled={vectorLayers?.length > 0}
-                   blurb="Roads, rivers and peaks from OpenStreetMap, and GPX or GeoJSON of your own.">
+                   blurb="Roads, rivers and peaks from OpenStreetMap, and GPX, GeoJSON, KML or Shapefile of your own.">
             {geoTiffElevMin == null ? (
               <div data-testid="vector-needs-geotiff">
                 <div style={{ fontSize:10, color: MUTED, lineHeight:1.5, marginBottom:8 }}>
                   Roads, water, rail, landuse, buildings, lifts and peaks are queried
-                  from OpenStreetMap for the raster&rsquo;s own extent, and GPX tracks
-                  and GeoJSON are draped over it. All of that needs to know where on
+                  from OpenStreetMap for the raster&rsquo;s own extent, and GPX, GeoJSON,
+                  KML and Shapefile are draped over it. All of that needs to know where on
                   earth the terrain is — so it needs a georeferenced raster.
                 </div>
                 <LoadBtn data-testid="vector-load-geotiff" onClick={loadGeoTiffFromPicker}>GeoTIFF</LoadBtn>
@@ -2953,6 +2958,7 @@ export function Sidebar({
                 coverage={vectorCoverage} error={vectorError}
                 sources={vectorSources} layers={vectorLayers}
                 onLoadGpx={loadGpxFromPicker} onLoadGeoJson={loadGeoJsonFromPicker}
+                onLoadShapefile={loadShapefileFromPicker} onLoadKml={loadKmlFromPicker}
                 onPatch={onPatchVectorLayer} onRemove={onRemoveVectorLayer}
                 onReorder={onReorderVectorLayer}
                 onRemoveSource={onRemoveVectorSource}
@@ -3425,6 +3431,18 @@ export function Sidebar({
               <Tog label="Plotter order" testId="plot-order" small
                 help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."
                 checked={!!view.plotPenOrder} onChange={v => sv({ plotPenOrder: v })} />
+              <InlineSl label="Join gap" testId="plot-join-gap"
+                help="Joins a stroke to the next one of the same ink when the gap between them on paper is this small or smaller, so the pen stays down across it. Best with Plotter order on, which puts near ends next to each other. Off at 0."
+                min={0} max={2} step={0.05} value={view.plotJoinGapMm ?? 0}
+                onChange={v => sv({ plotJoinGapMm: v })} fmt={v => (v > 0 ? v.toFixed(2) + ' mm' : 'off')} />
+              <InlineSl label="Min length" testId="plot-min-length"
+                help="Leaves out strokes shorter than this on paper. Each one costs a pen lift and adds almost nothing to the picture. Off at 0."
+                min={0} max={5} step={0.05} value={view.plotMinLengthMm ?? 0}
+                onChange={v => sv({ plotMinLengthMm: v })} fmt={v => (v > 0 ? v.toFixed(2) + ' mm' : 'off')} />
+              <InlineSl label="Simplify" testId="plot-simplify"
+                help="Removes points that lie closer than this on paper to the line through their neighbours, so the SVG is smaller and loads faster in plotter software. A pen cannot draw the difference at 0.05 mm. Off at 0."
+                min={0} max={0.5} step={0.01} value={view.plotSimplifyMm ?? 0}
+                onChange={v => sv({ plotSimplifyMm: v })} fmt={v => (v > 0 ? v.toFixed(2) + ' mm' : 'off')} />
               {/* Only while a mode that exports filled areas is drawing. It is an
                   SVG-only choice, so the viewport looks the same either way. */}
               {(style.enabledIndexed || style.enabledMineral || style.enabledCover || style.enabledShed) && (
@@ -3473,7 +3491,14 @@ export function Sidebar({
                         {`Plotter order would cut the pen-up travel by ${Math.round(saved * 100)}%`}
                       </div>
                     )}
-                    {plotStats.dashed && <div>a dashed layer is counted as solid</div>}
+                    {(plotStats.joined > 0 || plotStats.dropped > 0) && (
+                      <div data-testid="preflight-cleanup">
+                        {[plotStats.joined > 0 && `${plotStats.joined.toLocaleString()} joined`,
+                          plotStats.dropped > 0 && `${plotStats.dropped.toLocaleString()} short strokes left out`]
+                          .filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    {plotStats.dashed && <div>a dashed layer is counted as solid, and is not cleaned up</div>}
                   </>)
                 })()}
               </div>
@@ -3549,7 +3574,8 @@ export function Sidebar({
               <ExpBtn label="STL" shortcut="4" onClick={onStl} testId="export-stl" />
               {/* The cap stays while recording: 5 is also how it stops. */}
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} shortcut="5" onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Heightmap" onClick={onHeightmap} />
+              <ExpBtn label="Heightmap" shortcut="6" onClick={onHeightmap} testId="export-heightmap" />
+              <ExpBtn label="GeoTIFF" shortcut="7" onClick={onGeoTiff} testId="export-geotiff" />
             </div>
             <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
           </Section>
@@ -3577,12 +3603,13 @@ export function Sidebar({
           </Stage>
 
           {/* ── Stats ───────────────────────────────────────────────────────
-              Output only. Under every stage it read as part of whatever pane
-              was open — on Overlay it floated in empty space and looked like
-              the pane's content. It stays in the DOM elsewhere, hidden, so the
-              numbers are always current and a script can still read them. */}
+              Under the stages whose settings move the numbers (Terrain,
+              Surface, Marks) and under Output. On Overlay and Frame it floated
+              in empty space and looked like the pane's content. It stays in the
+              DOM elsewhere, hidden, so the numbers are always current and a
+              script can still read them. */}
           <div data-testid="panel-stats" style={{ padding:'8px 12px 4px', fontSize:10, color: MUTED, fontVariantNumeric:'tabular-nums', lineHeight:1.9,
-            ...(stage === 6 && !q ? null : { display:'none' }) }}>
+            ...(STATS_STAGES.includes(stage) && !q ? null : { display:'none' }) }}>
             <div>Segments: {segs} · Verts: {verts}</div>
             <div>Triangles: {tris} · Grid: {grid}</div>
             {/* Measured, not estimated. `drawModes.js` carries a cost per mode,

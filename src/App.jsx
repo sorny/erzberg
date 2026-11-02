@@ -38,10 +38,11 @@ import { gradientTexture, multipliesOnPaper } from './utils/bgTexture'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
+import { vectorImporterFor } from './utils/vectorImport'
 import { layersFromSource, moveLayer, sourceRings } from './utils/vectorLayers'
 import { GRADIENT_PRESETS } from './utils/gradientPresets'
 import { describeEdit, effectiveBounds } from './utils/heightmapEdit'
-import { exportHeightmap } from './utils/heightmapExport'
+import { exportGeoTiff, exportHeightmap } from './utils/heightmapExport'
 import { isRecording, startWebM, stopWebM } from './utils/webmRecorder'
 import { clearOsmCache } from './utils/osmFetch'
 import { workAttribution } from './utils/attribution'
@@ -352,7 +353,7 @@ function DropTarget() {
       }}>
         <div style={{ fontSize:13, color:TEXT, marginBottom:8 }}>Drop to open</div>
         <div style={{ fontSize:12, color:MUTED, lineHeight:1.7 }}>
-          PNG or GeoTIFF heightmap · GPX or GeoJSON overlay<br />
+          PNG or GeoTIFF heightmap · GPX, GeoJSON, KML or zipped Shapefile overlay<br />
           a preset, or any plate this app exported
         </div>
       </div>
@@ -947,6 +948,32 @@ export default function App() {
   const notify = useCallback((msg, opts = {}) => {
     setToast({ msg, seq: ++toastSeq.current, ...opts })
   }, [])
+
+  // Shapefile, KML and KMZ: read as binary or through a library, so async,
+  // and each may come back with a note that its placement is approximate.
+  const importVectorFile = useCallback(async (file) => {
+    const read = vectorImporterFor(file.name)
+    if (!read) return false
+    setVectorError(null)
+    try {
+      const { source, note } = await read(file)
+      adoptVectorSource(source)
+      if (note) notify(note)
+    } catch (err) {
+      console.error('[Vector] Import error:', err)
+      setVectorError(err?.message || `Could not read ${file.name}.`)
+    }
+    return true
+  }, [adoptVectorSource, notify])
+
+  const loadVectorArchive = useCallback((accept) => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept })
+    input.onchange = (e) => { const file = e.target.files[0]; if (file) importVectorFile(file) }
+    input.click()
+  }, [importVectorFile])
+  const loadShapefileFromPicker = useCallback(() => loadVectorArchive('.zip,application/zip'), [loadVectorArchive])
+  const loadKmlFromPicker = useCallback(
+    () => loadVectorArchive('.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz'), [loadVectorArchive])
   const dismissToast = useCallback(() => setToast(null), [])
 
   /**
@@ -1817,6 +1844,19 @@ export default function App() {
     loadGeoTiffFromPicker(afterGeoTiff)
   }, [soundscape, loadGeoTiffFromPicker, afterGeoTiff])
 
+  // Another band of the open GeoTIFF: the same file, read again on that band.
+  // One area of a GeoTIFF, for the atlas. Fits like any other load.
+  const loadGeoTiffArea = useCallback((file, area) => {
+    soundscape.release()
+    return loadGeoTiff(file, 0, area).then((r) => { if (r) afterGeoTiff(r); return r })
+  }, [soundscape, loadGeoTiff, afterGeoTiff])
+
+  const loadGeoTiffBand = useCallback((band) => {
+    const bands = useStore.getState().geoTiffBands
+    if (!bands?.file) return
+    loadGeoTiff(bands.file, band).then((r) => { if (r) afterGeoTiff(r) })
+  }, [loadGeoTiff, afterGeoTiff])
+
   // ── Drop ──────────────────────────────────────────────────────────────────
   /**
    * One file, onto the window.
@@ -1864,6 +1904,10 @@ export default function App() {
         }
         return
       }
+      if (route === 'vector') {
+        await importVectorFile(file)
+        return
+      }
       if (route === 'gpx' || route === 'geojson') {
         const parse = route === 'gpx' ? gpxToSource : parseGeoJson
         try {
@@ -1879,7 +1923,7 @@ export default function App() {
     }
     showError(explainDrop(file.name, routes))
   }, [applyPreset, load, loadGeoTiff, afterRaster, afterGeoTiff, adoptVectorSource,
-      adoptCover, soundscape, showError, notify])
+      adoptCover, soundscape, showError, notify, importVectorFile])
 
   /**
    * The highlight, and the two events that are harder than they look.
@@ -2323,7 +2367,7 @@ export default function App() {
   automationDoneRef.current = useAutomation({
     p, lineGeo, isComputing, isLoading, lastBuildMs, loadError, plotStats, externalPresets,
     heightmapFilename, heightmapWidth, heightmapHeight,
-    handleDroppedFile, applyPreset, setParams,
+    handleDroppedFile, applyPreset, setParams, fetchTerrainAndFit, loadGeoTiffArea,
     beginSvgExport, beginPngExport, beginPreflight, handleStl,
   })
 
@@ -2332,6 +2376,22 @@ export default function App() {
     if (written) notify(`Wrote ${written}`)
     else notify('Nothing to write — no terrain is loaded.')
   }, [terrainData, exportBaseName, notify])
+
+  const handleGeoTiffExport = useCallback(async () => {
+    const st = useStore.getState()
+    try {
+      const written = await exportGeoTiff({
+        pixels: st.heightmapPixels, mask: st.nodataMask, width: st.heightmapWidth, height: st.heightmapHeight,
+        bbox: st.geoTiffBbox, crs: st.geoTiffCRS, elevMin: st.geoTiffElevMin, elevMax: st.geoTiffElevMax,
+      }, exportBaseName)
+      if (!written) notify('A GeoTIFF needs a georeferenced raster in metres. Use Heightmap for a PNG.')
+      else notify(written.codeless
+        ? `Wrote ${written.filename}. The file defined its own projection, so it carries no EPSG code.`
+        : `Wrote ${written.filename}`)
+    } catch (err) {
+      notify(`Could not write the GeoTIFF: ${err?.message ?? err}`)
+    }
+  }, [exportBaseName, notify])
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
@@ -2435,25 +2495,27 @@ export default function App() {
       }
       // The Mask Studio owns the keyboard the same way, and answers its own
       // keys. Without this, E toggled its eraser *and* opened Edit Mode on top
-      // of it, and 1–5 exported a terrain nobody could see.
+      // of it, and 1–7 exported a terrain nobody could see.
       if (studioMaskId) return
       if (e.code === 'Escape') { setProfileMode(false); setProfileClicks([]); setPick(null) }
       if (e.code === 'KeyE')   openEditor()
       // A slider with focus ignores digits, so a stray one there was a whole
       // export: the panel is where hands rest, and the files stay a click away.
-      if (/^Digit[1-5]$/.test(e.code) && e.target?.type === 'range') return
+      if (/^Digit[1-7]$/.test(e.code) && e.target?.type === 'range') return
       if (e.code === 'Digit1') beginSvgExport()
       if (e.code === 'Digit2') beginPngExport(false)
       if (e.code === 'Digit3') beginPngExport(true)
       if (e.code === 'Digit4') handleStl()
       if (e.code === 'Digit5') handleWebmToggle()
+      if (e.code === 'Digit6') handleHeightmapExport()
+      if (e.code === 'Digit7') handleGeoTiffExport()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
     // beginSvgExport belongs here for the same reason handleStl does: both claim
     // the single export slot, and a stale copy would not see it taken.
   }, [handleWebmToggle, handleStl, editMode, applyEditDraft, openEditor, beginSvgExport,
-      beginPngExport, undo, redo, showKeys, studioMaskId, editHistory])
+      beginPngExport, handleHeightmapExport, handleGeoTiffExport, undo, redo, showKeys, studioMaskId, editHistory])
 
   // ── Load default heightmap on mount ───────────────────────────────────────
   // Mount-only by intent, and the empty dep array is the whole mechanism: this is
@@ -2622,6 +2684,8 @@ export default function App() {
         sun={sun}
         loadGpxFromPicker={loadGpxFromPicker}
         loadGeoJsonFromPicker={loadGeoJsonFromPicker}
+        loadShapefileFromPicker={loadShapefileFromPicker}
+        loadKmlFromPicker={loadKmlFromPicker}
         vectorSources={vectorSources}
         vectorLayers={vectorLayers}
         textLayers={textLayers}
@@ -2659,6 +2723,8 @@ export default function App() {
         onPngAlpha={() => beginPngExport(true)}
         onStl={handleStl}
         onHeightmap={handleHeightmapExport}
+        onGeoTiff={handleGeoTiffExport}
+        onGeoTiffBand={loadGeoTiffBand}
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}

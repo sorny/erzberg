@@ -12,14 +12,15 @@
  *
  * Usage:
  *   node scripts/erzberg.js render <heightmap> -o out.svg [-o out.png] [options]
+ *   node scripts/erzberg.js atlas <features.geojson> -o 'sheets/{name}.svg' [options]
  *   node scripts/erzberg.js list modes|presets|params
  *
  * See docs/CLI.md.
  */
 
 import { createServer } from 'node:http'
-import { createReadStream, existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
@@ -36,6 +37,7 @@ const OUTPUT_KIND = { '.svg': 'svg', '.png': 'png', '.stl': 'stl' }
 const HELP = `erzberg — render a plate from the command line
 
   erzberg render <heightmap> -o <file> [-o <file>…] [options]
+  erzberg atlas <features.geojson> -o <dir/{name}.svg> [-o …] [options]
   erzberg list modes|presets|params
 
 Render options:
@@ -53,6 +55,11 @@ Render options:
       --no-build          use dist/ as it is, even if src/ is newer
       --headed            show the browser
   -q, --quiet             no progress on stderr
+
+Atlas options (and every render option, applied to each sheet):
+      --dem <file>        cut each sheet from this GeoTIFF instead of fetching Terrain Tiles
+      --box <km>          the square around a point feature (default 10)
+  Each -o must hold {name}, which becomes the feature's name.
 
 Order: defaults, then --preset, then the heightmap's fit (zoom, grid stride),
 then --only, --mode, --frame, --pen-order, and last --set.
@@ -82,6 +89,8 @@ export function parseCli(argv) {
         'no-build': { type: 'boolean' },
         headed: { type: 'boolean' },
         quiet: { type: 'boolean', short: 'q' },
+        dem: { type: 'string' },
+        box: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     })
@@ -96,14 +105,18 @@ export function parseCli(argv) {
     if (!['modes', 'presets', 'params'].includes(what)) throw new UsageError('list takes modes, presets or params')
     return { command, what, headed: !!v.headed, build: !v['no-build'] }
   }
-  if (command !== 'render') throw new UsageError(`unknown command "${command}"`)
+  if (command !== 'render' && command !== 'atlas') throw new UsageError(`unknown command "${command}"`)
+  const atlas = command === 'atlas'
 
   const [input, ...extra] = rest
-  if (!input) throw new UsageError('render needs a heightmap file')
+  if (!input) throw new UsageError(atlas ? 'atlas needs a GeoJSON file of features' : 'render needs a heightmap file')
   if (extra.length) throw new UsageError(`unexpected argument "${extra[0]}"`)
-  if (!RASTER_EXT.has(extname(input).toLowerCase())) {
+  if (atlas) {
+    if (!/\.(geo)?json$/i.test(input)) throw new UsageError(`${input}: the features are a .geojson or .json file`)
+  } else if (!RASTER_EXT.has(extname(input).toLowerCase())) {
     throw new UsageError(`${input}: a heightmap is .tif, .tiff, .png, .jpg or .webp`)
   }
+  if (!atlas && (v.dem || v.box)) throw new UsageError('--dem and --box belong to atlas')
 
   const outputs = (v.out ?? []).map((file) => {
     const kind = OUTPUT_KIND[extname(file).toLowerCase()]
@@ -111,6 +124,10 @@ export function parseCli(argv) {
     return { file, kind: kind === 'png' && v.alpha ? 'pngAlpha' : kind }
   })
   if (!outputs.length && !v.stats) throw new UsageError('nothing to write: give -o <file> or --stats')
+  if (atlas) {
+    const fixed = outputs.find((o) => !o.file.includes('{name}'))
+    if (fixed) throw new UsageError(`${fixed.file}: an atlas output holds {name}, or every sheet writes the same file`)
+  }
 
   const set = {}
   for (const pair of v.set ?? []) {
@@ -135,7 +152,16 @@ export function parseCli(argv) {
   const timeout = v.timeout === undefined ? 300 : Number(v.timeout)
   if (!(timeout > 0)) throw new UsageError(`--timeout takes seconds, not "${v.timeout}"`)
 
+  let atlasRun = {}
+  if (atlas) {
+    if (v.dem && !/\.tiff?$/i.test(v.dem)) throw new UsageError(`${v.dem}: --dem takes a GeoTIFF`)
+    const box = v.box === undefined ? 10 : Number(v.box)
+    if (!(box > 0 && box <= 500)) throw new UsageError(`--box takes 0 to 500 km, not "${v.box}"`)
+    atlasRun = { dem: v.dem ?? null, boxKm: box }
+  }
+
   return {
+    ...atlasRun,
     command, input, outputs, preset: v.preset ?? null,
     modes: (v.mode ?? []).flatMap((m) => m.split(',')).map((m) => m.trim()).filter(Boolean),
     only: !!v.only, set, size, stats: !!v.stats, timeoutMs: timeout * 1000,
@@ -155,6 +181,84 @@ export function resolvePreset(name, presetsDir = PRESETS) {
 
 function bundledPresets() {
   return JSON.parse(readFileSync(join(PRESETS, 'manifest.json'), 'utf8')).map((f) => f.replace(/\.json$/, ''))
+}
+
+// ── Atlas sheets ──────────────────────────────────────────────────────────────
+
+const KM_PER_DEG_LAT = 110.574
+const KM_PER_DEG_LON = 111.320
+
+function positions(geom, out = []) {
+  if (!geom) return out
+  if (geom.type === 'GeometryCollection') { for (const g of geom.geometries ?? []) positions(g, out); return out }
+  const walk = (c) => { if (typeof c[0] === 'number') out.push(c); else for (const x of c) walk(x) }
+  if (Array.isArray(geom.coordinates)) walk(geom.coordinates)
+  return out
+}
+
+// File names lose path separators, reserved characters and control codes.
+// eslint-disable-next-line no-control-regex
+const safeName = (s) => String(s ?? '').replace(/[/\\:*?"<>|\u0000-\u001f]+/g, '-').trim()
+
+/**
+ * A GeoJSON FeatureCollection → one sheet per feature: `{ name, area }`, where
+ * `area` is [minLon, minLat, maxLon, maxLat]. A point gets a square of `boxKm`
+ * around it, and any other geometry its own extent. Throws UsageError.
+ */
+export function atlasSheets(geojson, boxKm = 10) {
+  const features = geojson?.type === 'FeatureCollection' ? geojson.features
+    : geojson?.type === 'Feature' ? [geojson] : null
+  if (!Array.isArray(features)) throw new UsageError('the atlas file is not a GeoJSON FeatureCollection')
+  const sheets = [], used = new Map()
+  features.forEach((f, i) => {
+    const pts = positions(f?.geometry)
+    if (!pts.length) return
+    for (const [lon, lat] of pts) {
+      if (!(Math.abs(lon) <= 180 && Math.abs(lat) <= 90)) {
+        throw new UsageError('the atlas features must be in longitude and latitude (WGS84), as GeoJSON is')
+      }
+    }
+    let minLon = Infinity, minLat = Infinity, maxLon = -Infinity, maxLat = -Infinity
+    for (const [lon, lat] of pts) {
+      minLon = Math.min(minLon, lon); maxLon = Math.max(maxLon, lon)
+      minLat = Math.min(minLat, lat); maxLat = Math.max(maxLat, lat)
+    }
+    // A point, or features that are all one point, get the box around it.
+    if (maxLon - minLon < 1e-9 && maxLat - minLat < 1e-9) {
+      const dLat = boxKm / 2 / KM_PER_DEG_LAT
+      const dLon = boxKm / 2 / (KM_PER_DEG_LON * Math.cos((minLat * Math.PI) / 180))
+      ;[minLon, minLat, maxLon, maxLat] = [minLon - dLon, minLat - dLat, maxLon + dLon, maxLat + dLat]
+    }
+    const p = f.properties ?? {}
+    let name = safeName(p.name ?? p.title ?? p.id ?? f.id) || `sheet-${String(i + 1).padStart(2, '0')}`
+    const n = (used.get(name) ?? 0) + 1
+    used.set(name, n)
+    if (n > 1) name = `${name}-${n}`
+    sheets.push({ name, area: [minLon, minLat, maxLon, maxLat] })
+  })
+  if (!sheets.length) throw new UsageError('the atlas file holds no feature with a geometry')
+  return sheets
+}
+
+/** An output template with `{name}` filled in. */
+export const sheetFile = (template, name) => template.replaceAll('{name}', name)
+
+/** The index page: every sheet's PNG, with its name and height range. */
+export function atlasIndex(title, sheets, dir) {
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
+  const cells = sheets.map((s, i) => `<figure><img src="${esc(relative(dir, s.png).split('\\').join('/'))}" alt="${esc(s.name)}" loading="lazy">
+<figcaption><b>${String(i + 1).padStart(2, '0')}</b> ${esc(s.name)}<span>${s.elevMin != null ? `${Math.round(s.elevMin)}–${Math.round(s.elevMax)} m` : ''}</span></figcaption></figure>`).join('\n')
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(title)}</title>
+<style>body{margin:0;padding:24px;font:14px/1.5 system-ui,sans-serif;background:#f4f4f1;color:#1b1b1b}
+h1{font-size:22px;margin:0 0 16px}main{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+figure{margin:0;background:#fff;border:1px solid #ddd}img{display:block;width:100%;height:auto}
+figcaption{padding:8px 10px;display:flex;gap:8px;border-top:1px solid #ddd}figcaption span{margin-left:auto;color:#666}</style>
+<h1>${esc(title)}</h1>
+<main>
+${cells}
+</main>
+`
 }
 
 // ── The built app ───────────────────────────────────────────────────────────
@@ -299,6 +403,79 @@ async function render(run, log) {
   }
 }
 
+/**
+ * One plate per feature, in one browser. Each sheet loads its own ground, then
+ * takes the same modes and values, so a terrain setting from --set holds on
+ * every sheet. A sheet that fails is reported and skipped.
+ */
+async function atlasRun(run, log) {
+  if (!existsSync(run.input)) throw new UsageError(`${run.input}: no such file`)
+  if (run.dem && !existsSync(run.dem)) throw new UsageError(`${run.dem}: no such file`)
+  let geojson
+  try { geojson = JSON.parse(readFileSync(run.input, 'utf8')) } catch (e) { throw new UsageError(`${run.input}: ${e.message}`) }
+  const sheets = atlasSheets(geojson, run.boxKm)
+  const presetPath = run.preset ? resolvePreset(run.preset) : null
+
+  const app = await openApp(run, log)
+  const { page, server } = app
+  const call = (fn, ...args) => page.evaluate(fn, args)
+  const demUrl = run.dem ? server.add(run.dem) : null
+  const done = []
+  let failed = 0, empty = 0
+  try {
+    await call(() => window.erzberg.settle())
+    if (presetPath) {
+      log(`preset ${basename(presetPath)}`)
+      await call(([n, u]) => window.erzberg.applyPreset(n, u), basename(presetPath), server.add(presetPath))
+    }
+    for (const [i, sheet] of sheets.entries()) {
+      log(`[${i + 1}/${sheets.length}] ${sheet.name}`)
+      try {
+        const got = demUrl
+          ? await call(([n, u, a]) => window.erzberg.loadRasterArea(n, u, a), basename(run.dem), demUrl, sheet.area)
+          : await call(([n, a]) => window.erzberg.fetchArea(n, a), sheet.name, sheet.area)
+        log(`  ${got.width} × ${got.height}, ${Math.round(got.elevMin)}–${Math.round(got.elevMax)} m`)
+        if (run.modes.length || run.only) await call(([m, o]) => window.erzberg.setModes(m, o), run.modes, run.only)
+        if (Object.keys(run.set).length) await call(([s]) => window.erzberg.setParams(s), run.set)
+        await call(() => window.erzberg.settle())
+        if (run.stats) {
+          const stats = await call(() => window.erzberg.preflight())
+          process.stdout.write(JSON.stringify({ sheet: sheet.name, ...stats }) + '\n')
+        }
+        const entry = { name: sheet.name, elevMin: got.elevMin, elevMax: got.elevMax, png: null }
+        for (const { file: tpl, kind } of run.outputs) {
+          const file = resolve(sheetFile(tpl, sheet.name))
+          mkdirSync(dirname(file), { recursive: true })
+          const download = page.waitForEvent('download')
+          download.catch(() => {})
+          const status = await call(([k]) => window.erzberg.export(k), kind)
+          if (status === 'empty') { console.error(`erzberg: ${sheet.name}: nothing to draw`); empty++; break }
+          if (status !== 'done') throw new Error(`export of ${file} ended "${status}"`)
+          await (await download).saveAs(file)
+          process.stdout.write(file + '\n')
+          if (kind === 'png' || kind === 'pngAlpha') entry.png ??= file
+        }
+        done.push(entry)
+      } catch (e) {
+        failed++
+        console.error(`erzberg: ${sheet.name}: ${pageMessage(e)}`)
+      }
+    }
+  } finally {
+    await app.close()
+  }
+
+  const withPng = done.filter((d) => d.png)
+  if (withPng.length) {
+    const dir = dirname(withPng[0].png)
+    const index = join(dir, 'atlas.html')
+    writeFileSync(index, atlasIndex(basename(run.input).replace(/\.(geo)?json$/i, ''), withPng, dir))
+    process.stdout.write(index + '\n')
+  }
+  if (failed) return EXIT.error
+  return empty === sheets.length ? EXIT.empty : EXIT.ok
+}
+
 async function list(run, log) {
   if (run.what === 'presets') {
     process.stdout.write(bundledPresets().join('\n') + '\n')
@@ -334,7 +511,8 @@ export async function main(argv = process.argv.slice(2)) {
   if (run.command === 'help') { console.log(HELP); return EXIT.ok }
   const log = run.quiet ? () => {} : (m) => console.error(m)
   try {
-    return run.command === 'list' ? await list(run, log) : await render(run, log)
+    if (run.command === 'list') return await list(run, log)
+    return run.command === 'atlas' ? await atlasRun(run, log) : await render(run, log)
   } catch (e) {
     console.error(`erzberg: ${e.message}`)
     return e instanceof UsageError || /unknown (parameter|draw mode)|takes /.test(e.message) ? EXIT.usage : EXIT.error

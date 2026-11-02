@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Erzberg</name>
+    <Placemark><name>Erzberg</name><Point><coordinates>14.9024,47.5241,1466</coordinates></Point></Placemark>
+    <Placemark><name>Steig</name><LineString><coordinates>14.90,47.52 14.91,47.53 14.92,47.525</coordinates></LineString></Placemark>
+  </Document>
+</kml>

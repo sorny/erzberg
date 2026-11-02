@@ -116,9 +116,9 @@ different style from the grid, then tune it.
 | Source | Notes |
 |---|---|
 | **PNG** | 8-bit or 16-bit, decoded natively. Alpha is NoData. |
-| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. |
+| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. A file with several bands shows each band's range and preview, so you pick the elevation band. |
 | **Audio** | MP3, WAV, OGG or M4A, analysed into a spectrogram that drives the terrain. See [Soundscapes](#soundscapes). |
-| **GPX / GeoJSON** | Tracks, points, lines and polygons, draped over a georeferenced raster. |
+| **GPX / GeoJSON / KML / Shapefile** | Tracks, points, lines and polygons, draped over a georeferenced raster. A Shapefile comes as a zip. Its `.prj` is read, so a national grid is placed with the same datum shift as a raster. |
 | **Fetch** | Type a place. Nominatim resolves it, and a map lets you place and size the box before you download. The panel states the zoom, tile count, raster size and metres per pixel first. Tiles come from Terrain Tiles on AWS Open Data. |
 | **OpenStreetMap** | Roads, water, rail, landuse, buildings, lifts and peaks inside the raster's extent, through Overpass. |
 | **Satellite** | True-colour Sentinel-2 at 10 m from AWS Open Data. It drapes on the terrain and backs the Mask Studio. |
@@ -134,7 +134,7 @@ always the finest that fits the 36-tile budget.
 content, not by guess:
 
 - A GeoTIFF becomes the terrain.
-- A GPX or GeoJSON becomes an overlay.
+- A GPX, GeoJSON, KML, KMZ or zipped Shapefile becomes an overlay.
 - A cover plate becomes the land cover.
 - A preset JSON, or a PNG or SVG that this app exported, restores the look.
 
@@ -157,9 +157,11 @@ Every layer is simplified to what the DEM can express and draped on the ground.
 A recolour or a restack costs a frame, not a rebuild. Each layer becomes one
 Inkscape layer in the SVG. → [Georeferencing](docs/Georeferencing.md)
 
-**Projections.** The app supports geographic CRS, Web Mercator, and the WGS84,
-ETRS89, NAD83 and NAD27 UTM zones. It names and declines national grids that
-need a datum shift, rather than approximate them. If features do not appear,
+**Projections.** The app places overlays on any EPSG grid that proj4 can
+define, and on a projection defined in the file itself. National grids such as
+Austria Lambert, LAEA Europe, Swiss LV95 and OSGB are exact. The app applies the
+published datum shift for MGI, CH1903, OSGB36 and DHDN, and flags other old
+datums. If features do not appear,
 the panel says why. *Source → Extent* lists the place, size, projection and
 metres per pixel, and one row per layer with its source.
 
@@ -438,6 +440,7 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 | **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. |
 | **STL** | Watertight mesh. A vector layer with **STL ribbon** gets a second solid for multicolour printing. |
 | **Heightmap PNG** | The processed greyscale raster. |
+| **GeoTIFF** | The raster in metres as 32-bit floats, with its projection, extent and NoData, after Edit Mode crops and erosion. It reopens in QGIS or here. |
 | **WebM** | A recording of the live canvas. |
 | **Profile SVG** | The elevation profile as a chart. |
 
@@ -456,9 +459,14 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 - **Plotter order** re-orders strokes inside each pen layer. On the sample plate
   it cuts pen-up travel from 52.4 m to 1.4 m. It is off by default, because
   stroke order decides which ink is on top.
+- **Join gap, Min length and Simplify** clean the pen strokes, in mm on paper.
+  Join gap keeps the pen down across small gaps between strokes of one ink. Min
+  length leaves out tiny strokes. Simplify removes points a pen cannot show. All
+  three are off at 0. Preflight says how many strokes were joined or left out.
 - **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o
   graz.svg` renders a plate without the panel, through the same app in headless
-  Chrome. Draw modes, presets and any parameter are arguments.
+  Chrome. Draw modes, presets and any parameter are arguments. `atlas` renders
+  one plate per feature of a GeoJSON file, all in one style.
   → [Command line](docs/CLI.md)
 
 ---
@@ -479,7 +487,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `\` | Show or hide the panel |
 | `/` | Find a control |
 | `[` `]` | Previous or next stage |
-| `1` – `5` | Export SVG, PNG, PNG α, STL, WebM |
+| `1` – `7` | Export SVG, PNG, PNG α, STL, WebM, Heightmap, GeoTIFF |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⌘⇧Z` / `Ctrl+Y` | Redo |
 | `?` | Show this table in the app |

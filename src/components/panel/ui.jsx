@@ -1687,19 +1687,18 @@ export function StageRail({ stage, onStage, live, hits }) {
               // rather than six buttons one of which is highlighted.
               boxShadow: sel ? `inset -2px 0 0 ${TEXT}` : 'none',
               color: sel ? TEXT : MUTED,
-              cursor: reachable(n) ? 'pointer' : 'default', textAlign:'center', fontFamily:'inherit',
+              cursor: reachable(n) ? 'pointer' : 'default', textAlign:'left', paddingLeft:4, fontFamily:'inherit',
               // A pane with nothing on, while the query found nothing in it, is
               // not a place this search can take you.
               opacity: filtering && !badge ? 0.35 : 1,
             }}>
-            {/* The badge gets its own lane on the right of the number, and the
-                number centres in what is left. Centred across the whole 40 px
-                they ran under the badge — `02` and an ore `2` on top of each
-                other, which is two counts pretending to be one. */}
+            {/* Number and name start at the same left edge, so the column
+                reads as one list. The badge sits at the top right, clear of
+                the two-digit number. */}
             {/* A lozenge, not `00`. Presets is a destination and not a step
                 the renderer runs, and a digit in the pipeline's own column
                 would claim it was one. */}
-            <span style={{ display:'block', paddingRight:11, fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+            <span style={{ display:'block', fontSize:10, fontWeight:600, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
               {n === PRESETS_STAGE ? '◇' : String(n).padStart(2, '0')}
             </span>
             {/* The whole word, across the whole tab. `Terr`, `Surf` and `Pre`

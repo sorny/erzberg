@@ -664,7 +664,7 @@ function FeatureList({ layer, bucket, onPatch }) {
 export function VectorLayersPanel({
   crs, crsName, bbox, coverage, error,
   sources, layers,
-  onLoadGpx, onLoadGeoJson, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
+  onLoadGpx, onLoadGeoJson, onLoadShapefile, onLoadKml, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
   identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, viewTilt, viewSpin,
 }) {
   const [expanded, setExpanded] = useState(null)
@@ -763,9 +763,11 @@ export function VectorLayersPanel({
                          hasFeatures={layers?.length > 0}
                          uploadsOnly={sources?.some((s) => s.kind !== 'osm')} />
 
-      <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4, marginBottom: 8 }}>
         <LoadBtn block={false} onClick={onLoadGeoJson} data-testid="load-geojson">GeoJSON</LoadBtn>
         <LoadBtn block={false} onClick={onLoadGpx} data-testid="load-gpx">GPX</LoadBtn>
+        <LoadBtn block={false} onClick={onLoadShapefile} data-testid="load-shapefile">Shapefile</LoadBtn>
+        <LoadBtn block={false} onClick={onLoadKml} data-testid="load-kml">KML</LoadBtn>
       </div>
 
       {/* ── OpenStreetMap ───────────────────────────────────────────────── */}

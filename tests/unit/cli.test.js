@@ -7,7 +7,7 @@
  * the author set by hand. The render itself is covered by tests/cli.spec.js.
  */
 import { describe, expect, it } from 'vitest'
-import { parseCli, resolvePreset, UsageError } from '../../scripts/erzberg.js'
+import { atlasIndex, atlasSheets, parseCli, resolvePreset, sheetFile, UsageError } from '../../scripts/erzberg.js'
 import { coerceParams, coerceValue, modePatch, resolveModes } from '../../src/utils/paramCoerce'
 import { DRAW_MODES } from '../../src/utils/drawModes'
 import { STYLE_DEF } from '../../src/defaults'
@@ -96,5 +96,55 @@ describe('modes', () => {
   })
   it('has a switch in the defaults for every mode it can name', () => {
     for (const m of DRAW_MODES) expect(STYLE_DEF, m.id).toHaveProperty(`enabled${m.id}`)
+  })
+})
+
+describe('atlas', () => {
+  it('reads a run, with the sheet options and the render options', () => {
+    const r = parseCli(['atlas', 'peaks.geojson', '-o', 'out/{name}.svg', '-p', 'Blueprint', '--box', '4', '--dem', 'a.tif'])
+    expect(r).toMatchObject({ command: 'atlas', input: 'peaks.geojson', boxKm: 4, dem: 'a.tif', preset: 'Blueprint' })
+    expect(parseCli(['atlas', 'p.json', '-o', '{name}.png']).boxKm).toBe(10)
+  })
+
+  it('refuses an output without {name}, a bad box and options that belong to atlas', () => {
+    expect(() => parseCli(['atlas', 'p.geojson', '-o', 'x.svg'])).toThrow(/\{name\}/)
+    expect(() => parseCli(['atlas', 'p.geojson', '-o', '{name}.svg', '--box', '0'])).toThrow(/--box/)
+    expect(() => parseCli(['atlas', 'p.geojson', '-o', '{name}.svg', '--dem', 'a.png'])).toThrow(/GeoTIFF/)
+    expect(() => parseCli(['atlas', 'p.tif', '-o', '{name}.svg'])).toThrow(/geojson/)
+    expect(() => parseCli(['render', 'a.tif', '-o', 'x.svg', '--box', '3'])).toThrow(UsageError)
+  })
+
+  const fc = (...features) => ({ type: 'FeatureCollection', features })
+  const point = (name, lon, lat) => ({ type: 'Feature', properties: { name }, geometry: { type: 'Point', coordinates: [lon, lat] } })
+
+  it('puts a square of the box size around a point', () => {
+    const [s] = atlasSheets(fc(point('Erzberg', 14.902, 47.522)), 10)
+    const [w, so, e, n] = s.area
+    expect((n - so) * 110.574).toBeCloseTo(10, 6)
+    expect((e - w) * 111.320 * Math.cos((47.522 * Math.PI) / 180)).toBeCloseTo(10, 6)
+  })
+
+  it('uses the extent of any other geometry', () => {
+    const poly = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[14, 47], [14.2, 47], [14.2, 47.1], [14, 47]]] } }
+    expect(atlasSheets(fc(poly))[0]).toEqual({ name: 'sheet-01', area: [14, 47, 14.2, 47.1] })
+  })
+
+  it('names sheets safely and once each, and skips features without geometry', () => {
+    const sheets = atlasSheets(fc(point('A/B', 1, 1), point('A/B', 2, 2), { type: 'Feature', properties: { name: 'x' }, geometry: null }))
+    expect(sheets.map((s) => s.name)).toEqual(['A-B', 'A-B-2'])
+  })
+
+  it('refuses a grid that is not longitude and latitude, and an empty file', () => {
+    expect(() => atlasSheets(fc(point('x', 430000, 5260000)))).toThrow(/longitude and latitude/)
+    expect(() => atlasSheets(fc())).toThrow(/no feature/)
+    expect(() => atlasSheets({ type: 'Point', coordinates: [1, 1] })).toThrow(/FeatureCollection/)
+  })
+
+  it('fills the template and writes an index with relative links', () => {
+    expect(sheetFile('out/{name}/{name}.svg', 'Dachstein')).toBe('out/Dachstein/Dachstein.svg')
+    const html = atlasIndex('peaks', [{ name: 'A <b>', png: '/x/out/A.png', elevMin: 600.4, elevMax: 2000.6 }], '/x/out')
+    expect(html).toContain('src="A.png"')
+    expect(html).toContain('A &lt;b>')
+    expect(html).toContain('600–2001 m')
   })
 })

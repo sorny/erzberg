@@ -10,11 +10,13 @@
  * Round trips are asserted to metre accuracy, which is the honest bar for the
  * UTM series implemented here and far tighter than anything the draping needs.
  */
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import {
-  bboxToWgs84, classifyCRS, isInvertible, isProjectable,
+  bboxToWgs84, classifyCRS, isInvertible, isProjectable, loadProjections,
   metresPerWorldUnit, gridValueToMetres, projectWgs84, unprojectWgs84, wgs84ExtentKm,
 } from '../../src/utils/geoCoords'
+
+beforeAll(() => loadProjections())
 
 describe('classifyCRS', () => {
   it('recognises WGS84 as geographic', () => {
@@ -27,9 +29,11 @@ describe('classifyCRS', () => {
     expect(classifyCRS('EPSG:32633')).toMatchObject({ kind: 'utm', zone: 33, isSouth: false, supported: true })
     expect(classifyCRS('EPSG:32733')).toMatchObject({ kind: 'utm', zone: 33, isSouth: true, supported: true })
   })
-  it('declines a national grid rather than approximating it', () => {
-    // Gauss-Krüger / Lambert grids need a datum shift this does not do.
-    expect(classifyCRS('EPSG:31287').supported).toBe(false)
+  it('places a national grid through proj4, with its datum shift', () => {
+    expect(classifyCRS('EPSG:31287')).toMatchObject({ kind: 'projected', supported: true, accuracy: 'exact' })
+  })
+  it('declines a code proj4 cannot define', () => {
+    expect(classifyCRS('EPSG:99999').supported).toBe(false)
   })
   it('treats an unreferenced raster as unsupported', () => {
     expect(classifyCRS('EPSG:none').supported).toBe(false)
@@ -45,7 +49,7 @@ describe('projectWgs84', () => {
   it('returns null for a CRS it cannot transform', () => {
     // The load-bearing case: null is what stops the caller treating degrees as
     // grid units and drawing the overlay somewhere plausible but wrong.
-    expect(projectWgs84(47, 15, 'EPSG:31287')).toBeNull()
+    expect(projectWgs84(47, 15, 'EPSG:99999')).toBeNull()
     expect(projectWgs84(47, 15, 'EPSG:none')).toBeNull()
   })
 

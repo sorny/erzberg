@@ -49,12 +49,15 @@ decides if that is possible.
 | Family | Codes | Accuracy |
 |---|---|---|
 | Geographic | 4326 WGS84, 4258 ETRS89, 4269 NAD83, 4283 GDA94, 7844 GDA2020, … | exact |
-| Geographic, older datums | 4267 NAD27, 4230 ED50, 4312 MGI, 4314 DHDN, … | flagged, 100–400 m |
+| Geographic, older datums | 4312 MGI, 4314 DHDN, 4149 CH1903, 4277 OSGB36 | exact, shifted |
+| Geographic, other old datums | 4267 NAD27, 4230 ED50, … | flagged, 100–400 m |
 | Web Mercator | 3857, 3785, 900913, 102100, 102113 | exact |
 | UTM — WGS84 | 326xx north, 327xx south, zones 1–60 | exact |
 | UTM — ETRS89 | 258xx, zones 28–38 | exact |
 | UTM — NAD83 | 269xx, zones 1–23 | exact |
 | UTM — NAD27 | 267xx, zones 3–22 | flagged, datum shift |
+| Any other EPSG grid, through proj4 | 31287 Austria Lambert, 31254–31259 Austria GK, 3035 LAEA Europe, 2056 LV95, 27700 OSGB, 2154 Lambert-93, 31466–31469 DHDN GK, 3395, … | exact on WGS84, GRS80 or a shifted datum, flagged otherwise |
+| User-defined in the file | geokey 32767 | as above |
 
 Modern datums agree within a metre or two, so no shift is applied. UTM uses the
 Transverse Mercator series on the WGS84 ellipsoid. Zone ranges are bounded per
@@ -62,13 +65,17 @@ family, so EPSG:32661 (UPS North) is not read as zone 61. The longitude
 difference is wrapped to ±180° before the series, so zones at the dateline
 project correctly.
 
+Every other code goes through proj4. `geotiff-geokeys-to-proj4` turns the code,
+or a user-defined file's own geokeys, into a proj4 definition. That definition
+carries no datum shift. `DATUM_SHIFTS` adds the published Helmert parameters
+for MGI, CH1903, OSGB36 and DHDN, which are good to a metre or two. A grid on
+any other old datum, for example S-JTSK (5514), is placed unshifted and
+flagged. The raster stays in its own grid. Only the overlays are projected.
+
 ### Not supported
 
-The app names and declines national grids: Austria Lambert (31287), the Austrian
-Gauss-Krüger strips (31254–31259), Swiss LV95 (2056), OSGB (27700), Lambert-93
-(2154), LAEA Europe (3035) and World Mercator (3395). They need Lambert or
-Gauss-Krüger maths plus a datum shift. An unshifted overlay sits hundreds of
-metres off and still looks right. Reproject instead:
+A code that proj4 cannot define is named if possible and declined. Reproject
+the raster instead:
 
 ```sh
 gdalwarp -t_srs EPSG:4326 in.tif out.tif
@@ -81,7 +88,7 @@ Reprojection does not change how the terrain renders. See
 
 ## Vector layers
 
-With a georeferenced raster, **Vector Layers** drapes WGS84 features from three
+With a georeferenced raster, **Vector Layers** drapes WGS84 features from these
 sources:
 
 | Source | What arrives |
@@ -89,6 +96,14 @@ sources:
 | **OpenStreetMap** | A checklist of categories, then one Overpass query over the extent. |
 | **GeoJSON** | One file, bucketed by geometry class (RFC 7946, WGS84). |
 | **GPX** | Track points, or route points as a fallback. Waypoints are ignored. |
+| **KML / KMZ** | Placemarks, through `@tmcw/togeojson`. A KMZ is read from its `doc.kml`. |
+| **Shapefile** | A zip of `.shp`, `.dbf` and `.prj`. Every layer in the zip is read. |
+
+KML, KMZ and Shapefile become GeoJSON in `utils/vectorImport.js` and then take
+the GeoJSON path. A Shapefile's `.prj` is read by proj4 through
+`converterFromWkt`, which adds the same datum shifts as for rasters. A `.prj`
+on another old datum is placed unshifted, and a message says so. A Shapefile
+without a `.prj` is read only if its coordinates are longitude and latitude.
 
 Every source becomes the same packed form (`utils/vectorLayers.js`). Each bucket
 becomes a **layer** with colour, weight, opacity, dash, visibility and an
@@ -577,7 +592,7 @@ plain-object shape.
 
 ### Adding a CRS
 
-Add the code to `GEOGRAPHIC_EXACT`, `GEOGRAPHIC_APPROX`, `MERCATOR` or a
-`UTM_FAMILIES` block in `classifyCRS`. New maths also needs a branch in
-`projectWgs84` with an honest `accuracy`, and one in `unprojectWgs84`, or the
-OpenStreetMap query stays refused.
+Most codes need nothing, because proj4 places them. If a grid uses an old
+datum, add its published `+towgs84` parameters and its codes to
+`DATUM_SHIFTS` in `geoCoords.js`. Without them the grid is flagged `approx`.
+Add a display name to `GRID_NAMES` if the file citation is not enough.

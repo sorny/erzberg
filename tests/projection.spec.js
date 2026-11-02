@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import { existsSync } from 'node:fs'
 import {
   bboxToWgs84, classifyCRS, crsDisplayName, featureCoverage, geoToPixel, groundPixelSize,
-  isInvertible, isProjectable, metresPerLonDegree, projectWgs84, squareGroundShape,
-  suggestElevScale, unprojectWgs84, wgs84ExtentKm,
+  isInvertible, isProjectable, loadProjections, metresPerLonDegree, needsProjections, projectWgs84,
+  squareGroundShape, suggestElevScale, unprojectWgs84, wgs84ExtentKm,
 } from '../src/utils/geoCoords.js'
 import { areaResample } from '../src/utils/terrain.js'
 import { openStage, waitForApp } from './helpers.js'
@@ -29,6 +29,9 @@ import { openStage, waitForApp } from './helpers.js'
 const ERZBERG = { lat: 47.5333, lon: 14.8833 }
 const centre = projectWgs84(ERZBERG.lat, ERZBERG.lon, 'EPSG:32633')
 const BBOX = [centre[0] - 5000, centre[1] - 5000, centre[0] + 5000, centre[1] + 5000]
+
+// proj4 loads on demand in the app. Here every test may meet a national grid.
+test.beforeAll(() => loadProjections())
 
 test.describe('CRS classification', () => {
   test('recognises the transformable families', () => {
@@ -57,24 +60,64 @@ test.describe('CRS classification', () => {
   test('does not mistake a neighbouring code for a UTM zone', () => {
     // 32661 is UPS North, one past zone 60. A naive `326(\d\d)` match reads it
     // as "zone 61" and projects with a central meridian off the end of the world.
+    // UPS North is placed by proj4 as its own grid, never as UTM zone 61.
     expect(classifyCRS('EPSG:32661').kind).toBe('projected')
-    expect(classifyCRS('EPSG:32661').supported).toBe(false)
+    expect(classifyCRS('EPSG:32661').zone).toBeNull()
     expect(classifyCRS('EPSG:25827').supported).toBe(false)  // below the ETRS89 block
     expect(classifyCRS('EPSG:25839').supported).toBe(false)  // above it
   })
 
-  test('rejects national grids instead of approximating them', () => {
+  test('built-in grids never ask for proj4', () => {
+    for (const crs of ['EPSG:4326', 'EPSG:3857', 'EPSG:32633', 'EPSG:25832', 'EPSG:4267', 'EPSG:none', null])
+      expect(needsProjections(crs), String(crs)).toBe(false)
+  })
+
+  test('places national grids through proj4', () => {
     for (const code of ['EPSG:31287', 'EPSG:31255', 'EPSG:2056', 'EPSG:27700', 'EPSG:2154', 'EPSG:3035', 'EPSG:3395']) {
       const c = classifyCRS(code)
       expect(c.kind, code).toBe('projected')
-      expect(c.supported, code).toBe(false)
+      expect(c.supported, code).toBe(true)
+      expect(c.accuracy, code).toBe('exact')
     }
+    // An old datum with no published shift in the table is placed, but flagged.
+    expect(classifyCRS('EPSG:5514').accuracy).toBe('approx')
+    // A code proj4 cannot define is still refused.
+    expect(classifyCRS('EPSG:99999').supported).toBe(false)
+  })
+
+  test('national grids land where PROJ puts them', () => {
+    // Reference values from pyproj (PROJ 9) with its default transformation.
+    const cases = [
+      ['EPSG:31287', 16.3731, 48.2085, 625870.1, 483218.5],     // Vienna, MGI Austria Lambert
+      ['EPSG:31255', 15.4395, 47.0707, 160027.9, 216775.6],     // Graz, MGI GK Central
+      ['EPSG:3035',  15.4395, 47.0707, 4734079.9, 2677069.7],   // Graz, LAEA Europe
+      ['EPSG:2056',  15.4395, 47.0707, 3206668.0, 1244249.1],   // CH1903+ / LV95
+      ['EPSG:27700', -0.1276, 51.5072, 530043.2, 180358.2],     // London, OSGB
+      ['EPSG:31467', 9.18, 48.78, 3513304.5, 5404737.6],        // Stuttgart, DHDN GK 3
+    ]
+    for (const [crs, lon, lat, x, y] of cases) {
+      const [px, py] = projectWgs84(lat, lon, crs)
+      expect(Math.abs(px - x), crs).toBeLessThan(1)
+      expect(Math.abs(py - y), crs).toBeLessThan(1)
+      const [blat, blon] = unprojectWgs84(px, py, crs)
+      expect(blat, crs).toBeCloseTo(lat, 7)
+      expect(blon, crs).toBeCloseTo(lon, 7)
+    }
+  })
+
+  test('reads a user-defined projection from the file', () => {
+    const c = classifyCRS('PROJ4:+proj=lcc +lat_0=47.5 +lon_0=13.333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=GRS80 +units=m +no_defs')
+    expect(c).toMatchObject({ kind: 'projected', supported: true, accuracy: 'exact' })
+    const [x, y] = projectWgs84(47.0707, 15.4395, 'PROJ4:+proj=lcc +lat_0=47.5 +lon_0=13.333333333333 +lat_1=49 +lat_2=46 +x_0=400000 +y_0=400000 +ellps=GRS80 +units=m +no_defs')
+    expect(x).toBeGreaterThan(550000)
+    expect(y).toBeGreaterThan(340000)
+    expect(classifyCRS('PROJ4:+proj=longlat +ellps=bessel +no_defs')).toMatchObject({ kind: 'geographic', accuracy: 'approx' })
   })
 
   test('flags datums it does not shift for', () => {
     expect(classifyCRS('EPSG:4326').accuracy).toBe('exact')
     expect(classifyCRS('EPSG:4267').accuracy).toBe('approx')   // NAD27, ~100 m out
-    expect(classifyCRS('EPSG:4312').accuracy).toBe('approx')   // MGI, ~400 m out
+    expect(classifyCRS('EPSG:4312').accuracy).toBe('exact')    // MGI, shifted through proj4
     expect(classifyCRS('EPSG:26718').accuracy).toBe('approx')  // NAD27 / UTM
     expect(classifyCRS('EPSG:projected-unknown').accuracy).toBe('guess')
   })
@@ -131,7 +174,7 @@ test.describe('forward projection', () => {
   test('an untransformable CRS returns null rather than raw degrees', () => {
     // The regression this whole file exists for. Returning [lon, lat] here is
     // what made the failure silent.
-    expect(projectWgs84(ERZBERG.lat, ERZBERG.lon, 'EPSG:31287')).toBeNull()
+    expect(projectWgs84(ERZBERG.lat, ERZBERG.lon, 'EPSG:99999')).toBeNull()
     expect(projectWgs84(ERZBERG.lat, ERZBERG.lon, 'EPSG:none')).toBeNull()
     expect(projectWgs84(ERZBERG.lat, ERZBERG.lon, null)).toBeNull()
   })
@@ -247,7 +290,7 @@ test.describe('pixel mapping', () => {
   })
 
   test('returns null when the CRS cannot be transformed', () => {
-    expect(geoToPixel(ERZBERG.lat, ERZBERG.lon, BBOX, 'EPSG:31287', 1000, 1000)).toBeNull()
+    expect(geoToPixel(ERZBERG.lat, ERZBERG.lon, BBOX, 'EPSG:99999', 1000, 1000)).toBeNull()
     expect(geoToPixel(ERZBERG.lat, ERZBERG.lon, null, 'EPSG:32633', 1000, 1000)).toBeNull()
   })
 })
@@ -262,7 +305,7 @@ test.describe('feature coverage', () => {
     expect(status(onTile, 'EPSG:32633')).toBe('ok')
     expect(status(offTile, 'EPSG:32633')).toBe('outside')       // right CRS, wrong place
     expect(status([...onTile, ...offTile], 'EPSG:32633')).toBe('partial')
-    expect(status(onTile, 'EPSG:31287')).toBe('unsupported')    // cannot project at all
+    expect(status(onTile, 'EPSG:99999')).toBe('unsupported')    // cannot project at all
     expect(status(onTile, 'EPSG:none')).toBe('none')            // raster has no georeferencing
     expect(status([], 'EPSG:32633')).toBe('empty')
     expect(status([new Float64Array(0)], 'EPSG:32633')).toBe('empty')
@@ -321,7 +364,8 @@ test.describe('inverse projection', () => {
     expect(isInvertible('EPSG:projected-unknown')).toBe(false)
     expect(unprojectWgs84(500000, 5265000, 'EPSG:projected-unknown')).toBeNull()
 
-    expect(isInvertible('EPSG:31287')).toBe(false)
+    expect(isInvertible('EPSG:31287')).toBe(true)     // proj4 inverts it
+    expect(isInvertible('EPSG:99999')).toBe(false)
     expect(isInvertible('EPSG:none')).toBe(false)
     expect(isInvertible(null)).toBe(false)
     expect(isInvertible('EPSG:geographic-unknown')).toBe(true)
@@ -355,7 +399,7 @@ test.describe('extent as a WGS84 envelope', () => {
   })
 
   test('returns null rather than a wrong envelope', () => {
-    expect(bboxToWgs84(BBOX, 'EPSG:31287')).toBeNull()
+    expect(bboxToWgs84(BBOX, 'EPSG:99999')).toBeNull()
     expect(bboxToWgs84(BBOX, 'EPSG:projected-unknown')).toBeNull()
     expect(bboxToWgs84(null, 'EPSG:32633')).toBeNull()
     expect(bboxToWgs84([0, 0, NaN, 1], 'EPSG:32633')).toBeNull()
@@ -374,7 +418,8 @@ test.describe('projectability gate', () => {
     expect(isProjectable('EPSG:25832', BBOX)).toBe(true)
     // Both of these passed the old `crs?.startsWith('EPSG:')` gate.
     expect(isProjectable('EPSG:none', BBOX)).toBe(false)
-    expect(isProjectable('EPSG:31287', BBOX)).toBe(false)
+    expect(isProjectable('EPSG:99999', BBOX)).toBe(false)
+    expect(isProjectable('EPSG:31287', BBOX)).toBe(true)
   })
 
   test('rejects a missing or degenerate extent', () => {

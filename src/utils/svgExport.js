@@ -44,7 +44,7 @@ import { isDarkBackground } from './colorUtils'
 import { screenInk, screenInkHex } from './screenInk'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
-import { orderRuns, routeStats } from './penRoute'
+import { bridgeRuns, dropShortRuns, orderRuns, routeStats, simplifyRuns } from './penRoute'
 import { hatchLoops, hatchPlan, inkLightness } from './hatchFill'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
@@ -433,6 +433,9 @@ async function runExport({
   // panel can answer "is this drawing too dense" before the click rather than at
   // the machine. See utils/penRoute.js.
   penOrder = false, measureOnly = false, onStats = null,
+  // Clean-up of the pen strokes, in millimetres on paper; each is off at 0.
+  // See simplifyRuns, dropShortRuns and bridgeRuns in utils/penRoute.js.
+  simplifyMm = 0, minLengthMm = 0, joinGapMm = 0,
   // Filled areas as hatch strokes instead of fills. The pitch is millimetres on
   // paper, so it needs the sheet width to become page units. See hatchFill.js.
   areaFill = 'solid', hatchPitchMm = 0.8, hatchAngle = 45, sheetMm = 297,
@@ -1347,7 +1350,13 @@ async function runExport({
    * by depth, which is right for occlusion and blind to the carriage. The other
    * is what a nearest-neighbour route would cost instead.
    */
-  const plot = { ink: 0, travelAsBuilt: 0, travelOrdered: 0, strokes: 0, pens: 0, dashed: false }
+  const plot = { ink: 0, travelAsBuilt: 0, travelOrdered: 0, strokes: 0, pens: 0, dashed: false,
+                 dropped: 0, joined: 0 }
+  // The clean-up tolerances in export pixels, through the sheet width.
+  const strokePxPerMm = vw / Math.max(1, sheetMm)
+  const simplifyPx = (simplifyMm ?? 0) * strokePxPerMm
+  const minLengthPx = (minLengthMm ?? 0) * strokePxPerMm
+  const joinGapPx = (joinGapMm ?? 0) * strokePxPerMm
 
   const penLayer = (id, label, body) =>
     (plot.pens++, `<g id="layer-${id}" inkscape:groupmode="layer" inkscape:label="${label}">${body}</g>`)
@@ -1523,21 +1532,28 @@ async function runExport({
 
     const buildLineEls = async (segs) => {
       if (!dashSizes) {
-        const joined = await joinRuns(segs)
+        // Simplify and drop short strokes first: neither depends on the order.
+        const short = dropShortRuns(simplifyRuns(await joinRuns(segs), simplifyPx), minLengthPx)
+        plot.dropped += short.dropped
+        // The join gap bridges whatever order is written, so it runs on both.
+        const asBuiltRuns = bridgeRuns(short.runs, joinGapPx)
         // What this layer costs a plotter, measured on the strokes that will
-        // actually be written — after the occlusion walk has cut them and after
-        // `joinRuns` has folded the pieces back into whole pen strokes.
-        const asBuilt = routeStats(joined)
+        // actually be written — after the occlusion walk has cut them, after
+        // `joinRuns` has folded the pieces back into whole pen strokes, and
+        // after the clean-up above.
+        const asBuilt = routeStats(asBuiltRuns.runs)
         plot.ink += asBuilt.ink
         plot.travelAsBuilt += asBuilt.travel
-        plot.strokes += asBuilt.strokes
         // The optimised figure costs a pass of its own, so it is computed when
         // it is going to be used — either because the export is taking it, or
         // because a preflight asked what it would be worth.
         const wantOrder = penOrder || measureOnly
-        const runs = wantOrder ? orderRuns(joined) : joined
-        plot.travelOrdered += wantOrder ? routeStats(runs).travel : asBuilt.travel
-        return mapPaced(penOrder ? runs : joined, ({ pts, stroke }) => {
+        const ordered = wantOrder ? bridgeRuns(orderRuns(short.runs), joinGapPx) : asBuiltRuns
+        plot.travelOrdered += wantOrder ? routeStats(ordered.runs).travel : asBuilt.travel
+        const written = penOrder ? ordered : asBuiltRuns
+        plot.strokes += written.runs.length
+        plot.joined += written.joined
+        return mapPaced(written.runs, ({ pts, stroke }) => {
           // A run of one is still a `<line>`: it is shorter than the equivalent
           // two-point polyline, and it keeps the element every plotter and
           // editor handles most simply.
