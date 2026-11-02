@@ -18,7 +18,7 @@
     "colorProfileSheet": "#ffffff",
     "countProfileSheet": 20,
     "depthOcclusion": true,
-    "enabledLines": true,
+    "enabledLines": false,
     "enabledProfileSheet": true,
     "occludeBy": "ground",
     "spacingLines": 6,
