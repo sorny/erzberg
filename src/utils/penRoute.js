@@ -170,6 +170,85 @@ export function orderRuns(runs) {
   return out
 }
 
+// ── Clean-up before the plot ─────────────────────────────────────────────────
+//
+// Three passes a plotter tool such as vpype also offers (`linesimplify`,
+// `filter --min-length`, `linemerge`), done here on the strokes the exporter
+// already holds. Each is off at 0, and each works inside one pen layer only, so
+// no ink changes. Units are export pixels, like everything in this file.
+
+/** Length of one stroke. */
+function runLength(pts) {
+  let len = 0
+  for (let i = 2; i < pts.length; i += 2) len += Math.hypot(pts[i] - pts[i - 2], pts[i + 1] - pts[i - 1])
+  return len
+}
+
+/**
+ * Ramer–Douglas–Peucker on each stroke: removes points that sit closer than
+ * `tol` to the line through their neighbours, which a pen cannot show. The
+ * ends always stay, so joins and closed loops are kept.
+ */
+export function simplifyRuns(runs, tol) {
+  if (!(tol > 0)) return runs
+  const t2 = tol * tol
+  return runs.map((run) => {
+    const pts = run.pts, n = pts.length >> 1
+    if (n < 3) return run
+    const keep = new Uint8Array(n)
+    keep[0] = keep[n - 1] = 1
+    const stack = [0, n - 1]
+    while (stack.length) {
+      const b = stack.pop(), a = stack.pop()
+      const ax = pts[2 * a], ay = pts[2 * a + 1], dx = pts[2 * b] - ax, dy = pts[2 * b + 1] - ay
+      const l2 = dx * dx + dy * dy
+      let worst = -1, at = -1
+      for (let i = a + 1; i < b; i++) {
+        const px = pts[2 * i] - ax, py = pts[2 * i + 1] - ay
+        // Distance to the chord, or to its start when the chord is a point (a closed loop).
+        const d2 = l2 > 0 ? (px * dy - py * dx) ** 2 / l2 : px * px + py * py
+        if (d2 > worst) { worst = d2; at = i }
+      }
+      if (worst > t2) { keep[at] = 1; stack.push(a, at, at, b) }
+    }
+    const out = []
+    for (let i = 0; i < n; i++) if (keep[i]) out.push(pts[2 * i], pts[2 * i + 1])
+    return out.length === pts.length ? run : { ...run, pts: out }
+  })
+}
+
+/** Drops strokes shorter than `minLen`. Returns { runs, dropped }. */
+export function dropShortRuns(runs, minLen) {
+  if (!(minLen > 0)) return { runs, dropped: 0 }
+  const kept = runs.filter((r) => runLength(r.pts) >= minLen)
+  return { runs: kept, dropped: runs.length - kept.length }
+}
+
+/**
+ * Joins each stroke to the next when the next starts within `gap` of where it
+ * ends and both carry the same ink, so the pen stays down across the gap. Run
+ * it after `orderRuns`, which puts near ends next to each other. Returns
+ * { runs, joined }.
+ */
+export function bridgeRuns(runs, gap) {
+  if (!(gap > 0) || runs.length < 2) return { runs, joined: 0 }
+  const out = []
+  let cur = null, joined = 0
+  for (const run of runs) {
+    const pts = run.pts
+    if (cur && cur.stroke === run.stroke &&
+        Math.hypot(pts[0] - cur.pts[cur.pts.length - 2], pts[1] - cur.pts[cur.pts.length - 1]) <= gap) {
+      for (let i = 0; i < pts.length; i++) cur.pts.push(pts[i])
+      joined++
+    } else {
+      if (cur) out.push(cur)
+      cur = { ...run, pts: Array.from(pts) }
+    }
+  }
+  if (cur) out.push(cur)
+  return { runs: out, joined }
+}
+
 /**
  * How long a plot takes, given the one fact only the operator has.
  *

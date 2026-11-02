@@ -43,6 +43,8 @@ export function classifyDrop(name) {
   // it, exactly as before.
   if (ext(['.json']))                     return ['cover', 'preset', 'geojson']
   if (ext(['.gpx']))                      return ['gpx']
+  // A zip is a Shapefile here: the one archive this app reads.
+  if (ext(['.zip', '.kml', '.kmz']))      return ['vector']
   // Named so the caller can say where it goes rather than refusing in silence.
   if (ext(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])) return ['audio']
   return []
@@ -74,10 +76,13 @@ export function explainDrop(name, tried) {
   if (/\.(land)?cover\.json$/i.test(n)) {
     return `${short} is named like a cover plate but does not read as one. Cut a fresh one with scripts/embed-window.js.`
   }
+  if (/\.(shp|dbf|shx|prj)$/i.test(n)) {
+    return `${short} is one part of a Shapefile. Zip the .shp, .dbf and .prj together and drop the zip.`
+  }
   if (/\.(jpe?g|webp|gif|bmp|avif)$/i.test(n)) {
     return `${short} is not a heightmap — those are PNG or GeoTIFF. For a photographic texture over the terrain, use Texture under Terrain Style.`
   }
-  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX or GeoJSON overlay, a land cover plate, or a preset — the JSON from Presets › Save, or any PNG or SVG this app exported.`
+  return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX, GeoJSON, KML or Shapefile zip, a land cover plate, or a preset: the JSON from Presets › Save, or a PNG or SVG this app exported.`
 }
 
 /**

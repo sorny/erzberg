@@ -125,3 +125,44 @@ test('plotter order cuts the travel, and loses no stroke doing it', async ({ pag
   expect(ink(await page.locator('[data-testid="preflight-readout"]').textContent()))
     .toBeTruthy()
 })
+
+test('join gap, min length and simplify shrink the file and say what they did', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await openExport(page)
+  await page.locator('[data-testid="plot-order"]').click()
+
+  const blur = () => page.evaluate(() =>
+    document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  const svgFor = async () => {
+    await blur()
+    const wait = page.waitForEvent('download', { timeout: 120_000 })
+    await page.keyboard.press('Digit1')
+    return readFileSync(await (await wait).path(), 'utf8')
+  }
+  const strokes = (t) => Number(/([\d,]+) strokes/.exec(t)[1].replace(/,/g, ''))
+  const points = (svg) => (svg.match(/-?\d+\.\d,-?\d+\.\d/g) ?? []).length
+
+  const before = await preflight(page)
+  const plain = await svgFor()
+  await expect(page.locator('[data-testid="preflight-cleanup"]')).toHaveCount(0)
+
+  for (const [id, v] of [['plot-join-gap', '0.5'], ['plot-min-length', '0.5'], ['plot-simplify', '0.05']]) {
+    await page.locator(`[data-testid="${id}"]`).fill(v)
+    await blur()
+  }
+  await page.waitForTimeout(400)
+  const after = await preflight(page)
+  const cleaned = await svgFor()
+
+  // Fewer strokes, a smaller file, and the readout names both passes.
+  expect(strokes(after)).toBeLessThan(strokes(before))
+  await expect(page.locator('[data-testid="preflight-cleanup"]')).toContainText(/[\d,]+ joined/)
+  await expect(page.locator('[data-testid="preflight-cleanup"]')).toContainText(/short strokes left out/)
+  expect(points(cleaned)).toBeLessThan(points(plain))
+  expect(cleaned.length).toBeLessThan(plain.length)
+  console.log(`[plotter] clean-up: ${strokes(before)} → ${strokes(after)} strokes, ` +
+    `${points(plain)} → ${points(cleaned)} points, ${plain.length} → ${cleaned.length} bytes`)
+})

@@ -8,7 +8,7 @@
  * changing the ink laid down. Every test here is one of those four things.
  */
 import { describe, expect, it } from 'vitest'
-import { orderRuns, plotEstimate, routeStats } from '../../src/utils/penRoute'
+import { bridgeRuns, dropShortRuns, orderRuns, plotEstimate, routeStats, simplifyRuns } from '../../src/utils/penRoute'
 
 /** A horizontal stroke of length `len` starting at (x, y). */
 const stroke = (x, y, len = 10) => ({ pts: [x, y, x + len, y] })
@@ -136,5 +136,51 @@ describe('plotEstimate', () => {
   it('charges for a pen change', () => {
     const one = plotEstimate({ ink: 0, travel: 0, widthPx: 1, widthMm: 1, penChanges: 1 })
     expect(one.minutes).toBeCloseTo(0.5, 6)
+  })
+})
+
+describe('stroke clean-up', () => {
+  const run = (pts, stroke = '#000') => ({ stroke, pts })
+
+  it('simplifyRuns drops points closer than the tolerance to the line', () => {
+    // A straight stroke with one 0.3 px wobble and one real 5 px corner.
+    const [out] = simplifyRuns([run([0, 0, 10, 0.3, 20, 0, 30, 5, 40, 0])], 1)
+    expect(out.pts).toEqual([0, 0, 20, 0, 30, 5, 40, 0])
+    // Off at 0, and a two-point stroke is never touched.
+    const same = [run([0, 0, 10, 0.3, 20, 0])]
+    expect(simplifyRuns(same, 0)).toBe(same)
+    expect(simplifyRuns([run([0, 0, 5, 5])], 10)[0].pts).toEqual([0, 0, 5, 5])
+  })
+
+  it('simplifyRuns keeps a closed loop closed', () => {
+    const square = [0, 0, 10, 0, 10, 10, 0, 10, 0, 0]
+    const [out] = simplifyRuns([run(square)], 0.5)
+    expect(out.pts.slice(0, 2)).toEqual([0, 0])
+    expect(out.pts.slice(-2)).toEqual([0, 0])
+    expect(out.pts.length).toBe(square.length)
+  })
+
+  it('dropShortRuns leaves out strokes below the length and counts them', () => {
+    const { runs, dropped } = dropShortRuns([run([0, 0, 1, 0]), run([0, 0, 3, 4]), run([0, 0, 0, 0.5, 0, 1])], 2)
+    expect(dropped).toBe(2)
+    expect(runs.map((r) => r.pts)).toEqual([[0, 0, 3, 4]])
+    expect(dropShortRuns([run([0, 0, 1, 0])], 0).dropped).toBe(0)
+  })
+
+  it('bridgeRuns joins near ends of the same ink, and only those', () => {
+    const { runs, joined } = bridgeRuns([
+      run([0, 0, 10, 0]),
+      run([10.4, 0, 20, 0]),          // 0.4 from the last end: joined
+      run([20.2, 0, 30, 0], '#f00'),  // near, but another ink: not joined
+      run([50, 0, 60, 0], '#f00'),    // far: not joined
+    ], 0.5)
+    expect(joined).toBe(1)
+    expect(runs.map((r) => r.pts)).toEqual([[0, 0, 10, 0, 10.4, 0, 20, 0], [20.2, 0, 30, 0], [50, 0, 60, 0]])
+  })
+
+  it('bridgeRuns does not change the strokes it was given', () => {
+    const input = [run([0, 0, 1, 0]), run([1, 0, 2, 0])]
+    bridgeRuns(input, 1)
+    expect(input[0].pts).toEqual([0, 0, 1, 0])
   })
 })

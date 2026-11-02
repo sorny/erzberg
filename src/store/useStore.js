@@ -148,6 +148,10 @@ export const useStore = create((set) => ({
   // classifyCRS() in utils/geoCoords.js is the only thing that interprets these.
   geoTiffCRS: null,
   geoTiffCRSName: null,   // the CRS name the file states about itself, if any
+  // A GeoTIFF with more than one band: { file, count, band, summaries }. The
+  // file is kept so another band can be read from it. `summaries` is filled
+  // after the load, one { min, max, thumb } per band.
+  geoTiffBands: null,
   /**
    * Where the ground on screen came from, in one line.
    *
@@ -331,11 +335,13 @@ export const useStore = create((set) => ({
   setGeoTiffMeta: (elevMin, elevMax, bbox, crs, crsName) =>
     set((s) => {
       const next = { geoTiffElevMin: elevMin, geoTiffElevMax: elevMax, geoTiffBboxSrc: bbox ?? null,
-                     geoTiffCRS: crs ?? null, geoTiffCRSName: crsName ?? null }
+                     geoTiffCRS: crs ?? null, geoTiffCRSName: crsName ?? null, geoTiffBands: null }
       return { ...next, ...derive({ ...s, ...next }) }
     }),
 
   clearGeoTiffMeta: () =>
     set({ geoTiffElevMin: null, geoTiffElevMax: null, geoTiffBboxSrc: null, geoTiffBbox: null,
-          geoTiffCRS: null, geoTiffCRSName: null, terrainProvenance: null }),
+          geoTiffCRS: null, geoTiffCRSName: null, terrainProvenance: null, geoTiffBands: null }),
+
+  setGeoTiffBands: (bands) => set({ geoTiffBands: bands ?? null }),
 }))

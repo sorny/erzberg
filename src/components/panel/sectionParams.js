@@ -83,7 +83,7 @@ export const SECTION_PARAMS = {
   // Every mode section lists its own copies, and the list is one key for all.
   'Draw Modes': ['modeCopies'],
   'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
-  'Export': ['plotWidthMm', 'plotPenOrder', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
+  'Export': ['plotWidthMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',

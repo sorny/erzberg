@@ -5,7 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.63.0] — 2026-11-02
+
+### Added
+
+- **Every projection.** Overlays, OpenStreetMap, imagery, the sun and the scale
+  bar now work on any EPSG grid that proj4 can define, and on a projection that
+  the file defines itself. Austria Lambert, the Austrian Gauss-Krüger strips,
+  LAEA Europe (used by the BEV 1 m terrain model), Swiss LV95, OSGB and
+  Lambert-93 were refused before. `geotiff-geokeys-to-proj4` turns the code
+  into a proj4 definition. `DATUM_SHIFTS` adds the published shift for MGI,
+  CH1903, OSGB36 and DHDN. Against PROJ, Vienna, Graz, London and Stuttgart
+  land within 0.4 m. Other old datums are placed unshifted and flagged. proj4
+  loads only for a raster that needs it, so the main bundle stays the same
+  size. The workers are now built as module workers, as the dev server
+  already ran them.
+- **GeoTIFF export.** Output › Other files › GeoTIFF writes the raster in
+  metres as 32-bit floats, with its projection, extent and NoData value. The
+  file includes Edit Mode crops and erosion. GDAL reads it, and it reopens here
+  with the same range and projection.
+- **Band picker.** A GeoTIFF with several bands shows one tile per band, with
+  its value range and a preview. A click reloads the file on that band.
+- **KML, KMZ and Shapefile overlays.** By drop or by the new buttons under
+  Vector Layers. A Shapefile comes as a zip, and every layer in it is read. Its
+  `.prj` is read by proj4 with the same datum shifts as rasters, so an ArcGIS
+  file in Austria Lambert lands where it belongs.
+- **Join gap, Min length and Simplify** under Plotter order, in mm on paper.
+  On the default plate, 0.5 mm, 0.5 mm and 0.05 mm take the SVG from 1,769 to
+  489 strokes and from 2.7 MB to 0.8 MB. All three are off at 0, so existing
+  plates export as before. A dashed layer is not cleaned up.
+- Keys `6` and `7` export the heightmap and the GeoTIFF.
+- **Atlas.** `erzberg atlas peaks.geojson -p "Swiss Contours" -o
+  'sheets/{name}.svg'` renders one plate per feature in one browser. A point
+  gets a square of `--box` km. The ground comes from Terrain Tiles, or with
+  `--dem` from a window of one GeoTIFF in any projection the app can place.
+  A PNG output adds an `atlas.html` index. Three peaks render in about 20 s.
+  `window.erzberg` gains `fetchArea` and `loadRasterArea`.
+
+### Changed
+
+- The drop message and the Vector Layers text list KML and Shapefile.
+- The build readout (segments, triangles, rebuild time, elevation and
+  projection) now shows under Terrain, Surface and Marks too, not only under
+  Output.
+- The stage rail aligns its numbers and names to the left.
 
 ## [1.62.0] — 2026-11-02
 

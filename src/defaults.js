@@ -807,6 +807,10 @@ export const VIEW_DEF = {
   // the preflight prints what it would save so the decision is an informed one.
   // See utils/penRoute.js.
   plotPenOrder: false,
+  // Pen-stroke clean-up in the SVG, in mm on paper. Each is off at 0.
+  plotSimplifyMm: 0,
+  plotMinLengthMm: 0,
+  plotJoinGapMm: 0,
   // Filled areas (Indexed, Mineral, Land cover, Watershed) as a fill or as hatch
   // strokes a pen can draw. The pitch is millimetres on paper at full contrast.
   plotAreaFill: 'solid', plotHatchPitch: 0.8, plotHatchAngle: 45,

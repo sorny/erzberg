@@ -36,12 +36,18 @@
  *                           The zone is guessed from the point's own longitude,
  *                           which is right for a UTM tile and wrong for anything
  *                           else; flagged `accuracy: 'guess'`.
+ *   Any other EPSG code   — national grids such as Austria Lambert (31287),
+ *                           LAEA Europe (3035), Swiss LV95 (2056) or OSGB (27700),
+ *                           through proj4. `geotiff-geokeys-to-proj4` turns the
+ *                           code into a definition. It carries no datum shift,
+ *                           so `DATUM_SHIFTS` adds the published one for the
+ *                           common old datums. A grid on any other old datum is
+ *                           placed unshifted and flagged `accuracy: 'approx'`.
+ *   PROJ4:<definition>    — a file with a user-defined projection. The loader
+ *                           builds the definition from the file's own geokeys.
  *
- * Everything else — national grids such as Austria Lambert (31287), Swiss LV95
- * (2056) or OSGB (27700) — is reported unsupported rather than approximated.
- * Reprojecting those needs Lambert/Gauss-Krüger maths plus a datum shift, and a
- * silently wrong overlay is worse than a message saying to run the raster
- * through `gdalwarp -t_srs EPSG:4326` first.
+ * A code that proj4 cannot define is still reported unsupported rather than
+ * guessed, with `gdalwarp -t_srs EPSG:4326` as the fix.
  */
 
 // Explicit extension: `scripts/embed-window.js` loads this module in plain Node
@@ -49,6 +55,34 @@
 // way the bundler does. Keeping the two in step is what lets the script and the
 // app share one definition of every projection rather than two that can drift.
 import { sampleBilinear } from './terrain.js'
+
+// proj4 and its EPSG tables are about 380 kB, and most rasters never need
+// them. They load on first need through `loadProjections`. Until then a grid
+// that needs them classifies as unsupported, so every entry point that can
+// meet such a grid awaits the load first: the GeoTIFF loader, the geometry
+// worker and the scripts.
+let proj4 = null, toProj4 = null
+
+export function loadProjections() {
+  if (proj4) return Promise.resolve()
+  return Promise.all([import('proj4'), import('geotiff-geokeys-to-proj4')]).then(([p, g]) => {
+    proj4 = p.default ?? p
+    toProj4 = g.toProj4
+  })
+}
+
+/** Whether this CRS string needs proj4 and it has not loaded yet. */
+export function needsProjections(crs) {
+  if (proj4 || !crs) return false
+  if (crs.startsWith('PROJ4:')) return true
+  const m = /^EPSG:(\d+)$/.exec(crs)
+  if (!m) return false
+  const code = +m[1]
+  if (GEOGRAPHIC_EXACT.has(code) || MERCATOR.has(code)) return false
+  if (GEOGRAPHIC_APPROX.has(code)) return DATUM_SHIFTS.some((d) => d.has(code))
+  if (UTM_FAMILIES.some((f) => code - f.base >= f.lo && code - f.base <= f.hi)) return false
+  return !(code >= 4000 && code <= 4999)
+}
 
 // ── CRS classification ────────────────────────────────────────────────────────
 
@@ -95,9 +129,9 @@ const UTM_FAMILIES = [
   { base: 26700, lo: 3,  hi: 22, south: false, datum: 'NAD27',  accuracy: 'approx' },
 ]
 
-// Named purely so the sidebar can say what a rejected file actually is, which is
-// the difference between "unsupported" and "unsupported, and here is the fix".
-const KNOWN_UNSUPPORTED = new Map([
+// Names for the common national grids, so the sidebar can say what a file is.
+// proj4 places them; this table only names them.
+const GRID_NAMES = new Map([
   [31287, 'MGI / Austria Lambert'],
   [31254, 'MGI / Austria GK West'],
   [31255, 'MGI / Austria GK Central'],
@@ -115,6 +149,107 @@ const KNOWN_UNSUPPORTED = new Map([
   [3395,  'WGS 84 / World Mercator'],
   [5514,  'S-JTSK / Krovak East North'],
 ])
+
+// Published Helmert parameters (position vector, as `+towgs84`) for the old
+// datums that national grids still use. The figures are the ones epsg.io
+// prints for these codes. Each is good to a metre or two, about what the
+// modern datums already differ by, so a shifted grid counts as exact.
+const DATUM_SHIFTS = [
+  { name: 'MGI', towgs84: '577.326,90.129,463.919,5.137,1.474,5.297,2.4232',
+    has: (c) => c === 4312 || (c >= 31254 && c <= 31259) || (c >= 31284 && c <= 31287) },
+  { name: 'CH1903', towgs84: '674.374,15.056,405.346,0,0,0,0',
+    has: (c) => c === 4149 || c === 4150 || c === 21781 || c === 2056 },
+  { name: 'OSGB36', towgs84: '446.448,-125.157,542.06,0.15,0.247,0.842,-20.489',
+    has: (c) => c === 4277 || c === 27700 },
+  { name: 'DHDN', towgs84: '598.1,73.7,418.2,0.202,0.045,-2.455,6.7',
+    has: (c) => c === 4314 || (c >= 31466 && c <= 31469) },
+]
+
+// Ellipsoids that sit on WGS84 within a metre or two without a shift.
+const WGS84_LIKE = /\+(ellps|datum)=(WGS84|GRS80)\b/
+
+const defCache = new Map()
+
+/**
+ * A proj4 definition for an EPSG code, or null.
+ *
+ * `+axis` is dropped because GeoTIFF model space is always easting, northing,
+ * whatever axis order the EPSG register gives the CRS.
+ */
+function proj4Def(code) {
+  if (!toProj4) return null
+  if (defCache.has(code)) return defCache.get(code)
+  let out = null
+  try {
+    const geographic = code >= 4000 && code <= 4999
+    const r = toProj4(geographic
+      ? { GTModelTypeGeoKey: 2, GeographicTypeGeoKey: code }
+      : { GTModelTypeGeoKey: 1, ProjectedCSTypeGeoKey: code })
+    if (r?.proj4 && !Object.keys(r.errors ?? {}).length && r.isGCS === geographic) {
+      let def = r.proj4.replace(/\s*\+axis=\w+/, '')
+      const shift = DATUM_SHIFTS.find((d) => d.has(code))
+      if (shift && !/\+towgs84=/.test(def)) def += ` +towgs84=${shift.towgs84}`
+      const exact = !!shift || /\+towgs84=/.test(def) || WGS84_LIKE.test(def)
+      out = { def, accuracy: exact ? 'exact' : 'approx', geographic }
+    }
+  } catch { out = null }
+  defCache.set(code, out)
+  return out
+}
+
+/**
+ * The CRS string for a file whose projection is user-defined (geokey 32767).
+ * Returns `PROJ4:<definition>` built from the file's own geokeys, or null.
+ */
+export function crsFromGeoKeys(geoKeys) {
+  if (!toProj4) return null
+  try {
+    const r = toProj4(geoKeys)
+    if (!r?.proj4 || Object.keys(r.errors ?? {}).length) return null
+    return `PROJ4:${r.proj4.replace(/\s*\+axis=\w+/, '')}`
+  } catch { return null }
+}
+
+// How each shifted datum is spelled in a .prj file, ESRI or OGC style.
+const WKT_DATUMS = [
+  { name: 'MGI',    test: /D_MGI\b|Militar[-_ ]Geographische[-_ ]Institut|DATUM\["MGI"/i },
+  { name: 'CH1903', test: /CH1903/i },
+  { name: 'OSGB36', test: /OSGB[-_ ]?1936|OSGB36/i },
+  { name: 'DHDN',   test: /Deutsches[-_ ]Hauptdreiecksnetz|DHDN/i },
+]
+const WKT_WGS84_LIKE = /WGS[-_ ]?(19)?84|GRS[-_ ]?(19)?80|ETRS[-_ ]?(19)?89|NAD[-_ ]?(19)?83/i
+let wktSeq = 0
+
+/**
+ * A converter from a .prj file's WKT to WGS84, with the same datum shifts the
+ * rasters get. Returns { toWgs84([x, y]) → [lon, lat], accuracy, datum }, or
+ * null when proj4 cannot read the WKT or has not loaded.
+ */
+export function converterFromWkt(wkt) {
+  if (!proj4 || !wkt) return null
+  const name = `ERZBERG_WKT_${++wktSeq}`
+  try {
+    proj4.defs(name, wkt)
+    const def = proj4.defs(name)
+    if (!def) return null
+    const stated = Array.isArray(def.datum_params) && def.datum_params.some((v) => v !== 0)
+    const known = WKT_DATUMS.find((d) => d.test.test(wkt))
+    const shift = known && DATUM_SHIFTS.find((d) => d.name === known.name)
+    if (!stated && shift) def.datum_params = shift.towgs84.split(',').map(Number)
+    const exact = stated || !!shift || WKT_WGS84_LIKE.test(wkt)
+    const conv = proj4(name, 'WGS84')
+    return { toWgs84: (xy) => conv.forward(xy), accuracy: exact ? 'exact' : 'approx', datum: known?.name ?? null }
+  } catch { return null }
+}
+
+const converterCache = new Map()
+
+/** A cached proj4 converter from WGS84 to the definition. */
+function converter(def) {
+  let c = converterCache.get(def)
+  if (!c) { c = proj4('WGS84', def); converterCache.set(def, c) }
+  return c
+}
 
 /**
  * What can be done with a GeoTIFF's CRS string.
@@ -134,6 +269,14 @@ export function classifyCRS(crs) {
     return { ...none, kind: 'projected', supported: true, accuracy: 'guess', name: 'Projected grid, code not recorded' }
   if (crs === 'EPSG:geographic-unknown')
     return { ...none, kind: 'geographic', supported: true, accuracy: 'approx', name: 'Geographic, code not recorded' }
+  if (crs.startsWith('PROJ4:')) {
+    if (!proj4) return { ...none, kind: 'projected', supported: false, name: 'Projection defined in the file' }
+    const def = crs.slice(6)
+    const geographic = /\+proj=longlat\b/.test(def)
+    const exact = /\+towgs84=/.test(def) || WGS84_LIKE.test(def)
+    return { ...none, kind: geographic ? 'geographic' : 'projected', supported: true,
+             accuracy: exact ? 'exact' : 'approx', name: 'Projection defined in the file', def }
+  }
 
   const m = /^EPSG:(\d+)$/.exec(crs)
   if (!m) return none
@@ -141,8 +284,13 @@ export function classifyCRS(crs) {
 
   if (GEOGRAPHIC_EXACT.has(code))
     return { ...none, kind: 'geographic', code, supported: true, accuracy: 'exact', name: GEOGRAPHIC_EXACT.get(code) }
-  if (GEOGRAPHIC_APPROX.has(code))
-    return { ...none, kind: 'geographic', code, supported: true, accuracy: 'approx', name: GEOGRAPHIC_APPROX.get(code) }
+  if (GEOGRAPHIC_APPROX.has(code)) {
+    // An old datum with a published shift goes through proj4 and is exact.
+    const p = DATUM_SHIFTS.some((d) => d.has(code)) ? proj4Def(code) : null
+    return p
+      ? { ...none, kind: 'geographic', code, supported: true, accuracy: 'exact', name: GEOGRAPHIC_APPROX.get(code), def: p.def }
+      : { ...none, kind: 'geographic', code, supported: true, accuracy: 'approx', name: GEOGRAPHIC_APPROX.get(code) }
+  }
   if (MERCATOR.has(code))
     return { ...none, kind: 'mercator', code, supported: true, accuracy: 'exact', name: MERCATOR.get(code) }
 
@@ -160,7 +308,10 @@ export function classifyCRS(crs) {
   if (code >= 4000 && code <= 4999)
     return { ...none, kind: 'geographic', code, supported: true, accuracy: 'approx', name: null }
 
-  return { ...none, kind: 'projected', code, supported: false, accuracy: null, name: KNOWN_UNSUPPORTED.get(code) ?? null }
+  const p = proj4Def(code)
+  if (p && !p.geographic)
+    return { ...none, kind: 'projected', code, supported: true, accuracy: p.accuracy, name: GRID_NAMES.get(code) ?? null, def: p.def }
+  return { ...none, kind: 'projected', code, supported: false, accuracy: null, name: GRID_NAMES.get(code) ?? null }
 }
 
 /** One-line CRS description for the sidebar. `fileName` is the file's own citation. */
@@ -458,6 +609,7 @@ function inferUtmZone(lon, lat) {
 export function projectWgs84(lat, lon, crs) {
   const c = classifyCRS(crs)
   if (!c.supported) return null
+  if (c.def) return converter(c.def).forward([lon, lat])
 
   switch (c.kind) {
     case 'geographic':
@@ -492,8 +644,8 @@ export function projectWgs84(lat, lon, crs) {
  * uploads still work, since they only need the forward step.
  */
 export function isInvertible(crs) {
-  const kind = classifyCRS(crs).kind
-  return classifyCRS(crs).supported && (kind === 'geographic' || kind === 'mercator' || kind === 'utm')
+  const c = classifyCRS(crs)
+  return c.supported && (!!c.def || c.kind === 'geographic' || c.kind === 'mercator' || c.kind === 'utm')
 }
 
 /**
@@ -503,6 +655,10 @@ export function isInvertible(crs) {
 export function unprojectWgs84(x, y, crs) {
   const c = classifyCRS(crs)
   if (!isInvertible(crs)) return null
+  if (c.def) {
+    const [lon, lat] = converter(c.def).inverse([x, y])
+    return [lat, lon]
+  }
 
   switch (c.kind) {
     case 'geographic':

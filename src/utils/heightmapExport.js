@@ -66,3 +66,69 @@ export function exportHeightmap(terrainData, baseName) {
   link.click()
   return filename
 }
+
+// Written for cells outside the data, and named in GDAL_NODATA so GIS tools
+// and this app's own loader read them as holes.
+const GEOTIFF_NODATA = -9999
+
+/**
+ * The current raster as a 32-bit GeoTIFF in metres, with its projection and
+ * extent, so an edited or eroded terrain can go back to a GIS tool or reopen
+ * here unchanged.
+ *
+ * It writes the raster the app holds, at full size: Edit Mode's crop and the
+ * erosion are in it. The render settings (levels, blur, grid step) are not,
+ * because they are choices about the picture, not about the ground.
+ *
+ * A projection given as a code is written as that code. One the file defined
+ * itself (`PROJ4:`) has no code to write, so the file says only whether it is
+ * projected or geographic. Returns the name it wrote and that caveat, or null
+ * when there is nothing in metres to write.
+ */
+export async function exportGeoTiff(raster, baseName) {
+  const { pixels, mask, width, height, bbox, crs, elevMin, elevMax } = raster ?? {}
+  if (!pixels || !(width > 0) || !(height > 0) || elevMin == null || elevMax == null || !bbox) return null
+
+  const range = elevMax - elevMin
+  const values = new Float32Array(width * height)
+  for (let i = 0; i < values.length; i++)
+    values[i] = mask && mask[i] === 0 ? GEOTIFF_NODATA : elevMin + pixels[i] * range
+
+  const [minX, minY, maxX, maxY] = bbox
+  const keys = geoKeysFor(crs)
+  const metadata = {
+    width, height,
+    ModelPixelScale: [(maxX - minX) / width, (maxY - minY) / height, 0],
+    ModelTiepoint: [0, 0, 0, minX, maxY, 0],
+    GTRasterTypeGeoKey: 1,   // PixelIsArea: the bbox is the outer edge of the cells
+    GDAL_NODATA: `${GEOTIFF_NODATA}`,
+    ...keys.keys,
+  }
+  const { writeArrayBuffer } = await import('geotiff')
+  const buffer = writeArrayBuffer(values, metadata)
+
+  const filename = `${baseName ?? 'export'}-heightmap.tif`
+  const url = URL.createObjectURL(new Blob([buffer], { type: 'image/tiff' }))
+  const link = document.createElement('a')
+  link.download = filename
+  link.href = url
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
+  return { filename, codeless: keys.codeless }
+}
+
+/** The geokeys that name a CRS string, and whether it had no code to name. */
+export function geoKeysFor(crs) {
+  const m = /^EPSG:(\d+)$/.exec(crs ?? '')
+  if (m) {
+    const code = +m[1]
+    return code >= 4000 && code <= 4999
+      ? { keys: { GTModelTypeGeoKey: 2, GeographicTypeGeoKey: code }, codeless: false }
+      : { keys: { GTModelTypeGeoKey: 1, ProjectedCSTypeGeoKey: code }, codeless: false }
+  }
+  const geographic = crs === 'EPSG:geographic-unknown' || /\+proj=longlat\b/.test(crs ?? '')
+  // 32767 is GeoTIFF's "user-defined": the writer's default of WGS84 would be a lie.
+  return geographic
+    ? { keys: { GTModelTypeGeoKey: 2, GeographicTypeGeoKey: 32767 }, codeless: true }
+    : { keys: { GTModelTypeGeoKey: 1, ProjectedCSTypeGeoKey: 32767 }, codeless: true }
+}

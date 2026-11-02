@@ -9,6 +9,12 @@ export default defineConfig({
   optimizeDeps: {
     include: ['three'],
   },
+  // Module workers, as the dev server already runs them. A classic worker
+  // inlines every dynamic import, so proj4 would ship inside the geometry
+  // worker for every visitor instead of loading for the rasters that need it.
+  worker: {
+    format: 'es',
+  },
   build: {
     /*
      * The entry chunk is ~1.4 MB, and it is not going to get much smaller.

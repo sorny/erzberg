@@ -186,7 +186,7 @@ function affineOf(image) {
  */
 function mapperFor(rasterCrs, sceneCrs) {
   const a = classifyCRS(rasterCrs), b = classifyCRS(sceneCrs)
-  const same = a.supported && b.supported && a.kind === b.kind &&
+  const same = a.supported && b.supported && a.kind === b.kind && !a.def && !b.def &&
                a.zone === b.zone && a.isSouth === b.isSouth
   if (same) return (x, y) => [x, y]
   return (x, y) => {

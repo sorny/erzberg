@@ -60,6 +60,38 @@ Progress goes to stderr. Stdout gets only the path of each written file, or the
 | 2 | A bad argument: an unknown mode, an unknown key, or a value of the wrong type. |
 | 3 | Nothing to draw. |
 
+## Atlas
+
+```
+node scripts/erzberg.js atlas <features.geojson> -o 'sheets/{name}.svg' [-o …] [options]
+```
+
+The atlas renders one plate per feature, all with the same preset, modes and
+values. Use it for a series of matching sheets, for example the peaks of a
+range or the cells of a grid.
+
+| Option | Effect |
+|---|---|
+| `-o, --out <file>` | Must hold `{name}`. Each sheet writes its own file. |
+| `--box <km>` | The square around a point feature. The default is 10. |
+| `--dem <file>` | Cut each sheet from this GeoTIFF. Without it, each sheet fetches Terrain Tiles, as Fetch in the panel does. |
+
+All render options also apply, to every sheet.
+
+- A point gets a square of `--box` km around it. Any other geometry uses its
+  own extent.
+- The sheet name comes from the `name`, `title` or `id` property, else
+  `sheet-01`. A name that repeats gets `-2`.
+- The features must be in longitude and latitude, as GeoJSON is.
+- `--dem` takes a GeoTIFF in any projection that the app can place. Only the
+  window of each sheet is read.
+- Each sheet takes its own fit and elevation scale, then the run's modes and
+  `--set` values.
+- If a sheet fails, for example because it lies outside the `--dem` file, the
+  CLI names it, skips it and exits with 1 at the end.
+- With a PNG output, the run also writes `atlas.html`, an index of all sheets,
+  next to the first PNG.
+
 ## List
 
 ```
@@ -79,6 +111,10 @@ node scripts/erzberg.js render graz.tif -p "Swiss Topo" -o graz.svg -o graz.png
 # Labelled contours only, for a plotter, with the plot figures
 node scripts/erzberg.js render graz.tif -m Contours --only \
   -s intervalContours=6 -s labelContours=on --pen-order --stats -o graz.svg
+
+# Six peaks in one style, from Terrain Tiles, with an index page
+node scripts/erzberg.js atlas peaks.geojson -p "Swiss Contours" \
+  -o 'sheets/{name}.svg' -o 'sheets/{name}.png'
 
 # The look of an earlier plate, on A3 landscape with a scale bar
 node scripts/erzberg.js render graz.tif -p old-plate.svg --frame iso \

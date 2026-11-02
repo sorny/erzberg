@@ -113,6 +113,28 @@ export function useAutomation(live) {
         return { width: s.heightmapWidth, height: s.heightmapHeight }
       },
 
+      /**
+       * Terrain Tiles for a box in longitude and latitude, by the path the
+       * Fetch section uses. `name` names the plate and its files.
+       */
+      async fetchArea(name, area) {
+        const { fetchDem } = await import('./utils/demFetch')
+        const dem = await fetchDem(area)
+        L().fetchTerrainAndFit(dem, name)
+        await settle()
+        const s = L()
+        return { width: s.heightmapWidth, height: s.heightmapHeight, elevMin: dem.elevMin, elevMax: dem.elevMax }
+      },
+
+      /** The part of a GeoTIFF that covers a box in longitude and latitude. */
+      async loadRasterArea(name, url, area) {
+        const r = await L().loadGeoTiffArea(await fileAt(name, url), area)
+        await settle()
+        if (!r) throw new Error(L().loadError ?? `${name} did not load`)
+        const s = L()
+        return { width: s.heightmapWidth, height: s.heightmapHeight, elevMin: r.realElevMin, elevMax: r.realElevMax }
+      },
+
       /** A preset from a JSON file, or one embedded in an SVG or PNG this app wrote. */
       async applyPreset(name, url) {
         const d = await readPresetFile(await fileAt(name, url)).catch(() => null)

@@ -54,7 +54,9 @@ import { deflateSync, inflateSync } from 'node:zlib'
 import path from 'node:path'
 import { fromArrayBuffer, fromUrl, writeArrayBuffer } from 'geotiff'
 
-import { classifyCRS, projectWgs84, unprojectWgs84 } from '../src/utils/geoCoords.js'
+import { classifyCRS, loadProjections, projectWgs84, unprojectWgs84 } from '../src/utils/geoCoords.js'
+// proj4 loads on demand in the app. A script can simply wait for it.
+await loadProjections()
 import { fillPolygon } from '../src/utils/heightmapEdit.js'
 import { MAX_CLASSES } from '../src/utils/coverPlate.js'
 

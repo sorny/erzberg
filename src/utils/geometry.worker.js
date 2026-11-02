@@ -32,6 +32,7 @@ import { boxBlur, buildTerrain, maskHasHoles } from './terrain'
 import { buildLineGeometry, buildSurfaceGeometry } from './geometryBuilders'
 import { buildVectorGeometry } from './vectorGeometry'
 import { vectorBuildSignature } from './vectorLayers'
+import { loadProjections, needsProjections } from './geoCoords'
 
 // Cached source raster — replaced only by a message carrying `heightmapPixels`.
 let src = null
@@ -133,6 +134,12 @@ function sphereOf(pos) {
 }
 
 self.onmessage = (e) => {
+  // A national grid needs proj4, which loads on first need. Run the message
+  // again once it has, so the vector layers are placed in this same build.
+  if (needsProjections(e.data.p?.geoTiffCRS)) {
+    loadProjections().then(() => self.onmessage(e))
+    return
+  }
   const { heightmapPixels, nodataMask, heightmapWidth, heightmapHeight, vectorData, coverData, maskData, p, _gen } = e.data
 
   // A message with pixels refreshes the cache; one without reuses it.

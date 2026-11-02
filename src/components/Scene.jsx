@@ -649,6 +649,7 @@ export function Scene({
         sheetMarks: marks,
         sheetMarkColor: p.frameMarkColor ?? '#000000',
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
+        simplifyMm: p.plotSimplifyMm, minLengthMm: p.plotMinLengthMm, joinGapMm: p.plotJoinGapMm,
         areaFill: p.plotAreaFill, hatchPitchMm: p.plotHatchPitch, hatchAngle: p.plotHatchAngle,
         inksAsPicked: !!p.inksAsPicked,
         sheetMm: p.plotWidthMm,

@@ -24,6 +24,15 @@ describe('classifyDrop', () => {
     expect(classifyDrop('plate.png')).toEqual(['preset', 'raster'])
   })
 
+  it('reads a zip, a KML and a KMZ as vector overlays', () => {
+    for (const n of ['roads.zip', 'Trails.KML', 'route.kmz']) expect(classifyDrop(n)).toEqual(['vector'])
+  })
+
+  it('tells a loose Shapefile part to come zipped', () => {
+    for (const n of ['roads.shp', 'roads.dbf', 'roads.prj'])
+      expect(explainDrop(n, classifyDrop(n))).toContain('Zip the .shp, .dbf and .prj together')
+  })
+
   it('tries .json as a preset and .geojson as geometry', () => {
     // Same routes, opposite order, decided by what the extension says the
     // author meant. `Preset ⬇` writes `.json`; nobody names a preset `.geojson`.
@@ -64,7 +73,8 @@ describe('classifyDrop', () => {
   })
 
   it('takes nothing it has no loader for', () => {
-    for (const n of ['notes.txt', 'photo.jpg', 'archive.zip', '', null]) {
+    // A .zip is a Shapefile now, so the archive here is one nothing reads.
+    for (const n of ['notes.txt', 'photo.jpg', 'archive.7z', '', null]) {
       expect(classifyDrop(n)).toEqual([])
     }
   })
