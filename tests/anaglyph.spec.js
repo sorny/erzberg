@@ -79,6 +79,22 @@ test('the viewport draws both eyes, in both filter colours', async ({ page }) =>
   expect(stereo.cool).toBeGreaterThan(plain.cool + 2000)
 })
 
+// On a gradient the paper is CSS behind a transparent canvas, and the two
+// filters multiply: over nothing they drew nothing, on screen and in the PNG.
+test('the viewport draws both eyes on a gradient paper too', async ({ page }) => {
+  test.setTimeout(180_000)
+  await page.goto('http://localhost:5173/?automation')
+  await page.waitForFunction(() => !!window.erzberg, null, { timeout: 60_000 })
+  await page.evaluate(() => window.erzberg.settle())
+  await page.evaluate(() => window.erzberg.setParams({ bgGradient: true, bgColor: '#ffffff', anaglyph: true }))
+  await page.evaluate(() => window.erzberg.settle())
+  await page.waitForTimeout(1500)
+
+  const stereo = await splitInk(page)
+  expect(stereo.warm).toBeGreaterThan(2000)
+  expect(stereo.cool).toBeGreaterThan(2000)
+})
+
 test('the SVG carries two eyes as two pen layers', async ({ page }) => {
   test.setTimeout(300_000)
   await page.goto('http://localhost:5173')

@@ -22,7 +22,7 @@
     "enabledStipple": true,
     "occludeBy": "ground",
     "opacityStipple": 0.8,
-    "spacingStipple": 0.5,
+    "spacingStipple": 1,
     "thresholdRidge": 0.04,
     "weightRidge": 0.8,
     "weightStipple": 1.6

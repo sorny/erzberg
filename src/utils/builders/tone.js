@@ -165,11 +165,13 @@ export function buildSwissRockScree(terrain, p, spacing, threshold, length, scre
 
 // ─── Stipple ──────────────────────────────────────────────────────────────────
 
+const STIPPLE_MAX_CANDIDATES = 8e6
+
 /**
  * Stipple dots, placed by rejection sampling against a density field.
  *
- * A candidate is generated per grid cell and kept with probability equal to the
- * local density, so `spacing` sets the *maximum* dot count and the field decides
+ * A candidate is generated every `spacing` raster pixels and kept with
+ * probability equal to the local density, so `spacing` sets the *maximum* dot count and the field decides
  * how much of it survives. `densityMode` chooses what drives that field
  * (elevation, slope, …) and `gamma` bends it: above 1 concentrates dots into the
  * densest areas, below 1 spreads them toward an even wash.
@@ -185,7 +187,13 @@ export function buildSwissRockScree(terrain, p, spacing, threshold, length, scre
 export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
-  const step = Math.max(1, Math.round((spacing ?? 0.5) / scl))
+  // `spacing` is in raster pixels and may fall below one grid cell. A plate
+  // before format 9 (`snapStipple`) rounded it to whole cells, which left most
+  // of the slider drawing the same picture. The floor keeps the candidate count
+  // near STIPPLE_MAX_CANDIDATES on a large raster.
+  const step = p.snapStipple
+    ? Math.max(1, Math.round((spacing ?? 0.5) / scl))
+    : Math.max((spacing ?? 1) / scl, Math.sqrt((rows * cols) / STIPPLE_MAX_CANDIDATES))
   const eps = Math.max(0.001, scl * 0.003)
   const jAmt = (jitter ?? 0.8) * step
   const gam  = gamma ?? 1.2

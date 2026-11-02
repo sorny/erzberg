@@ -276,10 +276,12 @@ function resolveLayerStyle(id, p) {
       return { weight: p.screenWeightBitplane ?? 3, opacity: p.opacityBitplane, dash: 'solid' }
     // The three separations share the mode's dot size and opacity. Each carries
     // its own ink in its colour buffer, so only the weight and opacity are read.
+    // Overprint multiplies them, so two light inks make a darker third colour.
     case 'Riso-A':
     case 'Riso-B':
     case 'Riso-C':
-      return { weight: p.weightRiso, opacity: p.opacityRiso, dash: 'solid' }
+      return { weight: p.weightRiso, opacity: p.opacityRiso, dash: 'solid',
+               blending: p.overprintRiso === false ? 'normal' : 'multiply' }
     // Outrun's two pens over one path: a thin core of ink and a wide halo of
     // light. The halo is additive, so it can only brighten what it lies over;
     // on paper it vanishes and the core still reads.

@@ -201,8 +201,10 @@ across the valley, at the floor.
 
 ## 11. Stipple
 
-Candidates on a grid of pitch `spacing`, jittered by up to
-`jitter × spacing`. Each samples $d \in [0,1]$:
+Candidates on a grid of pitch `spacing`, in raster pixels, jittered by up to
+`jitter × spacing`. The pitch can fall below one grid cell, so several
+candidates can share a cell. Plates before format 9 round it to whole cells
+(`snapStipple`). Each samples $d \in [0,1]$:
 
 | Density mode | $d$ |
 |---|---|
@@ -452,7 +454,11 @@ white ground.
 ### Riso
 
 Three spot inks, each a different terrain reading, screened at 15°, 45° and 75°
-and multiplied. The screens are frequency-modulated (fixed dot, varying
+and multiplied (*Overprint*). Plates before format 9 open with Overprint off,
+as they drew. A multiplied layer needs the paper in the frame to darken it, so
+on a gradient paper the viewport draws the gradient into the frame, and the PNG
+export renders such a layer a second time over the paper. Anaglyph on paper
+multiplies the same way. The screens are frequency-modulated (fixed dot, varying
 density), because dot size is per layer. Each separation is stretched to its own
 percentile range.
 

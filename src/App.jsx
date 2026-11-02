@@ -34,6 +34,7 @@ import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
 import { bboxToWgs84, featureCoverage } from './utils/geoCoords'
 import { isDarkBackground } from './utils/colorUtils'
+import { gradientTexture, multipliesOnPaper } from './utils/bgTexture'
 import { needsSurfaceShading } from './utils/geometryBuilders'
 import { gpxToSource } from './utils/gpxParser'
 import { parseGeoJson } from './utils/geoJsonParser'
@@ -62,12 +63,22 @@ import { parseDate, solarPosition, sunTimes } from './utils/solar'
 import { isTyping } from './utils/shortcuts'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
-function BgSync({ color, gradient }) {
-  const { gl } = useThree()
+// A gradient is CSS behind the canvas, except under a multiplied layer, which
+// needs the paper in the frame to darken it. See utils/bgTexture.js.
+function BgSync({ color, gradient, stops, multiply }) {
+  const { gl, scene, invalidate } = useThree()
   useEffect(() => {
     if (gradient) gl.setClearColor(0, 0)
     else          gl.setClearColor(color, 1)
   }, [gl, color, gradient])
+  const key = gradient && multiply ? JSON.stringify(stops) : null
+  useEffect(() => {
+    if (!key) return
+    const tex = gradientTexture(JSON.parse(key))
+    scene.background = tex
+    invalidate()
+    return () => { scene.background = null; tex.dispose(); invalidate() }
+  }, [scene, key, invalidate])
   return null
 }
 
@@ -2489,7 +2500,8 @@ export default function App() {
         aria-label={`3D view of ${heightmapFilename || 'the terrain'} — drag to orbit, scroll to zoom`}
         role="application"
       >
-        <BgSync color={bgColor} gradient={style.bgGradient} />
+        <BgSync color={bgColor} gradient={style.bgGradient && bgGradientStops?.length > 1} stops={bgGradientStops}
+          multiply={multipliesOnPaper(style, view, isDarkBackground(bgColor))} />
         <DprGuard onClamp={handleBufferClamp} />
         <Scene
           terrain={terrainData}

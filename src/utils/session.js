@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateOcclusion, migrateOutrunPens, migratePillarInk, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
+import { migrateAzimuths, migrateOcclusion, migrateOutrunPens, migratePillarInk, migrateScreens, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -54,6 +54,9 @@ const WAVE_SCALE = 2
 
 /** And for Riso's dot size and opacity of v1.62.0, and Outrun's two pens. See `migrateRisoDots` and `migrateOutrunPens`. */
 const RISO_SCALE = 2
+
+/** And for Stipple's spacing and Riso's overprint of v1.62.0. See `migrateScreens`. */
+const SCREEN_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -107,6 +110,7 @@ export function loadSession(defaults) {
     if ((data.strokeScale ?? 1) < STROKE_SCALE) out = migrateStrokeBias(out)
     if ((data.waveScale ?? 1) < WAVE_SCALE) out = migrateWaveformClip(out)
     if ((data.risoScale ?? 1) < RISO_SCALE) out = migrateOutrunPens(migrateRisoDots(out))
+    if ((data.screenScale ?? 1) < SCREEN_SCALE) out = migrateScreens(out)
     out = repairWaveform(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
@@ -150,7 +154,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE, waveScale: WAVE_SCALE, risoScale: RISO_SCALE }
+    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE, waveScale: WAVE_SCALE, risoScale: RISO_SCALE, screenScale: SCREEN_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {

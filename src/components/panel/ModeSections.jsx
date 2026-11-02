@@ -203,7 +203,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
                   <InlineSl label="Step" min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
-                  <InlineSl label="Max length" min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
+                  <InlineSl label="Max length" help="Most steps per line. A line also ends where it meets another line or reaches flat ground, so high values often change little." min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Flow" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -270,7 +270,8 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" help="Grid pitch between candidate dots. Smaller = denser maximum." min={0.05} max={2} step={0.05} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Spacing" help="Distance between candidate dots, in raster pixels. Smaller is denser. Below one grid cell, several candidates share a cell." min={0.25} max={4} step={0.05} value={style.spacingStipple} onChange={v => ss({ spacingStipple: v, snapStipple: false })} fmt={v => v.toFixed(2)} />
+                  {style.snapStipple && <Note>This plate keeps the whole-cell dot grid of an older version. Move Spacing to use the finer spacing.</Note>}
                   <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.05} max={2} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 100% = full cell, 0% = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical dot pattern." min={1} max={999} step={1} value={style.seedStipple ?? 42} onChange={v => ss({ seedStipple: v })} />
@@ -324,7 +325,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                     value={style.dirModeCurv} onChange={(v) => ss({ dirModeCurv: v })}
                     style={{ marginBottom: 8 }} />
                   <InlineSl label="Spacing" help="Separation between strokes. Each line claims territory as it advances and stops on reaching another's, so strokes stay evenly spread instead of clumping." min={1} max={20} step={0.5} value={style.spacingCurv} onChange={v => ss({ spacingCurv: v })} />
-                  <InlineSl label="Length" help="Maximum steps per stroke. Short values give a broken, sketched texture; long values give sweeping continuous lines." min={5} max={400} step={5} value={style.lengthCurv} onChange={v => ss({ lengthCurv: v })} />
+                  <InlineSl label="Length" help="Maximum steps per stroke. Short values give a broken, sketched texture; long values give sweeping continuous lines. A stroke also ends where the curvature fades, so on smooth ground long values change little." min={5} max={400} step={5} value={style.lengthCurv} onChange={v => ss({ lengthCurv: v })} />
                   <InlineSl label="Step" help="Integration step in grid cells. Smaller follows the curvature field more faithfully at more segments." min={0.25} max={3} step={0.25} value={style.stepCurv} onChange={v => ss({ stepCurv: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Blur" help="Pre-blur radius before differencing. Second derivatives amplify noise, so raise this on grainy terrain." min={0} max={6} step={1} value={style.radiusCurv} onChange={v => ss({ radiusCurv: v })} />
                   <InlineSl label="Threshold" help="Minimum curvature, as a fraction of the strongest present. Raise it to leave flat ground bare and engrave only where the surface actually bends." min={0} max={0.9} step={0.01} value={style.thresholdCurv} onChange={v => ss({ thresholdCurv: v })} fmt={v => Math.round(v*100)+'%'} />
@@ -338,7 +339,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" help="Grid pitch between strokes/dots." min={0.5} max={10} step={0.5} value={style.spacingSwiss} onChange={v => ss({ spacingSwiss: v })} />
+                  <InlineSl label="Spacing" help="Grid pitch between strokes/dots." min={1} max={10} step={1} value={style.spacingSwiss} onChange={v => ss({ spacingSwiss: v })} />
                   <InlineSl label="Cliff" help="Normalised slope above which cells get cliff hachures." min={0.1} max={0.95} step={0.05} value={style.thresholdSwiss} onChange={v => ss({ thresholdSwiss: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Stroke length" help="Cliff hachure length multiplier." min={0.2} max={3} step={0.1} value={style.lengthSwiss} onChange={v => ss({ lengthSwiss: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Scree" help="Debris-dot density on the slope band below the cliffs." min={0} max={1} step={0.05} value={style.screeSwiss} onChange={v => ss({ screeSwiss: v })} fmt={v => Math.round(v * 100) + '%'} />
@@ -357,7 +358,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Tiers" help="How many flat plateaus the elevation range is cut into. Anchored to the terrain, so the steps stay put when Elevation Scale moves." min={2} max={40} step={1} value={style.tiersBitplane} onChange={v => ss({ tiersBitplane: v })} />
                   <Tog label="Risers" small help="Close each step with the verticals down to the plateau below — blocks rather than a flat staircase." checked={style.risersBitplane} onChange={v => ss({ risersBitplane: v })} />
                   <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen shading each band into the next. 0 leaves the plateaus bare." min={0} max={1} step={0.05} value={style.ditherBitplane} onChange={v => ss({ ditherBitplane: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Dot pitch" help="Grid spacing of the dither dots." min={0.5} max={20} step={0.5} value={style.spacingBitplane} onChange={v => ss({ spacingBitplane: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Dot pitch" help="Grid spacing of the dither dots." min={1} max={20} step={1} value={style.spacingBitplane} onChange={v => ss({ spacingBitplane: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Bitplane" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -375,7 +376,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 </Sub>
                 <Sub label="Screen">
                   <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen between two adjacent entries. The checkerboard reads as a colour the palette does not contain — that artefact is the point." min={0} max={1} step={0.05} value={style.ditherIndexed} onChange={v => ss({ ditherIndexed: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Cell size" help="Lattice pitch of the filled cells. Smaller is finer and much heavier." min={1} max={12} step={0.5} value={style.spacingIndexed} onChange={v => ss({ spacingIndexed: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell size" help="Lattice pitch of the filled cells. Smaller is finer and much heavier." min={1} max={12} step={1} value={style.spacingIndexed} onChange={v => ss({ spacingIndexed: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Indexed" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -416,7 +417,8 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Ink C curve" min={0.4} max={5} step={0.1} value={style.gammaCRiso} onChange={v => ss({ gammaCRiso: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRiso} onChange={v => ss({ seedRiso: v })} />
                 </Sub>
-                <Note>Multiply blending, so it wants paper. On a dark background three light inks go to mud.</Note>
+                <Tog label="Overprint" small help="Multiply the inks, so where two overlap they make a darker third colour, as on a press. Off, each ink covers the ones under it." checked={style.overprintRiso !== false} onChange={v => ss({ overprintRiso: v })} />
+                {style.overprintRiso !== false && <Note>Multiply blending, so it wants paper. On a dark background three light inks go to mud.</Note>}
                 <ModeStyleOverride prefix="Riso" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} showColor={false} label="Dot size" />
               </>
             )}
@@ -437,7 +439,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Broken at" help="Curvature above which rock is a face rather than massive." min={0.05} max={0.95} step={0.01} value={style.brokenMineral} onChange={v => ss({ brokenMineral: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Blur" help="Curvature is a second derivative, so it is taken on a blurred grid. On a raw DEM every pixel of sensor grain becomes its own rock type." min={0} max={8} step={1} value={style.radiusMineral} onChange={v => ss({ radiusMineral: v })} />
                   <InlineSl label="Grain" help="Each material carries its own tooth, so the surfaces differ in texture as well as hue." min={0} max={1} step={0.02} value={style.grainMineral} onChange={v => ss({ grainMineral: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={1} value={style.spacingMineral} onChange={v => ss({ spacingMineral: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Mineral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
               </>
@@ -457,7 +459,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Blur" testId="landform-blur"
                     help="Blur on the heights before they are classified. At 0 every grain in the data becomes its own small peak or pit."
                     min={0} max={12} step={1} value={style.radiusLandform ?? 2} onChange={v => ss({ radiusLandform: Math.round(v) })} />
-                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingLandform} onChange={v => ss({ spacingLandform: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={1} value={style.spacingLandform} onChange={v => ss({ spacingLandform: v })} fmt={v => v.toFixed(1)} />
                   {!geoTiffBbox && (
                     <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresLandform} onChange={v => ss({ cellMetresLandform: v })} fmt={v => `${v} m`} />
                   )}
@@ -497,7 +499,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                       : 'Every cell takes its own colour from the imagery the classes were cut from.'}
                   </Note>
                   <InlineSl label="Grain" help="A per-cell tooth, seeded by class, so two materials that share a tone still read as two surfaces." min={0} max={1} step={0.02} value={style.grainCover} onChange={v => ss({ grainCover: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingCover} onChange={v => ss({ spacingCover: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={1} value={style.spacingCover} onChange={v => ss({ spacingCover: v })} fmt={v => v.toFixed(1)} />
                 </Sub>
                 <ModeStyleOverride prefix="Cover" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} showHypso={false} showDash={false} label="Outline" />
               </>
@@ -510,7 +512,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   <InlineSl label="Inks" help="How many colours the gradient is cut into before basins are dealt from it." min={2} max={24} step={1} value={style.inksShed} onChange={v => ss({ inksShed: v })} />
                   <InlineSl label="Min basin" help="Percentage of the raster below which a catchment is folded into its largest neighbour. A thousand one-cell basins is noise, not a map." min={0} max={5} step={0.1} value={style.minBasinShed} onChange={v => ss({ minBasinShed: v })} fmt={v => v.toFixed(1) + '%'} />
-                  <InlineSl label="Cell size" min={1} max={12} step={0.5} value={style.spacingShed} onChange={v => ss({ spacingShed: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell size" min={1} max={12} step={1} value={style.spacingShed} onChange={v => ss({ spacingShed: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Relief" min={0} max={1} step={0.05} value={style.shadeShed} onChange={v => ss({ shadeShed: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Sun azimuth" min={0} max={360} step={5} value={style.azimuthShed} onChange={v => ss({ azimuthShed: v })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Seed" help="Which ink each basin is dealt." min={1} max={999} step={1} value={style.seedShed} onChange={v => ss({ seedShed: v })} />
@@ -538,7 +540,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 </Sub>
                 <Sub label="Grain">
                   <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainFlashbulb} onChange={v => ss({ grainFlashbulb: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Pitch" help="Grid spacing of the grain samples. The blue-noise tile is walked per sample, so this thins the grain without patterning it." min={0.5} max={12} step={0.5} value={style.spacingFlashbulb} onChange={v => ss({ spacingFlashbulb: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Pitch" help="Grid spacing of the grain samples. The blue-noise tile is walked per sample, so this thins the grain without patterning it." min={1} max={12} step={1} value={style.spacingFlashbulb} onChange={v => ss({ spacingFlashbulb: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Seed" help="The same seed always reproduces the identical grain." min={1} max={999} step={1} value={style.seedFlashbulb ?? 42} onChange={v => ss({ seedFlashbulb: v })} />
                 </Sub>
                 <Sub label="Shadow">
@@ -573,7 +575,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Exposure" min={0.2} max={4} step={0.05} value={style.exposureHalation} onChange={v => ss({ exposureHalation: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Contrast" min={0.2} max={5} step={0.05} value={style.contrastHalation} onChange={v => ss({ contrastHalation: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Density" min={0} max={1} step={0.05} value={style.grainHalation} onChange={v => ss({ grainHalation: v })} fmt={v => Math.round(v * 100) + '%'} />
-                  <InlineSl label="Pitch" min={0.5} max={12} step={0.5} value={style.spacingHalation} onChange={v => ss({ spacingHalation: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Pitch" min={1} max={12} step={1} value={style.spacingHalation} onChange={v => ss({ spacingHalation: v })} fmt={v => v.toFixed(1)} />
                   <Tog label="Cast shadows" small checked={style.shadowHalation} onChange={v => ss({ shadowHalation: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Halation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Grain style" showDash={false} />
@@ -788,7 +790,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               <>
                 <Sub>
                   <InlineSl label="Detrend" help="Blur radius subtracted first. Without it a scanline crosses its own mean twice on a whole mountain and the mode draws two dots." min={1} max={40} step={1} value={style.detrendZeroCross} onChange={v => ss({ detrendZeroCross: v })} />
-                  <InlineSl label="Line pitch" min={0.5} max={30} step={0.5} value={style.spacingZeroCross} onChange={v => ss({ spacingZeroCross: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Line pitch" min={1} max={30} step={1} value={style.spacingZeroCross} onChange={v => ss({ spacingZeroCross: v })} fmt={v => v.toFixed(1)} />
                   <SegGroup label="Crossing axes" options={[['Rows', 'rows'], ['Both', 'both']]}
                     value={style.axesZeroCross} onChange={(m) => ss({ axesZeroCross: m })} style={{ marginBottom: 8 }} />
                 </Sub>
@@ -818,7 +820,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   <InlineSl label="Cell size" help="Spacing of the feature points. The crazing is the boundary between their cells, not the cells themselves." min={2} max={80} step={1} value={style.cellRetic} onChange={v => ss({ cellRetic: v })} />
                   <InlineSl label="Crack width" min={0.05} max={2} step={0.05} value={style.widthRetic} onChange={v => ss({ widthRetic: v })} fmt={v => v.toFixed(2)} />
-                  <InlineSl label="Dot pitch" min={0.5} max={12} step={0.5} value={style.spacingRetic} onChange={v => ss({ spacingRetic: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Dot pitch" min={1} max={12} step={1} value={style.spacingRetic} onChange={v => ss({ spacingRetic: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Gamma" min={0.2} max={3} step={0.05} value={style.gammaRetic} onChange={v => ss({ gammaRetic: v })} fmt={v => v.toFixed(2)} />
                   <SegGroup label="Density from" options={[['Low', 'invElev'], ['High', 'elevation'], ['Steep', 'slope'], ['Flat', 'invSlope']]}
                     value={style.densityModeRetic} onChange={(m) => ss({ densityModeRetic: m })} style={{ marginBottom: 8 }} />
@@ -1254,9 +1256,6 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   <Note>The hypsometric curve (Strahler, 1952): how much of the plate lies above each height, with the hypsometric integral. It lies flat above the ground, so a plan view shows it alone.</Note>
                   <InlineSl label="Histogram bins" help="The bands of height in the histogram at the frame's right side. 0 is no histogram." min={0} max={60} step={1} value={style.binsHypsometry ?? 20} onChange={v => ss({ binsHypsometry: Math.round(v) })} fmt={v => (v > 0 ? String(v) : 'none')} />
-                  {!geoTiffBbox && (
-                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresHypsometry} onChange={v => ss({ cellMetresHypsometry: v })} fmt={v => `${v} m`} />
-                  )}
                   {!hasGeoTiff && (
                     <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefHypsometry} onChange={v => ss({ reliefHypsometry: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
                   )}

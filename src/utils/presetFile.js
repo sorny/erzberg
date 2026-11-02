@@ -71,8 +71,12 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * (`migrateRisoDots`). Outrun's two pens had lost their styles the same way, and
  * a payload before 8 keeps the core it drew with and no halo
  * (`migrateOutrunPens`).
+ *
+ * 9 is Stipple's spacing below one grid cell and Riso's overprint. Before,
+ * Stipple rounded its spacing to whole cells and the Riso inks drew with normal
+ * blending, and a payload before 9 keeps both (`migrateScreens`).
  */
-export const PRESET_FORMAT = 8
+export const PRESET_FORMAT = 9
 
 /**
  * Riso's dots as they drew, for a plate made before format 8.
@@ -91,6 +95,26 @@ export function migrateRisoDots(payload) {
   if (Array.isArray(style.modeCopies)) {
     style.modeCopies = style.modeCopies.map((c) => (
       c?.mode === 'Riso' && c.values ? { ...c, values: { ...c.values, weightRiso: 1, opacityRiso: 1 } } : c))
+  }
+  return { ...payload, style }
+}
+
+/**
+ * Stipple and Riso as they drew, for a plate made before format 9.
+ *
+ * Stipple rounded its spacing to whole grid cells, and the Riso inks did not
+ * multiply. An older plate gets `snapStipple` and no overprint, in mode copies
+ * too. The two keys did not exist before, so they are written over whatever is
+ * there. A new object comes back.
+ */
+export function migrateScreens(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const old = { snapStipple: true, overprintRiso: false }
+  const style = { ...payload.style, ...old }
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (
+      c?.mode === 'Stipple' && c.values ? { ...c, values: { ...c.values, snapStipple: true } }
+        : c?.mode === 'Riso' && c.values ? { ...c, values: { ...c.values, overprintRiso: false } } : c))
   }
   return { ...payload, style }
 }
@@ -392,7 +416,8 @@ export function parsePreset(text) {
     const walls = f < 5 ? migrateOcclusion(inks) : inks
     const bias = f < 6 ? migrateStrokeBias(walls) : walls
     const wave = f < 7 ? migrateWaveformClip(bias) : bias
-    return repairWaveform(f < 8 ? migrateOutrunPens(migrateRisoDots(wave)) : wave)
+    const pens = f < 8 ? migrateOutrunPens(migrateRisoDots(wave)) : wave
+    return repairWaveform(f < 9 ? migrateScreens(pens) : pens)
   } catch {
     return null
   }

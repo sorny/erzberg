@@ -384,3 +384,28 @@ describe('Outrun pens', () => {
     expect([glow.weight, glow.opacity, glow.blending]).toEqual([12, 0.3, 'additive'])
   })
 })
+
+describe('migrateScreens', () => {
+  it('keeps whole-cell Stipple and plain Riso for a plate before format 9, and leaves 9 alone', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(9)
+    const old = parsePreset(JSON.stringify({ format: 8, style: { enabledStipple: true, spacingStipple: 0.5 } })).style
+    expect([old.snapStipple, old.overprintRiso, old.spacingStipple]).toEqual([true, false, 0.5])
+    const now = parsePreset(JSON.stringify({ format: 9, style: { enabledStipple: true, spacingStipple: 0.5 } })).style
+    expect([now.snapStipple, now.overprintRiso]).toEqual([undefined, undefined])
+  })
+
+  it('reaches Stipple and Riso copies only', async () => {
+    const { migrateScreens } = await import('../../src/utils/presetFile')
+    const out = migrateScreens({ style: { modeCopies: [{ mode: 'Stipple', values: {} }, { mode: 'Riso', values: {} }, { mode: 'Lines', values: {} }] } })
+    expect(out.style.modeCopies[0].values.snapStipple).toBe(true)
+    expect(out.style.modeCopies[1].values.overprintRiso).toBe(false)
+    expect(out.style.modeCopies[2].values).toEqual({})
+  })
+
+  it('multiplies the Riso inks unless overprint is off', async () => {
+    const { layerStyle } = await import('../../src/utils/builders/shared')
+    expect(layerStyle('Riso-A', {}).blending).toBe('multiply')
+    expect(layerStyle('Riso-B', { overprintRiso: false }).blending).toBe('normal')
+  })
+})

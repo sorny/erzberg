@@ -111,8 +111,10 @@ export const STYLE_DEF = {
   hypsoValley: false, hypsoModeValley: 'elevation', hypsoBandedValley: false, hypsoIntervalValley: 10,
 
   // Stipple — seedStipple: same seed, same dot pattern (reproducible prints)
-  enabledStipple: false, spacingStipple: 0.5, weightStipple: 4, opacityStipple: 0.85, colorStipple: '#1a1a1a', dashStipple: 'solid',
+  enabledStipple: false, spacingStipple: 1, weightStipple: 4, opacityStipple: 0.85, colorStipple: '#1a1a1a', dashStipple: 'solid',
   stippleDensityMode: 'slope', stippleGamma: 1.2, stippleJitter: 0.8, seedStipple: 42,
+  // `snapStipple`: the whole-cell candidate grid of plates before format 9.
+  snapStipple: false,
   hypsoStipple: false, hypsoModeStipple: 'elevation', hypsoBandedStipple: false, hypsoIntervalStipple: 10,
   // Engraving (illumination cross-hatch)
   // Isophotes — lines of constant illumination. `levels` is a count rather than
@@ -485,6 +487,8 @@ export const STYLE_DEF = {
   // No `colorRiso`: the three separations each carry their own ink, and
   // nothing reads a base colour for this mode.
   weightRiso: 3, opacityRiso: 1, dashRiso: 'solid',
+  // Multiply the three inks. Off for plates before format 9, which drew them normally.
+  overprintRiso: true,
   hypsoRiso: false, hypsoModeRiso: 'elevation', hypsoBandedRiso: false, hypsoIntervalRiso: 10,
 
   // Mineral — five materials classified by slope and curvature, each grained.
