@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.62.0] — 2026-11-02
+
+### Added
+
+- **51 new presets.** They are built from the draw modes themselves, and
+  most use the Ground occluder. Some use mirroring, mode copies, landform
+  masks or the ghost occlusion colour.
+  - Arcade Tiles, Ash Ridge, Avalanche Runout, Basalt Gold, Blue Engraving
+  - Butter Aubergine, Caustics, Chalkboard, Chromotome, Dusk Radar
+  - Ember Static, Fern and Blush, Field Book, Flashbulb, Gallery Print
+  - Geodesic Bloom, Green Screen, Ice Field, Ink Storm, Leaf Skeleton
+  - Local Relief, Medial Axis, Mezzotint, Moire Strata, Moon Plaster
+  - Moonlit Hatch, Oblique Atlas, Oil Slick, Ordnance Grid, Overprint
+  - Paper Cutouts, Pin Cushion, Pink Crossings, Pistachio Rose, Pressing
+  - Red Planet, Red Relief Map, Riso Teal, Sage Shadow, Sakura Night
+  - Sashiko, Silver Gelatin, Slope Classes, Solar Flare, Solstice
+  - Sonar Bloom, Spectral Flow, Sumi Ink, Survey Sheet, Swiss Contours
+  - Swiss Red
+- **Riso Overprint.** A new toggle. When it is on, the inks multiply where
+  they overlap, as on a Riso press. When it is off, each ink covers the one
+  under it.
+- **Five new gradient styles:** Magma, Glacier, Vapor, Aurora and Luxe.
+
+### Changed
+
+- **The preset library went from 42 to 86.** The grid shows the strongest
+  looks first.
+- **Stipple Spacing is in raster pixels.** The slider goes from 0.25 to 4 in
+  steps of 0.05, and the default is 1. Before, the spacing was rounded to
+  whole grid cells, so most slider values drew the same dots. A plate from
+  an older version keeps its rounded dots through `snapStipple`. The 26
+  bundled presets with Stipple now store the rounded value. Their renders
+  match the old ones pixel for pixel.
+- Sliders that only take whole numbers now step by 1: the Swiss hachure
+  spacing, Bitplane, Indexed, Mineral, Landform, Cover, Shed, Flashbulb,
+  Halation, Retic and ZeroCross.
+- New help texts for the Flow Lines Max length and the Curvature Length.
+- `PRESET_FORMAT` is 9. A plate before format 9 opens with Overprint off
+  and snapped Stipple spacing, so it draws as before.
+- The README gallery shows Medial Axis in place of Spectral Ridge.
+
+### Fixed
+
+- **Outrun Glow had no effect.** The core and the halo drew at a size of 1
+  at full opacity, whatever the settings. Commit `70b3601` dropped their
+  style rules. The rules are back, with an additive halo. A plate before
+  format 8 keeps the core it drew with and gets a halo of opacity 0.
+- **Riso dot size and opacity had no effect.** They now set the dot weight
+  and opacity. Format 8 migrates older plates.
+- **Riso inks did not multiply.** The multiply note in the panel was true
+  only for the PNG export. The live view now multiplies too.
+- **The anaglyph and the Riso overprint drew nothing on a gradient
+  background.** The gradient is CSS behind a transparent canvas, so a
+  multiplied layer had nothing to darken. When a multiplied layer is on,
+  the gradient is now drawn into the frame. The PNG export renders the
+  multiplied layers a second time over the paper.
+- **Hypsometry showed a Pixel size slider that did nothing.** It is removed.
+
+### Removed
+
+- Seven presets: Cartographer's Draft, Contour Quilt, Geodesic Fan,
+  Mirror Lake, Spectral Ridge, Stone Relief and Sunset Ridge. A plate saved
+  with one of these looks still opens.
+- The gradient styles Fire, Ocean, Cyber, Sunset and Halloween. They were
+  too close to each other. A plate that uses one keeps its own stops.
+
 ## [1.61.0] — 2026-10-30
 
 ### Added
