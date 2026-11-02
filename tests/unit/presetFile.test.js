@@ -355,3 +355,32 @@ describe('Riso separations', () => {
     }
   })
 })
+
+describe('migrateOutrunPens', () => {
+  it('keeps the old core and no halo for a plate before format 8, and leaves 8 alone', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    const style = { enabledOutrun: true, weightOutrun: 3, opacityOutrun: 0.5, dashOutrun: 'dashed', glowOpacityOutrun: 0.4 }
+    const old = parsePreset(JSON.stringify({ format: 7, style })).style
+    expect([old.weightOutrun, old.opacityOutrun, old.dashOutrun, old.glowOpacityOutrun]).toEqual([1, 1, 'solid', 0])
+    const now = parsePreset(JSON.stringify({ format: 8, style })).style
+    expect([now.weightOutrun, now.opacityOutrun, now.dashOutrun, now.glowOpacityOutrun]).toEqual([3, 0.5, 'dashed', 0.4])
+  })
+
+  it('reaches Outrun copies only', async () => {
+    const { migrateOutrunPens } = await import('../../src/utils/presetFile')
+    const out = migrateOutrunPens({ style: { modeCopies: [{ mode: 'Outrun', values: { glowOpacityOutrun: 0.5 } }, { mode: 'Lines', values: {} }] } })
+    expect(out.style.modeCopies[0].values.glowOpacityOutrun).toBe(0)
+    expect(out.style.modeCopies[1].values.glowOpacityOutrun).toBeUndefined()
+  })
+})
+
+describe('Outrun pens', () => {
+  it('take the core and halo settings, with an additive halo', async () => {
+    const { layerStyle } = await import('../../src/utils/builders/shared')
+    const p = { weightOutrun: 1.5, opacityOutrun: 0.9, dashOutrun: 'solid', glowWeightOutrun: 12, glowOpacityOutrun: 0.3 }
+    const core = layerStyle('Outrun-Core', p)
+    const glow = layerStyle('Outrun-Glow', p)
+    expect([core.weight, core.opacity]).toEqual([1.5, 0.9])
+    expect([glow.weight, glow.opacity, glow.blending]).toEqual([12, 0.3, 'additive'])
+  })
+})

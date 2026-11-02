@@ -68,7 +68,9 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  *
  * 8 is Riso's dot size and opacity. Before, the three separations ignored both
  * and drew at a size of 1 and full opacity, and a payload before 8 keeps that
- * (`migrateRisoDots`).
+ * (`migrateRisoDots`). Outrun's two pens had lost their styles the same way, and
+ * a payload before 8 keeps the core it drew with and no halo
+ * (`migrateOutrunPens`).
  */
 export const PRESET_FORMAT = 8
 
@@ -89,6 +91,26 @@ export function migrateRisoDots(payload) {
   if (Array.isArray(style.modeCopies)) {
     style.modeCopies = style.modeCopies.map((c) => (
       c?.mode === 'Riso' && c.values ? { ...c, values: { ...c.values, weightRiso: 1, opacityRiso: 1 } } : c))
+  }
+  return { ...payload, style }
+}
+
+/**
+ * Outrun as it drew, for a plate made before format 8.
+ *
+ * Nothing mapped the layers `Outrun-Core` and `Outrun-Glow` to their settings,
+ * so both drew at the renderer's fallback, a solid size of 1 at full opacity,
+ * with normal blending. The core drew last, over the halo on the same path, so
+ * only the core showed. An older plate gets that core and a halo of opacity 0,
+ * which adds no light, in mode copies too. A new object comes back.
+ */
+export function migrateOutrunPens(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const old = { weightOutrun: 1, opacityOutrun: 1, dashOutrun: 'solid', glowOpacityOutrun: 0 }
+  const style = { ...payload.style, ...old }
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (
+      c?.mode === 'Outrun' && c.values ? { ...c, values: { ...c.values, ...old } } : c))
   }
   return { ...payload, style }
 }
@@ -370,7 +392,7 @@ export function parsePreset(text) {
     const walls = f < 5 ? migrateOcclusion(inks) : inks
     const bias = f < 6 ? migrateStrokeBias(walls) : walls
     const wave = f < 7 ? migrateWaveformClip(bias) : bias
-    return repairWaveform(f < 8 ? migrateRisoDots(wave) : wave)
+    return repairWaveform(f < 8 ? migrateOutrunPens(migrateRisoDots(wave)) : wave)
   } catch {
     return null
   }

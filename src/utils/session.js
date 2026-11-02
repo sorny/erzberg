@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateOcclusion, migratePillarInk, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
+import { migrateAzimuths, migrateOcclusion, migrateOutrunPens, migratePillarInk, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -52,7 +52,7 @@ const STROKE_SCALE = 2
 /** And for Waveform's limiter of v1.59.0. See `migrateWaveformClip`. */
 const WAVE_SCALE = 2
 
-/** And for Riso's dot size and opacity of v1.62.0. See `migrateRisoDots`. */
+/** And for Riso's dot size and opacity of v1.62.0, and Outrun's two pens. See `migrateRisoDots` and `migrateOutrunPens`. */
 const RISO_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
@@ -106,7 +106,7 @@ export function loadSession(defaults) {
     if ((data.occlusionScale ?? 1) < OCCLUSION_SCALE) out = migrateOcclusion(out)
     if ((data.strokeScale ?? 1) < STROKE_SCALE) out = migrateStrokeBias(out)
     if ((data.waveScale ?? 1) < WAVE_SCALE) out = migrateWaveformClip(out)
-    if ((data.risoScale ?? 1) < RISO_SCALE) out = migrateRisoDots(out)
+    if ((data.risoScale ?? 1) < RISO_SCALE) out = migrateOutrunPens(migrateRisoDots(out))
     out = repairWaveform(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
