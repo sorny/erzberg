@@ -327,3 +327,31 @@ describe('migrateWaveformClip', () => {
     expect(out.style.modeCopies[1].values.clipWaveform).toBeUndefined()
   })
 })
+
+describe('migrateRisoDots', () => {
+  it('keeps the old dots for a plate before format 8, and leaves 8 alone', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(8)
+    const old = parsePreset(JSON.stringify({ format: 7, style: { enabledRiso: true, weightRiso: 3, opacityRiso: 0.4 } })).style
+    expect([old.weightRiso, old.opacityRiso]).toEqual([1, 1])
+    const now = parsePreset(JSON.stringify({ format: 8, style: { enabledRiso: true, weightRiso: 3, opacityRiso: 0.4 } })).style
+    expect([now.weightRiso, now.opacityRiso]).toEqual([3, 0.4])
+  })
+
+  it('reaches Riso copies only', async () => {
+    const { migrateRisoDots } = await import('../../src/utils/presetFile')
+    const out = migrateRisoDots({ style: { modeCopies: [{ mode: 'Riso', values: { weightRiso: 5 } }, { mode: 'Lines', values: {} }] } })
+    expect(out.style.modeCopies[0].values.weightRiso).toBe(1)
+    expect(out.style.modeCopies[1].values.weightRiso).toBeUndefined()
+  })
+})
+
+describe('Riso separations', () => {
+  it('take the mode dot size and opacity', async () => {
+    const { layerStyle } = await import('../../src/utils/builders/shared')
+    for (const id of ['Riso-A', 'Riso-B', 'Riso-C']) {
+      const st = layerStyle(id, { weightRiso: 4.5, opacityRiso: 0.3 })
+      expect([st.weight, st.opacity]).toEqual([4.5, 0.3])
+    }
+  })
+})
