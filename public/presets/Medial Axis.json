@@ -20,6 +20,7 @@
     "enabledSpines": true,
     "hypsoModeSpines": "elevation",
     "hypsoSpines": true,
+    "inksAsPicked": true,
     "levelsSpines": 40,
     "occludeBy": "ground",
     "weightSpines": 0.8

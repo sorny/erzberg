@@ -14,12 +14,16 @@
   },
   "style": {
     "bgColor": "#2b2140",
+    "colorPencil": "#995900",
     "colorRadar": "#ffb38a",
     "depthOcclusion": true,
     "enabledLines": false,
+    "enabledPencil": true,
     "enabledRadar": true,
     "occludeBy": "ground",
+    "spacingPencil": 5,
     "spacingRadar": 3,
+    "thresholdPencil": 0.1,
     "weightRadar": 0.5
   },
   "points": {

@@ -19,7 +19,7 @@
     "colorStereonet": "#b23a48",
     "depthOcclusion": true,
     "enabledAspectRose": true,
-    "enabledContours": true,
+    "enabledContours": false,
     "enabledLines": false,
     "enabledStereonet": true,
     "intervalContours": 4,

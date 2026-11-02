@@ -18,8 +18,8 @@
     "depthOcclusion": true,
     "enabledContours": true,
     "enabledLines": false,
-    "intervalContours": 2,
-    "majorIntervalContours": 5,
+    "intervalContours": 0.5,
+    "majorIntervalContours": 0,
     "majorWeightContours": 1.4,
     "occludeBy": "ground",
     "weightContours": 0.5
