@@ -280,6 +280,14 @@ function resolveLayerStyle(id, p) {
     case 'Riso-B':
     case 'Riso-C':
       return { weight: p.weightRiso, opacity: p.opacityRiso, dash: 'solid' }
+    // Outrun's two pens over one path: a thin core of ink and a wide halo of
+    // light. The halo is additive, so it can only brighten what it lies over;
+    // on paper it vanishes and the core still reads.
+    case 'Outrun-Core':
+      return { weight: p.weightOutrun, opacity: p.opacityOutrun, dash: p.dashOutrun }
+    case 'Outrun-Glow':
+      return { weight: p.glowWeightOutrun ?? 8, opacity: p.glowOpacityOutrun ?? 0.14,
+               dash: 'solid', blending: 'additive' }
     case 'Halation-Grain':
       return { weight: p.weightHalation, opacity: p.opacityHalation, dash: 'solid' }
     // The halo is a second ink on the same plate, so it carries its own radius
