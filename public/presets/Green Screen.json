@@ -19,8 +19,12 @@
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledPrinter": true,
+    "haloPrinter": 1,
     "occludeBy": "ground",
+    "occlusionBias": 200,
     "pitchPrinter": 6,
+    "quantilePrinter": false,
+    "strokeDepthBias": 0,
     "weightPrinter": 0.8
   },
   "points": {

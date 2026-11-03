@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.63.1] — 2026-11-03
+
+### Changed
+
+- **Green Screen preset.** The Printer screen now has a halo of 1 and equal
+  bands in place of quantile classes. The Ground occluder has a bias of 200
+  and no stroke depth bias.
+- **One camera for every preset.** Lava Field, Compass Rose, Pin Art and Green
+  Screen had their own tilt, rotation and zoom, so the view jumped when you
+  picked one of them. All 86 presets now open at the default camera: tilt 50,
+  rotation 0 and zoom 0.75. The four thumbnails are rendered again.
+
 ## [1.63.0] — 2026-11-02
 
 ### Added
