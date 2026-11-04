@@ -30,6 +30,7 @@ import { useContourLabels } from './hooks/useContourLabels'
 import { useScaleLabels } from './hooks/useScaleLabels'
 import { flattenSvg } from './utils/svgFlatten'
 import { useStore } from './store/useStore'
+import { holdCamera } from './utils/viewLock'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
 import { bboxToWgs84, featureCoverage } from './utils/geoCoords'
@@ -693,7 +694,18 @@ export default function App() {
     return { ...cover, classes, classColors: classes.map((c) => c.color) }
   }, [cover, coverInks])
   const [points,  setPoints]  = useState(() => withDefaults(POINTS_DEF,  restored?.points))
-  const [view,    setView]    = useState(() => withDefaults(VIEW_DEF,    restored?.view))
+  const [view,    setViewState] = useState(() => withDefaults(VIEW_DEF,    restored?.view))
+  // Every write to `view` passes here, so with the view lock on, no path can
+  // move the camera: a preset, undo, Reset all, a new terrain's fit, a key.
+  const viewLocked = useStore((s) => s.viewLocked)
+  const setView = useCallback((next) => setViewState((prev) => {
+    const v = typeof next === 'function' ? next(prev) : next
+    return useStore.getState().viewLocked ? holdCamera(prev, v) : v
+  }), [])
+  // Auto-rotate turns the camera, so the lock stops it.
+  useEffect(() => {
+    if (viewLocked) setViewState((prev) => (prev.autoRotate ? { ...prev, autoRotate: false } : prev))
+  }, [viewLocked])
   /*
    * Free text placed in the scene.
    *
@@ -760,7 +772,7 @@ export default function App() {
     setGradientStops(s[4]); setBgGradientStops(s[5])
     setTextLayers(s[6]); setVectorLayers(s[7]); setVectorSources(s[8])
     setMasks(s[9])
-  }, [setVectorSources, setMasks])
+  }, [setVectorSources, setMasks, setView])
   /*
    * The names, derived rather than declared.
    *
@@ -948,6 +960,14 @@ export default function App() {
   const notify = useCallback((msg, opts = {}) => {
     setToast({ msg, seq: ++toastSeq.current, ...opts })
   }, [])
+
+  // The lock is switched by V as well, with the panel shut, so it says so.
+  const lockSeen = useRef(viewLocked)
+  useEffect(() => {
+    if (lockSeen.current === viewLocked) return
+    lockSeen.current = viewLocked
+    notify(viewLocked ? 'View locked. The camera stays put until you press V again.' : 'View unlocked.')
+  }, [viewLocked, notify])
 
   // Shapefile, KML and KMZ: read as binary or through a library, so async,
   // and each may come back with a note that its placement is approximate.
@@ -1448,7 +1468,7 @@ export default function App() {
         if (typeof restorePanel === 'function') restorePanel()
       },
     })
-  }, [terrain, style, points, view, gradientStops, bgGradientStops,
+  }, [setView, terrain, style, points, view, gradientStops, bgGradientStops,
       vectorLayers, vectorSources, textLayers, clearVectorSources, setVectorSources,
       cover, setCover, srcMasks, setMasks, imagery, setImagery,
       heightmapWidth, heightmapHeight, baseZoom, notify, tagHistory])
@@ -1541,7 +1561,7 @@ export default function App() {
         setGradientStops(before.gradientStops)
       },
     })
-  }, [terrain, style, points, view, gradientStops, paramDefaults, notify, tagHistory])
+  }, [terrain, style, points, view, gradientStops, paramDefaults, notify, tagHistory, setView])
 
   const orbitRef = useRef()
 
@@ -1642,7 +1662,7 @@ export default function App() {
     if (d.bgGradientStops) setBgGradientStops(d.bgGradientStops)
     applyVectorStyles(d)
     if (d.heightmapDataURL) load(d.heightmapDataURL)
-  }, [load, applyVectorStyles, tagHistory])
+  }, [load, applyVectorStyles, tagHistory, setView])
 
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'),
@@ -1705,7 +1725,7 @@ export default function App() {
     const zoom = Math.max(0.05, Math.min(4, 500 / Math.max(width, height)))
     setBaseZoom(zoom)
     setView(prev => ({ ...prev, zoom }))
-  }, [])
+  }, [setView])
 
   // ── Edit Mode ─────────────────────────────────────────────────────────────
   // The draft lives here rather than in the store so Cancel is free: nothing
@@ -2401,10 +2421,12 @@ export default function App() {
       iso:   { tilt: 45, rotation: -45 },
       reset: { tilt: 50, rotation: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
     }
+    // The scene moves the camera on its own when it hears of a preset.
+    if (useStore.getState().viewLocked) return
     const p = presets[name] || presets.reset
     setView(prev => ({ ...prev, ...p }))
     setCameraPreset({ name, ts: Date.now() })
-  }, [])
+  }, [setView])
 
 
   useEffect(() => {

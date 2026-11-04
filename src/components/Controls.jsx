@@ -2,6 +2,7 @@
  * Keyboard controls.
  *
  * Q      → toggle auto-rotate
+ * V      → lock or free the view
  * Space  → pause/resume the particle field
  *
  * Export shortcuts (1–7) are handled in App.jsx. Both of these appear on the
@@ -12,6 +13,7 @@
 import { useEffect } from 'react'
 import { useThree } from '@react-three/fiber'
 import { isTyping } from '../utils/shortcuts'
+import { useStore } from '../store/useStore'
 
 export function Controls({ getParams, setParams, orbitRef }) {
   const { camera } = useThree()
@@ -31,6 +33,7 @@ export function Controls({ getParams, setParams, orbitRef }) {
 
       switch (e.code) {
         case 'KeyQ': setParams({ autoRotate: !(v.autoRotate) }); break
+        case 'KeyV': { const st = useStore.getState(); st.setViewLocked(!st.viewLocked); break }
         // Only when there is a field to freeze — otherwise Space should keep
         // whatever meaning the page would normally give it.
         case 'Space':

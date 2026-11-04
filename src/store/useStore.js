@@ -324,6 +324,13 @@ export const useStore = create((set) => ({
    * it is let go. Nothing reads this in render, so it re-renders nothing.
    */
   cameraLive: null,
+  /**
+   * The view lock (`src/utils/viewLock.js`). Not part of a preset or the
+   * session: it is a working state, like a pinned window, and a reload frees
+   * the camera again.
+   */
+  viewLocked: false,
+  setViewLocked: (on) => set({ viewLocked: !!on }),
   setCameraLive: (patch) => set((s) => ({ cameraLive: { ...s.cameraLive, ...patch } })),
   clearCameraLive: () => set((s) => (s.cameraLive ? { cameraLive: null } : {})),
 

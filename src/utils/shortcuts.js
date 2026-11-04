@@ -31,6 +31,7 @@ export const SHORTCUTS = [
       { keys: ['scroll'],     label: 'Zoom' },
       { keys: ['right-drag'], label: 'Pan' },
       { keys: ['Q'],   codes: ['KeyQ'],      label: 'Auto-rotate', note: 'on and off' },
+      { keys: ['V'],   codes: ['KeyV'],      label: 'Lock the view', note: 'on and off' },
       { keys: ['Space'], codes: ['Space'],   label: 'Freeze the particles',
         note: 'only while a field is drawn' },
     ],

@@ -149,3 +149,28 @@ test('the wheel zooms by how far it turns', async ({ page }) => {
   expect(oneFlick / fiveNotches, 'a large delta must zoom as far as the notches it sums')
     .toBeCloseTo(step, 1)
 })
+
+test('the view lock holds the camera and frees it again', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(String(e)))
+  await openApp(page)
+  // Off the panel, so V reaches the viewport's key handler.
+  await page.mouse.click(500, 380)
+
+  await page.keyboard.press('KeyV')
+  await expect(page.locator('[data-testid="view-lock"]')).toBeChecked()
+  await expect(page.getByText('View locked.', { exact: false })).toBeVisible()
+  await expect(page.locator('[data-testid="camera-reset"]')).toBeDisabled()
+
+  await dragPan(page, -150, -110)
+  expect(await readout(page, 'pan-x'), 'a locked view must not pan').toBe('0')
+  expect(await readout(page, 'pan-y')).toBe('0')
+
+  await page.keyboard.press('KeyV')
+  await expect(page.locator('[data-testid="view-lock"]')).not.toBeChecked()
+  await dragPan(page, -150, -110)
+  const moved = Math.abs(Number(await readout(page, 'pan-x'))) +
+                Math.abs(Number(await readout(page, 'pan-y')))
+  expect(moved, 'an unlocked view pans again').toBeGreaterThan(0)
+  expect(errors).toEqual([])
+})
