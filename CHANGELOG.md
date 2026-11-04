@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.66.0] — 2026-11-04
+
+### Changed
+
+- **Clearer names across the panel.**
+  - Sections: *Texture* is *Image Overlay* (beside *Texture Shading*),
+    *Satellite* is *Imagery* (it also holds a GeoTIFF band now), *Sunlight* is
+    *Sun Hours Tint*, *Scale and North* is *Map Elements*, and the *Land Cover*
+    data section is *Land Cover Data*, apart from the draw mode of that name.
+    The search still finds each by its old name.
+  - Map Elements: *Grid* is *Coordinates*, apart from the Map Grid mode, and
+    *Magnetic north* is *Point to magnetic north*.
+  - Output: *Sheet* is *Sheet width*, the print size option *Trim* is *Off*,
+    *PNG α* is *Clear PNG*, and the buttons say *Save preset*, *Open preset*,
+    *Save project* and *Open project*.
+  - Presets: the shelf's *Keep* is *Add*, and its count sits at the right.
+  - The band buttons are *Image* and *Mask*. Soundscapes' *Analysis* heading
+    is *Spectrum*. Help texts say a georeferenced raster, a GeoTIFF or fetched
+    terrain, where they said a GeoTIFF.
+- **Clearer Presets headings.** *Your preset* and *My presets* read as the same
+  thing. They are now *Preset file* (save or open a `.json`) and *Shelf · in
+  this browser* (the looks kept here), beside *Styles*.
+- `out/`, where local CLI runs write, is ignored by git.
+
 ## [1.65.0] — 2026-11-04
 
 ### Added

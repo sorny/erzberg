@@ -91,17 +91,17 @@ const STATED = {
   'Shape': 1,
   'Levels': 1,
   'Hydraulic Erosion': 1,
-  'Land Cover': 1,
+  'Land Cover Data': 1,
   'Masks': 1,
 
   // Surface. Satellite is here because six of its nine controls paint an image
   // onto the ground — a drape is a surface treatment, whatever fetched it.
   'Terrain Style': 2,
-  'Satellite': 2,
+  'Imagery': 2,
   // Texture composites one line after Satellite in the same surface shader, so
   // it colours the ground rather than sitting over it. It was in Overlay, two
   // panes from the thing it is drawn beside.
-  'Texture': 2,
+  'Image Overlay': 2,
   'Hillshade': 2,
   'Slope Shading': 2,
   'Water Fill': 2,
@@ -112,7 +112,7 @@ const STATED = {
   'Texture Shading': 2,
   'Aerial Perspective': 2,
   'Wetness': 2,
-  'Sunlight': 2,
+  'Sun Hours Tint': 2,
 
   'Draw Modes': 3,
 
@@ -128,7 +128,7 @@ const STATED = {
   'Mirror': 5,
   'Anaglyph': 5,
   'Paper': 5,
-  'Scale and North': 5,
+  'Map Elements': 5,
 
   'Export': 6,
   'Analysis': 6,

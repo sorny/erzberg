@@ -45,7 +45,7 @@ async function download(page, info, start) {
   return { name: d.suggestedFilename(), path, bytes: readFileSync(path) }
 }
 
-test('My presets keeps a look with a thumbnail, across a reload, and removes it', async ({ page }) => {
+test('the shelf keeps a look with a thumbnail, across a reload, and removes it', async ({ page }) => {
   await open(page)
   await resetToDefaults(page)
   await openStage(page, 'presets')

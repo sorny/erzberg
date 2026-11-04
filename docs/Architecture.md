@@ -237,7 +237,7 @@ Two things come from the preset set and are not written by hand:
 | Exporter | Reads | Note |
 |---|---|---|
 | SVG | `lineGeo`, `surfaceGeo` | CPU projection with a software Z-buffer, so occlusion matches the viewport without a GPU readback. Area modes export filled polygons |
-| PNG / PNG α | The scene | Offscreen 4× render target, trimmed by alpha |
+| PNG / Clear PNG | The scene | Offscreen 4× render target, trimmed by alpha |
 | STL | `surfaceGeo` | Own facet normals. Skips vertices at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
 | Heightmap PNG | `terrain.grid` | After resolution and levels |
 | WebM | The live canvas | `MediaRecorder`, with the ODbL credit spliced into the Matroska header |

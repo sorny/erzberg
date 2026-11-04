@@ -1,5 +1,5 @@
 /**
- * My presets, as React state over `utils/presetShelf.js`.
+ * The preset shelf, as React state over `utils/presetShelf.js`.
  *
  * Every change is written to the browser at once. If the browser refuses (its
  * storage is full), the shelf on screen keeps the change and the user is told,
@@ -29,7 +29,7 @@ export function usePresetShelf({ exportPreset, paper, canvasRef, applyPreset, no
       saved: new Date().toISOString(),
     }
     commit(addToShelf(shelf, entry))
-    notify(`Kept as “${entry.name}” in My presets.`)
+    notify(`Kept as “${entry.name}” on the shelf.`)
     return entry.name
   }, [shelf, exportPreset, paper, canvasRef, commit, notify])
 
@@ -42,7 +42,7 @@ export function usePresetShelf({ exportPreset, paper, canvasRef, applyPreset, no
   const remove = useCallback((name) => {
     const before = shelf
     commit(removeFromShelf(shelf, name))
-    notify(`“${name}” removed from My presets.`, { action: 'Undo', onAction: () => commit(before) })
+    notify(`“${name}” removed from the shelf.`, { action: 'Undo', onAction: () => commit(before) })
   }, [shelf, commit, notify])
 
   const saveFile = useCallback(() => {
@@ -62,7 +62,7 @@ export function usePresetShelf({ exportPreset, paper, canvasRef, applyPreset, no
       if (!incoming) { notify('That file is not an erzberg preset shelf. Open the file written by Shelf ⬇.'); return }
       const next = mergeShelf(shelf, incoming)
       commit(next)
-      notify(`${next.length - shelf.length} preset${next.length - shelf.length === 1 ? '' : 's'} added to My presets.`)
+      notify(`${next.length - shelf.length} preset${next.length - shelf.length === 1 ? '' : 's'} added to the shelf.`)
     }
     input.click()
   }, [shelf, commit, notify])

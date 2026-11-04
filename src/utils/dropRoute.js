@@ -81,7 +81,7 @@ export function explainDrop(name, tried) {
     return `${short} is one part of a Shapefile. Zip the .shp, .dbf and .prj together and drop the zip.`
   }
   if (/\.(jpe?g|webp|gif|bmp|avif)$/i.test(n)) {
-    return `${short} is not a heightmap — those are PNG or GeoTIFF. For a photographic texture over the terrain, use Texture under Terrain Style.`
+    return `${short} is not a heightmap — those are PNG or GeoTIFF. For a photographic texture over the terrain, use Image Overlay in the Surface stage.`
   }
   return `Nothing here takes ${short}. Drop a PNG or GeoTIFF heightmap, a GPX, GeoJSON, KML or Shapefile zip, a land cover plate, or a preset: the JSON from Presets › Save, or a PNG or SVG this app exported.`
 }

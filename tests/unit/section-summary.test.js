@@ -89,10 +89,10 @@ describe('the readouts follow the params', () => {
   })
 
   it('names the sheet marks rather than counting them', () => {
-    expect(atDefaults()['Scale and North']).toBe('—')
-    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true } })['Scale and North']).toBe('bar')
-    expect(atDefaults({ view: { ...VIEW_DEF, frameNorth: true } })['Scale and North']).toBe('north')
-    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true, frameNorth: true } })['Scale and North'])
+    expect(atDefaults()['Map Elements']).toBe('—')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true } })['Map Elements']).toBe('bar')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameNorth: true } })['Map Elements']).toBe('north')
+    expect(atDefaults({ view: { ...VIEW_DEF, frameScaleBar: true, frameNorth: true } })['Map Elements'])
       .toBe('bar · north')
   })
 

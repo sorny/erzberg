@@ -16,7 +16,7 @@ export const TITLE_LINES = [
   ['projection', 'Projection'],
   ['interval', 'Contour interval'],
   ['range', 'Height range'],
-  ['source', 'Source'],
+  ['source', 'Data source'],
   ['date', 'Date'],
 ]
 

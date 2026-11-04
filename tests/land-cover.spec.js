@@ -146,7 +146,7 @@ test('the class map names what the pointer is over, both ways round', async ({ p
   await page.fill('[data-testid="panel-filter"]', 'Land Cover')
   await page.waitForTimeout(600)
 
-  const section = page.locator('[data-section="Land Cover"]')
+  const section = page.locator('[data-section="Land Cover Data"]')
   const canvas = section.locator('canvas')
   await expect(canvas).toHaveCount(1)
   // The plate is drawn at its own grid, not the raster's, so the backing store

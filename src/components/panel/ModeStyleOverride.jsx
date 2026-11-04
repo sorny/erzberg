@@ -182,7 +182,7 @@ function MaskBlock({ prefix, style, ss }) {
     hasPainted && (style[`layerMask${prefix}`] ?? NO_MASKS) !== NO_MASKS,
     prefix !== 'Landform' && !!style[`formMask${prefix}`],
   ].filter(Boolean).length
-  const missing = [!hasPainted && 'painted masks (Terrain › Masks)', !hasPlate && 'land cover (Terrain › Land Cover)'].filter(Boolean)
+  const missing = [!hasPainted && 'painted masks (Terrain › Masks)', !hasPlate && 'land cover (Terrain › Land Cover Data)'].filter(Boolean)
   return (
     <Fold testId={`masks-${prefix}`} title="Masks" readout={active ? `${active} on` : 'none'} active={!!active}>
       <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>

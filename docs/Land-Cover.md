@@ -49,7 +49,7 @@ your projection, WGS84 and UTM to the nearest embedding. Any projection that
 ### 2. Load both
 
 With `--dem`, drop `<name>.landcover.json` on the window. Otherwise load
-`<name>.tif` first, then the plate. With no plate loaded, the **Land Cover**
+`<name>.tif` first, then the plate. With no plate loaded, the **Land Cover Data**
 section prints the exact command for the raster on screen.
 
 ---
@@ -126,7 +126,7 @@ classes is the useful range.
 
 ## Seeing where they are
 
-The Land Cover section draws the plate flat, at its own grid, in class colours.
+The Land Cover Data section draws the plate flat, at its own grid, in class colours.
 Point at the map to name a class. Point at a legend row to light up its class.
 One piece of state drives both. Other classes drop to low alpha, and the canvas
 is `image-rendering: pixelated`, so no blended colour suggests a false class.
@@ -161,7 +161,7 @@ was named after it.
 ## Class inks
 
 Each class starts in its plate colour, the mean imagery colour of the class.
-Change any class's swatch in the Land Cover section, or deal a palette
+Change any class's swatch in the Land Cover Data section, or deal a palette
 (Distinct, Earth, Riso) in class order. *Plate* goes back to the plate colours.
 The inks are one `coverInks` parameter. They can be undone, they stay with the
 plate when a preset is applied, and a new plate clears them. Every mode, the

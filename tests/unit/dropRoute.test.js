@@ -90,7 +90,7 @@ describe('explainDrop', () => {
   })
 
   it('points a photograph at the texture slot rather than calling it unsupported', () => {
-    expect(explainDrop('valley.jpg', [])).toContain('Texture')
+    expect(explainDrop('valley.jpg', [])).toContain('Image Overlay')
   })
 
   it('truncates a long name instead of filling the banner with it', () => {

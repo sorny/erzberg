@@ -1,5 +1,5 @@
 /**
- * My presets: looks kept in the browser beside the bundled ones.
+ * The preset shelf: looks kept in the browser beside the bundled ones.
  *
  * Saving a look used to download a file, and using it again meant finding that
  * file. The shelf keeps each look with a thumbnail in localStorage, and shows it
