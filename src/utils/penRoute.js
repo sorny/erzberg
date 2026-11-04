@@ -250,6 +250,199 @@ export function bridgeRuns(runs, gap) {
 }
 
 /**
+ * Enters each closed stroke at its vertex nearest the pen, after `orderRuns`.
+ *
+ * A closed contour has no ends, but it is written from wherever the builder
+ * started it, so the router can only reach it at that one seam. Rotated to
+ * start where the pen already is, the loop costs no travel to enter, and the
+ * pen leaves it from the same point. The ink is the same loop. A stroke is
+ * closed when its ends lie within `eps`. Run before `bridgeRuns`.
+ */
+export function reloopRuns(runs, eps) {
+  if (!runs?.length) return runs
+  let px = null, py = null
+  return runs.map((run) => {
+    let pts = run.pts
+    const n = pts.length >> 1
+    if (px !== null && n >= 4 &&
+        Math.hypot(pts[0] - pts[2 * n - 2], pts[1] - pts[2 * n - 1]) <= eps) {
+      let best = 0, bestD = Infinity
+      for (let i = 0; i < n - 1; i++) {
+        const d = Math.hypot(pts[2 * i] - px, pts[2 * i + 1] - py)
+        if (d < bestD) { bestD = d; best = i }
+      }
+      if (best > 0) {
+        const out = []
+        for (let k = 0; k < n - 1; k++) {
+          const i = (best + k) % (n - 1)
+          out.push(pts[2 * i], pts[2 * i + 1])
+        }
+        out.push(pts[2 * best], pts[2 * best + 1])
+        pts = out
+        run = { ...run, pts }
+      }
+    }
+    px = pts[pts.length - 2]
+    py = pts[pts.length - 1]
+    return run
+  })
+}
+
+/**
+ * Removes ink that an earlier stroke of the same layer already laid down.
+ *
+ * Adjacent areas trace their shared border twice, and a pen drawing it twice
+ * wets the paper and wastes the time. Each stroke is sampled every `tol / 2`.
+ * A sample is covered when a kept sample of an earlier stroke lies within `tol`
+ * and runs within about 25° of the same direction, so a line that crosses
+ * another is not cut where it crosses. A stroke is never tested against
+ * itself, so a loop keeps its close.
+ *
+ * Samples within `tol` of a stroke's ends never count, so pieces that meet end
+ * to end are not cut at the joint. A covered stretch inside a stroke is cut
+ * only when it is at least `minCut` long, because each cut costs a pen lift;
+ * one at either end always goes. Pieces left shorter than `tol` are dropped.
+ * Returns { runs, removed }, the ink removed.
+ */
+export function dedupeRuns(runs, tol, minCut = tol) {
+  if (!(tol > 0) || !runs?.length) return { runs, removed: 0 }
+  const spacing = tol / 2, t2 = tol * tol
+  const PARALLEL = 0.9
+  // Kept samples as x, y and a unit direction, in cells of `tol`.
+  const grid = new Map()
+  const cellKey = (cx, cy) => cx * 73856093 ^ cy * 19349663
+  const covered = (x, y, ux, uy) => {
+    const cx = Math.floor(x / tol), cy = Math.floor(y / tol)
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+      const cell = grid.get(cellKey(cx + dx, cy + dy))
+      if (!cell) continue
+      for (let i = 0; i < cell.length; i += 4) {
+        const ex = cell[i] - x, ey = cell[i + 1] - y
+        if (ex * ex + ey * ey < t2 && Math.abs(cell[i + 2] * ux + cell[i + 3] * uy) > PARALLEL) return true
+      }
+    }
+    return false
+  }
+  const out = []
+  for (const run of runs) {
+    const pts = run.pts
+    const total = runLength(pts)
+    // Samples as x, y, arc, vertex (1) or between vertices (0), direction.
+    const sm = []
+    let arc = 0
+    for (let i = 2; i < pts.length; i += 2) {
+      const ax = pts[i - 2], ay = pts[i - 1], bx = pts[i], by = pts[i + 1]
+      const len = Math.hypot(bx - ax, by - ay)
+      const ux = len > 0 ? (bx - ax) / len : 0, uy = len > 0 ? (by - ay) / len : 0
+      if (i === 2) sm.push(ax, ay, 0, 1, ux, uy)
+      const k = Math.max(1, Math.ceil(len / spacing))
+      for (let j = 1; j <= k; j++) {
+        const u = j / k
+        sm.push(ax + (bx - ax) * u, ay + (by - ay) * u, arc + len * u, j === k ? 1 : 0, ux, uy)
+      }
+      arc += len
+    }
+    const n = sm.length / 6
+    if (n < 2) { out.push(run); continue }
+    const inner = new Uint8Array(n), hit = new Uint8Array(n)
+    for (let s = 0; s < n; s++) {
+      const at = sm[6 * s + 2]
+      inner[s] = at >= tol && total - at >= tol ? 1 : 0
+      if (inner[s]) hit[s] = covered(sm[6 * s], sm[6 * s + 1], sm[6 * s + 4], sm[6 * s + 5]) ? 1 : 0
+    }
+    // A short covered stretch inside the stroke is drawn after all.
+    for (let s = 0; s < n;) {
+      if (!hit[s]) { s++; continue }
+      let e = s
+      while (e + 1 < n && hit[e + 1]) e++
+      let atStart = true, atEnd = true
+      for (let q = 0; q < s; q++) if (inner[q]) { atStart = false; break }
+      for (let q = e + 1; q < n; q++) if (inner[q]) { atEnd = false; break }
+      if (!atStart && !atEnd && sm[6 * e + 2] - sm[6 * s + 2] < minCut) for (let q = s; q <= e; q++) hit[q] = 0
+      s = e + 1
+    }
+    const kept = []
+    let first = -1, piece = null
+    const close = (last) => {
+      if (sm[6 * last + 2] - sm[6 * first + 2] >= tol) {
+        const m = piece.length
+        if (piece[m - 2] !== sm[6 * last] || piece[m - 1] !== sm[6 * last + 1]) piece.push(sm[6 * last], sm[6 * last + 1])
+        out.push({ ...run, pts: piece })
+      }
+      first = -1; piece = null
+    }
+    for (let s = 0; s < n; s++) {
+      const o = 6 * s
+      if (hit[s]) { if (piece) close(s - 1); continue }
+      if (inner[s]) kept.push(sm[o], sm[o + 1], sm[o + 4], sm[o + 5])
+      if (!piece) { first = s; piece = [sm[o], sm[o + 1]] } else if (sm[o + 3]) piece.push(sm[o], sm[o + 1])
+    }
+    if (piece) close(n - 1)
+    for (let i = 0; i < kept.length; i += 4) {
+      const k = cellKey(Math.floor(kept[i] / tol), Math.floor(kept[i + 1] / tol))
+      const cell = grid.get(k)
+      if (cell) cell.push(kept[i], kept[i + 1], kept[i + 2], kept[i + 3])
+      else grid.set(k, [kept[i], kept[i + 1], kept[i + 2], kept[i + 3]])
+    }
+  }
+  const before = runs.reduce((a, r) => a + runLength(r.pts), 0)
+  const after = out.reduce((a, r) => a + runLength(r.pts), 0)
+  return { runs: out, removed: Math.max(0, before - after) }
+}
+
+/**
+ * Each stroke drawn `passes` times, back and forth with the pen down, for an
+ * ink too light to cover in one pass. The pen turns at each end, so the extra
+ * passes cost no lifts.
+ */
+export function multipassRuns(runs, passes) {
+  const n = Math.max(1, Math.round(passes ?? 1))
+  if (n === 1) return runs
+  return runs.map((run) => {
+    const back = reversed(run.pts)
+    const out = run.pts.slice()
+    for (let p = 1; p < n; p++) {
+      const next = p % 2 ? back : run.pts
+      for (let i = 2; i < next.length; i++) out.push(next[i])
+    }
+    return { ...run, pts: out }
+  })
+}
+
+/** The share of the ink above which short strokes are the drawing, not strays. */
+const SHORT_INK = 0.02
+
+const step = (v, s, lo, hi) => Math.min(hi, Math.max(lo, Number((Math.round(v / s) * s).toFixed(2))))
+
+/**
+ * Clean-up values for a pen of `penMm` tip width, from what a pen can show.
+ *
+ * Simplify: a sixth of the tip, well inside the line the pen draws. Join gap:
+ * half the tip. Round caps on both ends already close most of such a gap, so
+ * the bridge adds almost no ink. Min length: the tip itself, since a stroke
+ * shorter than the nib draws as a dot. That holds only where such strokes are
+ * strays: when they carry more than SHORT_INK of the ink (`lengthsMm`, the
+ * whole strokes before clean-up), they are the drawing (hachures, ticks), and
+ * min length stays off. Hatch pitch: the tip, so hatch lines touch at full
+ * contrast. Dedupe: half the tip, where two strokes draw as one line. Plotter
+ * order goes on, because it cuts the most time. Passes are left as they are:
+ * they depend on the ink, which no measurement here can see.
+ */
+export function recommendPlot({ penMm = 0.3, lengthsMm = [] } = {}) {
+  const pen = Math.min(3, Math.max(0.05, penMm))
+  const ink = lengthsMm.reduce((a, l) => a + l, 0)
+  const short = ink > 0 ? lengthsMm.reduce((a, l) => a + (l < pen ? l : 0), 0) / ink : 0
+  return {
+    plotPenOrder: true,
+    plotSimplifyMm: step(pen / 6, 0.01, 0.01, 0.5),
+    plotJoinGapMm: step(pen / 2, 0.05, 0.05, 2),
+    plotMinLengthMm: short > SHORT_INK ? 0 : step(pen, 0.05, 0.05, 5),
+    plotDedupeMm: step(pen / 2, 0.05, 0.05, 1),
+    plotHatchPitch: step(pen, 0.05, 0.2, 5),
+  }
+}
+
+/**
  * How long a plot takes, given the one fact only the operator has.
  *
  * The exporter writes pixels, not millimetres — deliberately, and it is the same

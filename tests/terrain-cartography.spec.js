@@ -92,3 +92,21 @@ test('a landform mask says what it keeps, and All clears it', async ({ page }) =
   await page.locator('[data-section="Mode: Contours"]').getByRole('button', { name: 'All', exact: true }).click()
   await expect(readout).toHaveText('all')
 })
+
+// Form colour reads the Landforms mode's settings. They are editable where Form
+// is picked, with Landforms off, and they are the same keys the mode reads.
+test('Form colour shows the landform settings in the mode that picks it', async ({ page }) => {
+  await boot(page)
+  await setMark(page, 'Truchet', true)
+  await openMark(page, 'Truchet')
+  await page.click('[data-testid="colour-Truchet-form"]')
+  await openFold(page, 'form-inks-Truchet')
+  await page.locator('[data-testid="form-ink-Truchet-Ridge"]').fill('#123456')
+  await expect(page.locator('[data-testid="form-ink-Truchet-Ridge"]')).toHaveValue('#123456')
+  await expect(page.locator('[data-testid="form-search-Truchet"]')).toBeVisible()
+  // Mode: Landforms reads the same key. An off mode hides its controls.
+  await openStage(page, 'output')
+  await setMark(page, 'Landform', true)
+  await openMark(page, 'Landform')
+  await expect(page.locator('[data-section="Mode: Landforms"] input[aria-label="Ridge"]')).toHaveValue('#123456')
+})

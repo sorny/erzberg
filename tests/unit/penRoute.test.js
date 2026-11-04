@@ -8,7 +8,7 @@
  * changing the ink laid down. Every test here is one of those four things.
  */
 import { describe, expect, it } from 'vitest'
-import { bridgeRuns, dropShortRuns, orderRuns, plotEstimate, routeStats, simplifyRuns } from '../../src/utils/penRoute'
+import { bridgeRuns, dedupeRuns, dropShortRuns, multipassRuns, orderRuns, plotEstimate, recommendPlot, reloopRuns, routeStats, simplifyRuns } from '../../src/utils/penRoute'
 
 /** A horizontal stroke of length `len` starting at (x, y). */
 const stroke = (x, y, len = 10) => ({ pts: [x, y, x + len, y] })
@@ -182,5 +182,90 @@ describe('stroke clean-up', () => {
     const input = [run([0, 0, 1, 0]), run([1, 0, 2, 0])]
     bridgeRuns(input, 1)
     expect(input[0].pts).toEqual([0, 0, 1, 0])
+  })
+})
+
+describe('reloopRuns', () => {
+  // A square loop written from its top-left corner, and a pen that ends at its
+  // bottom-right: entered there, the loop costs no travel.
+  const square = { stroke: '#000', pts: [0, 0, 10, 0, 10, 10, 0, 10, 0, 0] }
+  const lead = { stroke: '#000', pts: [20, 20, 11, 11] }
+
+  it('enters a closed stroke at the vertex nearest the pen', () => {
+    const [, loop] = reloopRuns([lead, square], 1)
+    expect(loop.pts.slice(0, 2)).toEqual([10, 10])
+    expect(loop.pts.slice(-2)).toEqual([10, 10])
+    expect(routeStats(reloopRuns([lead, square], 1)).travel).toBeLessThan(routeStats([lead, square]).travel)
+  })
+
+  it('draws the same loop, and leaves open strokes alone', () => {
+    const [, loop] = reloopRuns([lead, square], 1)
+    expect(routeStats([loop]).ink).toBeCloseTo(routeStats([square]).ink, 9)
+    const open = { stroke: '#000', pts: [0, 0, 10, 0, 10, 10] }
+    expect(reloopRuns([lead, open], 1)[1]).toBe(open)
+  })
+})
+
+describe('recommendPlot', () => {
+  it('scales the clean-up with the pen tip', () => {
+    expect(recommendPlot({ penMm: 0.3 })).toEqual({
+      plotPenOrder: true, plotSimplifyMm: 0.05, plotJoinGapMm: 0.15, plotMinLengthMm: 0.3, plotDedupeMm: 0.15, plotHatchPitch: 0.3,
+    })
+    expect(recommendPlot({ penMm: 0.8 }).plotJoinGapMm).toBe(0.4)
+  })
+
+  it('keeps short strokes when they are the drawing', () => {
+    // Hachures: most of the ink is in ticks shorter than the pen.
+    const ticks = Array.from({ length: 100 }, (_, i) => (i < 90 ? 0.2 : 1))
+    expect(recommendPlot({ penMm: 0.3, lengthsMm: ticks }).plotMinLengthMm).toBe(0)
+    // Contours: many short blips, but almost none of the ink.
+    const strays = Array.from({ length: 100 }, (_, i) => (i < 40 ? 0.1 : 5))
+    expect(recommendPlot({ penMm: 0.3, lengthsMm: strays }).plotMinLengthMm).toBe(0.3)
+  })
+})
+
+describe('dedupeRuns', () => {
+  const line = (pts) => ({ stroke: '#000', pts })
+  it('removes a stroke drawn twice, and keeps the one before it', () => {
+    const a = line([0, 0, 100, 0]), b = line([100, 0.2, 0, 0.2])
+    const { runs, removed } = dedupeRuns([a, b], 1)
+    expect(runs).toHaveLength(1)
+    expect(routeStats(runs).ink).toBeCloseTo(100, 6)
+    expect(removed).toBeCloseTo(100, 0)
+  })
+
+  it('cuts only the shared part of a stroke', () => {
+    // b runs along a for 50 and then leaves it.
+    const a = line([0, 0, 50, 0]), b = line([0, 0, 50, 0, 50, 50])
+    const { runs } = dedupeRuns([a, b], 1)
+    const ink = routeStats(runs).ink
+    expect(ink).toBeGreaterThan(98)
+    expect(ink).toBeLessThan(103)
+  })
+
+  it('does not cut a line where another crosses it', () => {
+    const a = line([0, 50, 100, 50]), b = line([50, 0, 50, 100])
+    expect(dedupeRuns([a, b], 1).runs).toHaveLength(2)
+  })
+
+  it('leaves a short shared stretch inside a stroke, which would cost a lift', () => {
+    const a = line([40, 0, 42, 0]), b = line([0, 0.2, 100, 0.2])
+    expect(dedupeRuns([a, b], 1, 10).runs).toHaveLength(2)
+    expect(dedupeRuns([a, b], 1, 10).runs[1].pts).toEqual(b.pts)
+  })
+
+  it('does not cut pieces that meet end to end, or a closed loop', () => {
+    const pieces = [line([0, 0, 10, 0]), line([10, 0, 20, 0]), line([20, 0, 30, 0])]
+    expect(routeStats(dedupeRuns(pieces, 1).runs).ink).toBeCloseTo(30, 6)
+    const loop = line([0, 0, 10, 0, 10, 10, 0, 10, 0, 0])
+    expect(dedupeRuns([loop], 1).runs[0].pts).toEqual(loop.pts)
+  })
+})
+
+describe('multipassRuns', () => {
+  it('draws each stroke back and forth with the pen down', () => {
+    const [run] = multipassRuns([{ stroke: '#000', pts: [0, 0, 10, 0] }], 3)
+    expect(run.pts).toEqual([0, 0, 10, 0, 0, 0, 10, 0])
+    expect(multipassRuns([{ pts: [0, 0, 1, 1] }], 1)[0].pts).toEqual([0, 0, 1, 1])
   })
 })

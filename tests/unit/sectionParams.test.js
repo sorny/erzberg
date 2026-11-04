@@ -44,6 +44,8 @@ const ACTIONS = [
   // Extent reads the store and writes nothing — there is no setting on it to
   // put back, which is what this list means.
   'Extent',
+  // Export writes files. The plot settings it held moved to Plot.
+  'Export',
   // Land Cover is no longer here: it owns `coverInks`, the class colours, which
   // Reset puts back to the plate's own. The per-layer `coverMask*` keys it
   // gives meaning to still belong to the mode sections that render them.

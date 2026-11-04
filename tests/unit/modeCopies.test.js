@@ -10,7 +10,7 @@ import { buildTerrain } from '../../src/utils/terrain'
 import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
 import { geometryKey } from '../../src/params'
 import { classBit } from '../../src/utils/coverPlate'
-import { makeCopy, nextUid, ownedKeys, patchCopy } from '../../src/utils/modeCopies'
+import { makeCopy, nextUid, ownedKeys, patchCopy, sharedPatch } from '../../src/utils/modeCopies'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from '../../src/defaults'
 
 const W = 64
@@ -97,5 +97,17 @@ describe('the copy data', () => {
     const [out] = patchCopy([a], 'c1', { intervalContours: 9, spacingLines: 3 })
     expect(out.values.intervalContours).toBe(9)
     expect(out.values.spacingLines).toBeUndefined()
+  })
+})
+
+describe('a patch from a copy', () => {
+  // Form colour's landform inks belong to Mode: Landforms, so a copy of
+  // Truchet keeps its own colour source and passes the ink to the live style.
+  it('keeps its own keys and passes the shared ones on', () => {
+    const copy = makeCopy('Truchet', STYLE_DEF, [])
+    const patch = { hypsoTruchet: true, colorCLandform: '#123456' }
+    expect(patchCopy([copy], copy.uid, patch)[0].values).toMatchObject({ hypsoTruchet: true })
+    expect(patchCopy([copy], copy.uid, patch)[0].values.colorCLandform).toBeUndefined()
+    expect(sharedPatch('Truchet', patch)).toEqual({ colorCLandform: '#123456' })
   })
 })

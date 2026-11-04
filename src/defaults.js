@@ -818,6 +818,11 @@ export const VIEW_DEF = {
   plotSimplifyMm: 0,
   plotMinLengthMm: 0,
   plotJoinGapMm: 0,
+  plotDedupeMm: 0,
+  plotPasses: 1,
+  // The pen's tip width in mm. Only Recommended values reads it: the SVG
+  // keeps the stroke widths of the plate.
+  plotPenMm: 0.3,
   // Filled areas (Indexed, Mineral, Land cover, Watershed) as a fill or as hatch
   // strokes a pen can draw. The pitch is millimetres on paper at full contrast.
   plotAreaFill: 'solid', plotHatchPitch: 0.8, plotHatchAngle: 45,

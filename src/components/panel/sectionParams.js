@@ -84,7 +84,7 @@ export const SECTION_PARAMS = {
   'Draw Modes': ['modeCopies'],
   'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor',
     'frameMagnetic', 'frameTitle', 'frameTitleText', 'frameTitleFacts', 'frameGrid', 'frameGridUnits'],
-  'Export': ['plotWidthMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
+  'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
@@ -108,9 +108,9 @@ export const SECTION_PARAMS = {
 export const ALSO_READS = {
   'Anaglyph': ['bgColor', 'orthographic'],
   'Paper': ['plotWidthMm'],
-  'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm',
-    // The hatch controls show only while a mode that exports filled areas is on.
-    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
+  'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm'],
+  // The hatch controls show only while a mode that exports filled areas is on.
+  'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
   'Map Elements': ['orthographic', 'plotWidthMm', 'tilt'],
   'Image Overlay': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],

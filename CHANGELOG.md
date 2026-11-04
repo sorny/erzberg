@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.68.0] — 2026-11-04
+
+### Added
+
+- **Output › Plot**, a section of its own for the plot: sheet width, pen tip,
+  plotter order, the clean-up, filled areas and Preflight. Export keeps the
+  file buttons.
+- **Recommended values.** It runs Preflight, sets the clean-up from the pen tip
+  (simplify a sixth of the tip, join gap and dedupe half of it, min length and
+  hatch pitch the tip), turns plotter order on, and runs Preflight again. Min
+  length stays off where short strokes are the drawing: Preflight now measures
+  every whole stroke, and if strokes shorter than the tip carry more than 2% of
+  the ink, they are kept. Measured on the default plates at 0.3 mm, such strokes
+  carry 0.8% of the ink on Contours, 2.8% on Engraving and 44% on Hachure.
+- **Dedupe** leaves out ink that another stroke of the same pen layer already
+  draws within the distance, such as the side two pillars share. Only ink
+  within about 25° of the same direction counts, so crossing lines stay whole,
+  and a cut inside a stroke must save 2 mm, because each cut adds a pen lift.
+  At 0.15 mm it removes 17.9 m of 66.1 m on Pillars (90 to 74 min), 1.7 m on
+  Contours, 0.9 m on Truchet and 0.8 m on Cross.
+- **Passes** draws every stroke 2 to 4 times, back and forth with the pen down.
+- **Plotter order enters a closed stroke at its nearest point.** A closed
+  contour could only be reached where it was written to start.
+- **Form colour shows the landforms in its own layer.** A mode coloured by Form
+  has a Landforms fold with Search, Flat below, Blur and the ten inks. They
+  were set only in Mode: Landforms, which locks its controls while it is off.
+  Every layer and Mode: Landforms share them.
+
+### Changed
+
+- The rule that kept plotter-tool features out is lifted: path work that vpype
+  also does is in scope. G-code and HPGL stay out.
+
+### Fixed
+
+- **Min length deleted contour lines.** Contours reach the exporter as pieces
+  (57 000 on the default plate, median 0.26 mm), and min length ran before they
+  were joined, so 0.3 mm left out more than half of them. Join gap now runs
+  first, and min length judges whole strokes. Simplify runs last.
+- In a mode copy, a setting the copy does not own was dropped silently. It is
+  now written to the plate, where the copy reads it.
+
 ## [1.67.0] — 2026-11-04
 
 ### Changed

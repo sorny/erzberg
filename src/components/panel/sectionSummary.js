@@ -353,6 +353,8 @@ export function buildSectionSummaries({
   out['Anaglyph'] = when(view.anaglyph, `${num(view.anaglyphEye ?? 2)}× apart`)
   const sheet = [view.frameScaleBar && 'bar', view.frameNorth && 'north'].filter(Boolean)
   out['Map Elements'] = sheet.length ? sheet.join(' · ') : OFF
+  // The sheet and the pen, the two facts every number in Plot comes from.
+  out['Plot'] = `${view.plotWidthMm ?? 297} mm · ${(view.plotPenMm ?? 0.3).toFixed(2)} pen${view.plotPenOrder ? ' · ordered' : ''}`
 
   return out
 }

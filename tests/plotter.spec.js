@@ -14,18 +14,21 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { openStage, resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults, setMark } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
+// Plot holds the sheet, the order, the clean-up and Preflight; Export the files.
 async function openExport(page) {
   await openStage(page, 'output')
-  const section = page.locator('[data-testid="section-export"]')
-  await section.scrollIntoViewIfNeeded()
-  if ((await section.getAttribute('aria-expanded')) !== 'true') {
-    await section.click()
-    await page.waitForTimeout(300)
+  for (const id of ['section-plot', 'section-export']) {
+    const section = page.locator(`[data-testid="${id}"]`)
+    await section.scrollIntoViewIfNeeded()
+    if ((await section.getAttribute('aria-expanded')) !== 'true') {
+      await section.click()
+      await page.waitForTimeout(300)
+    }
   }
 }
 
@@ -165,4 +168,60 @@ test('join gap, min length and simplify shrink the file and say what they did', 
   expect(cleaned.length).toBeLessThan(plain.length)
   console.log(`[plotter] clean-up: ${strokes(before)} → ${strokes(after)} strokes, ` +
     `${points(plain)} → ${points(cleaned)} points, ${plain.length} → ${cleaned.length} bytes`)
+})
+
+// Recommended values come from the pen tip and the strokes Preflight measured:
+// on a plate of lines a short stroke is a stray, on a hachure plate it is the drawing.
+test('recommended values follow the pen, and keep the ticks of a hachure plate', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await openExport(page)
+  const value = async (id) => Number(await page.locator(`[data-testid="${id}"]`).inputValue())
+  await page.locator('[data-testid="plot-pen"]').fill('0.5')
+  await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  await page.locator('[data-testid="plot-recommend"]').click()
+  await expect(page.locator('[data-testid="plot-recommend-note"]')).toHaveText('Set for a 0.50 mm pen.', { timeout: 60_000 })
+  await expect(page.locator('[data-testid="preflight-readout"]')).toContainText('pen up', { timeout: 60_000 })
+  expect(await value('plot-join-gap')).toBeCloseTo(0.25, 5)
+  expect(await value('plot-min-length')).toBeCloseTo(0.5, 5)
+  expect(await value('plot-simplify')).toBeCloseTo(0.08, 5)
+  expect(await value('plot-dedupe')).toBeCloseTo(0.25, 5)
+  await expect(page.locator('[data-testid="plot-order"]')).toBeChecked()
+
+  await setMark(page, 'Lines', false)
+  await setMark(page, 'Hachure', true)
+  await openExport(page)
+  await page.locator('[data-testid="plot-recommend"]').click()
+  await expect(page.locator('[data-testid="plot-recommend-note"]')).toContainText('min length off', { timeout: 60_000 })
+  expect(await value('plot-min-length')).toBe(0)
+})
+
+// Pillars draw the sides two columns share twice; Dedupe leaves the second out.
+// Passes draw every stroke again with the pen down: more ink, the same strokes.
+test('dedupe leaves out shared sides, and passes add ink but no strokes', async ({ page }) => {
+  test.setTimeout(240_000)
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await setMark(page, 'Lines', false)
+  await setMark(page, 'Pillars', true)
+  await openExport(page)
+  const blur = () => page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
+  const ink = (t) => Number(/ink ([\d.]+) m/.exec(t)[1])
+  const strokes = (t) => Number(/([\d,]+) strokes/.exec(t)[1].replace(/,/g, ''))
+  const plain = await preflight(page)
+  await page.locator('[data-testid="plot-dedupe"]').fill('0.15')
+  await blur()
+  await page.waitForTimeout(400)
+  const deduped = await preflight(page)
+  expect(ink(deduped)).toBeLessThan(ink(plain) * 0.9)
+  await expect(page.locator('[data-testid="preflight-cleanup"]')).toContainText('drawn twice left out')
+  await page.locator('[data-testid="plot-passes"]').fill('2')
+  await blur()
+  await page.waitForTimeout(400)
+  const twice = await preflight(page)
+  expect(strokes(twice)).toBe(strokes(deduped))
+  expect(ink(twice)).toBeCloseTo(ink(deduped) * 2, 0)
 })

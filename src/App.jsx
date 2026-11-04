@@ -1421,7 +1421,9 @@ export default function App() {
   const [preflightTrigger, setPreflightTrigger] = useState(0)
   const [plotStats, setPlotStats] = useState(null)
   const beginPreflight = useCallback(() => {
-    if (beginExport('preflight')) setPreflightTrigger(n => n + 1)
+    const ok = beginExport('preflight')
+    if (ok) setPreflightTrigger(n => n + 1)
+    return !!ok
   }, [beginExport])
 
   const [pngTrigger,        setPngTrigger]         = useState(0)
