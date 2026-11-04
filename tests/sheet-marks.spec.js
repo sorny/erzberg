@@ -13,7 +13,7 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { openStage, resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults, clickExport } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
@@ -134,6 +134,6 @@ test('the SVG carries the marks as their own plotter layer', async ({ page }) =>
   // no reading a distance back out of pixels, so what this asserts is that the
   // third renderer runs at all — a throw in it would take the whole export down.
   const png = page.waitForEvent('download', { timeout: 120_000 })
-  await page.keyboard.press('Digit2')
+  await clickExport(page, 'png')
   expect((await (await png).path()).length).toBeGreaterThan(0)
 })

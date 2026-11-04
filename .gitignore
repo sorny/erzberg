@@ -49,3 +49,9 @@ public/overpass-local.poly
 **/.impeccable/live/deferred-svelte-component-accepts.json
 **/.impeccable/live/*.png
 # impeccable-ignore-end
+
+# Python package
+python/.venv/
+python/**/__pycache__/
+python/**/*.egg-info/
+python/.pytest_cache/

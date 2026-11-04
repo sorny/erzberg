@@ -21,7 +21,8 @@ import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
-import { PAPERS, frameRect, paperAspect, paperRatioLabel } from '../utils/frame'
+import { PAPERS, frameRect, paperAspect, paperRatioLabel, printPixels } from '../utils/frame'
+import { TITLE_LINES } from '../utils/sheetFacts'
 import { formatClock, zoneForLongitude } from '../utils/solar'
 
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
@@ -33,7 +34,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, ON_IMAGE, ON_IMAGE_SCRIM, ON_IMAGE_SHADOW, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, Fold, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, ON_IMAGE, ON_IMAGE_SCRIM, ON_IMAGE_SHADOW, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
 import { reachError } from '../utils/netError'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, STAGES, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
@@ -670,6 +671,67 @@ const WAVE_GUIDE_KEY = 'erzberg.waveformGuide'
 // The stages that show the build readout under their pane.
 const STATS_STAGES = [1, 2, 3, 6]
 
+/**
+ * My presets: the looks kept in this browser, as tiles like the bundled ones,
+ * with a name field to keep the current look and the shelf as a file.
+ */
+function PresetShelf({ shelf, keep, apply, remove, saveFile, openFile }) {
+  const [name, setName] = useState('')
+  const onKeep = () => { keep(name); setName('') }
+  return (
+    <div data-testid="preset-shelf">
+      <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>
+        My presets <span style={{ color: MUTED, fontWeight:400, fontFamily: MONO }}>{shelf.length}</span>
+      </div>
+      {shelf.length > 0 && (
+        <div role="group" aria-label="My presets" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
+          {shelf.map((e) => (
+            <div key={e.name} style={{ position:'relative' }}>
+              <button className="hmpreset" data-testid={`shelf-${e.name}`} title={e.name} aria-label={e.name}
+                onClick={() => apply(e)}
+                style={{ position:'relative', display:'block', width:'100%', padding: e.thumb ? 0 : '6px 4px', fontSize:10,
+                         background: SURF, color: DIM, border:`1px solid ${BORDER}`, borderRadius:5,
+                         overflow:'hidden', lineHeight:0, cursor:'pointer' }}>
+                {e.thumb && <img src={e.thumb} alt="" style={{ display:'block', width:'100%', aspectRatio:'16/10', objectFit:'cover' }} />}
+                <span style={{ display:'block', lineHeight:1.2,
+                  ...(e.thumb ? { position:'absolute', left:0, right:0, bottom:0, padding:'16px 5px 3px',
+                    background: ON_IMAGE_SCRIM, color: ON_IMAGE, fontSize:11, textShadow: ON_IMAGE_SHADOW,
+                    overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', textAlign:'left' } : {}) }}>{e.name}</span>
+              </button>
+              <button data-testid={`shelf-remove-${e.name}`} onClick={() => remove(e.name)}
+                title={`Remove ${e.name}`} aria-label={`Remove ${e.name}`}
+                style={{ position:'absolute', top:3, right:3, width:16, height:16, padding:0, lineHeight:1,
+                         fontSize:10, border:0, borderRadius:3, background: GLASS_BG, color: STRONG, cursor:'pointer' }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display:'flex', gap:4 }}>
+        <input data-testid="shelf-name" value={name} onChange={(ev) => setName(ev.target.value)}
+          onKeyDown={(ev) => { if (ev.key === 'Enter') onKeep() }}
+          placeholder="Name" aria-label="Name of the preset to keep" maxLength={60}
+          style={{ flex:1, minWidth:0, fontSize:11, padding:'4px 6px', background: SUNK, color: TEXT,
+                   border:`1px solid ${BORDER}`, borderRadius:3, fontFamily: FONT }} />
+        <Btn onClick={onKeep} data-testid="shelf-keep" title="Keep the current look in this browser">Keep</Btn>
+      </div>
+      <div style={{ display:'flex', gap:4, marginTop:4 }}>
+        <Btn block size="xs" variant="ghost" onClick={saveFile} disabled={!shelf.length} data-testid="shelf-save">Shelf ⬇</Btn>
+        <Btn block size="xs" variant="ghost" onClick={openFile} data-testid="shelf-open">Shelf ⬆</Btn>
+      </div>
+    </div>
+  )
+}
+
+/** One kind of export under Other files: a small label, then its buttons. */
+function ExportGroup({ title, children }) {
+  return (
+    <div data-testid={`export-group-${title.toLowerCase().replace(/\s+/g, '-')}`} style={{ marginBottom:6 }}>
+      <div style={{ fontSize:10, color: MUTED, marginBottom:3 }}>{title}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4 }}>{children}</div>
+    </div>
+  )
+}
+
 /** Camera controls that the view lock turns off. A disabled fieldset disables every input in it. */
 function CamLock({ on, children }) {
   return (
@@ -714,10 +776,15 @@ export function Sidebar({
   imagery, imageryBusy, onFetchImagery, onClearImagery,
   onCustomIcon, iconOverflow, labelOverflow,
   onCameraPreset,
-  onSvg, onPng, onPngAlpha, onStl, onHeightmap, onGeoTiff, onGeoTiffBand,
+  onSvg, onPng, onPngAlpha, onStl, onHeightmap, onGeoTiff, onGeoTiffBand, onGeoJson,
+  onRouteProfile, onSendBand, onModel,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
+  // My presets: { shelf, keep, apply, remove, saveFile, openFile }, from usePresetShelf.
+  presetShelf,
+  // The project file: the look and everything it is drawn over, in one .erzberg.
+  onSaveProject, onOpenProject,
   // The plotter preflight: a run of the SVG pipeline that writes no file, and
   // the four numbers it comes back with.
   onPreflight, plotStats,
@@ -1911,9 +1978,10 @@ export function Sidebar({
               </div>
             )}
 
-            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'8px 0 4px' }}>
-              Styles <span style={{ color: MUTED, fontWeight:400, fontFamily: MONO }}>{presetNames.length}</span>
-            </div>
+            {/* The bundled styles fold away, so the shelf and the files under
+                them are one click from the top. Open at first: it is what
+                most visits come here for. */}
+            <Fold title="Styles" readout={presetNames.length} defaultOpen testId="preset-styles">
             {/* One Tab stop for the grid, walked with the arrows, the way the
                 Marks sheet is: sixty-six tiles were sixty-six stops before
                 anything else in the panel. The stop sits on the picked style. */}
@@ -1996,6 +2064,7 @@ export function Sidebar({
                 )
               })}
             </div>
+            </Fold>
             {/* The look as a file, beside the looks the app ships. It sat under
                 Output among the exports, which made a project file one of eight
                 equal buttons next to WebM, and put "open a look" two stages from
@@ -2012,6 +2081,7 @@ export function Sidebar({
             <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
               A PNG or SVG from this app opens here too: it carries its preset.
             </div>
+            {presetShelf && <PresetShelf {...presetShelf} />}
           </Section>
 
           </Stage>
@@ -2028,7 +2098,7 @@ export function Sidebar({
                 {heightmapFilename}
               </div>
             )}
-            <BandPicker onPick={onGeoTiffBand} />
+            <BandPicker onPick={onGeoTiffBand} onSend={onSendBand} />
 
             {/* Which look is on, and a way to the other 55.
                 Opening the Presets section is not enough on its own: it is the
@@ -2551,8 +2621,8 @@ export function Sidebar({
               )}
               {imagery && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <CoverFact label="Scene" value={imagery.date} />
-                  <CoverFact label="Cloud" value={`${Math.round(imagery.cloud)}%`} />
+                  <CoverFact label={imagery.source ? 'Source' : 'Scene'} value={imagery.source ?? imagery.date} />
+                  {imagery.cloud != null && <CoverFact label="Cloud" value={`${Math.round(imagery.cloud)}%`} />}
                   <CoverFact label="Size" value={`${imagery.width} × ${imagery.height}`} />
                 </div>
               )}
@@ -2974,6 +3044,7 @@ export function Sidebar({
                 onReorder={onReorderVectorLayer}
                 onRemoveSource={onRemoveVectorSource}
                 onAdopt={onAdoptVectorSource} onError={onVectorError}
+                onProfile={onRouteProfile}
                 identify={vectorIdentify} onIdentify={onVectorIdentify}
                 onCustomIcon={onCustomIcon} iconOverflow={iconOverflow}
                 labelOverflow={labelOverflow}
@@ -3341,7 +3412,7 @@ export function Sidebar({
           <Section title="Paper" open={sec.paper} onToggle={() => tog('paper')} enabled={!!view.showFrame}
                    blurb="A frame in the shape of a sheet. The SVG cuts at it.">
             <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
-              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export, and it does not affect PNG or STL." />
+              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export. PNG keeps its trimmed capture unless Print size is set, and STL ignores the frame." />
             {view.showFrame && (
               <Sub>
                 <SelectRow label="Paper" testId="frame-paper" value={view.framePaper ?? 'iso'}
@@ -3371,6 +3442,15 @@ export function Sidebar({
                 <InlineSl label="Offset Y" min={-0.5} max={0.5} step={0.005} value={view.frameOffsetY ?? 0} onChange={v => sv({ frameOffsetY: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-offset-y" />
                 <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
                   help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
+                <SegRow label="Print size" testIdPrefix="frame-dpi"
+                  options={[['Trim', 0], ['150', 150], ['300', 300], ['600', 600]]}
+                  value={view.framePrintDpi ?? 0} onChange={v => sv({ framePrintDpi: v })}
+                  help="How finely the PNG is printed, in dots per inch (DPI). Trim writes the drawing cut to its ink, as before. A DPI writes the whole sheet at the Sheet width under Output, so a 297 mm sheet at 300 DPI is 3508 pixels wide. The DPI is stored in the file, so a print program sizes it right. A sheet too large for the graphics card is written at the highest DPI that fits." />
+                {(view.framePrintDpi ?? 0) > 0 && (() => {
+                  const px = printPixels(view.plotWidthMm ?? 297, view.framePrintDpi,
+                    paperAspect(view.framePaper ?? 'iso', !!view.frameLandscape, view.frameCustomRatio))
+                  return <div data-testid="print-pixels"><Note>{`${px.w} × ${px.h} px · ${view.plotWidthMm ?? 297} mm wide`}</Note></div>
+                })()}
               </Sub>
             )}
           </Section>
@@ -3382,14 +3462,59 @@ export function Sidebar({
               different pen. See utils/sheetMarks.js. */}
           <Section title="Scale and North" open={sec.sheetMarks} onToggle={() => tog('sheetMarks')}
                    enabled={summaries['Scale and North'] !== '—'}
-                   blurb="A scale bar and a grid north arrow on the sheet, from a georeferenced GeoTIFF.">
+                   blurb="A scale bar, north arrows, a title block and coordinates on the sheet.">
             <Tog label="Scale bar" testId="mark-bar"
                  help="A bar of round length — 200 m, 500 m, 1 km — measured from this raster's own bounding box. Needs a georeferenced GeoTIFF: a PNG heightmap has no ground to measure."
                  checked={!!view.frameScaleBar} onChange={v => sv({ frameScaleBar: v })} />
             <Tog label="North arrow" testId="mark-north"
                  help="Points along the raster's own rows, and turns with the camera. It is grid north, which is not true north away from a projection's central meridian."
                  checked={!!view.frameNorth} onChange={v => sv({ frameNorth: v })} />
-            {(view.frameScaleBar || view.frameNorth) && (
+            {view.frameNorth && (
+              <Sub>
+                <Tog label="Magnetic north" testId="mark-magnetic" small
+                  help="Points the north arrow where a compass points, labelled MN, with the declination under it, in place of grid north. Computed for the plate's centre and today from the World Magnetic Model 2025 (NOAA and BGS), which holds until 2030. Grid north and true north differ too, away from a projection's central meridian, and the arrow includes that turn."
+                  checked={!!view.frameMagnetic} onChange={v => sv({ frameMagnetic: v })} />
+              </Sub>
+            )}
+            <Tog label="Title block" testId="mark-title"
+              help="A block in the top left of the sheet: a title, then facts the plate already knows. A fact the plate does not have is left out. Needs no georeference, so a PNG heightmap gets a title too."
+              checked={!!view.frameTitle} onChange={v => sv({ frameTitle: v })} />
+            {view.frameTitle && (
+              <Sub>
+                <input data-testid="mark-title-text" value={view.frameTitleText ?? ''} maxLength={80}
+                  onChange={(e) => sv({ frameTitleText: e.target.value })}
+                  placeholder="Title (the file name if empty)" aria-label="Title"
+                  style={{ width:'100%', boxSizing:'border-box', fontSize:11, padding:'4px 6px', marginBottom:6,
+                           background: SUNK, color: TEXT, border:`1px solid ${BORDER}`, borderRadius:3, fontFamily: FONT }} />
+                {TITLE_LINES.map(([key, label]) => {
+                  const on = String(view.frameTitleFacts ?? '').split(',').includes(key)
+                  return (
+                    <Tog key={key} label={label} small testId={`mark-title-${key}`} checked={on}
+                      onChange={(v) => {
+                        const set = new Set(String(view.frameTitleFacts ?? '').split(',').filter(Boolean))
+                        if (v) set.add(key); else set.delete(key)
+                        sv({ frameTitleFacts: TITLE_LINES.map(([k]) => k).filter((k) => set.has(k)).join(',') })
+                      }} />
+                  )
+                })}
+              </Sub>
+            )}
+            <SegRow label="Grid" testIdPrefix="mark-grid"
+              options={[['Off', 'off'], ['Ticks', 'ticks'], ['Lines', 'lines']]}
+              value={view.frameGrid ?? 'off'} onChange={v => sv({ frameGrid: v })}
+              help="Coordinates along the sheet's edge, at a round interval: ticks at the edge, or lines across the whole sheet. Drawn in a plan view only, with the tilt below 6°, because a tilted plate is at a different scale at its far side. Needs a georeferenced GeoTIFF." />
+            {(view.frameGrid ?? 'off') !== 'off' && (
+              <Sub>
+                <SegRow label="Units" testIdPrefix="mark-grid-units"
+                  options={[['Grid', 'grid'], ['Degrees', 'degrees']]}
+                  value={view.frameGridUnits ?? 'grid'} onChange={v => sv({ frameGridUnits: v })}
+                  help="Grid writes the raster's own coordinates, in metres for a projected file. Degrees writes longitude and latitude, as curves where the projection bends them." />
+                {(view.tilt ?? 0) >= 6 && (
+                  <Note>Tilt the camera below 6° to draw the grid.</Note>
+                )}
+              </Sub>
+            )}
+            {(view.frameScaleBar || view.frameNorth || view.frameTitle || (view.frameGrid ?? 'off') !== 'off') && (
               <Sub>
                 <InlineSl label="Size" min={0.4} max={3} step={0.05} value={view.frameMarkScale ?? 1}
                   onChange={v => sv({ frameMarkScale: v })} fmt={v => v.toFixed(2) + '×'} testId="mark-size" />
@@ -3584,19 +3709,39 @@ export function Sidebar({
                 }} />
             </div>
 
-            {/* The other files: pictures, a print, a recording and the raster.
-                Equal to each other, and second to the plot. */}
+            {/* The other files, second to the plot and grouped by what each
+                is for: a picture, a solid to print, map data for a GIS, and a
+                recording with its length beside it. Only SVG keeps a key. */}
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginBottom:4 }}>
-              <ExpBtn label="PNG" shortcut="2" onClick={onPng} testId="export-png" />
-              <ExpBtn label="PNG α" shortcut="3" onClick={onPngAlpha} testId="export-png-alpha" />
-              <ExpBtn label="STL" shortcut="4" onClick={onStl} testId="export-stl" />
-              {/* The cap stays while recording: 5 is also how it stops. */}
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} shortcut="5" onClick={onWebmToggle} active={webmActive} />
-              <ExpBtn label="Heightmap" shortcut="6" onClick={onHeightmap} testId="export-heightmap" />
-              <ExpBtn label="GeoTIFF" shortcut="7" onClick={onGeoTiff} testId="export-geotiff" />
-            </div>
+            <ExportGroup title="Images">
+              <ExpBtn label="PNG" onClick={onPng} testId="export-png" />
+              <ExpBtn label="PNG α" onClick={onPngAlpha} testId="export-png-alpha" />
+            </ExportGroup>
+            <ExportGroup title="3D models">
+              <ExpBtn label="STL" onClick={onStl} testId="export-stl" />
+              <ExpBtn label="glTF" onClick={() => onModel?.('glb')} testId="export-glb" />
+              <ExpBtn label="3MF" onClick={() => onModel?.('3mf')} testId="export-3mf" />
+            </ExportGroup>
+            <ExportGroup title="Map data">
+              <ExpBtn label="GeoTIFF" onClick={onGeoTiff} testId="export-geotiff" />
+              <ExpBtn label="GeoJSON" onClick={onGeoJson} testId="export-geojson" />
+              <ExpBtn label="Heightmap" onClick={onHeightmap} testId="export-heightmap" />
+            </ExportGroup>
+            <ExportGroup title="Video">
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} testId="export-webm" />
+            </ExportGroup>
             <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
+            {/* The whole plate as one file, last because it is not a picture of
+                it: the terrain, the look and every layer, to open again here. */}
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Project</div>
+            <div style={{ display:'flex', gap:4 }}>
+              <Btn block onClick={onSaveProject} data-testid="project-save"
+                title="One .erzberg file with the terrain, the look, the camera, the vectors, the text and the masks">Save ⬇</Btn>
+              <Btn block onClick={() => { spendOpening(); onOpenProject?.() }} data-testid="project-open">Open ⬆</Btn>
+            </div>
+            <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
+              A project reopens the plate exactly, with its terrain. A preset carries the look only.
+            </div>
           </Section>
 
           {/* ── Analysis ───────────────────────────────────────────────────── */}

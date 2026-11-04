@@ -666,6 +666,8 @@ export function VectorLayersPanel({
   sources, layers,
   onLoadGpx, onLoadGeoJson, onLoadShapefile, onLoadKml, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
   identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, viewTilt, viewSpin,
+  // The elevation profile along a line layer: a GPX track, or a layer of one line.
+  onProfile,
 }) {
   const [expanded, setExpanded] = useState(null)
   const [featuresOpen, setFeaturesOpen] = useState(null)
@@ -942,6 +944,16 @@ export function VectorLayersPanel({
                          onChange={(v) => onPatch(l.id, { stlRibbon: v })} />
                   </div>
                 )}
+                {l.geom === 'line' && onProfile && (() => {
+                  const src = sources?.find((x) => x.id === l.sourceId)
+                  const bucket = src?.buckets.find((b) => b.key === l.bucket)
+                  if (!bucket || (src.kind !== 'gpx' && bucket.count !== 1)) return null
+                  return (
+                    <Btn block onClick={() => onProfile(l)} data-testid={`vector-profile-${l.id}`}
+                      title="The terrain under this line, with its length, ascent and descent"
+                      style={{ marginTop: 4 }}>Elevation profile</Btn>
+                  )
+                })()}
 
                 {l.geom === 'point' && (
                   <IconPicker layer={l} onPatch={onPatch} onCustom={onCustomIcon}

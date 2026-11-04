@@ -43,6 +43,17 @@ function editMaskFor(edit, srcMask, w, h) {
   return value
 }
 
+/**
+ * Any plane on the source grid, clipped as the raster is: a GeoTIFF band sent
+ * to the drape has to land on the grid the drape is drawn on.
+ */
+export function clipLikeRaster(s, values) {
+  if (!s.edit) return { values, width: s.srcWidth, height: s.srcHeight }
+  const pre = editMaskFor(s.edit, s.srcMask, s.srcWidth, s.srcHeight)
+  const out = applyEdit({ pixels: values, mask: s.srcMask, width: s.srcWidth, height: s.srcHeight }, s.edit, pre)
+  return { values: out.pixels, width: out.width, height: out.height }
+}
+
 /** The clipped raster + geo extent the app renders, given the source and edit. */
 function derive(s) {
   if (!s.srcPixels || !s.edit) {
@@ -306,7 +317,11 @@ export const useStore = create((set) => ({
     set((s) => {
       const prev = s.mapScale
       if (prev === next) return {}
-      if (prev && next
+      // A grid also moves with a pan, which changes neither figure, so its
+      // mapping is compared too, to a tenth of a pixel at the plate's corners.
+      const sameGrid = !prev?.affine === !next?.affine && (!next?.affine
+        || next.affine.every((v, i) => Math.abs(v - prev.affine[i]) <= Math.abs(prev.affine[i]) * 1e-6 + (i % 3 === 2 ? 0.1 : 0)))
+      if (prev && next && sameGrid
         && Math.abs(prev.metresPerPixel - next.metresPerPixel) < prev.metresPerPixel * 5e-4
         && Math.abs(prev.northAngle - next.northAngle) < 0.0017) return {}
       return { mapScale: next }

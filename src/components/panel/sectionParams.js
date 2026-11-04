@@ -77,12 +77,13 @@ export const SECTION_PARAMS = {
   'Camera': ['tilt', 'rotation', 'zoom', 'renderScale', 'showGuides', /^autoRotate/,
     'fov', 'orthographic', 'planOblique', 'obliqueAngle', 'panX', 'panY', 'panZ'],
   'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
-    'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin'],
+    'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin', 'framePrintDpi'],
   'Anaglyph': [/^anaglyph/],
   'Land Cover': ['coverInks'],
   // Every mode section lists its own copies, and the list is one key for all.
   'Draw Modes': ['modeCopies'],
-  'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor'],
+  'Scale and North': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor',
+    'frameMagnetic', 'frameTitle', 'frameTitleText', 'frameTitleFacts', 'frameGrid', 'frameGridUnits'],
   'Export': ['plotWidthMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
@@ -106,6 +107,7 @@ export const SECTION_PARAMS = {
  */
 export const ALSO_READS = {
   'Anaglyph': ['bgColor', 'orthographic'],
+  'Paper': ['plotWidthMm'],
   'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm',
     // The hatch controls show only while a mode that exports filled areas is on.
     'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed',

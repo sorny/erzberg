@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { openMark, openStage, resetToDefaults } from './helpers.js'
+import { openMark, openStage, resetToDefaults, clickExport } from './helpers.js'
 import { SECTION_TERMS } from '../src/components/panel/sectionTerms.js'
 import { PANEL_MODES } from '../src/components/panel/sectionSummary.js'
 import { STAGE_OF } from '../src/components/panel/stages.js'
@@ -176,7 +176,7 @@ test.describe('panel', () => {
   test('the transparent PNG toast names the file that was written', async ({ page }) => {
     await openApp(page)
     const download = page.waitForEvent('download', { timeout: 60000 })
-    await page.keyboard.press('3')
+    await clickExport(page, 'png-alpha')
     const written = (await download).suggestedFilename()
     await page.waitForTimeout(700)
     const toast = await page.textContent('[data-testid="toast"]')

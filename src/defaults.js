@@ -768,6 +768,10 @@ export const VIEW_DEF = {
   // margin is a fraction of the frame's shorter side. See utils/frame.js.
   showFrame: false, framePaper: 'iso', frameLandscape: false, frameCustomRatio: 1.414,
   frameScale: 0.85, frameOffsetX: 0, frameOffsetY: 0, frameMargin: 0,
+  // The PNG at print size: the sheet alone, `plotWidthMm` wide at this many
+  // dots per inch, with the DPI written into the file. 0 keeps the trimmed
+  // capture.
+  framePrintDpi: 0,
   // The two marks that say where the sheet is and which way up it goes. Both
   // are ink: they are drawn in the viewport, composited into the PNG and
   // written into the SVG as their own Inkscape layer. Named `frame*` because
@@ -776,6 +780,13 @@ export const VIEW_DEF = {
   // the terrain. See utils/sheetMarks.js.
   frameScaleBar: false, frameNorth: false,
   frameMarkScale: 1, frameMarkColor: '#000000',
+  // More of the sheet, drawn with the same ink: magnetic north beside the
+  // arrow, a title block of facts the plate already knows, and coordinate
+  // ticks or a grid along the edge, in the raster's grid or in degrees. See
+  // utils/sheetFacts.js.
+  frameMagnetic: false,
+  frameTitle: false, frameTitleText: '', frameTitleFacts: 'projection,interval,range,source,date',
+  frameGrid: 'off', frameGridUnits: 'grid',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
   // A modifier rather than a mode: it takes whatever the fifty-six modes are

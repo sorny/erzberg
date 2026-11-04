@@ -82,7 +82,7 @@ function textChunk(keyword, text) {
  * is exactly the kind of thing worth asserting in Node rather than inferring
  * from a downloaded file eleven seconds into a Playwright spec.
  */
-export function withTextChunks(png, entries) {
+export function withTextChunks(png, entries, dpi = 0) {
   const bytes = new Uint8Array(png)
   const SIG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
   if (bytes.length < 8 + 25 || SIG.some((b, i) => bytes[i] !== b)) return bytes
@@ -93,6 +93,7 @@ export function withTextChunks(png, entries) {
   if (insertAt > bytes.length) return bytes
 
   const chunks = entries.map(([k, v]) => textChunk(k, v)).filter(Boolean)
+  if (dpi > 0) chunks.unshift(physChunk(dpi))
   if (!chunks.length) return bytes
 
   const extra = chunks.reduce((n, c) => n + c.length, 0)
@@ -102,6 +103,21 @@ export function withTextChunks(png, entries) {
   for (const c of chunks) { out.set(c, off); off += c.length }
   out.set(bytes.subarray(insertAt), off)
   return out
+}
+
+/**
+ * A `pHYs` chunk: the pixel density, in pixels per metre on both axes. A
+ * print program reads it as the DPI, so the sheet comes out at its size.
+ */
+function physChunk(dpi) {
+  const ppm = Math.round(dpi / 0.0254)
+  const chunk = new Uint8Array(12 + 9)
+  const dv = new DataView(chunk.buffer)
+  dv.setUint32(0, 9)
+  chunk.set([0x70, 0x48, 0x59, 0x73], 4)                 // "pHYs"
+  dv.setUint32(8, ppm); dv.setUint32(12, ppm); chunk[16] = 1   // 1: the unit is the metre
+  dv.setUint32(17, crc32(chunk.subarray(4, 17)))
+  return chunk
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -150,15 +166,15 @@ function triggerDownload(url, filename, revoke = false) {
  * would inflate it by a third only to be parsed straight back down again.
  * Asynchronous, which is why every caller returns the promise.
  */
-function downloadCanvas(canvas, filename, meta) {
+function downloadCanvas(canvas, filename, meta, dpi = 0) {
   return new Promise((resolve) => {
     canvas.toBlob(async (blob) => {
       if (!blob) { resolve(false); return }
       const entries = Object.entries(meta || {}).filter(([, v]) => v)
       let out = blob
-      if (entries.length) {
+      if (entries.length || dpi > 0) {
         try {
-          out = new Blob([withTextChunks(await blob.arrayBuffer(), entries)], { type: 'image/png' })
+          out = new Blob([withTextChunks(await blob.arrayBuffer(), entries, dpi)], { type: 'image/png' })
         } catch { out = blob }
       }
       const url = URL.createObjectURL(out)
@@ -214,9 +230,11 @@ function trimAndDownload(compositeCtx, maskData, width, height, filename, meta) 
  * @param {string|null}       attribution  ODbL credit, when OSM data is in the picture
  * @param {string|null}       presetText   the look as ASCII JSON, so the plate reopens
  * @param {object|null}       marks     scale bar and north arrow, from sheetMarks()
+ * @param {number}            dpi       above 0, the capture is the sheet at print size:
+ *                                      it is written whole, untrimmed, with this DPI
  */
 export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
-                                    attribution = null, presetText = null, marks = null) {
+                                    attribution = null, presetText = null, marks = null, dpi = 0) {
   const { width, height } = glCanvas
   const out = document.createElement('canvas')
   out.width = width
@@ -250,8 +268,6 @@ export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
   // margin is exactly the thing that scan calls empty.
   if (marks) { drawMarks(ctx, marks, marks.color); drawMarks(maskCtx, marks, '#000000') }
 
-  const maskData = maskCtx.getImageData(0, 0, width, height).data
-
   const base = baseName ?? 'heightmap'
   // ODbL: the credit travels with the picture, not with the app that drew it.
   // `Copyright` is the keyword every reader already looks for, and unlike the
@@ -260,7 +276,11 @@ export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
   // The preset rides in the chunk beside it, under a keyword of erzberg's own.
   // Both are dropped by `downloadCanvas` when null, so an uncredited plate with
   // no look to record still writes no chunks at all.
-  return trimAndDownload(ctx, maskData, width, height,
-    isAlpha ? `${base}-alpha.png` : `${base}.png`,
-    { Copyright: attribution, [PRESET_KEYWORD]: presetText })
+  const filename = isAlpha ? `${base}-alpha.png` : `${base}.png`
+  const meta = { Copyright: attribution, [PRESET_KEYWORD]: presetText }
+  // At print size the capture already is the sheet, edge to edge: trimming it
+  // would change the size the print needs.
+  if (dpi > 0) return downloadCanvas(out, filename, meta, dpi)
+  const maskData = maskCtx.getImageData(0, 0, width, height).data
+  return trimAndDownload(ctx, maskData, width, height, filename, meta)
 }

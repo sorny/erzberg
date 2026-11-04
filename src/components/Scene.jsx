@@ -15,13 +15,14 @@ import { gradientTexture } from '../utils/bgTexture'
 import { captureAndExportPNG } from '../utils/pngExport'
 import { workAttribution } from '../utils/attribution'
 import { presetComment, presetToText } from '../utils/presetFile'
-import { measureScale, sheetMarks } from '../utils/sheetMarks'
+import { crsAffine, measureScale } from '../utils/sheetMarks'
+import { marksFor, PLAN_TILT, wantsSheetMarks } from '../utils/sheetFacts'
 import { groundPixelMetres } from '../utils/geoCoords'
 import { setPlanOblique } from '../utils/planOblique'
 import { useStore } from '../store/useStore'
 import { hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { VectorPicker } from './VectorPicker'
-import { frameRect, insetRect, paperAspect } from '../utils/frame'
+import { frameRect, insetRect, paperAspect, printPixels } from '../utils/frame'
 import { Controls } from './Controls'
 import { HeightmapLines } from './HeightmapLines'
 import { ProfileOverlay } from './ProfileOverlay'
@@ -53,6 +54,37 @@ function sheetBox(p, width, height) {
   return frameRect(width, height,
     paperAspect(p.framePaper ?? 'iso', !!p.frameLandscape, p.frameCustomRatio),
     p.frameScale ?? 0.85, p.frameOffsetX ?? 0, p.frameOffsetY ?? 0)
+}
+
+/**
+ * The PNG at print size: the sheet, `plotWidthMm` wide at `framePrintDpi`.
+ *
+ * Null without a frame or a DPI, which keeps the trimmed capture. Otherwise the
+ * pixel size of the sheet, and the whole view at the same scale with the
+ * sheet's place in it, for `setViewOffset`. A sheet larger than the GPU's
+ * texture limit is written at the highest DPI that fits, and the file says that
+ * DPI, so its printed size stays right.
+ */
+function printCapture(p, vpW, vpH, maxTex) {
+  const box = sheetBox(p, vpW, vpH)
+  if (!box || !(p.framePrintDpi > 0)) return null
+  let dpi = p.framePrintDpi
+  let px = printPixels(p.plotWidthMm ?? 297, dpi, box.w / box.h)
+  const over = Math.max(px.w, px.h) / maxTex
+  if (over > 1) { dpi = Math.floor(dpi / over); px = printPixels(p.plotWidthMm ?? 297, dpi, box.w / box.h) }
+  const s = px.w / box.w
+  return { ...px, dpi, fullW: Math.round(vpW * s), fullH: Math.round(vpH * s),
+           x: Math.round(box.x * s), y: Math.round(box.y * s) }
+}
+
+/** Sheet marks moved by (dx, dy), for a capture that starts inside the view. */
+function shiftMarks(m, dx, dy) {
+  return {
+    ...m,
+    rects: m.rects.map(([x, y, w, h]) => [x + dx, y + dy, w, h]),
+    lines: m.lines.map(([x0, y0, x1, y1]) => [x0 + dx, y0 + dy, x1 + dx, y1 + dy]),
+    texts: m.texts.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy })),
+  }
 }
 
 /**
@@ -92,6 +124,14 @@ export function Scene({
   // A mode's guide on the ground while its section is open: 'Waveform' or null.
   guide,
   audioLive,
+  // The sheet's facts (utils/sheetFacts.js): the title, magnetic north and the
+  // degree converters. Kept out of `p` because it holds functions, and `p` is
+  // posted to the worker.
+  sheet = null,
+  // { kind: 'glb' | '3mf', ts } starts a coloured model export; the callback ends it.
+  modelTrigger = null, onModelDone,
+  // Filled in here with the plan capture, for web tiles through automation.
+  planCaptureRef = null,
 }) {
   const { camera: currentCamera, gl, scene, invalidate } = useThree()
   const groupRef    = useRef()
@@ -237,16 +277,23 @@ export function Scene({
   const setMapScale = useStore((s) => s.setMapScale)
   // The view lock: no orbit, pan or wheel zoom. The wheel reads `enabled` too.
   const viewLocked = useStore((s) => s.viewLocked)
-  const wantsMarks = !!(p.frameScaleBar || p.frameNorth)
+  const wantsMarks = wantsSheetMarks(p)
+  const wantsGrid = !!(p.frameGrid && p.frameGrid !== 'off')
   useFrame(() => {
     const cam = activeCamera || currentCamera
     if (!wantsMarks || !cam) return
     const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
     if (!ground) { setMapScale(null); return }
     const el = gl.domElement
-    setMapScale(measureScale(
-      screenProjector(cam, groupRef.current?.matrixWorld, el.clientWidth, el.clientHeight),
-      ground))
+    const project = screenProjector(cam, groupRef.current?.matrixWorld, el.clientWidth, el.clientHeight)
+    const scale = measureScale(project, ground)
+    // The map grid → screen mapping, for a grid on the sheet in a plan view.
+    const affine = scale && wantsGrid && terrain && (p.tilt ?? 0) < PLAN_TILT
+      ? crsAffine(project, { bbox: p.geoTiffBbox, width: p.imageWidth, height: p.imageHeight,
+          halfW: terrain.halfW, halfH: terrain.halfH,
+          peakOff: Math.floor(p.gridOffsetX ?? 0), lineOff: Math.floor(p.gridOffsetY ?? 0) })
+      : null
+    setMapScale(scale && affine ? { ...scale, affine } : scale)
   })
   /*
    * One frame when the marks are switched on, or the ground under them changes.
@@ -443,9 +490,11 @@ export function Scene({
     // 4× capture, clamped so the render target never exceeds the GPU's texture
     // limit (large windows would otherwise fail the export silently).
     const maxTex = gl.capabilities.maxTextureSize || 8192
+    // At print size the target is the sheet alone (see `printCapture`).
+    const print = printCapture(p, vpSize.x, vpSize.y, maxTex)
     const captureScale = Math.min(4.0, maxTex / Math.max(vpSize.x, vpSize.y))
-    const targetW = Math.round(vpSize.x * captureScale)
-    const targetH = Math.round(vpSize.y * captureScale)
+    const targetW = print ? print.w : Math.round(vpSize.x * captureScale)
+    const targetH = print ? print.h : Math.round(vpSize.y * captureScale)
 
     // Offscreen render target — never touches the main framebuffer.
     // samples: 4 enables WebGL2 MSAA so edges are smooth like the main canvas
@@ -484,9 +533,12 @@ export function Scene({
       }
     })
 
-    // Update camera for the capture aspect ratio
+    // Update camera for the capture aspect ratio. At print size the view keeps
+    // the viewport's shape, and the offset renders only the sheet's part of it.
     const oldAspect = cam.isPerspectiveCamera ? cam.aspect : null
-    if (cam.isPerspectiveCamera) {
+    if (print) {
+      cam.setViewOffset(print.fullW, print.fullH, print.x, print.y, print.w, print.h)
+    } else if (cam.isPerspectiveCamera) {
       cam.aspect = targetW / targetH
       cam.updateProjectionMatrix()
     }
@@ -549,6 +601,8 @@ export function Scene({
         }
       }
       gl.setRenderTarget(null)
+      // Off before the marks are measured, which project through the whole view.
+      if (print) cam.clearViewOffset()
       for (const obj of hidden) obj.visible = true
       gl.setClearColor(oldClearColor, oldAlpha)
       rt.dispose()
@@ -571,23 +625,26 @@ export function Scene({
       // The sheet marks are measured in *this* capture's pixels, not the
       // viewport's: a 4× plate has four times as many pixels per metre, and a
       // bar laid out against the screen would come out a quarter the length.
+      // At print size they are laid out over the whole view and moved by the
+      // sheet's offset, so they land where the viewport shows them.
+      const fullW = print ? print.fullW : targetW, fullH = print ? print.fullH : targetH
       const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
       const scale = ground && measureScale(
-        screenProjector(cam, groupRef.current?.matrixWorld, targetW, targetH), ground)
-      const marks = scale && sheetMarks({
-        width: targetW, height: targetH, frame: sheetBox(p, targetW, targetH),
-        metresPerPixel: scale.metresPerPixel, northAngle: scale.northAngle,
-        bar: !!p.frameScaleBar, north: !!p.frameNorth, scale: p.frameMarkScale ?? 1,
-      })
+        screenProjector(cam, groupRef.current?.matrixWorld, fullW, fullH), ground)
+      const laid = marksFor({ p, sheet, width: fullW, height: fullH, frame: sheetBox(p, fullW, fullH), scale,
+        project: screenProjector(cam, groupRef.current?.matrixWorld, fullW, fullH), terrain })
+      const marks = laid && print ? shiftMarks(laid, -print.x, -print.y) : laid
 
       captureAndExportPNG(offscreen, p.bgColor, p.bgGradient ? bgGradientStops : null, isAlpha,
         exportBaseName, workAttribution(p),
         exportPreset ? presetToText(exportPreset) : null,
-        marks ? { ...marks, color: p.frameMarkColor ?? '#000000' } : null)
+        marks ? { ...marks, color: p.frameMarkColor ?? '#000000' } : null,
+        print ? print.dpi : 0)
     } finally {
       scene.background = liveBackground
       // Restore materials and camera
       lineMaterials.forEach(({ mat, oldRes }) => { mat.resolution.copy(oldRes) })
+      if (print) cam.clearViewOffset()
       if (cam.isPerspectiveCamera && oldAspect !== null) {
         cam.aspect = oldAspect
         cam.updateProjectionMatrix()
@@ -622,11 +679,8 @@ export function Scene({
     const ground = groundPixelMetres(p.geoTiffBbox, p.geoTiffCRS, p.imageWidth, p.imageHeight)
     const scale = ground && exportCam && measureScale(
       screenProjector(exportCam, groupMatrix, width, height), ground)
-    const marks = scale && sheetMarks({
-      width, height, frame: sheetBox(p, width, height),
-      metresPerPixel: scale.metresPerPixel, northAngle: scale.northAngle,
-      bar: !!p.frameScaleBar, north: !!p.frameNorth, scale: p.frameMarkScale ?? 1,
-    })
+    const marks = exportCam && marksFor({ p, sheet, width, height, frame: sheetBox(p, width, height), scale,
+      project: screenProjector(exportCam, groupMatrix, width, height), terrain })
     setTimeout(async () => {
       // Loaded on demand. The exporter carries the software Z-buffer, the dash
       // splitter and the whole SVG writer, and a session that never presses
@@ -758,6 +812,125 @@ export function Scene({
   }, 0)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (pngTrigger)      deferredCapture(false) }, [pngTrigger])
+
+  /**
+   * The plate seen straight down, framed to the solid's top surface, for the
+   * coloured 3D models. An orthographic camera over the terrain, north up, with
+   * the terrain group held still for the one frame (auto-rotate turns it).
+   * Returns a canvas on the paper colour.
+   */
+  const captureTopDown = (b, maxSide = 2048, { transparent = false } = {}) => {
+    // `b` is in STL axes: x, and y = −world z.
+    const w = b.maxX - b.minX, h = b.maxY - b.minY
+    const k = maxSide / Math.max(w, h)
+    const tw = Math.max(1, Math.round(w * k)), th = Math.max(1, Math.round(h * k))
+    const cam = new THREE.OrthographicCamera(-w / 2, w / 2, h / 2, -h / 2, 0.1, 1e7)
+    cam.up.set(0, 0, -1)
+    cam.position.set((b.minX + b.maxX) / 2, 1e6, -(b.minY + b.maxY) / 2)
+    cam.lookAt((b.minX + b.maxX) / 2, 0, -(b.minY + b.maxY) / 2)
+    cam.updateProjectionMatrix()
+    const group = groupRef.current
+    const held = group ? { p: group.position.clone(), q: group.quaternion.clone(), s: group.scale.clone() } : null
+    if (group) { group.position.set(0, 0, 0); group.quaternion.identity(); group.scale.set(1, 1, 1); group.updateMatrixWorld(true) }
+    const rt = new THREE.WebGLRenderTarget(tw, th, { samples: 4, colorSpace: THREE.SRGBColorSpace })
+    const lines = [], hidden = []
+    scene.traverse((o) => {
+      if (o.material?.isLineMaterial) { lines.push([o.material, o.material.resolution.clone()]); o.material.resolution.set(tw, th) }
+      if (o.userData?.viewportOnly && o.visible) { hidden.push(o); o.visible = false }
+    })
+    const bg = scene.background
+    const clear = new THREE.Color(); gl.getClearColor(clear)
+    const alpha = gl.getClearAlpha()
+    try {
+      // Tiles go over another map, so they keep the paper out.
+      scene.background = transparent ? null : new THREE.Color(p.bgColor ?? '#ffffff')
+      gl.setRenderTarget(rt)
+      if (transparent) gl.setClearColor(0x000000, 0)
+      gl.clear()
+      gl.render(scene, cam)
+      const raw = new Uint8Array(tw * th * 4)
+      gl.readRenderTargetPixels(rt, 0, 0, tw, th, raw)
+      const canvas = document.createElement('canvas')
+      canvas.width = tw; canvas.height = th
+      const img = canvas.getContext('2d').createImageData(tw, th)
+      for (let y = 0; y < th; y++) img.data.set(raw.subarray((th - 1 - y) * tw * 4, (th - y) * tw * 4), y * tw * 4)
+      canvas.getContext('2d').putImageData(img, 0, 0)
+      return canvas
+    } finally {
+      gl.setRenderTarget(null)
+      gl.setClearColor(clear, alpha)
+      scene.background = bg
+      rt.dispose()
+      for (const [m, r] of lines) m.resolution.copy(r)
+      for (const o of hidden) o.visible = true
+      if (group && held) { group.position.copy(held.p); group.quaternion.copy(held.q); group.scale.copy(held.s); group.updateMatrixWorld(true) }
+      invalidate()
+    }
+  }
+
+  /**
+   * The plan picture for web tiles: the top-down capture framed to the drawn
+   * surface, with its bounds in STL axes. Published through a ref, so the
+   * automation API can ask for it.
+   */
+  if (planCaptureRef) {
+    planCaptureRef.current = (maxSide = 4096, opts = {}) => {
+      const pos = surfaceGeo?.positions, idx = surfaceGeo?.indices
+      if (!pos?.length || !idx?.length) return null
+      const b = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+      for (let t = 0; t < idx.length; t++) {
+        const x = pos[idx[t] * 3], y = -pos[idx[t] * 3 + 2]
+        if (x < b.minX) b.minX = x; if (x > b.maxX) b.maxX = x
+        if (y < b.minY) b.minY = y; if (y > b.maxY) b.maxY = y
+      }
+      const cap = Math.min(maxSide, gl.capabilities.maxTextureSize || 8192)
+      return { canvas: captureTopDown(b, cap, opts), bounds: b, halfW: terrain?.halfW ?? 0, halfH: terrain?.halfH ?? 0 }
+    }
+  }
+
+  // glTF or 3MF: the STL's solid with the plate on top (utils/modelExport.js).
+  useEffect(() => {
+    if (!modelTrigger) return
+    const t = setTimeout(async () => {
+      let status = 'done', failure = null
+      try {
+        const { buildSolid } = await import('../utils/stlExport')
+        const solid = await buildSolid({ surfaceGeo, terrain })
+        if (!solid) { status = 'empty'; return }
+        const { topBounds, writeGlb, write3mf, linearRgb, srgb } = await import('../utils/modelExport')
+        const canvas = captureTopDown(topBounds(solid.tris, solid.top))
+        const base = exportBaseName ?? 'heightmap'
+        let bytes, name, type
+        if (modelTrigger.kind === 'glb') {
+          const png = new Uint8Array(await (await new Promise((r) => canvas.toBlob(r, 'image/png'))).arrayBuffer())
+          bytes = writeGlb(solid, png, linearRgb(p.bgColor ?? '#cccccc'))
+          name = `${base}.glb`; type = 'model/gltf-binary'
+        } else {
+          const { width, height } = canvas
+          const px = canvas.getContext('2d').getImageData(0, 0, width, height).data
+          const colorAt = (u, v) => {
+            const x = Math.min(width - 1, Math.max(0, Math.floor(u * width)))
+            const y = Math.min(height - 1, Math.max(0, Math.floor(v * height)))
+            const o = (y * width + x) * 4
+            return [px[o], px[o + 1], px[o + 2]]
+          }
+          bytes = await write3mf(solid, colorAt, srgb(p.bgColor ?? '#cccccc'))
+          name = `${base}.3mf`; type = 'model/3mf'
+        }
+        const url = URL.createObjectURL(new Blob([bytes], { type }))
+        const a = Object.assign(document.createElement('a'), { href: url, download: name })
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+        setTimeout(() => URL.revokeObjectURL(url), 1000)
+      } catch (err) {
+        console.error('[Model] Export failed:', err)
+        status = 'failed'; failure = err
+      } finally {
+        onModelDone?.(status, failure)
+      }
+    }, 0)
+    return () => clearTimeout(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelTrigger])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (pngAlphaTrigger) deferredCapture(true)  }, [pngAlphaTrigger])
 

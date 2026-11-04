@@ -33,6 +33,7 @@ export function classifyDrop(name) {
   const n = String(name ?? '').toLowerCase()
   const ext = (list) => list.some((e) => n.endsWith(e))
 
+  if (ext(['.erzberg']))                  return ['project']
   if (ext(['.tif', '.tiff', '.geotiff'])) return ['geotiff']
   if (ext(['.png']))                      return ['preset', 'raster']
   if (ext(['.svg']))                      return ['preset']

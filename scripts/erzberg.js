@@ -3,7 +3,8 @@
  * erzberg from the command line.
  *
  * Renders a plate without a hand on the panel: a heightmap in, a look described
- * by a preset, draw modes and parameters, and SVG, PNG or STL out.
+ * by a preset, draw modes and parameters, and SVG, PNG, STL, glTF, 3MF or
+ * GeoJSON out.
  *
  * It does not re-implement the renderer. It opens the built app in headless
  * Chrome with `?automation` and drives it through `window.erzberg` (see
@@ -13,6 +14,8 @@
  * Usage:
  *   node scripts/erzberg.js render <heightmap> -o out.svg [-o out.png] [options]
  *   node scripts/erzberg.js atlas <features.geojson> -o 'sheets/{name}.svg' [options]
+ *   node scripts/erzberg.js day <heightmap> -o 'frames/{hour}.png' [--date …] [options]
+ *   node scripts/erzberg.js tiles <heightmap> -o tiles/ [--zoom 10-14] [options]
  *   node scripts/erzberg.js list modes|presets|params
  *
  * See docs/CLI.md.
@@ -24,6 +27,8 @@ import { basename, dirname, extname, join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 import { parseArgs } from 'node:util'
+import { tilesIndex } from '../src/utils/webTiles.js'
+import { parseDate, solarPosition } from '../src/utils/solar.js'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const DIST = join(ROOT, 'dist')
@@ -32,16 +37,18 @@ const PRESETS = join(ROOT, 'public', 'presets')
 export const EXIT = { ok: 0, error: 1, usage: 2, empty: 3 }
 
 const RASTER_EXT = new Set(['.tif', '.tiff', '.png', '.jpg', '.jpeg', '.webp'])
-const OUTPUT_KIND = { '.svg': 'svg', '.png': 'png', '.stl': 'stl' }
+const OUTPUT_KIND = { '.svg': 'svg', '.png': 'png', '.stl': 'stl', '.glb': 'glb', '.3mf': '3mf', '.geojson': 'geojson' }
 
 const HELP = `erzberg — render a plate from the command line
 
   erzberg render <heightmap> -o <file> [-o <file>…] [options]
   erzberg atlas <features.geojson> -o <dir/{name}.svg> [-o …] [options]
+  erzberg day <heightmap> -o <dir/{hour}.png> [--date …] [--hours 5-21] [options]
+  erzberg tiles <heightmap> -o <dir> [--zoom 10-14] [options]
   erzberg list modes|presets|params
 
 Render options:
-  -o, --out <file>        .svg, .png or .stl; repeat for several files of one plate
+  -o, --out <file>        .svg, .png, .stl, .glb, .3mf or .geojson; repeat for several files of one plate
   -p, --preset <name>     a bundled preset ("Blueprint"), or a .json/.svg/.png that carries one
   -m, --mode <ids>        switch draw modes on, by id or label; comma list, repeatable
       --only              switch every other draw mode off first
@@ -60,6 +67,17 @@ Atlas options (and every render option, applied to each sheet):
       --dem <file>        cut each sheet from this GeoTIFF instead of fetching Terrain Tiles
       --box <km>          the square around a point feature (default 10)
   Each -o must hold {name}, which becomes the feature's name.
+
+Day options (and every render option, applied to each hour):
+      --date <YYYY-MM-DD> the day (default 2026-06-21)
+      --hours <from-to>   clock hours to step through (default 5-21)
+      --step <h>          hours between frames (default 1)
+      --zone <h>          the clock's offset from UTC (default: the plate's own)
+  Each -o must hold {hour}, which becomes the time, as 06-30.
+
+Tiles options:
+      --zoom <from-to>    Web Mercator zoom levels (default 10-14, at most 8)
+  Writes <dir>/z/x/y.png and an index.html map. Needs a georeferenced raster.
 
 Order: defaults, then --preset, then the heightmap's fit (zoom, grid stride),
 then --only, --mode, --frame, --pen-order, and last --set.
@@ -91,6 +109,11 @@ export function parseCli(argv) {
         quiet: { type: 'boolean', short: 'q' },
         dem: { type: 'string' },
         box: { type: 'string' },
+        date: { type: 'string' },
+        hours: { type: 'string' },
+        step: { type: 'string' },
+        zone: { type: 'string' },
+        zoom: { type: 'string' },
         help: { type: 'boolean', short: 'h' },
       },
     })
@@ -105,8 +128,9 @@ export function parseCli(argv) {
     if (!['modes', 'presets', 'params'].includes(what)) throw new UsageError('list takes modes, presets or params')
     return { command, what, headed: !!v.headed, build: !v['no-build'] }
   }
-  if (command !== 'render' && command !== 'atlas') throw new UsageError(`unknown command "${command}"`)
+  if (!['render', 'atlas', 'day', 'tiles'].includes(command)) throw new UsageError(`unknown command "${command}"`)
   const atlas = command === 'atlas'
+  const day = command === 'day', tiles = command === 'tiles'
 
   const [input, ...extra] = rest
   if (!input) throw new UsageError(atlas ? 'atlas needs a GeoJSON file of features' : 'render needs a heightmap file')
@@ -117,27 +141,40 @@ export function parseCli(argv) {
     throw new UsageError(`${input}: a heightmap is .tif, .tiff, .png, .jpg or .webp`)
   }
   if (!atlas && (v.dem || v.box)) throw new UsageError('--dem and --box belong to atlas')
+  if (!day && (v.date || v.hours || v.step || v.zone)) throw new UsageError('--date, --hours, --step and --zone belong to day')
+  if (!tiles && v.zoom) throw new UsageError('--zoom belongs to tiles')
+
+  if (tiles) {
+    if ((v.out ?? []).length !== 1) throw new UsageError('tiles writes one folder: give one -o <dir>')
+    const zoom = /^(\d{1,2})-(\d{1,2})$/.exec(v.zoom ?? '10-14')
+    if (!zoom) throw new UsageError(`--zoom takes from-to, not "${v.zoom}"`)
+    const [minZoom, maxZoom] = [+zoom[1], +zoom[2]]
+    if (minZoom > maxZoom || maxZoom > 22 || maxZoom - minZoom > 8) throw new UsageError('--zoom takes 0 to 22, at most 8 levels')
+    return {
+      command, input, dir: v.out[0], minZoom, maxZoom, preset: v.preset ?? null,
+      modes: (v.mode ?? []).flatMap((m) => m.split(',')).map((m) => m.trim()).filter(Boolean),
+      only: !!v.only, set: setPairs(v), size: { width: 1600, height: 1131 },
+      timeoutMs: (v.timeout === undefined ? 300 : Number(v.timeout)) * 1000,
+      build: !v['no-build'], headed: !!v.headed, quiet: !!v.quiet,
+    }
+  }
 
   const outputs = (v.out ?? []).map((file) => {
     const kind = OUTPUT_KIND[extname(file).toLowerCase()]
-    if (!kind) throw new UsageError(`${file}: an output is .svg, .png or .stl`)
+    if (!kind) throw new UsageError(`${file}: an output is .svg, .png, .stl, .glb, .3mf or .geojson`)
     return { file, kind: kind === 'png' && v.alpha ? 'pngAlpha' : kind }
   })
   if (!outputs.length && !v.stats) throw new UsageError('nothing to write: give -o <file> or --stats')
+  if (day) {
+    const fixed = outputs.find((o) => !o.file.includes('{hour}'))
+    if (fixed) throw new UsageError(`${fixed.file}: a day output holds {hour}, or every hour writes the same file`)
+  }
   if (atlas) {
     const fixed = outputs.find((o) => !o.file.includes('{name}'))
     if (fixed) throw new UsageError(`${fixed.file}: an atlas output holds {name}, or every sheet writes the same file`)
   }
 
-  const set = {}
-  for (const pair of v.set ?? []) {
-    const eq = pair.indexOf('=')
-    if (eq < 1) throw new UsageError(`--set takes key=value, not "${pair}"`)
-    set[pair.slice(0, eq).trim()] = pair.slice(eq + 1)
-  }
-  // Shortcuts for two common keys. An explicit --set of the same key wins.
-  if (v.frame) Object.assign(set, { showFrame: 'true', framePaper: v.frame, ...set })
-  if (v['pen-order']) set.plotPenOrder ??= 'true'
+  const set = setPairs(v)
 
   let size = { width: 1600, height: 1131 }
   if (v.size) {
@@ -152,6 +189,19 @@ export function parseCli(argv) {
   const timeout = v.timeout === undefined ? 300 : Number(v.timeout)
   if (!(timeout > 0)) throw new UsageError(`--timeout takes seconds, not "${v.timeout}"`)
 
+  let dayRun = {}
+  if (day) {
+    const date = v.date ?? '2026-06-21'
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(date))) throw new UsageError(`--date takes YYYY-MM-DD, not "${date}"`)
+    const span = /^(\d{1,2}(?:\.\d+)?)-(\d{1,2}(?:\.\d+)?)$/.exec(v.hours ?? '5-21')
+    if (!span || +span[1] > +span[2] || +span[2] > 24) throw new UsageError(`--hours takes from-to between 0 and 24, not "${v.hours}"`)
+    const step = v.step === undefined ? 1 : Number(v.step)
+    if (!(step > 0 && step <= 12)) throw new UsageError(`--step takes 0 to 12 hours, not "${v.step}"`)
+    const zone = v.zone === undefined ? null : Number(v.zone)
+    if (zone !== null && !(zone >= -12 && zone <= 14)) throw new UsageError(`--zone takes an offset from UTC in hours, not "${v.zone}"`)
+    dayRun = { date, hours: dayHours(+span[1], +span[2], step), zone }
+  }
+
   let atlasRun = {}
   if (atlas) {
     if (v.dem && !/\.tiff?$/i.test(v.dem)) throw new UsageError(`${v.dem}: --dem takes a GeoTIFF`)
@@ -161,13 +211,37 @@ export function parseCli(argv) {
   }
 
   return {
-    ...atlasRun,
+    ...atlasRun, ...dayRun,
     command, input, outputs, preset: v.preset ?? null,
     modes: (v.mode ?? []).flatMap((m) => m.split(',')).map((m) => m.trim()).filter(Boolean),
     only: !!v.only, set, size, stats: !!v.stats, timeoutMs: timeout * 1000,
     build: !v['no-build'], headed: !!v.headed, quiet: !!v.quiet,
   }
 }
+
+/** `--set` pairs and the two shortcuts, as one object of strings. */
+function setPairs(v) {
+  const set = {}
+  for (const pair of v.set ?? []) {
+    const eq = pair.indexOf('=')
+    if (eq < 1) throw new UsageError(`--set takes key=value, not "${pair}"`)
+    set[pair.slice(0, eq).trim()] = pair.slice(eq + 1)
+  }
+  // Shortcuts for two common keys. An explicit --set of the same key wins.
+  if (v.frame) Object.assign(set, { showFrame: 'true', framePaper: v.frame, ...set })
+  if (v['pen-order']) set.plotPenOrder ??= 'true'
+  return set
+}
+
+/** The hours of a day run, from `from` to `to` by `step`, inclusive. */
+export function dayHours(from, to, step) {
+  const out = []
+  for (let h = from; h <= to + 1e-9; h += step) out.push(Math.round(h * 1000) / 1000)
+  return out
+}
+
+/** `6.5` → `06-30`, a file-safe clock time. */
+export const hourLabel = (h) => `${String(Math.floor(h)).padStart(2, '0')}-${String(Math.round((h % 1) * 60)).padStart(2, '0')}`
 
 /** A bundled preset by name (any case, `.json` optional), or a file on disk. */
 export function resolvePreset(name, presetsDir = PRESETS) {
@@ -476,6 +550,119 @@ async function atlasRun(run, log) {
   return empty === sheets.length ? EXIT.empty : EXIT.ok
 }
 
+/**
+ * Open a raster with the preset, modes and values, and settle. The opening
+ * every single-plate command shares.
+ */
+async function openPlate(run, log) {
+  if (!existsSync(run.input)) throw new UsageError(`${run.input}: no such file`)
+  const presetPath = run.preset ? resolvePreset(run.preset) : null
+  const app = await openApp(run, log)
+  const call = (fn, ...args) => app.page.evaluate(fn, args)
+  await call(() => window.erzberg.settle())
+  if (presetPath) {
+    log(`preset ${basename(presetPath)}`)
+    await call(([n, u]) => window.erzberg.applyPreset(n, u), basename(presetPath), app.server.add(presetPath))
+  }
+  log(`loading ${basename(run.input)}…`)
+  const dims = await call(([n, u]) => window.erzberg.loadRaster(n, u), basename(run.input), app.server.add(run.input))
+  log(`  ${dims.width} × ${dims.height}`)
+  if (run.modes.length || run.only) await call(([m, o]) => window.erzberg.setModes(m, o), run.modes, run.only)
+  if (Object.keys(run.set).length) await call(([s]) => window.erzberg.setParams(s), run.set)
+  await call(() => window.erzberg.settle())
+  return { app, call }
+}
+
+/**
+ * A day of the real sun: one plate per hour, the almanac stepped through the
+ * date at the plate's own place, and a filmstrip page of the PNGs.
+ */
+async function dayRun(run, log) {
+  const { app, call } = await openPlate(run, log)
+  const frames = []
+  try {
+    const at = await call(() => window.erzberg.centre())
+    if (!at) throw new UsageError('day needs a georeferenced raster, to know where the sun is')
+    const [lat, lon] = at
+    const follows = await call(([k]) => window.erzberg.get(k),
+      ['showHillshade', 'enabledShadowLine', 'enabledShadowHatch', 'hillshadeZone'])
+    if (!follows.showHillshade && !follows.enabledShadowLine && !follows.enabledShadowHatch) {
+      log('note: nothing in this look follows the sun, so every frame is the same. Use a preset with ' +
+        'hillshade, Shadow Line or Shadow Hatch (Silver Gelatin, Solstice, First Light), or -m ShadowLine.')
+    }
+    const zone = run.zone == null ? {} : { hillshadeZone: run.zone, zoneShadowLine: run.zone }
+    // Shadow Hatch takes its sun as two numbers, not from the almanac, so the
+    // day sets them from the same solar position the almanac computes.
+    const when = parseDate(run.date)
+    const utcOffset = run.zone ?? follows.hillshadeZone ?? 0
+    for (const [i, hour] of run.hours.entries()) {
+      log(`[${i + 1}/${run.hours.length}] ${hourLabel(hour).replace('-', ':')}`)
+      const sun = solarPosition({ lat, lon, ...when, hours: hour, utcOffset })
+      await call(([s]) => window.erzberg.setParams(s), {
+        hillshadeAlmanac: true, hillshadeDate: run.date, hillshadeHour: hour, hillshadeLat: lat, hillshadeLon: lon,
+        dateShadowLine: run.date, hourShadowLine: hour, latShadowLine: lat, lonShadowLine: lon, ...zone,
+        ...(follows.enabledShadowHatch ? {
+          azimuthShadowHatch: Math.round(sun.azimuth * 10) / 10,
+          // Below the horizon is all shadow; the hatch takes no negative altitude.
+          altitudeShadowHatch: Math.round(Math.max(0, sun.altitude) * 10) / 10,
+        } : {}),
+      })
+      await call(() => window.erzberg.settle())
+      const entry = { name: hourLabel(hour).replace('-', ':'), elevMin: null, elevMax: null, png: null }
+      for (const { file: tpl, kind } of run.outputs) {
+        const file = resolve(tpl.replaceAll('{hour}', hourLabel(hour)))
+        mkdirSync(dirname(file), { recursive: true })
+        const download = app.page.waitForEvent('download')
+        download.catch(() => {})
+        const status = await call(([k]) => window.erzberg.export(k), kind)
+        if (status !== 'done') throw new Error(`export of ${file} ended "${status}"`)
+        await (await download).saveAs(file)
+        process.stdout.write(file + '\n')
+        if (kind === 'png' || kind === 'pngAlpha') entry.png ??= file
+      }
+      frames.push(entry)
+    }
+  } catch (e) {
+    if (app.pageErrors.length) log(`page errors:\n  ${app.pageErrors.join('\n  ')}`)
+    throw e instanceof UsageError ? e : new Error(pageMessage(e), { cause: e })
+  } finally {
+    await app.close()
+  }
+  const withPng = frames.filter((f) => f.png)
+  if (withPng.length) {
+    const dir = dirname(withPng[0].png)
+    const index = join(dir, 'day.html')
+    writeFileSync(index, atlasIndex(`${basename(run.input).replace(/\.[^.]+$/, '')} · ${run.date}`, withPng, dir))
+    process.stdout.write(index + '\n')
+  }
+  return EXIT.ok
+}
+
+/** The plate as a folder of XYZ web tiles, and a page that shows them on a map. */
+async function tilesRun(run, log) {
+  const { app, call } = await openPlate(run, log)
+  try {
+    log(`tiles, zoom ${run.minZoom} to ${run.maxZoom}…`)
+    const got = await call(([a, b]) => window.erzberg.tiles(a, b), run.minZoom, run.maxZoom)
+    if (!got.tiles.length) { console.error('erzberg: nothing to draw: every tile is empty'); return EXIT.empty }
+    for (const { z, x, y, png } of got.tiles) {
+      const file = join(resolve(run.dir), String(z), String(x), `${y}.png`)
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, Buffer.from(png.slice(png.indexOf(',') + 1), 'base64'))
+    }
+    const index = join(resolve(run.dir), 'index.html')
+    writeFileSync(index, tilesIndex(basename(run.input).replace(/\.[^.]+$/, ''), got.bboxWgs84, run.minZoom, run.maxZoom))
+    log(`  ${got.tiles.length} tiles, the plate drawn at ${got.pictureMetres.toFixed(1)} m a pixel`)
+    process.stdout.write(index + '\n')
+    return EXIT.ok
+  } catch (e) {
+    if (app.pageErrors.length) log(`page errors:\n  ${app.pageErrors.join('\n  ')}`)
+    throw e instanceof UsageError ? e : new Error(pageMessage(e), { cause: e })
+  } finally {
+    await app.close()
+  }
+}
+
 async function list(run, log) {
   if (run.what === 'presets') {
     process.stdout.write(bundledPresets().join('\n') + '\n')
@@ -512,6 +699,8 @@ export async function main(argv = process.argv.slice(2)) {
   const log = run.quiet ? () => {} : (m) => console.error(m)
   try {
     if (run.command === 'list') return await list(run, log)
+    if (run.command === 'day') return await dayRun(run, log)
+    if (run.command === 'tiles') return await tilesRun(run, log)
     return run.command === 'atlas' ? await atlasRun(run, log) : await render(run, log)
   } catch (e) {
     console.error(`erzberg: ${e.message}`)

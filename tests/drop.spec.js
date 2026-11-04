@@ -12,7 +12,7 @@
 import { expect, test } from '@playwright/test'
 import { readFileSync } from 'fs'
 import path from 'path'
-import { openStage, resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp, clickExport } from './helpers.js'
 
 /**
  * A `DataTransfer` in the page, holding one file read from disk.
@@ -114,7 +114,7 @@ test('a dropped plate restores its look and leaves the ground alone', async ({ p
   // Export the plate, which carries that colour inside it.
   await page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur())
   const wait = page.waitForEvent('download', { timeout: 180_000 })
-  await page.keyboard.press('Digit2')
+  await clickExport(page, 'png')
   const dl = await wait
   const png = await dl.path()
   const pngName = dl.suggestedFilename()

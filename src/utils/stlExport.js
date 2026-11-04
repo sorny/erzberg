@@ -209,9 +209,16 @@ export async function exportSTL({
   }
 }
 
-async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName },
-                             pacer, report) {
-  if (!surfaceGeo || !terrain) return 'empty'
+/**
+ * The printable solid: the top surface, the side walls down to a floor, and a
+ * base plate, as flat triangles in STL axes (x, −z, y). `top` is how many
+ * floats of `tris` are the top surface, which the coloured formats texture.
+ * Null when there is nothing to build. Shared by STL, glTF and 3MF, so the
+ * three files hold the same solid.
+ */
+export async function buildSolid({ surfaceGeo, terrain }, pacer = null, report = () => {}) {
+  if (!surfaceGeo || !terrain) return null
+  pacer = pacer ?? { due: () => false, yield: async () => {} }
 
   const { positions, indices } = surfaceGeo
   const { rows, cols } = terrain
@@ -220,7 +227,7 @@ async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }
   // so zero vertices. Bailing here rather than pressing on is the difference
   // between no download and a multi-megabyte file of NaN floats: every bound
   // below would be Infinity, and the perimeter walk would read past the array.
-  if (!positions?.length || !indices?.length) return 'empty'
+  if (!positions?.length || !indices?.length) return null
 
   const spx = (i) =>  positions[i * 3]
   const spy = (i) => -positions[i * 3 + 2]
@@ -243,7 +250,7 @@ async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }
     const y = positions[indices[t] * 3 + 1]
     if (y < minWorldY) minWorldY = y
   }
-  if (!Number.isFinite(minWorldY)) return 'empty'
+  if (!Number.isFinite(minWorldY)) return null
   const baseZ = minWorldY - 2
 
   const tris = []
@@ -265,6 +272,8 @@ async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }
         spx(b), spy(b), spz(b),
         spx(c), spy(c), spz(c))
   }
+
+  const top = tris.length
 
   // ── 2. Side walls ─────────────────────────────────────────────────────────
   // The border is walked by index arithmetic, so it visits NoData cells as
@@ -303,6 +312,14 @@ async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName }
     const i0 = perim[i], i1 = perim[(i + 1) % pn]
     add(0, 0, baseZ, spx(i0), spy(i0), baseZ, spx(i1), spy(i1), baseZ)
   }
+  return { tris, top, baseZ }
+}
+
+async function buildAndWrite({ surfaceGeo, terrain, vectorSources, p, baseName },
+                             pacer, report) {
+  const solid = await buildSolid({ surfaceGeo, terrain }, pacer, report)
+  if (!solid) return 'empty'
+  const { tris } = solid
 
   const base = baseName ?? 'heightmap'
   report(0.8, 'Writing STL…')
