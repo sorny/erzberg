@@ -882,7 +882,8 @@ this mode's settings, also serves two things in every other mode:
 
 - **Landforms mask** in the style block: draw only on chosen landforms.
 - **Form** colour source: ink each stroke by the landform under it, one pen per
-  landform, in this mode's inks.
+  landform, in this mode's inks. The layer's **Landforms** fold sets the inks,
+  search, flat and blur, with this mode off. Every layer shares them.
 
 ---
 

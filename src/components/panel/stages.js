@@ -130,6 +130,7 @@ const STATED = {
   'Paper': 5,
   'Map Elements': 5,
 
+  'Plot': 6,
   'Export': 6,
   'Analysis': 6,
 }

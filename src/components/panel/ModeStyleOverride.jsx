@@ -241,6 +241,43 @@ function OcclusionBlock({ prefix, style, ss }) {
   )
 }
 
+/**
+ * The landforms, where a mode picks Form as its colour.
+ *
+ * The inks and the classification are the Landforms mode's own keys, so a mode
+ * inked by landform and the Landforms mode itself always agree, and every
+ * layer shares one pen per landform. They used to be set only in Mode:
+ * Landforms, which locks its controls while it is off, so Form colour could
+ * not be changed without drawing a second mode.
+ */
+function FormInks({ prefix, style, ss }) {
+  return (<>
+    <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>One pen layer for each landform.</div>
+    <Fold title="Landforms" readout="shared" testId={prefix ? `form-inks-${prefix}` : undefined}>
+      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 6 }}>
+        Shared by every layer that uses them, and by Mode: Landforms.
+      </div>
+      <InlineSl label="Search" testId={prefix ? `form-search-${prefix}` : undefined}
+        help="How far each cell looks along the eight compass lines, in metres. Short finds every spur on a slope; long finds the ridge the spurs belong to."
+        min={30} max={3000} step={10} log value={style.searchLandform} onChange={v => ss({ searchLandform: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+      <InlineSl label="Flat below"
+        help="A line that rises or falls less steeply than this counts as level. Raise it and gentle ground becomes flat; lower it and every swell becomes a shape."
+        min={0} max={10} step={0.1} value={style.flatLandform} onChange={v => ss({ flatLandform: v })} fmt={v => `${v.toFixed(1)}°`} />
+      <InlineSl label="Blur"
+        help="Blur on the heights before they are classified. At 0 every grain in the data becomes its own small peak or pit."
+        min={0} max={12} step={1} value={style.radiusLandform ?? 2} onChange={v => ss({ radiusLandform: Math.round(v) })} />
+      {LANDFORMS.map((f, k) => {
+        const key = `color${'ABCDEFGHIJ'[k]}Landform`
+        return <ColorRow key={f.id} label={f.name} testId={prefix ? `form-ink-${prefix}-${f.id}` : undefined}
+          value={style[key] ?? f.color} onChange={(v) => ss({ [key]: v })} />
+      })}
+      <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45 }}>
+        A heightmap without georeference takes its pixel size and relief from Mode: Landforms.
+      </div>
+    </Fold>
+  </>)
+}
+
 /** One stated fact about the loaded plate. Label left, value right. */
 
 
@@ -289,9 +326,7 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
         {(source === 'class' || source === 'plate') && hasPlate && (
           <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>One pen layer for each class.</div>
         )}
-        {source === 'form' && (
-          <div style={{ fontSize: 10, color: DIM, marginBottom: 8 }}>One pen layer for each landform, in the inks of the Landforms mode.</div>
-        )}
+        {source === 'form' && <FormInks prefix={prefix} style={style} ss={ss} />}
         {ramp && (
           <Sub>
             <Tog label="Banded" small help="Steps the gradient into flat bands, as on a printed hypsometric map, rather than a smooth ramp." checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />

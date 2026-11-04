@@ -44,7 +44,7 @@ import { isDarkBackground } from './colorUtils'
 import { screenInk, screenInkHex } from './screenInk'
 import { traceAreaRings } from './areaRings'
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
-import { bridgeRuns, dropShortRuns, orderRuns, routeStats, simplifyRuns } from './penRoute'
+import { bridgeRuns, dedupeRuns, dropShortRuns, multipassRuns, orderRuns, reloopRuns, routeStats, simplifyRuns } from './penRoute'
 import { hatchLoops, hatchPlan, inkLightness } from './hatchFill'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
@@ -436,6 +436,9 @@ async function runExport({
   // Clean-up of the pen strokes, in millimetres on paper; each is off at 0.
   // See simplifyRuns, dropShortRuns and bridgeRuns in utils/penRoute.js.
   simplifyMm = 0, minLengthMm = 0, joinGapMm = 0,
+  // Ink another stroke of the layer already drew, within this many mm, is left
+  // out; and each stroke is drawn this many times. See dedupeRuns, multipassRuns.
+  dedupeMm = 0, passes = 1,
   // Filled areas as hatch strokes instead of fills. The pitch is millimetres on
   // paper, so it needs the sheet width to become page units. See hatchFill.js.
   areaFill = 'solid', hatchPitchMm = 0.8, hatchAngle = 45, sheetMm = 297,
@@ -1348,13 +1351,16 @@ async function runExport({
    * by depth, which is right for occlusion and blind to the carriage. The other
    * is what a nearest-neighbour route would cost instead.
    */
+  // `lengthsMm` is every solid stroke's length on paper before the clean-up,
+  // which the panel's Recommended values read to tell strays from dots.
   const plot = { ink: 0, travelAsBuilt: 0, travelOrdered: 0, strokes: 0, pens: 0, dashed: false,
-                 dropped: 0, joined: 0 }
+                 dropped: 0, joined: 0, dedupedPx: 0, lengthsMm: [] }
   // The clean-up tolerances in export pixels, through the sheet width.
   const strokePxPerMm = vw / Math.max(1, sheetMm)
   const simplifyPx = (simplifyMm ?? 0) * strokePxPerMm
   const minLengthPx = (minLengthMm ?? 0) * strokePxPerMm
   const joinGapPx = (joinGapMm ?? 0) * strokePxPerMm
+  const dedupePx = (dedupeMm ?? 0) * strokePxPerMm
 
   const penLayer = (id, label, body) =>
     (plot.pens++, `<g id="layer-${id}" inkscape:groupmode="layer" inkscape:label="${label}">${body}</g>`)
@@ -1531,10 +1537,31 @@ async function runExport({
     const buildLineEls = async (segs) => {
       if (!dashSizes) {
         // Simplify and drop short strokes first: neither depends on the order.
-        const short = dropShortRuns(simplifyRuns(await joinRuns(segs), simplifyPx), minLengthPx)
-        plot.dropped += short.dropped
-        // The join gap bridges whatever order is written, so it runs on both.
-        const asBuiltRuns = bridgeRuns(short.runs, joinGapPx)
+        const raw = await joinRuns(segs)
+        // The strokes a pen would draw, with touching pieces chained: a contour
+        // arrives as hundreds of pieces, and only the chained length says
+        // whether it is a stray. Measured for Recommended values.
+        if (measureOnly) {
+          for (const r of bridgeRuns(orderRuns(raw), CONNECT_EPS).runs) {
+            let len = 0
+            for (let i = 2; i < r.pts.length; i += 2) len += Math.hypot(r.pts[i] - r.pts[i - 2], r.pts[i + 1] - r.pts[i - 1])
+            plot.lengthsMm.push(len / strokePxPerMm)
+          }
+        }
+        // Joined first, so min length judges whole strokes and not the pieces
+        // a contour is built from. Simplify last, on what will be written.
+        const clean = (runs) => {
+          const joined = bridgeRuns(runs, joinGapPx)
+          const short = dropShortRuns(joined.runs, minLengthPx)
+          return { runs: simplifyRuns(short.runs, simplifyPx), joined: joined.joined, dropped: short.dropped }
+        }
+        // Dedupe before anything else: the passes after it then never see ink
+        // that is drawn twice. It keeps the first stroke, so it reads the order
+        // the layer was built in, whichever order is written.
+        // A cut inside a stroke must save more than 2 mm, the ink of a fraction of a lift.
+        const deduped = dedupeRuns(raw, dedupePx, 2 * strokePxPerMm)
+        plot.dedupedPx += deduped.removed
+        const asBuiltRuns = clean(deduped.runs)
         // What this layer costs a plotter, measured on the strokes that will
         // actually be written — after the occlusion walk has cut them, after
         // `joinRuns` has folded the pieces back into whole pen strokes, and
@@ -1546,11 +1573,16 @@ async function runExport({
         // it is going to be used — either because the export is taking it, or
         // because a preflight asked what it would be worth.
         const wantOrder = penOrder || measureOnly
-        const ordered = wantOrder ? bridgeRuns(orderRuns(short.runs), joinGapPx) : asBuiltRuns
+        const ordered = wantOrder ? clean(reloopRuns(orderRuns(deduped.runs), CONNECT_EPS)) : asBuiltRuns
         plot.travelOrdered += wantOrder ? routeStats(ordered.runs).travel : asBuilt.travel
-        const written = penOrder ? ordered : asBuiltRuns
+        const chosen = penOrder ? ordered : asBuiltRuns
+        // Passes go on last, on the strokes as written: the ink grows by their
+        // number, the lifts do not.
+        const written = passes > 1 ? { ...chosen, runs: multipassRuns(chosen.runs, passes) } : chosen
+        if (passes > 1) plot.ink += asBuilt.ink * (Math.round(passes) - 1)
         plot.strokes += written.runs.length
         plot.joined += written.joined
+        plot.dropped += written.dropped
         return mapPaced(written.runs, ({ pts, stroke }) => {
           // A run of one is still a `<line>`: it is shorter than the equivalent
           // two-point polyline, and it keeps the element every plotter and

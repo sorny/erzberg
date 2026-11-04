@@ -39,7 +39,8 @@ background. A spec that reads pixels, the GPU, a download or audio goes in the
 - **Labels use GIS and survey terms** (occluder, chainage, depth bias). Put the plain explanation in the `help` text.
 - **A preset must reopen unchanged.** If a change alters how an existing setting renders, add a legacy switch, bump `PRESET_FORMAT`, add a migration and update the bundled preset files. Render the bundled presets before and after, and compare them.
 - **Docs stay compact.** State what exists and how to use it. Put rationale and measurements in `CHANGELOG.md`.
-- **No plotter code.** Do not write G-code, HPGL or features that plotter tools own.
+- **SVG is the last step.** Do not write G-code or HPGL. Path work that plotter
+  tools such as vpype also do (sort, merge, simplify, dedupe, multipass) is in scope.
 - **Licence is MIT.** Do not propose a change.
 
 ## Releases

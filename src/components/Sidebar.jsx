@@ -28,7 +28,7 @@ import { formatClock, zoneForLongitude } from '../utils/solar'
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
 import { shadowSun } from '../utils/sunHours'
 import { isDarkBackground } from '../utils/colorUtils'
-import { plotEstimate } from '../utils/penRoute'
+import { plotEstimate, recommendPlot } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, describeFetch, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
@@ -1134,7 +1134,7 @@ export function Sidebar({
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     localRelief: false, curvShade: false, openness: false, texShade: false, aerial: false, wetness: false, sunTint: false,
-    points: false, texture: false, mirror: false, erosion: false, export: true,
+    points: false, texture: false, mirror: false, erosion: false, plot: true, export: true,
     sheetMarks: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
     satellite: false, masks: false,
@@ -1309,6 +1309,33 @@ export function Sidebar({
   const ss = (v) => { leftPreset(); setStyle(p => ({ ...p, ...v })) }
   const sp = (v) => { leftPreset(); setPoints(p => ({ ...p, ...v })) }
   const sv = (v) => { leftPreset(); setView(p => ({ ...p, ...v })) }
+  /*
+   * Recommended values, in two preflights. The first measures the strokes as
+   * the plate draws them, which tells strays from dots. The values are set
+   * from that and the pen tip, and the second preflight shows what they did.
+   */
+  const [recommending, setRecommending] = useState(false)
+  const [recommended, setRecommended] = useState(null)
+  const recommendStep = useRef(null)
+  const recommendPlotValues = () => {
+    recommendStep.current = 'measure'
+    setRecommending(true)
+    if (onPreflight() === false) { recommendStep.current = null; setRecommending(false) }
+  }
+  useEffect(() => {
+    if (recommendStep.current !== 'measure' || !plotStats) return
+    const pen = view.plotPenMm ?? 0.3
+    const values = recommendPlot({ penMm: pen, lengthsMm: plotStats.lengthsMm })
+    recommendStep.current = 'show'
+    setRecommended({ pen, dots: values.plotMinLengthMm === 0 })
+    sv(values)
+  }, [plotStats]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (recommendStep.current !== 'show') return
+    recommendStep.current = null
+    setRecommending(false)
+    onPreflight()
+  }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // The panel's own share of a reset: the preset tiles have to stop pointing at
   // a look the settings no longer hold.
@@ -3553,7 +3580,7 @@ export function Sidebar({
 
           <Stage n={6} title="Output">
 
-          <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
+          <Section title="Plot" open={sec.plot} onToggle={() => tog('plot')}>
             {/* ── The plot ─────────────────────────────────────────────────
                 The stated audience of this whole tool is a pen plotter, and
                 until now nothing here said what a plot would cost. Two numbers
@@ -3569,6 +3596,18 @@ export function Sidebar({
                 help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Map Elements."
                 min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
                 onChange={v => sv({ plotWidthMm: Math.round(v) })} fmt={v => Math.round(v) + ' mm'} />
+              <InlineSl label="Pen tip" testId="plot-pen"
+                help="The width your pen draws on paper. Recommended values reads it to set the clean-up below. The SVG keeps the plate's own stroke widths."
+                min={0.05} max={2} step={0.05} value={view.plotPenMm ?? 0.3}
+                onChange={v => sv({ plotPenMm: v })} fmt={v => v.toFixed(2) + ' mm'} />
+              <Btn block onClick={recommendPlotValues} disabled={recommending} data-testid="plot-recommend" style={{ marginBottom: 4 }}>
+                {recommending ? 'Measuring…' : 'Recommended values'}
+              </Btn>
+              <div data-testid="plot-recommend-note" style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
+                {recommended
+                  ? `Set for a ${recommended.pen.toFixed(2)} mm pen${recommended.dots ? ', min length off: most strokes are shorter than the pen' : ''}.`
+                  : 'Measures the strokes, then sets plotter order and the clean-up from the pen tip.'}
+              </div>
               <Tog label="Plotter order" testId="plot-order" small
                 help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."
                 checked={!!view.plotPenOrder} onChange={v => sv({ plotPenOrder: v })} />
@@ -3584,6 +3623,14 @@ export function Sidebar({
                 help="Removes points that lie closer than this on paper to the line through their neighbours, so the SVG is smaller and loads faster in plotter software. A pen cannot draw the difference at 0.05 mm. Off at 0."
                 min={0} max={0.5} step={0.01} value={view.plotSimplifyMm ?? 0}
                 onChange={v => sv({ plotSimplifyMm: v })} fmt={v => (v > 0 ? v.toFixed(2) + ' mm' : 'off')} />
+              <InlineSl label="Dedupe" testId="plot-dedupe"
+                help="Leaves out ink that another stroke of the same pen layer already draws within this distance on paper, such as the border two areas share. The first stroke is kept. Off at 0."
+                min={0} max={1} step={0.05} value={view.plotDedupeMm ?? 0}
+                onChange={v => sv({ plotDedupeMm: v })} fmt={v => (v > 0 ? v.toFixed(2) + ' mm' : 'off')} />
+              <InlineSl label="Passes" testId="plot-passes"
+                help="Draws every stroke this many times, back and forth with the pen down, for an ink too light to cover in one pass. The pen lifts no more often."
+                min={1} max={4} step={1} value={view.plotPasses ?? 1}
+                onChange={v => sv({ plotPasses: Math.round(v) })} fmt={v => `${Math.round(v)}×`} />
               {/* Only while a mode that exports filled areas is drawing. It is an
                   SVG-only choice, so the viewport looks the same either way. */}
               {(style.enabledIndexed || style.enabledMineral || style.enabledCover || style.enabledShed) && (
@@ -3632,10 +3679,11 @@ export function Sidebar({
                         {`Plotter order would cut the pen-up travel by ${Math.round(saved * 100)}%`}
                       </div>
                     )}
-                    {(plotStats.joined > 0 || plotStats.dropped > 0) && (
+                    {(plotStats.joined > 0 || plotStats.dropped > 0 || plotStats.dedupedPx > 0) && (
                       <div data-testid="preflight-cleanup">
                         {[plotStats.joined > 0 && `${plotStats.joined.toLocaleString()} joined`,
-                          plotStats.dropped > 0 && `${plotStats.dropped.toLocaleString()} short strokes left out`]
+                          plotStats.dropped > 0 && `${plotStats.dropped.toLocaleString()} short strokes left out`,
+                          plotStats.dedupedPx > 0 && `${metres(plotStats.dedupedPx)} drawn twice left out`]
                           .filter(Boolean).join(' · ')}
                       </div>
                     )}
@@ -3644,12 +3692,14 @@ export function Sidebar({
                 })()}
               </div>
             </div>
+          </Section>
 
+          <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
             {/* ── The file ─────────────────────────────────────────────────
                 SVG is the product, so it is the one primary action here, with
                 what it will hold said under it. Pens are counted by Preflight,
                 which builds the file; before that the line says what is known. */}
-            <div style={{ marginTop:10, paddingTop:10, borderTop:`1px solid ${BORDER}` }}>
+            <div>
               <Btn size="lg" variant="primary" block onClick={onSvg} data-testid="export-svg" style={{ width:'100%' }}>
                 SVG<Key>1</Key>
               </Btn>

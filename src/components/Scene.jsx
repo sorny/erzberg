@@ -737,6 +737,7 @@ export function Scene({
         sheetMarkColor: p.frameMarkColor ?? '#000000',
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
         simplifyMm: p.plotSimplifyMm, minLengthMm: p.plotMinLengthMm, joinGapMm: p.plotJoinGapMm,
+        dedupeMm: p.plotDedupeMm, passes: p.plotPasses,
         areaFill: p.plotAreaFill, hatchPitchMm: p.plotHatchPitch, hatchAngle: p.plotHatchAngle,
         sheetMm: p.plotWidthMm,
         // The anaglyph runs the whole pipeline twice, once per eye, so the

@@ -9,7 +9,7 @@
  * to the mode bodies. Data and rules: utils/modeCopies.js.
  */
 import { useState } from 'react'
-import { copyView, makeCopy, patchCopy } from '../../utils/modeCopies'
+import { copyView, makeCopy, patchCopy, sharedPatch } from '../../utils/modeCopies'
 import { MODE_ID } from './sectionParams'
 import { BORDER, Btn, Chevron, Fold, MUTED, SURF, Switch, TEXT } from './ui'
 
@@ -64,7 +64,7 @@ export function ModeCopies({ title, style, ss, renderBody }) {
             </div>
             {isOpen && (
               <div style={{ padding: '0 8px 8px', borderTop: `1px solid ${BORDER}` }}>
-                {renderBody(title, view, (patch) => write(patchCopy(all, copy.uid, patch)))}
+                {renderBody(title, view, (patch) => ss({ ...sharedPatch(mode, patch), modeCopies: patchCopy(all, copy.uid, patch) }))}
                 <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
                   <Btn size="xs" onClick={() => add(view)} data-testid={`mode-copy-duplicate-${copy.uid}`}>Duplicate</Btn>
                   <Btn size="xs" onClick={() => write(all.filter((c) => c.uid !== copy.uid))}

@@ -471,13 +471,28 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   degrees, in a plan view.
 - **Preflight** reports the stroke count, pen count, ink length, pen-up travel
   and an estimated plot time.
-- **Plotter order** re-orders strokes inside each pen layer. On the sample plate
+- **Output › Plot** holds the sheet width, the pen tip, the stroke order, the
+  clean-up and Preflight. Output › Export writes the files.
+- **Plotter order** re-orders strokes inside each pen layer. It enters a closed
+  stroke, such as a contour, at the point nearest the pen. On the sample plate
   it cuts pen-up travel from 52.4 m to 1.4 m. It is off by default, because
   stroke order decides which ink is on top.
 - **Join gap, Min length and Simplify** clean the pen strokes, in mm on paper.
   Join gap keeps the pen down across small gaps between strokes of one ink. Min
-  length leaves out tiny strokes. Simplify removes points a pen cannot show. All
-  three are off at 0. Preflight says how many strokes were joined or left out.
+  length then leaves out whole strokes that are shorter. Simplify removes points
+  a pen cannot show. All three are off at 0. Preflight says how many strokes
+  were joined or left out.
+- **Dedupe** leaves out ink that another stroke of the same pen layer already
+  draws within the distance, such as a side two pillars share. Only near-parallel
+  ink counts, so crossing lines stay whole. A cut inside a stroke must save 2 mm,
+  because each cut adds a pen lift. On the default Pillars plate it removes
+  18 m of 66 m.
+- **Passes** draws every stroke 2 to 4 times, back and forth with the pen down,
+  for a light ink.
+- **Recommended values** runs Preflight and sets the order and the clean-up from
+  the pen tip: simplify a sixth of the tip, join gap and dedupe half, min length
+  and hatch pitch the tip. Passes stay as they are. If short strokes carry more than 2% of the ink, as in
+  hachures, min length stays off.
 - **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o
   graz.svg` renders a plate without the panel, through the same app in headless
   Chrome. Draw modes, presets and any parameter are arguments. `atlas` renders

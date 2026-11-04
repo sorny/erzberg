@@ -61,6 +61,16 @@ export function makeCopy(mode, source, copies) {
 /** The style a copy's controls read: the live style with the copy's values over it. */
 export const copyView = (style, copy) => ({ ...style, ...copy.values })
 
+/**
+ * The part of a patch from a copy's controls that the copy does not own. Its
+ * view reads those keys from the live style, so they are written there: Form
+ * colour's landform inks and classification are shared by every layer.
+ */
+export function sharedPatch(mode, patch) {
+  const own = new Set(ownedKeys(mode))
+  return Object.fromEntries(Object.entries(patch).filter(([k]) => !own.has(k)))
+}
+
 /** A patch from the copy's controls, kept to the keys the copy owns. */
 export function patchCopy(copies, uid, patch) {
   return copies.map((c) => {
