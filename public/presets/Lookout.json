@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -24,13 +24,14 @@
     "crossViewshed": true,
     "radiusViewshed": 2,
     "spacingViewshed": 3,
-    "colorViewshed": "#1f5a4a",
+    "colorViewshed": "#72afa3",
     "weightViewshed": 1,
     "enabledContours": true,
     "intervalContours": 6,
-    "colorContours": "#9c968a",
+    "colorContours": "#cfcdca",
     "weightContours": 1,
-    "opacityContours": 0.7
+    "opacityContours": 0.7,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

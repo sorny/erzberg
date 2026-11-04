@@ -52,7 +52,7 @@ export const SECTION_PARAMS = {
   'Terrain Style': ['showFill', 'fillColor', 'fillHypsometric', 'fillBanded',
     'fillHypsoInterval', 'fillHypsoWeight', 'fillHypsoMode', 'showMesh', 'meshColor',
     'bgColor', 'bgGradient', 'depthOcclusion', 'occludeBy', 'occlusionBias', 'strokeDepthBias', 'occlusionColor',
-    'occlusionOpacity', 'gradientStops', 'inksAsPicked'],
+    'occlusionOpacity', 'gradientStops'],
   'Hillshade': [/^hillshade/, 'showHillshade', 'showSun', 'showAO', 'aoStrength', 'aoRays'],
   'Slope Shading': ['showSlopeShade', 'slopeShadeOpacity', 'slopeColorLow', 'slopeColorHigh',
     'slopeShadeMax', 'slopeShadeBand', 'slopeShadeTrue', 'groundCellMetres', 'groundRelief'],
@@ -110,9 +110,7 @@ export const ALSO_READS = {
   'Paper': ['plotWidthMm'],
   'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm',
     // The hatch controls show only while a mode that exports filled areas is on.
-    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed',
-    // Mirrored under the pen layers: it changes every ink in the file.
-    'inksAsPicked'],
+    'enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
   'Map Elements': ['orthographic', 'plotWidthMm', 'tilt'],
   'Image Overlay': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],

@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,7 +14,7 @@
   },
   "style": {
     "bgColor": "#f6f1e7",
-    "colorContours": "#ff48b0",
+    "colorContours": "#eaa9d4",
     "depthOcclusion": true,
     "enabledContours": true,
     "enabledLines": false,
@@ -27,7 +27,7 @@
         "values": {
           "enabledContours": true,
           "intervalContours": 5,
-          "colorContours": "#0078bf",
+          "colorContours": "#4ec2d6",
           "weightContours": 1.6,
           "opacityContours": 0.75
         }
@@ -39,7 +39,7 @@
         "values": {
           "enabledContours": true,
           "intervalContours": 11,
-          "colorContours": "#ffe800",
+          "colorContours": "#e6df63",
           "weightContours": 4,
           "opacityContours": 0.7
         }
@@ -47,7 +47,8 @@
     ],
     "occludeBy": "ground",
     "opacityContours": 0.85,
-    "weightContours": 0.8
+    "weightContours": 0.8,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,7 +14,7 @@
   },
   "style": {
     "bgColor": "#ffffff",
-    "colorContours": "#111111",
+    "colorContours": "#3f3f3f",
     "depthOcclusion": true,
     "enabledContours": true,
     "enabledLines": false,
@@ -22,7 +22,8 @@
     "majorIntervalContours": 0,
     "majorWeightContours": 1.4,
     "occludeBy": "ground",
-    "weightContours": 0.5
+    "weightContours": 0.5,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

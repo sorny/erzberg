@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -18,7 +18,15 @@
     "enabledLines": false,
     "enabledMineral": true,
     "occludeBy": "ground",
-    "weightMineral": 0.8
+    "weightMineral": 0.8,
+    "occlusionColor": "#df000a",
+    "colorAMineral": "#947967",
+    "colorBMineral": "#cba488",
+    "colorCMineral": "#dcc49d",
+    "colorDMineral": "#b4bcad",
+    "colorEMineral": "#dddbd5",
+    "colorMineral": "#947967",
+    "grainMineral": 0.103
   },
   "points": {
     "showPoints": false,

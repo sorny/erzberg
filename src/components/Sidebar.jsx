@@ -2596,10 +2596,6 @@ export function Sidebar({
               </Sub>
             )}
             
-            <Tog label="Inks as picked" testId="inks-as-picked"
-              help="Draws every line and area in exactly the colour you picked, as its swatch shows it. Off, colours pass through the viewport's filmic tone curve and come out lighter and softer. Also sets the colours written to the SVG. The same switch sits under the pen layers in Output."
-              checked={!!style.inksAsPicked} onChange={v => ss({ inksAsPicked: v })} />
-
             <ColorRow label="Background" testId="bg-color" value={style.bgColor} onChange={v => ss({ bgColor: v })} />
             <Sub>
               <Tog label="Gradient" small checked={style.bgGradient} onChange={v => ss({ bgGradient: v })} />
@@ -3701,7 +3697,7 @@ export function Sidebar({
               <div data-testid="export-carries" style={{ marginTop:2, fontSize:11, color: MUTED }}>
                 PNG and SVG carry the preset
               </div>
-              <PenStrip pens={pens} style={style} onInksAsPicked={(v) => ss({ inksAsPicked: v })}
+              <PenStrip pens={pens} style={style}
                 onOneInk={(mode) => ss({ [`hypso${mode}`]: false })}
                 onOpenMark={(mode) => {
                   const row = PANEL_MODES.find((r) => r[1] === `enabled${mode}`)
@@ -3716,7 +3712,7 @@ export function Sidebar({
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
             <ExportGroup title="Images">
               <ExpBtn label="PNG" onClick={onPng} testId="export-png" />
-              <ExpBtn label="Clear PNG" onClick={onPngAlpha} testId="export-png-alpha" />
+              <ExpBtn label="PNG α" onClick={onPngAlpha} testId="export-png-alpha" />
             </ExportGroup>
             <ExportGroup title="3D models">
               <ExpBtn label="STL" onClick={onStl} testId="export-stl" />

@@ -1,5 +1,4 @@
 import { layerStyle } from './builders/shared'
-import { screenInk, screenInkHex } from './screenInk'
 
 const hex2 = (v) => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0')
 
@@ -36,8 +35,8 @@ const MAX_SWATCHES = 6
 export function pensOf(lineGeo, p = {}) {
   const hidden = !!p.depthOcclusion && (p.occlusionOpacity ?? 0) > 0
   if (!Array.isArray(lineGeo)) return { rows: [], layers: 0, exact: !hidden, hidden }
-  const rgb = p.inksAsPicked ? (r, g, b) => `#${hex2(r)}${hex2(g)}${hex2(b)}` : screenInk
-  const hex = p.inksAsPicked ? (h) => (h || '#000000').toLowerCase() : screenInkHex
+  const rgb = (r, g, b) => `#${hex2(r)}${hex2(g)}${hex2(b)}`
+  const hex = (h) => (h || '#000000').toLowerCase()
 
   const rows = []
   for (const L of lineGeo) {

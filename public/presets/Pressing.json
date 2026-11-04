@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,8 +14,8 @@
   },
   "style": {
     "bgColor": "#0a0a0a",
-    "colorContours": "#3a3a3a",
-    "colorWaveform": "#f2f2f2",
+    "colorContours": "#919191",
+    "colorWaveform": "#e1e1e1",
     "depthOcclusion": true,
     "detailWaveform": 2.5,
     "enabledContours": true,
@@ -27,7 +27,8 @@
     "spacingWaveform": 1,
     "weightContours": 0.5,
     "weightWaveform": 0.6,
-    "widthWaveform": 220
+    "widthWaveform": 220,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

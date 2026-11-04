@@ -16,6 +16,7 @@ import { captureAndExportPNG } from '../utils/pngExport'
 import { workAttribution } from '../utils/attribution'
 import { presetComment, presetToText } from '../utils/presetFile'
 import { crsAffine, measureScale } from '../utils/sheetMarks'
+import { asScreenTarget, readScreenBytes } from '../utils/screenRead'
 import { marksFor, PLAN_TILT, wantsSheetMarks } from '../utils/sheetFacts'
 import { groundPixelMetres } from '../utils/geoCoords'
 import { setPlanOblique } from '../utils/planOblique'
@@ -55,6 +56,12 @@ function sheetBox(p, width, height) {
     paperAspect(p.framePaper ?? 'iso', !!p.frameLandscape, p.frameCustomRatio),
     p.frameScale ?? 0.85, p.frameOffsetX ?? 0, p.frameOffsetY ?? 0)
 }
+
+/**
+ * The largest side of one capture tile. 2048² at 40 bytes a pixel is 168 MB,
+ * which every desktop GPU this app runs on allocates. See `renderTiled`.
+ */
+const CAPTURE_TILE = 2048
 
 /**
  * The PNG at print size: the sheet, `plotWidthMm` wide at `framePrintDpi`.
@@ -134,6 +141,50 @@ export function Scene({
   planCaptureRef = null,
 }) {
   const { camera: currentCamera, gl, scene, invalidate } = useThree()
+  const readTarget = (t, x, y, w, h, buf) => gl.readRenderTargetPixels(t, x, y, w, h, buf)
+
+  /*
+   * A capture, drawn in tiles. An export target is 16-bit floats with four
+   * samples, 40 bytes a pixel, and a 4× capture of a 2560 px window asked for
+   * 2.3 GB: Chrome left the framebuffer empty and the PNG was paper alone.
+   *
+   * Each tile is a target at most CAPTURE_TILE on a side, and the whole W × H
+   * frame is drawn into it through a viewport moved by the tile's corner, so
+   * the target clips it. The camera, the line resolutions and the background
+   * are those of a whole-frame render, so a tile is that render's pixels.
+   * (A view offset per tile changed the projection, and Riso's dots, which the
+   * stroke shader sizes from it, drew smaller the smaller the tile.)
+   * The pixels land in one buffer, rows bottom first like `readPixels`.
+   */
+  const renderTiled = (what, cam, W, H) => {
+    const out = new Uint8Array(W * H * 4)
+    const Tw = Math.min(CAPTURE_TILE, W), Th = Math.min(CAPTURE_TILE, H)
+    for (let ty = 0; ty < H; ty += Th) {
+      for (let tx = 0; tx < W; tx += Tw) {
+        // A fresh target a tile: a target drawn a second time after a read
+        // came back all zeros (see the multiply passes).
+        const rt = asScreenTarget(new THREE.WebGLRenderTarget(Tw, Th, { samples: 4 }), THREE)
+        // GL counts rows from the bottom: the tile's lowest row is H − ty − Th.
+        rt.viewport.set(-tx, -(H - ty - Th), W, H)
+        try {
+          gl.setRenderTarget(rt)
+          gl.clear()
+          gl.render(what, cam)
+          const bytes = readScreenBytes(readTarget, rt, Tw, Th)
+          const w = Math.min(Tw, W - tx)
+          for (let r = 0; r < Th; r++) {
+            const top = ty + Th - 1 - r
+            if (top >= H) continue
+            out.set(bytes.subarray(r * Tw * 4, (r * Tw + w) * 4), ((H - 1 - top) * W + tx) * 4)
+          }
+        } finally {
+          gl.setRenderTarget(null)
+          rt.dispose()
+        }
+      }
+    }
+    return out
+  }
   const groupRef    = useRef()
   const particleRef = useRef()
   const persRef     = useRef()
@@ -496,17 +547,8 @@ export function Scene({
     const targetW = print ? print.w : Math.round(vpSize.x * captureScale)
     const targetH = print ? print.h : Math.round(vpSize.y * captureScale)
 
-    // Offscreen render target — never touches the main framebuffer.
-    // samples: 4 enables WebGL2 MSAA so edges are smooth like the main canvas
-    // (antialias: true). Three.js resolves the MSAA buffer to the texture
-    // automatically at the end of gl.render(), before readRenderTargetPixels.
-    const rt = new THREE.WebGLRenderTarget(targetW, targetH, {
-      minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter,
-      format: THREE.RGBAFormat,
-      samples: 4,
-      colorSpace: THREE.SRGBColorSpace,
-    })
+    // Offscreen tiles (`renderTiled`) — never the main framebuffer. Each has
+    // four samples, so edges are smooth like the main canvas (antialias: true).
 
     // Only update LineMaterial resolution to match the render target dimensions.
     // linewidth is intentionally NOT scaled: the shader formula
@@ -557,15 +599,11 @@ export function Scene({
       // The live gradient paper (see BgSync) stays out of this pass, or it
       // would fill the alpha the trim reads; the export lays its own paper.
       scene.background = null
-      gl.setRenderTarget(rt)
       gl.setClearColor(0x000000, 0)
-      gl.clear()
-      gl.render(scene, cam)
 
-      // Read pixels from the render target.
-      // WebGL origin is bottom-left; flip vertically so (0,0) is top-left.
-      const raw = new Uint8Array(targetW * targetH * 4)
-      gl.readRenderTargetPixels(rt, 0, 0, targetW, targetH, raw)
+      // The pixels as the screen shows them, rows bottom first.
+      // WebGL origin is bottom-left; flipped below so (0,0) is top-left.
+      const raw = renderTiled(scene, cam, targetW, targetH)
 
       // A multiplied layer (Riso's overprint, an anaglyph on paper) can only
       // darken what is under it, and over the transparent clear above there is
@@ -580,20 +618,14 @@ export function Scene({
       if (multiplies && !isAlpha) {
         const paper = p.bgGradient && bgGradientStops?.length > 1
           ? gradientTexture(bgGradientStops) : new THREE.Color(p.bgColor)
-        // Fresh targets: the first one, once read, does not take a second pass
-        // and drew all zeros.
-        const pass = (target, what) => {
-          const out = new Uint8Array(targetW * targetH * 4)
+        const pass = (what) => {
           what.background = paper
-          gl.setRenderTarget(target)
-          gl.render(what, cam)
-          gl.readRenderTargetPixels(target, 0, 0, targetW, targetH, out)
+          const out = renderTiled(what, cam, targetW, targetH)
           what.background = null
-          target.dispose()
           return out
         }
-        const over = pass(rt.clone(), scene)
-        const bare = pass(rt.clone(), new THREE.Scene())
+        const over = pass(scene)
+        const bare = pass(new THREE.Scene())
         if (paper.isTexture) paper.dispose()
         for (let i = 0; i < over.length; i += 4) {
           if (Math.abs(over[i] - bare[i]) + Math.abs(over[i + 1] - bare[i + 1]) + Math.abs(over[i + 2] - bare[i + 2]) <= 3) continue
@@ -605,7 +637,6 @@ export function Scene({
       if (print) cam.clearViewOffset()
       for (const obj of hidden) obj.visible = true
       gl.setClearColor(oldClearColor, oldAlpha)
-      rt.dispose()
 
       const flipped = new Uint8Array(targetW * targetH * 4)
       const rowBytes = targetW * 4
@@ -707,7 +738,6 @@ export function Scene({
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
         simplifyMm: p.plotSimplifyMm, minLengthMm: p.plotMinLengthMm, joinGapMm: p.plotJoinGapMm,
         areaFill: p.plotAreaFill, hatchPitchMm: p.plotHatchPitch, hatchAngle: p.plotHatchAngle,
-        inksAsPicked: !!p.inksAsPicked,
         sheetMm: p.plotWidthMm,
         // The anaglyph runs the whole pipeline twice, once per eye, so the
         // exporter needs the separation and the two filter inks as well as the
@@ -832,7 +862,6 @@ export function Scene({
     const group = groupRef.current
     const held = group ? { p: group.position.clone(), q: group.quaternion.clone(), s: group.scale.clone() } : null
     if (group) { group.position.set(0, 0, 0); group.quaternion.identity(); group.scale.set(1, 1, 1); group.updateMatrixWorld(true) }
-    const rt = new THREE.WebGLRenderTarget(tw, th, { samples: 4, colorSpace: THREE.SRGBColorSpace })
     const lines = [], hidden = []
     scene.traverse((o) => {
       if (o.material?.isLineMaterial) { lines.push([o.material, o.material.resolution.clone()]); o.material.resolution.set(tw, th) }
@@ -844,12 +873,8 @@ export function Scene({
     try {
       // Tiles go over another map, so they keep the paper out.
       scene.background = transparent ? null : new THREE.Color(p.bgColor ?? '#ffffff')
-      gl.setRenderTarget(rt)
       if (transparent) gl.setClearColor(0x000000, 0)
-      gl.clear()
-      gl.render(scene, cam)
-      const raw = new Uint8Array(tw * th * 4)
-      gl.readRenderTargetPixels(rt, 0, 0, tw, th, raw)
+      const raw = renderTiled(scene, cam, tw, th)
       const canvas = document.createElement('canvas')
       canvas.width = tw; canvas.height = th
       const img = canvas.getContext('2d').createImageData(tw, th)
@@ -860,7 +885,6 @@ export function Scene({
       gl.setRenderTarget(null)
       gl.setClearColor(clear, alpha)
       scene.background = bg
-      rt.dispose()
       for (const [m, r] of lines) m.resolution.copy(r)
       for (const o of hidden) o.visible = true
       if (group && held) { group.position.copy(held.p); group.quaternion.copy(held.q); group.scale.copy(held.s); group.updateMatrixWorld(true) }

@@ -409,3 +409,77 @@ describe('migrateScreens', () => {
     expect(layerStyle('Riso-B', { overprintRiso: false }).blending).toBe('normal')
   })
 })
+
+describe('format 10: every ink as picked', () => {
+  it('rewrites an older plate\'s line inks as the tone curve drew them', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    const { screenInkHex } = await import('../../src/utils/screenInk')
+    const out = parsePreset('{"format":9,"style":{"bgColor":"#050805","colorPrinter":"#39ff6a","hillshadeShadowColor":"#223344"}}')
+    expect(out.style.colorPrinter).toBe(screenInkHex('#39ff6a'))
+    expect(out.style.colorPrinter).toBe('#b6e3c1')
+    // The paper and the surface were never curved, so they stay.
+    expect(out.style.bgColor).toBe('#050805')
+    expect(out.style.hillshadeShadowColor).toBe('#223344')
+    expect('inksAsPicked' in out.style).toBe(false)
+  })
+
+  it('leaves a plate that drew as picked alone, and a format 10 plate too', async () => {
+    const { parsePreset } = await import('../../src/utils/presetFile')
+    const picked = parsePreset('{"format":9,"style":{"inksAsPicked":true,"colorPrinter":"#39ff6a"}}')
+    expect(picked.style).toEqual({ colorPrinter: '#39ff6a' })
+    expect(parsePreset('{"format":10,"style":{"colorPrinter":"#39ff6a"}}').style).toEqual({ colorPrinter: '#39ff6a' })
+  })
+
+  it('fills the inks a sparse plate leaves out with the curved default', async () => {
+    const { softenInks } = await import('../../src/utils/softInks')
+    const { STYLE_DEF } = await import('../../src/defaults')
+    const { screenInkHex } = await import('../../src/utils/screenInk')
+    const out = softenInks({ style: { enabledMineral: true } }).style
+    expect(out.colorAMineral).toBe(screenInkHex(STYLE_DEF.colorAMineral))
+    // Black is black under the curve, so a black default is not written.
+    expect(STYLE_DEF.colorContours).toBe('#000000')
+    expect('colorContours' in out).toBe(false)
+    expect('bgColor' in out).toBe(false)
+  })
+
+  it('curves the gradient only where lines alone read it', async () => {
+    const { softenInks } = await import('../../src/utils/softInks')
+    const stops = [{ pos: 0, color: '#000080' }, { pos: 1, color: '#00ffff' }]
+    const lines = softenInks({ style: { hypsoDag: true }, gradientStops: stops })
+    // Blue to cyan bends under the curve, so the ramp takes stops between.
+    expect(lines.gradientStops.length).toBeGreaterThan(2)
+    expect(softenInks({ style: { hypsoDag: true, fillHypsometric: true }, gradientStops: stops }).gradientStops).toBe(stops)
+    expect(softenInks({ style: {}, gradientStops: stops }).gradientStops).toBe(stops)
+  })
+
+  it('keeps the blend between curved stops within two levels of the curve', async () => {
+    const { curveStops } = await import('../../src/utils/softInks')
+    const { sampleGradient, hexToRgb } = await import('../../src/utils/colorUtils')
+    const { screenInk } = await import('../../src/utils/screenInk')
+    const stops = [{ pos: 0, color: '#000080' }, { pos: 0.25, color: '#00ffff' }, { pos: 0.5, color: '#00ff00' }, { pos: 1, color: '#800000' }]
+    const curved = curveStops(stops)
+    for (let t = 0; t <= 1; t += 0.01) {
+      const got = sampleGradient(curved, t).map((c) => Math.round(c * 255))
+      const want = hexToRgb(screenInk(...sampleGradient(stops, t))).map((c) => Math.round(c * 255))
+      got.forEach((v, i) => expect(Math.abs(v - want[i]), `t=${t.toFixed(2)}`).toBeLessThanOrEqual(6))
+    }
+  })
+
+  it('weakens Mineral\'s grain by what the curve kept of it', async () => {
+    const { softenInks } = await import('../../src/utils/softInks')
+    const out = softenInks({ style: { enabledMineral: true, grainMineral: 0.28 } }).style
+    expect(out.grainMineral).toBeGreaterThan(0)
+    expect(out.grainMineral).toBeLessThan(0.28)
+    expect('grainMineral' in softenInks({ style: { grainMineral: 0.28 } }).style).toBe(true)
+  })
+
+  it('no bundled preset carries the old switch', async () => {
+    const { readFileSync } = await import('node:fs')
+    const names = JSON.parse(readFileSync('public/presets/manifest.json', 'utf8'))
+    for (const n of names) {
+      const d = JSON.parse(readFileSync(`public/presets/${n}`, 'utf8'))
+      expect('inksAsPicked' in (d.style ?? {}), n).toBe(false)
+      expect(d.format, n).toBe(10)
+    }
+  })
+})

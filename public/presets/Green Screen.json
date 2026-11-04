@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,7 +15,7 @@
   "style": {
     "bgColor": "#050805",
     "classesPrinter": 8,
-    "colorPrinter": "#39ff6a",
+    "colorPrinter": "#b6e3c1",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledPrinter": true,
@@ -25,7 +25,8 @@
     "pitchPrinter": 6,
     "quantilePrinter": false,
     "strokeDepthBias": 0,
-    "weightPrinter": 0.8
+    "weightPrinter": 0.8,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

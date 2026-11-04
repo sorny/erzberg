@@ -30,6 +30,7 @@
 
 /** The `tEXt` keyword, and the marker the SVG comment opens with. */
 import { DRAW_MODE_IDS } from './drawModes'
+import { softenInks } from './softInks'
 
 export const PRESET_KEYWORD = 'erzberg:preset'
 
@@ -75,8 +76,22 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * 9 is Stipple's spacing below one grid cell and Riso's overprint. Before,
  * Stipple rounded its spacing to whole cells and the Riso inks drew with normal
  * blending, and a payload before 9 keeps both (`migrateScreens`).
+ *
+ * 10 is every ink drawn as picked. Before, line inks went through the
+ * viewport's tone curve unless the plate switched Inks as picked on, and a
+ * payload before 10 that did not has its inks rewritten as the curve drew them
+ * (`softenInks`).
  */
-export const PRESET_FORMAT = 9
+export const PRESET_FORMAT = 10
+
+/**
+ * The soft inks, as exact inks, for a plate made before format 10. See
+ * `softenInks`. A new object comes back.
+ */
+export function migrateInks(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  return softenInks(payload)
+}
 
 /**
  * Riso's dots as they drew, for a plate made before format 8.
@@ -417,7 +432,8 @@ export function parsePreset(text) {
     const bias = f < 6 ? migrateStrokeBias(walls) : walls
     const wave = f < 7 ? migrateWaveformClip(bias) : bias
     const pens = f < 8 ? migrateOutrunPens(migrateRisoDots(wave)) : wave
-    return repairWaveform(f < 9 ? migrateScreens(pens) : pens)
+    const screens = f < 9 ? migrateScreens(pens) : pens
+    return repairWaveform(f < 10 ? migrateInks(screens) : screens)
   } catch {
     return null
   }

@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,8 +14,8 @@
   },
   "style": {
     "bgColor": "#e9e0cc",
-    "colorRidge": "#1d140c",
-    "colorStipple": "#1d140c",
+    "colorRidge": "#5c4832",
+    "colorStipple": "#5c4832",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledRidge": true,
@@ -26,7 +26,8 @@
     "stippleDensityMode": "shade",
     "thresholdRidge": 0.04,
     "weightRidge": 0.8,
-    "weightStipple": 1.5
+    "weightStipple": 1.5,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -21,7 +21,8 @@
     "maxLenFlow": 400,
     "occludeBy": "ground",
     "spacingFlow": 2,
-    "weightFlow": 0.6
+    "weightFlow": 0.6,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,
@@ -56,23 +57,51 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#3b1f8f"
+      "color": "#9267c9"
+    },
+    {
+      "pos": 0.0313,
+      "color": "#8f7dcc"
+    },
+    {
+      "pos": 0.0625,
+      "color": "#8d8ece"
+    },
+    {
+      "pos": 0.125,
+      "color": "#89a7d3"
     },
     {
       "pos": 0.25,
-      "color": "#1f7fd1"
+      "color": "#87c5da"
     },
     {
       "pos": 0.5,
-      "color": "#2fd6a0"
+      "color": "#aaddd1"
+    },
+    {
+      "pos": 0.5625,
+      "color": "#c0dcca"
+    },
+    {
+      "pos": 0.625,
+      "color": "#cfdcc1"
     },
     {
       "pos": 0.75,
-      "color": "#f7d038"
+      "color": "#e3dca5"
+    },
+    {
+      "pos": 0.875,
+      "color": "#e4cca7"
+    },
+    {
+      "pos": 0.9375,
+      "color": "#e6c0a9"
     },
     {
       "pos": 1,
-      "color": "#ff4f4f"
+      "color": "#eaadaa"
     }
   ],
   "bgGradientStops": [

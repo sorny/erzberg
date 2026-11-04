@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,17 +14,17 @@
   },
   "style": {
     "bgColor": "#e8dccb",
-    "colorALandform": "#e8dccb",
-    "colorBLandform": "#eb5627",
-    "colorCLandform": "#2e7fb2",
-    "colorContours": "#1a1a1a",
-    "colorDLandform": "#f3c03f",
-    "colorELandform": "#1a1a1a",
-    "colorFLandform": "#e8dccb",
-    "colorGLandform": "#eb5627",
-    "colorHLandform": "#f3c03f",
-    "colorILandform": "#2e7fb2",
-    "colorJLandform": "#1a1a1a",
+    "colorALandform": "#dfdddb",
+    "colorBLandform": "#e6b182",
+    "colorCLandform": "#95c5d4",
+    "colorContours": "#585858",
+    "colorDLandform": "#e2d8a8",
+    "colorELandform": "#585858",
+    "colorFLandform": "#dfdddb",
+    "colorGLandform": "#e6b182",
+    "colorHLandform": "#e2d8a8",
+    "colorILandform": "#95c5d4",
+    "colorJLandform": "#585858",
     "depthOcclusion": true,
     "enabledContours": true,
     "enabledLandform": true,
@@ -33,7 +33,9 @@
     "occludeBy": "ground",
     "opacityContours": 0.7,
     "weightContours": 0.6,
-    "weightLandform": 1.2
+    "weightLandform": 1.2,
+    "occlusionColor": "#df000a",
+    "colorLandform": "#d5a181"
   },
   "points": {
     "showPoints": false,

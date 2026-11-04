@@ -313,8 +313,8 @@ function loopArea2(pts) {
 
 const hex2 = (v) => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16).padStart(2, '0')
 
-// The tone curve lives in screenInk.js, so the panel can show an ink as the
-// file will write it without loading this module. Re-exported for the tests.
+// The tone curve lives in screenInk.js. Line inks no longer pass through it;
+// the particles still do, as the viewport draws them. Re-exported for the tests.
 export { screenInk, screenInkHex }
 
 // ─── Main export ──────────────────────────────────────────────────────────────
@@ -439,10 +439,6 @@ async function runExport({
   // Filled areas as hatch strokes instead of fills. The pitch is millimetres on
   // paper, so it needs the sheet width to become page units. See hatchFill.js.
   areaFill = 'solid', hatchPitchMm = 0.8, hatchAngle = 45, sheetMm = 297,
-  // "Inks as picked": write each ink as its picked hex rather than as the tone-
-  // mapped colour the default viewport shows. The viewport does the same then,
-  // so the file still matches the screen.
-  inksAsPicked = false,
   /*
    * Anaglyph. `eye` is a world-space offset applied before the camera, which is
    * a real eye separation under a perspective camera: a near mark moves further
@@ -481,8 +477,10 @@ async function runExport({
   const ghostOpac = occlusionOpacity ?? 0
   // One ghost ink for the whole file: the hidden pass, the hidden dots and the
   // hidden half of the flock all draw in it, and they must not disagree.
-  const inkRGB = inksAsPicked ? (r, g, b) => `#${hex2(r)}${hex2(g)}${hex2(b)}` : screenInk
-  const inkHex = inksAsPicked ? (h) => (h || '#000000').toLowerCase() : screenInkHex
+  // Each ink as its picked hex: the viewport draws line inks without the tone
+  // curve, so the picked colour is the colour on screen.
+  const inkRGB = (r, g, b) => `#${hex2(r)}${hex2(g)}${hex2(b)}`
+  const inkHex = (h) => (h || '#000000').toLowerCase()
   const ghostInk = inkHex(occlusionColor)
   const camInv = camera.matrixWorldInverse
   const wld2 = new THREE.Vector3()
@@ -890,9 +888,9 @@ async function runExport({
       // every such area is here as lines, so nothing goes missing.
       // One filter colour for the whole eye when an anaglyph is being written.
       // A per-vertex ramp underneath would be seen by one eye and not the other,
-      // which is not a colour a stereo pair can carry. Written raw, not through
-      // `screenInkHex`: the file is for glasses and a two-pen plotter, and the
-      // tone curve turned #ff2020 into a salmon #f37870 that the red filter
+      // which is not a colour a stereo pair can carry. Written raw: the file is
+      // for glasses and a two-pen plotter, and the tone curve once turned
+      // #ff2020 into a salmon #f37870 that the red filter
       // leaks, which is what made an exported anaglyph read as a grey drawing.
       const flatStroke = eyeInk ? eyeInk : inkHex(color)
 
@@ -995,8 +993,8 @@ async function runExport({
           })
         }
         if (runs.length) {
-          // `flatStroke`, so the ink has already been through `screenInk` — the
-          // writer must not put it through a second time. Measured: a label set
+          // `flatStroke`, the ink as the layer writes it. The text writer must
+          // not convert it a second time: under the old tone curve a label set
           // to #00ff00 went out as #d0dfb9 rather than #93e459.
           svgLayers.push({ id, name, isText: true, runs, style: layer.textStyle,
                            color: flatStroke, weight, opacity })
@@ -1728,7 +1726,9 @@ async function runExport({
  */
 function sheetMarkGroup(marks, color, vx, vy) {
   if (!marks) return []
-  const ink = screenInkHex(color)
+  // As picked: the viewport draws the marks as HTML and the PNG strokes them
+  // on a 2D canvas, and neither passes through the tone curve.
+  const ink = (color || '#000000').toLowerCase()
   const stroke = Math.max(0.4, (marks.texts[0]?.size ?? 12) * 0.08)
   const els = [
     ...marks.rects.map(([x, y, w, h]) =>

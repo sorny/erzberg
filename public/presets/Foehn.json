@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,13 +15,14 @@
   "style": {
     "bgColor": "#0f1a24",
     "bgGradient": true,
-    "colorWind": "#e8dcc4",
+    "colorWind": "#dfddda",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledWind": true,
     "occludeBy": "ground",
     "spacingWind": 4,
-    "weightWind": 0.6
+    "weightWind": 0.6,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,13 +14,14 @@
   },
   "style": {
     "bgColor": "#0e0e12",
-    "colorZeroCross": "#ff2e88",
+    "colorZeroCross": "#ee8ec8",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledZeroCross": true,
     "occludeBy": "ground",
     "spacingZeroCross": 4,
-    "weightZeroCross": 1
+    "weightZeroCross": 1,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

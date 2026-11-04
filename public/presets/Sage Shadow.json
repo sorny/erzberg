@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -16,8 +16,8 @@
     "altitudeShadowHatch": 18,
     "azimuthShadowHatch": 300,
     "bgColor": "#dfe5d3",
-    "colorContours": "#c4623f",
-    "colorShadowHatch": "#2e4a3a",
+    "colorContours": "#dcb79e",
+    "colorShadowHatch": "#84a292",
     "crossShadowHatch": false,
     "depthOcclusion": true,
     "enabledContours": true,
@@ -28,7 +28,8 @@
     "opacityContours": 0.7,
     "spacingShadowHatch": 3,
     "weightContours": 0.6,
-    "weightShadowHatch": 0.7
+    "weightShadowHatch": 0.7,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

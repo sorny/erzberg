@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,14 +15,15 @@
   "style": {
     "azimuthFlashbulb": 200,
     "bgColor": "#0b0b0d",
-    "colorFlashbulb": "#f2efe6",
+    "colorFlashbulb": "#e1e0df",
     "depthOcclusion": true,
     "enabledFlashbulb": true,
     "enabledLines": false,
     "exposureFlashbulb": 1.2,
     "occludeBy": "ground",
     "spacingFlashbulb": 2,
-    "weightFlashbulb": 1.5
+    "weightFlashbulb": 1.5,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

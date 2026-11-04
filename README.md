@@ -349,10 +349,10 @@ Colour to Line. The line at the top of the panel gives the same count
 (`3 layers · 1 ink · 2 mixed`). Preflight counts exactly when filled areas or
 hidden lines are drawing.
 
-**Inks as picked.** By default inks pass through a filmic tone curve and look
-softer on screen. Switch this on in Terrain Style, or under the pen layers, to
-draw and export every ink exactly as picked, so a pen matched to a swatch
-matches the plot.
+**Inks as picked.** Every line and area draws and exports in exactly the
+color you pick, so a pen matched to a swatch matches the plot. The viewport,
+the SVG and the PNG show the same colors. A plate saved before v1.67 opens with
+its inks rewritten as it showed them then, so it keeps its look.
 
 **Plan oblique.** A straight-down view in which each point moves up the sheet
 by its height (Jenny and Patterson, 2007), so the mountains stand up while the
@@ -444,7 +444,7 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 | Format | Notes |
 |---|---|
 | **SVG** | Software Z-buffer with terrain occlusion. One Inkscape layer per mode and per vector layer. Exact dash patterns. Shows progress and can be cancelled. |
-| **PNG** | 4K with MSAA, trimmed to content. **Clear PNG** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
+| **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
 | **STL** | Watertight mesh. A vector layer with **STL ribbon** gets a second solid for multicolour printing. |
 | **glTF, 3MF** | The STL's solid with the plate on top, seen from above: as a texture in a `.glb` for Blender and web viewers, as vertex colours in a `.3mf` for colour printers. |
 | **GeoJSON** | The ground marks as lines in the raster's projection, with layer, pen name and height in metres. Charts, pillars and the panorama are left out. |

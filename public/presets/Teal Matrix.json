@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": false,
     "depthOcclusion": false,
     "occlusionBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
@@ -78,10 +78,10 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": false,
     "intervalContours": 1,
-    "colorContours": "#7b4f2e",
+    "colorContours": "#c3a886",
     "weightContours": 1,
     "opacityContours": 1,
     "dashContours": "solid",
@@ -166,7 +166,7 @@
     "spacingStipple": 1,
     "weightStipple": 1,
     "opacityStipple": 1,
-    "colorStipple": "#10d0a0",
+    "colorStipple": "#92dcd1",
     "dashStipple": "solid",
     "stippleDensityMode": "elevation",
     "stippleGamma": 0.4,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#10d0a0",
+    "colorCurv": "#92dcd1",
     "weightCurv": 1,
     "opacityCurv": 1,
     "dashCurv": "solid",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,23 +262,23 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#082818"
+        "color": "#1c7355"
       },
       {
         "pos": 0.35,
-        "color": "#10c898"
+        "color": "#8fdbce"
       },
       {
         "pos": 0.65,
-        "color": "#20d8a8"
+        "color": "#a1ddd3"
       },
       {
         "pos": 0.82,
-        "color": "#c87030"
+        "color": "#dcbf90"
       },
       {
         "pos": 1,
-        "color": "#e08040"
+        "color": "#e0c6a2"
       }
     ]
   },
@@ -315,23 +315,47 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#082818"
+      "color": "#1c7355"
+    },
+    {
+      "pos": 0.0438,
+      "color": "#299277"
+    },
+    {
+      "pos": 0.0875,
+      "color": "#3ba78f"
+    },
+    {
+      "pos": 0.175,
+      "color": "#5fc1af"
+    },
+    {
+      "pos": 0.2625,
+      "color": "#7ad1c2"
     },
     {
       "pos": 0.35,
-      "color": "#10c898"
+      "color": "#8fdbce"
     },
     {
       "pos": 0.65,
-      "color": "#20d8a8"
+      "color": "#a1ddd3"
+    },
+    {
+      "pos": 0.735,
+      "color": "#c2d1be"
+    },
+    {
+      "pos": 0.7775,
+      "color": "#d0c9ac"
     },
     {
       "pos": 0.82,
-      "color": "#c87030"
+      "color": "#dcbf90"
     },
     {
       "pos": 1,
-      "color": "#e08040"
+      "color": "#e0c6a2"
     }
   ],
   "bgGradientStops": [
