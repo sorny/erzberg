@@ -5,7 +5,7 @@
  * state, and two copies had already drifted: one had a heading, the imagery
  * line and the exposure controls, and the other had none of them.
  *
- * The exposure controls sit here as well as in the Satellite section. Aiming at
+ * The exposure controls sit here as well as in the Imagery section. Aiming at
  * a boundary is exactly when you need them, and the sidebar that carries them
  * is hidden while either view is open.
  */
@@ -36,7 +36,7 @@ export function BackdropBlock({ prefix, backdrop, setBackdrop, hasPhoto, imagery
       )}
       {!hasPhoto && backdrop === 'imagery' && (
         <div style={{ fontSize: 10, color: '#ef4444', lineHeight: 1.6 }}>
-          Nothing to show. Fetch imagery in the Satellite section first.
+          Nothing to show. Fetch imagery in the Imagery section first.
         </div>
       )}
       {hasPhoto && style && ss && (

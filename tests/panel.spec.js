@@ -591,8 +591,8 @@ test.describe('panel', () => {
     expect(at('section-paper')).toBeGreaterThan(at('section-camera'))
     expect(at('section-mirror')).toBeLessThan(at('stage-output'))
     // Satellite is a drape, so it sits in Surface with the other surface tones.
-    expect(at('section-satellite')).toBeGreaterThan(at('stage-surface'))
-    expect(at('section-satellite')).toBeLessThan(at('stage-marks'))
+    expect(at('section-imagery')).toBeGreaterThan(at('stage-surface'))
+    expect(at('section-imagery')).toBeLessThan(at('stage-marks'))
     expect(at('section-draw-modes')).toBeGreaterThan(at('stage-marks'))
   })
 

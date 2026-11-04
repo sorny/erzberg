@@ -346,7 +346,7 @@ left out, because they are data, not look:
 | Export | Vector layers |
 |---|---|
 | SVG | One named Inkscape layer per vector layer. Icons in their own `· icons` layer. Area fills are omitted, outlines stay. |
-| PNG / PNG α / WebM | Yes, as rendered. |
+| PNG / Clear PNG / WebM | Yes, as rendered. |
 | STL | Layers with **STL ribbon** on, as `<base>-vectors.stl`. Default on for GPX, off for OSM and GeoJSON. |
 | Heightmap PNG | No. |
 

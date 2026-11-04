@@ -7,7 +7,7 @@
  * elevation band is the one with a range in metres and a picture of relief.
  * The previews arrive after the load, because each one reads a whole band.
  *
- * Under each tile, Drape and Mask send that band somewhere else instead: to the
+ * Under each tile, Image and Mask send that band somewhere else instead: to the
  * imagery drape, or to a new mask (see utils/bandUse.js).
  */
 import { useStore } from '../../store/useStore'
@@ -22,7 +22,7 @@ export function BandPicker({ onPick, onSend }) {
   return (
     <div data-testid="band-picker" style={{ marginTop: 8 }}>
       <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-        Band · this file has {count}. Pick the one that holds elevation. Drape and Mask use a band as an image or a mask.
+        This file has {count} bands. Click the one that holds elevation. Image lays a band on the terrain as a picture, and Mask makes a mask from it.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
         {Array.from({ length: count }, (_, i) => {
@@ -51,7 +51,7 @@ export function BandPicker({ onPick, onSend }) {
             </button>
             {onSend && (
               <div style={{ display: 'flex', gap: 2 }}>
-                {[['Drape', 'imagery'], ['Mask', 'mask']].map(([label, target]) => (
+                {[['Image', 'imagery'], ['Mask', 'mask']].map(([label, target]) => (
                   <button key={target} type="button" data-testid={`band-${i + 1}-${target}`}
                     title={target === 'imagery' ? `Band ${i + 1} as the imagery drape` : `Band ${i + 1} as a mask`}
                     onClick={() => onSend(i, target)}

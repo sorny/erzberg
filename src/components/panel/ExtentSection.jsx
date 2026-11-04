@@ -133,7 +133,7 @@ export function ExtentSection() {
         detail={cover
           ? `${cover.name ?? 'Plate'}${cover.year ? ` · ${cover.year}` : ''}`
           : 'Not loaded'}
-        where={cover ? null : 'Terrain › Land Cover'} />
+        where={cover ? null : 'Terrain › Land Cover Data'} />
     </div>
   )
 }

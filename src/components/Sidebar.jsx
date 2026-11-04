@@ -672,7 +672,7 @@ const WAVE_GUIDE_KEY = 'erzberg.waveformGuide'
 const STATS_STAGES = [1, 2, 3, 6]
 
 /**
- * My presets: the looks kept in this browser, as tiles like the bundled ones,
+ * The shelf: the looks kept in this browser, as tiles like the bundled ones,
  * with a name field to keep the current look and the shelf as a file.
  */
 function PresetShelf({ shelf, keep, apply, remove, saveFile, openFile }) {
@@ -680,11 +680,12 @@ function PresetShelf({ shelf, keep, apply, remove, saveFile, openFile }) {
   const onKeep = () => { keep(name); setName('') }
   return (
     <div data-testid="preset-shelf">
-      <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>
-        My presets <span style={{ color: MUTED, fontWeight:400, fontFamily: MONO }}>{shelf.length}</span>
+      <div style={{ display:'flex', fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>
+        <span>Shelf <span style={{ color: MUTED, fontWeight:400 }}>· in this browser</span></span>
+        <span style={{ marginLeft:'auto', color: MUTED, fontWeight:400, fontFamily: MONO }}>{shelf.length}</span>
       </div>
       {shelf.length > 0 && (
-        <div role="group" aria-label="My presets" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
+        <div role="group" aria-label="Shelf" style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginBottom:6 }}>
           {shelf.map((e) => (
             <div key={e.name} style={{ position:'relative' }}>
               <button className="hmpreset" data-testid={`shelf-${e.name}`} title={e.name} aria-label={e.name}
@@ -709,10 +710,10 @@ function PresetShelf({ shelf, keep, apply, remove, saveFile, openFile }) {
       <div style={{ display:'flex', gap:4 }}>
         <input data-testid="shelf-name" value={name} onChange={(ev) => setName(ev.target.value)}
           onKeyDown={(ev) => { if (ev.key === 'Enter') onKeep() }}
-          placeholder="Name" aria-label="Name of the preset to keep" maxLength={60}
+          placeholder="Name" aria-label="Name of the look to add" maxLength={60}
           style={{ flex:1, minWidth:0, fontSize:11, padding:'4px 6px', background: SUNK, color: TEXT,
                    border:`1px solid ${BORDER}`, borderRadius:3, fontFamily: FONT }} />
-        <Btn onClick={onKeep} data-testid="shelf-keep" title="Keep the current look in this browser">Keep</Btn>
+        <Btn onClick={onKeep} data-testid="shelf-keep" title="Add the current look to the shelf">Add</Btn>
       </div>
       <div style={{ display:'flex', gap:4, marginTop:4 }}>
         <Btn block size="xs" variant="ghost" onClick={saveFile} disabled={!shelf.length} data-testid="shelf-save">Shelf ⬇</Btn>
@@ -781,7 +782,7 @@ export function Sidebar({
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
   onSavePreset, onLoadPreset,
-  // My presets: { shelf, keep, apply, remove, saveFile, openFile }, from usePresetShelf.
+  // The shelf: { shelf, keep, apply, remove, saveFile, openFile }, from usePresetShelf.
   presetShelf,
   // The project file: the look and everything it is drawn over, in one .erzberg.
   onSaveProject, onOpenProject,
@@ -2069,14 +2070,14 @@ export function Sidebar({
                 Output among the exports, which made a project file one of eight
                 equal buttons next to WebM, and put "open a look" two stages from
                 the looks. */}
-            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Your preset</div>
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Preset file</div>
             <div style={{ display:'flex', gap:4 }}>
-              <Btn block onClick={onSavePreset} data-testid="preset-save">Save ⬇</Btn>
+              <Btn block onClick={onSavePreset} data-testid="preset-save">Save preset ⬇</Btn>
               {/* Spends the opening on the *click*, not on the file landing: the
                   picker is a dialog the user sits in front of, and the opening
                   arriving behind it would be overwritten by the load anyway —
                   or worse, land after it. */}
-              <Btn block onClick={() => { spendOpening(); onLoadPreset?.() }} data-testid="preset-load">Open ⬆</Btn>
+              <Btn block onClick={() => { spendOpening(); onLoadPreset?.() }} data-testid="preset-load">Open preset ⬆</Btn>
             </div>
             <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
               A PNG or SVG from this app opens here too: it carries its preset.
@@ -2276,7 +2277,7 @@ export function Sidebar({
               the ground *is*, which is what lets a mark follow material rather
               than gradient. Cut one with scripts/embed-window.js — the fetch
               cannot happen in the browser, and the section says why. */}
-          <Section title="Land Cover" open={sec.landCover} onToggle={() => tog('landCover')} enabled={Boolean(cover)}>
+          <Section title="Land Cover Data" open={sec.landCover} onToggle={() => tog('landCover')} enabled={Boolean(cover)}>
             {/* One column, one gap, and nothing carrying a margin of its own.
                 The section body has no top padding — the first child sits
                 against the header — so anything with a negative top margin
@@ -2469,7 +2470,7 @@ export function Sidebar({
                 }} />
 
                 <Sub>
-                  <Heading>Analysis</Heading>
+                  <Heading>Spectrum</Heading>
                   <SegGroup label="FFT size" options={[[1024, 1024], [2048, 2048], [4096, 4096]]}
                     value={snd.opts.fftSize} onChange={(n) => snd.setOpts({ fftSize: n })}
                     style={{ marginBottom: 8 }} />
@@ -2610,7 +2611,7 @@ export function Sidebar({
               Unlike the cover plates, this one can be a button: Sentinel-2 on
               AWS answers CORS where AlphaEarth's bucket does not. Same terms as
               Fetch — no key, no account, nothing until it is pressed. */}
-          <Section title="Satellite" open={sec.satellite} onToggle={() => tog('satellite')} enabled={Boolean(imagery)}>
+          <Section title="Imagery" open={sec.satellite} onToggle={() => tog('satellite')} enabled={Boolean(imagery)}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 2 }}>
               {!imagery && (
                 <CoverProse>
@@ -2682,7 +2683,7 @@ export function Sidebar({
             </div>
           </Section>
 
-          <Section title="Texture" open={sec.texture} onToggle={() => tog('texture')}
+          <Section title="Image Overlay" open={sec.texture} onToggle={() => tog('texture')}
                    enabled={!!style.showTexture} onEnabled={v => ss({ showTexture: v })}>
             {style.showTexture && !style.showFill && (
               <Callout>Fill is off, so the texture does not show until Fill is on.</Callout>
@@ -2965,7 +2966,7 @@ export function Sidebar({
           </Section>
 
           {/* ── Sunlight ────────────────────────────────────────────────────── */}
-          <Section title="Sunlight" preview open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint} onEnabled={v => ss({ showSunTint: v })}>
+          <Section title="Sun Hours Tint" preview open={sec.sunTint} onToggle={() => tog('sunTint')} enabled={style.showSunTint} onEnabled={v => ss({ showSunTint: v })}>
             {(
               <Sub>
                 <Note>Hours of direct sun, with the shadows of the ridges, from the shaded colour to the sunny one. At the latitude of a GeoTIFF, or the Hillshade's for a plain heightmap.</Note>
@@ -3412,7 +3413,7 @@ export function Sidebar({
           <Section title="Paper" open={sec.paper} onToggle={() => tog('paper')} enabled={!!view.showFrame}
                    blurb="A frame in the shape of a sheet. The SVG cuts at it.">
             <Tog label="Paper frame" checked={!!view.showFrame} onChange={v => sv({ showFrame: v })}
-              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export. PNG keeps its trimmed capture unless Print size is set, and STL ignores the frame." />
+              help="Shows where a sheet of paper falls over the scene, and makes SVG export emit only what lands inside it — cut at the boundary rather than hidden behind a clip path, so there is nothing left to delete afterwards. The frame is an overlay: it never appears in an export. PNG is cut to its ink unless Print size is set, and STL ignores the frame." />
             {view.showFrame && (
               <Sub>
                 <SelectRow label="Paper" testId="frame-paper" value={view.framePaper ?? 'iso'}
@@ -3443,9 +3444,9 @@ export function Sidebar({
                 <InlineSl label="Margin" min={0} max={0.25} step={0.005} value={view.frameMargin ?? 0} onChange={v => sv({ frameMargin: v })} fmt={v => Math.round(v * 100) + '%'} testId="frame-margin"
                   help="An unprinted border inside the sheet, as a fraction of its shorter side. Geometry is cut to the inner edge while the page stays the full sheet, so the export comes out already mounted." />
                 <SegRow label="Print size" testIdPrefix="frame-dpi"
-                  options={[['Trim', 0], ['150', 150], ['300', 300], ['600', 600]]}
+                  options={[['Off', 0], ['150', 150], ['300', 300], ['600', 600]]}
                   value={view.framePrintDpi ?? 0} onChange={v => sv({ framePrintDpi: v })}
-                  help="How finely the PNG is printed, in dots per inch (DPI). Trim writes the drawing cut to its ink, as before. A DPI writes the whole sheet at the Sheet width under Output, so a 297 mm sheet at 300 DPI is 3508 pixels wide. The DPI is stored in the file, so a print program sizes it right. A sheet too large for the graphics card is written at the highest DPI that fits." />
+                  help="How finely the PNG is printed, in dots per inch (DPI). Off writes the drawing cut to its ink. A DPI writes the whole sheet at the Sheet width under Output, so a 297 mm sheet at 300 DPI is 3508 pixels wide. The DPI is stored in the file, so a print program sizes it right. A sheet too large for the graphics card is written at the highest DPI that fits." />
                 {(view.framePrintDpi ?? 0) > 0 && (() => {
                   const px = printPixels(view.plotWidthMm ?? 297, view.framePrintDpi,
                     paperAspect(view.framePaper ?? 'iso', !!view.frameLandscape, view.frameCustomRatio))
@@ -3455,23 +3456,23 @@ export function Sidebar({
             )}
           </Section>
 
-          {/* ── Scale and North ────────────────────────────────────────────
+          {/* ── Map Elements ────────────────────────────────────────────
               The two marks that make a plate a document. Both are ink: they are
               drawn over the viewport, composited into the PNG and written into
               the SVG as their own Inkscape layer, so a plotter can put them in a
               different pen. See utils/sheetMarks.js. */}
-          <Section title="Scale and North" open={sec.sheetMarks} onToggle={() => tog('sheetMarks')}
-                   enabled={summaries['Scale and North'] !== '—'}
-                   blurb="A scale bar, north arrows, a title block and coordinates on the sheet.">
+          <Section title="Map Elements" open={sec.sheetMarks} onToggle={() => tog('sheetMarks')}
+                   enabled={summaries['Map Elements'] !== '—'}
+                   blurb="A scale bar, a north arrow, a title block and coordinates on the sheet.">
             <Tog label="Scale bar" testId="mark-bar"
-                 help="A bar of round length — 200 m, 500 m, 1 km — measured from this raster's own bounding box. Needs a georeferenced GeoTIFF: a PNG heightmap has no ground to measure."
+                 help="A bar of round length — 200 m, 500 m, 1 km — measured from this raster's own bounding box. Needs a georeferenced raster, a GeoTIFF or fetched terrain: a PNG heightmap has no ground to measure."
                  checked={!!view.frameScaleBar} onChange={v => sv({ frameScaleBar: v })} />
             <Tog label="North arrow" testId="mark-north"
                  help="Points along the raster's own rows, and turns with the camera. It is grid north, which is not true north away from a projection's central meridian."
                  checked={!!view.frameNorth} onChange={v => sv({ frameNorth: v })} />
             {view.frameNorth && (
               <Sub>
-                <Tog label="Magnetic north" testId="mark-magnetic" small
+                <Tog label="Point to magnetic north" testId="mark-magnetic" small
                   help="Points the north arrow where a compass points, labelled MN, with the declination under it, in place of grid north. Computed for the plate's centre and today from the World Magnetic Model 2025 (NOAA and BGS), which holds until 2030. Grid north and true north differ too, away from a projection's central meridian, and the arrow includes that turn."
                   checked={!!view.frameMagnetic} onChange={v => sv({ frameMagnetic: v })} />
               </Sub>
@@ -3499,10 +3500,10 @@ export function Sidebar({
                 })}
               </Sub>
             )}
-            <SegRow label="Grid" testIdPrefix="mark-grid"
+            <SegRow label="Coordinates" testIdPrefix="mark-grid"
               options={[['Off', 'off'], ['Ticks', 'ticks'], ['Lines', 'lines']]}
               value={view.frameGrid ?? 'off'} onChange={v => sv({ frameGrid: v })}
-              help="Coordinates along the sheet's edge, at a round interval: ticks at the edge, or lines across the whole sheet. Drawn in a plan view only, with the tilt below 6°, because a tilted plate is at a different scale at its far side. Needs a georeferenced GeoTIFF." />
+              help="Coordinates along the sheet's edge, at a round interval: ticks at the edge, or lines across the whole sheet. Drawn in a plan view only, with the tilt below 6°, because a tilted plate is at a different scale at its far side. Needs a georeferenced raster: a GeoTIFF or fetched terrain." />
             {(view.frameGrid ?? 'off') !== 'off' && (
               <Sub>
                 <SegRow label="Units" testIdPrefix="mark-grid-units"
@@ -3510,7 +3511,7 @@ export function Sidebar({
                   value={view.frameGridUnits ?? 'grid'} onChange={v => sv({ frameGridUnits: v })}
                   help="Grid writes the raster's own coordinates, in metres for a projected file. Degrees writes longitude and latitude, as curves where the projection bends them." />
                 {(view.tilt ?? 0) >= 6 && (
-                  <Note>Tilt the camera below 6° to draw the grid.</Note>
+                  <Note>Tilt the camera below 6° to draw the coordinates.</Note>
                 )}
               </Sub>
             )}
@@ -3568,8 +3569,8 @@ export function Sidebar({
                 and how areas are filled are all SVG choices, and Preflight
                 measures the result before anything is written. */}
             <div>
-              <InlineSl label="Sheet" testId="plot-width"
-                help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Scale and North."
+              <InlineSl label="Sheet width" testId="plot-width"
+                help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Map Elements."
                 min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
                 onChange={v => sv({ plotWidthMm: Math.round(v) })} fmt={v => Math.round(v) + ' mm'} />
               <Tog label="Plotter order" testId="plot-order" small
@@ -3715,7 +3716,7 @@ export function Sidebar({
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
             <ExportGroup title="Images">
               <ExpBtn label="PNG" onClick={onPng} testId="export-png" />
-              <ExpBtn label="PNG α" onClick={onPngAlpha} testId="export-png-alpha" />
+              <ExpBtn label="Clear PNG" onClick={onPngAlpha} testId="export-png-alpha" />
             </ExportGroup>
             <ExportGroup title="3D models">
               <ExpBtn label="STL" onClick={onStl} testId="export-stl" />
@@ -3736,8 +3737,8 @@ export function Sidebar({
             <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Project</div>
             <div style={{ display:'flex', gap:4 }}>
               <Btn block onClick={onSaveProject} data-testid="project-save"
-                title="One .erzberg file with the terrain, the look, the camera, the vectors, the text and the masks">Save ⬇</Btn>
-              <Btn block onClick={() => { spendOpening(); onOpenProject?.() }} data-testid="project-open">Open ⬆</Btn>
+                title="One .erzberg file with the terrain, the look, the camera, the vectors, the text and the masks">Save project ⬇</Btn>
+              <Btn block onClick={() => { spendOpening(); onOpenProject?.() }} data-testid="project-open">Open project ⬆</Btn>
             </div>
             <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
               A project reopens the plate exactly, with its terrain. A preset carries the look only.

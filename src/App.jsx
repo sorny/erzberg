@@ -1009,7 +1009,7 @@ export default function App() {
   useEffect(() => {
     if (lockSeen.current === viewLocked) return
     lockSeen.current = viewLocked
-    notify(viewLocked ? 'View locked. The camera stays put until you press V again.' : 'View unlocked.')
+    notify(viewLocked ? 'View locked. Press V, or switch Lock view off, to move the camera again.' : 'View unlocked.')
   }, [viewLocked, notify])
 
   // Shapefile, KML and KMZ: read as binary or through a library, so async,
@@ -1784,7 +1784,7 @@ export default function App() {
   // Defined below, after the project helpers it needs.
   const openProjectRef = useRef(null)
 
-  // My presets. The thumbnail is drawn from the live canvas: the orbit
+  // The preset shelf. The thumbnail is drawn from the live canvas: the orbit
   // controls' element when it is the canvas, or the one three.js marks as its own.
   const canvasRef = useMemo(() => ({
     get current() {
@@ -2635,7 +2635,7 @@ export default function App() {
       width: w, height: h, bbox: st.geoTiffBbox, crs: st.geoTiffCRS,
       metresAt, nameOf: (id) => layerStyle(id, p).name,
     })
-    if (!lines) { notify('No ground marks to write. Charts, pillars and the panorama are not map data.'); return 'empty' }
+    if (!lines) { notify('Nothing to write: charts, pillars and the panorama have no place on the ground.'); return 'empty' }
     const url = URL.createObjectURL(new Blob([JSON.stringify(geojson)], { type: 'application/geo+json' }))
     const a = Object.assign(document.createElement('a'), { href: url, download: `${plateBaseName}.geojson` })
     document.body.appendChild(a)

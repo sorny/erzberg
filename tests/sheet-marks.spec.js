@@ -20,9 +20,9 @@ test.beforeAll(() => mkdirSync(OUT, { recursive: true }))
 
 async function openMarks(page) {
   await openStage(page, 'frame')
-  await page.locator('[data-testid="section-scale-and-north"]').scrollIntoViewIfNeeded()
+  await page.locator('[data-testid="section-map-elements"]').scrollIntoViewIfNeeded()
   await openStage(page, 'frame')
-  await page.click('[data-testid="section-scale-and-north"]')
+  await page.click('[data-testid="section-map-elements"]')
   await page.waitForTimeout(300)
 }
 

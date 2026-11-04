@@ -40,7 +40,7 @@ test('a multi-band GeoTIFF offers its bands, and a pick reloads on that band', a
   await chooser.setFiles(path)
 
   const picker = page.locator('[data-testid="band-picker"]')
-  await expect(picker).toContainText('this file has 3')
+  await expect(picker).toContainText('This file has 3 bands')
   await expect(page.locator('[data-testid="band-1"]')).toHaveAttribute('aria-pressed', 'true')
   // The ranges arrive after the load, with a preview for each band.
   await expect(page.locator('[data-testid="band-2"]')).toContainText('500–1,500')

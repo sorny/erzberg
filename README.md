@@ -32,7 +32,7 @@ press their button:
 
 - *Vector Layers* asks OpenStreetMap for features inside the raster's extent.
 - *Fetch* asks a geocoder for a place, then a tile host for the ground under it.
-- *Satellite* asks an open archive for a Sentinel-2 scene over the extent.
+- *Imagery* asks an open archive for a Sentinel-2 scene over the extent.
 
 Each sends a place name or a bounding box. None sends a file or needs a key.
 
@@ -116,12 +116,12 @@ different style from the grid, then tune it.
 | Source | Notes |
 |---|---|
 | **PNG** | 8-bit or 16-bit, decoded natively. Alpha is NoData. |
-| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. A file with several bands shows each band's range and preview, so you pick the elevation band. *Drape* and *Mask* under a band use it as the imagery drape or as a new mask. |
+| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. A file with several bands shows each band's range and preview, so you pick the elevation band. *Image* and *Mask* under a band use it as the imagery drape or as a new mask. |
 | **Audio** | MP3, WAV, OGG or M4A, analysed into a spectrogram that drives the terrain. See [Soundscapes](#soundscapes). |
 | **GPX / GeoJSON / KML / Shapefile** | Tracks, points, lines and polygons, draped over a georeferenced raster. A Shapefile comes as a zip. Its `.prj` is read, so a national grid is placed with the same datum shift as a raster. |
 | **Fetch** | Type a place. Nominatim resolves it, and a map lets you place and size the box before you download. The panel states the zoom, tile count, raster size and metres per pixel first. Tiles come from Terrain Tiles on AWS Open Data. |
 | **OpenStreetMap** | Roads, water, rail, landuse, buildings, lifts and peaks inside the raster's extent, through Overpass. |
-| **Satellite** | True-colour Sentinel-2 at 10 m from AWS Open Data. It drapes on the terrain and backs the Mask Studio. |
+| **Imagery** | True-colour Sentinel-2 at 10 m from AWS Open Data. It drapes on the terrain and backs the Mask Studio. |
 | **Mask** | A PNG, JPG or WebP stencil, a drawn mask, or a mask made from heights or features. See [Masks](#masks). |
 | **Cover plate** | A `.landcover.json` from `scripts/embed-window.js`. See [Land cover](#land-cover). |
 
@@ -180,7 +180,7 @@ node scripts/embed-window.js --dem my-terrain.tif --classes 6
 node scripts/embed-window.js --place "Eisenerz" --km 4 --classes 6
 ```
 
-Then drop `<name>.landcover.json` on the window. The Land Cover section prints
+Then drop `<name>.landcover.json` on the window. The Land Cover Data section prints
 the command for the terrain on screen. The step is a script because the
 embedding bucket sends no CORS header, so a browser cannot read it.
 
@@ -223,7 +223,7 @@ a land-cover class does, and a layer can carry both.
   outside.
 - **Copy.** **⧉** duplicates a mask with a new colour.
 
-**Satellite imagery.** *Satellite → ↓ Fetch imagery* gets the least cloudy
+**Satellite imagery.** *Imagery → ↓ Fetch imagery* gets the least cloudy
 growing-season Sentinel-2 scene of the last three years. The raw product is very
 dark, so **Auto levels** stretches the window's histogram to mid-grey.
 Brightness, Contrast and Saturation are also available. The Copernicus credit
@@ -370,10 +370,10 @@ is its own layer and pen, and follows the ground under it.
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. It skips modes that need a file, a picked point, a date
 or a georeference. ↩ and ↪ step through the last 50 seeds of the session.
-*Keep* puts the current look on the *My presets* shelf in this browser, with a
+*Add* puts the current look on the *Shelf* in this browser, with a
 thumbnail. *Shelf ⬇* and *Shelf ⬆* save and open the whole shelf as one file.
 
-**Project file.** *Output › Project › Save* writes one `.erzberg` file with the
+**Project file.** *Output › Project › Save project* writes one `.erzberg` file with the
 terrain, its Edit Mode clip and georeference, the look and camera, the vectors,
 the text, the masks, the land cover and the imagery. Open it, or drop it, and
 the plate comes back exactly.
@@ -444,7 +444,7 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 | Format | Notes |
 |---|---|
 | **SVG** | Software Z-buffer with terrain occlusion. One Inkscape layer per mode and per vector layer. Exact dash patterns. Shows progress and can be cancelled. |
-| **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
+| **PNG** | 4K with MSAA, trimmed to content. **Clear PNG** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
 | **STL** | Watertight mesh. A vector layer with **STL ribbon** gets a second solid for multicolour printing. |
 | **glTF, 3MF** | The STL's solid with the plate on top, seen from above: as a texture in a `.glb` for Blender and web viewers, as vertex colours in a `.3mf` for colour printers. |
 | **GeoJSON** | The ground marks as lines in the raster's projection, with layer, pen name and height in metres. Charts, pillars and the panorama are left out. |
@@ -467,7 +467,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   Magnetic Model 2025.
 - **Title block** with the facts the plate has: projection, contour interval,
   height range, source and date. Each line can be switched off.
-- **Grid** ticks or lines along the sheet edge, in the raster's grid or in
+- **Coordinates**: ticks or lines along the sheet edge, in the raster's grid or in
   degrees, in a plan view.
 - **Preflight** reports the stroke count, pen count, ink length, pen-up travel
   and an estimated plot time.

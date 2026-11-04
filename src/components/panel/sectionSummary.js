@@ -269,9 +269,9 @@ export function buildSectionSummaries({
   // materials the ground was cut into is the fact every mask below depends on.
   // The date, not the switch: which scene you are looking at is the fact that
   // changes between two fetches, and the drape has its own dot on the header.
-  out['Satellite'] = imagery ? (imagery.date ?? 'band') : OFF
+  out['Imagery'] = imagery ? (imagery.date ?? 'band') : OFF
   out['Masks'] = masks.length ? `${masks.length} drawn` : OFF
-  out['Land Cover'] = cover?.classes?.length
+  out['Land Cover Data'] = cover?.classes?.length
     ? `${cover.classes.length} classes`
     : OFF
 
@@ -303,7 +303,7 @@ export function buildSectionSummaries({
   out['Texture Shading'] = when(style.showTexShade, `α ${(style.texShadeDetail ?? 0.8).toFixed(2)} · ${pct(style.texShadeOpacity)}`)
   out['Aerial Perspective'] = when(style.showAerial, pct(style.aerialStrength))
   out['Wetness']       = when(style.showWetness, pct(style.wetnessOpacity))
-  out['Sunlight']      = when(style.showSunTint, `${style.sunTintPeriod === 'day' ? 'one day' : 'a year'} · ${pct(style.sunTintOpacity)}`)
+  out['Sun Hours Tint']      = when(style.showSunTint, `${style.sunTintPeriod === 'day' ? 'one day' : 'a year'} · ${pct(style.sunTintOpacity)}`)
 
   // ── Marks ─────────────────────────────────────────────────────────────────
   // The index says how many of the forty are drawing. It is the one header
@@ -325,7 +325,7 @@ export function buildSectionSummaries({
     (points.particleMode ?? 'hologram') === 'murmuration'
       ? `${num(points.flockCount ?? 0)} birds`
       : `every ${num(points.particleSpacing ?? 1)}`)
-  out['Texture'] = when(style.showTexture, pct(style.textureOpacity))
+  out['Image Overlay'] = when(style.showTexture, pct(style.textureOpacity))
 
   // ── Frame ─────────────────────────────────────────────────────────────────
   // The camera in one line: where it is pointing, and what lens it is using.
@@ -352,7 +352,7 @@ export function buildSectionSummaries({
   // The separation is the only dial it has, and it is what you reach for.
   out['Anaglyph'] = when(view.anaglyph, `${num(view.anaglyphEye ?? 2)}× apart`)
   const sheet = [view.frameScaleBar && 'bar', view.frameNorth && 'north'].filter(Boolean)
-  out['Scale and North'] = sheet.length ? sheet.join(' · ') : OFF
+  out['Map Elements'] = sheet.length ? sheet.join(' · ') : OFF
 
   return out
 }
