@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.64.0] — 2026-11-04
+
+### Added
+
+- **Lock view.** Camera › Lock view, or the `V` key, keeps the camera where it
+  is while everything else changes: presets, modes, the terrain, undo and
+  Reset all. Use it to export several plates of one view and layer them later.
+  Orbit, pan, wheel zoom, auto-rotate and the camera controls stop while it is
+  on. One guard on `setView` keeps the pose (`src/utils/viewLock.js`), so no
+  path can move the camera. The lock is not stored in a preset or the session.
+  `camera.spec.js` checks that a locked view does not pan and that unlocking
+  frees it.
+
 ## [1.63.1] — 2026-11-03
 
 ### Changed

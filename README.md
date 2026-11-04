@@ -483,6 +483,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `Shift` | Constrain an ellipse to a circle |
 | Right-click | Remove a point from a lasso or polygon |
 | `Q` | Toggle auto-rotate |
+| `V` | Lock or unlock the view. The camera stays put while you change anything else, so several exports share one view. |
 | `Space` | Freeze the particle field |
 | `\` | Show or hide the panel |
 | `/` | Find a control |

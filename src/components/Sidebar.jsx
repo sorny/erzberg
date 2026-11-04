@@ -670,6 +670,15 @@ const WAVE_GUIDE_KEY = 'erzberg.waveformGuide'
 // The stages that show the build readout under their pane.
 const STATS_STAGES = [1, 2, 3, 6]
 
+/** Camera controls that the view lock turns off. A disabled fieldset disables every input in it. */
+function CamLock({ on, children }) {
+  return (
+    <fieldset disabled={on} style={{ border:0, padding:0, margin:0, minWidth:0, opacity: on ? 0.4 : 1 }}>
+      {children}
+    </fieldset>
+  )
+}
+
 export function Sidebar({
   terrain, setTerrain,
   style,   setStyle,
@@ -937,6 +946,8 @@ export function Sidebar({
    * sync back in.
    */
   const camLive = useStore((s) => s.setCameraLive)
+  const viewLocked = useStore((s) => s.viewLocked)
+  const setViewLocked = useStore((s) => s.setViewLocked)
   const endCamLive = useStore((s) => s.clearCameraLive)
   const camCommit = (patch) => { sv(patch); endCamLive() }
 
@@ -3172,6 +3183,9 @@ export function Sidebar({
               credited to the section before it — this comment named two and
               failed the drift check for Texture, four hundred lines away. */}
           <Section title="Camera" open={sec.camera} onToggle={() => tog('camera')}>
+            <Tog label="Lock view" hint={<Key>V</Key>} testId="view-lock" checked={viewLocked} onChange={setViewLocked}
+              help="Keeps the camera where it is while you change everything else: presets, modes, the terrain, undo. Use it to export several plates of one view and layer them later. Orbit, pan, zoom and the controls below stop until you switch it off." />
+            <CamLock on={viewLocked}>
             <div style={{ display:'flex', gap:4, marginBottom:4 }}>
               {/* Three aims. The view Reset used to be a fourth button here, but
                   it is not an aim: it puts back the lens and the pan as well. It
@@ -3189,7 +3203,9 @@ export function Sidebar({
               <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => camCommit({ zoom: (v / 100) * baseZoom })} onLive={v => camLive({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
             <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            </CamLock>
             <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
+            <CamLock on={viewLocked}>
             <Tog label="Auto-rotate" hint={<Key>Q</Key>} checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
@@ -3201,6 +3217,7 @@ export function Sidebar({
                 </div>
               </Sub>
             )}
+            </CamLock>
             <Tog label="Centre guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
 
             {/* One choice, not two switches. Orthographic and Plan oblique sat
@@ -3208,6 +3225,7 @@ export function Sidebar({
                 could both be on. The segment writes the same two flags, so a
                 preset reopens as it was; with both set, plan oblique wins, as
                 it always did (it takes the parallel camera either way). */}
+            <CamLock on={viewLocked}>
             <Heading>Projection</Heading>
             <SegGroup label="Projection" nameButtons testIdOf={(v) => `camera-projection-${v}`}
               options={[['Perspective', 'persp'], ['Orthographic', 'ortho'], ['Plan oblique', 'oblique']]}
@@ -3241,6 +3259,7 @@ export function Sidebar({
                 title="Reset the view only: aim, zoom, lens and pan" aria-label="Reset view"
                 data-testid="camera-reset">↺ Reset view</Btn>
             </div>
+            </CamLock>
           </Section>
 
           <Section title="Mirror" open={sec.mirror} onToggle={() => tog('mirror')}

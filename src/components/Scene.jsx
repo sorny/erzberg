@@ -235,6 +235,8 @@ export function Scene({
    * writes nothing and re-renders nothing. Three projections a frame.
    */
   const setMapScale = useStore((s) => s.setMapScale)
+  // The view lock: no orbit, pan or wheel zoom. The wheel reads `enabled` too.
+  const viewLocked = useStore((s) => s.viewLocked)
   const wantsMarks = !!(p.frameScaleBar || p.frameNorth)
   useFrame(() => {
     const cam = activeCamera || currentCamera
@@ -786,7 +788,7 @@ export function Scene({
           occlusion curtains z-fight (sparkle at crossings while orbiting).
           near=5 is 5× finer; the zoom slider bottoms out at ~50 units distance
           and minDistance keeps free scroll-zoom clear of the near plane. */}
-      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enableDamping dampingFactor={0.08} enableZoom={false} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
+      <OrbitControls ref={orbitRef} camera={activeCamera || currentCamera} enabled={!viewLocked} enableDamping dampingFactor={0.08} enableZoom={false} minDistance={15} makeDefault onChange={handleOrbitChange} onEnd={handleOrbitEnd} />
       <Controls getParams={getParams} setParams={setParams} orbitRef={orbitRef} />
       {/*
         * The orientation gizmo, and the two things that take the corner from it.
