@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": false,
     "depthOcclusion": false,
     "occlusionBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
@@ -78,10 +78,10 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": true,
     "intervalContours": 1,
-    "colorContours": "#3a4878",
+    "colorContours": "#94a0bf",
     "weightContours": 0.8,
     "opacityContours": 0.45,
     "dashContours": "solid",
@@ -166,7 +166,7 @@
     "spacingStipple": 1,
     "weightStipple": 2,
     "opacityStipple": 0.8,
-    "colorStipple": "#3a4878",
+    "colorStipple": "#94a0bf",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.6,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#3a4878",
+    "colorCurv": "#94a0bf",
     "weightCurv": 0.8,
     "opacityCurv": 0.45,
     "dashCurv": "solid",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,19 +262,19 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#e8e4d8"
+        "color": "#dfdfdd"
       },
       {
         "pos": 0.4,
-        "color": "#8090b8"
+        "color": "#c6cbd6"
       },
       {
         "pos": 0.7,
-        "color": "#505888"
+        "color": "#a9aec7"
       },
       {
         "pos": 1,
-        "color": "#3a4878"
+        "color": "#94a0bf"
       }
     ]
   },

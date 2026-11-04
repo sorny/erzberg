@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,9 +14,9 @@
   },
   "style": {
     "bgColor": "#e9e4d8",
-    "colorFlow": "#1a1a1a",
-    "colorHachure": "#3d5a80",
-    "colorRidge": "#c1121f",
+    "colorFlow": "#585858",
+    "colorHachure": "#99b0c3",
+    "colorRidge": "#e75369",
     "depthOcclusion": true,
     "enabledFlow": true,
     "enabledHachure": true,
@@ -29,7 +29,8 @@
     "thresholdRidge": 0.03,
     "weightFlow": 0.5,
     "weightHachure": 0.6,
-    "weightRidge": 1.2
+    "weightRidge": 1.2,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

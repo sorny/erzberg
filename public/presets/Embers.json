@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": false,
     "depthOcclusion": true,
     "occlusionBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
@@ -78,10 +78,10 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": false,
     "intervalContours": 1,
-    "colorContours": "#d02a1b",
+    "colorContours": "#e78366",
     "weightContours": 2,
     "opacityContours": 1,
     "dashContours": "solid",
@@ -109,7 +109,7 @@
     "spacingFlow": 6,
     "stepFlow": 2,
     "maxLenFlow": 250,
-    "colorFlow": "#d02a1b",
+    "colorFlow": "#e78366",
     "weightFlow": 1.5,
     "opacityFlow": 1,
     "dashFlow": "dotted",
@@ -166,7 +166,7 @@
     "spacingStipple": 1,
     "weightStipple": 4,
     "opacityStipple": 0.85,
-    "colorStipple": "#1a1a1a",
+    "colorStipple": "#585858",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#d02a1b",
+    "colorCurv": "#e78366",
     "weightCurv": 1.5,
     "opacityCurv": 1,
     "dashCurv": "dotted",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,19 +262,19 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#1c2535"
+        "color": "#5e6f87"
       },
       {
         "pos": 0.3,
-        "color": "#3a1810"
+        "color": "#8d5441"
       },
       {
         "pos": 0.6,
-        "color": "#8a1c0c"
+        "color": "#cf643c"
       },
       {
         "pos": 1,
-        "color": "#d42818"
+        "color": "#e88160"
       }
     ]
   },
@@ -311,19 +311,35 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#1c2535"
+      "color": "#5e6f87"
+    },
+    {
+      "pos": 0.15,
+      "color": "#79646b"
     },
     {
       "pos": 0.3,
-      "color": "#3a1810"
+      "color": "#8d5441"
+    },
+    {
+      "pos": 0.375,
+      "color": "#a45840"
+    },
+    {
+      "pos": 0.45,
+      "color": "#b65c3e"
     },
     {
       "pos": 0.6,
-      "color": "#8a1c0c"
+      "color": "#cf643c"
+    },
+    {
+      "pos": 0.8,
+      "color": "#de7350"
     },
     {
       "pos": 1,
-      "color": "#d42818"
+      "color": "#e88160"
     }
   ],
   "bgGradientStops": [

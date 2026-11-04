@@ -11,7 +11,7 @@
  */
 import { MODE_LABEL } from '../../utils/drawModes'
 import { MAX_SWATCHES, modeOf, penLine } from '../../utils/pens'
-import { BORDER, Btn, DIM, MONO, MUTED, Tog, WARN } from './ui'
+import { BORDER, Btn, DIM, MONO, MUTED, WARN } from './ui'
 
 /** One ink, drawn as a chip. */
 function Swatch({ hex }) {
@@ -111,7 +111,7 @@ function faintOnPaper(rows, paper) {
   })
 }
 
-export function PenStrip({ pens, style, onInksAsPicked, onOneInk, onOpenMark }) {
+export function PenStrip({ pens, style, onOneInk, onOpenMark }) {
   const { rows } = pens
   const mixed = mixedMarks(rows, style)
   // Against the base colour, gradient or not: a gradient starts from it.
@@ -193,15 +193,6 @@ export function PenStrip({ pens, style, onInksAsPicked, onOneInk, onOpenMark }) 
           Plus a hidden layer for each mark whose lines pass behind the ground.
         </div>
       )}
-      {/* The same switch as in Surface › Terrain Style, mirrored: it changes
-          every ink in the file, so it belongs where the file is made as well.
-          Its label says so, so nobody wonders which of the two wins. */}
-      <div style={{ marginTop:4 }}>
-        <Tog label="Inks as picked" testId="export-inks-as-picked"
-          help="Writes every ink exactly as you picked it, as its swatch shows it. Off, inks are written as the viewport shows them, through its filmic tone curve, lighter and softer. This is the same switch as Surface › Terrain Style › Inks as picked: changing one changes both."
-          checked={!!style.inksAsPicked} onChange={onInksAsPicked} />
-        <div style={{ fontSize:11, color: MUTED, marginTop:-2 }}>The same switch as in Surface › Terrain Style.</div>
-      </div>
     </div>
   )
 }

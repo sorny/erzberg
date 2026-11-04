@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,7 +15,7 @@
   "style": {
     "bedsBedding": 90,
     "bgColor": "#efe6d6",
-    "colorBedding": "#2a2a2a",
+    "colorBedding": "#797979",
     "depthOcclusion": true,
     "enabledBedding": true,
     "enabledLines": false,
@@ -24,12 +24,13 @@
     "hillshadeHighlightColor": "#fbf6ec",
     "hillshadeOpacity": 0.5,
     "hillshadeShadowColor": "#8a7860",
-    "markerColorBedding": "#b5441b",
+    "markerColorBedding": "#dba06a",
     "markerWeightBedding": 2,
     "occludeBy": "ground",
     "showFill": true,
     "showHillshade": true,
-    "weightBedding": 0.45
+    "weightBedding": 0.45,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

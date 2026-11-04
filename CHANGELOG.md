@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.67.0] — 2026-11-04
+
+### Changed
+
+- **Every ink is drawn as picked; the Inks as picked switch is gone**
+  (format 10). Line inks went through the viewport's ACES curve unless a plate
+  switched it on, which was a library default nobody chose: React Three Fiber
+  tone-maps its canvas, and the SVG had copied the curve (v1.11.0) so the file
+  matched. The switch (v1.34.0) existed so presets kept that look. Now lines,
+  ghosts, lids and area fills always skip the curve, and the SVG, the PNG and
+  the pen strip write the picked hex. The surface, particles and paper are
+  drawn as before.
+- **Older plates keep their look.** `softenInks` rewrites each line ink of a
+  plate saved before format 10 as the curve drew it (`#39ff6a` is stored as
+  `#b6e3c1`). It fills the defaults of the marks the plate draws, resamples a
+  gradient that only lines read (the curve bends between stops, so a straight
+  blend of curved stops missed by up to 60 levels on Jet), and scales Mineral's
+  grain by what the curve kept of it. The 86 bundled presets were converted
+  the same way and rendered against their old look: 81 match within two levels
+  on average. Neon City, Swiss Topo, Alpine Survey and Compass Rose share their
+  gradient with the surface's hypsometric fill, which still draws through the
+  curve, so their gradient is kept as stored and their line ramps are more
+  saturated now. Their thumbnails are rendered again.
+- *Clear PNG* is *PNG α* again.
+- **Dependencies updated:** three 0.187.0 (pinned exactly, as before), React
+  19.3.1, react-three-fiber 9.8.2, zustand 5.0.16, Vite 8.3.5, Vitest 5.1.0,
+  Playwright 1.64.1, ESLint 10.14.0, Tailwind 4.3.4, @vitejs/plugin-react
+  6.2.1 and globals 17.14.0. `npm audit` finds nothing in what the app ships.
+  Six moderate findings remain in ESLint's own `minimatch`, a lint tool only.
+
+### Fixed
+
+- **The PNG did not match the viewport.** Exports draw into a render target,
+  and three.js tone-maps only what it draws to the screen, so every soft ink
+  in a PNG missed the viewport's ACES curve and came out
+  greener and deeper: `#c8e2d2` showed as `#dadedc` on screen and wrote as
+  `#e5f2ea`. The export target now draws as the screen does
+  (`utils/screenRead.js`): tone-mapped per material, kept in linear half
+  floats, and encoded to sRGB on readback. The PNG, the glTF and 3MF top and
+  the web tiles now match the viewport to the byte. The preset
+  thumbnails are rendered again through it. `png-color.spec.js` guards it with
+  Green Screen: the PNG's phosphor ink must match the viewport's and the hex
+  the preset stores. With the fix taken out it failed: the PNG ink read
+  `130,255,173` against `182,227,193`.
+- **Large exports are drawn in tiles.** The screen-matched target holds 16-bit
+  floats with four samples, 40 bytes a pixel, and a 4× capture of a 2560 px
+  window asked for 2.3 GB. Chrome left the framebuffer incomplete and the PNG
+  came out as paper alone. Each capture (the PNG, its overprint passes and the
+  top-down picture for glTF, 3MF and web tiles) now renders in tiles of at most
+  2048 px a side, so it needs 168 MB at any size. Each tile draws the whole
+  frame through a moved viewport and keeps what lands in it, so the camera and
+  every stroke are those of a whole-frame render. A camera view offset per tile
+  was tried first: Riso's dots shrank with the tile, because the stroke shader
+  reads the projection. Riso Teal tiled against whole differs by 0.004 levels on
+  average. `png-color.spec.js` exports from a 2560 × 1600 window. Without the
+  tiles it finds no ink.
+- **The SVG's scale bar and north arrow are written as picked.** The viewport
+  draws them as HTML and the PNG on a 2D canvas, neither through the tone
+  curve, but the SVG curved their ink.
+
 ## [1.66.0] — 2026-11-04
 
 ### Changed

@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -20,7 +20,6 @@
     "enabledSpines": true,
     "hypsoModeSpines": "elevation",
     "hypsoSpines": true,
-    "inksAsPicked": true,
     "levelsSpines": 40,
     "occludeBy": "ground",
     "weightSpines": 0.8

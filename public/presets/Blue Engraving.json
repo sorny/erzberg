@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,8 +14,8 @@
   },
   "style": {
     "bgColor": "#f3f1ec",
-    "colorContours": "#9aa7c0",
-    "colorEngrave": "#1c2f5a",
+    "colorContours": "#cfd2d8",
+    "colorEngrave": "#6281ad",
     "depthOcclusion": true,
     "enabledContours": true,
     "enabledEngrave": true,
@@ -26,7 +26,8 @@
     "spacingEngrave": 2.5,
     "sunAzimuthEngrave": 315,
     "weightContours": 0.6,
-    "weightEngrave": 0.7
+    "weightEngrave": 0.7,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

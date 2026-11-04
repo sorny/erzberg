@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "app": "erzberg",
   "terrain": {
     "resolution": 1,
@@ -29,9 +29,8 @@
     "occludeBy": "lines",
     "occlusionBias": 1,
     "strokeDepthBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
-    "inksAsPicked": false,
     "showImagery": true,
     "imageryOpacity": 0.85,
     "imageryAutoLevels": true,
@@ -72,7 +71,7 @@
     "linesCross": true,
     "marksCross": false,
     "markSizeCross": 6,
-    "markColorCross": "#c0561a",
+    "markColorCross": "#ddaf6c",
     "markWeightCross": 1.5,
     "markDashCross": "solid",
     "hypsoCross": false,
@@ -94,11 +93,11 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "pillarAbove": false,
     "pillarCeiling": 0,
     "pillarSolid": 0,
-    "colorPillarsAbove": "#8a8a8a",
+    "colorPillarsAbove": "#c9c9c9",
     "weightPillarsAbove": 1,
     "opacityPillarsAbove": 0.6,
     "dashPillarsAbove": "solid",
@@ -151,7 +150,7 @@
     "spacingFlow": 7.5,
     "stepFlow": 1,
     "maxLenFlow": 100,
-    "colorFlow": "#fb1818",
+    "colorFlow": "#f46960",
     "weightFlow": 5.5,
     "opacityFlow": 1,
     "dashFlow": "solid",
@@ -211,7 +210,7 @@
     "spacingStipple": 1,
     "weightStipple": 4,
     "opacityStipple": 0.85,
-    "colorStipple": "#1a1a1a",
+    "colorStipple": "#585858",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -307,7 +306,7 @@
     "foldFlashbulb": false,
     "shadowFlashbulb": true,
     "shadowStepsFlashbulb": 24,
-    "colorFlashbulb": "#111111",
+    "colorFlashbulb": "#3f3f3f",
     "weightFlashbulb": 3,
     "opacityFlashbulb": 1,
     "dashFlashbulb": "solid",
@@ -331,10 +330,10 @@
     "bloomHalation": 8,
     "bleedHalation": 0.6,
     "glowHalation": 0.6,
-    "glowColorHalation": "#c8481e",
+    "glowColorHalation": "#e0a571",
     "glowWeightHalation": 4,
     "glowOpacityHalation": 0.45,
-    "colorHalation": "#111111",
+    "colorHalation": "#3f3f3f",
     "weightHalation": 3,
     "opacityHalation": 1,
     "dashHalation": "solid",
@@ -425,7 +424,7 @@
     "lonShadowLine": 14.89,
     "smoothingShadowLine": 2,
     "radiusShadowLine": 1,
-    "colorShadowLine": "#1a1a1a",
+    "colorShadowLine": "#585858",
     "weightShadowLine": 2,
     "opacityShadowLine": 1,
     "dashShadowLine": "solid",
@@ -442,7 +441,7 @@
     "latSunHours": 47.53,
     "smoothingSunHours": 1,
     "radiusSunHours": 1,
-    "colorSunHours": "#1a1a1a",
+    "colorSunHours": "#585858",
     "weightSunHours": 1,
     "opacitySunHours": 1,
     "dashSunHours": "solid",
@@ -454,7 +453,7 @@
     "detrendZeroCross": 6,
     "spacingZeroCross": 2,
     "axesZeroCross": "both",
-    "colorZeroCross": "#1a1a1a",
+    "colorZeroCross": "#585858",
     "weightZeroCross": 3,
     "opacityZeroCross": 0.9,
     "dashZeroCross": "solid",
@@ -467,7 +466,7 @@
     "spacingSprite": 10,
     "sizeSprite": 1,
     "facesSprite": true,
-    "faceColorSprite": "#ffffff",
+    "faceColorSprite": "#e2e2e2",
     "colorSprite": "#000000",
     "weightSprite": 1,
     "opacitySprite": 1,
@@ -483,7 +482,7 @@
     "gammaRetic": 1,
     "densityModeRetic": "invElev",
     "seedRetic": 42,
-    "colorRetic": "#1a1a1a",
+    "colorRetic": "#585858",
     "weightRetic": 2.5,
     "opacityRetic": 0.9,
     "dashRetic": "solid",
@@ -499,7 +498,7 @@
     "azimuthTsp": 315,
     "seedTsp": 7,
     "closedTsp": false,
-    "colorTsp": "#1a1a1a",
+    "colorTsp": "#585858",
     "weightTsp": 1.5,
     "opacityTsp": 1,
     "dashTsp": "solid",
@@ -515,7 +514,7 @@
     "crossShadowHatch": true,
     "radiusShadowHatch": 1,
     "outlineShadowHatch": true,
-    "colorShadowHatch": "#1a1a1a",
+    "colorShadowHatch": "#585858",
     "weightShadowHatch": 1.5,
     "opacityShadowHatch": 1,
     "dashShadowHatch": "solid",
@@ -535,7 +534,7 @@
     "smoothingIsochrone": 2,
     "radiusIsochrone": 2,
     "markerIsochrone": true,
-    "colorIsochrone": "#1a1a1a",
+    "colorIsochrone": "#585858",
     "weightIsochrone": 1.5,
     "opacityIsochrone": 1,
     "dashIsochrone": "solid",
@@ -548,7 +547,7 @@
     "thresholdTruchet": 0.12,
     "alignTruchet": "fall",
     "seedTruchet": 5,
-    "colorTruchet": "#1a1a1a",
+    "colorTruchet": "#585858",
     "weightTruchet": 1.5,
     "opacityTruchet": 1,
     "dashTruchet": "solid",
@@ -569,7 +568,7 @@
     "markerViewshed": true,
     "cellMetresViewshed": 10,
     "reliefViewshed": 1000,
-    "colorViewshed": "#1a1a1a",
+    "colorViewshed": "#585858",
     "weightViewshed": 1.2,
     "opacityViewshed": 1,
     "dashViewshed": "solid",
@@ -587,7 +586,7 @@
     "markerRoute": true,
     "cellMetresRoute": 10,
     "reliefRoute": 1000,
-    "colorRoute": "#c0561a",
+    "colorRoute": "#ddaf6c",
     "weightRoute": 3,
     "opacityRoute": 1,
     "dashRoute": "solid",
@@ -604,7 +603,7 @@
     "markerPanorama": true,
     "cellMetresPanorama": 10,
     "reliefPanorama": 1000,
-    "colorPanorama": "#1a1a1a",
+    "colorPanorama": "#585858",
     "weightPanorama": 1.2,
     "skylineWeightPanorama": 2.4,
     "opacityPanorama": 1,
@@ -619,12 +618,12 @@
     "bedsBedding": 40,
     "offsetBedding": 0,
     "markerBedding": 6,
-    "markerColorBedding": "#c0561a",
+    "markerColorBedding": "#ddaf6c",
     "markerWeightBedding": 2.4,
     "smoothingBedding": 2,
     "cellMetresBedding": 10,
     "reliefBedding": 1000,
-    "colorBedding": "#1a1a1a",
+    "colorBedding": "#585858",
     "weightBedding": 1,
     "opacityBedding": 1,
     "dashBedding": "solid",
@@ -642,7 +641,7 @@
     "outlineSlopeClass": true,
     "cellMetresSlopeClass": 10,
     "reliefSlopeClass": 1000,
-    "colorSlopeClass": "#1a1a1a",
+    "colorSlopeClass": "#585858",
     "weightSlopeClass": 1,
     "opacitySlopeClass": 1,
     "dashSlopeClass": "solid",
@@ -661,7 +660,7 @@
     "eddiesWind": true,
     "cellMetresWind": 10,
     "reliefWind": 1000,
-    "colorWind": "#1a1a1a",
+    "colorWind": "#585858",
     "weightWind": 1,
     "opacityWind": 1,
     "dashWind": "solid",
@@ -675,13 +674,13 @@
     "spacingRunout": 6,
     "radiusRunout": 1,
     "zoneRunout": true,
-    "zoneColorRunout": "#c0561a",
+    "zoneColorRunout": "#ddaf6c",
     "zoneWeightRunout": 0.8,
     "hatchRunout": true,
     "angleRunout": 45,
     "cellMetresRunout": 10,
     "reliefRunout": 1000,
-    "colorRunout": "#1a1a1a",
+    "colorRunout": "#585858",
     "weightRunout": 1,
     "opacityRunout": 1,
     "dashRunout": "solid",
@@ -694,15 +693,15 @@
     "linesMapGrid": false,
     "marksMapGrid": true,
     "markSizeMapGrid": 10,
-    "markColorMapGrid": "#1a1a1a",
+    "markColorMapGrid": "#585858",
     "markWeightMapGrid": 1,
     "markDashMapGrid": "solid",
     "scaleMapGrid": true,
     "scaleSizeMapGrid": 12,
-    "scaleColorMapGrid": "#1a1a1a",
+    "scaleColorMapGrid": "#585858",
     "scaleWeightMapGrid": 1,
     "cellMetresMapGrid": 10,
-    "colorMapGrid": "#1a1a1a",
+    "colorMapGrid": "#585858",
     "weightMapGrid": 0.8,
     "opacityMapGrid": 1,
     "dashMapGrid": "solid",
@@ -717,7 +716,7 @@
     "fieldPrinter": "elevation",
     "quantilePrinter": true,
     "blankPrinter": false,
-    "colorPrinter": "#1a1a1a",
+    "colorPrinter": "#585858",
     "weightPrinter": 0.8,
     "opacityPrinter": 1,
     "dashPrinter": "solid",
@@ -731,7 +730,7 @@
     "tipsStems": true,
     "tipSizeStems": 1.5,
     "tipWeightStems": 2,
-    "colorStems": "#1a1a1a",
+    "colorStems": "#585858",
     "weightStems": 0.6,
     "opacityStems": 1,
     "dashStems": "dotted",
@@ -745,7 +744,7 @@
     "jitterHair": 0.6,
     "segmentsHair": 6,
     "seedHair": 1,
-    "colorHair": "#1a1a1a",
+    "colorHair": "#585858",
     "weightHair": 0.4,
     "opacityHair": 0.8,
     "dashHair": "solid",
@@ -768,7 +767,7 @@
     "smoothWaveform": 4,
     "gammaWaveform": 1,
     "clipWaveform": false,
-    "colorWaveform": "#1a1a1a",
+    "colorWaveform": "#585858",
     "weightWaveform": 0.6,
     "opacityWaveform": 1,
     "dashWaveform": "solid",
@@ -785,7 +784,7 @@
     "gridProfileSheet": 4,
     "tickProfileSheet": 5,
     "nodeProfileSheet": 4,
-    "colorProfileSheet": "#1a1a1a",
+    "colorProfileSheet": "#585858",
     "weightProfileSheet": 0.8,
     "opacityProfileSheet": 1,
     "dashProfileSheet": "solid",
@@ -801,7 +800,7 @@
     "quartilesSwathProfile": false,
     "cellMetresSwathProfile": 10,
     "reliefSwathProfile": 1000,
-    "colorSwathProfile": "#1a1a1a",
+    "colorSwathProfile": "#585858",
     "weightSwathProfile": 1,
     "opacitySwathProfile": 1,
     "dashSwathProfile": "solid",
@@ -814,7 +813,7 @@
     "binsHypsometry": 20,
     "cellMetresHypsometry": 10,
     "reliefHypsometry": 1000,
-    "colorHypsometry": "#1a1a1a",
+    "colorHypsometry": "#585858",
     "weightHypsometry": 1,
     "opacityHypsometry": 1,
     "dashHypsometry": "solid",
@@ -832,7 +831,7 @@
     "hatchAspectRose": 0,
     "cellMetresAspectRose": 10,
     "reliefAspectRose": 1000,
-    "colorAspectRose": "#1a1a1a",
+    "colorAspectRose": "#585858",
     "weightAspectRose": 0.8,
     "opacityAspectRose": 1,
     "dashAspectRose": "solid",
@@ -851,7 +850,7 @@
     "cellMetresStereonet": 10,
     "reliefStereonet": 1000,
     "poleWeightStereonet": 0.5,
-    "colorStereonet": "#1a1a1a",
+    "colorStereonet": "#585858",
     "weightStereonet": 0.8,
     "opacityStereonet": 1,
     "dashStereonet": "solid",
@@ -866,7 +865,7 @@
     "spacingVenation": 3,
     "gammaVenation": 1.2,
     "seedVenation": 1,
-    "colorVenation": "#1a1a1a",
+    "colorVenation": "#585858",
     "weightVenation": 1,
     "opacityVenation": 1,
     "dashVenation": "solid",
@@ -883,7 +882,7 @@
     "markerGeodesic": true,
     "cellMetresGeodesic": 10,
     "reliefGeodesic": 1000,
-    "colorGeodesic": "#1a1a1a",
+    "colorGeodesic": "#585858",
     "weightGeodesic": 0.8,
     "opacityGeodesic": 1,
     "dashGeodesic": "solid",
@@ -898,7 +897,7 @@
     "gainRadar": 1,
     "cellMetresRadar": 10,
     "reliefRadar": 1000,
-    "colorRadar": "#1a1a1a",
+    "colorRadar": "#585858",
     "weightRadar": 0.8,
     "opacityRadar": 1,
     "dashRadar": "solid",
@@ -910,7 +909,7 @@
     "levelsSpines": 16,
     "depthSpines": 2,
     "radiusSpines": 2,
-    "colorSpines": "#1a1a1a",
+    "colorSpines": "#585858",
     "weightSpines": 0.8,
     "opacitySpines": 1,
     "dashSpines": "solid",
@@ -924,7 +923,7 @@
     "nodesCoral": 30000,
     "stepsCoral": 4000,
     "seedCoral": 1,
-    "colorCoral": "#1a1a1a",
+    "colorCoral": "#585858",
     "weightCoral": 0.8,
     "opacityCoral": 1,
     "dashCoral": "solid",
@@ -940,10 +939,10 @@
     "spacingGlacier": 6,
     "radiusGlacier": 2,
     "moraineGlacier": true,
-    "iceColorGlacier": "#2f6690",
+    "iceColorGlacier": "#8eb7ca",
     "cellMetresGlacier": 10,
     "reliefGlacier": 1000,
-    "colorGlacier": "#1a1a1a",
+    "colorGlacier": "#585858",
     "weightGlacier": 1,
     "opacityGlacier": 1,
     "dashGlacier": "solid",
@@ -958,7 +957,7 @@
     "radiusRugged": 1,
     "kindRugged": "delaunay",
     "seedRugged": 11,
-    "colorRugged": "#1a1a1a",
+    "colorRugged": "#585858",
     "weightRugged": 1,
     "opacityRugged": 0.9,
     "dashRugged": "solid",
@@ -983,7 +982,7 @@
     "enabledOutrun": false,
     "levelsOutrun": 16,
     "whitenOutrun": 0.35,
-    "colorOutrun": "#ff2d95",
+    "colorOutrun": "#ee8dcc",
     "weightOutrun": 1.2,
     "opacityOutrun": 0.95,
     "dashOutrun": "solid",
@@ -998,9 +997,9 @@
     "offsetRiso": 1.4,
     "limitRiso": 3,
     "azimuthRiso": 315,
-    "colorARiso": "#ff48b0",
-    "colorBRiso": "#5ec8e5",
-    "colorCRiso": "#ffe800",
+    "colorARiso": "#eaa9d4",
+    "colorBRiso": "#bfdade",
+    "colorCRiso": "#e6df63",
     "gammaARiso": 2.6,
     "gammaBRiso": 2,
     "gammaCRiso": 2.2,
@@ -1018,12 +1017,12 @@
     "steepMineral": 0.62,
     "brokenMineral": 0.45,
     "grainMineral": 0.28,
-    "colorAMineral": "#3e2a1f",
-    "colorBMineral": "#8c4a2f",
-    "colorCMineral": "#c97b3c",
-    "colorDMineral": "#5e6e54",
-    "colorEMineral": "#d8cbb0",
-    "colorMineral": "#3e2a1f",
+    "colorAMineral": "#947967",
+    "colorBMineral": "#cba488",
+    "colorCMineral": "#dcc49d",
+    "colorDMineral": "#b4bcad",
+    "colorEMineral": "#dddbd5",
+    "colorMineral": "#947967",
     "weightMineral": 1,
     "opacityMineral": 1,
     "dashMineral": "solid",
@@ -1038,17 +1037,17 @@
     "radiusLandform": 2,
     "cellMetresLandform": 10,
     "reliefLandform": 1000,
-    "colorALandform": "#e9e3d3",
-    "colorBLandform": "#4a1a10",
-    "colorCLandform": "#a4462a",
-    "colorDLandform": "#e0b27a",
-    "colorELandform": "#cf8550",
-    "colorFLandform": "#cdbf9e",
-    "colorGLandform": "#8fb3a6",
-    "colorHLandform": "#bed3ae",
-    "colorILandform": "#3e7a8a",
-    "colorJLandform": "#1b3a55",
-    "colorLandform": "#a4462a",
+    "colorALandform": "#dfdfdc",
+    "colorBLandform": "#a05a42",
+    "colorCLandform": "#d5a181",
+    "colorDLandform": "#ded5c6",
+    "colorELandform": "#dcc8ae",
+    "colorFLandform": "#dbd8d1",
+    "colorGLandform": "#ccd5d2",
+    "colorHLandform": "#d8dcd5",
+    "colorILandform": "#a0c2c8",
+    "colorJLandform": "#6290a9",
+    "colorLandform": "#d5a181",
     "weightLandform": 1,
     "opacityLandform": 1,
     "dashLandform": "solid",
@@ -1060,7 +1059,7 @@
     "spacingCover": 2,
     "sourceCover": "plate",
     "grainCover": 0.12,
-    "colorCover": "#8a8f98",
+    "colorCover": "#c9cbce",
     "weightCover": 1,
     "opacityCover": 1,
     "dashCover": "solid",
@@ -1076,7 +1075,7 @@
     "shadeShed": 0.32,
     "azimuthShed": 315,
     "seedShed": 11,
-    "colorShed": "#ff3d6e",
+    "colorShed": "#ec9ebc",
     "weightShed": 1,
     "opacityShed": 1,
     "dashShed": "solid",
@@ -1169,23 +1168,23 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#000080"
+        "color": "#0000c1"
       },
       {
         "pos": 0.25,
-        "color": "#00ffff"
+        "color": "#99e3e2"
       },
       {
         "pos": 0.5,
-        "color": "#00ff00"
+        "color": "#93e459"
       },
       {
         "pos": 0.75,
-        "color": "#ff8800"
+        "color": "#e7ca42"
       },
       {
         "pos": 1,
-        "color": "#800000"
+        "color": "#ca0006"
       }
     ],
     "coverMaskLines": 0,
@@ -1598,23 +1597,147 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#000080"
+      "color": "#0000c1"
+    },
+    {
+      "pos": 0.0039,
+      "color": "#0010c2"
+    },
+    {
+      "pos": 0.0078,
+      "color": "#0022c3"
+    },
+    {
+      "pos": 0.0156,
+      "color": "#003ec5"
+    },
+    {
+      "pos": 0.0313,
+      "color": "#0066c9"
+    },
+    {
+      "pos": 0.0469,
+      "color": "#0082cc"
+    },
+    {
+      "pos": 0.0625,
+      "color": "#0097ce"
+    },
+    {
+      "pos": 0.0664,
+      "color": "#009ccf"
+    },
+    {
+      "pos": 0.0703,
+      "color": "#08a0d0"
+    },
+    {
+      "pos": 0.0781,
+      "color": "#1ca7d1"
+    },
+    {
+      "pos": 0.0938,
+      "color": "#34b4d3"
+    },
+    {
+      "pos": 0.125,
+      "color": "#54c5d7"
+    },
+    {
+      "pos": 0.1563,
+      "color": "#6cd1da"
+    },
+    {
+      "pos": 0.1875,
+      "color": "#7fd9dd"
     },
     {
       "pos": 0.25,
-      "color": "#00ffff"
+      "color": "#99e3e2"
+    },
+    {
+      "pos": 0.3125,
+      "color": "#97e3d9"
+    },
+    {
+      "pos": 0.375,
+      "color": "#94e3c9"
+    },
+    {
+      "pos": 0.4063,
+      "color": "#93e4bc"
+    },
+    {
+      "pos": 0.4375,
+      "color": "#93e4aa"
+    },
+    {
+      "pos": 0.4688,
+      "color": "#93e48d"
+    },
+    {
+      "pos": 0.4844,
+      "color": "#93e477"
     },
     {
       "pos": 0.5,
-      "color": "#00ff00"
+      "color": "#93e459"
+    },
+    {
+      "pos": 0.5313,
+      "color": "#a6e156"
+    },
+    {
+      "pos": 0.5625,
+      "color": "#b5df53"
+    },
+    {
+      "pos": 0.625,
+      "color": "#cbd94e"
     },
     {
       "pos": 0.75,
-      "color": "#ff8800"
+      "color": "#e7ca42"
+    },
+    {
+      "pos": 0.8125,
+      "color": "#e4ba31"
+    },
+    {
+      "pos": 0.875,
+      "color": "#dfa01e"
+    },
+    {
+      "pos": 0.9063,
+      "color": "#dc8d15"
+    },
+    {
+      "pos": 0.9375,
+      "color": "#d9720c"
+    },
+    {
+      "pos": 0.9688,
+      "color": "#d34808"
+    },
+    {
+      "pos": 0.9844,
+      "color": "#cf2907"
+    },
+    {
+      "pos": 0.9883,
+      "color": "#ce1b07"
+    },
+    {
+      "pos": 0.9922,
+      "color": "#cd0b07"
+    },
+    {
+      "pos": 0.9961,
+      "color": "#cb0007"
     },
     {
       "pos": 1,
-      "color": "#800000"
+      "color": "#ca0006"
     }
   ],
   "bgGradientStops": [

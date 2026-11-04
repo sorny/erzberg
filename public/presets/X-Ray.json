@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": false,
     "depthOcclusion": true,
     "occlusionBias": 2,
-    "occlusionColor": "#e8fbff",
+    "occlusionColor": "#e0e2e2",
     "occlusionOpacity": 0.85,
     "showTexture": false,
     "textureScale": 1,
@@ -44,7 +44,7 @@
     "spacingLines": 3,
     "shiftLines": 0,
     "angleLines": 0,
-    "colorLines": "#8fd4ff",
+    "colorLines": "#cfdce2",
     "weightLines": 0.7,
     "opacityLines": 0.35,
     "dashLines": "solid",
@@ -55,7 +55,7 @@
     "enabledCross": true,
     "spacingCross": 9,
     "angleCross": 90,
-    "colorCross": "#3aa0d8",
+    "colorCross": "#a7d0dc",
     "weightCross": 0.6,
     "opacityCross": 0.25,
     "dashCross": "solid",
@@ -78,10 +78,10 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": false,
     "intervalContours": 1,
-    "colorContours": "#7b4f2e",
+    "colorContours": "#c3a886",
     "weightContours": 1,
     "opacityContours": 0.29,
     "dashContours": "solid",
@@ -166,7 +166,7 @@
     "spacingStipple": 1,
     "weightStipple": 4,
     "opacityStipple": 0.85,
-    "colorStipple": "#1a1a1a",
+    "colorStipple": "#585858",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#7b4f2e",
+    "colorCurv": "#c3a886",
     "weightCurv": 1,
     "opacityCurv": 0.29,
     "dashCurv": "solid",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,25 +262,26 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#000080"
+        "color": "#0000c1"
       },
       {
         "pos": 0.25,
-        "color": "#00ffff"
+        "color": "#99e3e2"
       },
       {
         "pos": 0.5,
-        "color": "#00ff00"
+        "color": "#93e459"
       },
       {
         "pos": 0.75,
-        "color": "#ff8800"
+        "color": "#e7ca42"
       },
       {
         "pos": 1,
-        "color": "#800000"
+        "color": "#ca0006"
       }
-    ]
+    ],
+    "markColorCross": "#ddaf6c"
   },
   "points": {
     "showPoints": false,

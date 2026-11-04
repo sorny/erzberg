@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,13 +14,14 @@
   },
   "style": {
     "bgColor": "#f1ead2",
-    "colorVenation": "#4f6b2a",
+    "colorVenation": "#aaba83",
     "countVenation": 8000,
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledVenation": true,
     "occludeBy": "ground",
-    "weightVenation": 1.3
+    "weightVenation": 1.3,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

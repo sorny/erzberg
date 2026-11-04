@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,9 +14,9 @@
   },
   "style": {
     "bgColor": "#f3ecd9",
-    "colorAspectRose": "#1f4e79",
-    "colorContours": "#8c7b65",
-    "colorStereonet": "#b23a48",
+    "colorAspectRose": "#71a6c0",
+    "colorContours": "#cac3b9",
+    "colorStereonet": "#db96a2",
     "depthOcclusion": true,
     "enabledAspectRose": true,
     "enabledContours": false,
@@ -25,7 +25,8 @@
     "intervalContours": 4,
     "occludeBy": "ground",
     "weightContours": 0.5,
-    "weightStereonet": 0.8
+    "weightStereonet": 0.8,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

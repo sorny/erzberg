@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": false,
     "depthOcclusion": true,
     "occlusionBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
@@ -44,7 +44,7 @@
     "spacingLines": 4,
     "shiftLines": 0,
     "angleLines": 0,
-    "colorLines": "#1a1005",
+    "colorLines": "#543d18",
     "weightLines": 1.2,
     "opacityLines": 1,
     "dashLines": "solid",
@@ -78,10 +78,10 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": false,
     "intervalContours": 2,
-    "colorContours": "#7b4f2e",
+    "colorContours": "#c3a886",
     "weightContours": 1,
     "opacityContours": 0.5,
     "dashContours": "solid",
@@ -166,7 +166,7 @@
     "spacingStipple": 2,
     "weightStipple": 1.5,
     "opacityStipple": 1,
-    "colorStipple": "#2e1500",
+    "colorStipple": "#7a4c00",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#2e1500",
+    "colorCurv": "#7a4c00",
     "weightCurv": 1.5,
     "opacityCurv": 1,
     "dashCurv": "solid",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,23 +262,23 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#000080"
+        "color": "#0000c1"
       },
       {
         "pos": 0.25,
-        "color": "#00ffff"
+        "color": "#99e3e2"
       },
       {
         "pos": 0.5,
-        "color": "#00ff00"
+        "color": "#93e459"
       },
       {
         "pos": 0.75,
-        "color": "#ff8800"
+        "color": "#e7ca42"
       },
       {
         "pos": 1,
-        "color": "#800000"
+        "color": "#ca0006"
       }
     ]
   },
@@ -318,28 +318,116 @@
       "color": "#000000"
     },
     {
+      "pos": 0.0109,
+      "color": "#0a0500"
+    },
+    {
+      "pos": 0.0164,
+      "color": "#0f0a00"
+    },
+    {
+      "pos": 0.0219,
+      "color": "#130a00"
+    },
+    {
+      "pos": 0.0438,
+      "color": "#201200"
+    },
+    {
+      "pos": 0.0656,
+      "color": "#2f1d00"
+    },
+    {
+      "pos": 0.0875,
+      "color": "#3b2300"
+    },
+    {
+      "pos": 0.175,
+      "color": "#654000"
+    },
+    {
+      "pos": 0.2625,
+      "color": "#835800"
+    },
+    {
       "pos": 0.35,
-      "color": "#442200"
+      "color": "#9a6b00"
+    },
+    {
+      "pos": 0.4706,
+      "color": "#9a6b00"
+    },
+    {
+      "pos": 0.6968,
+      "color": "#9a6b00"
+    },
+    {
+      "pos": 0.914,
+      "color": "#9a6b00"
+    },
+    {
+      "pos": 0.9188,
+      "color": "#a6761b"
+    },
+    {
+      "pos": 0.9235,
+      "color": "#b1812f"
+    },
+    {
+      "pos": 0.933,
+      "color": "#c09149"
+    },
+    {
+      "pos": 0.952,
+      "color": "#d4a96e"
+    },
+    {
+      "pos": 0.971,
+      "color": "#dfb98a"
     },
     {
       "pos": 0.99,
-      "color": "#ff7b3a"
+      "color": "#e6c59d"
+    },
+    {
+      "pos": 0.9925,
+      "color": "#dcb488"
+    },
+    {
+      "pos": 0.995,
+      "color": "#c7986a"
+    },
+    {
+      "pos": 0.9963,
+      "color": "#b48256"
+    },
+    {
+      "pos": 0.9975,
+      "color": "#956540"
+    },
+    {
+      "pos": 0.9981,
+      "color": "#7f5435"
+    },
+    {
+      "pos": 0.9988,
+      "color": "#613d25"
+    },
+    {
+      "pos": 0.9994,
+      "color": "#392112"
+    },
+    {
+      "pos": 0.9997,
+      "color": "#1e1007"
+    },
+    {
+      "pos": 0.9998,
+      "color": "#0e0602"
     },
     {
       "pos": 1,
       "color": "#000000"
-    },
-    {
-      "pos": 0.6968325791855203,
-      "color": "#442200"
-    },
-    {
-      "pos": 0.9140271493212669,
-      "color": "#442200"
-    },
-    {
-      "pos": 0.47058823529411764,
-      "color": "#442200"
     }
   ],
   "bgGradientStops": [

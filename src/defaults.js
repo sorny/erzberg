@@ -34,10 +34,6 @@ export const STYLE_DEF = {
   strokeDepthBias: 1,
   occlusionColor: '#a80000',
   occlusionOpacity: 0.0,
-  // Inks exactly as picked: lines and areas skip the viewport's ACES tone curve
-  // and the double sRGB encode, and the SVG writes the picked hex. Off keeps the
-  // softer screen look every preset was tuned against.
-  inksAsPicked: false,
 
   // Satellite drape. Its own switch and its own opacity rather than sharing the
   // texture overlay's: imagery is fetched for this extent and lands 1:1 on the

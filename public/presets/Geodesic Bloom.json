@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,7 +14,7 @@
   },
   "style": {
     "bgColor": "#fdf0d5",
-    "colorGeodesic": "#780000",
+    "colorGeodesic": "#c40005",
     "depthOcclusion": true,
     "enabledGeodesic": true,
     "enabledLines": false,
@@ -32,14 +32,15 @@
           "raysGeodesic": 360,
           "exaggerationGeodesic": 6,
           "weightGeodesic": 0.6,
-          "colorGeodesic": "#003049",
+          "colorGeodesic": "#00819e",
           "markerGeodesic": false
         }
       }
     ],
     "occludeBy": "ground",
     "raysGeodesic": 360,
-    "weightGeodesic": 0.6
+    "weightGeodesic": 0.6,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

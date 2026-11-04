@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -22,7 +22,8 @@
     "opennessOpacity": 1,
     "opennessRed": true,
     "showFill": true,
-    "showOpenness": true
+    "showOpenness": true,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

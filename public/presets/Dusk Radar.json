@@ -1,5 +1,5 @@
 {
-  "format": 7,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,8 +14,8 @@
   },
   "style": {
     "bgColor": "#2b2140",
-    "colorPencil": "#995900",
-    "colorRadar": "#ffb38a",
+    "colorPencil": "#d1b022",
+    "colorRadar": "#e3d6cb",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledPencil": true,
@@ -24,7 +24,8 @@
     "spacingPencil": 5,
     "spacingRadar": 3,
     "thresholdPencil": 0.1,
-    "weightRadar": 0.5
+    "weightRadar": 0.5,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

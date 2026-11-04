@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,7 +14,7 @@
   },
   "style": {
     "bgColor": "#1b1b2f",
-    "colorShadowLine": "#ffd166",
+    "colorShadowLine": "#e3dcc0",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledShadowLine": true,
@@ -24,7 +24,9 @@
     "levelsSunHours": 14,
     "occludeBy": "ground",
     "weightShadowLine": 2.5,
-    "weightSunHours": 1
+    "weightSunHours": 1,
+    "occlusionColor": "#df000a",
+    "colorSunHours": "#585858"
   },
   "points": {
     "showPoints": false,
@@ -66,23 +68,55 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#3d348b"
+      "color": "#968ac7"
+    },
+    {
+      "pos": 0.0625,
+      "color": "#a69ed0"
+    },
+    {
+      "pos": 0.125,
+      "color": "#b1add6"
     },
     {
       "pos": 0.25,
-      "color": "#7678ed"
+      "color": "#c2c2df"
+    },
+    {
+      "pos": 0.3125,
+      "color": "#cdc9d4"
+    },
+    {
+      "pos": 0.375,
+      "color": "#d6cec3"
+    },
+    {
+      "pos": 0.4063,
+      "color": "#dad1b6"
+    },
+    {
+      "pos": 0.4375,
+      "color": "#ded3a3"
+    },
+    {
+      "pos": 0.4688,
+      "color": "#e1d585"
+    },
+    {
+      "pos": 0.4844,
+      "color": "#e3d672"
     },
     {
       "pos": 0.5,
-      "color": "#f7b801"
+      "color": "#e5d756"
     },
     {
       "pos": 0.75,
-      "color": "#f18701"
+      "color": "#e5c944"
     },
     {
       "pos": 1,
-      "color": "#f35b04"
+      "color": "#e8b43d"
     }
   ],
   "bgGradientStops": [

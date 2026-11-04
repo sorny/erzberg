@@ -1,5 +1,5 @@
 {
-  "format": 2,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -26,7 +26,7 @@
     "bgGradient": true,
     "depthOcclusion": true,
     "occlusionBias": 1,
-    "occlusionColor": "#a80000",
+    "occlusionColor": "#df000a",
     "occlusionOpacity": 0,
     "showTexture": false,
     "textureScale": 1,
@@ -44,7 +44,7 @@
     "spacingLines": 4,
     "shiftLines": 0,
     "angleLines": 0,
-    "colorLines": "#ffffff",
+    "colorLines": "#e2e2e2",
     "weightLines": 1,
     "opacityLines": 1,
     "dashLines": "solid",
@@ -78,7 +78,7 @@
     "pillarStyle": "line",
     "pillarSize": 0.8,
     "pillarSegments": 8,
-    "pillarLidColor": "#ffffff",
+    "pillarLidColor": "#e2e2e2",
     "enabledContours": false,
     "intervalContours": 4,
     "colorContours": "#000000",
@@ -166,7 +166,7 @@
     "spacingStipple": 1,
     "weightStipple": 4,
     "opacityStipple": 0.85,
-    "colorStipple": "#1a1a1a",
+    "colorStipple": "#585858",
     "dashStipple": "solid",
     "stippleDensityMode": "slope",
     "stippleGamma": 1.2,
@@ -197,7 +197,7 @@
     "radiusCurv": 1,
     "dirModeCurv": "max",
     "stepCurv": 1,
-    "colorCurv": "#ffffff",
+    "colorCurv": "#e2e2e2",
     "weightCurv": 1,
     "opacityCurv": 1,
     "dashCurv": "solid",
@@ -220,7 +220,7 @@
     "hypsoModeSwiss": "elevation",
     "hypsoBandedSwiss": false,
     "hypsoIntervalSwiss": 10,
-    "colorGpx": "#a80000",
+    "colorGpx": "#df000a",
     "weightGpx": 2,
     "opacityGpx": 1,
     "dashGpx": "solid",
@@ -262,25 +262,26 @@
     "gradientStops": [
       {
         "pos": 0,
-        "color": "#000080"
+        "color": "#0000c1"
       },
       {
         "pos": 0.25,
-        "color": "#00ffff"
+        "color": "#99e3e2"
       },
       {
         "pos": 0.5,
-        "color": "#00ff00"
+        "color": "#93e459"
       },
       {
         "pos": 0.75,
-        "color": "#ff8800"
+        "color": "#e7ca42"
       },
       {
         "pos": 1,
-        "color": "#800000"
+        "color": "#ca0006"
       }
-    ]
+    ],
+    "colorPillarsAbove": "#c9c9c9"
   },
   "points": {
     "showPoints": false,

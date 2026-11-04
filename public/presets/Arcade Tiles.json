@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,16 +15,16 @@
   "style": {
     "alignTruchet": "random",
     "bgColor": "#1a1033",
-    "colorALandform": "#2d1b69",
-    "colorBLandform": "#fffb96",
-    "colorCLandform": "#ff71ce",
-    "colorDLandform": "#ffb3e6",
-    "colorELandform": "#ff9a3c",
-    "colorFLandform": "#b967ff",
-    "colorGLandform": "#05ffa1",
-    "colorHLandform": "#7af5ff",
-    "colorILandform": "#01cdfe",
-    "colorJLandform": "#3d5afe",
+    "colorALandform": "#7d5cb6",
+    "colorBLandform": "#e3e2d1",
+    "colorCLandform": "#e5c1da",
+    "colorDLandform": "#e2d6df",
+    "colorELandform": "#e5cfa2",
+    "colorFLandform": "#d8bbe2",
+    "colorGLandform": "#99e3d2",
+    "colorHLandform": "#cce1e2",
+    "colorILandform": "#88dce1",
+    "colorJLandform": "#9fb0e2",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledTruchet": true,
@@ -34,7 +34,9 @@
     "seedTruchet": 9,
     "spacingTruchet": 8,
     "thresholdTruchet": 0,
-    "weightTruchet": 2.6
+    "weightTruchet": 2.6,
+    "occlusionColor": "#df000a",
+    "colorTruchet": "#585858"
   },
   "points": {
     "showPoints": false,
@@ -76,27 +78,55 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#3a7fc8"
+      "color": "#a0c5d9"
+    },
+    {
+      "pos": 0.075,
+      "color": "#b9d1dc"
     },
     {
       "pos": 0.15,
-      "color": "#7cc8e8"
+      "color": "#c9dadf"
+    },
+    {
+      "pos": 0.265,
+      "color": "#d7ddde"
     },
     {
       "pos": 0.38,
-      "color": "#ede8dc"
+      "color": "#e0dfde"
+    },
+    {
+      "pos": 0.48,
+      "color": "#dedacf"
+    },
+    {
+      "pos": 0.53,
+      "color": "#ddd7c3"
     },
     {
       "pos": 0.58,
-      "color": "#d4a850"
+      "color": "#ddd3b1"
+    },
+    {
+      "pos": 0.68,
+      "color": "#dcc99b"
     },
     {
       "pos": 0.78,
-      "color": "#c06820"
+      "color": "#dbba79"
+    },
+    {
+      "pos": 0.89,
+      "color": "#d2a85c"
+    },
+    {
+      "pos": 0.945,
+      "color": "#cd9b4a"
     },
     {
       "pos": 1,
-      "color": "#7a3408"
+      "color": "#c58b33"
     }
   ],
   "bgGradientStops": [

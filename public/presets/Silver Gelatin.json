@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,7 +14,7 @@
   },
   "style": {
     "bgColor": "#e8e6e1",
-    "colorRetic": "#222222",
+    "colorRetic": "#6a6a6a",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledRetic": true,
@@ -25,7 +25,8 @@
     "opacityRetic": 0.6,
     "showFill": true,
     "showHillshade": true,
-    "weightRetic": 1.6
+    "weightRetic": 1.6,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

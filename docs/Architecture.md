@@ -237,7 +237,7 @@ Two things come from the preset set and are not written by hand:
 | Exporter | Reads | Note |
 |---|---|---|
 | SVG | `lineGeo`, `surfaceGeo` | CPU projection with a software Z-buffer, so occlusion matches the viewport without a GPU readback. Area modes export filled polygons |
-| PNG / Clear PNG | The scene | Offscreen 4× render target, trimmed by alpha |
+| PNG / PNG α | The scene | Offscreen 4× render target, trimmed by alpha |
 | STL | `surfaceGeo` | Own facet normals. Skips vertices at `NODATA_SENTINEL_Y`. Paced, with progress and cancel |
 | Heightmap PNG | `terrain.grid` | After resolution and levels |
 | WebM | The live canvas | `MediaRecorder`, with the ODbL credit spliced into the Matroska header |
@@ -281,27 +281,28 @@ topology.
 
 ### Screen ink
 
-The R3F canvas applies ACES filmic tone mapping and an sRGB encode. `screenInk`
-in `utils/svgExport.js` applies the same two steps, so SVG colours match the
-screen: Jet's `#800000` renders as `#ca0006`. Two facts were measured:
-
-- Per-vertex and material colours come out the same.
-- The background is not tone mapped (`setClearColor`), so `bgColor` and the
-  gradient stops are written raw.
-
-`tests/unit/screen-ink.test.js` pins four pairs read from the running app.
-
-The curve itself is in `utils/screenInk.js`, so the panel's pen strip
-(`utils/pens.js`) can show an ink as the file will write it without loading the
-exporter.
-
-**Inks as picked** (`inksAsPicked`, Surface → Terrain Style, mirrored under the
-pen layers in Output) turns both steps
-off for inks. The line, ghost, lid and fill materials skip tone mapping, and
+The R3F canvas applies ACES filmic tone mapping and an sRGB encode. Line inks
+skip both: the line, ghost, lid and fill materials set `toneMapped: false`, and
 vertex colours are converted from sRGB to linear before upload, so the output
-encode returns the picked hex. The SVG then writes the picked hex instead of
-`screenInk`. Measured: `#9650a0` renders as `#ceaacf` off, and as `#9650a0` on.
-The switch is render-side and off by default, so the presets keep their look.
+encode returns the picked hex. The SVG and the pen strip write the picked hex.
+
+The surface, the particles and the background still pass through the curve
+(the background arrives through `setClearColor` and is not tone mapped).
+`screenInk` in `utils/screenInk.js` reproduces the curve: the SVG uses it for
+particles, and `tests/unit/screen-ink.test.js` pins four pairs read from the
+running app. Jet's `#800000` renders as `#ca0006` through it.
+
+Before format 10, line inks went through the curve unless a plate switched
+Inks as picked on. `softenInks` in `utils/softInks.js` rewrites such a plate's
+line inks as the curve drew them. It also fills the defaults of the marks the
+plate draws, resamples a gradient that only lines read, and scales Mineral's
+grain. A gradient that the surface's hypsometric fill shares is kept as stored.
+
+Exports render into a target, which three.js does not tone-map, so the PNG,
+the 3D models' top and the web tiles used to skip the curve the screen applies.
+`utils/screenRead.js` marks the target as an XR target, so three tone-maps it
+per material as on screen, keeps it in linear half floats, and encodes sRGB on
+readback. The PNG matches the viewport to the byte, in both modes.
 
 ### Credits
 

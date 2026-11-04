@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,8 +14,8 @@
   },
   "style": {
     "bgColor": "#123a6b",
-    "colorLines": "#4f7fb5",
-    "colorProfileSheet": "#ffffff",
+    "colorLines": "#aec5d5",
+    "colorProfileSheet": "#e2e2e2",
     "countProfileSheet": 20,
     "depthOcclusion": true,
     "enabledLines": false,
@@ -24,7 +24,8 @@
     "spacingLines": 6,
     "valueProfileSheet": "height",
     "weightLines": 0.5,
-    "weightProfileSheet": 0.9
+    "weightProfileSheet": 0.9,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

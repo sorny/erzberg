@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -23,7 +23,8 @@
     "showFill": true,
     "showOpenness": true,
     "showTexShade": true,
-    "texShadeOpacity": 0.6
+    "texShadeOpacity": 0.6,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

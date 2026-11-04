@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,14 +15,16 @@
   "style": {
     "angleCross": 45,
     "bgColor": "#1f2a44",
-    "colorCross": "#f4efe4",
+    "colorCross": "#e1e0df",
     "dashCross": "dashed",
     "depthOcclusion": true,
     "enabledCross": true,
     "enabledLines": false,
     "occludeBy": "ground",
     "spacingCross": 6,
-    "weightCross": 0.8
+    "weightCross": 0.8,
+    "occlusionColor": "#df000a",
+    "markColorCross": "#ddaf6c"
   },
   "points": {
     "showPoints": false,

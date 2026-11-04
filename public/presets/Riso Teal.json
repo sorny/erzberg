@@ -1,5 +1,5 @@
 {
-  "format": 9,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,16 +14,17 @@
   },
   "style": {
     "bgColor": "#f3ede0",
-    "colorARiso": "#00838a",
-    "colorBRiso": "#ff6c2f",
-    "colorCRiso": "#3d1f3b",
+    "colorARiso": "#50c7c8",
+    "colorBRiso": "#e8be90",
+    "colorCRiso": "#92658f",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledRiso": true,
     "occludeBy": "ground",
     "opacityRiso": 0.85,
     "overprintRiso": true,
-    "weightRiso": 2
+    "weightRiso": 2,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

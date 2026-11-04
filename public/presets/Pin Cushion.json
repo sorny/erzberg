@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -23,7 +23,9 @@
     "spacingStems": 7,
     "tipSizeStems": 2.5,
     "tipWeightStems": 2.5,
-    "weightStems": 0.5
+    "weightStems": 0.5,
+    "occlusionColor": "#df000a",
+    "colorStems": "#585858"
   },
   "points": {
     "showPoints": false,
@@ -65,19 +67,31 @@
   "gradientStops": [
     {
       "pos": 0,
-      "color": "#01cdfe"
+      "color": "#88dce1"
     },
     {
-      "pos": 0.3333333333333333,
-      "color": "#b967ff"
+      "pos": 0.0833,
+      "color": "#a5d6e1"
     },
     {
-      "pos": 0.6666666666666666,
-      "color": "#ff71ce"
+      "pos": 0.1667,
+      "color": "#bacfe1"
+    },
+    {
+      "pos": 0.3333,
+      "color": "#d8bbe2"
+    },
+    {
+      "pos": 0.6667,
+      "color": "#e5c1da"
+    },
+    {
+      "pos": 0.8333,
+      "color": "#e3d7d6"
     },
     {
       "pos": 1,
-      "color": "#fffb96"
+      "color": "#e3e2d1"
     }
   ],
   "bgGradientStops": [

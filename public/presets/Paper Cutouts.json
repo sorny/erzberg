@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -14,21 +14,23 @@
   },
   "style": {
     "bgColor": "#f6f1e7",
-    "colorALandform": "#f6f1e7",
-    "colorBLandform": "#1d3557",
-    "colorCLandform": "#e63946",
-    "colorDLandform": "#f4a261",
-    "colorELandform": "#e9c46a",
-    "colorFLandform": "#f6f1e7",
-    "colorGLandform": "#2a9d8f",
-    "colorHLandform": "#a8dadc",
-    "colorILandform": "#457b9d",
-    "colorJLandform": "#1d3557",
+    "colorALandform": "#e1e1df",
+    "colorBLandform": "#658aab",
+    "colorCLandform": "#e898a1",
+    "colorDLandform": "#e2d2ba",
+    "colorELandform": "#e0d9c0",
+    "colorFLandform": "#e1e1df",
+    "colorGLandform": "#98cfcb",
+    "colorHLandform": "#d4dddd",
+    "colorILandform": "#a6c3ce",
+    "colorJLandform": "#658aab",
     "depthOcclusion": true,
     "enabledLandform": true,
     "enabledLines": false,
     "occludeBy": "ground",
-    "weightLandform": 0.8
+    "weightLandform": 0.8,
+    "occlusionColor": "#df000a",
+    "colorLandform": "#d5a181"
   },
   "points": {
     "showPoints": false,

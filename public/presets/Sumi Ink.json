@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -15,7 +15,7 @@
   "style": {
     "aoStrength": 0.8,
     "bgColor": "#f2eee4",
-    "colorRidge": "#111111",
+    "colorRidge": "#3f3f3f",
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledRidge": true,
@@ -24,7 +24,8 @@
     "showAO": true,
     "showFill": true,
     "thresholdRidge": 0.03,
-    "weightRidge": 1
+    "weightRidge": 1,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,

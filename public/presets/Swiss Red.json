@@ -1,5 +1,5 @@
 {
-  "format": 8,
+  "format": 10,
   "terrain": {
     "resolution": 1,
     "elevScale": 0,
@@ -16,14 +16,15 @@
     "altitudeShadowHatch": 18,
     "azimuthShadowHatch": 315,
     "bgColor": "#ffffff",
-    "colorShadowHatch": "#e30613",
+    "colorShadowHatch": "#f22f50",
     "crossShadowHatch": false,
     "depthOcclusion": true,
     "enabledLines": false,
     "enabledShadowHatch": true,
     "occludeBy": "ground",
     "spacingShadowHatch": 3,
-    "weightShadowHatch": 0.7
+    "weightShadowHatch": 0.7,
+    "occlusionColor": "#df000a"
   },
   "points": {
     "showPoints": false,
