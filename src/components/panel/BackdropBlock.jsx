@@ -27,7 +27,7 @@ export function BackdropBlock({ prefix, backdrop, setBackdrop, hasPhoto, imagery
       />
       {imagery?.date ? (
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>
-          Sentinel-2 · {imagery.date} · {Math.round(imagery.cloud)}% cloud
+          {imagery.source ?? `Sentinel-2 · ${imagery.date} · ${Math.round(imagery.cloud)}% cloud`}
         </div>
       ) : (
         <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.6 }}>

@@ -130,3 +130,13 @@ export function clipSegment(x0, y0, x1, y1, r) {
     tHead: t0,
   }
 }
+
+/**
+ * The pixel size of a sheet printed `widthMm` wide at `dpi`, for a frame of
+ * the given aspect (width ÷ height). The PNG at print size is written at
+ * exactly this size, so a print shop gets A3 at 300 DPI whatever the window.
+ */
+export function printPixels(widthMm, dpi, aspect) {
+  const w = Math.max(1, Math.round((Math.max(1, widthMm) / 25.4) * Math.max(1, dpi)))
+  return { w, h: Math.max(1, Math.round(w / Math.max(0.01, aspect || 1))) }
+}

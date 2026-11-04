@@ -6,27 +6,31 @@
  * elevation. Each tile shows the band's value range and a small preview, so the
  * elevation band is the one with a range in metres and a picture of relief.
  * The previews arrive after the load, because each one reads a whole band.
+ *
+ * Under each tile, Drape and Mask send that band somewhere else instead: to the
+ * imagery drape, or to a new mask (see utils/bandUse.js).
  */
 import { useStore } from '../../store/useStore'
 import { ACCENT, BORDER, MONO, MUTED, SUNK, SURF, TEXT } from './ui'
 
 const fmt = (v) => (v == null ? '–' : Math.abs(v) >= 100 ? Math.round(v).toLocaleString() : +v.toFixed(2))
 
-export function BandPicker({ onPick }) {
+export function BandPicker({ onPick, onSend }) {
   const bands = useStore((s) => s.geoTiffBands)
   if (!bands || bands.count < 2) return null
   const { count, band, summaries } = bands
   return (
     <div data-testid="band-picker" style={{ marginTop: 8 }}>
       <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>
-        Band · this file has {count}. Pick the one that holds elevation.
+        Band · this file has {count}. Pick the one that holds elevation. Drape and Mask use a band as an image or a mask.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
         {Array.from({ length: count }, (_, i) => {
           const s = summaries?.[i]
           const on = i === band
           return (
-            <button key={i} type="button" data-testid={`band-${i + 1}`} aria-pressed={on}
+            <div key={i} style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+            <button type="button" data-testid={`band-${i + 1}`} aria-pressed={on}
               title={s ? `Band ${i + 1}: ${fmt(s.min)} to ${fmt(s.max)}` : `Band ${i + 1}`}
               onClick={() => { if (!on) onPick?.(i) }}
               style={{
@@ -45,6 +49,18 @@ export function BandPicker({ onPick }) {
                 {s ? `${fmt(s.min)}–${fmt(s.max)}` : ''}
               </div>
             </button>
+            {onSend && (
+              <div style={{ display: 'flex', gap: 2 }}>
+                {[['Drape', 'imagery'], ['Mask', 'mask']].map(([label, target]) => (
+                  <button key={target} type="button" data-testid={`band-${i + 1}-${target}`}
+                    title={target === 'imagery' ? `Band ${i + 1} as the imagery drape` : `Band ${i + 1} as a mask`}
+                    onClick={() => onSend(i, target)}
+                    style={{ flex: 1, minWidth: 0, padding: '1px 0', fontSize: 9, borderRadius: 3, cursor: 'pointer',
+                             background: SURF, border: `1px solid ${BORDER}`, color: MUTED }}>{label}</button>
+                ))}
+              </div>
+            )}
+            </div>
           )
         })}
       </div>

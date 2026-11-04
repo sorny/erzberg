@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { PROFILE_A, PROFILE_B } from './ProfileOverlay'
 import { ACCENT, BORDER, Btn, DIM, GLASS, MONO, MUTED } from './panel/ui'
+import { distanceTicks, formatKm } from '../utils/routeProfile'
 
 /**
  * Popup chart size. Module scope rather than render scope on purpose: declared
@@ -53,7 +54,24 @@ function chartGeometry({ points, elevMin, elevMax, W, H, PAD, hasReal, realMin, 
  * behind it, and the axis it was read off — A on the left, B on the right, in
  * the colours the pins wear in the scene.
  */
-function buildProfileSvg({ points, elevMin, elevMax, hasReal, realMin, realMax }) {
+/** A route's figures in one line: `12.4 km · ↑ 1 230 m · ↓ 1 180 m`. */
+function routeLine(route) {
+  if (!route) return ''
+  const m = (v) => `${Math.round(v).toLocaleString('en-US').replace(/,/g, ' ')} m`
+  return route.metres
+    ? `${formatKm(route.distanceM)} · ↑ ${m(route.ascent)} · ↓ ${m(route.descent)}`
+    : formatKm(route.distanceM)
+}
+
+/** The x axis of a route: a tick and a figure at each round distance. */
+function xTicks(route, PAD, innerW) {
+  if (!route) return []
+  return distanceTicks(route.distanceM).map((d) => ({
+    x: PAD.left + (d / route.distanceM) * innerW, label: d ? formatKm(d) : '0',
+  }))
+}
+
+function buildProfileSvg({ points, elevMin, elevMax, hasReal, realMin, realMax, route = null }) {
   const W = 760, H = 300
   const PAD = { top: 34, right: 24, bottom: 44, left: 74 }
   const g = chartGeometry({ points, elevMin, elevMax, W, H, PAD, hasReal, realMin, realMax })
@@ -67,24 +85,29 @@ function buildProfileSvg({ points, elevMin, elevMax, hasReal, realMin, realMax }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <title>Elevation profile</title>
   <rect width="${W}" height="${H}" fill="#ffffff"/>
-  <text x="${PAD.left}" y="22" font-family="${sans}" font-size="13" font-weight="600" fill="${INK}">Elevation profile</text>
-  <text x="${W - PAD.right}" y="22" text-anchor="end" font-family="${mono}" font-size="10" fill="${MUTED}">${range}</text>
+  <text x="${PAD.left}" y="22" font-family="${sans}" font-size="13" font-weight="600" fill="${INK}">${route ? escapeXml(route.name) : 'Elevation profile'}</text>
+  <text x="${W - PAD.right}" y="22" text-anchor="end" font-family="${mono}" font-size="10" fill="${MUTED}">${route ? routeLine(route) + '  ·  ' : ''}${range}</text>
 ${g.ticks.map(({ y }) => `  <line x1="${PAD.left}" y1="${y.toFixed(1)}" x2="${(PAD.left + g.innerW).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${GRID}" stroke-width="0.5"/>`).join('\n')}
   <path d="${g.fillD}" fill="${INK}" fill-opacity="0.08"/>
   <path d="${g.pathD}" fill="none" stroke="${INK}" stroke-width="1.4" stroke-linejoin="round"/>
   <line x1="${PAD.left}" y1="${PAD.top}" x2="${PAD.left}" y2="${(PAD.top + g.innerH).toFixed(1)}" stroke="${INK}" stroke-width="0.8"/>
   <line x1="${PAD.left}" y1="${(PAD.top + g.innerH).toFixed(1)}" x2="${(PAD.left + g.innerW).toFixed(1)}" y2="${(PAD.top + g.innerH).toFixed(1)}" stroke="${INK}" stroke-width="0.8"/>
 ${g.ticks.map(({ y, label }) => `  <text x="${PAD.left - 8}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-family="${mono}" font-size="10" fill="${MUTED}">${label}</text>`).join('\n')}
-  <circle cx="${PAD.left}" cy="${(PAD.top + g.innerH + 14).toFixed(1)}" r="3.5" fill="${PROFILE_A}"/>
+${route
+    ? xTicks(route, PAD, g.innerW).map(({ x, label }) => `  <line x1="${x.toFixed(1)}" y1="${(PAD.top + g.innerH).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(PAD.top + g.innerH + 4).toFixed(1)}" stroke="${INK}" stroke-width="0.8"/>
+  <text x="${x.toFixed(1)}" y="${(PAD.top + g.innerH + 16).toFixed(1)}" text-anchor="middle" font-family="${mono}" font-size="10" fill="${MUTED}">${label}</text>`).join('\n')
+    : `  <circle cx="${PAD.left}" cy="${(PAD.top + g.innerH + 14).toFixed(1)}" r="3.5" fill="${PROFILE_A}"/>
   <text x="${PAD.left + 9}" y="${(PAD.top + g.innerH + 18).toFixed(1)}" font-family="${mono}" font-size="11" fill="${INK}">A</text>
   <circle cx="${(PAD.left + g.innerW - 9).toFixed(1)}" cy="${(PAD.top + g.innerH + 14).toFixed(1)}" r="3.5" fill="${PROFILE_B}"/>
-  <text x="${(PAD.left + g.innerW).toFixed(1)}" y="${(PAD.top + g.innerH + 18).toFixed(1)}" font-family="${mono}" font-size="11" fill="${INK}">B</text>
+  <text x="${(PAD.left + g.innerW).toFixed(1)}" y="${(PAD.top + g.innerH + 18).toFixed(1)}" font-family="${mono}" font-size="11" fill="${INK}">B</text>`}
   <text x="${(PAD.left + g.innerW / 2).toFixed(1)}" y="${H - 10}" text-anchor="middle" font-family="${mono}" font-size="9" fill="${MUTED}">${points.length} samples · erzberg</text>
 </svg>
 `
 }
 
-export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffElevMin, geoTiffElevMax, baseName = 'heightmap' }) {
+const escapeXml = (t) => String(t).replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' })[c])
+
+export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffElevMin, geoTiffElevMax, baseName = 'heightmap', route = null }) {
   const { W, H, PAD } = SCREEN
 
   const hasReal = geoTiffElevMin != null && geoTiffElevMax != null
@@ -97,7 +120,7 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
   )
 
   const exportSvg = () => {
-    const svg = buildProfileSvg({ points, elevMin, elevMax, hasReal, realMin, realMax })
+    const svg = buildProfileSvg({ points, elevMin, elevMax, hasReal, realMin, realMax, route })
     const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }))
     Object.assign(document.createElement('a'), { href: url, download: `${baseName}-profile.svg` }).click()
     // Revoked on the next tick rather than immediately: Safari has not started
@@ -112,7 +135,10 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
       zIndex: 100, userSelect: 'none',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 8 }}>
-        <span style={{ color: DIM, fontSize: 12, fontWeight: 600 }}>Elevation profile</span>
+        <span style={{ color: DIM, fontSize: 12, fontWeight: 600 }}>{route ? route.name : 'Elevation profile'}</span>
+        {route && (
+          <span data-testid="profile-route" style={{ color: MUTED, fontSize: 10, fontFamily: MONO }}>{routeLine(route)}</span>
+        )}
         <Btn onClick={exportSvg} data-testid="profile-export-svg" title="Save this section as an SVG file"
           style={{ marginLeft: 'auto' }}>SVG</Btn>
         <Btn variant="ghost" onClick={onClose} aria-label="Close" title="Close"
@@ -133,14 +159,22 @@ export function ElevationProfile({ points, elevMin, elevMax, onClose, geoTiffEle
           <text key={i} x={PAD.left - 6} y={y + 4} textAnchor="end"
             style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>{label}</text>
         ))}
-        {/* X-axis ends, carrying the pin colours from the scene so the chart says
-            which end of the line on the terrain it started from. */}
-        <circle cx={PAD.left} cy={H - 9} r={3} fill={PROFILE_A} />
-        <text x={PAD.left + 8} y={H - 6} textAnchor="start"
-          style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>A</text>
-        <circle cx={PAD.left + innerW - 8} cy={H - 9} r={3} fill={PROFILE_B} />
-        <text x={PAD.left + innerW} y={H - 6} textAnchor="start"
-          style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>B</text>
+        {/* A route has a length, so its axis is in kilometres. A clicked
+            section has two ends, carrying the pin colours from the scene so the
+            chart says which end of the line on the terrain it started from. */}
+        {route ? xTicks(route, PAD, innerW).map(({ x, label }, i) => (
+          <g key={i}>
+            <line x1={x} y1={H - PAD.bottom} x2={x} y2={H - PAD.bottom + 3} style={{ stroke: MUTED }} strokeWidth={0.8} />
+            <text x={x} y={H - 6} textAnchor="middle" style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>{label}</text>
+          </g>
+        )) : (<>
+          <circle cx={PAD.left} cy={H - 9} r={3} fill={PROFILE_A} />
+          <text x={PAD.left + 8} y={H - 6} textAnchor="start"
+            style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>A</text>
+          <circle cx={PAD.left + innerW - 8} cy={H - 9} r={3} fill={PROFILE_B} />
+          <text x={PAD.left + innerW} y={H - 6} textAnchor="start"
+            style={{ fill: MUTED, fontSize: 9, fontFamily: MONO }}>B</text>
+        </>)}
       </svg>
     </div>
   )

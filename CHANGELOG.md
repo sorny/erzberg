@@ -5,6 +5,89 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.65.0] — 2026-11-04
+
+### Added
+
+- **My presets.** *Keep* puts the current look on a shelf in this browser,
+  with a 320 × 200 thumbnail drawn from the canvas, as its own group in
+  Presets. Each entry stores the preset as the text a plate carries, so it is
+  read through `parsePreset` and migrated like a file. *Shelf ⬇* and *Shelf ⬆*
+  save and open the whole shelf, and a name that is taken gets a number.
+- **Project file.** One `.erzberg` zip with the source raster as loaded, the
+  Edit Mode clip, the georeference, the look and camera, the vector sources
+  and layers, the text, the masks, the land cover and the imagery. Every typed
+  array is its own deflated entry, and `project.json` names it, so a raster is
+  never turned into text. Save and open it under Output › Project, or open it
+  from Presets › Open ⬆, or by drop.
+- **PNG at print size.** *Paper › Print size* at 150, 300 or 600 DPI writes the
+  whole sheet at the Sheet width times the DPI, untrimmed, with a `pHYs` chunk.
+  The camera's view offset renders only the sheet, so A3 at 300 DPI needs no
+  oversized viewport. A sheet above the texture limit is written at the
+  highest DPI that fits, and the file says that DPI.
+- **Lines as GeoJSON.** Output › GeoJSON writes the ground marks in the
+  raster's projection: each segment run is traced back to its raster cell and
+  its height read from the raster. Each line carries its layer, mode, pen name
+  and mean height. Charts, pillars, stems, hair, sprites, Air and the panorama
+  are left out. The file has the old `crs` member, which QGIS and GDAL read.
+- **Title block.** A block in the sheet's top left, with a title (the file name
+  if empty) and the facts the plate has: projection, contour interval in
+  metres, height range, source and date. Each line can be switched off, and a
+  fact the plate lacks is left out.
+- **Coordinate grid.** Ticks or lines along the sheet edge at a 1-2-5 interval,
+  in the raster's grid or in degrees, lettered where each line meets the edge.
+  Drawn in a plan view only (tilt below 6°). Meridians and parallels are
+  sampled, so they bend where the projection bends them.
+- **Magnetic north.** The north arrow turns to magnetic north, labelled MN,
+  with the declination under it. The turn is the meridian convergence plus the
+  declination at the plate's centre today, from
+  the World Magnetic Model 2025 (NOAA NCEI and BGS, public domain). The model
+  matches all 40 NOAA test values to 0.01°. At the Erzberg in November 2026 the
+  declination is about 5° east.
+- **Profile along a route.** *Elevation profile* on a GPX layer, or a layer of
+  one line, samples the terrain at 400 even steps along the route. The chart
+  gives the length, ascent and descent and ticks round distances, and its SVG
+  carries them too.
+- **A band as imagery or a mask.** *Drape* and *Mask* under each band tile.
+  Drape stretches the band to grey and lays it on the clipped grid. Mask is on
+  where the band is above the middle of its range, and opens in Mask Studio.
+- **glTF and 3MF.** The STL's solid (now `buildSolid`, shared by all three)
+  with the plate on top, from an orthographic capture straight down. The `.glb`
+  carries it as a texture, the `.3mf` as one colour per vertex, five bits a
+  channel. The walls take the paper colour.
+- **`erzberg day`.** One plate per hour of a date, with the almanac, Shadow
+  Line and Shadow Hatch set to the real sun at the plate's centre, and a
+  `day.html` filmstrip. Shadow Hatch takes its sun as an azimuth and an
+  altitude, so the run sets both from `solarPosition` for each hour.
+- **`erzberg tiles`.** XYZ web map tiles in Web Mercator, traced back into one
+  top-down capture, so a plate in any projection lands in place. Empty tiles
+  are left out, and `index.html` shows them on a plain ground. It has no base
+  map: OpenStreetMap refuses tiles to a page opened from disk.
+- **Python package.** `python/` holds `erzberg` for notebooks: `render`,
+  `atlas`, `presets` and `modes` call the command line, and a plate shows as
+  its PNG in Jupyter. No dependencies. Install with `uv pip install -e python`.
+- The CLI writes `.glb`, `.3mf` and `.geojson` too.
+
+### Changed
+
+- **Other files is grouped by kind:** Images (PNG, PNG α), 3D models (STL,
+  glTF, 3MF), Map data (GeoTIFF, GeoJSON, Heightmap) and Video (WebM, with its
+  length under it). Nine buttons in one grid had no order.
+- **Styles folds.** The 86 bundled styles sit in a fold, open at first, so the
+  shelf under them is one click from the top.
+- **Only SVG keeps a key.** `1` still exports SVG. Keys `2` to `7` (PNG, PNG α,
+  STL, WebM, Heightmap, GeoTIFF) are gone, so a stray digit no longer starts a
+  download. The browser tests click the buttons instead.
+
+### Fixed
+
+- Saving or opening a project showed nothing while a big raster was packed or
+  read. It now uses the export overlay, with progress, and Save can be
+  cancelled. `zip` reports the bytes compressed and checks for Cancel between
+  entries.
+- A preset kept on the shelf got no thumbnail: the canvas was looked up through
+  the orbit controls' event element, which is not always the canvas.
+
 ## [1.64.0] — 2026-11-04
 
 ### Added

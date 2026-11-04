@@ -13,7 +13,7 @@ import { unprojectWgs84 } from '../src/utils/geoCoords.js'
  * against colours measured off the running app, in unit/screen-ink.test.js.
  */
 import { screenInkHex } from '../src/utils/svgExport.js'
-import { openStage, resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp, clickExport } from './helpers.js'
 
 /**
  * Vector layers — OpenStreetMap, GeoJSON and GPX draped on the terrain.
@@ -2005,7 +2005,7 @@ test.describe('vector layers', () => {
 
     const names = []
     page.on('download', (d) => names.push(d.suggestedFilename()))
-    await page.keyboard.press('Digit4')
+    await clickExport(page, 'stl')
     // Two files: the plate, then the ribbon. The plate is written first, so
     // waiting on one download would race the second.
     await expect.poll(() => names.length, { timeout: 60000 }).toBe(2)

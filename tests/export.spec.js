@@ -17,7 +17,7 @@
 import { test, expect } from '@playwright/test'
 import { writeFileSync, mkdirSync } from 'fs'
 import path from 'path'
-import { openMark, openStage, resetToDefaults, setMark, waitForApp } from './helpers.js'
+import { openMark, openStage, resetToDefaults, setMark, waitForApp, clickExport } from './helpers.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
 
@@ -91,10 +91,10 @@ test('SVG export contains many lines and matches viewport layout', async ({ page
   writeFileSync(path.join(OUT, 'viewport.png'), viewportShot)
   console.log('Viewport screenshot saved.')
 
-  // ── 3. Export PNG (key 3) ─────────────────────────────────────────────────
+  // ── 3. Export PNG α ─────────────────────────────────────────────────
   const [pngDownload] = await Promise.all([
     page.waitForEvent('download', { timeout: 15_000 }),
-    page.keyboard.press('Digit3'),
+    clickExport(page, 'png-alpha'),
   ])
   const pngBuf = await pngDownload.createReadStream().then(stream =>
     new Promise((res, rej) => {

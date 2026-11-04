@@ -80,15 +80,4 @@ test.describe('GeoTIFF export', () => {
     await expect(page.getByText('A GeoTIFF needs a georeferenced raster in metres.')).toBeVisible()
     expect(downloaded).toBe(false)
   })
-
-  test('6 and 7 export the heightmap and the GeoTIFF', async ({ page }) => {
-    await page.goto('http://localhost:5173')
-    await waitForApp(page)
-    await loadFixture(page, FIXTURE)
-    await page.locator('body').click({ position: { x: 10, y: 10 } })
-    for (const [key, name] of [['6', /\.png$/], ['7', /-heightmap\.tif$/]]) {
-      const [download] = await Promise.all([page.waitForEvent('download'), page.keyboard.press(key)])
-      expect(download.suggestedFilename()).toMatch(name)
-    }
-  })
 })

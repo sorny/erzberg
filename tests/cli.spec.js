@@ -74,3 +74,35 @@ test('atlas cuts one sheet per feature from a GeoTIFF, and skips one outside it'
   expect(west).not.toBe(east)
   expect(readFileSync(join(dir, 'sheets', 'atlas.html'), 'utf8')).toContain('src="East.png"')
 })
+
+test('day writes one plate per hour, and tiles a folder of web tiles', async () => {
+  test.skip(!existsSync('tests/testdata/geotiff.tif'), 'tests/testdata/geotiff.tif not present (gitignored)')
+  test.setTimeout(300_000)
+  const dir = mkdtempSync(join(tmpdir(), 'erzberg-day-'))
+  // First Light hatches the shade: Shadow Hatch, which the run turns with the sun.
+  const day = cli('day', 'tests/testdata/geotiff.tif', '-p', 'First Light', '--size', '480x340',
+    '--date', '2026-12-21', '--hours', '9-15', '--step', '3', '-o', join(dir, 'f', '{hour}.png'))
+  expect(day.status, day.stderr).toBe(0)
+  expect(day.stdout.trim().split('\n').map((f) => f.slice(dir.length + 1)))
+    .toEqual(['f/09-00.png', 'f/12-00.png', 'f/15-00.png', 'f/day.html'])
+  // The sun moved, so the frames differ.
+  expect(readFileSync(join(dir, 'f', '09-00.png')).equals(readFileSync(join(dir, 'f', '15-00.png')))).toBe(false)
+
+  const tiles = cli('tiles', 'tests/testdata/geotiff.tif', '-m', 'Contours', '--only', '--zoom', '11-12', '-o', join(dir, 't'))
+  expect(tiles.status, tiles.stderr).toBe(0)
+  expect(existsSync(join(dir, 't', 'index.html'))).toBe(true)
+  // Zoom 11 at 13.9–14.1°E, 47.48–47.54°N: column 1103, rows 715 and 716.
+  expect(existsSync(join(dir, 't', '11', '1103', '715.png')) || existsSync(join(dir, 't', '11', '1103', '716.png'))).toBe(true)
+})
+
+test('render writes glTF, 3MF and GeoJSON', async () => {
+  test.skip(!existsSync('tests/testdata/geotiff.tif'), 'tests/testdata/geotiff.tif not present (gitignored)')
+  test.setTimeout(300_000)
+  const dir = mkdtempSync(join(tmpdir(), 'erzberg-models-'))
+  const r = cli('render', 'tests/testdata/geotiff.tif', '-m', 'Contours', '--only', '--size', '480x340',
+    '-o', join(dir, 'p.glb'), '-o', join(dir, 'p.3mf'), '-o', join(dir, 'p.geojson'))
+  expect(r.status, r.stderr).toBe(0)
+  expect(readFileSync(join(dir, 'p.glb')).subarray(0, 4).toString('ascii')).toBe('glTF')
+  expect(readFileSync(join(dir, 'p.3mf')).subarray(0, 2).toString('ascii')).toBe('PK')
+  expect(JSON.parse(readFileSync(join(dir, 'p.geojson'), 'utf8')).features.length).toBeGreaterThan(10)
+})

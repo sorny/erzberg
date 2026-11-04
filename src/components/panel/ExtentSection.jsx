@@ -119,7 +119,7 @@ export function ExtentSection() {
       <Row state={imagery ? 'ok' : 'off'} name="Imagery"
         value={imagery ? `${imagery.width} px` : 'none'}
         detail={imagery
-          ? `Sentinel-2 L2A · ${imagery.date}${imagery.cloud != null ? ` · ${Math.round(imagery.cloud)}% cloud` : ''}`
+          ? imagery.source ?? `Sentinel-2 L2A · ${imagery.date}${imagery.cloud != null ? ` · ${Math.round(imagery.cloud)}% cloud` : ''}`
           : 'Not fetched'}
         where={imagery ? null : 'Surface › Imagery'} />
 

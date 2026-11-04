@@ -66,12 +66,6 @@ export const SHORTCUTS = [
     group: 'Export',
     rows: [
       { keys: ['1'], codes: ['Digit1'], label: 'SVG' },
-      { keys: ['2'], codes: ['Digit2'], label: 'PNG' },
-      { keys: ['3'], codes: ['Digit3'], label: 'PNG with transparency' },
-      { keys: ['4'], codes: ['Digit4'], label: 'STL' },
-      { keys: ['5'], codes: ['Digit5'], label: 'WebM', note: 'again to stop' },
-      { keys: ['6'], codes: ['Digit6'], label: 'Heightmap' },
-      { keys: ['7'], codes: ['Digit7'], label: 'GeoTIFF' },
     ],
   },
   {

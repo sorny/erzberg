@@ -18,10 +18,10 @@
  */
 import { useEffect, useState } from 'react'
 import { frameRect, paperAspect } from '../utils/frame'
-import { sheetMarks } from '../utils/sheetMarks'
+import { marksFor, wantsSheetMarks } from '../utils/sheetFacts'
 import { useStore } from '../store/useStore'
 
-export function SheetMarks({ view, rightInset = 0 }) {
+export function SheetMarks({ view, sheet = null, rightInset = 0 }) {
   const scale = useStore((s) => s.mapScale)
   const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
 
@@ -31,19 +31,17 @@ export function SheetMarks({ view, rightInset = 0 }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
-  const bar = !!view.frameScaleBar, north = !!view.frameNorth
-  if ((!bar && !north) || !scale) return null
+  if (!wantsSheetMarks(view)) return null
 
   const w = win.w - rightInset, h = win.h
-  const marks = sheetMarks({
-    width: w, height: h,
+  // The grid mapping comes measured from the scene, in these same CSS pixels.
+  const marks = marksFor({
+    p: view, sheet, width: w, height: h, scale, affine: scale?.affine ?? null,
     frame: view.showFrame
       ? frameRect(w, h,
         paperAspect(view.framePaper ?? 'iso', !!view.frameLandscape, view.frameCustomRatio),
         view.frameScale ?? 0.85, view.frameOffsetX ?? 0, view.frameOffsetY ?? 0)
       : null,
-    metresPerPixel: scale.metresPerPixel, northAngle: scale.northAngle,
-    bar, north, scale: view.frameMarkScale ?? 1,
   })
   if (!marks) return null
 

@@ -218,3 +218,12 @@ export async function openFold(page, testId) {
 export async function waitForApp(page, timeout = 30_000) {
   await page.getByRole('heading', { name: 'erzberg' }).waitFor({ state: 'visible', timeout })
 }
+
+/**
+ * Start an export by its button in Output, as a user does. Only SVG has a key
+ * (`1`); the others were taken off the number row.
+ */
+export async function clickExport(page, id) {
+  await openStage(page, 'output')
+  await page.click(`[data-testid="export-${id}"]`)
+}

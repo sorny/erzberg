@@ -15,7 +15,7 @@
 import { test, expect } from '@playwright/test'
 import { mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
-import { openStage, resetToDefaults } from './helpers.js'
+import { openStage, resetToDefaults, clickExport } from './helpers.js'
 import { PRESET_FORMAT, readPngPreset, readSvgPreset } from '../src/utils/presetFile.js'
 
 const OUT = path.join(process.cwd(), 'test-results')
@@ -31,9 +31,7 @@ const tiltSlider = (page) =>
 /**
  * Move the camera off its default and hand focus back.
  *
- * The export hotkeys are a window listener that ignores events aimed at an
- * INPUT, so leaving focus on the slider makes the Digit2 below vanish and the
- * test time out waiting for a download that was never asked for.
+ * Focus goes back to the page, so a slider does not keep it.
  */
 async function setTilt(page, deg) {
   // Tilt is in View, which is in the Frame pane.
@@ -46,10 +44,10 @@ async function setTilt(page, deg) {
   await page.waitForTimeout(400)
 }
 
-/** Press an export hotkey and write what comes back to disk. */
-async function exportTo(page, key, filename) {
+/** Click an export button and write what comes back to disk. */
+async function exportTo(page, id, filename) {
   const wait = page.waitForEvent('download', { timeout: 90_000 })
-  await page.keyboard.press(key)
+  await clickExport(page, id)
   const dl = await wait
   const file = path.join(OUT, filename)
   writeFileSync(file, readFileSync(await dl.path()))
@@ -62,7 +60,7 @@ test('a PNG carries the look, and opens it again', async ({ page }) => {
   await resetToDefaults(page)
   await setTilt(page, TILT)
 
-  const file = await exportTo(page, 'Digit2', 'preset-carrier.png')
+  const file = await exportTo(page, 'png', 'preset-carrier.png')
 
   // ── The chunk is there, and it holds this session's parameters ───────────
   const preset = readPngPreset(readFileSync(file))
@@ -97,7 +95,7 @@ test('an SVG carries the look as a comment a plotter never draws', async ({ page
   await resetToDefaults(page)
   await setTilt(page, TILT)
 
-  const svg = readFileSync(await exportTo(page, 'Digit1', 'preset-carrier.svg'), 'utf8')
+  const svg = readFileSync(await exportTo(page, 'svg', 'preset-carrier.svg'), 'utf8')
 
   const preset = readSvgPreset(svg)
   expect(preset, 'the exported SVG carries no erzberg:preset comment').not.toBeNull()

@@ -71,7 +71,6 @@ test('the export keys do not fire underneath the card', async ({ page }) => {
   let download = false
   page.on('download', () => { download = true })
   await page.keyboard.press('Digit1')
-  await page.keyboard.press('Digit2')
   await page.waitForTimeout(2500)
   expect(download).toBe(false)
   await expect(page.locator('text=Exporting SVG…')).toHaveCount(0)

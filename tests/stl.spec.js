@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { deflateSync } from 'node:zlib'
-import { openStage, resetToDefaults, waitForApp } from './helpers.js'
+import { openStage, resetToDefaults, waitForApp, clickExport } from './helpers.js'
 
 /**
  * STL export content, which nothing covered before.
@@ -113,7 +113,7 @@ test('STL export is unaffected by NoData regions', async ({ page }) => {
 
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 20000 }),
-    page.keyboard.press('Digit4'),
+    clickExport(page, 'stl'),
   ])
   const { nTri, lo, hi, nonFinite } = stlBounds(await read(dl))
   console.log(`STL: ${nTri} triangles, Z ${lo[2].toFixed(2)}…${hi[2].toFixed(2)}`)
@@ -159,7 +159,7 @@ test('STL export writes nothing when an axis has no octants', async ({ page }) =
 
   let downloaded = false
   page.on('download', () => { downloaded = true })
-  await page.keyboard.press('Digit4')
+  await clickExport(page, 'stl')
   await page.waitForTimeout(3000)
   expect(downloaded, 'no STL should be produced from empty geometry').toBe(false)
 })
@@ -191,6 +191,8 @@ test('exporting STL keeps the page alive and says what it is doing', async ({ pa
   })
   expect(driven, 'the Resolution slider should be reachable').toBe(true)
   await page.waitForTimeout(8000)
+  // The export starts from its button, which lives in Output.
+  await openStage(page, 'output')
 
   const r = await page.evaluate(async () => {
     const gaps = []; const seen = []
@@ -204,7 +206,7 @@ test('exporting STL keeps the page alive and says what it is doing', async ({ pa
     }
     requestAnimationFrame(tick)
     await new Promise((res) => setTimeout(res, 300))
-    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit4', bubbles: true }))
+    document.querySelector('[data-testid="export-stl"]').click()
     await new Promise((res) => setTimeout(res, 6000))
     running = false
     return { longest: Math.max(...gaps), sawOverlay, seen }

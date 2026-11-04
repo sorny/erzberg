@@ -148,3 +148,30 @@ describe('atlas', () => {
     expect(html).toContain('600–2001 m')
   })
 })
+
+describe('day and tiles', () => {
+  it('steps the hours of a day, and wants {hour} in each output', async () => {
+    const { parseCli, dayHours, hourLabel } = await import('../../scripts/erzberg.js')
+    const run = parseCli(['day', 'a.tif', '-o', 'f/{hour}.png', '--date', '2026-12-21', '--hours', '8-16', '--step', '2', '--zone', '1'])
+    expect(run.hours).toEqual([8, 10, 12, 14, 16])
+    expect(run).toMatchObject({ date: '2026-12-21', zone: 1 })
+    expect(() => parseCli(['day', 'a.tif', '-o', 'f/x.png'])).toThrow(/\{hour\}/)
+    expect(() => parseCli(['day', 'a.tif', '-o', 'f/{hour}.png', '--hours', '20-6'])).toThrow(/--hours/)
+    expect(() => parseCli(['render', 'a.tif', '-o', 'x.png', '--date', '2026-01-01'])).toThrow(/belong to day/)
+    expect(dayHours(6, 7, 0.25)).toHaveLength(5)
+    expect(hourLabel(13.75)).toBe('13-45')
+  })
+
+  it('writes one folder of tiles over a few zoom levels', async () => {
+    const { parseCli } = await import('../../scripts/erzberg.js')
+    expect(parseCli(['tiles', 'a.tif', '-o', 'out'])).toMatchObject({ dir: 'out', minZoom: 10, maxZoom: 14 })
+    expect(() => parseCli(['tiles', 'a.tif', '-o', 'a', '-o', 'b'])).toThrow(/one folder/)
+    expect(() => parseCli(['tiles', 'a.tif', '-o', 'a', '--zoom', '2-18'])).toThrow(/at most 8/)
+  })
+
+  it('takes the new model and map outputs', async () => {
+    const { parseCli } = await import('../../scripts/erzberg.js')
+    expect(parseCli(['render', 'a.tif', '-o', 'm.glb', '-o', 'm.3mf', '-o', 'l.geojson']).outputs.map((o) => o.kind))
+      .toEqual(['glb', '3mf', 'geojson'])
+  })
+})

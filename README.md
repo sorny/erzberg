@@ -116,7 +116,7 @@ different style from the grid, then tune it.
 | Source | Notes |
 |---|---|
 | **PNG** | 8-bit or 16-bit, decoded natively. Alpha is NoData. |
-| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. A file with several bands shows each band's range and preview, so you pick the elevation band. |
+| **GeoTIFF** | Real elevation. The panel states the file's CRS, honours its NoData value, and suggests a vertical exaggeration from the pixel size. A file with several bands shows each band's range and preview, so you pick the elevation band. *Drape* and *Mask* under a band use it as the imagery drape or as a new mask. |
 | **Audio** | MP3, WAV, OGG or M4A, analysed into a spectrogram that drives the terrain. See [Soundscapes](#soundscapes). |
 | **GPX / GeoJSON / KML / Shapefile** | Tracks, points, lines and polygons, draped over a georeferenced raster. A Shapefile comes as a zip. Its `.prj` is read, so a national grid is placed with the same datum shift as a raster. |
 | **Fetch** | Type a place. Nominatim resolves it, and a map lets you place and size the box before you download. The panel states the zoom, tile count, raster size and metres per pixel first. Tiles come from Terrain Tiles on AWS Open Data. |
@@ -370,6 +370,13 @@ is its own layer and pen, and follows the ground under it.
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. It skips modes that need a file, a picked point, a date
 or a georeference. ↩ and ↪ step through the last 50 seeds of the session.
+*Keep* puts the current look on the *My presets* shelf in this browser, with a
+thumbnail. *Shelf ⬇* and *Shelf ⬆* save and open the whole shelf as one file.
+
+**Project file.** *Output › Project › Save* writes one `.erzberg` file with the
+terrain, its Edit Mode clip and georeference, the look and camera, the vectors,
+the text, the masks, the land cover and the imagery. Open it, or drop it, and
+the plate comes back exactly.
 
 **Seeds.** Stipple, Rock & Scree, Flashbulb, Halation, Reticulation, Single Line
 and Roughness Mesh carry a seed. The same seed gives the same pattern.
@@ -437,12 +444,14 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 | Format | Notes |
 |---|---|
 | **SVG** | Software Z-buffer with terrain occlusion. One Inkscape layer per mode and per vector layer. Exact dash patterns. Shows progress and can be cancelled. |
-| **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. |
+| **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
 | **STL** | Watertight mesh. A vector layer with **STL ribbon** gets a second solid for multicolour printing. |
+| **glTF, 3MF** | The STL's solid with the plate on top, seen from above: as a texture in a `.glb` for Blender and web viewers, as vertex colours in a `.3mf` for colour printers. |
+| **GeoJSON** | The ground marks as lines in the raster's projection, with layer, pen name and height in metres. Charts, pillars and the panorama are left out. |
 | **Heightmap PNG** | The processed greyscale raster. |
 | **GeoTIFF** | The raster in metres as 32-bit floats, with its projection, extent and NoData, after Edit Mode crops and erosion. It reopens in QGIS or here. |
 | **WebM** | A recording of the live canvas. |
-| **Profile SVG** | The elevation profile as a chart. |
+| **Profile SVG** | The elevation profile as a chart. *Elevation profile* on a GPX layer, or on a layer of one line, charts the route with its length, ascent and descent. |
 
 Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 `graz-alpha.png`, `graz.stl` and so on.
@@ -453,7 +462,13 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 - **Paper frame.** ISO A, US sizes, common ratios or your own, with a margin.
   The SVG is cut at the frame, not clipped.
 - **Scale bar and north arrow**, measured from the raster's bounding box. With a
-  sheet width in mm, the panel prints the map ratio.
+  sheet width in mm, the panel prints the map ratio. *Magnetic north* turns the
+  arrow to where a compass points and letters the declination, from the World
+  Magnetic Model 2025.
+- **Title block** with the facts the plate has: projection, contour interval,
+  height range, source and date. Each line can be switched off.
+- **Grid** ticks or lines along the sheet edge, in the raster's grid or in
+  degrees, in a plan view.
 - **Preflight** reports the stroke count, pen count, ink length, pen-up travel
   and an estimated plot time.
 - **Plotter order** re-orders strokes inside each pen layer. On the sample plate
@@ -466,7 +481,9 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 - **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o
   graz.svg` renders a plate without the panel, through the same app in headless
   Chrome. Draw modes, presets and any parameter are arguments. `atlas` renders
-  one plate per feature of a GeoJSON file, all in one style.
+  one plate per feature of a GeoJSON file, all in one style. `day` steps the
+  real sun through a date, and `tiles` writes XYZ web map tiles. The `python/`
+  folder holds a Python package that calls the command line from a notebook.
   → [Command line](docs/CLI.md)
 
 ---
@@ -488,7 +505,7 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
 | `\` | Show or hide the panel |
 | `/` | Find a control |
 | `[` `]` | Previous or next stage |
-| `1` – `7` | Export SVG, PNG, PNG α, STL, WebM, Heightmap, GeoTIFF |
+| `1` | Export SVG. The other files have buttons under Output › Other files. |
 | `⌘Z` / `Ctrl+Z` | Undo |
 | `⌘⇧Z` / `Ctrl+Y` | Redo |
 | `?` | Show this table in the app |

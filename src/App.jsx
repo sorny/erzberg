@@ -24,16 +24,21 @@ import { useVectorIcons } from './hooks/useVectorIcons'
 import { useVectorLabels } from './hooks/useVectorLabels'
 import { useTextLayers } from './hooks/useTextLayers'
 import { useHistory } from './hooks/useHistory'
+import { usePresetShelf } from './hooks/usePresetShelf'
 import { useDraftHistory } from './hooks/useDraftHistory'
 import { adoptTextLayers } from './utils/textLayers'
 import { useContourLabels } from './hooks/useContourLabels'
 import { useScaleLabels } from './hooks/useScaleLabels'
 import { flattenSvg } from './utils/svgFlatten'
-import { useStore } from './store/useStore'
+import { clipLikeRaster, useStore } from './store/useStore'
 import { holdCamera } from './utils/viewLock'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
 import { clearSession, loadSession, saveSession, withDefaults } from './utils/session'
-import { bboxToWgs84, featureCoverage } from './utils/geoCoords'
+import { bboxToWgs84, featureCoverage, geoToPixel, gridValueToMetres, isProjectable } from './utils/geoCoords'
+import { layerStyle } from './utils/builders/shared'
+import { sheetFacts } from './utils/sheetFacts'
+// Static: the profile chart imports it at load anyway.
+import { routeProfile } from './utils/routeProfile'
 import { isDarkBackground } from './utils/colorUtils'
 import { gradientTexture, multipliesOnPaper } from './utils/bgTexture'
 import { needsSurfaceShading } from './utils/geometryBuilders'
@@ -53,7 +58,9 @@ import { AUTOMATION, useAutomation } from './automation'
 
 /** Every tweakable key, from the index that already enumerates them. */
 const PARAM_KEYS = [...GROUP_OF.keys()]
-import { buildPreset, migrateOcclusion, migrateStrokeBias, readPresetFile } from './utils/presetFile'
+import { buildPreset, migrateOcclusion, migrateStrokeBias, parsePreset, readPresetFile } from './utils/presetFile'
+import { isProjectFile, readProject, writeProject } from './utils/projectFile'
+import { ZIP_CANCELLED } from './utils/zipWrite'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, effectiveClasses, parseCover, suggestInks } from './utils/coverPlate'
 import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, uniqueMaskName } from './utils/maskLayers'
@@ -170,6 +177,11 @@ const SAVE_MAX_WAIT_MS = 2000
 const EXPORT_KINDS = {
   svg:      ['svg', 'SVG'],
   stl:      ['stl', 'STL'],
+  glb:      ['glb', 'glTF'],
+  '3mf':    ['3mf', '3MF'],
+  project:  ['erzberg', 'Project'],
+  // Not an export, but the same overlay: a big project takes seconds to read.
+  projectOpen: [null, 'Project'],
   png:      ['png', 'PNG'],
   // `-alpha.png`, not `.alpha.png`: this string is joined to the base name and
   // has to match what pngExport.js actually writes, or the one message whose
@@ -460,6 +472,7 @@ export default function App() {
   // moment a clip existed.
   const geoTiffBboxSrc    = useStore((s) => s.geoTiffBboxSrc)
   const geoTiffCRSName    = useStore((s) => s.geoTiffCRSName)
+  const terrainProvenance = useStore((s) => s.terrainProvenance)
 
   const soundscape = useSoundscape()
   // The flock's own track. Separate from Soundscapes on purpose: that hook's job
@@ -961,6 +974,36 @@ export default function App() {
     setToast({ msg, seq: ++toastSeq.current, ...opts })
   }, [])
 
+  /**
+   * The profile along a line layer: a GPX track's segments in order, or the one
+   * line of a layer. Sampled on the raster as the click profile is, with the
+   * route's length, ascent and descent beside it.
+   */
+  const profileRoute = useCallback(async (layer) => {
+    const src = useStore.getState().vectorSources.find((x) => x.id === layer.sourceId)
+    const b = src?.buckets.find((x) => x.key === layer.bucket)
+    if (!b || !heightmapPixels) return
+    // The bucket's coordinates are already the rings end to end.
+    const lonLat = b.coords.subarray(b.rings[0] * 2, b.rings[b.rings.length - 1] * 2)
+    const w = heightmapWidth, h = heightmapHeight
+    const valueAt = (lat, lon) => {
+      const px = geoToPixel(lat, lon, geoTiffBbox, geoTiffCRS, w, h)
+      if (!px || px.col < 0 || px.row < 0 || px.col > w - 1 || px.row > h - 1) return null
+      const x0 = Math.floor(px.col), y0 = Math.floor(px.row)
+      const x1 = Math.min(x0 + 1, w - 1), y1 = Math.min(y0 + 1, h - 1)
+      const dx = px.col - x0, dy = px.row - y0
+      return heightmapPixels[y0 * w + x0] * (1 - dx) * (1 - dy) + heightmapPixels[y0 * w + x1] * dx * (1 - dy)
+           + heightmapPixels[y1 * w + x0] * (1 - dx) * dy + heightmapPixels[y1 * w + x1] * dx * dy
+    }
+    const toMetres = (v) => geoTiffElevMin != null ? geoTiffElevMin + v * (geoTiffElevMax - geoTiffElevMin) : v * 100
+    const r = routeProfile(lonLat, valueAt, toMetres)
+    if (!r) { notify(`${layer.name} does not cross this terrain.`); return }
+    setProfileData({ points: r.points, elevMin: r.elevMin, elevMax: r.elevMax,
+      route: { name: layer.name, distanceM: r.distanceM, ascent: r.ascent, descent: r.descent,
+               metres: geoTiffElevMin != null, off: r.off } })
+    setProfileAnchors(null)
+  }, [heightmapPixels, heightmapWidth, heightmapHeight, geoTiffBbox, geoTiffCRS, geoTiffElevMin, geoTiffElevMax, notify])
+
   // The lock is switched by V as well, with the panel shut, so it says so.
   const lockSeen = useRef(viewLocked)
   useEffect(() => {
@@ -1130,6 +1173,45 @@ export default function App() {
   }, [srcWidth, srcHeight, srcMasks, setMasks, notify, showError])
 
   /**
+   * A band of the open GeoTIFF as the imagery drape or as a mask, not as the
+   * ground. See utils/bandUse.js.
+   */
+  const sendBand = useCallback(async (band, target) => {
+    const st = useStore.getState()
+    const file = st.geoTiffBands?.file
+    if (!file || !st.srcWidth) return
+    if (target === 'mask' && srcMasks.length >= MAX_MASKS) {
+      showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
+      return
+    }
+    try {
+      const { readBand, bandMask, bandRgba } = await import('./utils/bandUse')
+      const { values } = await readBand(file, band, st.srcWidth, st.srcHeight)
+      const label = `Band ${band + 1} of ${file.name}`
+      if (target === 'mask') {
+        const mask = createMask(st.srcWidth, st.srcHeight, srcMasks.length, uniqueMaskName(`Band ${band + 1}`, srcMasks))
+        mask.data = bandMask(values)
+        setMasks([...srcMasks, mask])
+        setStudioMaskId(mask.id)
+        notify(`${label} is a mask, on where it is above the middle of its range. Refine it in Mask Studio.`)
+        return
+      }
+      const clipped = clipLikeRaster(st, values)
+      const rgba = bandRgba(clipped.values)
+      const canvas = document.createElement('canvas')
+      canvas.width = clipped.width
+      canvas.height = clipped.height
+      canvas.getContext('2d').putImageData(new ImageData(rgba, clipped.width, clipped.height), 0, 0)
+      setImagery({ rgba, width: clipped.width, height: clipped.height, url: canvas.toDataURL('image/png'),
+                   date: `Band ${band + 1}`, cloud: null, credit: null, source: label })
+      setStyle((s) => (s.showImagery ? s : { ...s, showImagery: true }))
+      notify(`${label} is the imagery drape.`)
+    } catch (err) {
+      showError(`Could not read band ${band + 1}: ${err?.message ?? err}`)
+    }
+  }, [srcMasks, setMasks, setImagery, notify, showError])
+
+  /**
    * Satellite imagery for the extent on screen.
    *
    * On a press and never otherwise, like every other thing here that talks to a
@@ -1289,9 +1371,12 @@ export default function App() {
         `${name} export failed\n${failure?.stack || failure?.message || 'No error detail.'}\nerzberg ${version}`),
     })
     else if (status === 'empty')  notify(`Nothing to write — the scene has no geometry for ${name}.`)
+    // An opened project says so itself, with the file's name.
+    else if (status === 'opened') { /* nothing more to say */ }
     else if (status === 'measured' || ext === null) notify('Preflight done — see the Export section.')
     else {
-      const base = ext === 'stl' ? exportBaseName : plateBaseName
+      // The solids are named after the terrain, as the STL is; the plates after the look too.
+      const base = ['stl', 'glb', '3mf'].includes(ext) ? exportBaseName : plateBaseName
       notify(`Wrote ${base}${ext.startsWith('-') ? '' : '.'}${ext}`)
     }
   }, [notify, exportBaseName, plateBaseName])
@@ -1315,6 +1400,13 @@ export default function App() {
 
   const beginSvgExport = useCallback(() => {
     if (beginExport('svg')) setSvgTrigger(n => n + 1)
+  }, [beginExport])
+
+  // glTF and 3MF: the scene renders the plate from above, so it does the work.
+  const [modelTrigger, setModelTrigger] = useState(null)
+  const planCaptureRef = useRef(null)
+  const beginModelExport = useCallback((kind) => {
+    if (beginExport(kind)) setModelTrigger({ kind, ts: Date.now() })
   }, [beginExport])
 
   /**
@@ -1666,9 +1758,11 @@ export default function App() {
 
   const loadPresetFromFile = useCallback(() => {
     const input = Object.assign(document.createElement('input'),
-      { type:'file', accept:'.json,.png,.svg' })
+      { type:'file', accept:'.json,.png,.svg,.erzberg' })
     input.onchange = async (e) => {
       const file = e.target.files[0]; if (!file) return
+      // A project holds a look too, and much more: Open takes it whole.
+      if (isProjectFile(file.name)) { openProjectRef.current?.(file); return }
       // Everything that fails to load says so in the banner at the foot of the
       // screen; a system dialog on top of a dark tool broke the frame and said
       // nothing about what to check.
@@ -1687,6 +1781,108 @@ export default function App() {
     }
     input.click()
   }, [applyPreset, showError])
+  // Defined below, after the project helpers it needs.
+  const openProjectRef = useRef(null)
+
+  // My presets. The thumbnail is drawn from the live canvas: the orbit
+  // controls' element when it is the canvas, or the one three.js marks as its own.
+  const canvasRef = useMemo(() => ({
+    get current() {
+      const el = orbitRef.current?.domElement
+      return el instanceof HTMLCanvasElement ? el : document.querySelector('canvas[data-engine]')
+    },
+  }), [])
+  const presetShelf = usePresetShelf({ exportPreset, paper: style.bgColor, canvasRef, applyPreset, notify })
+
+  // ── The project file ──────────────────────────────────────────────────────
+  /**
+   * Everything a plate is drawn from, in one `.erzberg` file: the source
+   * raster as loaded and its clip, the georeference, the look with its camera,
+   * the vectors, the text, the masks, the land cover and the imagery. See
+   * utils/projectFile.js for how it is packed.
+   */
+  const saveProject = useCallback(async () => {
+    const st = useStore.getState()
+    if (!st.srcPixels) { notify('There is no terrain to save yet.'); return }
+    // The export overlay, with progress and Cancel: a big raster takes seconds
+    // to compress, and the page looked frozen while it did.
+    if (!beginExport('project')) return
+    let status = 'done', failure = null
+    try {
+      handleExportProgress(0, 'Packing the project…')
+      const bytes = await writeProject({
+        terrain: {
+          srcPixels: st.srcPixels, srcMask: st.srcMask, srcWidth: st.srcWidth, srcHeight: st.srcHeight,
+          filename: st.heightmapFilename, edit: st.edit,
+          elevMin: st.geoTiffElevMin, elevMax: st.geoTiffElevMax, bboxSrc: st.geoTiffBboxSrc,
+          crs: st.geoTiffCRS, crsName: st.geoTiffCRSName, provenance: st.terrainProvenance,
+          baseElevScale, baseZoom,
+        },
+        preset: buildPreset({ terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers }),
+        vectorLayers, textLayers,
+        vectorSources: st.vectorSources, masks: st.srcMasks, cover: st.cover, imagery: st.imagery,
+      }, {
+        onProgress: (f) => handleExportProgress(f, 'Packing the project…'),
+        shouldCancel: exportCancelRef.current,
+      })
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }))
+      const a = Object.assign(document.createElement('a'), { href: url, download: `${plateBaseName}.erzberg` })
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      if (err === ZIP_CANCELLED) status = 'cancelled'
+      else { status = 'failed'; failure = err }
+    } finally {
+      finishExport(status, failure)
+    }
+  }, [terrain, style, points, view, gradientStops, bgGradientStops, vectorLayers, textLayers,
+      baseElevScale, baseZoom, plateBaseName, notify, beginExport, finishExport, handleExportProgress])
+
+  /** Put a project back: the ground first, then the look and the layers over it. */
+  const openProject = useCallback(async (file) => {
+    if (!beginExport('projectOpen')) return
+    let d
+    try {
+      handleExportProgress(0, `Opening ${file.name}…`)
+      d = await readProject(await file.arrayBuffer(), { onProgress: (f) => handleExportProgress(f, `Opening ${file.name}…`) })
+    } catch (err) {
+      finishExport('opened')
+      showError(`Could not open ${file.name}: ${err?.message ?? err}`)
+      return
+    }
+    finishExport('opened')
+    if (!d?.terrain?.srcPixels) { showError(`${file.name} is not an erzberg project.`); return }
+    soundscape.release()
+    tagHistory(`Project · ${file.name.replace(/\.[^.]+$/, '')}`)
+    const st = useStore.getState()
+    const t = d.terrain
+    st.setGeoTiffMeta(t.elevMin ?? null, t.elevMax ?? null, t.bboxSrc ?? null, t.crs ?? null, t.crsName ?? null)
+    st.setTerrainProvenance(t.provenance ?? null)
+    st.setHeightmap(t.srcPixels, t.srcMask ?? null, t.srcWidth, t.srcHeight, t.filename || file.name)
+    // After the raster: a new raster drops the clip, the masks, the cover and the imagery.
+    if (t.edit) st.setEdit(t.edit)
+    st.setMasks(d.masks ?? [])
+    st.setCover(d.cover ?? null)
+    st.setImagery(d.imagery ?? null)
+    st.setVectorSources(d.vectorSources ?? [])
+    setBaseElevScale(t.baseElevScale ?? 1)
+    setBaseZoom(t.baseZoom ?? 1)
+    // Through the preset reader, so a project from an older format is migrated.
+    const look = parsePreset(JSON.stringify(d.preset ?? {}))
+    if (look) applyPreset(look, null)
+    setVectorLayers(d.vectorLayers ?? [])
+    setTextLayers(adoptTextLayers(d.textLayers ?? []))
+    notify(`Opened ${file.name}`)
+  }, [soundscape, tagHistory, applyPreset, showError, notify, beginExport, finishExport, handleExportProgress])
+
+  openProjectRef.current = openProject
+  const openProjectFromPicker = useCallback(() => {
+    const input = Object.assign(document.createElement('input'), { type: 'file', accept: '.erzberg' })
+    input.onchange = (e) => { const file = e.target.files[0]; if (file) openProject(file) }
+    input.click()
+  }, [openProject])
 
   // ── Keyboard bridge for Controls.jsx ───
   const getParams = useCallback(
@@ -1895,6 +2091,7 @@ export default function App() {
   const handleDroppedFile = useCallback(async (file) => {
     const routes = classifyDrop(file.name)
     for (const route of routes) {
+      if (route === 'project') { await openProject(file); return }
       if (route === 'preset') {
         const d = await readPresetFile(file).catch(() => null)
         if (!d) continue
@@ -1943,7 +2140,7 @@ export default function App() {
     }
     showError(explainDrop(file.name, routes))
   }, [applyPreset, load, loadGeoTiff, afterRaster, afterGeoTiff, adoptVectorSource,
-      adoptCover, soundscape, showError, notify, importVectorFile])
+      adoptCover, soundscape, showError, notify, importVectorFile, openProject])
 
   /**
    * The highlight, and the two events that are harder than they look.
@@ -2382,14 +2579,6 @@ export default function App() {
   }, [surfaceGeo, terrainData, vectorSources, geoTiffBbox, geoTiffCRS, p, exportBaseName,
       beginExport, finishExport, handleExportProgress])
 
-  // The page as a script drives it. Installed only under `?automation`; see
-  // src/automation.js. Below every callback it hands on, so none is undefined.
-  automationDoneRef.current = useAutomation({
-    p, lineGeo, isComputing, isLoading, lastBuildMs, loadError, plotStats, externalPresets,
-    heightmapFilename, heightmapWidth, heightmapHeight,
-    handleDroppedFile, applyPreset, setParams, fetchTerrainAndFit, loadGeoTiffArea,
-    beginSvgExport, beginPngExport, beginPreflight, handleStl,
-  })
 
   const handleHeightmapExport = useCallback(() => {
     const written = exportHeightmap(terrainData, exportBaseName)
@@ -2412,6 +2601,60 @@ export default function App() {
       notify(`Could not write the GeoTIFF: ${err?.message ?? err}`)
     }
   }, [exportBaseName, notify])
+
+  /**
+   * The ground marks as GeoJSON, in the raster's own projection. Heights come
+   * from the raster under each point, so a contour carries its level.
+   */
+  // The sheet's own facts, for the title block, magnetic north and a grid in
+  // degrees. Rebuilt only when one of the facts or switches changes.
+  const sheet = useMemo(() => sheetFacts(p, {
+    filename: heightmapFilename, crs: geoTiffCRS, crsName: geoTiffCRSName, provenance: terrainProvenance,
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [view.frameTitle, view.frameTitleText, view.frameTitleFacts, view.frameNorth, view.frameMagnetic,
+       view.frameGrid, view.frameGridUnits, style.enabledContours, style.intervalContours, p.elevScale,
+       terrain.blackPoint, terrain.whitePoint, geoTiffBbox, geoTiffCRS, geoTiffCRSName,
+       geoTiffElevMin, geoTiffElevMax, heightmapFilename, terrainProvenance])
+
+  const handleGeoJsonExport = useCallback(async () => {
+    const st = useStore.getState()
+    if (!terrainData || !st.geoTiffBbox || !isProjectable(st.geoTiffCRS, st.geoTiffBbox)) {
+      notify('GeoJSON needs a georeferenced raster. Load a GeoTIFF or fetch terrain first.')
+      return 'failed'
+    }
+    const { linesToGeoJson } = await import('./utils/geoJsonExport')
+    const { heightmapPixels: px, heightmapWidth: w, heightmapHeight: h } = st
+    const metresAt = (col, row) => {
+      const c = Math.min(w - 1, Math.max(0, Math.round(col))), r = Math.min(h - 1, Math.max(0, Math.round(row)))
+      if (st.nodataMask && !st.nodataMask[r * w + c]) return null
+      return gridValueToMetres(px[r * w + c], st.geoTiffElevMin, st.geoTiffElevMax)
+    }
+    const { geojson, lines, layers } = linesToGeoJson(lineGeo, {
+      halfW: terrainData.halfW, halfH: terrainData.halfH,
+      peakOff: Math.floor(terrain.gridOffsetX ?? 0), lineOff: Math.floor(terrain.gridOffsetY ?? 0),
+      width: w, height: h, bbox: st.geoTiffBbox, crs: st.geoTiffCRS,
+      metresAt, nameOf: (id) => layerStyle(id, p).name,
+    })
+    if (!lines) { notify('No ground marks to write. Charts, pillars and the panorama are not map data.'); return 'empty' }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(geojson)], { type: 'application/geo+json' }))
+    const a = Object.assign(document.createElement('a'), { href: url, download: `${plateBaseName}.geojson` })
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    notify(`Wrote ${plateBaseName}.geojson: ${lines.toLocaleString()} lines in ${layers} layer${layers === 1 ? '' : 's'}`)
+    return 'done'
+  }, [terrainData, lineGeo, terrain.gridOffsetX, terrain.gridOffsetY, p, plateBaseName, notify])
+
+  // The page as a script drives it. Installed only under `?automation`; see
+  // src/automation.js. Below every callback it hands on, so none is undefined.
+  automationDoneRef.current = useAutomation({
+    p, lineGeo, isComputing, isLoading, lastBuildMs, loadError, plotStats, externalPresets,
+    heightmapFilename, heightmapWidth, heightmapHeight,
+    handleDroppedFile, applyPreset, setParams, fetchTerrainAndFit, loadGeoTiffArea,
+    beginSvgExport, beginPngExport, beginPreflight, handleStl, beginModelExport, planCaptureRef, handleGeoJsonExport,
+    geoTiffBbox, geoTiffCRS, terrainGrid: { gridOffsetX: terrain.gridOffsetX, gridOffsetY: terrain.gridOffsetY },
+  })
 
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
@@ -2523,14 +2766,8 @@ export default function App() {
       if (e.code === 'KeyE')   openEditor()
       // A slider with focus ignores digits, so a stray one there was a whole
       // export: the panel is where hands rest, and the files stay a click away.
-      if (/^Digit[1-7]$/.test(e.code) && e.target?.type === 'range') return
+      if (e.code === 'Digit1' && e.target?.type === 'range') return
       if (e.code === 'Digit1') beginSvgExport()
-      if (e.code === 'Digit2') beginPngExport(false)
-      if (e.code === 'Digit3') beginPngExport(true)
-      if (e.code === 'Digit4') handleStl()
-      if (e.code === 'Digit5') handleWebmToggle()
-      if (e.code === 'Digit6') handleHeightmapExport()
-      if (e.code === 'Digit7') handleGeoTiffExport()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -2613,6 +2850,10 @@ export default function App() {
           webmRecording={webmActive}
           exportBaseName={plateBaseName}
           audioLive={flockAudio.liveRef}
+          sheet={sheet}
+          modelTrigger={modelTrigger}
+          planCaptureRef={planCaptureRef}
+          onModelDone={finishExport}
         />
       </Canvas>
       </div>
@@ -2746,7 +2987,11 @@ export default function App() {
         onStl={handleStl}
         onHeightmap={handleHeightmapExport}
         onGeoTiff={handleGeoTiffExport}
+        onGeoJson={handleGeoJsonExport}
+        onModel={beginModelExport}
+        onRouteProfile={profileRoute}
         onGeoTiffBand={loadGeoTiffBand}
+        onSendBand={sendBand}
         onWebmToggle={handleWebmToggle}
         webmActive={webmActive}
         webmDuration={webmDuration}  setWebmDuration={setWebmDuration}
@@ -2754,6 +2999,9 @@ export default function App() {
         plotStats={plotStats}
         onSavePreset={savePreset}
         onLoadPreset={loadPresetFromFile}
+        presetShelf={presetShelf}
+        onSaveProject={saveProject}
+        onOpenProject={openProjectFromPicker}
         externalPresets={externalPresets}
         onReset={handleResetAll}
         onResetSection={resetSection}
@@ -2783,7 +3031,7 @@ export default function App() {
       {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} rightInset={viewInset} />}
       {/* Ink, unlike the frame above it: a recording is a picture of the plate,
           so the marks stay while the veiled frame does not. */}
-      <SheetMarks view={view} rightInset={viewInset} />
+      <SheetMarks view={view} sheet={sheet} rightInset={viewInset} />
       {!webmActive && <FeatureTooltip layers={vectorLayers} rightInset={viewInset} />}
 
       {/* ── WebM REC badge ───────────────────────────────────────────────── */}
@@ -2872,6 +3120,7 @@ export default function App() {
           geoTiffElevMin={geoTiffElevMin}
           geoTiffElevMax={geoTiffElevMax}
           baseName={exportBaseName}
+          route={profileData.route ?? null}
         />
       )}
 

@@ -18,6 +18,11 @@ import { DRAW_MODES } from './utils/drawModes'
 import { coerceParams, modePatch, resolveModes } from './utils/paramCoerce'
 import { readPresetFile } from './utils/presetFile'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from './defaults'
+import { bboxToWgs84, projectWgs84 } from './utils/geoCoords'
+import { centreLatLon } from './utils/sheetFacts'
+import { renderTile, tileMetres, tilesFor } from './utils/webTiles'
+// Static: the panel imports it at load anyway, so a dynamic import split nothing.
+import { fetchDem } from './utils/demFetch'
 
 export const AUTOMATION = typeof location !== 'undefined'
   && new URLSearchParams(location.search).has('automation')
@@ -32,7 +37,7 @@ export const AUTOMATION = typeof location !== 'undefined'
  */
 export const drawn = { mounted: false, lineGeo: null }
 
-const EXPORT_KIND = { svg: 'svg', png: 'png', pngAlpha: 'pngAlpha', stl: 'stl' }
+const EXPORT_KIND = { svg: 'svg', png: 'png', pngAlpha: 'pngAlpha', stl: 'stl', glb: 'glb', '3mf': '3mf', geojson: 'geojson' }
 
 const frame = () => new Promise((r) => requestAnimationFrame(() => r()))
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
@@ -118,7 +123,6 @@ export function useAutomation(live) {
        * Fetch section uses. `name` names the plate and its files.
        */
       async fetchArea(name, area) {
-        const { fetchDem } = await import('./utils/demFetch')
         const dem = await fetchDem(area)
         L().fetchTerrainAndFit(dem, name)
         await settle()
@@ -167,6 +171,9 @@ export function useAutomation(live) {
         const s = L()
         if (k === 'svg') return run(k, () => s.beginSvgExport())
         if (k === 'stl') return run(k, () => s.handleStl())
+        if (k === 'glb' || k === '3mf') return run(k, () => s.beginModelExport(k))
+        // Written straight away, not through the export overlay.
+        if (k === 'geojson') return s.handleGeoJsonExport()
         return run(k, () => s.beginPngExport(k === 'pngAlpha'))
       },
 
@@ -175,6 +182,76 @@ export function useAutomation(live) {
         await run('preflight', () => L().beginPreflight())
         await frame(); await frame()
         return L().plotStats ?? null
+      },
+
+      /** The current values of some parameters. */
+      get(keys) {
+        const p = L().p
+        return Object.fromEntries(keys.map((k) => [k, p[k]]))
+      },
+
+      /** The plate's centre as [lat, lon], or null without a georeference. */
+      centre() {
+        const { geoTiffBbox, geoTiffCRS } = L()
+        return centreLatLon(geoTiffBbox, geoTiffCRS)
+      },
+
+      /**
+       * The plate as Web Mercator tiles from zoom `minZoom` to `maxZoom`, each
+       * `{ z, x, y, png }` with the PNG as a data URL. Empty tiles are left out.
+       * See utils/webTiles.js.
+       */
+      async tiles(minZoom, maxZoom, maxSide = 4096) {
+        const s = L()
+        const bbox = s.geoTiffBbox, crs = s.geoTiffCRS
+        const wgs = bbox && bboxToWgs84(bbox, crs)
+        if (!wgs) throw new Error('tiles need a georeferenced raster')
+        const cap = s.planCaptureRef?.current?.(maxSide, { transparent: true })
+        if (!cap) throw new Error('the plate has no surface to tile')
+        const { canvas, bounds: b, halfW, halfH } = cap
+        const full = { width: canvas.width, height: canvas.height }
+        const W = s.p.imageWidth, H = s.p.imageHeight
+        const kx = (bbox[2] - bbox[0]) / W, ky = (bbox[3] - bbox[1]) / H
+        const peak = Math.floor(s.terrainGrid.gridOffsetX ?? 0), line = Math.floor(s.terrainGrid.gridOffsetY ?? 0)
+        // The raster's grid → world → the picture, the inverse of the mesh layout.
+        const toUnit = (X, Y) => {
+          const wx = (X - bbox[0]) / kx - peak - halfW
+          const sy = -((bbox[3] - Y) / ky - line - halfH)
+          return [(wx - b.minX) / (b.maxX - b.minX), (b.maxY - sy) / (b.maxY - b.minY)]
+        }
+        const pictureMetres = (bbox[2] - bbox[0]) / full.width
+        const midLat = (wgs[1] + wgs[3]) / 2
+        // The picture at a zoom's own scale: a tile far coarser than the
+        // picture would pick one pixel in twenty and lose the thin lines, so it
+        // is shrunk first, by halves, with the browser's smoothing.
+        const pictureFor = (z) => {
+          const want = Math.max(1, Math.round(full.width * Math.min(1, pictureMetres / tileMetres(z, midLat))))
+          let src = canvas
+          while (src.width / 2 >= want) {
+            const half = document.createElement('canvas')
+            half.width = Math.max(1, Math.round(src.width / 2)); half.height = Math.max(1, Math.round(src.height / 2))
+            half.getContext('2d').drawImage(src, 0, 0, half.width, half.height)
+            src = half
+          }
+          return { image: src.getContext('2d').getImageData(0, 0, src.width, src.height).data, width: src.width, height: src.height }
+        }
+        const toCrs = (lat, lon) => projectWgs84(lat, lon, crs)
+        const out = []
+        const tc = document.createElement('canvas')
+        tc.width = tc.height = 256
+        const ctx = tc.getContext('2d')
+        for (let z = minZoom; z <= maxZoom; z++) {
+          const { image, width, height } = pictureFor(z)
+          const toImage = (X, Y) => { const [u, v] = toUnit(X, Y); return [u * width, v * height] }
+          for (const [x, y] of tilesFor(wgs, z)) {
+            const { rgba, empty } = renderTile({ tile: [z, x, y], toCrs, toImage, image, width, height })
+            if (empty) continue
+            ctx.putImageData(new ImageData(rgba, 256, 256), 0, 0)
+            out.push({ z, x, y, png: tc.toDataURL('image/png') })
+          }
+          await frame()
+        }
+        return { tiles: out, bboxWgs84: wgs, pictureMetres }
       },
 
       catalog() {
