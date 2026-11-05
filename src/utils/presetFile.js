@@ -85,6 +85,19 @@ export const PRESET_KEYWORD = 'erzberg:preset'
 export const PRESET_FORMAT = 10
 
 /**
+ * The sheet keys a bundled preset may carry in an optional `sheet` block: the
+ * map elements and the legend. A tile applies style, particles and gradients
+ * and leaves the view alone, so a look that is lettered like a survey sheet
+ * states its marks here. A preset without the block leaves them as they are.
+ */
+const SHEET_KEY = /^(frame(ScaleBar|North|Mark|Magnetic|Title|Grid)|legend)/
+export function presetSheet(sheet) {
+  if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) return null
+  const out = Object.fromEntries(Object.entries(sheet).filter(([k]) => SHEET_KEY.test(k)))
+  return Object.keys(out).length ? out : null
+}
+
+/**
  * The soft inks, as exact inks, for a plate made before format 10. See
  * `softenInks`. A new object comes back.
  */

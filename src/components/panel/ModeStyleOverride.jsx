@@ -331,6 +331,9 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
           <Sub>
             <Tog label="Banded" small help="Steps the gradient into flat bands, as on a printed hypsometric map, rather than a smooth ramp." checked={style[`hypsoBanded${prefix}`]} onChange={v => ss({ [`hypsoBanded${prefix}`]: v })} />
             {style[`hypsoBanded${prefix}`] && <InlineSl label="Band interval" help="The width of one band, as a percentage of the gradient. 10 gives ten bands." min={0.5} max={50} value={style[`hypsoInterval${prefix}`]} onChange={v => ss({ [`hypsoInterval${prefix}`]: v })} />}
+            <Tog label="Soft" small testId={prefix ? `hypso-soft-${prefix}` : undefined}
+              help="Draws the gradient through a film tone curve, which makes its colours lighter and paler. Lines then stand out over a height fill that uses the same gradient."
+              checked={!!style[`hypsoSoft${prefix}`]} onChange={v => ss({ [`hypsoSoft${prefix}`]: v })} />
             {/* The gradient is global (shared by every gradient source and the
                 fill), but it must be editable right where a source picks it —
                 not hidden behind enabling fill in Terrain Style. */}

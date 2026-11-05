@@ -125,6 +125,8 @@ const RENDER_SIDE = [
   // the worker never reads it.
   /^halo[A-Z]/,
   /^(frame|showFrame)/,
+  // The legend: sheet marks drawn from parameters the plate already has.
+  /^legend/,
   // Plotter preflight and pen routing. Read by the SVG exporter alone, and it
   // runs on geometry the worker has already built — a decision about the order
   // strokes come out in cannot change where any of them are.

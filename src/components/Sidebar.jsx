@@ -15,6 +15,7 @@ import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '..
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
 import { GROUP_OF, presetStyle } from '../params'
+import { presetSheet } from '../utils/presetFile'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { loadSingleLineManifest } from '../utils/textGeometry'
 import { GradientPicker } from './GradientPicker'
@@ -23,12 +24,13 @@ import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
 import { PAPERS, frameRect, paperAspect, paperRatioLabel, printPixels } from '../utils/frame'
 import { TITLE_LINES } from '../utils/sheetFacts'
+import { LEGEND_PARTS } from '../utils/legend'
 import { formatClock, zoneForLongitude } from '../utils/solar'
 
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
 import { shadowSun } from '../utils/sunHours'
 import { isDarkBackground } from '../utils/colorUtils'
-import { plotEstimate, recommendPlot } from '../utils/penRoute'
+import { AS_DRAWN, plotEstimate, recommendPlot } from '../utils/penRoute'
 import { DEM_CREDIT, GEOCODER_CREDIT, describeFetch, fetchDem, geocodePlace, padBbox } from '../utils/demFetch'
 import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
@@ -750,6 +752,8 @@ export function Sidebar({
   gradientStops, setGradientStops,
   bgGradientStops, setBgGradientStops,
   heightmapPixels, heightmapFilename,
+  // The legend's entries as App read them from the plate, for the readout.
+  legend,
   textureImage, setTextureImage,
   loadFromPicker, loadGeoTiffFromPicker,
   // Terrain by name: the panel resolves the place and pulls the tiles itself,
@@ -1135,7 +1139,7 @@ export function Sidebar({
     waterFill: false, aspectMap: false, analysis: false,
     localRelief: false, curvShade: false, openness: false, texShade: false, aerial: false, wetness: false, sunTint: false,
     points: false, texture: false, mirror: false, erosion: false, plot: true, export: true,
-    sheetMarks: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
+    sheetMarks: false, legend: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
     satellite: false, masks: false,
   })
@@ -1336,6 +1340,11 @@ export function Sidebar({
     setRecommending(false)
     onPreflight()
   }, [view]) // eslint-disable-line react-hooks/exhaustive-deps
+  const asDrawnPlotValues = () => {
+    recommendStep.current = null
+    setRecommended({ asDrawn: true })
+    sv(AS_DRAWN)
+  }
 
   // The panel's own share of a reset: the preset tiles have to stop pointing at
   // a look the settings no longer hold.
@@ -1548,6 +1557,9 @@ export function Sidebar({
     if (preset.points) setPoints(prev => ({ ...prev, ...preset.points }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
     if (preset.bgGradientStops) setBgGradientStops(preset.bgGradientStops)
+    // The marks and legend, for the few looks that letter the sheet. See presetSheet.
+    const sheet = presetSheet(preset.sheet)
+    if (sheet) setView(prev => ({ ...prev, ...sheet }))
     syncSectionsToStyle(preset.style)
     setLastPreset(name)
     setPresetEdited(false)
@@ -2618,7 +2630,7 @@ export function Sidebar({
                   options={[['Lines', 'lines'], ['Ground', 'ground']]}
                   value={style.occludeBy ?? 'lines'} onChange={v => ss({ occludeBy: v })} />
                 <InlineSl label="Depth tolerance" help="How far behind the ground a line can be and still show. Higher values let lines peek through the surface: the terrain is pushed further back in the depth buffer." min={0} max={200} step={0.1} value={style.occlusionBias} onChange={v => ss({ occlusionBias: v })} fmt={v => v.toFixed(1)} />
-                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. At 0, strokes on slopes seen at a low angle come out thinner. Older plates open at 0, so they look as they did." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v}×` : 'off')} />
+                <InlineSl label="Stroke depth bias" testId="stroke-depth-bias" help="Lifts each stroke toward the camera by this many stroke widths, in depth only, so a stroke on a steep slope keeps its full width in front of the terrain. It applies where the terrain hides lines: with a fill on, or with the Ground occluder. At 0, strokes on slopes seen at a low angle come out thinner." min={0} max={3} step={0.25} value={style.strokeDepthBias ?? 0} onChange={v => ss({ strokeDepthBias: v })} fmt={v => (v > 0 ? `${v}×` : 'off')} />
                 <InlineSl label="Hidden opacity" help="Opacity of lines hidden behind mountains. 0% = hidden, 100% = fully visible." min={0} max={1} step={0.01} value={style.occlusionOpacity} onChange={v => ss({ occlusionOpacity: v })} fmt={v => Math.round(v*100)+'%'} />
               </Sub>
             )}
@@ -2858,7 +2870,7 @@ export function Sidebar({
             {(
               <Sub>
                 <InlineSl label="Opacity" help="Blend strength of slope colours over the fill." min={0} max={1} step={0.01} value={style.slopeShadeOpacity} onChange={v => ss({ slopeShadeOpacity: v })} fmt={v => Math.round(v * 100) + '%'} />
-                <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off reads the slope from the normal as drawn, so it moves with the height slider. Older plates open with it off, so they look as they did." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
+                <Tog label="True degrees" help="Colour by the slope on the ground, in degrees. Off reads the slope from the normal as drawn, so it moves with the height slider." checked={style.slopeShadeTrue !== false} onChange={v => ss({ slopeShadeTrue: v })} />
                 <ColorRow label="Flat colour" value={style.slopeColorLow} onChange={v => ss({ slopeColorLow: v })} />
                 <ColorRow label="Steep colour" value={style.slopeColorHigh} onChange={v => ss({ slopeColorHigh: v })} />
                 {style.slopeShadeTrue !== false && (<>
@@ -3083,6 +3095,68 @@ export function Sidebar({
             singleLineFonts={singleLineFonts}
             viewTilt={view.tilt} viewSpin={view.rotation}
           />
+
+          {/* ── The legend ────────────────────────────────────────────────
+              What each colour and line stands for, read from the plate: the
+              ramps the layers draw with, the class inks, the surface tints and
+              each layer's own ink. Drawn with the sheet marks, so the viewport,
+              the PNG and the SVG show the same one. See utils/legend.js. */}
+          <Section title="Legend" open={sec.legend} onToggle={() => tog('legend')}
+                   enabled={!!view.legendOn}
+                   blurb="What each colour and line on the plate stands for, in a corner of the sheet.">
+            <Tog label="Legend" testId="legend-on"
+              help="Lists what the plate draws: a ramp for each colour source a layer uses, with the height range in metres on a georeferenced raster, the inks of Landforms and Land cover, the surface tints, and a line sample for every layer in its own ink. Only what is on screen is listed. It is ink like the scale bar: drawn in the viewport, the PNG and the SVG."
+              checked={!!view.legendOn} onChange={v => sv({ legendOn: v })} />
+            {view.legendOn && (
+              <Sub>
+                <SegRow label="Corner" testIdPrefix="legend-corner"
+                  options={[['↖', 'tl'], ['↗', 'tr'], ['↙', 'bl'], ['↘', 'br']]}
+                  value={view.legendCorner ?? 'bl'} onChange={v => sv({ legendCorner: v })}
+                  help="The corner of the sheet the legend sits in. With the paper frame on, that is the frame's corner. It moves clear of a scale bar, north arrow or title block in the same corner." />
+                {LEGEND_PARTS.map(([key, label]) => {
+                  const on = String(view.legendParts ?? '').split(',').includes(key)
+                  return (
+                    <Tog key={key} label={label} small testId={`legend-part-${key}`} checked={on}
+                      help={{
+                        ramp: 'A stepped ramp for each colour source that a layer or the fill draws with: height, slope or speed. Aspect is shown as four facing directions.',
+                        class: 'The inks of Landforms, and of Land cover with a cover plate loaded, one swatch per class.',
+                        surface: 'The surface tints that are on: slope shading, sun hours, local relief, curvature, wetness and water.',
+                        line: 'One line sample for each draw mode and vector layer that draws in its own ink, with its dash. Contours carry their interval in metres.',
+                      }[key]}
+                      onChange={(v) => {
+                        const set = new Set(String(view.legendParts ?? '').split(',').filter(Boolean))
+                        if (v) set.add(key); else set.delete(key)
+                        sv({ legendParts: LEGEND_PARTS.map(([k]) => k).filter((k) => set.has(k)).join(',') })
+                      }} />
+                  )
+                })}
+                <input data-testid="legend-heading" value={view.legendHeading ?? ''} maxLength={60}
+                  onChange={(e) => sv({ legendHeading: e.target.value })}
+                  placeholder="Heading (none if empty)" aria-label="Legend heading"
+                  style={{ width:'100%', boxSizing:'border-box', fontSize:11, padding:'4px 6px', margin:'2px 0 6px',
+                           background: SUNK, color: TEXT, border:`1px solid ${BORDER}`, borderRadius:3, fontFamily: FONT }} />
+                <InlineSl label="Ramp steps" testId="legend-steps" min={3} max={12} step={1}
+                  help="How many cells a smooth ramp is drawn in. A banded ramp is drawn in its own bands."
+                  value={view.legendSteps ?? 7} onChange={v => sv({ legendSteps: Math.round(v) })} fmt={v => String(Math.round(v))} />
+                <InlineSl label="Size" testId="legend-size" min={0.4} max={3} step={0.05}
+                  value={view.legendScale ?? 1} onChange={v => sv({ legendScale: v })} fmt={v => v.toFixed(2) + '×'} />
+                <Tog label="Capitals" small testId="legend-caps"
+                  help="Letters the titles in capitals, as survey sheets do."
+                  checked={view.legendCaps !== false} onChange={v => sv({ legendCaps: v })} />
+                <Tog label="Box" small testId="legend-box"
+                  help="Draws a rule round the legend."
+                  checked={!!view.legendBox} onChange={v => sv({ legendBox: v })} />
+                <ColorRow label="Ink" testId="legend-ink" value={view.legendInk || view.frameMarkColor || '#000000'}
+                  onChange={v => sv({ legendInk: v })} />
+                <div data-testid="legend-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.6 }}>
+                  {legend?.length
+                    ? legend.map((e) => e.kind === 'ramp' ? `${e.title} ${e.range}` : `${e.title} (${e.items.length})`).join(' · ')
+                    : <span style={{ color: WARN }}>Nothing to explain yet. Colour a layer by height, slope or form, or turn on a group above.</span>}
+                </div>
+                <Note>The typeface is set under Frame › Map Elements.</Note>
+              </Sub>
+            )}
+          </Section>
 
           <Section title="Particles" open={sec.points} onToggle={() => tog('points')} enabled={points.showPoints}
                    blurb="A flock of points over the ground. It can hold still, move, or follow a sound track.">
@@ -3538,10 +3612,14 @@ export function Sidebar({
                 )}
               </Sub>
             )}
-            {(view.frameScaleBar || view.frameNorth || view.frameTitle || (view.frameGrid ?? 'off') !== 'off') && (
+            {(view.frameScaleBar || view.frameNorth || view.frameTitle || view.legendOn || (view.frameGrid ?? 'off') !== 'off') && (
               <Sub>
                 <InlineSl label="Size" min={0.4} max={3} step={0.05} value={view.frameMarkScale ?? 1}
                   onChange={v => sv({ frameMarkScale: v })} fmt={v => v.toFixed(2) + '×'} testId="mark-size" />
+                <SegRow label="Font" testIdPrefix="mark-font"
+                  options={[['Sans', 'sans'], ['Mono', 'mono'], ['Serif', 'serif']]}
+                  value={view.frameMarkFont ?? 'sans'} onChange={v => sv({ frameMarkFont: v })}
+                  help="The typeface of every sheet mark: the scale bar, the arrow, the title block, the coordinates and the legend. Each is a common system font, written into the SVG by name with a generic fallback." />
                 <ColorRow label="Ink" value={view.frameMarkColor ?? '#000000'}
                   onChange={v => sv({ frameMarkColor: v })} testId="mark-color" />
                 {/* What the marks are, and what they are not. The bar is exact
@@ -3600,13 +3678,21 @@ export function Sidebar({
                 help="The width your pen draws on paper. Recommended values reads it to set the clean-up below. The SVG keeps the plate's own stroke widths."
                 min={0.05} max={2} step={0.05} value={view.plotPenMm ?? 0.3}
                 onChange={v => sv({ plotPenMm: v })} fmt={v => v.toFixed(2) + ' mm'} />
-              <Btn block onClick={recommendPlotValues} disabled={recommending} data-testid="plot-recommend" style={{ marginBottom: 4 }}>
-                {recommending ? 'Measuring…' : 'Recommended values'}
-              </Btn>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
+                <Btn onClick={recommendPlotValues} disabled={recommending} data-testid="plot-recommend" style={{ flex: 2 }}>
+                  {recommending ? 'Measuring…' : 'Recommended values'}
+                </Btn>
+                <Btn onClick={asDrawnPlotValues} disabled={recommending} data-testid="plot-as-drawn" style={{ flex: 1 }}
+                  title="Turns plotter order and all clean-up off, and sets passes to 1. The SVG then has the strokes as the plate draws them.">
+                  As drawn
+                </Btn>
+              </div>
               <div data-testid="plot-recommend-note" style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
-                {recommended
+                {recommended?.asDrawn
+                  ? 'Clean-up off. The SVG has the strokes as the plate draws them.'
+                  : recommended
                   ? `Set for a ${recommended.pen.toFixed(2)} mm pen${recommended.dots ? ', min length off: most strokes are shorter than the pen' : ''}.`
-                  : 'Measures the strokes, then sets plotter order and the clean-up from the pen tip.'}
+                  : 'Recommended values measures the strokes, then sets plotter order and the clean-up from the pen tip. As drawn turns them all off.'}
               </div>
               <Tog label="Plotter order" testId="plot-order" small
                 help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."

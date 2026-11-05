@@ -10,6 +10,7 @@
 import { crsDisplayName, metresPerWorldUnit, projectWgs84, unprojectWgs84 } from './geoCoords'
 import { declination, decimalYear, formatDeclination } from './magnetic'
 import { crsAffine, sheetMarks } from './sheetMarks'
+import { legendShapes, markFont } from './legend'
 
 /** The lines the title block can hold, in order, and their panel names. */
 export const TITLE_LINES = [
@@ -97,7 +98,8 @@ export const PLAN_TILT = 6
  *
  * Each measures in its own pixels, so each passes its own `scale` (from
  * `measureScale`) and either its own `project` or an `affine` the viewport
- * measured already. The grid is drawn in a plan view only.
+ * measured already. The grid is drawn in a plan view only. `sheet.legend` is
+ * the entries App reads from the plate (utils/legend.js), laid out here.
  */
 export function marksFor({ p, sheet, width, height, frame, scale, project = null, affine = null, terrain = null }) {
   let grid = null
@@ -109,13 +111,32 @@ export function marksFor({ p, sheet, width, height, frame, scale, project = null
     }))
     if (map) grid = { affine: map, mode: sheet.gridMode, degrees: sheet.degrees, toCrs: sheet.toCrs, toLonLat: sheet.toLonLat }
   }
-  return sheetMarks({
+  const marks = sheetMarks({
     width, height, frame, metresPerPixel: scale?.metresPerPixel, northAngle: scale?.northAngle ?? 0,
     bar: !!p.frameScaleBar, north: !!p.frameNorth, scale: p.frameMarkScale ?? 1,
     title: sheet?.title ?? null, grid, magnetic: sheet?.magnetic ?? null,
   })
+  // The legend goes in after the other marks, clear of the room they hold.
+  const legend = sheet?.legend?.length && width > 0 && height > 0 && legendShapes(sheet.legend, {
+    box: frame ?? { x: 0, y: 0, w: width, h: height },
+    corner: p.legendCorner ?? 'bl', scale: p.legendScale ?? 1, upper: p.legendCaps !== false,
+    boxed: !!p.legendBox, heading: (p.legendHeading ?? '').trim() || null, avoid: marks?.boxes ?? [],
+  })
+  if (!marks && !legend) return null
+  const font = markFont(p.frameMarkFont)
+  if (!legend) return { ...marks, font }
+  const base = marks ?? { lines: [], rects: [], texts: [], distance: null, boxes: [] }
+  // Text in the legend's own ink; the swatches keep theirs.
+  const ink = p.legendInk || null
+  return {
+    ...base, font,
+    rects: [...base.rects, ...legend.rects],
+    lines: [...base.lines, ...legend.lines.map((l) => (l.length < 5 && ink ? [...l, ink] : l))],
+    texts: [...base.texts, ...legend.texts.map((t) => (ink ? { ...t, color: ink } : t))],
+    boxes: [...base.boxes, legend.bounds],
+  }
 }
 
 /** Does the plate want any sheet mark at all? */
 export const wantsSheetMarks = (p) =>
-  !!(p.frameScaleBar || p.frameNorth || p.frameTitle || (p.frameGrid && p.frameGrid !== 'off'))
+  !!(p.frameScaleBar || p.frameNorth || p.frameTitle || p.legendOn || (p.frameGrid && p.frameGrid !== 'off'))

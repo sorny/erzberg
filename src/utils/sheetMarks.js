@@ -124,7 +124,7 @@ export function formatDistance(metres) {
  *                                  north instead, `turn` radians clockwise from
  *                                  grid north, with `label` under it
  * @returns {{lines: number[][], rects: number[][], texts: object[],
- *            distance: number|null}|null}
+ *            distance: number|null, boxes: object[]}|null}
  */
 export function sheetMarks({
   width, height, frame = null, metresPerPixel, northAngle = 0,
@@ -143,8 +143,11 @@ export function sheetMarks({
   const pad = short * 0.05
   const text = Math.max(7, short * 0.018 * scale)
   const lines = [], rects = [], texts = []
+  // The room each mark holds, so a legend can stay out of it.
+  const boxes = []
 
   const titleBox = title?.length ? titleBlock(box, title, pad, text, lines, texts) : null
+  if (titleBox) boxes.push(titleBox)
   if (grid?.affine) gridMarks(box, grid, short, text, lines, texts, titleBox)
 
   // ── The bar ────────────────────────────────────────────────────────────────
@@ -173,6 +176,7 @@ export function sheetMarks({
       lines.push([x, y0, x, y0 - barH * 0.8])
       texts.push({ x, y: y0 - barH * 1.4, text: label, size: text, anchor: t ? 'end' : 'start' })
     }
+    boxes.push({ x: x0, y: y0 - barH * 1.4 - text, w: barW, h: barH * 2.4 + text })
   }
 
   // ── The arrow ──────────────────────────────────────────────────────────────
@@ -203,9 +207,11 @@ export function sheetMarks({
     if (mag && magnetic.label) {
       texts.push({ x: tailX, y: tailY + text * 1.4, text: magnetic.label, size: text * 0.8, anchor: 'middle' })
     }
+    const r = len * 0.5 + text * 1.6
+    boxes.push({ x: cx - r, y: cy - r, w: 2 * r, h: 2 * r + (mag ? text * 1.4 : 0) })
   }
 
-  return { lines, rects, texts, distance }
+  return { lines, rects, texts, distance, boxes }
 }
 
 /**

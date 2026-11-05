@@ -82,8 +82,9 @@ export const SECTION_PARAMS = {
   'Land Cover Data': ['coverInks'],
   // Every mode section lists its own copies, and the list is one key for all.
   'Draw Modes': ['modeCopies'],
-  'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor',
+  'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor', 'frameMarkFont',
     'frameMagnetic', 'frameTitle', 'frameTitleText', 'frameTitleFacts', 'frameGrid', 'frameGridUnits'],
+  'Legend': [/^legend/],
   'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
@@ -111,7 +112,9 @@ export const ALSO_READS = {
   'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm'],
   // The hatch controls show only while a mode that exports filled areas is on.
   'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
-  'Map Elements': ['orthographic', 'plotWidthMm', 'tilt'],
+  'Map Elements': ['orthographic', 'plotWidthMm', 'tilt', 'legendOn'],
+  // The ink falls back to the marks' own.
+  'Legend': ['frameMarkColor'],
   'Image Overlay': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],
   'Camera': ['resolution'],

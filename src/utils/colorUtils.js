@@ -1,3 +1,4 @@
+import { screenInk } from './screenInk'
 /** Parse '#rrggbb' → [r,g,b] in 0–1 range. Cached: computeVertexColor calls this
  *  once per vertex in the geometry worker, almost always with the same few strings. */
 const _hexCache = new Map()
@@ -117,5 +118,7 @@ export function computeVertexColor(normElev, normSlope, aspect, params, speed = 
     val = Math.floor(val * steps) / steps
   }
 
-  return sampleGradient(gradientStops, Math.max(0, Math.min(1, val)))
+  const rgb = sampleGradient(gradientStops, Math.max(0, Math.min(1, val)))
+  // A soft ramp: the colour the old tone curve drew for it. See `hypsoSoft<Id>`.
+  return params.lineSoft ? hexToRgb(screenInk(rgb[0], rgb[1], rgb[2])) : rgb
 }

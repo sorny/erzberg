@@ -1763,12 +1763,13 @@ function sheetMarkGroup(marks, color, vx, vy) {
   const ink = (color || '#000000').toLowerCase()
   const stroke = Math.max(0.4, (marks.texts[0]?.size ?? 12) * 0.08)
   const els = [
-    ...marks.rects.map(([x, y, w, h]) =>
-      `<rect x="${(x - vx).toFixed(1)}" y="${(y - vy).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"/>`),
-    ...marks.lines.map(([x0, y0, x1, y1]) =>
-      `<line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" fill="none" stroke="${ink}" stroke-width="${stroke.toFixed(2)}"/>`),
+    // A legend swatch, sample or label carries its own colour as a fifth element.
+    ...marks.rects.map(([x, y, w, h, c]) =>
+      `<rect x="${(x - vx).toFixed(1)}" y="${(y - vy).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${c ? ` fill="${c.toLowerCase()}"` : ''}/>`),
+    ...marks.lines.map(([x0, y0, x1, y1, c, sw]) =>
+      `<line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" fill="none" stroke="${(c || ink).toLowerCase()}" stroke-width="${(sw ?? stroke).toFixed(2)}"/>`),
     ...marks.texts.map((t) =>
-      `<text x="${(t.x - vx).toFixed(1)}" y="${(t.y - vy).toFixed(1)}" font-family="sans-serif" font-size="${t.size.toFixed(1)}" text-anchor="${t.anchor}" fill="${ink}" stroke="none">${xmlText(t.text)}</text>`),
+      `<text x="${(t.x - vx).toFixed(1)}" y="${(t.y - vy).toFixed(1)}" font-family="${xmlText(marks.font ?? 'sans-serif')}" font-size="${t.size.toFixed(1)}" text-anchor="${t.anchor}" fill="${(t.color || ink).toLowerCase()}" stroke="none">${xmlText(t.text)}</text>`),
   ]
   return [`<g id="layer-sheet-marks" inkscape:groupmode="layer" inkscape:label="Scale and north" fill="${ink}">${els.join('')}</g>`]
 }

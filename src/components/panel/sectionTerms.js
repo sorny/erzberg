@@ -113,6 +113,7 @@ export const SECTION_TERMS = {
   'Masks':            'mask masks paint brush draw stencil region select restrict layer studio import png jpg',
   'Land Cover Data':       'landcover land use class classes mask stencil vegetation forest water rock alphaearth embedding satellite plate ink by class palette colour color swatch pens',
   'Anaglyph':         'anaglyph stereo 3d red cyan glasses depth parallax two pen eyes stereoscopic',
-  'Map Elements':  'scale bar ruler distance metres kilometres north arrow compass bearing magnetic declination grid convergence ratio legend annotation title block coordinates ticks graticule degrees marginalia',
+  'Map Elements':  'scale bar ruler distance metres kilometres north arrow compass bearing magnetic declination grid convergence ratio annotation title block coordinates ticks graticule degrees marginalia font typeface mono',
+  'Legend':        'legend key explanation colours ramp elevation range hypsometric tints swatch classes landforms land cover layers line samples marginalia',
   'Analysis':         'elevation profile cross-section transect chart a b pins',
 }

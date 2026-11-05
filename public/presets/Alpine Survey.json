@@ -285,7 +285,8 @@
         "color": "#c58b33"
       }
     ],
-    "markColorCross": "#ddaf6c"
+    "markColorCross": "#ddaf6c",
+    "hypsoSoftContours": true
   },
   "points": {
     "showPoints": false,

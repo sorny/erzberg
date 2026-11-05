@@ -88,8 +88,8 @@ function printCapture(p, vpW, vpH, maxTex) {
 function shiftMarks(m, dx, dy) {
   return {
     ...m,
-    rects: m.rects.map(([x, y, w, h]) => [x + dx, y + dy, w, h]),
-    lines: m.lines.map(([x0, y0, x1, y1]) => [x0 + dx, y0 + dy, x1 + dx, y1 + dy]),
+    rects: m.rects.map(([x, y, w, h, ...rest]) => [x + dx, y + dy, w, h, ...rest]),
+    lines: m.lines.map(([x0, y0, x1, y1, ...rest]) => [x0 + dx, y0 + dy, x1 + dx, y1 + dy, ...rest]),
     texts: m.texts.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy })),
   }
 }

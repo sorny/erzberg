@@ -280,7 +280,8 @@
         "pos": 1,
         "color": "#ca0006"
       }
-    ]
+    ],
+    "hypsoSoftLines": true
   },
   "points": {
     "showPoints": false,

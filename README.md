@@ -59,7 +59,7 @@ Each sends a place name or a bounding box. None sends a file or needs a key.
   </tr>
 </table>
 
-<sub>Six of the 86 bundled presets, rendered by the app's own PNG exporter from
+<sub>Six of the 87 bundled presets, rendered by the app's own PNG exporter from
 the sample heightmap.</sub>
 
 ---
@@ -366,7 +366,9 @@ weight. The SVG writes each eye as its own pen layer.
 **Text layers.** Place your own words on the plate, in any label font. Each text
 is its own layer and pen, and follows the ground under it.
 
-**Presets.** 86 presets ship as thumbnails. *Surprise me* rolls a seeded look:
+**Presets.** 87 presets ship as thumbnails. A tile sets the look and leaves the
+camera alone. A preset with a `sheet` block, such as *Wild Terrain*, also sets the
+map elements and the legend. *Surprise me* rolls a seeded look:
 one to three modes, a palette and at most one overlay, with an ink that shows
 against the background. It skips modes that need a file, a picked point, a date
 or a georeference. ↩ and ↪ step through the last 50 seeds of the session.
@@ -469,6 +471,12 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   height range, source and date. Each line can be switched off.
 - **Coordinates**: ticks or lines along the sheet edge, in the raster's grid or in
   degrees, in a plan view.
+- **Font.** All sheet marks are lettered in sans, mono or serif.
+- **Legend** (Overlay › Legend) lists what the plate draws, in a corner of the sheet:
+  a stepped ramp for each colour source, with the height range in metres on a
+  georeferenced raster, the Landforms and Land cover inks, the surface tints, and
+  a line sample for each layer in its own ink. It shows only what is on screen, and
+  it moves clear of the other marks. It is drawn in the viewport, the PNG and the SVG.
 - **Preflight** reports the stroke count, pen count, ink length, pen-up travel
   and an estimated plot time.
 - **Output › Plot** holds the sheet width, the pen tip, the stroke order, the
@@ -493,6 +501,8 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   the pen tip: simplify a sixth of the tip, join gap and dedupe half, min length
   and hatch pitch the tip. Passes stay as they are. If short strokes carry more than 2% of the ink, as in
   hachures, min length stays off.
+- **As drawn** turns plotter order and all clean-up off and sets passes to 1.
+  The SVG then has the strokes as the plate draws them.
 - **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o
   graz.svg` renders a plate without the panel, through the same app in headless
   Chrome. Draw modes, presets and any parameter are arguments. `atlas` renders
