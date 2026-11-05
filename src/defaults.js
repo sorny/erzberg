@@ -436,7 +436,7 @@ export const STYLE_DEF = {
   hypsoSpines: false, hypsoModeSpines: 'elevation', hypsoBandedSpines: false, hypsoIntervalSpines: 10,
 
   // Coral — one closed line grown until it fills the ground above a level.
-  enabledCoral: false, spacingCoral: 12, levelCoral: 0.3, nodesCoral: 30000, stepsCoral: 4000, seedCoral: 1,
+  enabledCoral: false, spacingCoral: 12, levelCoral: 0.3, nodesCoral: 30000, stepsCoral: 4000, seedCoral: 1, crowdCoral: false,
   colorCoral: '#1a1a1a', weightCoral: 0.8, opacityCoral: 1, dashCoral: 'solid',
   hypsoCoral: false, hypsoModeCoral: 'elevation', hypsoBandedCoral: false, hypsoIntervalCoral: 10,
 

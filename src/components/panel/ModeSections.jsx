@@ -1438,13 +1438,16 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   {coralNote && (
                     <div data-testid="coral-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
-                      {`${coralNote.nodes.toLocaleString()} nodes`}
+                      {`${coralNote.nodes.toLocaleString()} nodes${coralNote.curves > 1 ? ` · ${coralNote.curves} curves` : ''}`}
                     </div>
                   )}
                   <InlineSl label="Gap" help="The distance the folds keep apart. It halves on the steepest ground." min={1} max={30} step={0.5} value={style.spacingCoral} onChange={v => ss({ spacingCoral: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Above" help="The line grows on the ground above this share of the height range." min={0} max={0.95} step={0.01} value={style.levelCoral} onChange={v => ss({ levelCoral: v })} fmt={v => `${Math.round(v * 100)}%`} />
-                  <InlineSl label="Nodes" help="The growth stops at this many points on the line. More fill more of the ground and take longer." min={500} max={60000} step={500} value={style.nodesCoral} onChange={v => ss({ nodesCoral: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
+                  <InlineSl label="Nodes" help="The growth stops at this many points on the lines. It also stops by itself when the folds fill the ground. A small Gap needs more points, about four times as many at half the Gap." min={500} max={style.crowdCoral ? 60000 : 400000} step={500} value={style.nodesCoral} onChange={v => ss({ nodesCoral: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
                   <InlineSl label="Steps" help="The growth also stops after this many steps." min={100} max={20000} step={100} value={style.stepsCoral} onChange={v => ss({ stepsCoral: Math.round(v) })} fmt={v => Math.round(v).toLocaleString()} />
+                  {style.crowdCoral && (
+                    <Tog label="Split when crowded" help="One line grows from the highest point. Every long edge splits, even where another strand is close, and every point moves at every step. The folds pack into a solid mass in the middle, and the growth reaches the Nodes limit before it fills the ground. Switch it off to grow a line on each patch of high ground and split only where there is room, which fills the ground with far fewer points and in less time." testId="coral-crowd" checked={!!style.crowdCoral} onChange={v => ss({ crowdCoral: v })} />
+                  )}
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedCoral} onChange={v => ss({ seedCoral: Math.round(v) })} />
                 </Sub>
                 <ModeStyleOverride prefix="Coral" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />

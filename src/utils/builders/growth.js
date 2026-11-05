@@ -163,7 +163,7 @@ export function buildVenation(terrain, p, o) {
 // ─── Coral ───────────────────────────────────────────────────────────────────
 
 /**
- * One closed line that grows until it fills the ground above a level.
+ * Closed lines that grow until they fill the ground above a level.
  *
  * Differential growth. Each node pulls toward the midpoint of its two
  * neighbours on the curve, and pushes away every other node within a radius.
@@ -175,9 +175,32 @@ export function buildVenation(terrain, p, o) {
  * farther apart than the radius, stop pushing, and the curve stops growing.
  *
  * The region is a hard wall: a node that would step out of it stays where it
- * is. The curve starts as a small ring at the highest point and grows until it
- * has `nodes` nodes or runs out of steps. It never crosses itself, because two
- * strands closer than the radius always push apart.
+ * is. Each patch of ground above the level gets its own curve, a small ring at
+ * the patch's highest point, so a second massif fills as the first does. A
+ * large patch gets more rings, on its high ground and 16 gaps apart, which meet
+ * like coral heads: one ring would need a step for every fiftieth of a gap it
+ * grows across the patch. A patch too small for two gaps across gets none. The
+ * curves grow together until
+ * they have `nodes` nodes between them, run out of steps, or stop. A curve never
+ * crosses itself or another, because two strands closer than the radius always
+ * push apart.
+ *
+ * An edge splits only where it has room: no node of another strand within
+ * three quarters of the radius of either end. The outer folds move at most a
+ * fifth of the radius a step, and without the gate the curve grew faster than
+ * that everywhere, packed the new length into the middle as a solid mass, and
+ * hit the node limit with a fifth of the region still bare. The forces are
+ * also taken at a tenth: at full strength nearly every node hit the step limit
+ * at every step and shook in place instead of settling. A node whose
+ * neighbourhood did not move in the last step sleeps: it still pushes, but it
+ * is not moved, and it wakes when a node near it moves. Most of a grown coral
+ * is asleep, so a step costs the growing edge, not the whole curve. The growth
+ * stops when every node sleeps, when no edge split for 50 steps after the
+ * first split, or when the curves grew by less than 1% in 250 steps.
+ *
+ * `crowd` keeps the old growth, for plates made before format 11: one curve
+ * from the highest point, every long edge splits, every node moves at every
+ * step, and only the limits stop it.
  */
 export function buildCoral(terrain, p, o) {
   const { grid, gridMask, rows, cols, scl, gridSlopes, maxSlope } = terrain
@@ -200,21 +223,99 @@ export function buildCoral(terrain, p, o) {
   }
   const slopeAt = (x, y) => gridSlopes[Math.round(y) * cols + Math.round(x)] / (maxSlope || 1)
 
-  // The seed ring: small, inside the region, round the top.
-  let xs = [], ys = []
-  const cx = top % cols, cy = (top / cols) | 0
-  for (let ring = 3 * r0; ring >= 0.5 && !xs.length; ring *= 0.5) {
-    const m = Math.max(8, Math.round(2 * Math.PI * ring / (0.2 * r0)))
-    const px = [], py = []
-    for (let q = 0; q < m; q++) { px.push(cx + Math.cos(q / m * 2 * Math.PI) * ring); py.push(cy + Math.sin(q / m * 2 * Math.PI) * ring) }
-    if (px.every((x, q) => inside(x, py[q]))) { xs = px; ys = py }
+  // A seed ring: small, inside the region, round a top.
+  const seedRing = (cx, cy) => {
+    for (let ring = 3 * r0; ring >= 0.5; ring *= 0.5) {
+      const m = Math.max(8, Math.round(2 * Math.PI * ring / (0.2 * r0)))
+      const px = [], py = []
+      for (let q = 0; q < m; q++) { px.push(cx + Math.cos(q / m * 2 * Math.PI) * ring); py.push(cy + Math.sin(q / m * 2 * Math.PI) * ring) }
+      if (px.every((x, q) => inside(x, py[q]))) return [px, py]
+    }
+    return null
   }
-  if (!xs.length) return null
 
-  const maxNodes = Math.max(200, Math.min(60000, Math.round(o.nodes ?? 12000)))
+  const crowd = !!o.crowd
+  const maxNodes = Math.max(200, Math.min(crowd ? 60000 : 400000, Math.round(o.nodes ?? 12000)))
   const steps = Math.max(10, Math.min(20000, Math.round(o.steps ?? 3000)))
-  const cap = 0.2 * r0
   const radiusAt = (x, y) => r0 * (1 - 0.5 * slopeAt(x, y))
+  const opts = { r0, rows, cols, maxNodes, steps, radiusAt, inside, rng }
+  let rings
+  if (crowd) {
+    const seed = seedRing(top % cols, (top / cols) | 0)
+    if (!seed) return null
+    rings = [growCrowded(seed[0], seed[1], opts)]
+  } else {
+    const seeds = []
+    for (const i of patchSeeds(grid, gridMask, rows, cols, level, 4 * r0 * r0, 16 * r0)) {
+      const seed = seedRing(i % cols, (i / cols) | 0)
+      if (seed) seeds.push(seed)
+    }
+    if (!seeds.length) return null
+    rings = growRoom(seeds, opts)
+  }
+
+  const out = { positions: new F32List(), colors: new F32List() }
+  let nodes = 0
+  for (const [xs, ys] of rings) {
+    nodes += xs.length
+    for (let q = 0; q < xs.length; q++) {
+      const b = q < xs.length - 1 ? q + 1 : 0
+      drapeEdge(out, terrain, p, sMask, xs[q], ys[q], xs[b], ys[b], Math.atan2(ys[b] - ys[q], xs[b] - xs[q]))
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray(), note: { nodes, curves: rings.length } }
+}
+
+/**
+ * Seed cells for the patches of ground at or above `level`: each patch of at
+ * least `minArea` cells gets its highest cell, and a large patch also gets the
+ * highest cell of each part of it that lies `apart` cells or more from every
+ * seed already on that patch. Patches join at edges, not at corners, by a flood
+ * fill over the grid. Highest first.
+ */
+export function patchSeeds(grid, gridMask, rows, cols, level, minArea, apart) {
+  const n = rows * cols, label = new Int32Array(n).fill(-1), stack = new Int32Array(n), area = []
+  for (let i0 = 0; i0 < n; i0++) {
+    if (label[i0] >= 0 || !gridMask[i0] || grid[i0] < level) continue
+    const id = area.length
+    let sp = 0, a = 0
+    stack[sp++] = i0; label[i0] = id
+    while (sp) {
+      const i = stack[--sp], x = i % cols
+      a++
+      const nb = [x > 0 ? i - 1 : -1, x < cols - 1 ? i + 1 : -1, i - cols, i + cols]
+      for (const j of nb) {
+        if (j < 0 || j >= n || label[j] >= 0 || !gridMask[j] || grid[j] < level) continue
+        label[j] = id; stack[sp++] = j
+      }
+    }
+    area.push(a)
+  }
+  // The highest cell of each patch in each block of half the spacing.
+  const C = Math.max(1, Math.floor(apart / 2)), cw = Math.ceil(cols / C)
+  const best = new Map()
+  for (let i = 0; i < n; i++) {
+    const id = label[i]
+    if (id < 0 || area[id] < minArea) continue
+    const key = (Math.floor((i / cols) / C) * cw + Math.floor((i % cols) / C)) * area.length + id
+    const b = best.get(key)
+    if (b === undefined || grid[i] > grid[b]) best.set(key, i)
+  }
+  const picked = []
+  for (const i of [...best.values()].sort((a, b) => grid[b] - grid[a])) {
+    const x = i % cols, y = (i / cols) | 0
+    if (picked.some((j) => label[j] === label[i] && Math.hypot((j % cols) - x, ((j / cols) | 0) - y) < apart)) continue
+    picked.push(i)
+  }
+  return picked
+}
+
+/**
+ * Coral's old growth, kept as it was for `crowdCoral`: every long edge splits,
+ * every node moves at every step.
+ */
+function growCrowded(xs, ys, { r0, rows, cols, maxNodes, steps, radiusAt, inside, rng }) {
+  const cap = 0.2 * r0
   const B = r0, bw = Math.ceil(cols / B) + 1, bh = Math.ceil(rows / B) + 1
   for (let it = 0; it < steps && xs.length < maxNodes; it++) {
     const m = xs.length
@@ -261,11 +362,142 @@ export function buildCoral(terrain, p, o) {
     }
     xs = nx; ys = ny
   }
+  return [xs, ys]
+}
 
-  const out = { positions: new F32List(), colors: new F32List() }
-  for (let q = 0; q < xs.length; q++) {
-    const b = q < xs.length - 1 ? q + 1 : 0
-    drapeEdge(out, terrain, p, sMask, xs[q], ys[q], xs[b], ys[b], Math.atan2(ys[b] - ys[q], xs[b] - xs[q]))
+/**
+ * Coral's growth with room and sleep, for one or more closed curves. See
+ * `buildCoral`.
+ *
+ * The same forces and splits as the old growth, on buffers that are made once:
+ * a step can at most double the line, so two buffers of twice the node limit
+ * hold every step. The curves sit one after another in the buffers, and
+ * `start` and `end` give each curve's run, so a node's two neighbours wrap
+ * within its own curve. `hot` lists the buckets where a node moved or was made
+ * in the last step, and `wake` is those buckets and their eight neighbours, so
+ * a node checks one bucket to know whether it sleeps.
+ */
+function growRoom(seeds, { r0, rows, cols, maxNodes, steps, radiusAt, inside, rng }) {
+  const cap = 0.2 * r0, room = 0.75, near = 8, still = 0.002 * r0, gain = 0.1
+  const B = r0, bw = Math.ceil(cols / B) + 1, bh = Math.ceil(rows / B) + 1, nb = bw * bh
+  const nr = seeds.length
+  let m = seeds.reduce((t, [px]) => t + px.length, 0)
+  const size = 2 * maxNodes + m
+  let xs = new Float64Array(size), ys = new Float64Array(size)
+  let xn = new Float64Array(size), yn = new Float64Array(size)
+  let ring = new Int32Array(size), rn = new Int32Array(size)
+  let start = new Int32Array(nr), end = new Int32Array(nr)
+  const startN = new Int32Array(nr), endN = new Int32Array(nr)
+  for (let r = 0, at = 0; r < nr; r++) {
+    const [px, py] = seeds[r]
+    xs.set(px, at); ys.set(py, at); ring.fill(r, at, at + px.length)
+    start[r] = at; at += px.length; end[r] = at
   }
-  return { positions: out.positions.toArray(), colors: out.colors.toArray(), note: { nodes: xs.length } }
+  const head = new Int32Array(nb + 1), fill = new Int32Array(nb + 1)
+  const order = new Int32Array(size), cell = new Int32Array(size)
+  const fx = new Float64Array(size), fy = new Float64Array(size)
+  // 1 where a node has no room to split, or sleeps.
+  const tight = new Uint8Array(size)
+  const wake = new Uint8Array(nb).fill(1), isHot = new Uint8Array(nb)
+  let hot = new Int32Array(nb), nHot = 0, prevHot = new Int32Array(nb), nPrev = 0
+  let lastSplit = -1, mark = m
+  const heat = (x, y) => {
+    const c = Math.floor(y / B) * bw + Math.floor(x / B)
+    if (!isHot[c]) { isHot[c] = 1; hot[nHot++] = c }
+  }
+  for (let it = 0; it < steps && m < maxNodes; it++) {
+    head.fill(0)
+    for (let q = 0; q < m; q++) { cell[q] = Math.floor(ys[q] / B) * bw + Math.floor(xs[q] / B); head[cell[q] + 1]++ }
+    for (let b = 0; b < nb; b++) head[b + 1] += head[b]
+    fill.set(head)
+    for (let q = 0; q < m; q++) order[fill[cell[q]]++] = q
+    fx.fill(0, 0, m); fy.fill(0, 0, m); tight.fill(0, 0, m)
+    for (let q = 0; q < m; q++) {
+      if (!wake[cell[q]]) { tight[q] = 1; continue }
+      const r = ring[q], s0 = start[r], e0 = end[r], len = e0 - s0
+      const a = q > s0 ? q - 1 : e0 - 1, b = q < e0 - 1 ? q + 1 : s0, x = xs[q], y = ys[q]
+      fx[q] = ((xs[a] + xs[b]) / 2 - x) * 0.3
+      fy[q] = ((ys[a] + ys[b]) / 2 - y) * 0.3
+      const rr = radiusAt(x, y), rr2 = rr * rr, tr2 = room * room * rr2
+      const bi = Math.floor(x / B), bj = Math.floor(y / B)
+      for (let v = Math.max(0, bj - 1); v <= Math.min(bh - 1, bj + 1); v++) {
+        for (let u = Math.max(0, bi - 1); u <= Math.min(bw - 1, bi + 1); u++) {
+          const c = v * bw + u
+          for (let s = head[c]; s < head[c + 1]; s++) {
+            const w = order[s]
+            if (w === q || w === a || w === b) continue
+            const dx = x - xs[w], dy = y - ys[w], d2 = dx * dx + dy * dy
+            if (!(d2 > 0 && d2 < rr2)) continue
+            const d = Math.sqrt(d2), f = (1 - d / rr) * 0.5 * rr
+            fx[q] += dx / d * f; fy[q] += dy / d * f
+            // Another strand: another curve, or this one away from its own
+            // next nodes along it.
+            if (d2 < tr2 && !tight[q]) {
+              if (ring[w] !== r) tight[q] = 1
+              else { const di = Math.abs(w - q); if (Math.min(di, len - di) > near) tight[q] = 1 }
+            }
+          }
+        }
+      }
+    }
+    for (let q = 0; q < m; q++) {
+      if (!fx[q] && !fy[q]) continue
+      const gx = fx[q] * gain, gy = fy[q] * gain
+      const f = Math.hypot(gx, gy), k = f > cap ? cap / f : 1
+      const x = xs[q] + gx * k, y = ys[q] + gy * k
+      if (inside(x, y)) {
+        xs[q] = x; ys[q] = y
+        if (f * k > still) heat(x, y)
+      }
+    }
+    let n = 0
+    for (let r = 0; r < nr; r++) {
+      const s0 = start[r], e0 = end[r]
+      startN[r] = n
+      for (let q = s0; q < e0; q++) {
+        xn[n] = xs[q]; yn[n] = ys[q]; rn[n] = r; n++
+        const b = q < e0 - 1 ? q + 1 : s0
+        if (tight[q] || tight[b]) continue
+        if (Math.hypot(xs[b] - xs[q], ys[b] - ys[q]) > 0.42 * radiusAt((xs[q] + xs[b]) / 2, (ys[q] + ys[b]) / 2)) {
+          const x = (xs[q] + xs[b]) / 2 + (rng() - 0.5) * 0.02 * r0, y = (ys[q] + ys[b]) / 2 + (rng() - 0.5) * 0.02 * r0
+          if (inside(x, y)) { xn[n] = x; yn[n] = y; rn[n] = r; n++; heat(x, y) }
+        }
+      }
+      endN[r] = n
+    }
+    ;[xs, xn] = [xn, xs]; [ys, yn] = [yn, ys]; [ring, rn] = [rn, ring]
+    start.set(startN); end.set(endN)
+    const grew = n > m
+    m = n
+    if (grew) lastSplit = it
+    // The seed rings stretch for a while before the first split. Once the
+    // curves add less than 1% in 250 steps, the rest is a trickle of splits
+    // where curves meet, and it kept a few thousand nodes awake for thousands
+    // of steps. The seeds sit close enough that no curve has to squeeze through
+    // a long neck to reach its ground.
+    if (it > 50 && (!nHot || (lastSplit >= 0 && it - lastSplit > 50))) break
+    if (it > 0 && it % 250 === 0) {
+      if (lastSplit >= 0 && m < mark * 1.01) break
+      mark = m
+    }
+    // The next step wakes the hot buckets and their neighbours.
+    if (it === 0) wake.fill(0)
+    else for (let h = 0; h < nPrev; h++) {
+      const c = prevHot[h], bi = c % bw, bj = (c / bw) | 0
+      for (let v = Math.max(0, bj - 1); v <= Math.min(bh - 1, bj + 1); v++) {
+        for (let u = Math.max(0, bi - 1); u <= Math.min(bw - 1, bi + 1); u++) wake[v * bw + u] = 0
+      }
+    }
+    for (let h = 0; h < nHot; h++) {
+      const c = hot[h], bi = c % bw, bj = (c / bw) | 0
+      isHot[c] = 0
+      for (let v = Math.max(0, bj - 1); v <= Math.min(bh - 1, bj + 1); v++) {
+        for (let u = Math.max(0, bi - 1); u <= Math.min(bw - 1, bi + 1); u++) wake[v * bw + u] = 1
+      }
+    }
+    ;[hot, prevHot] = [prevHot, hot]; nPrev = nHot; nHot = 0
+  }
+  const out = []
+  for (let r = 0; r < nr; r++) out.push([Array.from(xs.subarray(start[r], end[r])), Array.from(ys.subarray(start[r], end[r]))])
+  return out
 }

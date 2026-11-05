@@ -27,7 +27,7 @@ export const SECTION_LABELS = {
   "Mode: Berms": "spacing tick length physics carve gravity friction air drag max steps",
   "Mode: Bitplane": "tiers risers dither dot pitch size",
   "Mode: Contours": "interval major every offset weight close contours smoothing summit and hollow mark size label heights spacing clearance colour only use single-line font tanaka illumination sun azimuth lit shaded",
-  "Mode: Coral": "gap above nodes steps seed",
+  "Mode: Coral": "gap above nodes steps split when crowded seed",
   "Mode: Crosshatch": "spacing angle lines intersections size cross colour weight dash",
   "Mode: Crossings": "detrend line pitch crossing axes dot style",
   "Mode: Curvature": "stroke direction spacing length step blur threshold",

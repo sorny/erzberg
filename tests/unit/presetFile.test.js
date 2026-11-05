@@ -385,6 +385,18 @@ describe('Outrun pens', () => {
   })
 })
 
+describe('migrateCoral', () => {
+  it('keeps the crowded growth on a plate before format 11', async () => {
+    const { parsePreset, migrateCoral } = await import('../../src/utils/presetFile')
+    expect(PRESET_FORMAT).toBeGreaterThanOrEqual(11)
+    expect(parsePreset(JSON.stringify({ format: 10, style: { enabledCoral: true } })).style.crowdCoral).toBe(true)
+    expect(parsePreset(JSON.stringify({ format: 11, style: { enabledCoral: true } })).style.crowdCoral).toBeUndefined()
+    const out = migrateCoral({ style: { modeCopies: [{ mode: 'Coral', values: {} }, { mode: 'Lines', values: {} }] } })
+    expect(out.style.modeCopies[0].values.crowdCoral).toBe(true)
+    expect(out.style.modeCopies[1].values.crowdCoral).toBeUndefined()
+  })
+})
+
 describe('migrateScreens', () => {
   it('keeps whole-cell Stipple and plain Riso for a plate before format 9, and leaves 9 alone', async () => {
     const { parsePreset } = await import('../../src/utils/presetFile')
@@ -426,8 +438,8 @@ describe('format 10: every ink as picked', () => {
   it('leaves a plate that drew as picked alone, and a format 10 plate too', async () => {
     const { parsePreset } = await import('../../src/utils/presetFile')
     const picked = parsePreset('{"format":9,"style":{"inksAsPicked":true,"colorPrinter":"#39ff6a"}}')
-    expect(picked.style).toEqual({ colorPrinter: '#39ff6a' })
-    expect(parsePreset('{"format":10,"style":{"colorPrinter":"#39ff6a"}}').style).toEqual({ colorPrinter: '#39ff6a' })
+    expect(picked.style).toEqual({ colorPrinter: '#39ff6a', crowdCoral: true })
+    expect(parsePreset('{"format":10,"style":{"colorPrinter":"#39ff6a"}}').style).toEqual({ colorPrinter: '#39ff6a', crowdCoral: true })
   })
 
   it('fills the inks a sparse plate leaves out with the curved default', async () => {
@@ -479,7 +491,8 @@ describe('format 10: every ink as picked', () => {
     for (const n of names) {
       const d = JSON.parse(readFileSync(`public/presets/${n}`, 'utf8'))
       expect('inksAsPicked' in (d.style ?? {}), n).toBe(false)
-      expect(d.format, n).toBe(10)
+      expect('crowdCoral' in (d.style ?? {}), n).toBe(false)
+      expect(d.format, n).toBe(PRESET_FORMAT)
     }
   })
 })

@@ -59,7 +59,7 @@ Each sends a place name or a bounding box. None sends a file or needs a key.
   </tr>
 </table>
 
-<sub>Six of the 87 bundled presets, rendered by the app's own PNG exporter from
+<sub>Six of the 88 bundled presets, rendered by the app's own PNG exporter from
 the sample heightmap.</sub>
 
 ---
@@ -317,7 +317,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Geodesic Fan | Straight lines on the ground from one point, bent round the mountains |
 | Radar | A side-looking radar's view as range ticks, with layover and radar shadow |
 | Spines | The skeleton of the ground above each of a stack of levels |
-| Coral | One closed line grown by differential growth until it fills the high ground |
+| Coral | Closed lines grown by differential growth until they fill the high ground |
 | Glacier | Ice above a snowline, with blue contours, crevasses and moraine |
 | Map Grid | A grid at a round true distance from the south-west corner, as lines or crosses, with the map sheet's edge scale in km |
 | Line Printer | A SYMAP line-printer map: one glyph per character cell, from a dot to an overprinted block |
@@ -366,7 +366,7 @@ weight. The SVG writes each eye as its own pen layer.
 **Text layers.** Place your own words on the plate, in any label font. Each text
 is its own layer and pen, and follows the ground under it.
 
-**Presets.** 87 presets ship as thumbnails. A tile sets the look and leaves the
+**Presets.** 88 presets ship as thumbnails. A tile sets the look and leaves the
 camera alone. A preset with a `sheet` block, such as *Wild Terrain*, also sets the
 map elements and the legend. *Surprise me* rolls a seeded look:
 one to three modes, a palette and at most one overlay, with an ink that shows

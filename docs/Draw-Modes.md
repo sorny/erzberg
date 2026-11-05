@@ -780,11 +780,15 @@ the ground above it at every height, so the main ridges draw densest.
 
 ## 51. Coral
 
-One closed line grown by differential growth. Each node pulls toward the
+Closed lines grown by differential growth. Each node pulls toward the
 midpoint of its neighbours and pushes away all nodes within the *Gap*, which
 halves on the steepest ground. An edge longer than about half the local gap
-splits. The line starts as a ring at the summit and stays on the ground *Above*
-a share of the height range. It grows until *Nodes* or *Steps* runs out.
+splits, but only where no other strand is close. The lines stay on the ground
+*Above* a share of the height range. Each patch of that ground gets a ring at
+its highest point, and a large patch gets more rings, 16 gaps apart on its high
+ground. The rings grow until the folds fill the ground, or until *Nodes* or
+*Steps* runs out. The panel shows the nodes and the curves. A plate with *Split
+when crowded* on keeps one line from the summit, which splits every long edge.
 
 ## 52. Glacier
 

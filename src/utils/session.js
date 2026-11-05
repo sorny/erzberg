@@ -14,7 +14,7 @@
  * the same picture a preset gives you, which is the thing worth keeping.
  */
 
-import { migrateAzimuths, migrateInks, migrateOcclusion, migrateOutrunPens, migratePillarInk, migrateScreens, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
+import { migrateAzimuths, migrateCoral, migrateInks, migrateOcclusion, migrateOutrunPens, migratePillarInk, migrateScreens, migrateShading, migrateRisoDots, migrateStrokeBias, migrateWaveformClip, repairWaveform } from './presetFile'
 
 const KEY = 'erzberg.session.v1'
 
@@ -60,6 +60,9 @@ const SCREEN_SCALE = 2
 
 /** And for every ink drawn as picked from v1.67.0. See `softenInks`. */
 const INKS_SCALE = 2
+
+/** And for Coral's growth with room. See `migrateCoral`. */
+const CORAL_SCALE = 2
 
 /** Field names, so a shape change in one place cannot drift from the other. */
 // `textLayers` is content rather than a look — the words someone typed onto a
@@ -115,6 +118,7 @@ export function loadSession(defaults) {
     if ((data.risoScale ?? 1) < RISO_SCALE) out = migrateOutrunPens(migrateRisoDots(out))
     if ((data.screenScale ?? 1) < SCREEN_SCALE) out = migrateScreens(out)
     if ((data.inksScale ?? 1) < INKS_SCALE) out = migrateInks(out)
+    if ((data.coralScale ?? 1) < CORAL_SCALE) out = migrateCoral(out)
     out = repairWaveform(out)
     for (const [field, omit] of [['view', VIEW_OMIT], ['terrain', TERRAIN_OMIT]]) {
       if (!out[field]) continue
@@ -158,7 +162,7 @@ function differsFromDefaults(restored, defaults) {
  */
 export function saveSession(data) {
   try {
-    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE, waveScale: WAVE_SCALE, risoScale: RISO_SCALE, screenScale: SCREEN_SCALE, inksScale: INKS_SCALE }
+    const out = { azimuthScale: AZIMUTH_SCALE, shadingScale: SHADING_SCALE, pillarScale: PILLAR_SCALE, occlusionScale: OCCLUSION_SCALE, strokeScale: STROKE_SCALE, waveScale: WAVE_SCALE, risoScale: RISO_SCALE, screenScale: SCREEN_SCALE, inksScale: INKS_SCALE, coralScale: CORAL_SCALE }
     for (const f of FIELDS) if (data[f] != null) out[f] = data[f]
     localStorage.setItem(KEY, JSON.stringify(out))
   } catch {
