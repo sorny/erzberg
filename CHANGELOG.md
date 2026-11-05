@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.70.0] — 2026-11-05
+
+### Added
+
+- **Catchment Quilt**, a preset on Watershed, which no other preset used. Each
+  drainage basin is a patch in one of eight inks from a muted five-colour
+  palette, slope-shaded, on cream paper, with the Lines occluder.
+
+### Changed
+
+- **Coral fills the ground, and fast.** Before, every edge longer than half the
+  gap split at every step, but the outer folds can move only a fifth of the gap
+  a step. The new length packed into the middle as a solid mass, and the growth
+  hit the node limit early. On the default plate, the default 30,000 nodes took
+  2.5 s and covered 81% of the patch round the summit. 60,000 nodes took 8.2 s
+  and still left a fifth of it bare. Now an edge splits only where no other
+  strand is within three quarters of the gap. The forces are taken at a tenth,
+  because at full strength nearly every node hit the step limit and shook in
+  place. A node whose neighbourhood did not move sleeps until a node near it
+  moves. The growth stops by itself when the folds fill the ground. The default
+  gap now fills the patch with about 4,300 nodes in 0.6 s.
+- **Coral grows on every patch of high ground.** Before, one ring grew from the
+  highest point, so a second massif above the level stayed empty. Each patch
+  now gets a ring at its highest point, and a large patch gets more rings, 16
+  gaps apart, which meet like coral heads. On the 1,024 grid of the default
+  plate, the default gap fills both massifs in 2.7 s. One ring took 5 s for the
+  same ground. The panel readout shows the curves next to the nodes.
+- **Coral Nodes** now goes to 400,000, for small gaps.
+
+### Migration
+
+- **Preset format 11.** A preset, plate or session from before format 11 gets
+  `crowdCoral`, which keeps the old growth exactly, in mode copies too. The
+  panel then shows **Split when crowded**. Switch it off for the new growth.
+  The bundled presets moved to format 11. None of them uses Coral, so none
+  changes.
+
 ## [1.69.0] — 2026-11-05
 
 ### Added

@@ -106,6 +106,34 @@ describe('Coral', () => {
     const floor = (0.5 - 0.5) * 100 - 3
     for (let q = 1; q < l.positions.length; q += 3) expect(l.positions[q]).toBeGreaterThan(floor)
   })
+  it('stops by itself when the folds fill the ground', () => {
+    const p = { enabledCoral: true, spacingCoral: 4, levelCoral: 0.3, nodesCoral: 8000, stepsCoral: 4000 }
+    const l = one(cone, p, 'Coral')
+    wellFormed(l)
+    // A couple of thousand points fill the cone, far below the limit.
+    expect(l.note.nodes).toBeLessThan(5000)
+    // Crowded, the folds jam and the same ground runs into the limit.
+    expect(one(cone, { ...p, crowdCoral: true }, 'Coral').note.nodes).toBeGreaterThanOrEqual(8000)
+  })
+  it('grows a curve on each patch of high ground', () => {
+    // Two peaks with a saddle below the level between them.
+    const twin = terrainOf((x, y) => Math.max(0, 1 - Math.hypot(x - 26, y - 48) / 22, 0.9 - Math.hypot(x - 72, y - 48) / 22))
+    const p = { enabledCoral: true, spacingCoral: 4, levelCoral: 0.3, nodesCoral: 8000, stepsCoral: 4000 }
+    const l = one(twin, p, 'Coral')
+    wellFormed(l)
+    expect(l.note.curves).toBe(2)
+    const xs = []
+    for (let q = 0; q < l.positions.length; q += 3) xs.push(l.positions[q])
+    // Lines on both sides of the saddle, which sits in the middle of the plate.
+    expect(xs.some((x) => x < -10)).toBe(true)
+    expect(xs.some((x) => x > 10)).toBe(true)
+    // The old growth keeps one curve, from the highest point.
+    expect(one(twin, { ...p, crowdCoral: true, nodesCoral: 1500 }, 'Coral').note.curves).toBe(1)
+  })
+  it('grows the same line for the same seed', () => {
+    const p = { enabledCoral: true, spacingCoral: 4, levelCoral: 0.5, nodesCoral: 20000, stepsCoral: 2000 }
+    expect(one(cone, p, 'Coral').positions).toEqual(one(cone, p, 'Coral').positions)
+  })
 })
 
 describe('Glacier', () => {

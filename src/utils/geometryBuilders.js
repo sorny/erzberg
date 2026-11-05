@@ -250,7 +250,8 @@ export function buildLineGeometry(terrain, p) {
     { id:'Spines',  builder: (t, ctx) => buildSpines(t, ctx, {
         levels: p.levelsSpines, depth: p.depthSpines, radius: p.radiusSpines }) },
     { id:'Coral',   builder: (t, ctx) => buildCoral(t, ctx, {
-        spacing: p.spacingCoral, level: p.levelCoral, nodes: p.nodesCoral, steps: p.stepsCoral, seed: p.seedCoral }) },
+        spacing: p.spacingCoral, level: p.levelCoral, nodes: p.nodesCoral, steps: p.stepsCoral, seed: p.seedCoral,
+        crowd: p.crowdCoral }) },
     { id:'Glacier', builder: (t, ctx) => buildGlacier(t, ctx, {
         snowline: p.snowlineGlacier, steep: p.steepGlacier, crack: p.crackGlacier,
         interval: p.intervalGlacier, spacing: p.spacingGlacier, radius: p.radiusGlacier,

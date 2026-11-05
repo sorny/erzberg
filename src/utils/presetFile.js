@@ -81,8 +81,12 @@ export const PRESET_KEYWORD = 'erzberg:preset'
  * viewport's tone curve unless the plate switched Inks as picked on, and a
  * payload before 10 that did not has its inks rewritten as the curve drew them
  * (`softenInks`).
+ *
+ * 11 is Coral's growth with room. Before, every long edge split and every node
+ * moved at every step, so the folds jammed into a solid mass in the middle,
+ * and a payload before 11 keeps that growth (`migrateCoral`).
  */
-export const PRESET_FORMAT = 10
+export const PRESET_FORMAT = 11
 
 /**
  * The sheet keys a bundled preset may carry in an optional `sheet` block: the
@@ -123,6 +127,24 @@ export function migrateRisoDots(payload) {
   if (Array.isArray(style.modeCopies)) {
     style.modeCopies = style.modeCopies.map((c) => (
       c?.mode === 'Riso' && c.values ? { ...c, values: { ...c.values, weightRiso: 1, opacityRiso: 1 } } : c))
+  }
+  return { ...payload, style }
+}
+
+/**
+ * Coral as it grew, for a plate made before format 11.
+ *
+ * Coral split every long edge, crowded or not, and moved every node at every
+ * step. An older plate gets `crowdCoral`, in mode copies too. The key did not
+ * exist before, so it is written over whatever is there. A new object comes
+ * back.
+ */
+export function migrateCoral(payload) {
+  if (!payload || typeof payload !== 'object' || !payload.style || typeof payload.style !== 'object') return payload
+  const style = { ...payload.style, crowdCoral: true }
+  if (Array.isArray(style.modeCopies)) {
+    style.modeCopies = style.modeCopies.map((c) => (
+      c?.mode === 'Coral' && c.values ? { ...c, values: { ...c.values, crowdCoral: true } } : c))
   }
   return { ...payload, style }
 }
@@ -446,7 +468,8 @@ export function parsePreset(text) {
     const wave = f < 7 ? migrateWaveformClip(bias) : bias
     const pens = f < 8 ? migrateOutrunPens(migrateRisoDots(wave)) : wave
     const screens = f < 9 ? migrateScreens(pens) : pens
-    return repairWaveform(f < 10 ? migrateInks(screens) : screens)
+    const inked = f < 10 ? migrateInks(screens) : screens
+    return repairWaveform(f < 11 ? migrateCoral(inked) : inked)
   } catch {
     return null
   }
