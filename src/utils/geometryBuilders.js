@@ -56,7 +56,8 @@ export function buildLineGeometry(terrain, p) {
     lineHypsometric:  p[`hypso${id}`],
     lineHypsoMode:    p[`hypsoMode${id}`],
     lineBanded:       p[`hypsoBanded${id}`],
-    lineHypsoInterval:p[`hypsoInterval${id}`]
+    lineHypsoInterval:p[`hypsoInterval${id}`],
+    lineSoft:         p[`hypsoSoft${id}`],
   })
 
   // A function of `p`, not a constant over it: a mode copy runs the same

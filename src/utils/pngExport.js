@@ -132,18 +132,32 @@ function physChunk(dpi) {
  * Text is the browser's own, matching the text layers the SVG exporter already
  * writes as `<text>`. It is the one mark here a pen has to be told how to draw.
  */
-function drawMarks(ctx, marks, color) {
+function drawMarks(ctx, marks, color, colored = true) {
   ctx.save()
   ctx.fillStyle = color
   ctx.strokeStyle = color
   ctx.lineWidth = Math.max(1, (marks.texts[0]?.size ?? 12) * 0.08)
   ctx.lineCap = 'butt'
-  for (const [x, y, w, h] of marks.rects) ctx.fillRect(x, y, w, h)
+  // The trim mask passes `colored: false` and keeps every shape in its one ink.
+  const own = (c) => (colored && c ? c : color)
+  for (const [x, y, w, h, c] of marks.rects) { ctx.fillStyle = own(c); ctx.fillRect(x, y, w, h) }
+  const width = ctx.lineWidth
   ctx.beginPath()
-  for (const [x0, y0, x1, y1] of marks.lines) { ctx.moveTo(x0, y0); ctx.lineTo(x1, y1) }
+  for (const [x0, y0, x1, y1, c, sw] of marks.lines) {
+    // A legend line sample carries its own ink and width, and is stroked alone.
+    if (c || sw) {
+      ctx.stroke(); ctx.beginPath()
+      ctx.strokeStyle = own(c); ctx.lineWidth = sw ?? width
+      ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke()
+      ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = width
+      continue
+    }
+    ctx.moveTo(x0, y0); ctx.lineTo(x1, y1)
+  }
   ctx.stroke()
   for (const t of marks.texts) {
-    ctx.font = `${t.size.toFixed(1)}px sans-serif`
+    ctx.fillStyle = own(t.color)
+    ctx.font = `${t.size.toFixed(1)}px ${marks.font ?? 'sans-serif'}`
     ctx.textAlign = t.anchor === 'middle' ? 'center' : t.anchor
     ctx.textBaseline = 'alphabetic'
     ctx.fillText(t.text, t.x, t.y)
@@ -266,7 +280,7 @@ export function captureAndExportPNG(glCanvas, bgHex, bgStops, isAlpha, baseName,
   // mask. Drawn on the composite alone they would be cropped away by the very
   // scan that decides where the content ends — a scale bar sitting in the
   // margin is exactly the thing that scan calls empty.
-  if (marks) { drawMarks(ctx, marks, marks.color); drawMarks(maskCtx, marks, '#000000') }
+  if (marks) { drawMarks(ctx, marks, marks.color); drawMarks(maskCtx, marks, '#000000', false) }
 
   const base = baseName ?? 'heightmap'
   // ODbL: the credit travels with the picture, not with the app that drew it.

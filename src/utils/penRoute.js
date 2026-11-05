@@ -443,6 +443,20 @@ export function recommendPlot({ penMm = 0.3, lengthsMm = [] } = {}) {
 }
 
 /**
+ * The plot with no clean-up: the strokes in the order and shape the plate
+ * draws them, each drawn once. Filled areas and the hatch are left as they
+ * are, because they are a choice of fill, not a clean-up.
+ */
+export const AS_DRAWN = Object.freeze({
+  plotPenOrder: false,
+  plotSimplifyMm: 0,
+  plotJoinGapMm: 0,
+  plotMinLengthMm: 0,
+  plotDedupeMm: 0,
+  plotPasses: 1,
+})
+
+/**
  * How long a plot takes, given the one fact only the operator has.
  *
  * The exporter writes pixels, not millimetres — deliberately, and it is the same

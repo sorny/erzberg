@@ -17,6 +17,7 @@ import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
 import { FrameOverlay } from './components/FrameOverlay'
 import { SheetMarks } from './components/SheetMarks'
+import { legendEntries } from './utils/legend'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
@@ -2610,13 +2611,20 @@ export default function App() {
    */
   // The sheet's own facts, for the title block, magnetic north and a grid in
   // degrees. Rebuilt only when one of the facts or switches changes.
-  const sheet = useMemo(() => sheetFacts(p, {
+  const sheetBase = useMemo(() => sheetFacts(p, {
     filename: heightmapFilename, crs: geoTiffCRS, crsName: geoTiffCRSName, provenance: terrainProvenance,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [view.frameTitle, view.frameTitleText, view.frameTitleFacts, view.frameNorth, view.frameMagnetic,
        view.frameGrid, view.frameGridUnits, style.enabledContours, style.intervalContours, p.elevScale,
        terrain.blackPoint, terrain.whitePoint, geoTiffBbox, geoTiffCRS, geoTiffCRSName,
        geoTiffElevMin, geoTiffElevMax, heightmapFilename, terrainProvenance])
+  // The legend reads nearly every ink on the plate, so it has its own memo over
+  // the whole style rather than a list of keys that would drift.
+  const legend = useMemo(() => (view.legendOn ? legendEntries(p, { cover, vectorLayers }, { steps: view.legendSteps ?? 7 }) : null),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [view.legendOn, view.legendParts, view.legendSteps, style, gradientStops, cover, vectorLayers,
+     geoTiffElevMin, geoTiffElevMax, terrain.blackPoint, terrain.whitePoint, p.elevScale])
+  const sheet = useMemo(() => ({ ...sheetBase, legend }), [sheetBase, legend])
 
   const handleGeoJsonExport = useCallback(async () => {
     const st = useStore.getState()
@@ -2933,6 +2941,7 @@ export default function App() {
         bgGradientStops={bgGradientStops}     setBgGradientStops={setBgGradientStops}
         heightmapPixels={heightmapPixels}
         heightmapFilename={heightmapFilename}
+        legend={legend}
         textureImage={textureImage}
         setTextureImage={setTextureImage}
         loadFromPicker={loadPngAndFit}

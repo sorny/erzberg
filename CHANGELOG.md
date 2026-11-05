@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.69.0] — 2026-11-05
+
+### Added
+
+- **Overlay › Legend.** A legend in a corner of the sheet that lists what the plate
+  draws. It has a stepped ramp for each colour source a layer or the fill uses
+  (height, slope, speed, and aspect as four facing directions). On a
+  georeferenced raster, the height range is in metres. It also shows the ten
+  Landforms inks when a layer is coloured by form, the Land cover classes, the
+  surface tints, and a line sample for each draw mode, mode copy and vector layer
+  in its own ink and dash. Contours carry their interval in metres. Only what is
+  on screen is listed: a mode that is off, a hidden layer and a tint at 0% say
+  nothing. The legend is ink, like the scale bar. The viewport, the PNG and the
+  SVG draw it from the same shapes, and it moves clear of a scale bar, north
+  arrow or title block in the same corner. You can pick the corner, the groups, a
+  heading, the ramp steps, the size, capitals, a box and the ink.
+- **Map Elements › Font.** Every sheet mark is lettered in sans, mono or serif.
+  The SVG names the font with a generic fallback.
+- **Wild Terrain**, a preset after a survey poster: banded greens from dark
+  valleys to pale summits, dense contours with labels, blue drainage, a red map
+  grid with crosses, and mono lettering with a title block, a north arrow and the
+  height legend.
+- **Soft**, a switch under the Colour row of every layer coloured by a ramp. It
+  draws the gradient through the viewport's old ACES curve, as every line ramp
+  drew before format 10. It is off by default, so no plate changes. The colour
+  is baked into the geometry, so the SVG and the legend show it too.
+- **A preset can carry its sheet.** A tile applies the style and leaves the view
+  alone, so a bundled preset can add an optional `sheet` block with map element
+  and legend keys. A preset without one leaves the marks as they are.
+
+- **As drawn**, a button next to Recommended values in Output › Plot. It turns
+  plotter order and all clean-up off and sets passes to 1, so the SVG has the
+  strokes as the plate draws them. Before, after Recommended values, you had to
+  press Undo or set each value back by hand. The hatch pitch stays, because it
+  is a choice of fill, not a clean-up.
+
+### Changed
+
+- **Neon City, Swiss Topo, Alpine Survey and Compass Rose look as they did
+  before v1.67.0.** Their lines draw the height gradient that the fill also
+  draws. Before format 10, the lines went through the tone curve, which made
+  them a pale version of the fill. Drawn exactly, they took the fill's own
+  colours and sank into it. Each now turns Soft on for that layer. Against a
+  v1.66.0 render on the default plate, the mean difference falls from 12.2 to
+  0.5 colour levels (Neon City), 6.9 to 0.3 (Swiss Topo), 4.9 to 0.3 (Alpine
+  Survey) and 3.5 to 0.2 (Compass Rose). One fixed pale ink per preset was
+  tried first. It reached 2.7 and 2.3 on Swiss Topo and Alpine Survey, and no
+  ink beat the unchanged Neon City, whose lines run from purple to cyan.
+
 ## [1.68.0] — 2026-11-04
 
 ### Added

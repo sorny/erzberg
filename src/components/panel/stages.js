@@ -119,6 +119,7 @@ const STATED = {
   // Overlay is separate geometry, drawn after the surface finishes.
   'Vector Layers': 4,
   'Text': 4,
+  'Legend': 4,
   'Particles': 4,
 
   // Frame: the camera, then the page. `View` used to hold both and `Camera`

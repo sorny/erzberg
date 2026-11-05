@@ -172,7 +172,7 @@ test('join gap, min length and simplify shrink the file and say what they did', 
 
 // Recommended values come from the pen tip and the strokes Preflight measured:
 // on a plate of lines a short stroke is a stray, on a hachure plate it is the drawing.
-test('recommended values follow the pen, and keep the ticks of a hachure plate', async ({ page }) => {
+test('recommended values follow the pen, as drawn takes them off, and hachures keep their ticks', async ({ page }) => {
   test.setTimeout(240_000)
   await page.goto('http://localhost:5173')
   await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
@@ -189,6 +189,13 @@ test('recommended values follow the pen, and keep the ticks of a hachure plate',
   expect(await value('plot-simplify')).toBeCloseTo(0.08, 5)
   expect(await value('plot-dedupe')).toBeCloseTo(0.25, 5)
   await expect(page.locator('[data-testid="plot-order"]')).toBeChecked()
+
+  // As drawn takes every clean-up back off, in one click.
+  await page.locator('[data-testid="plot-as-drawn"]').click()
+  await expect(page.locator('[data-testid="plot-recommend-note"]')).toContainText('Clean-up off')
+  for (const id of ['plot-join-gap', 'plot-min-length', 'plot-simplify', 'plot-dedupe']) expect(await value(id), id).toBe(0)
+  expect(await value('plot-passes')).toBe(1)
+  await expect(page.locator('[data-testid="plot-order"]')).not.toBeChecked()
 
   await setMark(page, 'Lines', false)
   await setMark(page, 'Hachure', true)

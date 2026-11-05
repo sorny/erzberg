@@ -1,5 +1,5 @@
 /**
- * The scale bar and the north arrow, over the viewport.
+ * The scale bar, the north arrow and the legend, over the viewport.
  *
  * A DOM overlay, positioned exactly like `FrameOverlay` — and unlike it, this
  * one is *ink*. The frame is a composition aid that deliberately cannot reach
@@ -53,15 +53,16 @@ export function SheetMarks({ view, sheet = null, rightInset = 0 }) {
          style={{ position:'fixed', top:0, left:0, bottom:0, right: rightInset,
                   pointerEvents:'none', zIndex: 501 }}>
       <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ display:'block' }}>
-        {marks.rects.map(([x, y, rw, rh], i) => (
-          <rect key={`r${i}`} x={x} y={y} width={rw} height={rh} fill={ink} />
+        {/* A legend swatch, sample or label carries its own colour; the rest is the ink. */}
+        {marks.rects.map(([x, y, rw, rh, c], i) => (
+          <rect key={`r${i}`} x={x} y={y} width={rw} height={rh} fill={c ?? ink} />
         ))}
-        {marks.lines.map(([x0, y0, x1, y1], i) => (
-          <line key={`l${i}`} x1={x0} y1={y0} x2={x1} y2={y1} stroke={ink} strokeWidth={stroke} />
+        {marks.lines.map(([x0, y0, x1, y1, c, sw], i) => (
+          <line key={`l${i}`} x1={x0} y1={y0} x2={x1} y2={y1} stroke={c ?? ink} strokeWidth={sw ?? stroke} />
         ))}
         {marks.texts.map((t, i) => (
-          <text key={`t${i}`} x={t.x} y={t.y} fill={ink} fontSize={t.size}
-                fontFamily="sans-serif" textAnchor={t.anchor}>{t.text}</text>
+          <text key={`t${i}`} x={t.x} y={t.y} fill={t.color ?? ink} fontSize={t.size}
+                fontFamily={marks.font ?? 'sans-serif'} textAnchor={t.anchor}>{t.text}</text>
         ))}
       </svg>
     </div>

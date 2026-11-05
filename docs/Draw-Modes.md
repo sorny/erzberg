@@ -11,6 +11,15 @@ See [Land cover](Land-Cover.md#how-masking-works) and
 
 ---
 
+## Soft ramp
+
+A layer coloured by height, slope, aspect or speed has a **Soft** switch under its
+Colour row. It draws the gradient through a film tone curve, which makes its
+colours lighter and paler. Lines then stand out over a height fill that uses the
+same gradient.
+
+---
+
 ## Copies
 
 **Duplicate this mode**, in the Copies block at the foot of each mode's section, adds a copy of the

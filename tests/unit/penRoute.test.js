@@ -8,7 +8,7 @@
  * changing the ink laid down. Every test here is one of those four things.
  */
 import { describe, expect, it } from 'vitest'
-import { bridgeRuns, dedupeRuns, dropShortRuns, multipassRuns, orderRuns, plotEstimate, recommendPlot, reloopRuns, routeStats, simplifyRuns } from '../../src/utils/penRoute'
+import { bridgeRuns, dedupeRuns, dropShortRuns, multipassRuns, orderRuns, plotEstimate, recommendPlot, AS_DRAWN, reloopRuns, routeStats, simplifyRuns } from '../../src/utils/penRoute'
 
 /** A horizontal stroke of length `len` starting at (x, y). */
 const stroke = (x, y, len = 10) => ({ pts: [x, y, x + len, y] })
@@ -203,6 +203,14 @@ describe('reloopRuns', () => {
     expect(routeStats([loop]).ink).toBeCloseTo(routeStats([square]).ink, 9)
     const open = { stroke: '#000', pts: [0, 0, 10, 0, 10, 10] }
     expect(reloopRuns([lead, open], 1)[1]).toBe(open)
+  })
+})
+
+describe('AS_DRAWN', () => {
+  it('turns off every value recommendPlot sets, except the hatch pitch', () => {
+    const keys = Object.keys(recommendPlot({ penMm: 0.3 })).filter((k) => k !== 'plotHatchPitch')
+    for (const k of keys) expect(AS_DRAWN[k], k).toBe(k === 'plotPenOrder' ? false : 0)
+    expect(AS_DRAWN.plotPasses).toBe(1)
   })
 })
 

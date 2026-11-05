@@ -33,3 +33,16 @@ describe('isDarkBackground', () => {
     expect(isDarkBackground('not a colour')).toBe(false)
   })
 })
+
+describe('the soft ramp', () => {
+  it('draws the gradient as the old tone curve did, and only when asked', async () => {
+    const { computeVertexColor, hexToRgb } = await import('../../src/utils/colorUtils')
+    const { screenInkHex } = await import('../../src/utils/screenInk')
+    const p = { lineColor: '#000000', lineHypsometric: true, lineHypsoMode: 'elevation',
+      gradientStops: [{ pos: 0, color: '#0d0221' }, { pos: 1, color: '#00ffe7' }] }
+    expect(computeVertexColor(1, 0, 0, p)).toEqual(hexToRgb('#00ffe7'))
+    expect(computeVertexColor(1, 0, 0, { ...p, lineSoft: true })).toEqual(hexToRgb(screenInkHex('#00ffe7')))
+    // The line colour is never softened: it is drawn as picked.
+    expect(computeVertexColor(1, 0, 0, { ...p, lineHypsometric: false, lineSoft: true })).toEqual(hexToRgb('#000000'))
+  })
+})

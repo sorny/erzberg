@@ -1,0 +1,141 @@
+{
+  "format": 10,
+  "terrain": {
+    "resolution": 1,
+    "elevScale": 0,
+    "blurRadius": 0,
+    "gridOffsetX": 0,
+    "gridOffsetY": 0,
+    "elevMinCut": 0,
+    "elevMaxCut": 100,
+    "blackPoint": 0,
+    "whitePoint": 255,
+    "jitterAmt": 0
+  },
+  "style": {
+    "bgColor": "#ebe7da",
+    "colorContours": "#41593a",
+    "colorMapGrid": "#d0603f",
+    "colorValley": "#4f8fb8",
+    "depthOcclusion": true,
+    "enabledContours": true,
+    "enabledLines": false,
+    "enabledMapGrid": true,
+    "enabledValley": true,
+    "fillBanded": true,
+    "fillColor": "#ebe7da",
+    "fillHypsoInterval": 14.3,
+    "fillHypsoMode": "elevation",
+    "fillHypsoWeight": 0,
+    "fillHypsometric": true,
+    "hillshadeExaggeration": 2.5,
+    "hillshadeHighlightColor": "#fbfaf2",
+    "hillshadeIntensity": 1,
+    "hillshadeOpacity": 0.3,
+    "hillshadeShadowColor": "#3a5530",
+    "intervalContours": 1.2,
+    "labelColorContours": "#33452c",
+    "labelContours": true,
+    "labelSizeContours": 8,
+    "labelSpacingContours": 180,
+    "linesMapGrid": true,
+    "majorIntervalContours": 5,
+    "majorWeightContours": 1.4,
+    "markColorMapGrid": "#1f2a1c",
+    "marksMapGrid": true,
+    "occludeBy": "ground",
+    "opacityContours": 0.65,
+    "opacityMapGrid": 0.8,
+    "opacityValley": 1,
+    "scaleMapGrid": false,
+    "showFill": true,
+    "showHillshade": true,
+    "strokeDepthBias": 1,
+    "thresholdValley": 0.25,
+    "weightContours": 0.5,
+    "weightMapGrid": 0.5,
+    "weightValley": 2.2
+  },
+  "points": {
+    "showPoints": false,
+    "pointColor": "#000000",
+    "pointSize": 4,
+    "particleSpacing": 1,
+    "animateParticles": false,
+    "holoGlowColor": "#7df9ff",
+    "holoFloat": 1,
+    "holoNoiseAmt": 1,
+    "holoNoiseScale": 1,
+    "holoFlowSpeed": 1,
+    "holoMaskContrast": 1.5,
+    "holoShimmer": 0.4
+  },
+  "view": {
+    "tilt": 50,
+    "rotation": 0,
+    "zoom": 0.75,
+    "fov": 60,
+    "orthographic": false,
+    "renderScale": 1,
+    "panX": 0,
+    "panY": 0,
+    "autoRotate": false,
+    "autoRotateSpeed": 0.2,
+    "autoRotateAxis": "Y",
+    "autoRotateDir": 1,
+    "showGuides": false,
+    "showRawTerrain": false,
+    "planOblique": false,
+    "obliqueAngle": 45,
+    "showFrame": false,
+    "frameScaleBar": false,
+    "frameNorth": false,
+    "frameMargin": 0,
+    "anaglyph": false
+  },
+  "gradientStops": [
+    {
+      "pos": 0,
+      "color": "#5a8650"
+    },
+    {
+      "pos": 0.22,
+      "color": "#7fa66c"
+    },
+    {
+      "pos": 0.45,
+      "color": "#a9c592"
+    },
+    {
+      "pos": 0.7,
+      "color": "#d4e0c2"
+    },
+    {
+      "pos": 1,
+      "color": "#f5f4ec"
+    }
+  ],
+  "bgGradientStops": [
+    {
+      "pos": 0,
+      "color": "#fbf9f4"
+    },
+    {
+      "pos": 1,
+      "color": "#ede6d9"
+    }
+  ],
+  "sheet": {
+    "frameMarkFont": "mono",
+    "frameMarkColor": "#1f2a1c",
+    "frameTitle": true,
+    "frameTitleText": "Wild Terrain",
+    "frameTitleFacts": "range,projection",
+    "frameNorth": true,
+    "legendOn": true,
+    "legendParts": "ramp",
+    "legendSteps": 7,
+    "legendCorner": "bl",
+    "legendCaps": true
+  }
+}

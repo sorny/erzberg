@@ -657,6 +657,14 @@ export const STYLE_DEF = {
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`formMask${id}`, 0])),
 
   /*
+   * A soft ramp per mode: the gradient drawn through the viewport's old ACES
+   * curve, as every line ramp was before format 10. The curve lifts and pales
+   * the colours, so a soft ramp reads as a light version of a fill drawn with
+   * the same stops. Off by default, which is every older preset.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`hypsoSoft${id}`, false])),
+
+  /*
    * Occlusion per mode. `walls<Id>`: under *Occluder: Lines*, or under both
    * models for a solid mode (Pillars), whether the mode hangs a wall under its
    * strokes that hides what is behind them (off for the marks and overlays
@@ -783,6 +791,15 @@ export const VIEW_DEF = {
   frameMagnetic: false,
   frameTitle: false, frameTitleText: '', frameTitleFacts: 'projection,interval,range,source,date',
   frameGrid: 'off', frameGridUnits: 'grid',
+  // The typeface every sheet mark is lettered in: 'sans', 'mono' or 'serif'.
+  frameMarkFont: 'sans',
+  // The legend: what each colour and line on the plate stands for, drawn with
+  // the sheet marks in a corner of the sheet. `legendParts` picks the groups
+  // (ramp, class, surface, line); `legendInk` letters it, and '' takes the
+  // marks' ink. See utils/legend.js.
+  legendOn: false, legendCorner: 'bl', legendParts: 'ramp,class,surface,line',
+  legendScale: 1, legendSteps: 7, legendInk: '', legendCaps: true, legendBox: false,
+  legendHeading: '',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
   // A modifier rather than a mode: it takes whatever the fifty-six modes are

@@ -568,6 +568,7 @@ midpoints. Output is capped at 2048 px on the long side.
 | `src/utils/solar.js` | Solar position, sunrise and sunset, zone guess, sun-path sampling |
 | `src/utils/sunHours.js` | Shadow sweep, hours field, lit field, fitted levels |
 | `src/utils/sheetMarks.js` | `measureScale`, scale bar and north arrow shapes |
+| `src/utils/legend.js` | Legend entries from the plate, and their shapes |
 | `src/hooks/useHeightmap.js` | GeoTIFF decode, geokeys, NoData, CRS detection |
 | `src/utils/vectorLayers.js` | Packed source and layer records |
 | `src/utils/gpxParser.js`, `geoJsonParser.js` | File → vector source |
