@@ -13,7 +13,7 @@
  * the index does not drag three.js in behind it.
  */
 /**
- * The seven families, and which marks are in each.
+ * The eight families, and which marks are in each.
  *
  * Thirty-four tiles in one grid is a catalogue you read by scanning. The
  * families were always there in the marks themselves and nothing on screen said
@@ -35,9 +35,9 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow Lines', 'Network', 'Ridges', 'Valleys', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier']],
+    ['Lines', 'Contours', 'Flow Lines', 'Network', 'Ridges', 'Valleys', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Sand Ripples', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier']],
   ['Tone',     'many small marks add up to a grey',
-    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'Truchet', 'Slope Classes', 'Coral', 'Line Printer', 'Hair']],
+    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'TIN Facets', 'Truchet', 'Slope Classes', 'Coral', 'Hoarfrost', 'Line Printer', 'Tally', 'Cross-Stitch', 'Hair']],
   ['Relief',   'the ground given thickness',
     ['Pillars', 'Bitplane', 'Sprite Blocks', 'Stems']],
   ['Plate',    'colour rather than mark-making',
@@ -46,6 +46,8 @@ export const FAMILIES = [
     ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama', 'Radar']],
   ['Momentum', 'something with mass went down this slope',
     ['Fall Line', 'Berms', 'Air', 'Race Line', 'Runout']],
+  ['Symbol',   'a map symbol stamped where the ground calls for it',
+    ['Tree Line', 'Constellation', 'Weather Fronts', 'Orographic Rain']],
   ['Chart',    'the ground as a diagram, laid flat above it',
     ['Waveform', 'Profile Sheet', 'Swath Profile', 'Hypsometry', 'Aspect Rose', 'Stereonet']],
 ]

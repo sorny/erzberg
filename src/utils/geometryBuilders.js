@@ -16,6 +16,9 @@ import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed
 import { buildBedding, buildGlacier, buildProfileSheet, buildRunout, buildSlopeClass } from './builders/survey.js'
 import { buildAspectRose, buildHypsometry, buildStereonet, buildSwathProfile } from './builders/charts.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
+import { buildConstellation, buildFronts, buildRain, buildTally, buildTreeLine } from './builders/symbols.js'
+import { buildHoarfrost, buildRipples } from './builders/process.js'
+import { buildStitch, buildTin } from './builders/mesh.js'
 import { buildMapGrid } from './builders/mapGrid.js'
 import { buildHair, buildPrinter, buildStems, buildWaveform } from './builders/signal.js'
 import { buildWind } from './builders/weather.js'
@@ -257,6 +260,31 @@ export function buildLineGeometry(terrain, p) {
         interval: p.intervalGlacier, spacing: p.spacingGlacier, radius: p.radiusGlacier,
         moraine: p.moraineGlacier, iceColor: p.iceColorGlacier,
         cellMetres: p.cellMetresGlacier, relief: p.reliefGlacier }) },
+    { id:'TreeLine', builder: (t, ctx) => buildTreeLine(t, ctx, {
+        treeline: p.treelineTreeLine, broadleaf: p.broadleafTreeLine, steep: p.steepTreeLine,
+        spacing: p.spacingTreeLine, size: p.sizeTreeLine, line: p.lineTreeLine, lineColor: p.lineColorTreeLine,
+        seed: p.seedTreeLine, cellMetres: p.cellMetresTreeLine, relief: p.reliefTreeLine }) },
+    { id:'Constellation', builder: (t, ctx) => buildConstellation(t, ctx, {
+        count: p.countConstellation, spacing: p.spacingConstellation, size: p.sizeConstellation,
+        mark: p.markConstellation, links: p.linksConstellation }) },
+    { id:'Fronts',  builder: (t, ctx) => buildFronts(t, ctx, {
+        levels: p.levelsFronts, spacing: p.spacingFronts, size: p.sizeFronts, radius: p.radiusFronts,
+        solid: p.solidFronts, warmColor: p.warmColorFronts, coldColor: p.coldColorFronts }) },
+    { id:'Tally',   builder: (t, ctx) => buildTally(t, ctx, {
+        cell: p.cellTally, max: p.maxTally, jitter: p.jitterTally, seed: p.seedTally }) },
+    { id:'Rain',    builder: (t, ctx) => buildRain(t, ctx, {
+        azimuth: p.azimuthRain, lift: p.liftRain, shadow: p.shadowRain, spacing: p.spacingRain,
+        length: p.lengthRain, seed: p.seedRain }) },
+    { id:'Ripples', builder: (t, ctx) => buildRipples(t, ctx, {
+        azimuth: p.azimuthRipples, wavelength: p.wavelengthRipples, warp: p.warpRipples, top: p.topRipples,
+        rock: p.rockRipples, levels: p.levelsRipples, rockColor: p.rockColorRipples }) },
+    { id:'Hoarfrost', builder: (t, ctx) => buildHoarfrost(t, ctx, {
+        cold: p.coldHoarfrost, count: p.countHoarfrost, seeds: p.seedsHoarfrost, cell: p.cellHoarfrost,
+        line: p.lineHoarfrost, seed: p.seedHoarfrost }) },
+    { id:'Stitch',  builder: (t, ctx) => buildStitch(t, ctx, {
+        cell: p.cellStitch, bands: p.bandsStitch, back: p.backStitch, lightColor: p.lightColorStitch }) },
+    { id:'Tin',     builder: (t, ctx) => buildTin(t, ctx, {
+        count: p.countTin, floor: p.floorTin, pitch: p.pitchTin, azimuth: p.azimuthTin, edges: p.edgesTin, seed: p.seedTin }) },
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },

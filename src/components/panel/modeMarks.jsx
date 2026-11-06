@@ -465,6 +465,71 @@ const MARKS = {
       <path d="M3 11.5 L3.3 11.5 M7 12 L7.3 12 M11 12.3 L11.3 12.3 M15 12 L15.3 12 M19 11.5 L19.3 11.5" strokeWidth="1.4" />
     </g>
   ),
+  // Two conifers and a broadleaf round, under a dotted tree line.
+  treeline: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1 2 L21 2" strokeDasharray="0.1 2" strokeWidth="1.2" />
+      <path d="M2 11 L4.5 5 L7 11 M4.5 11 L4.5 12.5 M15 11 L17.5 5 L20 11 M17.5 11 L17.5 12.5" />
+      <circle cx="11" cy="8" r="2.2" />
+      <path d="M11 10.2 L11 12.5" />
+    </g>
+  ),
+  // Three stars joined by dashed links.
+  constellation: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M4 10 L10 4 L18 8" strokeDasharray="1.2 1" strokeWidth="0.6" />
+      <path d="M4 7.5 L4 12.5 M1.5 10 L6.5 10 M10 1 L10 7 M7 4 L13 4 M18 5.5 L18 10.5 M15.5 8 L20.5 8" />
+    </g>
+  ),
+  // A front with a cold tooth and a warm bump on it.
+  fronts: (
+    <g {...BASE} strokeWidth="0.9">
+      <path d="M1 9 C6 9 8 7 11 7 C14 7 16 9 21 9" />
+      <path d="M4 8.6 L5.5 4.5 L7.5 8" />
+      <path d="M13.5 7.4 A2.4 2.4 0 0 1 18 8.3" />
+    </g>
+  ),
+  // A gate of five and three more strokes.
+  tally: (
+    <g {...BASE} strokeWidth="0.9">
+      <path d="M3 3 L3 11 M5 3 L5 11 M7 3 L7 11 M9 3 L9 11 M1.5 10 L10.5 4" />
+      <path d="M14 3 L14 11 M16 3 L16 11 M18 3 L18 11" />
+    </g>
+  ),
+  // Slanted rain against a slope, dense on the near side.
+  rain: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M2 2 L3.5 6 M5 1.5 L6.5 5.5 M8 2 L9.5 6 M4 7 L5.5 11 M7 6.5 L8.5 10.5 M11 3 L12.5 7 M16 2 L17 4.5" />
+      <path d="M1 12.5 L9 12.5 L14 6.5 L21 12.5" strokeWidth="1" />
+    </g>
+  ),
+  // Ripple crests bending round a rise.
+  ripples: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1 3 C6 2 10 4 21 2.5 M1 6 C6 5 9 8 14 7 C17 6.5 19 5.5 21 5.5 M1 9 C5 8.5 8 11 13 10.5 C16 10 18 9 21 8.5 M1 12 C7 11.5 12 13 21 11.5" />
+    </g>
+  ),
+  // A dendrite branching from a seed.
+  hoarfrost: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M11 7 L4 2 M11 7 L18 2 M11 7 L11 13 M11 7 L3 10 M11 7 L19 10" />
+      <path d="M7 4.2 L6 6 M8 5 L9 2.6 M15 4.2 L16 6 M14 5 L13 2.6 M11 10 L9 11.5 M11 10 L13 11.5 M6 9 L5 7.5 M16 9 L17 7.5" strokeWidth="0.5" />
+    </g>
+  ),
+  // Crosses and half stitches with a backstitch step.
+  stitch: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M2 2 L6 6 M6 2 L2 6 M8 2 L12 6 M12 2 L8 6 M14 6 L18 2 M2 8 L6 12 M6 8 L2 12 M8 12 L12 8 M14 12 L18 8" />
+      <path d="M13 1 L13 7 L7 7 L7 13" strokeWidth="1" />
+    </g>
+  ),
+  // Two triangles of a network, one hatched.
+  tin: (
+    <g {...BASE} strokeWidth="0.7">
+      <path d="M1 12.5 L8 1.5 L14 12.5 Z M8 1.5 L21 5 L14 12.5" />
+      <path d="M4 11 L8 4 M6.5 12 L9.5 6 M9.5 12 L11 8.5" strokeWidth="0.5" />
+    </g>
+  ),
   // Three bands of hatch, sparse to crossed, as the ground steepens.
   slopeclass: (
     <g {...BASE} strokeWidth="0.7">

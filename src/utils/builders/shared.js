@@ -345,6 +345,37 @@ function resolveLayerStyle(id, p) {
     case 'Glacier-Crevasses':
     case 'Glacier-Moraine':
       return { weight: p.weightGlacier, opacity: p.opacityGlacier, dash: id === 'Glacier-Ice' ? p.dashGlacier : 'solid' }
+    case 'TreeLine-Trees':
+      return { weight: p.weightTreeLine, opacity: p.opacityTreeLine, dash: 'solid' }
+    // The tree line is a boundary, dotted as a map dots one.
+    case 'TreeLine-Line':
+      return { weight: p.lineWeightTreeLine ?? 1.2, opacity: p.opacityTreeLine, dash: p.dashTreeLine ?? 'dotted' }
+    case 'Constellation-Stars':
+      return { weight: p.weightConstellation, opacity: p.opacityConstellation, dash: 'solid' }
+    case 'Constellation-Links':
+      return { weight: p.linkWeightConstellation ?? 0.6, opacity: p.opacityConstellation, dash: p.dashConstellation }
+    case 'Fronts-Lines':
+      return { weight: p.weightFronts, opacity: p.opacityFronts, dash: p.dashFronts }
+    // A symbol is never dashed.
+    case 'Fronts-Warm':
+    case 'Fronts-Cold':
+      return { weight: p.weightFronts, opacity: p.opacityFronts, dash: 'solid' }
+    case 'Ripples-Sand':
+    case 'Ripples-Rock':
+      return { weight: p.weightRipples, opacity: p.opacityRipples, dash: id === 'Ripples-Sand' ? p.dashRipples : 'solid' }
+    case 'Hoarfrost-Ice':
+      return { weight: p.weightHoarfrost, opacity: p.opacityHoarfrost, dash: p.dashHoarfrost }
+    case 'Hoarfrost-Line':
+      return { weight: p.weightHoarfrost, opacity: p.opacityHoarfrost, dash: 'dotted' }
+    // A stitch is never dashed.
+    case 'Stitch-Light':
+    case 'Stitch-Dark':
+    case 'Stitch-Back':
+      return { weight: p.weightStitch, opacity: p.opacityStitch, dash: 'solid' }
+    case 'Tin-Hatch':
+      return { weight: p.weightTin, opacity: p.opacityTin, dash: 'solid' }
+    case 'Tin-Edges':
+      return { weight: p.weightTin, opacity: p.opacityTin, dash: p.dashTin }
     // One pen per band, named for its degrees, so the plot says which is which.
     case 'SlopeClass-Low':
     case 'SlopeClass-Mid':

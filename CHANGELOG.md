@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Four map-symbol modes**, from the Twenty New Marks sketches, in a new
+  Symbol family on the Marks sheet. Each stamps a small symbol where the
+  ground calls for it, draped on the slope. `builders/symbols.js`.
+  - **Tree Line:** broadleaf rounds low down and conifers higher up, thinning
+    as the slope rises, with none above a ragged tree line. The tree line is a
+    dotted second pen. Slopes are true degrees.
+  - **Constellation:** the highest summits as stars, larger the higher they
+    stand, joined by a minimum spanning tree as a dashed second pen. A summit
+    must stand 2% of the height range above its surroundings, so a flat plain
+    or a raster clipped flat at its edge is not a field of stars.
+    A point symbol draws a star or a dot at each summit, or nothing, which
+    leaves only the links.
+  - **Weather Fronts:** contours lettered as a synoptic chart. Warm fronts
+    with semicircles low down, cold fronts with triangles high up, and
+    stationary fronts between, whose symbols alternate sides. Every symbol
+    points uphill. Three pens, with their own warm and cold colours.
+  - **Orographic Rain:** rain streaks on a wind, heaviest where the wind is
+    forced uphill, with a rain shadow behind higher ground upwind.
+- **Five ground-texture modes**, from the Twenty and Forty New Marks sketches.
+  - **Sand Ripples** (Line): wind ripple crests as the zero lines of a phase
+    that runs along the wind and is bent by the height, on the ground below a
+    dune field top, with the rock above contoured as a second pen.
+  - **Tally** (Tone, beside Line Printer): the height counted in gates of five
+    tally marks, one cell each.
+  - **Hoarfrost** (Tone, beside Coral): diffusion-limited aggregation from the
+    summits, kept to the ground above a cold line.
+  - **Cross-Stitch** (Tone): half stitches and crosses in two threads by
+    height class, with backstitch outlines.
+  - **TIN Facets** (Tone, beside Roughness Mesh): a Delaunay network of points
+    picked by curvature, each facet hatched along its fall line by its own
+    shade.
+  The sample plate builds the symbol modes in 4 to 95 ms at a 512 grid. At a
+  1 024 grid the others rebuild in 0.1 to 0.5 s, and Hoarfrost in about 1.8 s.
+
 ## [1.70.0] — 2026-11-05
 
 ### Added

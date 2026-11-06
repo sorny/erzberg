@@ -447,6 +447,57 @@ export const STYLE_DEF = {
   colorGlacier: '#1a1a1a', weightGlacier: 1, opacityGlacier: 1, dashGlacier: 'solid',
   hypsoGlacier: false, hypsoModeGlacier: 'elevation', hypsoBandedGlacier: false, hypsoIntervalGlacier: 10,
 
+  // Tree line — forest symbols below a tree line, thinning on steep ground.
+  enabledTreeLine: false, treelineTreeLine: 0.7, broadleafTreeLine: 0.4, steepTreeLine: 40,
+  spacingTreeLine: 6, sizeTreeLine: 1, lineTreeLine: true, lineColorTreeLine: '#c0561a', lineWeightTreeLine: 1.2,
+  seedTreeLine: 1, cellMetresTreeLine: 10, reliefTreeLine: 1000,
+  colorTreeLine: '#2d5a27', weightTreeLine: 0.8, opacityTreeLine: 1, dashTreeLine: 'dotted',
+  hypsoTreeLine: false, hypsoModeTreeLine: 'elevation', hypsoBandedTreeLine: false, hypsoIntervalTreeLine: 10,
+
+  // Constellation — the summits as stars, joined by a minimum spanning tree.
+  enabledConstellation: false, countConstellation: 30, spacingConstellation: 30, sizeConstellation: 1, markConstellation: 'star',
+  linksConstellation: true, linkWeightConstellation: 0.6,
+  colorConstellation: '#1a1a1a', weightConstellation: 0.9, opacityConstellation: 1, dashConstellation: 'dashed',
+  hypsoConstellation: false, hypsoModeConstellation: 'elevation', hypsoBandedConstellation: false, hypsoIntervalConstellation: 10,
+
+  // Weather fronts — contours lettered with warm, cold and stationary front symbols.
+  enabledFronts: false, levelsFronts: 5, spacingFronts: 24, sizeFronts: 1, radiusFronts: 2, solidFronts: true,
+  warmColorFronts: '#c0392b', coldColorFronts: '#1f5fa8',
+  colorFronts: '#1a1a1a', weightFronts: 0.9, opacityFronts: 1, dashFronts: 'solid',
+  hypsoFronts: false, hypsoModeFronts: 'elevation', hypsoBandedFronts: false, hypsoIntervalFronts: 10,
+
+  // Tally — the height counted in gates of five tally marks, one cell each.
+  enabledTally: false, cellTally: 24, maxTally: 10, jitterTally: 0.3, seedTally: 1,
+  colorTally: '#1a1a1a', weightTally: 0.9, opacityTally: 1, dashTally: 'solid',
+  hypsoTally: false, hypsoModeTally: 'elevation', hypsoBandedTally: false, hypsoIntervalTally: 10,
+
+  // Orographic rain — streaks on a wind, heavy on the windward slopes, a shadow behind.
+  enabledRain: false, azimuthRain: 270, liftRain: 1, shadowRain: 0.6, spacingRain: 3, lengthRain: 6, seedRain: 1,
+  colorRain: '#35577a', weightRain: 0.6, opacityRain: 1, dashRain: 'solid',
+  hypsoRain: false, hypsoModeRain: 'elevation', hypsoBandedRain: false, hypsoIntervalRain: 10,
+
+  // Sand ripples — wind ripples combed across the low ground, rock contoured above.
+  enabledRipples: false, azimuthRipples: 300, wavelengthRipples: 6, warpRipples: 1, topRipples: 0.6,
+  rockRipples: true, levelsRipples: 8, rockColorRipples: '#8a6a4a',
+  colorRipples: '#1a1a1a', weightRipples: 0.6, opacityRipples: 1, dashRipples: 'solid',
+  hypsoRipples: false, hypsoModeRipples: 'elevation', hypsoBandedRipples: false, hypsoIntervalRipples: 10,
+
+  // Hoarfrost — ice dendrites grown from the summits by diffusion-limited aggregation.
+  enabledHoarfrost: false, coldHoarfrost: 0.5, countHoarfrost: 6000, seedsHoarfrost: 7, cellHoarfrost: 3,
+  lineHoarfrost: true, seedHoarfrost: 1,
+  colorHoarfrost: '#1f4f78', weightHoarfrost: 0.6, opacityHoarfrost: 1, dashHoarfrost: 'solid',
+  hypsoHoarfrost: false, hypsoModeHoarfrost: 'elevation', hypsoBandedHoarfrost: false, hypsoIntervalHoarfrost: 10,
+
+  // Cross-stitch — half stitches and crosses by height band, with backstitch outlines.
+  enabledStitch: false, cellStitch: 8, bandsStitch: 5, backStitch: true, lightColorStitch: '#c0561a',
+  colorStitch: '#1a1a1a', weightStitch: 0.8, opacityStitch: 1, dashStitch: 'solid',
+  hypsoStitch: false, hypsoModeStitch: 'elevation', hypsoBandedStitch: false, hypsoIntervalStitch: 10,
+
+  // TIN facets — a triangulated irregular network, each facet hatched by its light.
+  enabledTin: false, countTin: 1500, floorTin: 0.03, pitchTin: 2, azimuthTin: 315, edgesTin: true, seedTin: 1,
+  colorTin: '#1a1a1a', weightTin: 0.5, opacityTin: 1, dashTin: 'solid',
+  hypsoTin: false, hypsoModeTin: 'elevation', hypsoBandedTin: false, hypsoIntervalTin: 10,
+
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
   radiusRugged: 1, kindRugged: 'delaunay', seedRugged: 11,

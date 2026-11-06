@@ -148,6 +148,15 @@ export const PANEL_MODES = [
   ['Mode: Spines',         'enabledSpines',    'Levels',    (s) => num(s.levelsSpines)],
   ['Mode: Coral',          'enabledCoral',     'Gap',       (s) => num(s.spacingCoral)],
   ['Mode: Glacier',        'enabledGlacier',   'Snowline',  (s) => `${Math.round((s.snowlineGlacier ?? 0.7) * 100)}%`],
+  ['Mode: Tree Line',      'enabledTreeLine',  'Tree line', (s) => `${Math.round((s.treelineTreeLine ?? 0.7) * 100)}%`],
+  ['Mode: Constellation',  'enabledConstellation', 'Stars', (s) => num(s.countConstellation)],
+  ['Mode: Weather Fronts', 'enabledFronts',    'Fronts',    (s) => num(s.levelsFronts)],
+  ['Mode: Tally',          'enabledTally',     'Most',      (s) => num(s.maxTally)],
+  ['Mode: Orographic Rain', 'enabledRain',     'Wind',      (s) => deg(s.azimuthRain)],
+  ['Mode: Sand Ripples',   'enabledRipples',   'Wind',      (s) => deg(s.azimuthRipples)],
+  ['Mode: Hoarfrost',      'enabledHoarfrost', 'Crystals',  (s) => num(s.countHoarfrost)],
+  ['Mode: Cross-Stitch',   'enabledStitch',    'Cell',      (s) => num(s.cellStitch)],
+  ['Mode: TIN Facets',     'enabledTin',       'Points',    (s) => num(s.countTin)],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
 ]
 

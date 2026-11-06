@@ -472,7 +472,7 @@ export function buildZeroCross(terrain, p, o) {
  * triangulation a sliver. Candidates are uniform over the raster, so the field
  * decides only how many survive where — the same contract as Stipple.
  */
-function sampleByDensity(terrain, density, count, rng) {
+export function sampleByDensity(terrain, density, count, rng) {
   const { gridMask, rows, cols } = terrain
   const taken = new Uint8Array(rows * cols)
   const xs = [], ys = []
