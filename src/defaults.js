@@ -451,6 +451,8 @@ export const STYLE_DEF = {
   enabledTreeLine: false, treelineTreeLine: 0.7, broadleafTreeLine: 0.4, steepTreeLine: 40,
   spacingTreeLine: 6, sizeTreeLine: 1, lineTreeLine: true, lineColorTreeLine: '#c0561a', lineWeightTreeLine: 1.2,
   seedTreeLine: 1, cellMetresTreeLine: 10, reliefTreeLine: 1000,
+  styleTreeLine: 'drawn', stanceTreeLine: 'flat', followTreeLine: 'bearing', facingTreeLine: 180, turnTreeLine: 0,
+  clumpingTreeLine: 0.35, krummholzTreeLine: 0.6, shadeTreeLine: true,
   colorTreeLine: '#2d5a27', weightTreeLine: 0.8, opacityTreeLine: 1, dashTreeLine: 'dotted',
   hypsoTreeLine: false, hypsoModeTreeLine: 'elevation', hypsoBandedTreeLine: false, hypsoIntervalTreeLine: 10,
 

@@ -329,7 +329,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Hypsometry | Strahler's hypsometric curve, with its histogram and the hypsometric integral |
 | Aspect Rose | A rose diagram of the way the ground faces, weighted by slope, on an equal-area scale |
 | Stereonet | Every slope's pole on a lower-hemisphere equal-area net, with density contours |
-| Tree Line | Forest symbols, broadleaf low and conifers higher, thinning on steep ground, up to a dotted tree line |
+| Tree Line | Forest symbols, broadleaf low and conifers higher, in groves that thin on steep ground and shrink up to a dotted tree line, flat or upright, turned to any facing |
 | Constellation | The highest summits as stars, joined by a minimum spanning tree |
 | Weather Fronts | Contours lettered as a synoptic chart: warm fronts low, cold fronts high, all pointing uphill |
 | Tally | The height counted in gates of five tally marks, one cell each |

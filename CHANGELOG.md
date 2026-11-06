@@ -7,14 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.71.0] — 2026-11-06
+
 ### Added
 
 - **Four map-symbol modes**, from the Twenty New Marks sketches, in a new
   Symbol family on the Marks sheet. Each stamps a small symbol where the
   ground calls for it, draped on the slope. `builders/symbols.js`.
-  - **Tree Line:** broadleaf rounds low down and conifers higher up, thinning
-    as the slope rises, with none above a ragged tree line. The tree line is a
-    dotted second pen. Slopes are true degrees.
+  - **Tree Line:** broadleaf trees with lobed crowns low down and conifers of
+    tiered boughs higher up, mixing over a band between, thinning as the slope
+    rises, with none above a ragged tree line. Groves and clearings come from a
+    value noise, and krummholz shrinks the trees near the line. Four tree
+    styles: Drawn, Classic (the first plain symbols), Map and Scribble.
+    Optional shading on the lower right. Each tree faces a bearing, or down or up the
+    slope, with a random turn spread, and lies flat or stands upright as a
+    cut-out. The tree line is a dotted second pen. Slopes are true degrees.
   - **Constellation:** the highest summits as stars, larger the higher they
     stand, joined by a minimum spanning tree as a dashed second pen. A summit
     must stand 2% of the height range above its surroundings, so a flat plain

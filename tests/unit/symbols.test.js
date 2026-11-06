@@ -40,11 +40,46 @@ describe('Tree Line', () => {
     for (let q = 1; q < trees.positions.length; q += 3) expect(trees.positions[q]).toBeLessThan(top)
     expect(layerStyle('TreeLine-Line', STYLE_DEF).dash).toBe('dotted')
   })
+  it('stands the trees upright, facing the bearing or the slope', () => {
+    const p = { enabledTreeLine: true, treelineTreeLine: 0.6, spacingTreeLine: 3, steepTreeLine: 89, reliefTreeLine: 200 }
+    const flat = one(cone, p, 'TreeLine-Trees')
+    const up = one(cone, { ...p, stanceTreeLine: 'upright' }, 'TreeLine-Trees')
+    wellFormed(up)
+    expect(up.note.trees).toBe(flat.note.trees)
+    // Upright, every trunk is a vertical segment: one x and z, two heights.
+    const trunks = (l) => {
+      let n = 0
+      for (let q = 0; q < l.positions.length; q += 6) {
+        const a = l.positions
+        if (a[q] === a[q + 3] && a[q + 2] === a[q + 5] && a[q + 4] > a[q + 1]) n++
+      }
+      return n
+    }
+    expect(trunks(up)).toBeGreaterThanOrEqual(up.note.trees)
+    expect(trunks(flat)).toBe(0)
+    const north = one(cone, { ...p, facingTreeLine: 0 }, 'TreeLine-Trees')
+    expect(Array.from(north.positions)).not.toEqual(Array.from(flat.positions))
+    for (const follow of ['downhill', 'uphill']) wellFormed(one(cone, { ...p, followTreeLine: follow, turnTreeLine: 30 }, 'TreeLine-Trees'))
+  })
+  it('draws each tree style at the same sites', () => {
+    const p = { enabledTreeLine: true, treelineTreeLine: 0.6, spacingTreeLine: 3, steepTreeLine: 89, reliefTreeLine: 200 }
+    const seen = new Set()
+    let trees = null
+    for (const st of ['drawn', 'classic', 'map', 'scribble']) {
+      const l = one(cone, { ...p, styleTreeLine: st }, 'TreeLine-Trees')
+      wellFormed(l)
+      trees ??= l.note.trees
+      expect(l.note.trees).toBe(trees)
+      seen.add(l.positions.length)
+    }
+    expect(seen.size).toBe(4)
+  })
   it('keeps no tree on ground steeper than the limit', () => {
-    // A ramp of 2 000 m over 960 m: about 64° everywhere.
+    // A ramp of 2 000 m over 960 m: about 64° everywhere, and 46.5° on the
+    // edge columns, where the slope is read from one side only.
     const ramp = terrainOf((x) => x / (W - 1))
     const p = { enabledTreeLine: true, treelineTreeLine: 1, spacingTreeLine: 3, reliefTreeLine: 2000, cellMetresTreeLine: 10 }
-    expect(one(ramp, { ...p, steepTreeLine: 60 }, 'TreeLine-Trees')).toBeUndefined()
+    expect(one(ramp, { ...p, steepTreeLine: 45 }, 'TreeLine-Trees')).toBeUndefined()
     wellFormed(one(ramp, { ...p, steepTreeLine: 70 }, 'TreeLine-Trees'))
   })
 })

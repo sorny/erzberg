@@ -1498,6 +1498,19 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Steepest" help="No tree stands on ground steeper than this. Below it the forest thins as the slope rises." min={5} max={89} step={1} value={style.steepTreeLine} onChange={v => ss({ steepTreeLine: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Spacing" help="The gap between the sites where a tree can stand, in raster pixels." min={2} max={40} step={0.5} value={style.spacingTreeLine} onChange={v => ss({ spacingTreeLine: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Symbol size" help="The size of each tree, as a share of the spacing." min={0.2} max={2.5} step={0.05} value={style.sizeTreeLine} onChange={v => ss({ sizeTreeLine: v })} fmt={v => v.toFixed(2)} />
+                  <SegGroup label="Tree style" options={[['Drawn', 'drawn'], ['Classic', 'classic'], ['Map', 'map'], ['Scribble', 'scribble']]} testIdOf={(m) => `treeline-style-${m}`}
+                    value={style.styleTreeLine ?? 'drawn'} onChange={v => ss({ styleTreeLine: v })} style={{ marginBottom: 8 }} />
+                  <InlineSl label="Clumping" help="Gathers the trees into groves with clearings between them. At 0 the forest is even." min={0} max={1} step={0.01} value={style.clumpingTreeLine ?? 0.35} onChange={v => ss({ clumpingTreeLine: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Krummholz" help="Shrinks the trees as they near the tree line, the way wind and cold stunt them at the edge of the forest." min={0} max={1} step={0.01} value={style.krummholzTreeLine ?? 0.6} onChange={v => ss({ krummholzTreeLine: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <Tog label="Shading" help="A short ground line at each tree. Drawn trees also take a few strokes on the lower right, the side away from a light in the upper left." testId="treeline-shade" checked={style.shadeTreeLine ?? true} onChange={v => ss({ shadeTreeLine: v })} />
+                  <SegGroup label="Stance" options={[['Flat', 'flat'], ['Upright', 'upright']]} testIdOf={(m) => `treeline-stance-${m}`}
+                    value={style.stanceTreeLine ?? 'flat'} onChange={v => ss({ stanceTreeLine: v })} style={{ marginBottom: 8 }} />
+                  <SegGroup label="Facing" options={[['Bearing', 'bearing'], ['Downhill', 'downhill'], ['Uphill', 'uphill']]} testIdOf={(m) => `treeline-follow-${m}`}
+                    value={style.followTreeLine ?? 'bearing'} onChange={v => ss({ followTreeLine: v })} style={{ marginBottom: 8 }} />
+                  {(style.followTreeLine ?? 'bearing') === 'bearing' && (
+                    <InlineSl label="Facing bearing" help="The bearing each tree faces: the side it is drawn to be seen from. Flat trees point their tops the other way. At 180° they face south, so their tops point north." min={0} max={360} step={1} value={style.facingTreeLine ?? 180} onChange={v => ss({ facingTreeLine: Math.round(v) })} fmt={v => `${Math.round(v)}°`} />
+                  )}
+                  <InlineSl label="Turn spread" help="Turns each tree at random, by up to this many degrees either way from its facing." min={0} max={180} step={1} value={style.turnTreeLine ?? 0} onChange={v => ss({ turnTreeLine: Math.round(v) })} fmt={v => `±${Math.round(v)}°`} />
                   <Tog label="Tree line" help="The tree line itself, traced as a dotted contour in a second pen." testId="treeline-line" checked={!!style.lineTreeLine} onChange={v => ss({ lineTreeLine: v })} />
                   {style.lineTreeLine && (
                     <>
@@ -1594,7 +1607,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                       {`${symbolNotes.Rain.streaks.toLocaleString()} streaks`}
                     </div>
                   )}
-                  <InlineSl label="Wind from" help="The bearing the wind blows from. Rain falls hardest on the slopes that face it." min={0} max={360} step={1} value={style.azimuthRain} onChange={v => ss({ azimuthRain: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Wind from" help="The bearing the wind blows from. Rain falls hardest on the slopes that face it." min={0} max={360} step={1} value={style.azimuthRain} onChange={v => ss({ azimuthRain: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Lift" help="How much more rain falls where the wind is forced uphill." min={0} max={3} step={0.05} value={style.liftRain} onChange={v => ss({ liftRain: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Rain shadow" help="How much drier the ground is behind higher ground upwind." min={0} max={2} step={0.05} value={style.shadowRain} onChange={v => ss({ shadowRain: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Spacing" help="The gap between the sites where a streak can fall, in raster pixels." min={1} max={20} step={0.5} value={style.spacingRain} onChange={v => ss({ spacingRain: v })} fmt={v => v.toFixed(1)} />
@@ -1615,7 +1628,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                       {`${Math.round(symbolNotes.Ripples.sand * 100)}% sand`}
                     </div>
                   )}
-                  <InlineSl label="Wind from" help="The bearing the wind blows from. The ripple crests run across it." min={0} max={360} step={1} value={style.azimuthRipples} onChange={v => ss({ azimuthRipples: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Wind from" help="The bearing the wind blows from. The ripple crests run across it." min={0} max={360} step={1} value={style.azimuthRipples} onChange={v => ss({ azimuthRipples: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Wavelength" help="The gap between ripple crests, in raster pixels. A gap under three grid cells is widened to three." min={2} max={60} step={0.5} value={style.wavelengthRipples} onChange={v => ss({ wavelengthRipples: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Warp" help="How far the height bends the crests. At 1 the full height range shifts them by 9% of the plate." min={0} max={4} step={0.05} value={style.warpRipples} onChange={v => ss({ warpRipples: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Dune field top" help="Sand covers the ground below this share of the height range. Above it is rock." min={0.05} max={1} step={0.01} value={style.topRipples} onChange={v => ss({ topRipples: v })} fmt={v => `${Math.round(v * 100)}%`} />
@@ -1687,7 +1700,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Points" help="The number of points in the network. They gather where the ground bends." min={10} max={20000} step={10} value={style.countTin} onChange={v => ss({ countTin: Math.round(v) })} />
                   <InlineSl label="Floor" help="The chance of a point on smooth ground, so a flat still gets a few facets." min={0} max={1} step={0.01} value={style.floorTin} onChange={v => ss({ floorTin: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Hatch pitch" help="The gap between hatch lines on a facet that faces away from the sun, in raster pixels. Lit facets hatch sparser." min={0.5} max={20} step={0.1} value={style.pitchTin} onChange={v => ss({ pitchTin: v })} fmt={v => v.toFixed(1)} />
-                  <InlineSl label="Sun azimuth" help="The bearing of the sun, at 45° above the horizon." min={0} max={360} step={1} value={style.azimuthTin} onChange={v => ss({ azimuthTin: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Sun azimuth" help="The bearing of the sun, at 45° above the horizon." min={0} max={360} step={1} value={style.azimuthTin} onChange={v => ss({ azimuthTin: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
                   <Tog label="Edges" help="The triangle edges, as a second pen." testId="tin-edges" checked={!!style.edgesTin} onChange={v => ss({ edgesTin: v })} />
                   <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTin} onChange={v => ss({ seedTin: Math.round(v) })} />
                 </Sub>

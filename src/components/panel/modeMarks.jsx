@@ -469,7 +469,7 @@ const MARKS = {
   treeline: (
     <g {...BASE} strokeWidth="0.8">
       <path d="M1 2 L21 2" strokeDasharray="0.1 2" strokeWidth="1.2" />
-      <path d="M2 11 L4.5 5 L7 11 M4.5 11 L4.5 12.5 M15 11 L17.5 5 L20 11 M17.5 11 L17.5 12.5" />
+      <path d="M2 9 L4.5 4 L7 9 M2.6 11.4 L4.5 7 L6.4 11.4 M4.5 11 L4.5 12.8 M15 9 L17.5 4 L20 9 M15.6 11.4 L17.5 7 L19.4 11.4 M17.5 11 L17.5 12.8" />
       <circle cx="11" cy="8" r="2.2" />
       <path d="M11 10.2 L11 12.5" />
     </g>
