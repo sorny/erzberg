@@ -68,7 +68,7 @@ for (const mode of DRAW_MODES.filter((m) => !m.needsData)) {
     for await (const c of await dl.createReadStream()) chunks.push(c)
     const svg = Buffer.concat(chunks).toString('utf-8')
     const label = MODE_LABEL[mode.id]
-    const pens = [...svg.matchAll(/inkscape:label="([^"]+)"/g)]
+    const pens = [...svg.matchAll(/data-name="([^"]+)"/g)]
       .map((m) => m[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&quot;/g, '"'))
     expect(pens.some((l) => l === label || l.startsWith(`${label} · `)),
       `no pen layer for ${label} in ${pens.join(', ')}`).toBe(true)

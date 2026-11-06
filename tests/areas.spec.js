@@ -63,7 +63,9 @@ async function exportSvg(page) {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-const labelsOf = (svg) => [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+const labelsOf = (svg) => [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
+// Each pen layer's bare name and its one ink.
+const penInks = (svg) => [...svg.matchAll(/data-ink="([^"]+)"[^>]*data-name="([^"]+)"/g)].map((m) => [m[2], m[1]])
 
 for (const [term, label, expectInks] of [
   ['Mode: Watershed', 'Watershed', 10],
@@ -76,11 +78,11 @@ for (const [term, label, expectInks] of [
     await page.waitForTimeout(3500)
     const svg = await exportSvg(page)
 
-    const mine = labelsOf(svg).filter((l) => l.startsWith(`${label} · ink `))
+    const mine = penInks(svg).filter(([l]) => l.startsWith(`${label} · ink `))
     expect(mine.length, 'one pen layer per ink').toBe(expectInks)
-    // The label carries the hex, because that is what somebody sorting a plot by
-    // pen reads. Two layers must never claim the same one.
-    const hexes = mine.map((l) => l.slice(-7))
+    // The layer carries the hex, because that is what somebody sorting a plot
+    // by pen reads. Two layers must never claim the same one.
+    const hexes = mine.map(([, h]) => h)
     expect(new Set(hexes).size).toBe(expectInks)
     for (const h of hexes) expect(h).toMatch(/^#[0-9a-f]{6}$/)
 

@@ -28,7 +28,7 @@ test('renders only the asked-for modes, with the look embedded', async () => {
   expect(r.stdout.trim()).toBe(out)
 
   const svg = readFileSync(out, 'utf8')
-  const layers = [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+  const layers = [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
   expect(layers.length).toBeGreaterThan(0)
   expect(layers.every((l) => l.startsWith('Contours'))).toBe(true)
   // The preset comment carries the values the run set, over Blueprint's.
@@ -70,7 +70,7 @@ test('atlas cuts one sheet per feature from a GeoTIFF, and skips one outside it'
   // Two different pieces of ground, each 3 km wide at 10 m.
   const west = readFileSync(join(dir, 'sheets', 'West.svg'), 'utf8')
   const east = readFileSync(join(dir, 'sheets', 'East.svg'), 'utf8')
-  expect(west).toContain('inkscape:label="Contours')
+  expect(west).toContain('data-name="Contours')
   expect(west).not.toBe(east)
   expect(readFileSync(join(dir, 'sheets', 'atlas.html'), 'utf8')).toContain('src="East.png"')
 })

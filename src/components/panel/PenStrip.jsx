@@ -25,8 +25,8 @@ function Swatch({ hex }) {
 
 /**
  * The chips a row draws. A mixed layer is one pen, so it is one chip, a ramp
- * through its inks — six chips side by side read as six pens. An area layer
- * is a pen per ink, so it gets a chip per ink.
+ * through its inks — six chips side by side read as six pens. An area layer,
+ * or a line layer split by ink, is a pen per ink, so it gets a chip per ink.
  */
 function Swatches({ row }) {
   if (row.kind === 'mixed') {
@@ -54,7 +54,7 @@ function inkNumbers(rows) {
 
 /** What a row says on its right: the ink of one-ink layer, or why there is no one ink. */
 function readoutOf(row, inks) {
-  if (row.kind === 'areas') return `${row.count} ink${row.count === 1 ? '' : 's'}`
+  if (row.kind === 'areas' || row.kind === 'split') return `${row.count} ink${row.count === 1 ? '' : 's'}`
   if (row.kind === 'mixed') return 'multicolour'
   return `ink ${inks.get(row.inks[0])} · ${row.inks[0]}`
 }
@@ -64,7 +64,7 @@ function readoutOf(row, inks) {
  * colours they carry are said here: "Crosshatch, ink #c0d5db".
  */
 function spokenOf(row) {
-  if (row.kind === 'areas') return `${row.name}, ${row.count} inks: ${row.inks.join(', ')}`
+  if (row.kind === 'areas' || row.kind === 'split') return `${row.name}, ${row.count} inks: ${row.inks.join(', ')}`
   if (row.kind === 'mixed') return `${row.name}, one layer in many colours`
   return `${row.name}, ink ${row.inks[0]}`
 }

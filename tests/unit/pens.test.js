@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { penLine, pensOf } from '../../src/utils/pens'
+import { MAX_SPLIT_INKS, penLine, pensOf } from '../../src/utils/pens'
 
 const seg = [0, 0, 0, 1, 1, 1]
 const rgb = (...hexes) => hexes.flatMap((h) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16) / 255))
@@ -21,10 +21,19 @@ describe('pensOf', () => {
     expect(pensOf(geo, {}).rows[0].inks).toEqual(['#ffffff'])
   })
 
-  it('calls a layer coloured per vertex one layer of many colours', () => {
+  it('gives a line layer in a few inks one pen per ink, as the SVG splits it', () => {
     const geo = [{ id: 'Contours', positions: [...seg, ...seg], colors: rgb('#ff0000', '#ff0000', '#0000ff', '#0000ff') }]
+    const out = pensOf(geo, {})
+    expect(out.rows[0]).toMatchObject({ kind: 'split', count: 2, inks: ['#ff0000', '#0000ff'] })
+    expect(out).toMatchObject({ layers: 2, exact: false })
+  })
+
+  it('calls a layer graded through many inks one layer of many colours', () => {
+    const ramp = Array.from({ length: MAX_SPLIT_INKS + 1 }, (_, k) => `#0000${(k * 16).toString(16).padStart(2, '0')}`)
+    const geo = [{ id: 'Contours', positions: ramp.flatMap(() => seg), colors: rgb(...ramp.flatMap((h) => [h, h])) }]
     const [row] = pensOf(geo, {}).rows
-    expect(row).toMatchObject({ kind: 'mixed', count: 1, inks: ['#ff0000', '#0000ff'], mode: 'Contours', copy: false })
+    expect(row).toMatchObject({ kind: 'mixed', count: 1, mode: 'Contours', copy: false })
+    expect(row.inks.length).toBe(MAX_SPLIT_INKS + 1)
     const copy = pensOf([{ ...geo[0], id: 'Contours-Minor@c3' }], {}).rows[0]
     expect(copy).toMatchObject({ mode: 'Contours', copy: true })
   })

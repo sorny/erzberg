@@ -116,7 +116,7 @@ test('labels are lettered, and read as height above the ground', async ({ page }
    * against a name rather than against a missing layer.
    */
   expect(after, 'the numbers get their own pen layer')
-    .toMatch(/<g id="layer-Contours-Labels"[^>]*inkscape:label="Contours · Heights"/)
+    .toMatch(/<g id="layer-Contours-Labels"[^>]*data-name="Contours · Heights"/)
 
   // An outline face exports as editable text, exactly like the vector labels.
   const texts = [...after.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map((m) => m[1])

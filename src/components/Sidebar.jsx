@@ -3684,7 +3684,7 @@ export function Sidebar({
                 measures the result before anything is written. */}
             <div>
               <InlineSl label="Sheet width" testId="plot-width"
-                help="How wide the plot is on paper. The exporter writes pixels rather than millimetres — deliberately, so one file suits any sheet — so this is the one fact it cannot know. Everything physical needs it: the time below, and the map ratio in Map Elements."
+                help="How wide the plot is on paper. The SVG page is this wide in millimetres, and its height follows the drawing, so an A4 portrait page is 210 mm. Everything physical reads it: the pen widths in the layer names, the time below, and the map ratio in Map Elements."
                 min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
                 onChange={v => sv({ plotWidthMm: Math.round(v) })} fmt={v => Math.round(v) + ' mm'} />
               <InlineSl label="Pen tip" testId="plot-pen"

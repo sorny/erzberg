@@ -120,7 +120,7 @@ test('the SVG carries the marks as their own plotter layer', async ({ page }) =>
 
   // Its own Inkscape layer, so a plotter run can put the annotation in a
   // different pen from the terrain.
-  expect(svg).toContain('inkscape:label="Scale and north"')
+  expect(svg).toContain('data-name="Scale and north"')
   expect(svg).toContain('>N</text>')
   // The exporter measures again in its own pixels — a 4× plate has four times as
   // many pixels per metre — but it must land on the same round distance the

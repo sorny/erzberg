@@ -352,9 +352,10 @@ with or without a fill. A mode's *Halo* breaks the lines behind its strokes.
 terrain. Hidden segments can take their own colour and opacity.
 
 **Pen layers.** Output lists the layers the SVG will hold under the SVG
-button: one row per pen, with its ink. A layer coloured by height or slope says
-`mixed`, because one pen cannot draw it as shown; **One ink** sets that mode's
-Colour to Line. The line at the top of the panel gives the same count
+button: one row per pen, with its ink. A layer in two to eight inks, such as
+banded height, is one pen layer per ink. A layer graded through more inks says
+`multicolour`, because one pen cannot draw it as shown; **One ink** sets that
+mode's Colour to Line. The line at the top of the panel gives the same count
 (`3 layers · 1 ink · 2 mixed`). Preflight counts exactly when filled areas or
 hidden lines are drawing.
 
@@ -454,7 +455,7 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 
 | Format | Notes |
 |---|---|
-| **SVG** | Software Z-buffer with terrain occlusion. One Inkscape layer per mode and per vector layer. Exact dash patterns. Shows progress and can be cancelled. |
+| **SVG** | Software Z-buffer with terrain occlusion. One Inkscape layer per pen, numbered in plot order and named for what it draws, its ink and its pen width (`03 · Contours · Minor · #1a1a1a · 0.21 mm`), with a description inside. The paper is a locked `% Paper` layer that plotters skip. The page is the *Output › Plot › Sheet width* wide in millimetres, so for A4 portrait set Paper to ISO, portrait, and the Sheet width to 210 mm. Exact dash patterns. Shows progress and can be cancelled. |
 | **PNG** | 4K with MSAA, trimmed to content. **PNG α** has a transparent background. With *Paper › Print size* at a DPI, the PNG is the whole sheet at the Sheet width times that DPI, and the DPI is stored in the file. |
 | **STL** | Watertight mesh. A vector layer with **STL ribbon** gets a second solid for multicolour printing. |
 | **glTF, 3MF** | The STL's solid with the plate on top, seen from above: as a texture in a `.glb` for Blender and web viewers, as vertex colours in a `.3mf` for colour printers. |

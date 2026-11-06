@@ -23,7 +23,7 @@ async function exportSvg(page) {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-const labelsOf = (svg) => [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+const labelsOf = (svg) => [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
 const lookOf = (svg) => JSON.parse(/<!-- erzberg:preset (.*?) -->/.exec(svg)[1])
 
 test('a copy of a mode is its own pens, in undo and in the file', async ({ page }) => {

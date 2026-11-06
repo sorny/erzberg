@@ -110,11 +110,13 @@ async function exportSvg(page) {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-const labelsOf = (svg) => [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+const labelsOf = (svg) => [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
+// Each pen layer's bare name and its one ink.
+const penInks = (svg) => [...svg.matchAll(/data-ink="([^"]+)"[^>]*data-name="([^"]+)"/g)].map((m) => [m[2], m[1]])
 
 /** How many line segments one pen layer holds. */
 function segmentsIn(svg, label) {
-  const start = svg.indexOf(`inkscape:label="${label}"`)
+  const start = svg.indexOf(`data-name="${label}"`)
   if (start < 0) return 0
   const end = svg.indexOf('</g>', start)
   return (svg.slice(start, end).match(/<(path|line|polyline)\b/g) ?? []).length
@@ -216,9 +218,9 @@ test('the Land cover mode inks one layer per class', async ({ page }) => {
   await page.waitForTimeout(3500)
 
   const svg = await exportSvg(page)
-  const mine = labelsOf(svg).filter((l) => l.startsWith('Land cover · ink '))
+  const mine = penInks(svg).filter(([l]) => l.startsWith('Land cover · ink '))
   expect(mine.length, 'one pen layer per class').toBe(BANDS)
-  expect(new Set(mine.map((l) => l.slice(-7))).size).toBe(BANDS)
+  expect(new Set(mine.map(([, h]) => h)).size).toBe(BANDS)
 
   // CC-BY travels with the work, not with the app: a plate that is actually in
   // the picture puts its credit in the file.
@@ -327,7 +329,7 @@ test('the pens are the class inks exactly', async ({ page }) => {
   const svg = await exportSvg(page)
   // The stroke is the swatch, never the tone-mapped colour (#e69f00 → #e2d149).
   for (const [label, ink] of [['Class A', '#e69f00'], ['Class B', '#56b4e9'], ['Class C', '#009e73']]) {
-    const layer = svg.match(new RegExp(`inkscape:label="Pillars · ${label} ${ink}">([\\s\\S]*?)</g>`))
+    const layer = svg.match(new RegExp(`data-name="Pillars · ${label} ${ink}">([\\s\\S]*?)</g>`))
     expect(layer, `no pen layer for ${label}`).toBeTruthy()
     const strokes = new Set([...layer[1].matchAll(/stroke="(#[0-9a-f]{6})"/g)].map((m) => m[1]))
     expect([...strokes]).toEqual([ink])

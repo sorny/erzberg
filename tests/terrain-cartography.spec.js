@@ -30,7 +30,7 @@ async function exportSvg(page) {
   return Buffer.concat(chunks).toString('utf-8')
 }
 
-const labelsOf = (svg) => [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+const labelsOf = (svg) => [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
 // Every coordinate the strokes are written with, in order.
 const strokes = (svg) => [...svg.matchAll(/ (?:points|x1|y1|x2|y2|d)="([^"]+)"/g)].map((m) => m[1]).join(' ')
 
