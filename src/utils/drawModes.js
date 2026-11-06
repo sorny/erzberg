@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all sixty-two at once.
+ * does the index that shows all seventy-one at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -343,6 +343,51 @@ export const DRAW_MODES = [
     pick: { spacing: [4, 10], radius: [1, 3] },
   },
   {
+    // One glyph of a few strokes per site, on a jittered grid.
+    id: 'TreeLine', label: 'Tree line', cost: 1.5, mark: 'treeline', walls: false,
+    pick: { spacing: [5, 10], treeline: [0.55, 0.85] },
+  },
+  {
+    // A few dozen stars and the tree that links them.
+    id: 'Constellation', label: 'Constellation', cost: 1, mark: 'constellation', walls: false,
+    pick: { count: [12, 40] },
+  },
+  {
+    // A handful of contours, each with a symbol every few dozen pixels.
+    id: 'Fronts', label: 'Weather fronts', cost: 1.5, mark: 'fronts', walls: false,
+    pick: { levels: [3, 7], spacing: [16, 36] },
+  },
+  {
+    // Up to ten strokes per cell.
+    id: 'Tally', label: 'Tally', cost: 1, mark: 'tally', walls: false,
+    pick: { cell: [16, 36] },
+  },
+  {
+    // One short streak per kept site, and a short walk upwind from each.
+    id: 'Rain', label: 'Orographic rain', cost: 2, mark: 'rain', walls: false,
+    pick: { azimuth: [0, 360], spacing: [2, 5] },
+  },
+  {
+    // A phase field and one level of it, plus a few contours of the rock.
+    id: 'Ripples', label: 'Sand ripples', cost: 1.5, mark: 'ripples', walls: false,
+    pick: { azimuth: [0, 360], wavelength: [4, 10] },
+  },
+  {
+    // Random walkers on a lattice, most of them short-lived.
+    id: 'Hoarfrost', label: 'Hoarfrost', cost: 3, mark: 'hoarfrost', walls: false,
+    pick: { cold: [0.35, 0.65] },
+  },
+  {
+    // Two strokes a cell.
+    id: 'Stitch', label: 'Cross-stitch', cost: 1, mark: 'stitch', walls: false,
+    pick: { cell: [5, 14] },
+  },
+  {
+    // One triangulation, and a clipped hatch per facet.
+    id: 'Tin', label: 'TIN facets', cost: 2, mark: 'tin', walls: false,
+    pick: { count: [600, 3000] },
+  },
+  {
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
     pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
@@ -402,6 +447,22 @@ export const SUB_LAYER_LABEL = {
   'Glacier-Ice':             'Ice',
   'Glacier-Crevasses':       'Crevasses',
   'Glacier-Moraine':         'Moraine',
+  'TreeLine-Trees':          'Trees',
+  'TreeLine-Line':           'Tree line',
+  'Constellation-Stars':     'Stars',
+  'Constellation-Links':     'Links',
+  'Fronts-Lines':            'Lines',
+  'Fronts-Warm':             'Warm',
+  'Fronts-Cold':             'Cold',
+  'Ripples-Sand':            'Sand',
+  'Ripples-Rock':            'Rock',
+  'Hoarfrost-Ice':           'Ice',
+  'Hoarfrost-Line':          'Cold line',
+  'Stitch-Light':            'Light thread',
+  'Stitch-Dark':             'Dark thread',
+  'Stitch-Back':             'Backstitch',
+  'Tin-Hatch':               'Hatch',
+  'Tin-Edges':               'Edges',
 }
 
 /**

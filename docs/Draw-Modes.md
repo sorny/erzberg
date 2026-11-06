@@ -974,6 +974,87 @@ opposite the way it faces. Up to *Poles read* cells are read, evenly. *Density
 contours* come from a Gaussian count on a 64² grid over the net, in *Contour
 levels* steps up to the peak. *Net* draws the graticule every 10°.
 
+## 64–67. Map symbols: Tree Line, Constellation, Weather Fronts, Orographic Rain
+
+Each stamps a small symbol where the ground calls for it, draped on the slope.
+Heights are shares of the plate's height range. `builders/symbols.js`.
+
+### Tree Line
+
+Forest symbols on a jittered grid, *Spacing* pixels apart: a broadleaf round
+below *Broadleaf below*, a conifer above it, and none above *Tree line*, whose
+edge is ragged. The forest thins as the slope rises, a site keeping its tree
+with a chance of $1 - (s/s_{max})^2$, and no tree stands steeper than
+*Steepest*. Slopes are true degrees, from *Pixel size* and *Relief* where the
+raster has none. *Tree line* also traces the line itself as a dotted second pen.
+
+### Constellation
+
+The *Stars* highest summits, each the highest point within *Spacing* pixels
+and standing at least 2% of the height range above the lowest point there. A
+higher summit draws a larger star. *Links* joins them with a minimum spanning
+tree (Prim), the shortest set of lines that links every star, as a dashed
+second pen. *Point symbol* draws a star, a dot or nothing at each summit. With
+None, only the links are drawn, and they run to the summits.
+
+### Weather Fronts
+
+*Fronts* contours, evenly spaced in height, lettered as a synoptic chart. The
+lower two fifths are warm fronts (semicircles), the upper two fifths cold
+fronts (triangles), and those between stationary fronts, whose triangles and
+semicircles alternate on opposite sides. A symbol stands every *Spacing*
+pixels and points uphill. Three pens: the lines, *Warm colour* and *Cold
+colour*. *Solid symbols* draws a smaller copy inside each one.
+
+### Orographic Rain
+
+Rain streaks on a wind from *Wind from*. The rain at a point is a small base,
+plus a little for height, plus *Lift* times the rise of the ground along the
+wind, scaled so the 95th percentile is 1. *Rain shadow* takes away rain in
+proportion to how far the highest ground upwind stands above the point. Streak
+sites sit *Spacing* pixels apart, each kept with a chance equal to the rain,
+and each streak runs *Streak length* pixels downwind.
+
+## 68–72. Ground textures: Sand Ripples, Tally, Hoarfrost, Cross-Stitch, TIN Facets
+
+Sand Ripples is in the Line family, the others in Tone. Heights are shares of
+the plate's height range. Tally is in `builders/symbols.js`, Sand Ripples and
+Hoarfrost in `builders/process.js`, the others in `builders/mesh.js`.
+
+### Sand Ripples
+
+Ripple crests across the wind from *Wind from*, *Wavelength* pixels apart, on
+the ground below *Dune field top*. *Warp* bends them with the height: at 1 the
+full range shifts them by 9% of the plate. *Rock contours* draws *Rock levels*
+contours above the dune field, starting with its edge, in *Rock colour*.
+
+### Tally
+
+The height counted in tally marks, one *Cell* of pixels each. A cell's count
+is its share of the height range times *Most marks*. Four strokes and a slash
+make a gate of five, two gates to a row. *Jitter* moves each stroke a little.
+
+### Hoarfrost
+
+Diffusion-limited aggregation on a lattice of *Cell* pixels. The crystals
+start on the *Seeds* highest summits above *Cold line*. Random walkers stick
+where they touch a crystal and die below the cold line. Up to *Crystals* stick,
+each joined to the one it touched. *Cold line* also draws the line, dotted.
+
+### Cross-Stitch
+
+Stitch cells of *Cell* pixels split into *Bands* height classes with equal
+shares of the ground. The lowest class is bare cloth, the next takes half
+stitches and the rest full crosses. The lower half is the *Light thread*, the
+upper half the mode's ink. *Backstitch* outlines each class change.
+
+### TIN Facets
+
+*Points* points, picked with a chance of *Floor* plus the curvature, are
+triangulated. Each facet is hatched along its fall line. The gap is *Hatch
+pitch* where the facet faces away from a sun at *Sun azimuth* and 45°, and
+grows as it turns to the sun. *Edges* draws the triangles.
+
 ## NoData and clipped edges
 
 NoData cells, transparent PNG pixels and everything outside an Edit Mode

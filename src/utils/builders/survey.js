@@ -84,7 +84,7 @@ export function buildBedding(terrain, p, o) {
  * off the ground. A neighbour in NoData reads as the cell itself, so the edge
  * of a clipped selection is not a cliff.
  */
-function slopeDegrees(terrain, ground) {
+export function slopeDegrees(terrain, ground) {
   const { gridMask, rows, cols } = terrain
   const { heights, cellX, cellY } = ground
   const h = (r, c, i) => {

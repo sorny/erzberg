@@ -30,7 +30,7 @@ const formatWalk = (seconds) => {
 
 
 
-export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, terrainData, waveGuide = true, onWaveGuide, runoutNote, sec, slopeClassNote, sg, shadowLineSun, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
+export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGridNote, geoTiffBbox, glacierNote, gradientStops, hasGeoTiff, intervalMax, intervalMin, mPerWorld, metreInterval, onPick, pick, plateSpan = 1000, routeNote, terrainData, waveGuide = true, onWaveGuide, runoutNote, sec, slopeClassNote, sg, shadowLineSun, symbolNotes = {}, singleLineFonts, ss, style, sunHoursGeoreferenced, sunHoursSeconds, sunHoursSweeps, terrain, tog, venationNote, viewshedNote, windNote }) {
   return (
     <>
           <Section title="Mode: Lines" icon={<ModeMark kind="lines" />} open={sec.modeLines} onToggle={() => tog('modeLines')} enabled={style.enabledLines} onEnabled={v => ss({ enabledLines: v })}>
@@ -1483,6 +1483,220 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               </>
             )}
           </Section>
+
+          <Section title="Mode: Tree Line" icon={<ModeMark kind="treeline" />} open={sec.modeTreeLine} onToggle={() => tog('modeTreeLine')} enabled={style.enabledTreeLine} onEnabled={v => ss({ enabledTreeLine: v })} enableTestId="mode-treeline">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.TreeLine && (
+                    <div data-testid="treeline-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.TreeLine.trees.toLocaleString()} trees`}
+                    </div>
+                  )}
+                  <InlineSl label="Tree line" help="No trees grow above this share of the height range. The line is ragged, so a few sites just below it are bare too." min={0} max={1} step={0.01} value={style.treelineTreeLine} onChange={v => ss({ treelineTreeLine: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Broadleaf below" help="Below this share of the height range a site takes a broadleaf round, and above it a conifer." min={0} max={1} step={0.01} value={style.broadleafTreeLine} onChange={v => ss({ broadleafTreeLine: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Steepest" help="No tree stands on ground steeper than this. Below it the forest thins as the slope rises." min={5} max={89} step={1} value={style.steepTreeLine} onChange={v => ss({ steepTreeLine: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Spacing" help="The gap between the sites where a tree can stand, in raster pixels." min={2} max={40} step={0.5} value={style.spacingTreeLine} onChange={v => ss({ spacingTreeLine: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Symbol size" help="The size of each tree, as a share of the spacing." min={0.2} max={2.5} step={0.05} value={style.sizeTreeLine} onChange={v => ss({ sizeTreeLine: v })} fmt={v => v.toFixed(2)} />
+                  <Tog label="Tree line" help="The tree line itself, traced as a dotted contour in a second pen." testId="treeline-line" checked={!!style.lineTreeLine} onChange={v => ss({ lineTreeLine: v })} />
+                  {style.lineTreeLine && (
+                    <>
+                      <ColorRow label="Line colour" value={style.lineColorTreeLine} onChange={v => ss({ lineColorTreeLine: v })} />
+                      <InlineSl label="Line weight" min={0.3} max={6} step={0.1} value={style.lineWeightTreeLine} onChange={v => ss({ lineWeightTreeLine: v })} fmt={v => v.toFixed(1)} />
+                    </>
+                  )}
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTreeLine} onChange={v => ss({ seedTreeLine: Math.round(v) })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresTreeLine} onChange={v => ss({ cellMetresTreeLine: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefTreeLine} onChange={v => ss({ reliefTreeLine: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="TreeLine" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Constellation" icon={<ModeMark kind="constellation" />} open={sec.modeConstellation} onToggle={() => tog('modeConstellation')} enabled={style.enabledConstellation} onEnabled={v => ss({ enabledConstellation: v })} enableTestId="mode-constellation">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Constellation && (
+                    <div data-testid="constellation-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Constellation.stars} ${(style.markConstellation ?? 'star') === 'star' ? 'stars' : 'summits'}`}
+                    </div>
+                  )}
+                  <InlineSl label="Stars" help="The highest summits, at most this many. A higher summit draws a larger star or dot. With the point symbol at None, only the links are drawn." min={1} max={300} step={1} value={style.countConstellation} onChange={v => ss({ countConstellation: Math.round(v) })} />
+                  <InlineSl label="Spacing" help="A summit counts only if it is the highest point within this many raster pixels, so no two stars stand closer." min={4} max={200} step={1} value={style.spacingConstellation} onChange={v => ss({ spacingConstellation: Math.round(v) })} />
+                  <SegGroup label="Point symbol" options={[['Star', 'star'], ['Dot', 'dot'], ['None', 'none']]}
+                    value={style.markConstellation ?? 'star'} onChange={v => ss({ markConstellation: v })} testIdOf={(m) => `constellation-mark-${m}`} style={{ marginBottom: 8 }} />
+                  {(style.markConstellation ?? 'star') !== 'none' && (
+                    <InlineSl label="Symbol size" min={0.2} max={3} step={0.05} value={style.sizeConstellation} onChange={v => ss({ sizeConstellation: v })} fmt={v => v.toFixed(2)} />
+                  )}
+                  <Tog label="Links" help="Joins the stars with the shortest set of lines that links them all, as a second pen. It never closes a loop." testId="constellation-links" checked={!!style.linksConstellation} onChange={v => ss({ linksConstellation: v })} />
+                  {style.linksConstellation && (
+                    <InlineSl label="Link weight" min={0.2} max={4} step={0.1} value={style.linkWeightConstellation} onChange={v => ss({ linkWeightConstellation: v })} fmt={v => v.toFixed(1)} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Constellation" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Weather Fronts" icon={<ModeMark kind="fronts" />} open={sec.modeFronts} onToggle={() => tog('modeFronts')} enabled={style.enabledFronts} onEnabled={v => ss({ enabledFronts: v })} enableTestId="mode-fronts">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Fronts && (
+                    <div data-testid="fronts-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Fronts.fronts} fronts`}
+                    </div>
+                  )}
+                  <InlineSl label="Fronts" help="The number of contours drawn as fronts. The lower two fifths are warm fronts, the upper two fifths cold fronts, and those between are stationary." min={1} max={30} step={1} value={style.levelsFronts} onChange={v => ss({ levelsFronts: Math.round(v) })} />
+                  <InlineSl label="Spacing" help="The gap between symbols along a front, in raster pixels." min={4} max={120} step={1} value={style.spacingFronts} onChange={v => ss({ spacingFronts: Math.round(v) })} />
+                  <InlineSl label="Symbol size" help="The size of each symbol, as a share of the spacing." min={0.2} max={3} step={0.05} value={style.sizeFronts} onChange={v => ss({ sizeFronts: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Blur" help="Blur on the ground before the fronts are traced, so they run smooth." min={0} max={12} step={0.5} value={style.radiusFronts} onChange={v => ss({ radiusFronts: v })} fmt={v => v.toFixed(1)} />
+                  <Tog label="Solid symbols" help="Draws a smaller copy inside each symbol, so it reads as a solid mark." testId="fronts-solid" checked={!!style.solidFronts} onChange={v => ss({ solidFronts: v })} />
+                  <ColorRow label="Warm colour" value={style.warmColorFronts} onChange={v => ss({ warmColorFronts: v })} />
+                  <ColorRow label="Cold colour" value={style.coldColorFronts} onChange={v => ss({ coldColorFronts: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Fronts" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Tally" icon={<ModeMark kind="tally" />} open={sec.modeTally} onToggle={() => tog('modeTally')} enabled={style.enabledTally} onEnabled={v => ss({ enabledTally: v })} enableTestId="mode-tally">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Tally && (
+                    <div data-testid="tally-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Tally.marks.toLocaleString()} marks`}
+                    </div>
+                  )}
+                  <InlineSl label="Cell" help="The size of each counted patch, in raster pixels." min={6} max={120} step={1} value={style.cellTally} onChange={v => ss({ cellTally: Math.round(v) })} />
+                  <InlineSl label="Most marks" help="The count on the highest ground. Every five marks make one gate." min={1} max={40} step={1} value={style.maxTally} onChange={v => ss({ maxTally: Math.round(v) })} />
+                  <InlineSl label="Jitter" help="How far each stroke moves at random, so the count looks kept by hand." min={0} max={1.5} step={0.05} value={style.jitterTally} onChange={v => ss({ jitterTally: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTally} onChange={v => ss({ seedTally: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Tally" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Orographic Rain" icon={<ModeMark kind="rain" />} open={sec.modeRain} onToggle={() => tog('modeRain')} enabled={style.enabledRain} onEnabled={v => ss({ enabledRain: v })} enableTestId="mode-rain">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Rain && (
+                    <div data-testid="rain-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Rain.streaks.toLocaleString()} streaks`}
+                    </div>
+                  )}
+                  <InlineSl label="Wind from" help="The bearing the wind blows from. Rain falls hardest on the slopes that face it." min={0} max={360} step={1} value={style.azimuthRain} onChange={v => ss({ azimuthRain: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Lift" help="How much more rain falls where the wind is forced uphill." min={0} max={3} step={0.05} value={style.liftRain} onChange={v => ss({ liftRain: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Rain shadow" help="How much drier the ground is behind higher ground upwind." min={0} max={2} step={0.05} value={style.shadowRain} onChange={v => ss({ shadowRain: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Spacing" help="The gap between the sites where a streak can fall, in raster pixels." min={1} max={20} step={0.5} value={style.spacingRain} onChange={v => ss({ spacingRain: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Streak length" help="The length of each streak, in raster pixels. Streaks run downwind." min={1} max={40} step={0.5} value={style.lengthRain} onChange={v => ss({ lengthRain: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedRain} onChange={v => ss({ seedRain: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Rain" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Sand Ripples" icon={<ModeMark kind="ripples" />} open={sec.modeRipples} onToggle={() => tog('modeRipples')} enabled={style.enabledRipples} onEnabled={v => ss({ enabledRipples: v })} enableTestId="mode-ripples">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Ripples && (
+                    <div data-testid="ripples-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${Math.round(symbolNotes.Ripples.sand * 100)}% sand`}
+                    </div>
+                  )}
+                  <InlineSl label="Wind from" help="The bearing the wind blows from. The ripple crests run across it." min={0} max={360} step={1} value={style.azimuthRipples} onChange={v => ss({ azimuthRipples: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Wavelength" help="The gap between ripple crests, in raster pixels. A gap under three grid cells is widened to three." min={2} max={60} step={0.5} value={style.wavelengthRipples} onChange={v => ss({ wavelengthRipples: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Warp" help="How far the height bends the crests. At 1 the full height range shifts them by 9% of the plate." min={0} max={4} step={0.05} value={style.warpRipples} onChange={v => ss({ warpRipples: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Dune field top" help="Sand covers the ground below this share of the height range. Above it is rock." min={0.05} max={1} step={0.01} value={style.topRipples} onChange={v => ss({ topRipples: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <Tog label="Rock contours" help="Contours of the rock above the dune field, as a second pen. The first is the dune field's edge." testId="ripples-rock" checked={!!style.rockRipples} onChange={v => ss({ rockRipples: v })} />
+                  {style.rockRipples && (
+                    <>
+                      <InlineSl label="Rock levels" min={1} max={40} step={1} value={style.levelsRipples} onChange={v => ss({ levelsRipples: Math.round(v) })} />
+                      <ColorRow label="Rock colour" value={style.rockColorRipples} onChange={v => ss({ rockColorRipples: v })} />
+                    </>
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Ripples" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+
+          <Section title="Mode: Hoarfrost" icon={<ModeMark kind="hoarfrost" />} open={sec.modeHoarfrost} onToggle={() => tog('modeHoarfrost')} enabled={style.enabledHoarfrost} onEnabled={v => ss({ enabledHoarfrost: v })} enableTestId="mode-hoarfrost">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Hoarfrost && (
+                    <div data-testid="hoarfrost-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Hoarfrost.crystals.toLocaleString()} crystals`}
+                    </div>
+                  )}
+                  <InlineSl label="Cold line" help="Frost grows only above this share of the height range." min={0} max={1} step={0.01} value={style.coldHoarfrost} onChange={v => ss({ coldHoarfrost: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Crystals" help="The most ice particles that stick. Each one joins the particle it touched, so more particles grow longer branches." min={10} max={40000} step={10} value={style.countHoarfrost} onChange={v => ss({ countHoarfrost: Math.round(v) })} />
+                  <InlineSl label="Seeds" help="The number of summits the frost starts from." min={1} max={40} step={1} value={style.seedsHoarfrost} onChange={v => ss({ seedsHoarfrost: Math.round(v) })} />
+                  <InlineSl label="Cell" help="The size of one ice particle, in raster pixels." min={1} max={20} step={0.5} value={style.cellHoarfrost} onChange={v => ss({ cellHoarfrost: v })} fmt={v => v.toFixed(1)} />
+                  <Tog label="Cold line" help="The cold line itself, as a dotted second pen." testId="hoarfrost-line" checked={!!style.lineHoarfrost} onChange={v => ss({ lineHoarfrost: v })} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedHoarfrost} onChange={v => ss({ seedHoarfrost: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Hoarfrost" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+
+
+          <Section title="Mode: Cross-Stitch" icon={<ModeMark kind="stitch" />} open={sec.modeStitch} onToggle={() => tog('modeStitch')} enabled={style.enabledStitch} onEnabled={v => ss({ enabledStitch: v })} enableTestId="mode-stitch">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Stitch && (
+                    <div data-testid="stitch-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Stitch.stitches.toLocaleString()} stitches`}
+                    </div>
+                  )}
+                  <InlineSl label="Cell" help="The size of one stitch, in raster pixels." min={2} max={60} step={0.5} value={style.cellStitch} onChange={v => ss({ cellStitch: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Bands" help="The number of height classes, each with an equal share of the ground. The lowest is bare cloth and the next takes half stitches." min={3} max={9} step={1} value={style.bandsStitch} onChange={v => ss({ bandsStitch: Math.round(v) })} />
+                  <ColorRow label="Light thread" value={style.lightColorStitch} onChange={v => ss({ lightColorStitch: v })} />
+                  <Tog label="Backstitch" help="An outline along every cell edge where the class changes, as a third pen." testId="stitch-back" checked={!!style.backStitch} onChange={v => ss({ backStitch: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Stitch" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: TIN Facets" icon={<ModeMark kind="tin" />} open={sec.modeTin} onToggle={() => tog('modeTin')} enabled={style.enabledTin} onEnabled={v => ss({ enabledTin: v })} enableTestId="mode-tin">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Tin && (
+                    <div data-testid="tin-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Tin.facets.toLocaleString()} facets`}
+                    </div>
+                  )}
+                  <InlineSl label="Points" help="The number of points in the network. They gather where the ground bends." min={10} max={20000} step={10} value={style.countTin} onChange={v => ss({ countTin: Math.round(v) })} />
+                  <InlineSl label="Floor" help="The chance of a point on smooth ground, so a flat still gets a few facets." min={0} max={1} step={0.01} value={style.floorTin} onChange={v => ss({ floorTin: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Hatch pitch" help="The gap between hatch lines on a facet that faces away from the sun, in raster pixels. Lit facets hatch sparser." min={0.5} max={20} step={0.1} value={style.pitchTin} onChange={v => ss({ pitchTin: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Sun azimuth" help="The bearing of the sun, at 45° above the horizon." min={0} max={360} step={1} value={style.azimuthTin} onChange={v => ss({ azimuthTin: Math.round(v) % 360 })} fmt={v => Math.round(v) + '°'} />
+                  <Tog label="Edges" help="The triangle edges, as a second pen." testId="tin-edges" checked={!!style.edgesTin} onChange={v => ss({ edgesTin: v })} />
+                  <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTin} onChange={v => ss({ seedTin: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Tin" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+
 
           <Section title="Mode: Roughness Mesh" icon={<ModeMark kind="rugged" />} open={sec.modeRugged} onToggle={() => tog('modeRugged')} enabled={style.enabledRugged} onEnabled={v => ss({ enabledRugged: v })} enableTestId="mode-rugged">
             {(

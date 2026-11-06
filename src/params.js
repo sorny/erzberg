@@ -105,7 +105,7 @@ const RENDER_SIDE = [
   // and stay out of this.
   // Unanchored too — these are prefixes of suffixed names
   // (tanakaWeightBright, labelColorContours, screeWeightSwiss).
-  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight)/,
+  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight|lineWeight|linkWeight)/,
   /^label(SingleLine|Font)Contours$/,
   /^mark(Weight|Dash)(Cross|MapGrid)$/,
   /^scaleWeightMapGrid$/,
@@ -175,7 +175,7 @@ const isGeometry = (k) =>
  */
 const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
-  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight)[A-Z]/,
+  /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight|lineWeight|linkWeight)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,
   // Intersection crosses and Map Grid's scale: their own pens' weight and dash.
   /^mark(Weight|Dash)(Cross|MapGrid)$/,

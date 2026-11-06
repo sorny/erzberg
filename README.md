@@ -86,8 +86,8 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 62 modes as tiles in seven families:
-  Line, Tone, Relief, Plate, Light, Momentum and Chart. The ring in a tile corner
+- **Marks sheet.** The Marks stage shows the 71 modes as tiles in eight families:
+  Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
   Copies fold to one line that shows their setting.
@@ -191,7 +191,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 62 modes.
+  classes you pick. This works for all 71 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -329,6 +329,15 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Hypsometry | Strahler's hypsometric curve, with its histogram and the hypsometric integral |
 | Aspect Rose | A rose diagram of the way the ground faces, weighted by slope, on an equal-area scale |
 | Stereonet | Every slope's pole on a lower-hemisphere equal-area net, with density contours |
+| Tree Line | Forest symbols, broadleaf low and conifers higher, thinning on steep ground, up to a dotted tree line |
+| Constellation | The highest summits as stars, joined by a minimum spanning tree |
+| Weather Fronts | Contours lettered as a synoptic chart: warm fronts low, cold fronts high, all pointing uphill |
+| Tally | The height counted in gates of five tally marks, one cell each |
+| Orographic Rain | Rain streaks on a wind, heavy on the windward slopes, with a rain shadow behind each ridge |
+| Sand Ripples | Wind ripples combed across the low ground, bending round the hills, with the rock contoured above |
+| Hoarfrost | Ice dendrites grown from the summits by diffusion-limited aggregation, kept to the cold ground |
+| Cross-Stitch | Half stitches and crosses in two threads by height class, with backstitch outlines |
+| TIN Facets | A triangulated irregular network, each facet hatched along its fall line by its own light |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each
