@@ -510,7 +510,7 @@ ink per catchment. The divides are ridgelines.
 
 `fillCells` ships the lattice it painted. `traceAreaRings` in
 `src/utils/areaRings.js` walks it into closed rings. The exporter writes one
-`<path>` per ink, in a pen layer named like `Watershed · ink 03 #e04f2a`, and
+`<path>` per ink, in a pen layer named like `07 · Watershed · ink 03 · #e04f2a · 0.30 mm`, and
 drops that mode's lines.
 
 - **Keyed by ink, not region.** Two neighbouring basins with the same ink merge.

@@ -110,7 +110,7 @@ test('each text exports as real <text> in its own pen layer', async ({ page }) =
    * added. The name used to be captured at creation, so two texts both exported
    * as "erzberg" — which is a plot nobody can separate by pen.
    */
-  const labels = [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
+  const labels = [...svg.matchAll(/data-name="([^"]*)"/g)].map((m) => m[1])
   expect(labels).toContain('ERZBERG')
   expect(labels).toContain('NORTH FACE')
 })
@@ -147,6 +147,6 @@ test('a text opens on a stroke face, and plots as strokes', async ({ page }) => 
   // Strokes, and the layer still named after what it says so a plot can be
   // separated by pen.
   expect(svg).not.toContain('<text')
-  expect([...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])).toContain('ERZBERG')
+  expect([...svg.matchAll(/data-name="([^"]*)"/g)].map((m) => m[1])).toContain('ERZBERG')
   expect(svg).toMatch(/<(polyline|path)/)
 })

@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.72.0] — 2026-11-06
+
+### Fixed
+
+- **The SVG page has a size in millimetres.** The page is the Sheet width
+  across, and its height follows the drawing. The page size used to be in bare
+  pixels, which an editor reads at 96 per inch, so an ISO portrait frame with a
+  297 mm sheet width opened at 410 × 580 mm. With Paper on ISO portrait and a
+  210 mm Sheet width, the page is now 210 × 297 mm. The coordinates inside
+  are unchanged.
+
+### Changed
+
+- **SVG layers say what they hold.** Each pen layer is numbered in plot order
+  and named for what it draws, its ink and its pen width on paper:
+  `03 · Contours · Minor · #1a1a1a · 0.21 mm`. AxiDraw's driver reads the
+  leading number as the layer to plot. Inside, a `<title>` and a `<desc>` give
+  the draw mode and its family, the pen, the dash, the opacity, the stroke count
+  and the metres of ink, which Inkscape shows under Object Properties. The
+  group also carries `data-name`, `data-ink` and `data-pen-mm` for scripts.
+- **A layer in a few inks is a few pens.** A line or dot layer in two to eight
+  inks, such as banded height contours, is written one layer per ink. An ink's
+  number is the same in every layer of one file, so `ink 03` is one pen. A
+  layer graded through more inks stays one `N inks` layer. Output's pen list
+  counts the same way.
+- **One-ink layers write their colour once**, on the group, and not on every
+  line. The Contours and Tree Line sample came out 13% smaller.
+- **The paper is a locked layer**, `% Paper · #f2ece0`. AxiDraw skips a layer
+  whose name starts with `%`, and Inkscape will not select it by accident. The
+  flock, the particles and the sheet marks get named layers too.
+- **The file describes itself.** A `<title>`, a `<desc>` with the layer and pen
+  count, the plot width and the ink length, and a Dublin Core `<metadata>`
+  block with the date, the creator and the data credit. Inkscape shows the
+  block under Document Properties.
+- The Tree Line limit layer is named `Tree line · Limit`.
+
 ## [1.71.0] — 2026-11-06
 
 ### Added

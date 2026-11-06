@@ -347,7 +347,7 @@ test.describe('vector layers', () => {
     const stream = await download.createReadStream()
     let svg = ''
     for await (const chunk of stream) svg += chunk
-    const group = svg.match(/<g[^>]*inkscape:label="[^"]*Motorway"[^>]*>[\s\S]*?<\/g>/)
+    const group = svg.match(/<g[^>]*data-name="[^"]*Motorway"[^>]*>[\s\S]*?<\/g>/)
     expect(group, 'the motorway layer must be in the SVG').not.toBeNull()
     const strokes = new Set([...group[0].matchAll(/stroke="([^"]+)"/g)].map((m) => m[1]))
     expect(strokes.size).toBe(1)
@@ -1043,7 +1043,7 @@ test.describe('vector layers', () => {
     ])
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
-    const group = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
+    const group = svg.match(/<g[^>]*data-name="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
     expect(group, 'the icon layer must still export').not.toBeNull()
     // Stroked line art, in whichever element carries it: a mark whose outline
     // runs unbroken joins into a `<polyline>`, and one that does not stays a
@@ -1112,7 +1112,7 @@ test.describe('vector layers', () => {
 
     /** The stroke-width the SVG gives one pen layer. */
     const strokeOf = (svg, suffix) => {
-      const g = svg.match(new RegExp(`<g[^>]*inkscape:label="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
+      const g = svg.match(new RegExp(`<g[^>]*data-name="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
       return g ? Number(g[1].match(/stroke-width="([\d.]+)"/)?.[1]) : null
     }
 
@@ -1158,7 +1158,7 @@ test.describe('vector layers', () => {
 
     /** What one pen layer draws with: its stroke colour and its opacity. */
     const penOf = (svg, suffix) => {
-      const g = svg.match(new RegExp(`<g[^>]*inkscape:label="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
+      const g = svg.match(new RegExp(`<g[^>]*data-name="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
       if (!g) return null
       return {
         stroke: g[1].match(/stroke="(#[0-9a-fA-F]{6})"/)?.[1]?.toLowerCase(),
@@ -1213,7 +1213,7 @@ test.describe('vector layers', () => {
 
     const val = (what) => page.locator(`[data-testid="${what}-${id}"]`).inputValue()
     const penOf = (svg, suffix) => {
-      const g = svg.match(new RegExp(`<g[^>]*inkscape:label="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
+      const g = svg.match(new RegExp(`<g[^>]*data-name="[^"]*Peaks[^"]*${suffix}"[^>]*>([\\s\\S]*?)</g>`))
       if (!g) return null
       return {
         stroke: g[1].match(/stroke="(#[0-9a-fA-F]{6})"/)?.[1]?.toLowerCase(),
@@ -1368,7 +1368,7 @@ test.describe('vector layers', () => {
     ])
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
-    const g = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
+    const g = svg.match(/<g[^>]*data-name="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
     expect(Number(g[1].match(/stroke-width="([\d.]+)"/)[1])).toBeCloseTo(4, 3)
   })
 
@@ -1513,7 +1513,7 @@ test.describe('vector layers', () => {
      * they are always here to be filtered.
      */
     const drawnPens = (all) => all.filter((n) => !n.endsWith(' · hidden'))
-    const pens = drawnPens([...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1]))
+    const pens = drawnPens([...svg.matchAll(/data-name="([^"]*)"/g)].map((m) => m[1]))
     const peaks = pens.indexOf('Peaks')
     const labels = pens.indexOf('Peaks · labels')
     expect(peaks, 'the layer must export').toBeGreaterThanOrEqual(0)
@@ -1565,7 +1565,7 @@ test.describe('vector layers', () => {
 
     // Its own Inkscape layer, so the lettering can be a different pen from the
     // marks it labels — which is most of the reason to plot at all.
-    const group = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*labels"[^>]*>([\s\S]*?)<\/g>/)
+    const group = svg.match(/<g[^>]*data-name="[^"]*Peaks[^"]*labels"[^>]*>([\s\S]*?)<\/g>/)
     expect(group, 'the label layer must export').not.toBeNull()
     // An outline face leaves as <text> so it stays editable; the sibling test
     // above covers that. What matters here is the ink either form is drawn in:
@@ -1653,7 +1653,7 @@ test.describe('vector layers', () => {
       const stream = await download.createReadStream()
       let svg = ''
       for await (const chunk of stream) svg += chunk
-      return [...svg.matchAll(/<g[^>]*inkscape:label="([^"]*)"[^>]*>([\s\S]*?)<\/g>/g)]
+      return [...svg.matchAll(/<g[^>]*data-name="([^"]*)"[^>]*>([\s\S]*?)<\/g>/g)]
         .filter((m) => m[1].includes('Peaks'))
     }
 
@@ -1699,7 +1699,7 @@ test.describe('vector layers', () => {
       const stream = await download.createReadStream()
       let svg = ''
       for await (const chunk of stream) svg += chunk
-      const g = svg.match(/<g[^>]*inkscape:label="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
+      const g = svg.match(/<g[^>]*data-name="[^"]*Peaks[^"]*icons"[^>]*>([\s\S]*?)<\/g>/)
       expect(g, 'the icon layer must be in the SVG').not.toBeNull()
       return g[1]
     }
@@ -2054,7 +2054,7 @@ test.describe('vector layers', () => {
     let svg = ''
     for await (const chunk of await download.createReadStream()) svg += chunk
     await openStage(page, 'overlay')
-    return [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
+    return [...svg.matchAll(/data-name="([^"]*)"/g)].map((m) => m[1])
   }
 
   test('the top of the list is the front of the scene, and a drag moves it there', async ({ page }) => {
@@ -2229,7 +2229,7 @@ test.describe('vector layers', () => {
     for await (const chunk of stream) svg += chunk
     // Vector layers become their own Inkscape layers, which is what makes a plot
     // separable by pen.
-    const motorway = [...svg.matchAll(/inkscape:label="([^"]*)"/g)].map((m) => m[1])
+    const motorway = [...svg.matchAll(/data-name="([^"]*)"/g)].map((m) => m[1])
     expect(motorway.some((n) => n.includes('Motorway'))).toBe(true)
     expect(motorway.some((n) => n.includes('Track'))).toBe(false)
   })

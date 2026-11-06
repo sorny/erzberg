@@ -57,7 +57,7 @@ function expectSame(a, b) {
 
 /** One pen layer's strokes and pen-down length, by its label. */
 function ink(svg, label) {
-  const start = svg.indexOf(`inkscape:label="${label}"`)
+  const start = svg.indexOf(`data-name="${label}"`)
   if (start < 0) return { strokes: 0, length: 0 }
   const body = svg.slice(start, svg.indexOf('</g>', start))
   let strokes = 0, length = 0

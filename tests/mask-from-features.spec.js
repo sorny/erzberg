@@ -154,7 +154,7 @@ async function maskNames(page) {
 }
 
 function segmentsIn(svg, label) {
-  const start = svg.indexOf(`inkscape:label="${label}"`)
+  const start = svg.indexOf(`data-name="${label}"`)
   if (start < 0) return 0
   const end = svg.indexOf('</g>', start)
   return (svg.slice(start, end).match(/<(path|line|polyline)\b/g) ?? []).length

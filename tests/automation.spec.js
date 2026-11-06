@@ -41,7 +41,7 @@ test('settle waits for a rebuild started in the same call', async ({ page }) => 
       const chunks = []
       for await (const c of await dl.createReadStream()) chunks.push(c)
       const svg = Buffer.concat(chunks).toString('utf-8')
-      const pens = [...svg.matchAll(/inkscape:label="([^"]+)"/g)].map((m) => m[1])
+      const pens = [...svg.matchAll(/data-name="([^"]+)"/g)].map((m) => m[1])
       expect(pens, `${modes[0]}, round ${round + 1}`).toEqual(modes)
     }
   }

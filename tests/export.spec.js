@@ -424,3 +424,43 @@ test('a dashed layer still exports as separate pieces', async ({ page }) => {
     'a dashed stroke stays in pieces').toBeGreaterThan(100)
   expect(layer, 'and is never joined into a polyline').not.toContain('<polyline')
 })
+
+test('each layer says what it is, in plot order, with its ink and pen', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await setTilt(page)
+  const svg = await exportSvgText(page)
+
+  // The file names itself, and Inkscape's Document Properties read the block.
+  expect(svg).toMatch(/<svg [^>]*xmlns:sodipodi=/)
+  // The page is the Sheet width across, in millimetres, in the viewBox's ratio.
+  const [, mw, mh, bw, bh] = svg.match(/<svg [^>]*width="([\d.]+)mm" height="([\d.]+)mm" viewBox="0 0 ([\d.]+) ([\d.]+)"/).map(Number)
+  expect(mw).toBe(297)
+  expect(mh / mw).toBeCloseTo(bh / bw, 4)
+  expect(svg).toMatch(/<title>[^<]+<\/title>\s*<desc>Line art drawn from an elevation model with erzberg\./)
+  expect(svg).toMatch(/<metadata><rdf:RDF><cc:Work[\s\S]*<dc:creator><cc:Agent><dc:title>erzberg<\/dc:title>/)
+
+  // The paper is locked and named so a plotter driver skips it.
+  expect(svg).toMatch(/<g id="layer-paper" inkscape:groupmode="layer" inkscape:label="% Paper · #[0-9a-f]{6}" sodipodi:insensitive="true">/)
+
+  const layers = [...svg.matchAll(/<g id="layer-(?!paper)[^"]+" inkscape:groupmode="layer" inkscape:label="([^"]+)"([^>]*)><title>([^<]+)<\/title><desc>([^<]+)<\/desc>/g)]
+  expect(layers.length).toBeGreaterThan(0)
+  layers.forEach(([, label, attrs, title, desc], k) => {
+    // `01 · Lines · #000000 · 0.34 mm`: the number is the plot order.
+    expect(label).toMatch(new RegExp(`^${String(k + 1).padStart(2, '0')} · .+ · (#[0-9a-f]{6}|\\d+ inks)( · \\d+\\.\\d\\d mm)?$`))
+    expect(title).toBe(label)
+    const name = attrs.match(/data-name="([^"]+)"/)?.[1]
+    expect(label).toContain(` · ${name} · `)
+    expect(desc).toMatch(/\.$/)
+  })
+  const lines = layers.find(([, , attrs]) => attrs.includes('data-name="Lines"'))
+  expect(lines[4]).toMatch(/^Draw mode Lines, Line family\. Pen \d+\.\d\d mm, solid line, opacity \d+%\. Ink #[0-9a-f]{6}\. [\d,]+ strokes/)
+
+  // A one-ink layer carries its ink once, on the group.
+  const body = svg.slice(svg.indexOf('<g id="layer-Lines"'))
+  const group = body.slice(0, body.indexOf('</g>'))
+  const ink = lines[2].match(/data-ink="([^"]+)"/)[1]
+  expect(group).toContain(`stroke="${ink}"`)
+  expect((group.match(/stroke="#/g) || []).length).toBe(1)
+})

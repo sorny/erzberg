@@ -6,6 +6,12 @@ const hex2 = (v) => Math.max(0, Math.min(255, Math.round(v * 255))).toString(16)
 const MAX_SWATCHES = 6
 
 /**
+ * The most inks a line layer can hold and still be written one pen layer per
+ * ink. Past it the inks are a graded ramp, and the SVG keeps them in one layer.
+ */
+export const MAX_SPLIT_INKS = 8
+
+/**
  * The pen layers an SVG export will write, read from the built geometry.
  *
  * The exporter writes one Inkscape layer per pen, and until Preflight built the
@@ -14,9 +20,11 @@ const MAX_SWATCHES = 6
  * handed, and the same `layerStyle` names, so a row here is a layer there:
  *
  *  - a line, dot or text layer is one pen, in its flat ink;
- *  - a line layer coloured per vertex (Height, Slope, a gradient) is still one
- *    layer, with many colours in it — said, not hidden, because one pen cannot
- *    draw it as the screen shows it;
+ *  - a line layer in a few inks (banded height, a land cover split) is one pen
+ *    per ink, as the SVG splits it;
+ *  - a line layer coloured per vertex in more inks than that (Height, Slope, a
+ *    gradient) is still one layer, with many colours in it — said, not hidden,
+ *    because one pen cannot draw it as the screen shows it;
  *  - a filled-area layer is one pen per ink. The inks are known from the
  *    geometry, but an area the frame cuts away writes no layer, so the count
  *    is an upper bound and Preflight has the last word;
@@ -29,7 +37,7 @@ const MAX_SWATCHES = 6
  *
  * @param {Array|null} lineGeo the worker's layers
  * @param {object} p           the merged params, as `layerStyle` reads them
- * @returns {{ rows: Array<{id: string, name: string, kind: 'line'|'mixed'|'areas',
+ * @returns {{ rows: Array<{id: string, name: string, kind: 'line'|'split'|'mixed'|'areas',
  *   inks: string[], count: number}>, layers: number, exact: boolean, hidden: boolean }}
  */
 export function pensOf(lineGeo, p = {}) {
@@ -55,13 +63,16 @@ export function pensOf(lineGeo, p = {}) {
     // one repeated colour is a flat layer that happens to carry it per vertex.
     // Sampled: a dense layer carries millions of floats, and a few thousand
     // vertices are enough to tell one ink from several.
-    const inks = L.colors?.length ? distinct(L.colors, rgb, MAX_SWATCHES + 1, 4096) : []
-    if (inks.length > 1) rows.push({ id: L.id, name, kind: 'mixed', inks, count: 1, ...modeOf(L.id) })
+    const inks = L.colors?.length ? distinct(L.colors, rgb, MAX_SPLIT_INKS + 1, 4096) : []
+    if (inks.length > MAX_SPLIT_INKS) rows.push({ id: L.id, name, kind: 'mixed', inks, count: 1, ...modeOf(L.id) })
+    else if (inks.length > 1) rows.push({ id: L.id, name, kind: 'split', inks, count: inks.length })
     else rows.push({ id: L.id, name, kind: 'line', inks: [inks[0] ?? hex(st.color)], count: 1 })
   }
 
   const layers = rows.reduce((n, r) => n + r.count, 0)
-  return { rows, layers, exact: !hidden && !rows.some((r) => r.kind === 'areas'), hidden }
+  // A split is counted from a sample of the vertices, so Preflight has the
+  // last word on it as on an area layer.
+  return { rows, layers, exact: !hidden && !rows.some((r) => r.kind === 'areas' || r.kind === 'split'), hidden }
 }
 
 /**

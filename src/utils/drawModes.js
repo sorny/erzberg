@@ -448,7 +448,7 @@ export const SUB_LAYER_LABEL = {
   'Glacier-Crevasses':       'Crevasses',
   'Glacier-Moraine':         'Moraine',
   'TreeLine-Trees':          'Trees',
-  'TreeLine-Line':           'Tree line',
+  'TreeLine-Line':           'Limit',
   'Constellation-Stars':     'Stars',
   'Constellation-Links':     'Links',
   'Fronts-Lines':            'Lines',

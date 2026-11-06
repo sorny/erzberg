@@ -459,10 +459,10 @@ export const AS_DRAWN = Object.freeze({
 /**
  * How long a plot takes, given the one fact only the operator has.
  *
- * The exporter writes pixels, not millimetres — deliberately, and it is the same
- * omission that stops the sheet printing a 1:25 000 ratio. So the sheet's
- * physical width is asked for rather than guessed, and everything here is
- * arithmetic on top of it.
+ * The drawing is in export pixels, and the Sheet width says what they are on
+ * paper: the SVG page is that wide in millimetres. So the sheet's physical
+ * width is asked for rather than guessed, and everything here is arithmetic
+ * on top of it.
  *
  * The speeds are an AxiDraw at its ordinary settings and are stated in the panel
  * beside the answer, because a pen that moves at half of this takes twice as
