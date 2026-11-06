@@ -263,7 +263,9 @@ export function buildLineGeometry(terrain, p) {
     { id:'TreeLine', builder: (t, ctx) => buildTreeLine(t, ctx, {
         treeline: p.treelineTreeLine, broadleaf: p.broadleafTreeLine, steep: p.steepTreeLine,
         spacing: p.spacingTreeLine, size: p.sizeTreeLine, line: p.lineTreeLine, lineColor: p.lineColorTreeLine,
-        seed: p.seedTreeLine, cellMetres: p.cellMetresTreeLine, relief: p.reliefTreeLine }) },
+        seed: p.seedTreeLine, cellMetres: p.cellMetresTreeLine, relief: p.reliefTreeLine,
+        style: p.styleTreeLine, stance: p.stanceTreeLine, follow: p.followTreeLine, facing: p.facingTreeLine, turn: p.turnTreeLine,
+        clumping: p.clumpingTreeLine, krummholz: p.krummholzTreeLine, shade: p.shadeTreeLine }) },
     { id:'Constellation', builder: (t, ctx) => buildConstellation(t, ctx, {
         count: p.countConstellation, spacing: p.spacingConstellation, size: p.sizeConstellation,
         mark: p.markConstellation, links: p.linksConstellation }) },

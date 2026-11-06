@@ -83,7 +83,7 @@ export const SECTION_LABELS = {
   "Mode: Swath Profile": "swath width hatch quartiles pixel size relief rule weight",
   "Mode: TIN Facets": "points floor hatch pitch sun azimuth edges seed",
   "Mode: Tally": "cell most marks jitter seed",
-  "Mode: Tree Line": "tree line broadleaf below steepest spacing symbol size colour weight seed pixel relief",
+  "Mode: Tree Line": "tree line broadleaf below steepest spacing symbol size style clumping krummholz shading stance facing bearing turn spread colour weight seed pixel relief",
   "Mode: Truchet": "tile alignment flat below seed",
   "Mode: Valleys": "spacing radius threshold",
   "Mode: Venation": "attractors roots step wet bias seed",

@@ -981,12 +981,28 @@ Heights are shares of the plate's height range. `builders/symbols.js`.
 
 ### Tree Line
 
-Forest symbols on a jittered grid, *Spacing* pixels apart: a broadleaf round
-below *Broadleaf below*, a conifer above it, and none above *Tree line*, whose
-edge is ragged. The forest thins as the slope rises, a site keeping its tree
-with a chance of $1 - (s/s_{max})^2$, and no tree stands steeper than
-*Steepest*. Slopes are true degrees, from *Pixel size* and *Relief* where the
-raster has none. *Tree line* also traces the line itself as a dotted second pen.
+Forest symbols on a jittered grid, *Spacing* pixels apart: a broadleaf with a
+lobed crown below *Broadleaf below*, a conifer of tiered boughs above it, and
+none above *Tree line*, whose edge is ragged. The two kinds mix over a band a
+tenth of the height range wide. The forest thins as the slope rises, a site
+keeping its tree with a chance of $1 - (s/s_{max})^2$, and no tree stands
+steeper than *Steepest*. Slopes are true degrees, from *Pixel size* and
+*Relief* where the raster has none. *Tree line* also traces the line itself as
+a dotted second pen.
+
+*Tree style* picks the symbols. Drawn is the lobed crown and the tiered
+conifer. Classic is a round crown on a trunk and two flanks to a point. Map is
+a small ring and a small triangle. Scribble draws each tree as one looped or
+zigzag pen line. *Clumping* gathers the trees into groves with clearings
+between them. *Krummholz* shrinks the trees over the last 12% of the range
+below the tree line. *Shading* adds a ground line to each tree, and strokes on
+the lower right of a Drawn tree.
+
+*Facing* sets the side each tree is drawn to be seen from: the *Facing
+bearing*, or down or up the slope at each tree. *Turn spread* turns each tree
+at random by up to that many degrees. With *Stance* at Flat, a tree lies on the
+ground with its top pointing away from the side it faces. With Upright, it
+stands in a vertical plane, as a cut-out seen from that side.
 
 ### Constellation
 

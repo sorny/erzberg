@@ -14,8 +14,9 @@ import { slopeDegrees } from './survey.js'
 import {
   F32List, F64List, I32List, MARCHING_TABLE, _edgeId, _edgeX, _edgeY,
   chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch,
-  mulberry32, traceLevelSet,
+  inElevCut, mulberry32, normElev, traceLevelSet,
 } from './shared.js'
+import { computeVertexColor } from '../colorUtils'
 
 const RAD = Math.PI / 180
 
@@ -44,21 +45,101 @@ export const done = (w, note) => ({ positions: w.positions.toArray(), colors: w.
 
 // ─── Tree Line ───────────────────────────────────────────────────────────────
 
+/** A conifer in symbol space: tiers of drooping boughs on a trunk, base at 0, up is +v. */
+function conifer(tiers, shade) {
+  const strokes = [[[0, 0], [0, 0.24]]]
+  const rise = 1.3 / (tiers + 0.6)
+  for (let k = 0; k < tiers; k++) {
+    const vb = 0.18 + k * rise, va = vb + rise * 1.6, w = 0.56 * (1 - k / (tiers + 0.4))
+    // A bough droops at its tip and turns up a little at the very end.
+    strokes.push([[-w, vb - 0.02], [-w * 0.92, vb - 0.07], [-w * 0.5, vb + (va - vb) * 0.28], [0, va], [w * 0.5, vb + (va - vb) * 0.28], [w * 0.92, vb - 0.07], [w, vb - 0.02]])
+    // One stroke down the shaded half of each tier.
+    if (shade) strokes.push([[w * 0.42, va - (va - vb) * 0.5], [w * 0.42, vb + 0.03]])
+  }
+  return strokes
+}
+
+/** A broadleaf in symbol space: a lobed crown on a forked trunk. */
+function broadleaf(rng, shade) {
+  const R = 0.46, cy = 0.78, ph = rng() * 6.283, ph2 = rng() * 6.283, crown = []
+  for (let k = 0; k < 36; k++) {
+    const t = k / 36 * 2 * Math.PI, rr = R * (1 + 0.09 * Math.sin(6 * t + ph) + 0.04 * Math.sin(11 * t + ph2))
+    crown.push([Math.cos(t) * rr, cy + Math.sin(t) * rr])
+  }
+  crown.push(crown[0])
+  const strokes = [crown, [[0, 0], [0, cy - 0.22]], [[0, cy - 0.3], [-0.14, cy - 0.1]], [[0, cy - 0.26], [0.12, cy - 0.06]]]
+  if (shade) {
+    // Crescents on the lower right, the side away from a light in the upper left.
+    for (const [f, t0, t1] of [[0.8, -100, 15], [0.58, -80, -10]]) {
+      const arc = []
+      for (let d = t0; d <= t1; d += 10) arc.push([Math.cos(d * RAD) * R * f, cy + Math.sin(d * RAD) * R * f])
+      strokes.push(arc)
+    }
+  }
+  return strokes
+}
+
+/** The other tree styles, in the same symbol space: [broadleaf, conifer]. */
+const TREE_STYLES = {
+  // The plain symbols: a round crown on a short trunk, two flanks to a point.
+  classic: () => {
+    const crown = []
+    for (let k = 0; k <= 8; k++) crown.push([Math.cos(k / 8 * 2 * Math.PI) * 0.45, 0.95 + Math.sin(k / 8 * 2 * Math.PI) * 0.45])
+    return [[crown, [[0, 0], [0, 0.5]]], [[[-0.5, 0.35], [0, 1.45], [0.5, 0.35]], [[0, 0.35], [0, 0]]]]
+  },
+  // A topographic sheet's marks: a small ring and a small closed triangle.
+  map: () => {
+    const ring = []
+    for (let k = 0; k <= 10; k++) ring.push([Math.cos(k / 10 * 2 * Math.PI) * 0.3, 0.45 + Math.sin(k / 10 * 2 * Math.PI) * 0.3])
+    return [[ring], [[[-0.3, 0.1], [0, 0.85], [0.3, 0.1], [-0.3, 0.1]]]]
+  },
+  // One pen line each: loops round the crown, and a zigzag that narrows upward.
+  scribble: (rng) => {
+    const loops = [], ph = rng() * 6.283
+    for (let k = 0; k <= 84; k++) {
+      const t = k / 84 * 2 * Math.PI
+      loops.push([0.27 * Math.cos(t + ph) + 0.17 * Math.cos(7 * t), 0.8 + 0.27 * Math.sin(t + ph) + 0.17 * Math.sin(7 * t)])
+    }
+    const zig = [[0, 0], [0, 0.3]]
+    for (let j = 0; j < 8; j++) {
+      const w = 0.5 * (1 - j / 8.5)
+      zig.push([j % 2 ? w : -w, 0.3 + j * 0.15])
+    }
+    zig.push([0, 1.5])
+    return [[loops, [[0, 0], [0, 0.55]]], [zig]]
+  },
+}
+
 /**
  * Forest symbols as an alpine map draws them, up to a tree line.
  *
  * Sites sit on a jittered grid, `spacing` raster pixels apart. Below
- * `broadleaf` (a share of the height range) a site takes a broadleaf round on a
- * trunk, and above it a conifer. Above `treeline` there are none, and the
- * line is ragged: a site a little below it may already be bare. The forest
- * thins with the slope in true degrees, a site keeping its tree with a chance
- * of 1 − (slope / steep)², and none stands on ground steeper than `steep`.
+ * `broadleaf` (a share of the height range) a site takes a broadleaf, a lobed
+ * crown on a forked trunk, and above it a conifer of tiered boughs. The two mix
+ * over a band a tenth of the range wide. Above `treeline` there are none, and
+ * the line is ragged. The forest thins with the slope in true degrees, a site
+ * keeping its tree with a chance of 1 − (slope / steep)², and none stands on
+ * ground steeper than `steep`. `clumping` gathers the trees into groves with
+ * clearings between, from a value noise six sites across. Trees vary in size,
+ * and `krummholz` shrinks them over the last 12% of the range below the line.
+ * With `shade`, each tree takes a short ground line, and a Drawn tree a few
+ * strokes on its lower right. `style` picks the symbols: 'drawn' (a lobed crown
+ * on a forked trunk, tiered boughs), 'classic' (a round crown, two flanks to a
+ * point), 'map' (a small ring, a small triangle) or 'scribble' (looped and
+ * zigzag pen lines).
+ *
+ * `facing` is the bearing a tree's front looks toward: the side it is drawn to
+ * be seen from. `follow` 'downhill' or 'uphill' turns each tree to the slope
+ * instead, and `turn` spreads the facings at random by up to that many degrees.
+ * With `stance` 'flat' the symbol lies on the ground, its top pointing away
+ * from the side it faces. With 'upright' it stands in a vertical plane, as a
+ * cut-out seen from that side.
  *
  * With `line`, the tree line itself is a second pen, `TreeLine-Line`, traced
  * as a contour in `lineColor` and dotted by its style.
  */
 export function buildTreeLine(terrain, p, o) {
-  const { grid, gridMask, rows, cols, scl } = terrain
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const sMask = terrain.hasNoData ? gridMask : null
   const range = heightRange(grid, gridMask)
   if (!range) return null
@@ -70,14 +151,43 @@ export function buildTreeLine(terrain, p, o) {
   const slope = slopeDegrees(terrain, groundMetres(terrain, p, o.cellMetres, o.relief).ground())
   const P = Math.max(1, (o.spacing ?? 6) / scl)
   const S = P * 0.42 * Math.max(0.2, o.size ?? 1)
+  const clump = clamp01(o.clumping, 0.35), krumm = clamp01(o.krummholz, 0.6), shade = o.shade ?? true
+  const upright = o.stance === 'upright', follow = o.follow ?? 'bearing'
+  const style = o.style ?? 'drawn'
+  const spread = Math.max(0, Math.min(180, o.turn ?? 0)) * RAD
+  const facing = (o.facing ?? 180) * RAD
   const rng = mulberry32(Math.round(o.seed ?? 1))
+  const B = follow === 'bearing' ? null : boxBlur(grid, cols, rows, 2, sMask)
+  const { elevScale, elevMinCut, elevMaxCut } = p
+
+  // The grove noise: random values on a lattice six sites across, smoothed.
+  const nrng = mulberry32(Math.round(o.seed ?? 1) * 7919 + 13), G = 6 * P
+  const gc = Math.ceil(cols / G) + 2, gr = Math.ceil(rows / G) + 2, lat = new Float32Array(gc * gr).map(() => nrng())
+  const grove = (c, r) => {
+    const x = c / G, y = r / G, i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), at = (a, b) => lat[b * gc + a]
+    return (at(i, j) * (1 - sx) + at(i + 1, j) * sx) * (1 - sy) + (at(i, j + 1) * (1 - sx) + at(i + 1, j + 1) * sx) * sy
+  }
 
   const trees = writer()
+  // A symbol-space stroke laid flat on the ground: `top` is the way up the symbol.
+  const lay = (pts, c, r, k, rc, rr, tc, tr) => stroke(trees, terrain, p, sMask,
+    pts.map(([u, v]) => [c + (u * rc + v * tc) * k, r + (u * rr + v * tr) * k]))
+  // The same stroke stood up in a vertical plane through the base.
+  const stand = (pts, c, r, e0, k, rc, rr, col) => {
+    for (let q = 1; q < pts.length; q++) {
+      const [u0, v0] = pts[q - 1], [u1, v1] = pts[q]
+      trees.positions.push6((c + u0 * rc * k) * scl - halfW, e0 + v0 * k * scl, (r + u0 * rr * k) * scl - halfH,
+        (c + u1 * rc * k) * scl - halfW, e0 + v1 * k * scl, (r + u1 * rr * k) * scl - halfH)
+      trees.colors.pushRgb2(col)
+    }
+  }
+
   let count = 0
   for (let rf = P / 2; rf < rows - 1; rf += P) {
     for (let cf = P / 2; cf < cols - 1; cf += P) {
       const c = cf + (rng() - 0.5) * 0.7 * P, r = rf + (rng() - 0.5) * 0.7 * P
-      const ragged = rng(), thin = rng()
+      const ragged = rng(), thin = rng(), mix = rng(), grow = rng(), turn = rng(), sow = rng(), shape = rng()
       if (c < 0 || r < 0 || c > cols - 1 || r > rows - 1) continue
       const i = Math.round(r) * cols + Math.round(c)
       if (!gridMask[i]) continue
@@ -85,16 +195,40 @@ export function buildTreeLine(terrain, p, o) {
       if (!(h < line - ragged * 0.04 * (hi - lo))) continue
       const s = slope[i]
       if (s < 0 || s >= steep || thin < (s / steep) ** 2) continue
-      if (h < broad) {
-        // A round crown on a short trunk.
-        const crown = []
-        for (let k = 0; k < 8; k++) crown.push([c + Math.cos(k / 8 * 2 * Math.PI) * 0.45 * S, r - 0.25 * S + Math.sin(k / 8 * 2 * Math.PI) * 0.45 * S])
-        stroke(trees, terrain, p, sMask, crown, true)
-        stroke(trees, terrain, p, sMask, [[c, r + 0.2 * S], [c, r + 0.7 * S]])
+      if (sow > 1 - clump * 1.4 * (1 - grove(c, r))) continue
+
+      // The way the tree faces, as a unit vector in (col, row).
+      let fa = facing
+      if (B) {
+        const gx = sampleBilinear(B, sMask, rows, cols, r, c + 1) - sampleBilinear(B, sMask, rows, cols, r, c - 1)
+        const gy = sampleBilinear(B, sMask, rows, cols, r + 1, c) - sampleBilinear(B, sMask, rows, cols, r - 1, c)
+        // Bearing of the downhill direction: north is −row.
+        if (Math.hypot(gx, gy) > 1e-9) fa = Math.atan2(-gx, gy) + (follow === 'uphill' ? Math.PI : 0)
+      }
+      fa += (turn - 0.5) * 2 * spread
+      const fc = Math.sin(fa), fr = -Math.cos(fa)
+      // Right of the symbol, as seen from the side it faces.
+      const rc = fr, rr = -fc
+
+      const near = Math.max(0, Math.min(1, (line - h) / (0.12 * (hi - lo))))
+      const k = S * (0.85 + 0.3 * grow) * (1 - krumm * 0.6 * (1 - near))
+      const isBroad = h < broad + (mix - 0.5) * 0.1 * (hi - lo)
+      // Its own stream for the shape, so every style keeps the same sites.
+      const own = mulberry32((shape * 4294967296) >>> 0)
+      const pts = TREE_STYLES[style] ? TREE_STYLES[style](own)[isBroad ? 0 : 1].slice()
+        : isBroad ? broadleaf(own, shade) : conifer(k < S * 0.7 ? 2 : 3, shade)
+      // Centred under the trunk: a foot to one side reads as a second, fallen stem.
+      if (shade) pts.push([[-0.26, 0], [0.26, 0]])
+
+      if (upright) {
+        const e0 = (h - 0.5) * 100 * elevScale
+        if (!inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+        const col = computeVertexColor(normElev(e0, minElev, maxElev), gridSlopes[i] / (maxSlope || 1), Math.PI / 2, p)
+        for (const q of pts) stand(q, c, r, e0, k, rc, rr, col)
       } else {
-        // A conifer: two flanks to a point, and a trunk.
-        stroke(trees, terrain, p, sMask, [[c - 0.5 * S, r + 0.45 * S], [c, r - 0.65 * S], [c + 0.5 * S, r + 0.45 * S]])
-        stroke(trees, terrain, p, sMask, [[c, r + 0.45 * S], [c, r + 0.8 * S]])
+        // Flat, the top points away from the viewer; the base sits below the site.
+        const tc = -fc, tr = -fr, bc = c - tc * 0.75 * k, br = r - tr * 0.75 * k
+        for (const q of pts) lay(q, bc, br, k, rc, rr, tc, tr)
       }
       count++
     }
