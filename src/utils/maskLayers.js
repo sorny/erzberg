@@ -126,6 +126,30 @@ export function maskCoverage(mask) {
   return on / mask.data.length
 }
 
+const coverageCache = new WeakMap()
+
+/**
+ * `maskCoverage` for a view that renders often, counted once per mask object.
+ *
+ * The panel renders on every camera sync, and a count reads the whole raster:
+ * four masks over 94.5 million pixels cost 250 ms a render.
+ *
+ * The plane is the key and the mask object is the check. The Studio paints into
+ * the plane in place and commits a new object around the same array, and undo
+ * restores an older object around it. Either way the object differs from the
+ * one last counted, so the plane is counted again.
+ *
+ * Not for the Studio's own readout, which must follow a stroke before it commits.
+ */
+export function cachedMaskCoverage(mask) {
+  if (!mask?.data?.length) return 0
+  const hit = coverageCache.get(mask.data)
+  if (hit?.mask === mask) return hit.value
+  const value = maskCoverage(mask)
+  coverageCache.set(mask.data, { mask, value })
+  return value
+}
+
 // ── Selection, one bit per mask ──────────────────────────────────────────────
 
 export const maskBit = (index) => 1 << index

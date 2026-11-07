@@ -49,7 +49,7 @@ import { paletteInks, setCoverInk } from '../utils/coverPlate'
 import { CoverPlate, ModeCopiesPanel, PaintedMasks, PanelStage, SectionFilter, SectionScope, sectionMatches, suggestTerms } from './panel/filter'
 import { ModeCopies } from './panel/ModeCopies'
 
-import { MAX_MASKS, maskCoverage } from '../utils/maskLayers'
+import { MAX_MASKS, cachedMaskCoverage } from '../utils/maskLayers'
 import { modifiedSections } from './panel/sectionParams'
 import { VectorLayersPanel } from './panel/VectorLayersPanel'
 
@@ -2289,7 +2289,7 @@ export function Sidebar({
                                  border: `1px solid ${BORDER}`, borderRadius: 3, padding: '2px 5px' }} />
                       <span style={{ fontSize: 10, color: DIM, fontVariantNumeric: 'tabular-nums',
                                      minWidth: 30, textAlign: 'right' }}>
-                        {(maskCoverage(m) * 100).toFixed(0)}%
+                        {(cachedMaskCoverage(m) * 100).toFixed(0)}%
                       </span>
                       {/* "Edit", not "Paint". The Studio does more than a brush —
                           it erases, fills, inverts, imports and crops — so naming

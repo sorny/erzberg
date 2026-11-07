@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  MAX_MASKS, NO_MASKS, createMask, describeSelection, fillAll, invert,
+  MAX_MASKS, NO_MASKS, cachedMaskCoverage, createMask, describeSelection, fillAll, invert,
   maskBit, maskCoverage, maskFromImageData, selectionHasMask, stamp, stroke,
   toggleMaskSelection, unionOf,
 } from '../../src/utils/maskLayers'
@@ -23,6 +23,38 @@ import {
 const W = 64, H = 64
 const blank = () => new Uint8Array(W * H)
 const countOn = (d) => d.reduce((n, v) => n + (v ? 1 : 0), 0)
+
+describe('the cached coverage', () => {
+  it('does not read the plane again for the same mask object', () => {
+    const m = createMask(W, H, 0)
+    m.data.fill(1)
+    expect(cachedMaskCoverage(m)).toBe(1)
+    // A write with no commit: only a recount could see it.
+    m.data.fill(0)
+    expect(cachedMaskCoverage(m)).toBe(1)
+  })
+
+  it('counts again when a commit wraps the same plane in a new object', () => {
+    const m = createMask(W, H, 0)
+    expect(cachedMaskCoverage(m)).toBe(0)
+    m.data.fill(1)
+    expect(cachedMaskCoverage({ ...m, data: m.data })).toBe(1)
+  })
+
+  it('counts again when undo restores an older object around the painted plane', () => {
+    const before = createMask(W, H, 0)
+    expect(cachedMaskCoverage(before)).toBe(0)
+    before.data.fill(1)
+    const after = { ...before, data: before.data }
+    expect(cachedMaskCoverage(after)).toBe(1)
+    expect(cachedMaskCoverage(before)).toBe(1)
+  })
+
+  it('reads an empty mask as nothing covered', () => {
+    expect(cachedMaskCoverage(null)).toBe(0)
+    expect(cachedMaskCoverage({ data: new Uint8Array(0) })).toBe(0)
+  })
+})
 
 describe('a mask', () => {
   it('starts empty, over the raster it was made for', () => {
