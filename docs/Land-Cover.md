@@ -76,13 +76,13 @@ data on your machine: one byte per pixel instead of 64.
 | `crs`, `bbox` | The ground covered, in its own projection |
 | `width`, `height` | Its own grid |
 | `classes[]` | `index`, `name`, `color`, `share`, `note` |
-| `labels` | One byte per pixel, the class index. Deflated, then base64 |
-| `plate` | Three bytes per pixel, the imagery colour. Deflated, then base64 |
+| `labels` | One byte per pixel, the class index. zlib, then base64 |
+| `plate` | Three bytes per pixel, the imagery colour. zlib, then base64 |
 | `variance` | Share of embedding variance held by the three colour axes |
 | `attribution` | The CC-BY credit |
 | `osmCredit` | The ODbL credit, when OSM named the classes |
 
-Payloads are raw deflate, not PNG, so row order cannot be ambiguous.
+Payloads are zlib streams (RFC 1950), not PNG, so row order cannot be ambiguous.
 
 The app refuses a plate that does not cover the raster's ground. Alignment is
 re-derived when the raster changes, so an Edit Mode crop re-cuts the plate.
