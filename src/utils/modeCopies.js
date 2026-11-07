@@ -71,6 +71,23 @@ export function sharedPatch(mode, patch) {
   return Object.fromEntries(Object.entries(patch).filter(([k]) => !own.has(k)))
 }
 
+/**
+ * The style patch that stops a mark drawing: the mode and every copy of it.
+ *
+ * For the Marks tile, which is lit while any of them draws. The mode's own
+ * switch writes only `enabled<Mode>`, so a copy can stay on without its original.
+ */
+export function markOffPatch(style, mode) {
+  const key = `enabled${mode}`
+  const copies = style.modeCopies ?? []
+  return {
+    [key]: false,
+    ...(copies.some((c) => c.mode === mode && c.values?.[key])
+      ? { modeCopies: copies.map((c) => (c.mode === mode ? { ...c, values: { ...c.values, [key]: false } } : c)) }
+      : null),
+  }
+}
+
 /** A patch from the copy's controls, kept to the keys the copy owns. */
 export function patchCopy(copies, uid, patch) {
   return copies.map((c) => {

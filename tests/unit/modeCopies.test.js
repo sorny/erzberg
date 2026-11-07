@@ -10,7 +10,7 @@ import { buildTerrain } from '../../src/utils/terrain'
 import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
 import { geometryKey } from '../../src/params'
 import { classBit } from '../../src/utils/coverPlate'
-import { makeCopy, nextUid, ownedKeys, patchCopy, sharedPatch } from '../../src/utils/modeCopies'
+import { makeCopy, markOffPatch, nextUid, ownedKeys, patchCopy, sharedPatch } from '../../src/utils/modeCopies'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from '../../src/defaults'
 
 const W = 64
@@ -109,5 +109,27 @@ describe('a patch from a copy', () => {
     expect(patchCopy([copy], copy.uid, patch)[0].values).toMatchObject({ hypsoTruchet: true })
     expect(patchCopy([copy], copy.uid, patch)[0].values.colorCLandform).toBeUndefined()
     expect(sharedPatch('Truchet', patch)).toEqual({ colorCLandform: '#123456' })
+  })
+})
+
+describe('the Marks tile switch', () => {
+  const on = (mode, uid) => ({ uid, mode, name: uid, values: { [`enabled${mode}`]: true, keep: 1 } })
+
+  it('stops the mode and every copy of it', () => {
+    const patch = markOffPatch({ modeCopies: [on('Contours', 'c1'), on('Contours', 'c2')] }, 'Contours')
+    expect(patch.enabledContours).toBe(false)
+    expect(patch.modeCopies.map((c) => c.values.enabledContours)).toEqual([false, false])
+    expect(patch.modeCopies[0].values.keep).toBe(1)
+  })
+
+  it('leaves the copies of another mode drawing', () => {
+    const other = on('Hachure', 'c2')
+    const patch = markOffPatch({ modeCopies: [on('Contours', 'c1'), other] }, 'Contours')
+    expect(patch.modeCopies[1]).toBe(other)
+  })
+
+  it('writes only the switch when no copy draws', () => {
+    expect(markOffPatch({ modeCopies: [] }, 'Contours')).toEqual({ enabledContours: false })
+    expect(markOffPatch({}, 'Contours')).toEqual({ enabledContours: false })
   })
 })

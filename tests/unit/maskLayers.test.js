@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import {
-  MAX_MASKS, NO_MASKS, cachedMaskCoverage, createMask, describeSelection, fillAll, invert,
+  MAX_MASKS, NO_MASKS, cachedMaskCoverage, coverageText, createMask, describeSelection, fillAll, invert,
   maskBit, maskCoverage, maskFromImageData, selectionHasMask, stamp, stroke,
   toggleMaskSelection, unionOf,
 } from '../../src/utils/maskLayers'
@@ -23,6 +23,20 @@ import {
 const W = 64, H = 64
 const blank = () => new Uint8Array(W * H)
 const countOn = (d) => d.reduce((n, v) => n + (v ? 1 : 0), 0)
+
+describe('the coverage text', () => {
+  it('never prints a mask with pixels as 0%', () => {
+    expect(coverageText(0.002)).toBe('<1%')
+    expect(coverageText(0.0000001)).toBe('<1%')
+  })
+
+  it('prints nothing and everything as whole numbers', () => {
+    expect(coverageText(0)).toBe('0%')
+    expect(coverageText(0.01)).toBe('1%')
+    expect(coverageText(0.456)).toBe('46%')
+    expect(coverageText(1)).toBe('100%')
+  })
+})
 
 describe('the cached coverage', () => {
   it('does not read the plane again for the same mask object', () => {

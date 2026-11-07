@@ -13,7 +13,7 @@
  * two hold different controls and will keep diverging in content; what has to
  * stay identical is the frame, and that is what `panel/ui` already provides.
  */
-import { maskCoverage } from '../utils/maskLayers'
+import { coverageText, maskCoverage } from '../utils/maskLayers'
 import { BackdropBlock } from './panel/BackdropBlock'
 import { ACCENT_TEXT, BG, BORDER, Btn, DANGER_TEXT, DIM, FONT, Heading, HelpBox, InlineSl, MUTED, PanelStyles, SegGroup, SegRow, STRONG, SUNK, SURF, TEXT, Tog, W, WORDMARK } from './panel/ui'
 
@@ -44,9 +44,7 @@ export function MaskPanel({
   onFill, onInvert, onClear, onDone, region,
   onUndo, onRedo, canUndo, canRedo,
 }) {
-  // maskCoverage answers a fraction, not a percentage — the mask rows in the
-  // sidebar scale it the same way.
-  const covered = mask ? maskCoverage(mask) * 100 : 0
+  const covered = mask ? maskCoverage(mask) : 0
 
   const btn = (label, onClick, kind, testId, disabled = false) => (
     <Btn size="lg" block variant={kind === 'primary' ? 'primary' : 'quiet'}
@@ -127,7 +125,7 @@ export function MaskPanel({
             <div>Source <span style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>{srcWidth}×{srcHeight}</span></div>
             <div>Covered <span data-testid="studio-coverage" style={{
               color: covered > 0 ? ACCENT_TEXT : DANGER_TEXT, fontVariantNumeric: 'tabular-nums',
-            }}>{covered > 0 && covered < 1 ? '<1' : Math.round(covered)}%</span></div>
+            }}>{coverageText(covered)}</span></div>
           </div>
         </div>
 
@@ -167,7 +165,7 @@ function RegionControls({ tool, r, total, btn }) {
   const set = (k) => (v) => setLevel((o) => ({ ...o, [k]: v }))
   const geom = pick.chosen?.geom ?? 'area'
   const distLabel = r.filling ? 'Buffer' : geom === 'line' ? 'Half-width' : 'Radius'
-  const share = r.preview ? (100 * r.preview.on) / total : null
+  const share = r.preview ? r.preview.on / total : null
 
   return (
     <>
@@ -219,7 +217,7 @@ function RegionControls({ tool, r, total, btn }) {
       {note(share == null
         ? 'Nothing to preview yet.'
         : <>The mask after you apply: <span data-testid="studio-preview-coverage" style={{ color: DIM, fontVariantNumeric: 'tabular-nums' }}>
-            {share > 0 && share < 1 ? '<1' : Math.round(share)}%</span> of the raster.</>)}
+            {coverageText(share)}</span> of the raster.</>)}
       <div style={{ display: 'flex' }}>
         {btn('Apply to mask', r.onApply, 'primary', 'studio-apply', !r.preview)}
       </div>

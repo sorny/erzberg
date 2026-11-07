@@ -49,7 +49,8 @@ import { paletteInks, setCoverInk } from '../utils/coverPlate'
 import { CoverPlate, ModeCopiesPanel, PaintedMasks, PanelStage, SectionFilter, SectionScope, sectionMatches, suggestTerms } from './panel/filter'
 import { ModeCopies } from './panel/ModeCopies'
 
-import { MAX_MASKS, cachedMaskCoverage } from '../utils/maskLayers'
+import { MAX_MASKS, cachedMaskCoverage, coverageText } from '../utils/maskLayers'
+import { markOffPatch } from '../utils/modeCopies'
 import { modifiedSections } from './panel/sectionParams'
 import { VectorLayersPanel } from './panel/VectorLayersPanel'
 
@@ -1526,9 +1527,10 @@ export function Sidebar({
    * afterwards shows its controls rather than a shut header.
    */
   const handleModeTile = (key, next) => {
-    ss({ [key]: next })
+    const mode = key.slice('enabled'.length)
+    ss(next ? { [key]: true } : markOffPatch(style, mode))
     if (!next) return
-    setSec(prev => ({ ...prev, ['mode' + key.slice('enabled'.length)]: true }))
+    setSec(prev => ({ ...prev, ['mode' + mode]: true }))
   }
 
   /**
@@ -2289,7 +2291,7 @@ export function Sidebar({
                                  border: `1px solid ${BORDER}`, borderRadius: 3, padding: '2px 5px' }} />
                       <span style={{ fontSize: 10, color: DIM, fontVariantNumeric: 'tabular-nums',
                                      minWidth: 30, textAlign: 'right' }}>
-                        {(cachedMaskCoverage(m) * 100).toFixed(0)}%
+                        {coverageText(cachedMaskCoverage(m))}
                       </span>
                       {/* "Edit", not "Paint". The Studio does more than a brush —
                           it erases, fills, inverts, imports and crops — so naming
