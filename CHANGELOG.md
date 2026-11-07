@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.72.1] — 2026-11-07
+
+### Fixed
+
+- **Masks no longer slow the camera on a large raster.** The Masks section
+  counted every pixel of every mask on each panel render, and an orbit renders
+  the panel every 150 ms. Four masks over a 10500 x 9000 GeoTIFF cost 250 ms a
+  render. The section now counts a mask once, and again after a change. In a
+  scripted orbit of that project, blocked main-thread time fell from 50.6 s to
+  1.9 s.
+
 ## [1.72.0] — 2026-11-06
 
 ### Fixed
