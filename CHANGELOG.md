@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.72.2] — 2026-11-07
+
+### Changed
+
+- **A mask takes a name that its features share.** Several picked features with
+  one name now give the mask that name, as one feature already did. Features
+  with different names, or an unnamed one among them, still give the layer name.
+
+### Fixed
+
+- **The Marks tile switches off a mode that has copies.** The tile stays lit
+  while any copy draws, but its tick turned off only the original, so the copies
+  kept drawing and a second tick did nothing. The tick now turns off the mode
+  and all its copies. The mode's own switch still changes only the original.
+- **The mask list no longer shows a small mask as 0%.** The list rounded down
+  and the Studio printed `<1%` for the same mask. Both now use `coverageText`.
+
 ## [1.72.1] — 2026-11-07
 
 ### Fixed

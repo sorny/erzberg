@@ -191,7 +191,8 @@ that share an endpoint:
 
 **Picking features.** The picker lists the layer's features, ticked, sorted and
 filterable, with **all** and **none**. The layer's hidden list seeds the pick,
-but after that they are independent. A mask of one feature takes its name.
+but after that they are independent. A mask of one feature takes its name. So does a mask of
+several features that all have that one name.
 
 - **Holes are cut.** A feature's rings are filled together under even-odd, not
   one by one, and not by winding.

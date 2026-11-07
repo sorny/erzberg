@@ -126,6 +126,17 @@ export function maskCoverage(mask) {
   return on / mask.data.length
 }
 
+/**
+ * A coverage fraction as the panel and the Studio print it.
+ *
+ * Some ground rounds up to `<1%`, because a mask of a few small features is not
+ * an empty mask, and `0%` reads as one.
+ */
+export function coverageText(fraction) {
+  const percent = fraction * 100
+  return `${percent > 0 && percent < 1 ? '<1' : Math.round(percent)}%`
+}
+
 const coverageCache = new WeakMap()
 
 /**

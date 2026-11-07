@@ -26,7 +26,9 @@ same gradient.
 mode. The copy takes a snapshot of all the mode's settings. After that, the
 original and the copy change independently: each has its own settings, class
 mask, painted mask and colour source. A copy can be on while the original is
-off.
+off: the switch in the mode's section and the switch on a copy each change only
+that one. The tick on the Marks tile turns off the mode and all its copies. A
+second tick turns on only the original.
 
 Each copy is its own set of pen layers, named for the copy: `Sparse · Minor`.
 A copy goes into undo, the session, presets and the look that every PNG and SVG

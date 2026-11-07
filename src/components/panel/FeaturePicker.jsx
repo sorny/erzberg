@@ -13,7 +13,7 @@
  */
 import { useMemo, useState } from 'react'
 import { featureLabel } from '../../utils/vectorLayers'
-import { enclosesRegion } from '../../utils/maskFromVector'
+import { enclosesRegion, sharedFeatureName } from '../../utils/maskFromVector'
 import { ACCENT, BORDER, DIM, MiniBtn, MUTED, Select, SURF, TEXT } from './ui'
 
 const MAX_ROWS = 200
@@ -70,11 +70,8 @@ export function useFeaturePick(layers = [], sources = [], prefix = 'mask-from') 
   }
   const onLayerChange = (v) => { setPick(v); setOnly(null); setFilter('') }
 
-  /** The name to give whatever is produced — the feature's when it is the only one. */
-  const label = (() => {
-    const one = picked.size === 1 ? bucket?.names?.get([...picked][0]) : null
-    return one ?? chosen?.name ?? ''
-  })()
+  /** The name to give whatever is produced: the picks' own name when they share one. */
+  const label = sharedFeatureName(bucket, picked) ?? chosen?.name ?? ''
 
   const element = !usable.length ? null : (
     <>

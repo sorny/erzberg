@@ -238,6 +238,22 @@ function isClosed(pts) {
 }
 
 /**
+ * The one name that every picked feature carries, or null.
+ *
+ * A glacier mapped as several polygons is one place with one name. An unnamed
+ * feature among the picks means the picks are not all that place.
+ */
+export function sharedFeatureName(bucket, picked) {
+  let shared = null
+  for (const i of picked ?? []) {
+    const name = bucket?.names?.get(i)
+    if (!name || (shared !== null && name !== shared)) return null
+    shared = name
+  }
+  return shared
+}
+
+/**
  * Whether a feature encloses a region — and so whether filling it means
  * anything at all.
  *

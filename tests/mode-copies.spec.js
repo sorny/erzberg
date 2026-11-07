@@ -68,3 +68,28 @@ test('a copy of a mode is its own pens, in undo and in the file', async ({ page 
   }
   await expect(page.locator('[data-testid="mode-copy-c1"]')).toHaveCount(0)
 })
+
+test('the Marks tile switches off the mode and all its copies', async ({ page }) => {
+  test.setTimeout(120_000)
+  await page.goto(PAGE)
+  await resetToDefaults(page)
+  await setMark(page, 'Contours')
+  await openMark(page, 'Contours')
+  await openFold(page, 'mode-copies-block-contours')
+  for (let i = 0; i < 5; i++) await page.click('[data-testid="mode-duplicate-contours"]')
+  await expect(page.locator('[data-testid^="mode-copy-on-"]')).toHaveCount(5)
+
+  await page.click('[data-testid="mode-back"]')
+  const tile = page.locator('[data-testid="mode-tile-Contours"]')
+  await expect(tile).toHaveAttribute('aria-pressed', 'true')
+  await tile.click()
+  await expect(tile).toHaveAttribute('aria-pressed', 'false')
+
+  // On again is the original alone: the copies keep their own switches.
+  await tile.click()
+  await openMark(page, 'Contours')
+  await openFold(page, 'mode-copies-block-contours')
+  const on = page.locator('[data-testid^="mode-copy-on-"]')
+  await expect(on).toHaveCount(5)
+  for (let i = 0; i < 5; i++) await expect(on.nth(i)).not.toBeChecked()
+})

@@ -16,6 +16,7 @@
  * corridor a hundred thousand times too wide, which is a filled rectangle.
  */
 import { describe, it, expect } from 'vitest'
+import { sharedFeatureName } from '../../src/utils/maskFromVector'
 import {
   canMakeMask, enclosesRegion, featureRings, growMask, maskFromFeatures,
   pixelsPerMetre, simplifyRing, stitchRings,
@@ -411,5 +412,26 @@ describe('simplifyRing', () => {
     for (let i = 0; i < 60000; i++) pts.push(i * 0.001, Math.sin(i * 0.0001) * 0.4)
     pts.push(pts[0], pts[1])
     expect(() => simplifyRing(Float64Array.from(pts), 0.34)).not.toThrow()
+  })
+})
+
+describe('the name that several picked features share', () => {
+  const bucket = { names: new Map([[0, 'Pasterze'], [1, 'Pasterze'], [2, 'Hofmannskees']]) }
+
+  it('is the name of one feature', () => {
+    expect(sharedFeatureName(bucket, new Set([2]))).toBe('Hofmannskees')
+  })
+
+  it('carries over when every pick has the same name', () => {
+    expect(sharedFeatureName(bucket, new Set([0, 1]))).toBe('Pasterze')
+  })
+
+  it('is null when two picks differ', () => {
+    expect(sharedFeatureName(bucket, new Set([0, 1, 2]))).toBeNull()
+  })
+
+  it('is null when a pick has no name, or nothing is picked', () => {
+    expect(sharedFeatureName(bucket, new Set([0, 3]))).toBeNull()
+    expect(sharedFeatureName(bucket, new Set())).toBeNull()
   })
 })
