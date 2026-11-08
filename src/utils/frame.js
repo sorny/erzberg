@@ -140,3 +140,46 @@ export function printPixels(widthMm, dpi, aspect) {
   const w = Math.max(1, Math.round((Math.max(1, widthMm) / 25.4) * Math.max(1, dpi)))
   return { w, h: Math.max(1, Math.round(w / Math.max(0.01, aspect || 1))) }
 }
+
+/** The guide sets the paper can show, in panel order, with their panel names. */
+export const GUIDE_SETS = [
+  ['centre', 'Centre'],
+  ['thirds', 'Thirds'],
+  ['golden', 'Golden section'],
+  ['diagonals', 'Diagonals'],
+]
+
+/** Where the golden section cuts a side, as a fraction from either end. */
+const PHI_CUT = 1 - 1 / ((1 + Math.sqrt(5)) / 2)
+
+/**
+ * Composition guides across a rectangle, as segments [x0, y0, x1, y1].
+ *
+ * `sets` is a comma list of `GUIDE_SETS` keys. Centre is the cross through
+ * the middle, Thirds the rule of thirds, Golden section the two cuts at
+ * 38.2% from each side, and Diagonals the two corner-to-corner lines.
+ */
+export function guideSegments(r, sets) {
+  if (!r || !(r.w > 0) || !(r.h > 0)) return []
+  const want = new Set(String(sets ?? '').split(',').filter(Boolean))
+  const out = []
+  const cross = (f) => {
+    out.push([r.x + r.w * f, r.y, r.x + r.w * f, r.y + r.h])
+    out.push([r.x, r.y + r.h * f, r.x + r.w, r.y + r.h * f])
+  }
+  if (want.has('centre')) cross(0.5)
+  if (want.has('thirds')) { cross(1 / 3); cross(2 / 3) }
+  if (want.has('golden')) { cross(PHI_CUT); cross(1 - PHI_CUT) }
+  if (want.has('diagonals')) {
+    out.push([r.x, r.y, r.x + r.w, r.y + r.h])
+    out.push([r.x + r.w, r.y, r.x, r.y + r.h])
+  }
+  return out
+}
+
+/** SVG dash pattern for a guide of width `w`. */
+export function guideDash(dash, w = 1) {
+  if (dash === 'dashed') return `${6 * w} ${4 * w}`
+  if (dash === 'dotted') return `${w} ${3 * w}`
+  return undefined
+}

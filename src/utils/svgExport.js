@@ -49,6 +49,7 @@ import { hatchLoops, hatchPlan, inkLightness } from './hatchFill'
 import { MODE_LABEL } from './drawModes'
 import { MAX_SPLIT_INKS } from './pens'
 import { FAMILIES } from '../components/panel/markFamilies'
+import { raisedOccludes } from './builders/lift'
 
 const MARGIN    = 20   // px padding around the geometry bounding box
 const N_SAMPLES = 64   // depth-test samples per segment (increased for precision)
@@ -523,6 +524,9 @@ async function runExport({
   // panel can answer "is this drawing too dense" before the click rather than at
   // the machine. See utils/penRoute.js.
   penOrder = false, measureOnly = false, onStats = null,
+  // 'layer' writes one top layer per pen layer, 'ink' one top layer per ink
+  // with the pen layers of that ink inside it. See `inkTree`.
+  groupBy = 'layer',
   // Clean-up of the pen strokes, in millimetres on paper; each is off at 0.
   // See simplifyRuns, dropShortRuns and bridgeRuns in utils/penRoute.js.
   simplifyMm = 0, minLengthMm = 0, joinGapMm = 0,
@@ -715,7 +719,8 @@ async function runExport({
   const curtainGeos = []
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
-      if (layer.curtains && layer.curtains.positions.length > 0) {
+      // A raised layer below full opacity hides nothing, as in the viewport.
+      if (layer.curtains && layer.curtains.positions.length > 0 && raisedOccludes(layer, lineStyles[layer.id]?.opacity ?? 1)) {
         zGeos.push(layer.curtains)
         curtainGeos.push(layer.curtains)
       }
@@ -971,6 +976,8 @@ async function runExport({
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
       const { weight = 1, opacity = 1, dash = 'solid', color, name } = lineStyles[id] ?? {}
+      // Opacity 0 draws nothing in the viewport, so it writes no pen layer.
+      if (!(opacity > 0)) continue
       // Inside the ground, with no fill, nothing the lift answers can hide it.
       const liftL = layer.insideGround && groundOccludes && !fillOccludes ? 0 : liftPerW * weight
       // Vector layers carry no per-vertex colour buffer unless hypsometric is
@@ -1842,8 +1849,10 @@ async function runExport({
   // so the export already only approximates it. Carrying the opacity across at
   // least keeps a deliberately faint field faint on paper.
   const pOpac = particleOpacity ?? 1
-  const circleEls = projectedParticles.map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : ghostInk}" opacity="${(visible ? pOpac : ghostOpac).toFixed(3)}"/>`)
-  const shadowEls = projectedShadows.map(({ cx, cy, r }) =>
+  // A disc or streak at opacity 0 is not drawn, so it is not written either.
+  const shown = ({ visible }) => (visible ? pOpac : ghostOpac) > 0
+  const circleEls = projectedParticles.filter(shown).map(({ cx, cy, r, visible }) => `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}" fill="${visible ? pColor : ghostInk}" opacity="${(visible ? pOpac : ghostOpac).toFixed(3)}"/>`)
+  const shadowEls = (particleShadowOpacity ?? 0.35) <= 0 ? [] : projectedShadows.map(({ cx, cy, r }) =>
     `<circle cx="${(cx-vx).toFixed(1)}" cy="${(cy-vy).toFixed(1)}" r="${r.toFixed(2)}"/>`)
   const shadowInk = screenInkHex(particleShadowColor)
   const shadowGroup = shadowEls.length > 0
@@ -1854,7 +1863,7 @@ async function runExport({
   // Its own Inkscape layer, unlike the dots: a plotter run is sorted by layer,
   // and streaks are the pen-drawn half of the flock.
   const trailStroke = Math.max(0.3, (particleSize ?? 4) * 0.15)
-  const trailEls = projectedTrails.map(({ x0, y0, x1, y1, visible }) =>
+  const trailEls = projectedTrails.filter(({ visible }) => (visible ? 0.75 * pOpac : ghostOpac) > 0).map(({ x0, y0, x1, y1, visible }) =>
     `<line x1="${(x0-vx).toFixed(1)}" y1="${(y0-vy).toFixed(1)}" x2="${(x1-vx).toFixed(1)}" y2="${(y1-vy).toFixed(1)}" stroke="${visible ? pColor : ghostInk}" opacity="${(visible ? 0.75 * pOpac : ghostOpac).toFixed(3)}"/>`)
   const trailGroup = trailEls.length > 0
     ? [docLayer('flock', 'Flock', `<g fill="none" stroke-width="${trailStroke.toFixed(2)}" stroke-linecap="round">${trailEls.join('')}</g>`,
@@ -1865,6 +1874,13 @@ async function runExport({
         { inks: [pColor], desc: `Particles as filled discs, ${circleEls.length.toLocaleString('en-US')} of them. Ink ${pColor}.` })]
     : []
   const useBgGrad = bgGradient && bgGradientStops?.length > 1
+  // Everything that is ink, in plot order. Grouped by ink, each ink becomes one
+  // top layer holding the layers drawn in it.
+  const inkLayers = [...layerGroups, ...shadowGroup, ...trailGroup, ...dotGroup,
+    ...sheetMarkGroup(marks, sheetMarkColor, vx, vy, docLayer, { byInk: groupBy === 'ink' })]
+  const tree = groupBy === 'ink' ? inkTree(inkLayers) : null
+  // A pen change is a change of ink now, which the plot estimate counts.
+  if (tree) plot.pens = tree.length
   // One eye of an anaglyph is a complete drawing that is not a document: the
   // caller assembles both into one. Returned before the header is written, so
   // there is exactly one `<svg>` element and one background in the result.
@@ -1889,7 +1905,7 @@ async function runExport({
     // the ISO ratios exactly, and a rounded height would land an A4 page at
     // 1:1.4147 instead of 1:1.41421.
     `<svg ${SVG_NS} ${pageSize(vw, vh, sheetMm)} viewBox="0 0 ${vw.toFixed(1)} ${vh.toFixed(1)}">`,
-    ...docHead({ title: baseName ?? 'heightmap', attribution, sheetMm, layers: count(), plot: { ...plot, pxPerMm: strokePxPerMm } }),
+    ...docHead({ title: baseName ?? 'heightmap', attribution, sheetMm, layers: tree ? tree.length : count(), plot: { ...plot, pxPerMm: strokePxPerMm } }),
     // OpenStreetMap data is ODbL: wherever it goes, the credit goes with it. A
     // comment rather than drawn text, so it survives being opened in Inkscape
     // without appearing on the plot.
@@ -1899,16 +1915,11 @@ async function runExport({
     ...(preset ? [preset] : []),
     ...(useBgGrad ? [`<defs><linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">${bgGradientStops.map(s => `<stop offset="${Math.round(s.pos*100)}%" stop-color="${s.color}"/>`).join('')}</linearGradient></defs>`] : []),
     paperLayer(useBgGrad ? 'url(#bg-grad)' : bgColor, useBgGrad ? bgGradientStops.map((g) => g.color) : [bgColor]),
-    ...layerGroups,
-    // After the line layers, matching the viewport's render order: a shadow
-    // falls *on* the terrain, so it darkens the marks drawn there rather than
-    // hiding beneath them.
-    ...shadowGroup,
-    ...trailGroup,
-    ...dotGroup,
-    // Last, and over everything: the two marks are annotation on the sheet
-    // rather than part of the picture, so nothing may draw across them.
-    ...sheetMarkGroup(marks, sheetMarkColor, vx, vy, docLayer),
+    // The line layers, then, matching the viewport's render order, the flock:
+    // a shadow falls *on* the terrain, so it darkens the marks drawn there
+    // rather than hiding beneath them. Last, and over everything, the sheet
+    // marks: annotation on the sheet rather than part of the picture.
+    ...(tree ?? inkLayers),
     `</svg>`,
   ].join('\n')
 
@@ -1932,23 +1943,72 @@ async function runExport({
  * because a framed export cuts its page out of the canvas, and these were laid
  * out in canvas pixels like everything else here.
  */
-function sheetMarkGroup(marks, color, vx, vy, docLayer) {
+function sheetMarkGroup(marks, color, vx, vy, docLayer, { byInk = false } = {}) {
   if (!marks) return []
   // As picked: the viewport draws the marks as HTML and the PNG strokes them
   // on a 2D canvas, and neither passes through the tone curve.
   const ink = (color || '#000000').toLowerCase()
-  const stroke = Math.max(0.4, (marks.texts[0]?.size ?? 12) * 0.08)
+  const stroke = Math.max(0.4, (marks.textSize ?? marks.texts[0]?.size ?? 12) * 0.08)
+  // Each element with the ink it is drawn in. A legend swatch, sample or label
+  // carries its own colour; the rest is the sheet ink.
+  const inkOf = (c) => (c || ink).toLowerCase()
   const els = [
-    // A legend swatch, sample or label carries its own colour as a fifth element.
-    ...marks.rects.map(([x, y, w, h, c]) =>
-      `<rect x="${(x - vx).toFixed(1)}" y="${(y - vy).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${c ? ` fill="${c.toLowerCase()}"` : ''}/>`),
-    ...marks.lines.map(([x0, y0, x1, y1, c, sw]) =>
-      `<line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" fill="none" stroke="${(c || ink).toLowerCase()}" stroke-width="${(sw ?? stroke).toFixed(2)}"/>`),
-    ...marks.texts.map((t) =>
-      `<text x="${(t.x - vx).toFixed(1)}" y="${(t.y - vy).toFixed(1)}" font-family="${xmlText(marks.font ?? 'sans-serif')}" font-size="${t.size.toFixed(1)}" text-anchor="${t.anchor}" fill="${(t.color || ink).toLowerCase()}" stroke="none">${xmlText(t.text)}</text>`),
+    ...marks.rects.map(([x, y, w, h, c]) => [inkOf(c),
+      `<rect x="${(x - vx).toFixed(1)}" y="${(y - vy).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}"${c ? ` fill="${c.toLowerCase()}"` : ''}/>`]),
+    ...marks.lines.map(([x0, y0, x1, y1, c, sw]) => [inkOf(c),
+      `<line x1="${(x0 - vx).toFixed(1)}" y1="${(y0 - vy).toFixed(1)}" x2="${(x1 - vx).toFixed(1)}" y2="${(y1 - vy).toFixed(1)}" fill="none" stroke="${inkOf(c)}" stroke-width="${(sw ?? stroke).toFixed(2)}"/>`]),
+    // A single-line face arrives as strokes, which a pen draws in one pass.
+    ...(marks.strokes ?? []).map((st) => [inkOf(st.color),
+      `<polyline points="${st.pts.map((v, i) => (v - (i % 2 ? vy : vx)).toFixed(2)).join(' ')}" fill="none" stroke="${inkOf(st.color)}" stroke-width="${st.w.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`]),
+    ...marks.texts.map((t) => [inkOf(t.color),
+      `<text x="${(t.x - vx).toFixed(1)}" y="${(t.y - vy).toFixed(1)}" font-family="${xmlText(marks.font ?? 'sans-serif')}" font-size="${t.size.toFixed(1)}" text-anchor="${t.anchor}" fill="${inkOf(t.color)}" stroke="none">${xmlText(t.text)}</text>`]),
   ]
-  return [docLayer('sheet-marks', 'Scale and north', `<g fill="${ink}">${els.join('')}</g>`,
-    { inks: [ink], desc: `Scale bar, north arrow and legend, drawn over the plate. Ink ${ink}.` })]
+  if (!byInk) {
+    return [docLayer('sheet-marks', 'Scale and north', `<g fill="${ink}">${els.map(([, e]) => e).join('')}</g>`,
+      { inks: [ink], desc: `Scale bar, north arrow and legend, drawn over the plate. Ink ${ink}.` })]
+  }
+  // By ink, one layer per ink, so each legend sample lands under its own pen.
+  // The sheet ink comes first and keeps the plain name.
+  const by = new Map([[ink, []]])
+  for (const [k, e] of els) {
+    if (!by.has(k)) by.set(k, [])
+    by.get(k).push(e)
+  }
+  return [...by].filter(([, list]) => list.length).map(([k, list]) => k === ink
+    ? docLayer('sheet-marks', 'Scale and north', `<g fill="${k}">${list.join('')}</g>`,
+      { inks: [k], desc: `Scale bar, north arrow and legend, drawn over the plate. Ink ${k}.` })
+    : docLayer(`sheet-marks-${xmlId(k.replace('#', ''))}`, 'Legend', `<g fill="${k}">${list.join('')}</g>`,
+      { inks: [k], desc: `The legend's marks in ink ${k}.` }))
+}
+
+/*
+ * The pen layers regrouped by ink: one top layer per ink, in the order its
+ * first layer plots, and the layers of that ink inside it as sublayers. A
+ * plotter driver that plots by top layer then makes one pen change per ink.
+ * A sublayer loses its leading plot number, which now belongs to its ink. A
+ * layer of several inks, such as a graded ramp, goes in a last group.
+ */
+export function inkTree(layers) {
+  const by = new Map()
+  for (const l of layers) {
+    const head = l.slice(0, l.indexOf('>'))
+    const ink = head.match(/ data-ink="([^"]+)"/)?.[1] ?? null
+    const sub = l.replace(/(inkscape:label=")\d+ · /, '$1').replace(/(<title>)\d+ · /, '$1')
+    if (!by.has(ink)) by.set(ink, [])
+    by.get(ink).push(sub)
+  }
+  const inks = [...by.keys()].filter((k) => k !== null)
+  if (by.has(null)) inks.push(null)
+  return inks.map((ink, i) => {
+    const subs = by.get(ink)
+    const label = `${String(i + 1).padStart(2, '0')} · ${ink ?? 'Several inks'}`
+    const id = ink ? `ink-${xmlId(ink.replace('#', ''))}` : 'ink-several'
+    const desc = ink
+      ? `${subs.length} ${subs.length === 1 ? 'layer' : 'layers'} in ink ${ink}. Plot them with one pen.`
+      : `${subs.length} ${subs.length === 1 ? 'layer' : 'layers'} that hold more than one ink.`
+    return `<g id="${id}" inkscape:groupmode="layer" inkscape:label="${xmlAttr(label)}"${ink ? ` data-ink="${ink}"` : ''} data-name="${xmlAttr(ink ?? 'Several inks')}">` +
+      `<title>${xmlText(label)}</title><desc>${xmlText(desc)}</desc>${subs.join('')}</g>`
+  })
 }
 
 function download(content, filename, mime) {

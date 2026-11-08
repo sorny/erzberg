@@ -83,3 +83,106 @@ test('a preset with a sheet block turns its marks and legend on', async ({ page 
   await expect(page.locator('[data-testid="legend-on"]')).toBeChecked()
   await expect(page.locator('[data-testid="legend-part-line"]')).not.toBeChecked()
 })
+
+test('the Layers group takes its own title, and each sample can be switched off', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await openStage(page, 'overlay')
+  const section = page.locator('[data-testid="section-legend"]')
+  await section.scrollIntoViewIfNeeded()
+  await section.click()
+  await page.locator('[data-testid="legend-on"]').click()
+  const marks = page.locator('[data-testid="sheet-marks"]')
+  await page.locator('[data-testid="legend-line-title"]').fill('Pens')
+  await expect(marks.locator('text', { hasText: 'PENS' })).toHaveCount(1)
+  await page.locator('[data-testid="legend-line-title"]').fill('')
+  await expect(marks.locator('text', { hasText: /^(PENS|LAYERS)$/ })).toHaveCount(0)
+  await expect(marks.locator('text', { hasText: 'Lines' })).toHaveCount(1)
+  // A typed name replaces the generated one, and clearing it brings that back.
+  const name = page.locator('[data-testid="legend-name-mode:Lines"]')
+  await expect(name).toHaveAttribute('placeholder', 'Lines')
+  await name.fill('Ridge strokes')
+  await expect(marks.locator('text', { hasText: 'Ridge strokes' })).toHaveCount(1)
+  await name.fill('')
+  await expect(marks.locator('text', { hasText: 'Lines' })).toHaveCount(1)
+  await page.locator('[data-testid="legend-font-mono"]').click()
+  await expect(marks.locator('text', { hasText: 'Lines' })).toHaveAttribute('font-family', /monospace/)
+  // The sheet's font is in reach from the legend too.
+  await page.locator('[data-testid="legend-font-line"]').click()
+  await expect(page.locator('[data-testid="legend-line-font"]')).toBeVisible()
+  await expect.poll(() => marks.locator('polyline').count(), { timeout: 15_000 }).toBeGreaterThan(3)
+  await expect(marks.locator('text')).toHaveCount(0)
+  await page.locator('[data-testid="legend-item-mode:Lines"]').uncheck()
+  await expect(marks).toHaveCount(0)
+  await expect(page.locator('[data-testid="legend-readout"]')).toContainText('Nothing to explain')
+  expect(errors).toEqual([])
+})
+
+test('a single-line face letters the marks as strokes, in the viewport and the SVG', async ({ page }, info) => {
+  test.setTimeout(180_000)
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('http://localhost:5173/?automation')
+  await page.waitForFunction(() => window.erzberg?.version === 1, null, { timeout: 60_000 })
+  await page.evaluate(async () => {
+    window.erzberg.setParams({ legendOn: true, frameTitle: true, frameTitleText: 'Erzberg', frameMarkFont: 'line', frameMarkLineFont: 'HersheySans1' })
+    await window.erzberg.settle()
+  })
+  const marks = page.locator('[data-testid="sheet-marks"]')
+  await expect.poll(() => marks.locator('polyline').count(), { timeout: 30_000 }).toBeGreaterThan(10)
+  await expect(marks.locator('text')).toHaveCount(0)
+  const [d] = await Promise.all([
+    page.waitForEvent('download', { timeout: 120_000 }),
+    page.evaluate(() => window.erzberg.export('svg')),
+  ])
+  const file = info.outputPath('strokes.svg')
+  await d.saveAs(file)
+  const svg = readFileSync(file, 'utf8')
+  const layer = svg.slice(svg.indexOf('data-name="Scale and north"'))
+  expect(layer).toContain('<polyline')
+  expect(layer).not.toContain('<text')
+  expect(errors).toEqual([])
+})
+
+test('the line samples reorder by dragging a grip, or with the arrow keys', async ({ page }) => {
+  const errors = []
+  page.on('pageerror', (e) => errors.push(e.message))
+  await page.goto('http://localhost:5173/?automation')
+  await page.waitForFunction(() => window.erzberg?.version === 1, null, { timeout: 60_000 })
+  await page.evaluate(async () => {
+    window.erzberg.setParams({ legendOn: true, enabledContours: true, legendCaps: false })
+    await window.erzberg.settle()
+  })
+  await page.keyboard.press('Backslash')
+  await openStage(page, 'overlay')
+  const section = page.locator('[data-testid="section-legend"]')
+  await section.scrollIntoViewIfNeeded()
+  // A closed section keeps its body mounted but inert, so ask the header.
+  if ((await section.getAttribute('aria-expanded')) !== 'true') await section.click()
+  await expect(section).toHaveAttribute('aria-expanded', 'true')
+  const marks = page.locator('[data-testid="sheet-marks"]')
+  const order = () => marks.locator('text').evaluateAll((ts) => ts.map((t) => t.textContent).filter((t) => /^(Lines|Contours)/.test(t)))
+  await expect.poll(order).toEqual(['Lines', expect.stringMatching(/^Contours/)])
+
+  // Drag Contours above Lines.
+  const grip = page.locator('[data-testid="legend-grip-mode:Contours"]')
+  // `page.mouse` takes raw viewport coordinates, so both rows must be on screen.
+  await page.locator('[data-testid="legend-row-mode:Lines"]').scrollIntoViewIfNeeded()
+  await grip.scrollIntoViewIfNeeded()
+  const target = await page.locator('[data-testid="legend-row-mode:Lines"]').boundingBox()
+  const g = await grip.boundingBox()
+  await page.mouse.move(g.x + g.width / 2, g.y + g.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(g.x + g.width / 2, target.y + 2, { steps: 8 })
+  await page.mouse.up()
+  await expect.poll(order).toEqual([expect.stringMatching(/^Contours/), 'Lines'])
+
+  // And back down with the keyboard.
+  await grip.focus()
+  await page.keyboard.press('ArrowDown')
+  await expect.poll(order).toEqual(['Lines', expect.stringMatching(/^Contours/)])
+  expect(errors).toEqual([])
+})

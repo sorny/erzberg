@@ -472,7 +472,10 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   an SVG in a comment. Open the file with *Presets › Open* to restore the look. The
   raster and its file name are never written.
 - **Paper frame.** ISO A, US sizes, common ratios or your own, with a margin.
-  The SVG is cut at the frame, not clipped.
+  The SVG is cut at the frame, not clipped. Guides for composition (centre,
+  thirds, golden section, diagonals) sit inside the margin, with their own width,
+  opacity, dash and colour. Like the Camera's centre guides, which follow the
+  free canvas as the panel opens and closes, no export draws them.
 - **Scale bar and north arrow**, measured from the raster's bounding box. With a
   sheet width in mm, the panel prints the map ratio. *Magnetic north* turns the
   arrow to where a compass points and letters the declination, from the World
@@ -481,16 +484,23 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   height range, source and date. Each line can be switched off.
 - **Coordinates**: ticks or lines along the sheet edge, in the raster's grid or in
   degrees, in a plan view.
-- **Font.** All sheet marks are lettered in sans, mono or serif.
+- **Font.** All sheet marks are lettered in sans, mono or serif, or in a
+  single-line face (Line), which writes the text as strokes that a pen plotter
+  draws in one pass. Contour labels, vector labels, text layers and the Map
+  Grid numbers have single-line faces of their own.
 - **Legend** (Overlay › Legend) lists what the plate draws, in a corner of the sheet:
   a stepped ramp for each colour source, with the height range in metres on a
   georeferenced raster, the Landforms and Land cover inks, the surface tints, and
-  a line sample for each layer in its own ink. It shows only what is on screen, and
+  a line sample for each layer in its own ink. The Layers group takes its own title,
+  or none. Each sample has a name field, a switch, and a grip to drag it into a new order. It shows only what is on screen, and
   it moves clear of the other marks. It is drawn in the viewport, the PNG and the SVG.
 - **Preflight** reports the stroke count, pen count, ink length, pen-up travel
   and an estimated plot time.
 - **Output › Plot** holds the sheet width, the pen tip, the stroke order, the
   clean-up and Preflight. Output › Export writes the files.
+- **Layers** (Plot) arranges the SVG by layer or by ink. By ink gives one top
+  layer per ink, with the pen layers of that ink inside it, so a plotter that
+  plots by layer changes the pen once per ink. A layer at opacity 0 is not written.
 - **Plotter order** re-orders strokes inside each pen layer. It enters a closed
   stroke, such as a contour, at the point nearest the pen. On the sample plate
   it cuts pen-up travel from 52.4 m to 1.4 m. It is off by default, because

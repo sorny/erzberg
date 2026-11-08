@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { legendEntries, legendShapes, markFont } from '../../src/utils/legend'
-import { marksFor } from '../../src/utils/sheetFacts'
+import { marksFor, strokeTexts } from '../../src/utils/sheetFacts'
 import { presetSheet } from '../../src/utils/presetFile'
 import { STYLE_DEF, VIEW_DEF } from '../../src/defaults'
 
@@ -48,7 +48,15 @@ describe('legendEntries', () => {
 
   it('lists a mode copy under its own name', () => {
     const e = legendEntries(plate({ modeCopies: [{ uid: 'c1', mode: 'Contours', name: 'Contours 2', values: { enabledContours: true, colorContours: '#ff0000' } }] }))
-    expect(e[0].items).toEqual([{ color: '#ff0000', dash: 'solid', name: 'Contours 2' }])
+    expect(e[0].items).toEqual([{ key: 'copy:c1', color: '#ff0000', dash: 'solid', name: 'Contours 2', base: 'Contours 2' }])
+  })
+
+  it('names a sample by what was typed for it, and keeps the generated name', () => {
+    const copies = [{ uid: 'c1', mode: 'Contours', name: 'Contours 2', values: { enabledContours: true } }]
+    const [it0] = legendEntries(plate({ modeCopies: copies, legendNames: JSON.stringify({ 'copy:c1': 'Index lines' }) }))[0].items
+    expect(it0).toMatchObject({ name: 'Index lines', base: 'Contours 2' })
+    // A broken value names nothing rather than throwing.
+    expect(legendEntries(plate({ modeCopies: copies, legendNames: '{oops' }))[0].items[0].name).toBe('Contours 2')
   })
 
   it('shows only the groups that are picked', () => {
@@ -114,5 +122,75 @@ describe('presetSheet', () => {
       .toEqual({ legendOn: true, frameMarkFont: 'mono', frameTitleText: 'X' })
     expect(presetSheet(null)).toBeNull()
     expect(presetSheet({ tilt: 0 })).toBeNull()
+  })
+})
+
+describe('the Layers group', () => {
+  const two = () => plate({
+    enabledContours: true,
+    modeCopies: [{ uid: 'c1', mode: 'Contours', name: 'Contours 2', values: { enabledContours: true, colorContours: '#ff0000' } }],
+  })
+  const lineOf = (p) => legendEntries(p).find((e) => e.kind === 'line')
+
+  it('keys each sample by mode, copy or vector layer', () => {
+    const e = legendEntries(two(), { vectorLayers: [{ id: 'v7', name: 'Roads', color: '#333333' }] }).find((x) => x.kind === 'line')
+    expect(e.items.map((it) => it.key)).toEqual(['mode:Contours', 'copy:c1', 'vector:v7'])
+  })
+
+  it('marks a sample switched off, and the layout leaves it out', () => {
+    const p = { ...two(), legendHide: 'copy:c1' }
+    const e = lineOf(p)
+    expect(e.items.map((it) => !!it.hidden)).toEqual([false, true])
+    const box = { x: 0, y: 0, w: 800, h: 600 }
+    const shown = legendShapes([e], { box }).texts.map((t) => t.text)
+    expect(shown.some((t) => t.startsWith('Contours 2'))).toBe(false)
+    expect(shown.some((t) => t.startsWith('Contours'))).toBe(true)
+  })
+
+  it('lists the samples in the order set in the panel, and an unnamed one after them', () => {
+    const facts = { vectorLayers: [{ id: 'v7', name: 'Roads', color: '#333333' }] }
+    const e = legendEntries({ ...two(), legendOrder: 'vector:v7,copy:c1' }, facts).find((x) => x.kind === 'line')
+    expect(e.items.map((it) => it.key)).toEqual(['vector:v7', 'copy:c1', 'mode:Contours'])
+    const shown = legendShapes([e], { box: { x: 0, y: 0, w: 800, h: 600 }, upper: false }).texts.map((t) => t.text)
+    expect(shown.slice(1, 3)).toEqual(['Roads', 'Contours 2'])
+  })
+
+  it('drops the group when every sample is off', () => {
+    const e = lineOf({ ...two(), legendHide: 'mode:Contours,copy:c1' })
+    expect(legendShapes([e], { box: { x: 0, y: 0, w: 800, h: 600 } })).toBeNull()
+  })
+
+  it('takes its title from the panel, and draws none when it is empty', () => {
+    const box = { x: 0, y: 0, w: 800, h: 600 }
+    const titled = legendShapes([lineOf({ ...two(), legendLineTitle: 'Pens' })], { box, upper: false })
+    expect(titled.texts[0].text).toBe('Pens')
+    const bare = legendShapes([lineOf({ ...two(), legendLineTitle: '' })], { box, upper: false })
+    expect(bare.texts.map((t) => t.text).some((t) => t === '' || t === 'Layers')).toBe(false)
+    expect(bare.texts).toHaveLength(2)
+  })
+})
+
+describe('marks in a single-line face', () => {
+  // Two glyphs: 'A' a single stroke, ' ' a blank advance.
+  const font = { key: 'sl:Test', stroke: true, unitsPerEm: 1000, glyphs: { A: [600, [[0, 0, 300, 700, 600, 0]]], ' ': [400, []] } }
+
+  it('sets each run as strokes in screen pixels, on its baseline', () => {
+    const [s] = strokeTexts([{ x: 100, y: 50, text: 'A', size: 10, anchor: 'start' }], font)
+    expect(s.pts).toEqual([100, 50, 103, 43, 106, 50])
+  })
+
+  it('honours the anchor', () => {
+    const [s] = strokeTexts([{ x: 100, y: 50, text: 'A', size: 10, anchor: 'end' }], font)
+    expect(s.pts[4]).toBeCloseTo(100)
+  })
+
+  it('replaces the text of every mark once the face is loaded', () => {
+    const p = plate({ frameTitle: true, frameMarkFont: 'line' })
+    const waiting = marksFor({ p, sheet: { title: ['A'] }, width: 800, height: 600, frame: null, scale: null })
+    expect(waiting.texts.length).toBeGreaterThan(0)
+    const m = marksFor({ p, sheet: { title: ['A'], strokeFont: font }, width: 800, height: 600, frame: null, scale: null })
+    expect(m.texts).toEqual([])
+    expect(m.strokes.length).toBeGreaterThan(0)
+    expect(m.textSize).toBe(waiting.texts[0].size)
   })
 })

@@ -15,9 +15,10 @@ import { ACCENT_TEXT, BG, BORDER, DANGER, DANGER_BORDER, DANGER_TEXT, DIM, FONT,
 import { useHeightmap } from './hooks/useHeightmap'
 import { useSoundscape } from './hooks/useSoundscape'
 import { useFlockAudio } from './hooks/useFlockAudio'
-import { FrameOverlay } from './components/FrameOverlay'
+import { CenterGuides, FrameOverlay } from './components/FrameOverlay'
 import { SheetMarks } from './components/SheetMarks'
 import { legendEntries } from './utils/legend'
+import { loadTextFont, singleLineKey } from './utils/textGeometry'
 import { ShortcutsOverlay } from './components/ShortcutsOverlay'
 import { FeatureTooltip } from './components/FeatureTooltip'
 import { useTerrainGeometry } from './hooks/useTerrainGeometry'
@@ -2622,9 +2623,19 @@ export default function App() {
   // the whole style rather than a list of keys that would drift.
   const legend = useMemo(() => (view.legendOn ? legendEntries(p, { cover, vectorLayers }, { steps: view.legendSteps ?? 7 }) : null),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-    [view.legendOn, view.legendParts, view.legendSteps, style, gradientStops, cover, vectorLayers,
+    [view.legendOn, view.legendParts, view.legendSteps, view.legendHide, view.legendLineTitle, view.legendOrder, view.legendNames, style, gradientStops, cover, vectorLayers,
      geoTiffElevMin, geoTiffElevMax, terrain.blackPoint, terrain.whitePoint, p.elevScale])
-  const sheet = useMemo(() => ({ ...sheetBase, legend }), [sheetBase, legend])
+  // A single-line face for the sheet marks, fetched when one is picked.
+  const [markStrokeFont, setMarkStrokeFont] = useState(null)
+  const markLineFont = view.frameMarkFont === 'line' ? (view.frameMarkLineFont || 'HersheySans1') : null
+  useEffect(() => {
+    if (!markLineFont) return undefined
+    let live = true
+    loadTextFont(singleLineKey(markLineFont)).then((f) => { if (live) setMarkStrokeFont(f) })
+    return () => { live = false }
+  }, [markLineFont])
+  const strokeFont = markLineFont && markStrokeFont?.key === singleLineKey(markLineFont) ? markStrokeFont : null
+  const sheet = useMemo(() => ({ ...sheetBase, legend, strokeFont }), [sheetBase, legend, strokeFont])
 
   const handleGeoJsonExport = useCallback(async () => {
     const st = useStore.getState()
@@ -2669,10 +2680,10 @@ export default function App() {
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
     const presets = {
-      top:   { tilt: 0,  rotation: 0 },
-      front: { tilt: 90, rotation: 0 },
-      iso:   { tilt: 45, rotation: -45 },
-      reset: { tilt: 50, rotation: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
+      top:   { tilt: 0,  rotation: 0, cameraRoll: 0 },
+      front: { tilt: 90, rotation: 0, cameraRoll: 0 },
+      iso:   { tilt: 45, rotation: -45, cameraRoll: 0 },
+      reset: { tilt: 50, rotation: 0, cameraRoll: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
     }
     // The scene moves the camera on its own when it hears of a preset.
     if (useStore.getState().viewLocked) return
@@ -3038,7 +3049,7 @@ export default function App() {
       </div>
 
       {/* ── Centre guides ────────────────────────────────────────────────── */}
-      {view.showGuides && <CenterGuides bgColor={bgColor} />}
+      {view.showGuides && <CenterGuides view={view} bgColor={bgColor} rightInset={viewInset} />}
       {view.showFrame && !webmActive && <FrameOverlay view={view} bgColor={bgColor} rightInset={viewInset} />}
       {/* Ink, unlike the frame above it: a recording is a picture of the plate,
           so the marks stay while the veiled frame does not. */}
@@ -3152,16 +3163,6 @@ export default function App() {
 }
 
 // ── UI helper components ──────────────────────────────────────────────────────
-
-function CenterGuides({ bgColor }) {
-  const lc = isDarkBackground(bgColor) ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.2)'
-  return (
-    <div style={{ position:'fixed', inset:0, pointerEvents:'none', zIndex:500 }}>
-      <div style={{ position:'absolute', left:'50%', top:0, bottom:0, width:1, background:lc }} />
-      <div style={{ position:'absolute', top:'50%', left:0, right:0, height:1, background:lc }} />
-    </div>
-  )
-}
 
 function EmptyState({ onLoad, onLoadGeoTiff }) {
   return (

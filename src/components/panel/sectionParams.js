@@ -74,18 +74,18 @@ export const SECTION_PARAMS = {
   // `View` split in two. Everything that aims the camera is Camera's, and
   // everything that describes the sheet is Paper's — the two subjects the one
   // section used to carry between them.
-  'Camera': ['tilt', 'rotation', 'zoom', 'renderScale', 'showGuides', /^autoRotate/,
+  'Camera': ['tilt', 'rotation', 'cameraRoll', 'zoom', 'renderScale', 'showGuides', /^guide[A-Z]/, /^autoRotate/,
     'fov', 'orthographic', 'planOblique', 'obliqueAngle', 'explode', 'panX', 'panY', 'panZ'],
   'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
-    'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin', 'framePrintDpi'],
+    'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin', 'framePrintDpi', /^frameGuide/],
   'Anaglyph': [/^anaglyph/],
   'Land Cover Data': ['coverInks'],
   // Every mode section lists its own copies, and the list is one key for all.
   'Draw Modes': ['modeCopies'],
-  'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor', 'frameMarkFont',
+  'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor', 'frameMarkFont', 'frameMarkLineFont',
     'frameMagnetic', 'frameTitle', 'frameTitleText', 'frameTitleFacts', 'frameGrid', 'frameGridUnits'],
   'Legend': [/^legend/],
-  'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenOrder', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
+  'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenOrder', 'plotGroupBy', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
@@ -108,16 +108,18 @@ export const SECTION_PARAMS = {
  */
 export const ALSO_READS = {
   'Anaglyph': ['bgColor', 'orthographic'],
-  'Paper': ['plotWidthMm'],
+  // The guides' auto colour is black or white against the background.
+  'Paper': ['plotWidthMm', 'bgColor'],
   'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm'],
   // The hatch controls show only while a mode that exports filled areas is on.
   'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
   'Map Elements': ['orthographic', 'plotWidthMm', 'tilt', 'legendOn'],
   // The ink falls back to the marks' own.
-  'Legend': ['frameMarkColor'],
+  // The font is the sheet's one typeface, shown here too.
+  'Legend': ['frameMarkColor', 'frameMarkFont', 'frameMarkLineFont'],
   'Image Overlay': ['showFill'],
   'Vector Layers': ['rotation', 'tilt'],
-  'Camera': ['resolution'],
+  'Camera': ['resolution', 'bgColor'],
   'Text': ['fillColor', 'resolution', 'tilt'],
   'Particles': ['hillshadeAzimuth', 'hillshadeAltitude'],
   'Mode: Sun Hours': ['elevScale', 'resolution'],

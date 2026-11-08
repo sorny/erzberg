@@ -17,8 +17,30 @@
  * to nudge it across.
  */
 import { useEffect, useState } from 'react'
-import { frameRect, insetRect, paperAspect } from '../utils/frame'
+import { frameRect, guideDash, guideSegments, insetRect, paperAspect } from '../utils/frame'
 import { isDarkBackground } from '../utils/colorUtils'
+
+/**
+ * The centre guides over the free canvas: the part of the window that the
+ * panel does not cover, so they move when the panel opens or closes.
+ */
+export function CenterGuides({ view, bgColor, rightInset = 0 }) {
+  const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
+  useEffect(() => {
+    const onResize = () => setWin({ w: window.innerWidth, h: window.innerHeight })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const w = Math.max(0, win.w - rightInset), h = win.h
+  return (
+    <div data-testid="centre-guide-lines" style={{ position: 'fixed', top: 0, left: 0, bottom: 0, right: rightInset,
+                  pointerEvents: 'none', zIndex: 500 }}>
+      <GuideLines segs={guideSegments({ x: 0, y: 0, w, h }, 'centre')} w={w} h={h}
+        dark={isDarkBackground(bgColor)} color={view.guideColor} weight={view.guideWeight ?? 1}
+        opacity={view.guideOpacity ?? 0.25} dash={view.guideDash ?? 'solid'} />
+    </div>
+  )
+}
 
 export function FrameOverlay({ view, bgColor, rightInset = 0 }) {
   const [win, setWin] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }))
@@ -70,6 +92,28 @@ export function FrameOverlay({ view, bgColor, rightInset = 0 }) {
         <div style={{ position: 'absolute', left: inner.x, top: inner.y, width: inner.w, height: inner.h,
                       border: `1px dashed ${soft}` }} />
       )}
+      {/* Composition guides across the printed area, inside the margin. */}
+      <GuideLines segs={guideSegments(inner, view.frameGuides)} w={size.w} h={size.h} dark={dark}
+        color={view.frameGuideColor} weight={view.frameGuideWeight ?? 1}
+        opacity={view.frameGuideOpacity ?? 0.5} dash={view.frameGuideDash ?? 'solid'} testId="paper-guides" />
     </div>
+  )
+}
+
+/**
+ * Guide segments as an SVG over the canvas. A composition aid like the frame:
+ * DOM only, so no exporter draws it. An empty colour takes black or white,
+ * whichever reads on the background.
+ */
+export function GuideLines({ segs, w, h, dark, color, weight = 1, opacity = 0.5, dash = 'solid', testId }) {
+  if (!segs?.length) return null
+  const ink = color || (dark ? '#ffffff' : '#000000')
+  return (
+    <svg data-testid={testId} width={w} height={h} viewBox={`0 0 ${w} ${h}`}
+         style={{ position: 'absolute', left: 0, top: 0, display: 'block', overflow: 'visible' }}>
+      <g stroke={ink} strokeOpacity={opacity} strokeWidth={weight} strokeDasharray={guideDash(dash, weight)} fill="none">
+        {segs.map(([x0, y0, x1, y1], i) => <line key={i} x1={x0} y1={y0} x2={x1} y2={y1} />)}
+      </g>
+    </svg>
   )
 }

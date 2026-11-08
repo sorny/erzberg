@@ -130,7 +130,9 @@ export function dropBelowGround(res, groundAt, tol) {
  */
 export function liftLayer(res, dy) {
   if (!res || !dy) return res
-  const out = { ...res }
+  // Marks the layer as raised: its depth-only surfaces are its raised ground,
+  // which hides only while the layer is opaque (see `raisedOccludes`).
+  const out = { ...res, lifted: true }
   if (res.positions instanceof Float32Array) out.positions = shiftY(res.positions, dy)
   if (res.lids?.positions) {
     // A raised fill no longer lies on the surface, so it takes the cap's bias.
@@ -182,6 +184,16 @@ export function liftedSurface(terrain, dy, groundAt) {
     }
   }
   return { positions: new Float32Array(pos), indices: new Uint32Array(idx) }
+}
+
+/**
+ * Whether a layer's depth-only surfaces hide what is behind them. A raised
+ * layer's are its own raised ground, so at an opacity below 1 they hide
+ * nothing, and the ground and the far side of the layer show through it, as a
+ * fill below full opacity does. Every other layer's always hide.
+ */
+export function raisedOccludes(layer, opacity) {
+  return !layer?.lifted || !(opacity < 0.999)
 }
 
 /** Two depth-only meshes as one. */

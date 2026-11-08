@@ -14,6 +14,7 @@ import { haloOf, hasFillLayer, layerStyle } from '../utils/geometryBuilders'
 import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 import { drawn } from '../automation'
+import { raisedOccludes } from '../utils/builders/lift'
 
 /**
  * A line layer as round dots: one near-zero segment per dot, spaced `spacing`
@@ -706,7 +707,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
      * and the panel says so.
      */
     <group position={shift}>
-      {curtainGeo && depthOcclusion && <mesh geometry={curtainGeo} material={curtainMat} />}
+      {curtainGeo && depthOcclusion && raisedOccludes(layer, opacity) && <mesh geometry={curtainGeo} material={curtainMat} />}
       {fillGeo && <mesh geometry={fillGeo} material={fillMat}
                         renderOrder={sub(outside ? SUB_FILL_OVER : SUB_FILL)} />}
       {lidGeo && <mesh geometry={lidGeo} material={lidMat} renderOrder={sub(SUB_LID)} />}

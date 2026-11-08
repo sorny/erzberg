@@ -124,17 +124,57 @@ export function marksFor({ p, sheet, width, height, frame, scale, project = null
   })
   if (!marks && !legend) return null
   const font = markFont(p.frameMarkFont)
-  if (!legend) return { ...marks, font }
   const base = marks ?? { lines: [], rects: [], texts: [], distance: null, boxes: [] }
   // Text in the legend's own ink; the swatches keep theirs.
   const ink = p.legendInk || null
-  return {
+  const out = !legend ? { ...base, font } : {
     ...base, font,
     rects: [...base.rects, ...legend.rects],
     lines: [...base.lines, ...legend.lines.map((l) => (l.length < 5 && ink ? [...l, ink] : l))],
     texts: [...base.texts, ...legend.texts.map((t) => (ink ? { ...t, color: ink } : t))],
     boxes: [...base.boxes, legend.bounds],
   }
+  // A single-line face letters every mark as strokes, so a plotter draws the
+  // text in one pass. Until the face is loaded, the marks keep the sans face.
+  if (p.frameMarkFont === 'line' && sheet?.strokeFont) {
+    return { ...out, texts: [], textSize: out.texts[0]?.size, strokes: strokeTexts(out.texts, sheet.strokeFont) }
+  }
+  return out
+}
+
+/**
+ * Text runs set in a single-line face, as polylines in screen pixels.
+ *
+ * `font` is a single-line face as `loadTextFont` returns it: per glyph an
+ * advance and its strokes, in font units with y up. Each run keeps its
+ * baseline, size, anchor and colour.
+ *
+ * @returns {{ pts: number[], color?: string, w: number }[]}  pts as x, y pairs
+ */
+export function strokeTexts(texts, font) {
+  const upm = font?.unitsPerEm || 1000
+  const out = []
+  for (const t of texts ?? []) {
+    const k = t.size / upm
+    const chars = [...String(t.text ?? '')]
+    const adv = (ch) => font.glyphs?.[ch]?.[0] ?? font.defaultAdvance ?? upm / 2
+    const width = chars.reduce((a, ch) => a + adv(ch), 0) * k
+    let x = t.anchor === 'middle' ? t.x - width / 2 : t.anchor === 'end' ? t.x - width : t.x
+    // The stroke width follows the size, as the sheet marks' rules do.
+    const w = Math.max(0.5, t.size * 0.07)
+    for (const ch of chars) {
+      for (const run of font.glyphs?.[ch]?.[1] ?? []) {
+        const pts = new Array(run.length)
+        for (let i = 0; i < run.length; i += 2) {
+          pts[i] = x + run[i] * k
+          pts[i + 1] = t.y - run[i + 1] * k
+        }
+        if (pts.length >= 4) out.push(t.color ? { pts, color: t.color, w } : { pts, w })
+      }
+      x += adv(ch) * k
+    }
+  }
+  return out
 }
 
 /** Does the plate want any sheet mark at all? */

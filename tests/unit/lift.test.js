@@ -8,7 +8,7 @@ import { buildLineGeometry, layerStyle } from '../../src/utils/geometryBuilders'
 import { geometryKey } from '../../src/params'
 import { classBit } from '../../src/utils/coverPlate'
 import { makeCopy, ownedKeys } from '../../src/utils/modeCopies'
-import { buildFootprint, buildPlumb, fencePoints, liftLayer, liftOf, maskOutline, plumbPoints } from '../../src/utils/builders/lift'
+import { buildFootprint, buildPlumb, fencePoints, liftLayer, liftOf, maskOutline, plumbPoints, raisedOccludes } from '../../src/utils/builders/lift'
 import { POINTS_DEF, STYLE_DEF, TERRAIN_DEF, VIEW_DEF } from '../../src/defaults'
 
 const W = 64
@@ -319,6 +319,24 @@ describe('explode', () => {
     expect(liftOf({ zOffsetContours: 1 }, 'Contours', t)).toBeCloseTo(relief, 6)
     expect(VIEW_DEF.explode).toBe(1)
     expect(geometryKey({ ...p0, explode: 1.5 })).not.toBe(geometryKey(p0))
+  })
+})
+
+describe('a raised layer below full opacity', () => {
+  it('hides nothing, so the ground shows through it', () => {
+    const geo = build({ zOffsetContours: 1, coverMaskContours: classBit(1) })
+    const minor = layer(geo, 'Contours-Minor')
+    expect(minor.lifted).toBe(true)
+    expect(minor.curtains.indices.length).toBeGreaterThan(0)
+    expect(raisedOccludes(minor, 1)).toBe(true)
+    expect(raisedOccludes(minor, 0.5)).toBe(false)
+    expect(raisedOccludes(minor, 0)).toBe(false)
+  })
+
+  it('leaves every layer on the ground as it was', () => {
+    const minor = layer(build({}), 'Contours-Minor')
+    expect(minor.lifted).toBe(false)
+    expect(raisedOccludes(minor, 0)).toBe(true)
   })
 })
 

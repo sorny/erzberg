@@ -122,7 +122,7 @@ const RENDER_SIDE = [
   /^imagery(Opacity|AutoLevels|Brightness|Contrast|Saturation)$/,
   // The camera, the lens, supersampling, the guides and the paper frame. None of
   // them reaches the worker at all.
-  /^(tilt|rotation|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides|planOblique|obliqueAngle)/,
+  /^(tilt|rotation|cameraRoll|zoom|fov|pan|orthographic|renderScale|autoRotate|showGuides|guide[A-Z]|planOblique|obliqueAngle)/,
   // A halo is a depth-only pass in the viewport and a buffer in the SVG export;
   // the worker never reads it.
   /^halo[A-Z]/,
