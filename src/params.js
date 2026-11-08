@@ -74,6 +74,8 @@ const RENDER_SIDE = [
   // for the viewport and in svgExport for the plot. Dragging a line's weight or
   // opacity must not cost a rebuild of all fifteen draw modes.
   /^(weight|opacity|dash)/,
+  // A plumb line's weight and opacity, times the mode's, in layerStyle too.
+  /^plumb(Weight|Opacity)[A-Z]/,
   // The occlusion *look*. `depthOcclusion` itself is deliberately absent from
   // this list: the curtains are geometry, and building them for a scene that
   // will not draw them costs ~18 MB a rebuild. `occludeBy` and `walls<Id>`
@@ -175,6 +177,7 @@ const isGeometry = (k) =>
  */
 const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
+  /^plumb(Weight|Opacity)[A-Z]/,
   /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight|lineWeight|linkWeight)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,
   // Intersection crosses and Map Grid's scale: their own pens' weight and dash.

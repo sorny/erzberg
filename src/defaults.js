@@ -710,6 +710,37 @@ export const STYLE_DEF = {
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`formMask${id}`, 0])),
 
   /*
+   * Z offset and plumb lines per mode (builders/lift.js). `zOffset<Id>` raises
+   * the mode's marks by that many times the terrain's relief: an exploded view
+   * of a masked region over the whole ground. `plumb<Id>` draws dashed
+   * verticals from a few points of each region down to the ground. 0 and off
+   * draw every mode on the ground, as every older preset did.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`zOffset${id}`, 0])),
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`plumb${id}`, false])),
+  /*
+   * The plumb lines' style. Ink '' is the mode's own. Weight and opacity are
+   * times the mode's and resolved render-side. Dash, gap and size are percent
+   * of relief and of the plate's half width, as in builders/lift.js.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.flatMap((id) => [
+    [`plumbColor${id}`, ''],
+    [`plumbWeight${id}`, 0.6],
+    [`plumbOpacity${id}`, 1],
+    [`plumbDash${id}`, 4],
+    [`plumbGap${id}`, 4],
+    [`plumbMark${id}`, 'ring'],
+    [`plumbSize${id}`, 0.6],
+    [`plumbEnds${id}`, 'both'],
+    [`plumbPoints${id}`, 'all'],
+    [`plumbSpacing${id}`, 12],
+    // Stack by landform: 'form' floats each landform tier at its own height.
+    [`zStack${id}`, 'off'],
+    // The raised region's outline on the ground: 'off', 'solid' or 'dashed'.
+    [`footprint${id}`, 'off'],
+  ])),
+
+  /*
    * A soft ramp per mode: the gradient drawn through the viewport's old ACES
    * curve, as every line ramp was before format 10. The curve lifts and pales
    * the colours, so a soft ramp reads as a light version of a fill drawn with
@@ -810,6 +841,9 @@ export const VIEW_DEF = {
   // of `obliqueAngle`. Mountains stand up and lean over the ground behind
   // them; the ground plane itself keeps its true shape and scale.
   planOblique: false, obliqueAngle: 45,
+  // Explode: a factor on every mode's and copy's Z offset (builders/lift.js),
+  // so one slider opens and closes the exploded view. Geometry, not a uniform.
+  explode: 1,
   // Supersampling multiplier on top of the device pixel ratio. Dense 1px line
   // fields are undersampled and "boil" during pan/rotate; 2× rendering cuts
   // hard pixel flips by ~97% (measured) at 4× fragment cost. Render-side only.

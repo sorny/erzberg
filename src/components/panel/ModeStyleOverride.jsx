@@ -173,6 +173,55 @@ function FormMaskRow({ prefix, style, ss }) {
  * with one sentence on what it does. A cell has to pass every row that is set.
  * A row whose data is not there yet says where it comes from instead of hiding.
  */
+/**
+ * The plumb lines' own style, under the switch that turns them on. Ink, weight
+ * and opacity are resolved render-side; the rest is geometry (builders/lift.js).
+ */
+function PlumbStyle({ prefix, style, ss, plumb }) {
+  const k = (name) => `${name}${prefix}`
+  const own = !!style[k('plumbColor')]
+  const pct = (v) => (v > 0 ? `${v.toFixed(1)}%` : 'off')
+  return (
+    <Sub>
+      <ColorRow label="Ink" testId={`plumb-colour-${prefix}`}
+        help="The pen colour of the plumb lines and the footprint. Until you set one, they use the mode's base colour."
+        value={style[k('plumbColor')] || style[k('color')] || '#1a1a1a'} onChange={(v) => ss({ [k('plumbColor')]: v })} />
+      {own && (
+        <Btn size="xs" data-testid={`plumb-colour-reset-${prefix}`} onClick={() => ss({ [k('plumbColor')]: '' })} style={{ marginTop: -4, marginBottom: 8 }}>
+          Use base colour
+        </Btn>
+      )}
+      <InlineSl label="Weight" testId={`plumb-weight-${prefix}`} help="Line width of the plumb lines and the footprint, as a share of the mode's own weight."
+        min={0.1} max={2} step={0.05} value={style[k('plumbWeight')]} onChange={(v) => ss({ [k('plumbWeight')]: v })}
+        fmt={(v) => `${v.toFixed(2)} × line`} />
+      <InlineSl label="Opacity" testId={`plumb-opacity-${prefix}`} help="Opacity, as a share of the mode's own opacity."
+        min={0} max={1} step={0.01} value={style[k('plumbOpacity')]} onChange={(v) => ss({ [k('plumbOpacity')]: v })}
+        fmt={(v) => `${Math.round(v * 100)}%`} />
+      {plumb && (<>
+      <InlineSl label="Dash" testId={`plumb-dash-${prefix}`} help="The length of one dash, in percent of the terrain's relief. The app stretches dashes a little, so each line starts and ends on a dash."
+        min={0.5} max={20} step={0.5} value={style[k('plumbDash')]} onChange={(v) => ss({ [k('plumbDash')]: v })} fmt={pct} />
+      <InlineSl label="Gap" testId={`plumb-gap-${prefix}`} help="The space between dashes, in percent of the terrain's relief. At 0 the line is solid."
+        min={0} max={20} step={0.5} value={style[k('plumbGap')]} onChange={(v) => ss({ [k('plumbGap')]: v })} fmt={(v) => (v > 0 ? `${v.toFixed(1)}%` : 'solid')} />
+      <SegGroup label="Marker" testIdOf={(v) => `plumb-mark-${prefix}-${v}`}
+        options={[['Ring', 'ring'], ['X', 'cross']]}
+        value={style[k('plumbMark')]} onChange={(v) => ss({ [k('plumbMark')]: v })} style={{ marginBottom: 8 }} />
+      <InlineSl label="Marker size" testId={`plumb-size-${prefix}`} help="The marker's radius, in percent of the plate's larger half width. At 0 there is no marker."
+        min={0} max={3} step={0.05} value={style[k('plumbSize')]} onChange={(v) => ss({ [k('plumbSize')]: v })} fmt={pct} />
+      <SegGroup label="Marker ends" testIdOf={(v) => `plumb-ends-${prefix}-${v}`}
+        options={[['Both', 'both'], ['Ground', 'ground'], ['Top', 'top']]}
+        value={style[k('plumbEnds')]} onChange={(v) => ss({ [k('plumbEnds')]: v })} style={{ marginBottom: 8 }} />
+      <SegGroup label="Points" testIdOf={(v) => `plumb-points-${prefix}-${v}`}
+        options={[['Summit + edges', 'all'], ['Summit', 'summit'], ['Fence', 'edge']]}
+        value={style[k('plumbPoints')]} onChange={(v) => ss({ [k('plumbPoints')]: v })} style={{ marginBottom: 8 }} />
+      {style[k('plumbPoints')] === 'edge' && (
+        <InlineSl label="Spacing" testId={`plumb-spacing-${prefix}`} help="Fence sets plumb lines along each region's outline. This is the distance between two of them, in grid cells. A region gets at most 400."
+          min={2} max={60} step={1} value={style[k('plumbSpacing')] ?? 12} onChange={(v) => ss({ [k('plumbSpacing')]: v })} fmt={(v) => `${Math.round(v)} cells`} />
+      )}
+      </>)}
+    </Sub>
+  )
+}
+
 function MaskBlock({ prefix, style, ss }) {
   const cover = useContext(CoverPlate)
   const masks = useContext(PaintedMasks)
@@ -183,8 +232,10 @@ function MaskBlock({ prefix, style, ss }) {
     prefix !== 'Landform' && !!style[`formMask${prefix}`],
   ].filter(Boolean).length
   const missing = [!hasPainted && 'painted masks (Terrain › Masks)', !hasPlate && 'land cover (Terrain › Land Cover Data)'].filter(Boolean)
+  const zOffset = Number(style[`zOffset${prefix}`]) || 0
+  const readout = [active && `${active} on`, zOffset > 0 && 'raised'].filter(Boolean).join(' · ') || 'none'
   return (
-    <Fold testId={`masks-${prefix}`} title="Masks" readout={active ? `${active} on` : 'none'} active={!!active}>
+    <Fold testId={`masks-${prefix}`} title="Masks" readout={readout} active={!!active || zOffset > 0}>
       <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
         Draw this mode only where the ground passes every mask set here.
       </div>
@@ -196,6 +247,33 @@ function MaskBlock({ prefix, style, ss }) {
           Also from {missing.join(' and ')}, once there is one.
         </div>
       )}
+      <div style={{ borderTop: `1px solid ${BORDER}`, marginTop: 8, paddingTop: 8 }}>
+        <InlineSl label="Z offset" testId={`z-offset-${prefix}`}
+          help="Raises this mode's marks above the ground by this many times the terrain's relief, as an exploded view. Set a mask above to raise one region. To stack regions, give each copy of the mode its own mask and Z offset."
+          min={0} max={5} step={0.05} value={zOffset} onChange={(v) => ss({ [`zOffset${prefix}`]: v })}
+          fmt={(v) => (v > 0 ? `${v.toFixed(2)} × relief` : 'off')} />
+        {zOffset > 0 && (<>
+          <SegGroup label="Stack" testIdOf={(v) => `z-stack-${prefix}-${v}`}
+            options={[['Off', 'off'], ['By landform', 'form']]}
+            value={style[`zStack${prefix}`] ?? 'off'} onChange={(v) => ss({ [`zStack${prefix}`]: v })} style={{ marginBottom: 4 }} />
+          <div style={{ fontSize: 10, color: MUTED, lineHeight: 1.45, marginBottom: 8 }}>
+            {style[`zStack${prefix}`] === 'form'
+              ? 'Each landform floats at its own tier: pit lowest, then valley, footslope and hollow, flat and slope, spur and shoulder, ridge, and peak highest. Z offset is the step between tiers.'
+              : 'By landform floats each landform at its own tier, Z offset apart.'}
+          </div>
+          <SegGroup label="Footprint" testIdOf={(v) => `footprint-${prefix}-${v}`}
+            options={[['No footprint', 'off'], ['Solid', 'solid'], ['Dashed', 'dashed']]}
+            value={style[`footprint${prefix}`] ?? 'off'} onChange={(v) => ss({ [`footprint${prefix}`]: v })} style={{ marginBottom: 8 }} />
+        </>)}
+        {zOffset > 0 && (
+          <Tog label="Plumb lines" testId={`plumb-${prefix}`}
+            help="Dashed verticals from the raised marks down to the ground, with a ring or an X at their ends. Each masked region gets them at its highest point and its four outermost points, at its highest point only, or as a fence along its outline (Points). The dashes are lines, so a plotter draws them dashed. They go to their own pen layer."
+            checked={!!style[`plumb${prefix}`]} onChange={(v) => ss({ [`plumb${prefix}`]: v })} />
+        )}
+        {zOffset > 0 && (style[`plumb${prefix}`] || (style[`footprint${prefix}`] ?? 'off') !== 'off') && (
+          <PlumbStyle prefix={prefix} style={style} ss={ss} plumb={!!style[`plumb${prefix}`]} />
+        )}
+      </div>
     </Fold>
   )
 }

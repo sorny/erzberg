@@ -239,6 +239,59 @@ presets, history and the rebuild key. The limit is 32 masks.
 
 ---
 
+## Z offset and plumb lines
+
+The Masks block of every draw mode has a Z offset (vertical offset). It raises
+the mode's marks above the ground by a multiple of the terrain's relief, for an
+exploded view. Plumb lines are dashed verticals from the raised marks down to
+the ground, with a ring or an X at their ends.
+
+To stack masked regions over the whole terrain:
+
+1. Turn on a draw mode, for example Contours. This draws the whole ground.
+2. In its Copies block, add one copy for each region.
+3. In each copy's Masks block, select one painted mask.
+4. Give each copy its own Z offset, for example 1, 2, 3 and 4.
+5. Turn on Plumb lines in each copy.
+6. Give the copies their own colour.
+
+The plumb lines of a region stand at its highest point and at its four
+outermost points. With Points set to Summit, only the highest point gets one.
+A region is a connected run of masked cells. Regions smaller than 2% of the
+largest one get none. At most six regions get plumb lines.
+
+Stack set to By landform floats each landform at its own tier, with no copies
+or masks. The tiers run from pit (lowest) through valley, footslope and hollow,
+flat and slope, spur and shoulder, and ridge, to peak (highest). Tier n floats
+n times the Z offset above the ground. Each tier is its own pen layer, for
+example `Contours · Minor · Ridge`. The bundled preset Geomorphon Stack uses it.
+
+Footprint draws the outline of each raised region on the ground, solid or
+dashed, as its own pen layer `<mode> · Footprint`.
+
+Explode, in Camera, multiplies every Z offset at once. At 0, every raised
+layer is back on the ground.
+
+When Plumb lines or Footprint are on, these controls set their style:
+
+| Control | What it sets |
+| --- | --- |
+| Ink | The pen colour, for plumb lines and footprint. Empty means the mode's base colour. |
+| Weight, Opacity | A share of the mode's own weight and opacity. |
+| Dash, Gap | The dash and space lengths, in percent of relief. Gap 0 is solid. |
+| Marker | A ring or an X. |
+| Marker size | The marker radius, in percent of the larger half width. 0 is none. |
+| Marker ends | Markers at both ends, at the ground only, or at the top only. |
+| Points | Summit and edges, Summit only, or Fence: one every Spacing cells along the outline. |
+
+A raised run hangs no walls. With occlusion on, it carries its own ground,
+raised with it and drawn for depth only, so the far side of a raised slope stays
+hidden. A masked line mode also stacks lower levels under the ground at the
+mask's edge. A raised run drops those strokes. The plumb lines are a pen layer
+of their own, `<copy> · Plumb lines`, and their dashes are geometry.
+
+---
+
 ## Licence
 
 Copernicus Sentinel data is free, full and open. The credit goes into any export
@@ -255,10 +308,11 @@ that draws from it:
 | `src/utils/maskLayers.js` | Bit planes: create, stamp, stroke, combine, import, 32-bit selection |
 | `src/utils/maskFromLevel.js` | `levelSource`, `thresholdLevel`, `maskFromLevel` |
 | `src/utils/maskFromVector.js` | `stitchRings`, `maskFromFeatures`, `featureRings`, `growMask` |
+| `src/utils/builders/lift.js` | Z offset, the raised ground, plumb points and lines |
 | `src/utils/imageryTone.js` | Exposure: `applyTone` and `TONE_GLSL` |
 | `src/utils/imageryFetch.js` | Scene search and windowed COG read |
 | `src/components/MaskStudio.jsx` | Painting view |
 | `src/components/MaskPanel.jsx` | Its panel |
 | `src/components/panel/FeaturePicker.jsx` | `useFeaturePick`, shared with Edit Mode |
 | `tests/masks.spec.js`, `tests/mask-from-features.spec.js` | End-to-end |
-| `tests/unit/maskFromVector.test.js`, `tests/unit/maskFromLevel.test.js`, `tests/unit/imageryTone.test.js` | Unit |
+| `tests/unit/maskFromVector.test.js`, `tests/unit/maskFromLevel.test.js`, `tests/unit/imageryTone.test.js`, `tests/unit/lift.test.js` | Unit |

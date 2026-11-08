@@ -3422,6 +3422,9 @@ export function Sidebar({
                 help="Plan oblique looks straight down, and moves every point up the sheet by its height, so the mountains stand up and lean over the ground behind them, as on Imfeld's and Berann's maps. The ground keeps its true shape and scale (after Jenny and Patterson, 2007). This sets how far they lean: 90° is a flat map, 45° moves a point up by its own height, and lower angles stand the relief up further."
                 min={20} max={85} step={1} value={view.obliqueAngle ?? 45} onChange={v => sv({ obliqueAngle: v })} fmt={v => Math.round(v) + '°'} />
             )}
+            <InlineSl label="Explode" testId="explode"
+              help="Multiplies the Z offset of every mode and copy. 0 sets every raised layer back on the ground, 1 is each Z offset as set, and 2 doubles it."
+              min={0} max={2} step={0.05} value={view.explode ?? 1} onChange={v => sv({ explode: v })} fmt={v => `${v.toFixed(2)} ×`} />
             {view.orthographic && !view.planOblique && (
               <Note>A parallel projection: no perspective distortion, as in an architectural drawing.</Note>
             )}

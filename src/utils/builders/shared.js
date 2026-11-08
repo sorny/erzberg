@@ -5,6 +5,7 @@
  * the public API, so importers are unchanged.
  */
 import { ALL_FORMS, LANDFORMS, formMaskHas } from '../landforms'
+import { TIER_FORMS } from './lift.js'
 
 const LANDFORM_SUFFIX = new RegExp(`^(.+)-(${LANDFORMS.map((f) => f.id).join('|')})$`)
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
@@ -196,6 +197,46 @@ function resolveLayerStyle(id, p) {
       weight: p[`weight${suf}`], opacity: p[`opacity${suf}`], dash: p[`dash${suf}`],
       name: `Pillars · ${pillarClass[1] ? 'Above · ' : ''}${cname}${c?.color ? ` ${c.color}` : ''}`,
     }
+  }
+
+  /*
+   * One tier of a mode stacked by landform (builders/lift.js): styled as the
+   * part it was split from, and named for the tier's landforms.
+   */
+  const tier = /^(.+)-Tier(\d)$/.exec(id)
+  if (tier) {
+    const base = resolveLayerStyle(tier[1], p)
+    const t = Number(tier[2])
+    const baseName = base.name ?? layerDisplayName(tier[1])
+    const forms = TIER_FORMS[t] ?? []
+    const named = forms.some((f) => baseName.endsWith(f))
+    return { ...base, name: named ? `${baseName} · Tier ${t + 1}` : `${baseName} · ${forms.join(', ')}` }
+  }
+
+  /*
+   * A raised mode's footprint: its outline on the ground, in the plumb lines'
+   * ink and weight.
+   */
+  const footprint = /^(.+)-Footprint$/.exec(id)
+  if (footprint) {
+    const plumbStyle = resolveLayerStyle(`${footprint[1]}-Plumb`, p)
+    const base = resolveLayerStyle(footprint[1], p)
+    return { ...plumbStyle, name: `${base.name ?? layerDisplayName(footprint[1])} · Footprint` }
+  }
+
+  /*
+   * A raised mode's plumb lines (builders/lift.js): the mode's weight and
+   * opacity times their own (`plumbWeight<Id>`, `plumbOpacity<Id>`), never
+   * dashed by style because the dashes are geometry.
+   */
+  const plumb = /^(.+)-Plumb$/.exec(id)
+  if (plumb) {
+    const base = resolveLayerStyle(plumb[1], p)
+    const times = (k, d) => (Number.isFinite(Number(p[`${k}${plumb[1]}`])) ? Number(p[`${k}${plumb[1]}`]) : d)
+    return { ...base, dash: 'solid',
+             weight: Math.max(0.5, (base.weight ?? 1) * times('plumbWeight', 0.6)),
+             opacity: Math.min(1, Math.max(0, (base.opacity ?? 1) * times('plumbOpacity', 1))),
+             name: `${base.name ?? layerDisplayName(plumb[1])} · Plumb lines` }
   }
 
   /*
