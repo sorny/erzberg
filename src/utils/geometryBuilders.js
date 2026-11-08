@@ -28,6 +28,8 @@ import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, bui
 import { buildPillars } from './builders/pillars.js'
 import { buildBitplane } from './builders/relief.js'
 import { F32List, U32List, maskedTerrain, paintFor } from './builders/shared.js'
+import { buildFootprint, buildPlumb, dropBelowGround, fencePoints, liftLayer, liftOf, liftedSurface, maskOutline, mergeOccluders, plumbPoints, plumbStyleOf, splitByTier, tierId, tierTerrain } from './builders/lift.js'
+import { hexToRgb } from './colorUtils'
 import { DRAW_MODES } from './drawModes'
 import { jitterNoise, sampleBilinear } from './terrain'
 import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
@@ -318,7 +320,8 @@ export function buildLineGeometry(terrain, p) {
    * and the mode beside it agree on where the ridges are.
    */
   const readsForms = runs.some(({ cfg, p: rp }) => rp[`enabled${cfg.id}`] && (cfg.id === 'Landform'
-    || rp[`formMask${cfg.id}`] || (rp[`hypso${cfg.id}`] && rp[`hypsoMode${cfg.id}`] === 'form')))
+    || rp[`formMask${cfg.id}`] || (rp[`hypso${cfg.id}`] && rp[`hypsoMode${cfg.id}`] === 'form')
+    || (rp[`zStack${cfg.id}`] === 'form' && liftOf(rp, cfg.id, terrain) > 0)))
   if (readsForms) terrain = { ...terrain, gridForm: landformGrid(terrain, p) }
   const formTerrain = readsForms
     ? { ...terrain, gridClass: terrain.gridForm, gridPlate: null, classColors: landformInks(p) } : null
@@ -394,6 +397,63 @@ export function buildLineGeometry(terrain, p) {
       subLayers = split
     }
 
+    // Z offset: the run's marks raised above the ground, an exploded view of
+    // its mask. With Stack by landform, each landform tier floats at its own
+    // height. Plumb lines and footprints tie each region back down to the
+    // ground. See builders/lift.js.
+    const dy = liftOf(p, cfg.id, terrain)
+    if (dy) {
+      // A solid or a mark inside the ground keeps its strokes below the surface.
+      const trim = !SOLID_MODES.has(cfg.id)
+      const tol = Math.max(1e-3, (terrain.maxElev - terrain.minElev) * 0.03)
+      const trimmed = (v) => (trim && !v?.insideGround ? dropBelowGround(v, groundAt, tol) : v)
+      // Each group is one raised region set: its suffix, its lift, its stencil.
+      let groups = [{ suffix: '', dy, terrain: layerTerrain }]
+      if (p[`zStack${cfg.id}`] === 'form' && layerTerrain.gridForm) {
+        const next = {}
+        const seen = new Set()
+        for (const [k, v] of Object.entries(subLayers)) {
+          const cut = trimmed(v)
+          const parts = splitByTier(cut, layerTerrain)
+          // Points and fills have no strokes to split: they float with the lowest tier.
+          if (!parts) { next[k] = liftLayer(cut, dy); continue }
+          for (const [t, part] of parts) { next[`${k}-${tierId(t)}`] = liftLayer(part, dy * (t + 1)); seen.add(t) }
+        }
+        subLayers = next
+        groups = [...seen].sort((a, b) => a - b)
+          .map((t) => ({ suffix: `-${tierId(t)}`, dy: dy * (t + 1), terrain: tierTerrain(layerTerrain, t) }))
+      } else {
+        subLayers = Object.fromEntries(Object.entries(subLayers).map(([k, v]) => [k, liftLayer(trimmed(v), dy)]))
+      }
+      // Its own ground, raised with it, so the far side of a raised slope stays
+      // hidden. Carried by the first part that draws, as a builder's occluder is.
+      const host = p.depthOcclusion
+        && Object.keys(subLayers).find((k) => subLayers[k]?.positions?.length || subLayers[k]?.lids?.positions?.length)
+      if (host) {
+        let occ = subLayers[host].occluder
+        for (const g of groups) occ = mergeOccluders(occ, liftedSurface(g.terrain, g.dy, groundAt))
+        subLayers[host] = { ...subLayers[host], occluder: occ }
+      }
+      // Its own ink, or the mode's when none is set.
+      const ink = hexToRgb(p[`plumbColor${cfg.id}`] || p[`color${cfg.id}`] || '#1a1a1a')
+      const which = p[`plumbPoints${cfg.id}`]
+      const foot = p[`footprint${cfg.id}`]
+      for (const g of groups) {
+        const outline = (which === 'edge' && p[`plumb${cfg.id}`]) || (foot && foot !== 'off') ? maskOutline(g.terrain) : null
+        if (p[`plumb${cfg.id}`]) {
+          const pts = which === 'edge'
+            ? fencePoints(outline, terrain, Number(p[`plumbSpacing${cfg.id}`]) || 12)
+            : plumbPoints(g.terrain, which)
+          const plumb = buildPlumb(pts, g.dy, terrain, groundAt, ink, plumbStyleOf(p, cfg.id))
+          if (plumb.positions.length) subLayers[`${cfg.id}-Plumb${g.suffix}`] = plumb
+        }
+        if (foot && foot !== 'off') {
+          const fp = buildFootprint(outline, terrain, groundAt, ink, foot === 'dashed')
+          if (fp.positions.length) subLayers[`${cfg.id}-Footprint${g.suffix}`] = fp
+        }
+      }
+    }
+
     for (const [subId, res] of Object.entries(subLayers)) {
       // A layer is drawable if it has strokes *or* fills. Until the colour modes
       // arrived every layer had strokes, so an empty `positions` meant an empty
@@ -435,7 +495,8 @@ export function buildLineGeometry(terrain, p) {
       // A solid's walls are its sides (Pillars' columns), which the ground cannot
       // stand in for, so it keeps them under both models (`solid` in drawModes).
       const solid = SOLID_MODES.has(cfg.id)
-      const hangsWalls = p.depthOcclusion && (p.occludeBy !== 'ground' || solid) && p[`walls${cfg.id}`] !== false
+      // A raised run hangs none: its walls would stand in the air under it.
+      const hangsWalls = p.depthOcclusion && (p.occludeBy !== 'ground' || solid) && p[`walls${cfg.id}`] !== false && !dy
       const segCount = (res.isPoints || !hangsWalls) ? 0 : (baseP.length / 6) | 0
       /*
        * No wall in the air. A curtain hangs from its stroke to the floor, and

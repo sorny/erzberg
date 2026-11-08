@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Z offset and plumb lines.** Each draw mode's Masks block has a Z offset that
+  raises its marks above the ground by a multiple of the relief. With one copy
+  per mask, each at its own offset, masked regions stack over the whole terrain
+  as an exploded view. Plumb lines drop dashed verticals, with a ring at each
+  end, from each region's summit and its four outermost points to the ground.
+  They plot as their own pen layer. Their ink, weight, opacity, dash and gap
+  lengths, end marker (ring or X, its size and ends) and points (summit and
+  edges, summit only, or a fence along the outline) are set under the switch,
+  per mode and per copy.
+- **Stack by landform, footprint and Explode.** Stack set to By landform floats
+  each landform of a mode at its own tier, pit lowest and peak highest, each
+  tier its own pen layer with its own plumb lines. Footprint draws a raised
+  region's outline on the ground. Explode (Camera) scales every Z offset at
+  once. Two presets use them: Geomorphon Stack (peaks, ridges, valleys and pits
+  in landform inks, in tiers over grey ground contours) and Ridge Lift (red
+  ridges and blue valleys raised in two tiers). Landform masks on this kind of
+  data are fragmented, so footprints and fences read best on painted or vector
+  masks with large regions. A raised run now also drops the strokes that a
+  NoData edge stacks off the data.
+  A raised run carries its own ground for
+  occlusion and drops the strokes a mask edge stacks under the ground. Both
+  settings are off by default, so existing presets render as before.
+
 ## [1.72.2] — 2026-11-07
 
 ### Changed
