@@ -834,7 +834,7 @@ export const POINTS_DEF = {
   flockAudioBurstLo: 0.15, flockAudioBurstHi: 0.9,
 }
 export const VIEW_DEF = {
-  tilt: 50, rotation: 0, zoom: 0.75,
+  tilt: 50, rotation: 0, cameraRoll: 0, zoom: 0.75,
   fov: 60, orthographic: false,
   // Plan oblique relief (Jenny and Patterson, 2007): a straight-down parallel
   // view in which each point moves up the sheet by its height over the tangent
@@ -853,12 +853,19 @@ export const VIEW_DEF = {
   panX: 0, panY: 0, panZ: 0,
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
   showGuides: false, showRawTerrain: false,
+  // The centre guides' line: width in pixels, opacity, colour ('' takes black
+  // or white against the background) and dash ('solid', 'dashed', 'dotted').
+  guideWeight: 1, guideOpacity: 0.25, guideColor: '', guideDash: 'solid',
   // Paper framing. The overlay shows where the page edges fall, and SVG export
   // emits only what lands inside — cut at the boundary, not hidden behind a
   // clip path. Offsets are fractions of the canvas so they survive a resize;
   // margin is a fraction of the frame's shorter side. See utils/frame.js.
   showFrame: false, framePaper: 'iso', frameLandscape: false, frameCustomRatio: 1.414,
   frameScale: 0.85, frameOffsetX: 0, frameOffsetY: 0, frameMargin: 0,
+  // Composition guides inside the paper frame's margin: a comma list of
+  // 'centre', 'thirds', 'golden' and 'diagonals', and their line. An overlay,
+  // so no export draws them.
+  frameGuides: '', frameGuideWeight: 1, frameGuideOpacity: 0.5, frameGuideColor: '', frameGuideDash: 'solid',
   // The PNG at print size: the sheet alone, `plotWidthMm` wide at this many
   // dots per inch, with the DPI written into the file. 0 keeps the trimmed
   // capture.
@@ -878,8 +885,9 @@ export const VIEW_DEF = {
   frameMagnetic: false,
   frameTitle: false, frameTitleText: '', frameTitleFacts: 'projection,interval,range,source,date',
   frameGrid: 'off', frameGridUnits: 'grid',
-  // The typeface every sheet mark is lettered in: 'sans', 'mono' or 'serif'.
-  frameMarkFont: 'sans',
+  // The typeface every sheet mark is lettered in: 'sans', 'mono' or 'serif',
+  // or 'line' for the single-line face `frameMarkLineFont`, drawn as strokes.
+  frameMarkFont: 'sans', frameMarkLineFont: 'HersheySans1',
   // The legend: what each colour and line on the plate stands for, drawn with
   // the sheet marks in a corner of the sheet. `legendParts` picks the groups
   // (ramp, class, surface, line); `legendInk` letters it, and '' takes the
@@ -887,6 +895,11 @@ export const VIEW_DEF = {
   legendOn: false, legendCorner: 'bl', legendParts: 'ramp,class,surface,line',
   legendScale: 1, legendSteps: 7, legendInk: '', legendCaps: true, legendBox: false,
   legendHeading: '',
+  // The title over the line samples ('' draws none), and the samples switched
+  // off in the panel, as keys: `mode:<id>`, `copy:<uid>` or `vector:<id>`.
+  // `legendOrder` lists the same keys in the order the panel set.
+  // `legendNames` is a JSON object of sample key → the name typed for it.
+  legendLineTitle: 'Layers', legendHide: '', legendOrder: '', legendNames: '',
 
   // ── Anaglyph ──────────────────────────────────────────────────────────────
   // A modifier rather than a mode: it takes whatever the fifty-six modes are
@@ -918,6 +931,8 @@ export const VIEW_DEF = {
   // the preflight prints what it would save so the decision is an informed one.
   // See utils/penRoute.js.
   plotPenOrder: false,
+  // The SVG's layer tree: one top layer per pen layer, or one per ink.
+  plotGroupBy: 'layer',
   // Pen-stroke clean-up in the SVG, in mm on paper. Each is off at 0.
   plotSimplifyMm: 0,
   plotMinLengthMm: 0,

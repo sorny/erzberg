@@ -50,10 +50,10 @@ const reader = (p, values) => (k) => (values && values[k] !== undefined ? values
 /** Every draw mode on the plate, the mode itself and each copy of it, with a name. */
 function drawnModes(p) {
   const out = []
-  for (const m of DRAW_MODES) if (p[`enabled${m.id}`]) out.push({ id: m.id, name: m.label, get: reader(p, null) })
+  for (const m of DRAW_MODES) if (p[`enabled${m.id}`]) out.push({ id: m.id, key: `mode:${m.id}`, name: m.label, get: reader(p, null) })
   for (const c of p.modeCopies ?? []) {
     if (!c?.mode || !c.values?.[`enabled${c.mode}`]) continue
-    out.push({ id: c.mode, name: c.name ?? MODE_LABEL[c.mode] ?? c.mode, get: reader(p, c.values) })
+    out.push({ id: c.mode, key: `copy:${c.uid}`, name: c.name ?? MODE_LABEL[c.mode] ?? c.mode, get: reader(p, c.values) })
   }
   return out
 }
@@ -184,17 +184,47 @@ export function legendEntries(p, facts = {}, { steps = 7 } = {}) {
     const items = []
     for (const m of modes) {
       if (NO_LINE_SAMPLE.has(m.id) || sourceOf(m.get, m.id) !== 'line') continue
-      items.push({ color: m.get(`color${m.id}`) ?? '#000000', dash: m.get(`dash${m.id}`) ?? 'solid', name: lineName(p, m) })
+      items.push({ key: m.key, color: m.get(`color${m.id}`) ?? '#000000', dash: m.get(`dash${m.id}`) ?? 'solid', name: lineName(p, m) })
     }
     for (const l of facts.vectorLayers ?? []) {
       if (!l || l.visible === false || !l.name) continue
+      const key = `vector:${l.id}`
       items.push(l.fill
-        ? { color: l.fillColor ?? l.color, name: l.name, area: true }
-        : { color: l.color ?? '#000000', dash: l.dash ?? 'solid', name: l.name })
+        ? { key, color: l.fillColor ?? l.color, name: l.name, area: true }
+        : { key, color: l.color ?? '#000000', dash: l.dash ?? 'solid', name: l.name })
     }
-    if (items.length) out.push({ kind: 'line', title: 'Layers', items })
+    // A name typed in the panel replaces the generated one, which is kept as
+    // `base` for the panel to offer back.
+    const names = legendNames(p)
+    for (const it of items) {
+      it.base = it.name
+      if (names[it.key]) it.name = names[it.key]
+    }
+    // Every item stays in the list, and the ones switched off in the panel
+    // are marked: the panel lists them all, and `legendShapes` skips them.
+    const hide = new Set(String(p.legendHide ?? '').split(',').filter(Boolean))
+    for (const it of items) if (hide.has(it.key)) it.hidden = true
+    // The order set in the panel. A sample it does not name keeps its place
+    // after the named ones, so a new layer joins at the foot of the list.
+    const rank = new Map(String(p.legendOrder ?? '').split(',').filter(Boolean).map((k, i) => [k, i]))
+    if (rank.size) {
+      const at = (it, i) => (rank.has(it.key) ? rank.get(it.key) : rank.size + i)
+      const sorted = items.map((it, i) => [at(it, i), it]).sort((a, b) => a[0] - b[0]).map(([, it]) => it)
+      items.splice(0, items.length, ...sorted)
+    }
+    if (items.length) out.push({ kind: 'line', title: String(p.legendLineTitle ?? 'Layers'), items })
   }
   return out
+}
+
+/** The names typed for line samples, by sample key. `legendNames` is a JSON object. */
+export function legendNames(p) {
+  try {
+    const o = JSON.parse(p.legendNames || '{}')
+    return o && typeof o === 'object' && !Array.isArray(o) ? o : {}
+  } catch {
+    return {}
+  }
 }
 
 /** The line's name, with the contour interval in metres where the plate can say it. */
@@ -231,8 +261,16 @@ const DASH = { dashed: [6, 4], dotted: [1, 3], 'long-dash': [12, 5] }
  * @param {object[]} o.avoid     boxes other marks hold, so the legend moves clear of them
  * @returns {{rects, lines, texts, bounds}|null}
  */
-export function legendShapes(entries, { box, corner = 'bl', scale = 1, upper = true, boxed = false, heading = null, avoid = [] }) {
-  if (!entries?.length || !(box?.w > 0) || !(box?.h > 0)) return null
+/** The entries with the items switched off in the panel taken out, and empty groups dropped. */
+export function shownEntries(entries) {
+  return (entries ?? [])
+    .map((e) => (e.items ? { ...e, items: e.items.filter((it) => !it.hidden) } : e))
+    .filter((e) => !e.items || e.items.length)
+}
+
+export function legendShapes(all, { box, corner = 'bl', scale = 1, upper = true, boxed = false, heading = null, avoid = [] }) {
+  const entries = shownEntries(all)
+  if (!entries.length || !(box?.w > 0) || !(box?.h > 0)) return null
   const short = Math.min(box.w, box.h)
   const pad = short * 0.05
   const size = Math.max(6, short * 0.016 * scale)
@@ -259,9 +297,11 @@ export function legendShapes(entries, { box, corner = 'bl', scale = 1, upper = t
       b.w = tx + glyph * size * Math.max(...words.map((t) => t.length))
       b.h = Math.max(colH, size + lead)
     } else {
-      b.texts.push({ x: 0, y: size, text: caps(e.title), size, anchor: 'start' })
-      let y = size + lead * 0.5
-      let wide = glyph * size * e.title.length
+      // A group whose title is cleared in the panel starts with its first item.
+      const titled = !!String(e.title ?? '').trim()
+      if (titled) b.texts.push({ x: 0, y: size, text: caps(e.title), size, anchor: 'start' })
+      let y = titled ? size + lead * 0.5 : 0
+      let wide = titled ? glyph * size * e.title.length : 0
       for (const it of e.items) {
         const sw = cell * 1.6
         if (e.kind === 'class' || it.area) {

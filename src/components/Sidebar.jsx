@@ -22,9 +22,11 @@ import { GradientPicker } from './GradientPicker'
 import { Histogram } from './Histogram'
 import { AudioMeter } from './AudioMeter'
 import { AudioTransport } from './AudioTransport'
-import { PAPERS, frameRect, paperAspect, paperRatioLabel, printPixels } from '../utils/frame'
+import { PAPERS, frameRect, paperAspect, paperRatioLabel, printPixels, GUIDE_SETS } from '../utils/frame'
 import { TITLE_LINES } from '../utils/sheetFacts'
-import { LEGEND_PARTS } from '../utils/legend'
+import { LEGEND_PARTS, shownEntries } from '../utils/legend'
+import { GuideStyle } from './panel/GuideStyle'
+import { LegendItems } from './panel/LegendItems'
 import { formatClock, zoneForLongitude } from '../utils/solar'
 
 import { formatDistance, niceDistance } from '../utils/sheetMarks'
@@ -36,7 +38,7 @@ import { DEFAULT_SPAN, fetchPreview, windowFor } from '../utils/extentPreview'
 import { ExtentMap } from './panel/ExtentMap'
 import { ExtentSection } from './panel/ExtentSection'
 import { SpectrogramView } from './SpectrogramView'
-import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, Fold, FONT, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, ON_IMAGE, ON_IMAGE_SCRIM, ON_IMAGE_SHADOW, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
+import { ACCENT, ACCENT_DEEP, ACCENT_TEXT, BG, BODY_W, BORDER, Btn, Callout, Chevron, ColorRow, DANGER_TEXT, DateRow, DIM, DISABLED_OPACITY, ExpBtn, Fold, FONT, FontSelect, GLASS_BG, GLASS_BORDER, Heading, HelpBtn, InlineSl, Key, LoadBtn, MiniBtn, MONO, MUTED, Note, ON_ACCENT, ON_IMAGE, ON_IMAGE_SCRIM, ON_IMAGE_SHADOW, PanelStyles, RangeSl, RowBtn, Section, SegGroup, SegRow, SelectRow, Sl, Stage, StageRail, STRONG, Sub, SUNK, SURF, TEXT, Tog, TogColor, VEIL, W, WARN, WORDMARK } from './panel/ui'
 import { reachError } from '../utils/netError'
 import { ALWAYS_VALUED, FIRST_STAGE, PRESETS_STAGE, STAGES, stageOf } from './panel/stages'
 import { ModeBack, ModeSheet } from './panel/ModeSheet'
@@ -3136,7 +3138,7 @@ export function Sidebar({
                         ramp: 'A stepped ramp for each colour source that a layer or the fill draws with: height, slope or speed. Aspect is shown as four facing directions.',
                         class: 'The inks of Landforms, and of Land cover with a cover plate loaded, one swatch per class.',
                         surface: 'The surface tints that are on: slope shading, sun hours, local relief, curvature, wetness and water.',
-                        line: 'One line sample for each draw mode and vector layer that draws in its own ink, with its dash. Contours carry their interval in metres.',
+                        line: 'One line sample for each draw mode, copy and vector layer that draws in its own ink, with its dash. Contours carry their interval in metres. Below, set the title of the group, drag the grip of a sample to reorder it, type a new name for a sample, and switch single samples off. An empty name falls back to the generated one.',
                       }[key]}
                       onChange={(v) => {
                         const set = new Set(String(view.legendParts ?? '').split(',').filter(Boolean))
@@ -3145,6 +3147,17 @@ export function Sidebar({
                       }} />
                   )
                 })}
+                {String(view.legendParts ?? '').split(',').includes('line') && (
+                  <Sub>
+                    <input data-testid="legend-line-title" value={view.legendLineTitle ?? 'Layers'} maxLength={60}
+                      onChange={(e) => sv({ legendLineTitle: e.target.value })}
+                      placeholder="Layers title (none if empty)" aria-label="Layers title"
+                      style={{ width:'100%', boxSizing:'border-box', fontSize:11, padding:'4px 6px', margin:'2px 0 6px',
+                               background: SUNK, color: TEXT, border:`1px solid ${BORDER}`, borderRadius:3, fontFamily: FONT }} />
+                    <LegendItems items={legend?.find((e) => e.kind === 'line')?.items ?? []} view={view} sv={sv}
+                      keys={{ hide: 'legendHide', order: 'legendOrder', names: 'legendNames' }} />
+                  </Sub>
+                )}
                 <input data-testid="legend-heading" value={view.legendHeading ?? ''} maxLength={60}
                   onChange={(e) => sv({ legendHeading: e.target.value })}
                   placeholder="Heading (none if empty)" aria-label="Legend heading"
@@ -3164,11 +3177,21 @@ export function Sidebar({
                 <ColorRow label="Ink" testId="legend-ink" value={view.legendInk || view.frameMarkColor || '#000000'}
                   onChange={v => sv({ legendInk: v })} />
                 <div data-testid="legend-readout" style={{ fontSize:10, color: MUTED, lineHeight:1.6 }}>
-                  {legend?.length
-                    ? legend.map((e) => e.kind === 'ramp' ? `${e.title} ${e.range}` : `${e.title} (${e.items.length})`).join(' · ')
+                  {shownEntries(legend).length
+                    ? shownEntries(legend).map((e) => e.kind === 'ramp' ? `${e.title} ${e.range}` : `${e.title} (${e.items.length})`).join(' · ')
                     : <span style={{ color: WARN }}>Nothing to explain yet. Colour a layer by height, slope or form, or turn on a group above.</span>}
                 </div>
-                <Note>The typeface is set under Frame › Map Elements.</Note>
+                {/* The same setting as Map Elements › Font: the sheet has one typeface. */}
+                <SegRow label="Font" testIdPrefix="legend-font"
+                  options={[['Sans', 'sans'], ['Mono', 'mono'], ['Serif', 'serif'], ['Line', 'line']]}
+                  value={view.frameMarkFont ?? 'sans'} onChange={v => sv({ frameMarkFont: v })}
+                  help="The typeface of the legend, shared with every other sheet mark: the scale bar, the arrow, the title block and the coordinates. It is the same setting as Frame › Map Elements › Font. Sans, Mono and Serif are written into the SVG as text. Line letters the marks in a single-line face, as strokes that a pen plotter draws in one pass." />
+                {view.frameMarkFont === 'line' && (
+                  <Sub>
+                    <FontSelect fonts={singleLineFonts} value={view.frameMarkLineFont || 'HersheySans1'}
+                      onChange={(v) => sv({ frameMarkLineFont: v })} testId="legend-line-font" />
+                  </Sub>
+                )}
               </Sub>
             )}
           </Section>
@@ -3386,7 +3409,10 @@ export function Sidebar({
               <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => camCommit({ tilt: v })} onLive={v => camLive({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
               <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => camCommit({ zoom: (v / 100) * baseZoom })} onLive={v => camLive({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </div>
-            <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
+              <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Roll" testId="camera-roll" help="Turns the camera about its line of sight, so the horizon slants. Positive turns the picture clockwise. An orbit drag keeps it, and Top, Front, Iso and Reset set it to 0." min={-180} max={180} step={0.1} value={view.cameraRoll ?? 0} onChange={v => camCommit({ cameraRoll: v })} onLive={v => camLive({ cameraRoll: v })} fmt={v => v.toFixed(1)+'°'} />
+            </div>
             </CamLock>
             <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
             <CamLock on={viewLocked}>
@@ -3402,7 +3428,14 @@ export function Sidebar({
               </Sub>
             )}
             </CamLock>
-            <Tog label="Centre guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })} />
+            <Tog label="Centre guides" testId="centre-guides" checked={view.showGuides} onChange={v => sv({ showGuides: v })}
+              help="A cross through the middle of the free canvas, the part this panel does not cover. An overlay: no export draws it. With the paper frame on, Paper has guides of its own." />
+            {view.showGuides && (
+              <Sub>
+                <GuideStyle view={view} sv={sv} prefix="centre-guide" opacity={0.25} dark={isDarkBackground(style.bgColor)}
+                  keys={{ weight: 'guideWeight', opacity: 'guideOpacity', color: 'guideColor', dash: 'guideDash' }} />
+              </Sub>
+            )}
 
             {/* One choice, not two switches. Orthographic and Plan oblique sat
                 indented under Centre guides, as if they were guide options, and
@@ -3567,6 +3600,30 @@ export function Sidebar({
                     paperAspect(view.framePaper ?? 'iso', !!view.frameLandscape, view.frameCustomRatio))
                   return <div data-testid="print-pixels"><Note>{`${px.w} × ${px.h} px · ${view.plotWidthMm ?? 297} mm wide`}</Note></div>
                 })()}
+                <Heading>Guides</Heading>
+                {GUIDE_SETS.map(([key, label]) => {
+                  const on = String(view.frameGuides ?? '').split(',').includes(key)
+                  return (
+                    <Tog key={key} label={label} small testId={`paper-guide-${key}`} checked={on}
+                      help={{
+                        centre: 'A cross through the middle of the sheet.',
+                        thirds: 'The rule of thirds: two lines each way, at a third and two thirds of the sheet.',
+                        golden: 'Two lines each way at the golden section, 38.2% in from each side.',
+                        diagonals: 'The two lines from corner to corner.',
+                      }[key] + ' Drawn inside the margin, as an overlay: no export draws the guides.'}
+                      onChange={(v) => {
+                        const set = new Set(String(view.frameGuides ?? '').split(',').filter(Boolean))
+                        if (v) set.add(key); else set.delete(key)
+                        sv({ frameGuides: GUIDE_SETS.map(([k]) => k).filter((k) => set.has(k)).join(',') })
+                      }} />
+                  )
+                })}
+                {String(view.frameGuides ?? '') !== '' && (
+                  <Sub>
+                    <GuideStyle view={view} sv={sv} prefix="paper-guide" opacity={0.5} dark={isDarkBackground(style.bgColor)}
+                      keys={{ weight: 'frameGuideWeight', opacity: 'frameGuideOpacity', color: 'frameGuideColor', dash: 'frameGuideDash' }} />
+                  </Sub>
+                )}
               </Sub>
             )}
           </Section>
@@ -3635,9 +3692,15 @@ export function Sidebar({
                 <InlineSl label="Size" min={0.4} max={3} step={0.05} value={view.frameMarkScale ?? 1}
                   onChange={v => sv({ frameMarkScale: v })} fmt={v => v.toFixed(2) + '×'} testId="mark-size" />
                 <SegRow label="Font" testIdPrefix="mark-font"
-                  options={[['Sans', 'sans'], ['Mono', 'mono'], ['Serif', 'serif']]}
+                  options={[['Sans', 'sans'], ['Mono', 'mono'], ['Serif', 'serif'], ['Line', 'line']]}
                   value={view.frameMarkFont ?? 'sans'} onChange={v => sv({ frameMarkFont: v })}
-                  help="The typeface of every sheet mark: the scale bar, the arrow, the title block, the coordinates and the legend. Each is a common system font, written into the SVG by name with a generic fallback." />
+                  help="The typeface of every sheet mark: the scale bar, the arrow, the title block, the coordinates and the legend. Sans, Mono and Serif are common system fonts, written into the SVG as text by name with a generic fallback. Line letters the marks in a single-line face, as strokes that a pen plotter draws in one pass." />
+                {view.frameMarkFont === 'line' && (
+                  <Sub>
+                    <FontSelect fonts={singleLineFonts} value={view.frameMarkLineFont || 'HersheySans1'}
+                      onChange={(v) => sv({ frameMarkLineFont: v })} testId="mark-line-font" />
+                  </Sub>
+                )}
                 <ColorRow label="Ink" value={view.frameMarkColor ?? '#000000'}
                   onChange={v => sv({ frameMarkColor: v })} testId="mark-color" />
                 {/* What the marks are, and what they are not. The bar is exact
@@ -3712,6 +3775,10 @@ export function Sidebar({
                   ? `Set for a ${recommended.pen.toFixed(2)} mm pen${recommended.dots ? ', min length off: most strokes are shorter than the pen' : ''}.`
                   : 'Recommended values measures the strokes, then sets plotter order and the clean-up from the pen tip. As drawn turns them all off.'}
               </div>
+              <SegRow label="Layers" testIdPrefix="plot-group"
+                help="How the SVG's layers are arranged. By layer gives one top layer per pen layer: each mode, copy, vector layer and ink. By ink gives one top layer per ink, with the layers drawn in that ink inside it, so a plotter that plots by layer changes the pen once per ink. Layers that hold more than one ink, such as a graded ramp, go in a last group."
+                options={[['By layer', 'layer'], ['By ink', 'ink']]}
+                value={view.plotGroupBy ?? 'layer'} onChange={(v) => sv({ plotGroupBy: v })} />
               <Tog label="Plotter order" testId="plot-order" small
                 help="Re-orders the strokes inside each pen layer so the carriage travels less, drawing any stroke backwards if its far end is nearer. Off by default: where two strokes of different colours cross, the order decides which ink is on top — on screen and on paper alike — so it is your call, not the exporter's. Filled areas are never reordered."
                 checked={!!view.plotPenOrder} onChange={v => sv({ plotPenOrder: v })} />

@@ -7,7 +7,7 @@
  * whose offset was not advanced restarts its pattern at the paper edge.
  */
 import { describe, expect, it } from 'vitest'
-import { clipSegment, insetRect, insideRect, paperAspect, paperRatioLabel } from '../../src/utils/frame'
+import { clipSegment, guideDash, guideSegments, insetRect, insideRect, paperAspect, paperRatioLabel } from '../../src/utils/frame'
 
 const R = { x: 0, y: 0, w: 100, h: 100 }
 
@@ -95,5 +95,28 @@ describe('paperAspect', () => {
   it('names a paper for the panel', () => {
     expect(typeof paperRatioLabel('iso')).toBe('string')
     expect(paperRatioLabel('iso').length).toBeGreaterThan(0)
+  })
+})
+
+describe('guideSegments', () => {
+  const r = { x: 10, y: 20, w: 300, h: 600 }
+  it('draws nothing for no set', () => {
+    expect(guideSegments(r, '')).toEqual([])
+  })
+  it('crosses the centre', () => {
+    expect(guideSegments(r, 'centre')).toEqual([[160, 20, 160, 620], [10, 320, 310, 320]])
+  })
+  it('divides in thirds and at the golden section', () => {
+    expect(guideSegments(r, 'thirds').map((s) => s[0])).toEqual([110, 10, 210, 10])
+    const g = guideSegments(r, 'golden')
+    expect(g[0][0]).toBeCloseTo(10 + 300 * 0.381966, 3)
+    expect(g[2][0]).toBeCloseTo(10 + 300 * 0.618034, 3)
+  })
+  it('runs the diagonals corner to corner', () => {
+    expect(guideSegments(r, 'diagonals')).toEqual([[10, 20, 310, 620], [310, 20, 10, 620]])
+  })
+  it('scales the dash with the width', () => {
+    expect(guideDash('dashed', 2)).toBe('12 8')
+    expect(guideDash('solid', 2)).toBeUndefined()
   })
 })

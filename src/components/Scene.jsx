@@ -91,6 +91,7 @@ function shiftMarks(m, dx, dy) {
     rects: m.rects.map(([x, y, w, h, ...rest]) => [x + dx, y + dy, w, h, ...rest]),
     lines: m.lines.map(([x0, y0, x1, y1, ...rest]) => [x0 + dx, y0 + dy, x1 + dx, y1 + dy, ...rest]),
     texts: m.texts.map((t) => ({ ...t, x: t.x + dx, y: t.y + dy })),
+    ...(m.strokes ? { strokes: m.strokes.map((st) => ({ ...st, pts: st.pts.map((v, i) => v + (i % 2 ? dy : dx)) })) } : {}),
   }
 }
 
@@ -272,11 +273,13 @@ export function Scene({
   // a drag re-renders nothing; the slider writes state once, when let go, and
   // the effect above then finds the camera already where state puts it.
   const moveCamera = useRef(null)
+  const liveRoll = useRef(null)
   moveCamera.current = (live) => {
     const pc = pRef.current
     updateCameraFromSliders(live.tilt ?? pc.tilt, live.rotation ?? pc.rotation, live.zoom ?? pc.zoom,
       live.panX ?? pc.panX, live.panY ?? pc.panY, live.panZ ?? pc.panZ)
     if (live.rotation != null) autoRotRef.current = live.rotation
+    if (live.cameraRoll != null) liveRoll.current = live.cameraRoll
     invalidate()
   }
   useEffect(() => useStore.subscribe((s, prev) => {
@@ -311,6 +314,28 @@ export function Scene({
     const zoom = wheelZoom.current.now || heldZoom.current || p.zoom
     updateCameraFromSliders(p.tilt, autoRotRef.current, zoom, p.panX, p.panY, p.panZ)
     invalidate()  // keep the on-demand loop running while auto-rotating
+  })
+
+  /*
+   * Roll: a turn of the camera about its own line of sight.
+   *
+   * OrbitControls aims the camera with lookAt on every update, which levels the
+   * horizon again, and it reads the up vector only when it is built. So the roll
+   * is put on here, after the controls (drei updates them at priority -1) and
+   * before the frame is drawn or measured. Aimed again first, so a still camera
+   * with the controls locked does not roll further each frame.
+   */
+  const rolled = useRef(false)
+  useEffect(() => { liveRoll.current = null; invalidate() }, [p.cameraRoll, invalidate])
+  useFrame(() => {
+    const cam = activeCamera
+    const orbit = orbitRef.current
+    const deg = liveRoll.current ?? p.cameraRoll ?? 0
+    if (!cam || !orbit || (!deg && !rolled.current)) return
+    cam.lookAt(orbit.target)
+    if (deg) cam.rotateZ(THREE.MathUtils.degToRad(deg))
+    cam.updateMatrixWorld()
+    rolled.current = !!deg
   })
 
   /**
@@ -736,6 +761,7 @@ export function Scene({
         sheetMarks: marks,
         sheetMarkColor: p.frameMarkColor ?? '#000000',
         penOrder: !!p.plotPenOrder, measureOnly, onStats: onPlotStats,
+        groupBy: p.plotGroupBy ?? 'layer',
         simplifyMm: p.plotSimplifyMm, minLengthMm: p.plotMinLengthMm, joinGapMm: p.plotJoinGapMm,
         dedupeMm: p.plotDedupeMm, passes: p.plotPasses,
         areaFill: p.plotAreaFill, hatchPitchMm: p.plotHatchPitch, hatchAngle: p.plotHatchAngle,

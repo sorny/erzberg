@@ -613,6 +613,8 @@ export function buildLineGeometry(terrain, p) {
           // Lines that live inside the ground — Pillars' columns, Stems' stems —
           // and so are not hidden by it under the Ground model.
           insideGround: !!res.insideGround,
+          // Raised by a Z offset: its curtains are its raised ground (lift.js).
+          lifted: !!res.lifted,
         })
         continue
       }
@@ -697,6 +699,7 @@ export function buildLineGeometry(terrain, p) {
         isPoints: res.isPoints ?? false,
         selfOcclude: !!res.selfOcclude,
         insideGround: !!res.insideGround,
+        lifted: !!res.lifted,
       })
     }
   }

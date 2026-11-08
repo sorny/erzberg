@@ -108,8 +108,8 @@ test('performance benchmark', async ({ page }) => {
   // a time, so the slider is in the DOM and hidden until we go there.
   await openStage(page, 'frame')
 
-  // Target the rotation slider by its unique min="-180" attribute
-  const rotSlider = page.locator('input[type="range"][min="-180"]')
+  // Target the rotation slider by its name: Roll shares its range
+  const rotSlider = page.locator('input[type="range"][aria-label="Rotation"]')
   await expect(rotSlider).toBeVisible({ timeout: 15000 })
 
   const rotStart = Date.now()

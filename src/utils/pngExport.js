@@ -136,7 +136,7 @@ function drawMarks(ctx, marks, color, colored = true) {
   ctx.save()
   ctx.fillStyle = color
   ctx.strokeStyle = color
-  ctx.lineWidth = Math.max(1, (marks.texts[0]?.size ?? 12) * 0.08)
+  ctx.lineWidth = Math.max(1, (marks.textSize ?? marks.texts[0]?.size ?? 12) * 0.08)
   ctx.lineCap = 'butt'
   // The trim mask passes `colored: false` and keeps every shape in its one ink.
   const own = (c) => (colored && c ? c : color)
@@ -155,6 +155,16 @@ function drawMarks(ctx, marks, color, colored = true) {
     ctx.moveTo(x0, y0); ctx.lineTo(x1, y1)
   }
   ctx.stroke()
+  // A single-line face arrives as strokes, not text.
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+  for (const st of marks.strokes ?? []) {
+    ctx.strokeStyle = own(st.color); ctx.lineWidth = st.w
+    ctx.beginPath()
+    for (let i = 0; i < st.pts.length; i += 2) {
+      if (i === 0) ctx.moveTo(st.pts[0], st.pts[1]); else ctx.lineTo(st.pts[i], st.pts[i + 1])
+    }
+    ctx.stroke()
+  }
   for (const t of marks.texts) {
     ctx.fillStyle = own(t.color)
     ctx.font = `${t.size.toFixed(1)}px ${marks.font ?? 'sans-serif'}`

@@ -46,7 +46,7 @@ export function SheetMarks({ view, sheet = null, rightInset = 0 }) {
   if (!marks) return null
 
   const ink = view.frameMarkColor ?? '#000000'
-  const stroke = Math.max(0.5, (marks.texts[0]?.size ?? 12) * 0.08)
+  const stroke = Math.max(0.5, (marks.textSize ?? marks.texts[0]?.size ?? 12) * 0.08)
 
   return (
     <div data-testid="sheet-marks"
@@ -59,6 +59,11 @@ export function SheetMarks({ view, sheet = null, rightInset = 0 }) {
         ))}
         {marks.lines.map(([x0, y0, x1, y1, c, sw], i) => (
           <line key={`l${i}`} x1={x0} y1={y0} x2={x1} y2={y1} stroke={c ?? ink} strokeWidth={sw ?? stroke} />
+        ))}
+        {/* A single-line face arrives as strokes, not text. */}
+        {(marks.strokes ?? []).map((st, i) => (
+          <polyline key={`s${i}`} points={st.pts.map((v) => v.toFixed(1)).join(' ')} fill="none"
+                    stroke={st.color ?? ink} strokeWidth={st.w} strokeLinecap="round" strokeLinejoin="round" />
         ))}
         {marks.texts.map((t, i) => (
           <text key={`t${i}`} x={t.x} y={t.y} fill={t.color ?? ink} fontSize={t.size}

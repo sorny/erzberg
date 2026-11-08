@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.73.0] — 2026-11-08
+
 ### Added
 
 - **Z offset and plumb lines.** Each draw mode's Masks block has a Z offset that
@@ -27,10 +29,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ridges and blue valleys raised in two tiers). Landform masks on this kind of
   data are fragmented, so footprints and fences read best on painted or vector
   masks with large regions. A raised run now also drops the strokes that a
-  NoData edge stacks off the data.
-  A raised run carries its own ground for
-  occlusion and drops the strokes a mask edge stacks under the ground. Both
-  settings are off by default, so existing presets render as before.
+  NoData edge stacks off the data. A raised layer below full opacity hides
+  nothing, so the ground shows through it, as through a fill below full
+  opacity. A raised run carries its own ground for occlusion and drops the
+  strokes a mask edge stacks under the ground. Both settings are off by
+  default, so existing presets render as before.
+- **SVG layers by ink.** Plot › Layers › By ink writes one top layer per ink,
+  numbered in plot order, with the pen layers of that ink inside it as
+  sublayers. A plotter driver that plots by top layer then changes the pen once
+  per ink. The legend is split by ink too, so each sample is drawn by the pen
+  of its own ink. Layers that hold several inks, such as a graded ramp, go in a
+  last group. By layer, the default, writes the file as before.
+- **Camera roll.** Roll (Camera) turns the camera about its line of sight, so
+  the horizon slants. A positive roll turns the picture clockwise. An orbit
+  drag keeps it, and the Top, Front, Iso and Reset buttons set it to 0. The
+  default is 0, so presets open unchanged.
+- **Guides.** The centre guides (Camera) follow the free canvas, so they move
+  when the panel opens or closes, and take a width, opacity, dash and colour.
+  The paper frame has guides of its own (Paper › Guides): centre, thirds, golden
+  section and diagonals, inside the margin, with the same line settings. Both
+  are overlays and never reach an export.
+- **Legend Layers group.** Its title can be changed or cleared, and every line
+  sample (mode, copy or vector layer) has a switch in the panel. Drag a
+  sample's grip, or focus it and press the arrow keys, to change the order.
+  Type in a sample's field to rename it. An empty field keeps the generated
+  name, for example the contour interval. The Legend
+  section also shows the sheet's Font, the same setting as Map Elements › Font.
+- **Single-line sheet marks.** Map Elements › Font › Line letters the scale
+  bar, north arrow, title block, coordinates and legend in a single-line face,
+  as strokes in the viewport, the PNG and the SVG. A plotter draws them without
+  a text-to-path step.
+
+### Fixed
+
+- **A layer at opacity 0 leaves the SVG.** A draw mode, copy or vector layer at
+  opacity 0 wrote a pen layer of invisible strokes, which a plotter still
+  drew. It now writes nothing, and neither do flock discs and streaks at 0.
 
 ## [1.72.2] — 2026-11-07
 
