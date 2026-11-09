@@ -245,3 +245,39 @@ describe('importing an image', () => {
     expect(out[15]).toBe(0)
   })
 })
+
+describe('mask ids after a project opens', () => {
+  it('a new mask or copy never takes an id a loaded mask already has', async () => {
+    const { createMask, duplicateMask, reserveMaskIds } = await import('../../src/utils/maskLayers')
+    // A project saved in another session: its ids run past this session's counter.
+    const loaded = [createMask(4, 4, 0, 'A'), createMask(4, 4, 1, 'B')]
+      .map((m, i) => ({ ...m, id: `mask-${900 + i}` }))
+    reserveMaskIds(loaded)
+    const ids = new Set(loaded.map((m) => m.id))
+    const copy = duplicateMask(loaded[0], 2, 'A inverse')
+    const fresh = createMask(4, 4, 3, 'C')
+    expect(ids.has(copy.id)).toBe(false)
+    expect(ids.has(fresh.id)).toBe(false)
+    expect(copy.id).not.toBe(fresh.id)
+  })
+
+  it('the store reserves the ids of every list it is given', async () => {
+    const { useStore } = await import('../../src/store/useStore')
+    const { createMask } = await import('../../src/utils/maskLayers')
+    const loaded = { ...createMask(4, 4, 0, 'Saved'), id: 'mask-5000' }
+    useStore.getState().setMasks([loaded])
+    expect(Number(createMask(4, 4, 1).id.slice(5))).toBeGreaterThan(5000)
+    useStore.getState().setMasks([])
+  })
+
+  it('a project that already holds a repeated id opens with distinct ids', async () => {
+    const { createMask, withUniqueMaskIds } = await import('../../src/utils/maskLayers')
+    const a = { ...createMask(4, 4, 0, 'Ridge'), id: 'mask-7000' }
+    const b = { ...createMask(4, 4, 1, 'Ridge inverse'), id: 'mask-7000' }
+    const out = withUniqueMaskIds([a, b])
+    expect(out[0]).toBe(a)
+    expect(out[1].id).not.toBe('mask-7000')
+    expect(out[1].name).toBe('Ridge inverse')
+    expect(out[1].data).toBe(b.data)
+  })
+})

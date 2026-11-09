@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { applyEdit, buildEditMask, cropBbox } from '../utils/heightmapEdit'
-import { cropMaskData } from '../utils/maskLayers'
+import { cropMaskData, reserveMaskIds } from '../utils/maskLayers'
 
 /**
  * Global store — only holds data that cannot live in plain React state:
@@ -290,6 +290,7 @@ export const useStore = create((set) => ({
    */
   setMasks: (masks) =>
     set((s) => {
+      reserveMaskIds(masks)
       const next = { srcMasks: masks ?? [] }
       return { ...next, ...derive({ ...s, ...next }) }
     }),

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.1] — 2026-11-09
+
+### Fixed
+
+- **A mask copy no longer shares its id with a loaded mask.** Mask ids came
+  from a counter that starts at 1 on each page load, and a project file brings
+  its masks back with their saved ids. A copy or new mask could then take an id
+  a loaded mask already had, so renaming or inverting the copy also renamed and
+  inverted the original. The counter now skips every id in the mask list,
+  and a project that already holds a repeated id opens with distinct ids.
+
 ## [1.74.0] — 2026-11-09
 
 ### Added
