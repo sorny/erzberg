@@ -94,7 +94,13 @@ describe('describeChange', () => {
       for (const k of Object.keys(def)) {
         const v = def[k]
         const moved = typeof v === 'number' ? v + 1 : typeof v === 'boolean' ? !v : `${v}x`
-        if (!label({ [group]: { [k]: moved } })) unnamed.push(k)
+        // One-key groups: the name depends only on the key that moved, and
+        // diffing the full 2700-key style group per key timed out on CI.
+        const at = ['terrain', 'style', 'points', 'view'].indexOf(group)
+        const before = [{}, {}, {}, {}], after = [{}, {}, {}, {}]
+        before[at] = { [k]: v }
+        after[at] = { [k]: moved }
+        if (!describeChange(before, after, KEYS)) unnamed.push(k)
       }
     }
     expect(unnamed, `no name for: ${unnamed.join(' ')}`).toEqual([])

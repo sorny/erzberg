@@ -47,13 +47,21 @@ const NO_LINE_SAMPLE = new Set(['Landform', 'Cover', 'Indexed', 'Mineral', 'Riso
 /** Read a mode's key from a copy's values first, then from the plate. */
 const reader = (p, values) => (k) => (values && values[k] !== undefined ? values[k] : p[k])
 
+/** A mode at opacity 0 draws nothing and exports nothing, so it has no legend. */
+const shows = (get, id) => (get(`opacity${id}`) ?? 1) > 0
+
 /** Every draw mode on the plate, the mode itself and each copy of it, with a name. */
 function drawnModes(p) {
   const out = []
-  for (const m of DRAW_MODES) if (p[`enabled${m.id}`]) out.push({ id: m.id, key: `mode:${m.id}`, name: m.label, get: reader(p, null) })
+  for (const m of DRAW_MODES) {
+    const get = reader(p, null)
+    if (p[`enabled${m.id}`] && shows(get, m.id)) out.push({ id: m.id, key: `mode:${m.id}`, name: m.label, get })
+  }
   for (const c of p.modeCopies ?? []) {
     if (!c?.mode || !c.values?.[`enabled${c.mode}`]) continue
-    out.push({ id: c.mode, key: `copy:${c.uid}`, name: c.name ?? MODE_LABEL[c.mode] ?? c.mode, get: reader(p, c.values) })
+    const get = reader(p, c.values)
+    if (!shows(get, c.mode)) continue
+    out.push({ id: c.mode, key: `copy:${c.uid}`, name: c.name ?? MODE_LABEL[c.mode] ?? c.mode, get })
   }
   return out
 }
@@ -187,7 +195,7 @@ export function legendEntries(p, facts = {}, { steps = 7 } = {}) {
       items.push({ key: m.key, color: m.get(`color${m.id}`) ?? '#000000', dash: m.get(`dash${m.id}`) ?? 'solid', name: lineName(p, m) })
     }
     for (const l of facts.vectorLayers ?? []) {
-      if (!l || l.visible === false || !l.name) continue
+      if (!l || l.visible === false || !l.name || (l.opacity ?? 1) <= 0) continue
       const key = `vector:${l.id}`
       items.push(l.fill
         ? { key, color: l.fillColor ?? l.color, name: l.name, area: true }

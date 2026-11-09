@@ -51,6 +51,8 @@ export function pensOf(lineGeo, p = {}) {
     const lines = L.positions?.length > 0
     if (!lines && !L.areas) continue
     const st = layerStyle(L.id, p)
+    // Opacity 0 draws nothing, and the SVG writes no layer for it.
+    if (!((st.opacity ?? 1) > 0)) continue
     const name = st.name ?? String(L.id)
 
     if (L.areas?.inks?.length) {

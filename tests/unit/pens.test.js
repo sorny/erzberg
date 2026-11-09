@@ -16,6 +16,14 @@ describe('pensOf', () => {
     expect(out).toMatchObject({ layers: 1, exact: true })
   })
 
+  it('counts no pen for a layer at opacity 0, which the SVG does not write', () => {
+    const geo = [{ id: 'Contours', positions: seg, colors: rgb('#123456', '#123456') },
+      { id: 'Lines', positions: seg, colors: rgb('#000000', '#000000') }]
+    const out = pensOf(geo, { opacityContours: 0 })
+    expect(out.rows.map((r) => r.id)).toEqual(['Lines'])
+    expect(out.layers).toBe(1)
+  })
+
   it('shows each ink as picked, never through the tone curve', () => {
     const geo = [{ id: 'Contours', positions: seg, colors: rgb('#ffffff', '#ffffff') }]
     expect(pensOf(geo, {}).rows[0].inks).toEqual(['#ffffff'])

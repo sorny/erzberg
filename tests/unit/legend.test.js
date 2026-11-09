@@ -51,6 +51,15 @@ describe('legendEntries', () => {
     expect(e[0].items).toEqual([{ key: 'copy:c1', color: '#ff0000', dash: 'solid', name: 'Contours 2', base: 'Contours 2' }])
   })
 
+  it('leaves out a mode, copy or vector layer at opacity 0', () => {
+    const copies = [{ uid: 'c1', mode: 'Contours', name: 'Contours 2', values: { enabledContours: true, opacityContours: 0 } }]
+    const items = legendEntries(plate({ enabledLines: true, opacityLines: 0, modeCopies: copies }))
+    expect(items.flatMap((e) => e.items ?? []).map((it) => it.key)).toEqual([])
+    const roads = (opacity) => legendEntries(plate({ legendParts: 'line' }), { vectorLayers: [{ id: 'v1', name: 'Roads', color: '#ff0000', opacity }] })
+    expect(roads(1)[0].items.map((it) => it.key)).toEqual(['vector:v1'])
+    expect(roads(0)).toEqual([])
+  })
+
   it('names a sample by what was typed for it, and keeps the generated name', () => {
     const copies = [{ uid: 'c1', mode: 'Contours', name: 'Contours 2', values: { enabledContours: true } }]
     const [it0] = legendEntries(plate({ modeCopies: copies, legendNames: JSON.stringify({ 'copy:c1': 'Index lines' }) }))[0].items

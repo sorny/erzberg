@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.73.1] — 2026-11-09
+
+### Fixed
+
+- **A layer at opacity 0 has no pen and no legend sample.** The pen list, the
+  standing line and the legend counted a mode, copy or vector layer at opacity
+  0, which the SVG no longer writes. They now leave it out.
+- **Every panel text field shows the focus ring.** Fields without a `type`
+  attribute, such as the legend names, copy names and title text, fell back to
+  the browser's own ring. They now take the panel's ring, like the others.
+- **The history test no longer times out on CI.** The every-key check diffed
+  the full 2,700-key style group once per key and took over 10 s on the runner.
+  It now diffs one-key groups, which name the same section, in 6 ms.
+
 ## [1.73.0] — 2026-11-08
 
 ### Added
