@@ -85,7 +85,7 @@ export const SECTION_PARAMS = {
   'Map Elements': ['frameScaleBar', 'frameNorth', 'frameMarkScale', 'frameMarkColor', 'frameMarkFont', 'frameMarkLineFont',
     'frameMagnetic', 'frameTitle', 'frameTitleText', 'frameTitleFacts', 'frameGrid', 'frameGridUnits'],
   'Legend': [/^legend/],
-  'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenOrder', 'plotGroupBy', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
+  'Plot': ['plotWidthMm', 'plotPenMm', 'plotPenPreview', 'plotPenOrder', 'plotGroupBy', 'plotJoinGapMm', 'plotMinLengthMm', 'plotSimplifyMm', 'plotDedupeMm', 'plotPasses', 'plotAreaFill', 'plotHatchPitch', 'plotHatchAngle'],
   // Older than the suffix rule, and left alone rather than renamed: the keys are
   // in every saved preset and every exported plate, and a rename is a migration.
   'Mode: Pillars': ['pillarGap', 'pillarDepth', 'pillarStyle', 'pillarSize',
@@ -112,7 +112,8 @@ export const ALSO_READS = {
   'Paper': ['plotWidthMm', 'bgColor'],
   'Export': ['frameLandscape', 'framePaper', 'showFrame', 'plotWidthMm'],
   // The hatch controls show only while a mode that exports filled areas is on.
-  'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed'],
+  // The pen readout says when it has no frame to measure.
+  'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed', 'showFrame'],
   'Map Elements': ['orthographic', 'plotWidthMm', 'tilt', 'legendOn'],
   // The ink falls back to the marks' own.
   // The font is the sheet's one typeface, shown here too.

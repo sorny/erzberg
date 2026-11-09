@@ -7,7 +7,7 @@
  * whose offset was not advanced restarts its pattern at the paper edge.
  */
 import { describe, expect, it } from 'vitest'
-import { clipSegment, guideDash, guideSegments, insetRect, insideRect, paperAspect, paperRatioLabel } from '../../src/utils/frame'
+import { clipSegment, guideDash, guideSegments, insetRect, insideRect, paperAspect, paperRatioLabel, frameRect, penPreviewPx, sheetPxPerMm } from '../../src/utils/frame'
 
 const R = { x: 0, y: 0, w: 100, h: 100 }
 
@@ -118,5 +118,22 @@ describe('guideSegments', () => {
   it('scales the dash with the width', () => {
     expect(guideDash('dashed', 2)).toBe('12 8')
     expect(guideDash('solid', 2)).toBeUndefined()
+  })
+})
+
+describe('penPreviewPx', () => {
+  const base = { plotWidthMm: 300, plotPenMm: 0.4 }
+  it('is off until the switch is on', () => {
+    expect(penPreviewPx(base, 1200, 800)).toBeNull()
+  })
+  it('maps the canvas onto the sheet width without a frame', () => {
+    expect(sheetPxPerMm(base, 1200, 800)).toBeCloseTo(4, 9)
+    expect(penPreviewPx({ ...base, plotPenPreview: true }, 1200, 800)).toBeCloseTo(1.6, 9)
+  })
+  it('maps the frame onto the sheet width when one is shown', () => {
+    const p = { ...base, plotPenPreview: true, showFrame: true, framePaper: 'iso', frameLandscape: true, frameScale: 0.5 }
+    const w = frameRect(1200, 800, paperAspect('iso', true), 0.5).w
+    expect(penPreviewPx(p, 1200, 800)).toBeCloseTo(0.4 * w / 300, 9)
+    expect(w).toBeLessThan(1200)
   })
 })

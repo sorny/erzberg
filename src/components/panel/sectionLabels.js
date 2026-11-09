@@ -95,7 +95,7 @@ export const SECTION_LABELS = {
   "Openness": "red relief full at reach gain opacity",
   "Paper": "paper frame ratio orientation scale offset margin print size",
   "Particles": "particles field size opacity glow spacing shimmer animate float noise scale flow speed reveal birds seed trail react to audio drive pace range pulse burst startle sync shadow strength spread sun azimuth altitude colour cohesion alignment separation neighbours turbulence roost height clearance ridge lift predator fear",
-  "Plot": "sheet width pen tip layers plotter order join gap min length simplify dedupe passes filled areas in the svg pitch angle",
+  "Plot": "sheet width pen tip preview layers plotter order join gap min length simplify dedupe passes filled areas in the svg pitch angle",
   "Presets": "previous roll next styles",
   "Shape": "raw terrain view resolution height scale blur jitter low cut high",
   "Slope Shading": "opacity true degrees flat colour steep full at bands pixel size relief",
