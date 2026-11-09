@@ -521,6 +521,10 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   the pen tip: simplify a sixth of the tip, join gap and dedupe half, min length
   and hatch pitch the tip. Passes stay as they are. If short strokes carry more than 2% of the ink, as in
   hachures, min length stays off.
+- **Pen preview** draws every line on screen at the pen tip's width on paper,
+  through the sheet width and the paper frame. A note under it gives the pen
+  width in screen pixels and what 1 px is on paper. The SVG keeps the widths
+  set in each mode.
 - **As drawn** turns plotter order and all clean-up off and sets passes to 1.
   The SVG then has the strokes as the plate draws them.
 - **Command line.** `node scripts/erzberg.js render graz.tif -p Blueprint -o

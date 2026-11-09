@@ -141,6 +141,30 @@ export function printPixels(widthMm, dpi, aspect) {
   return { w, h: Math.max(1, Math.round(w / Math.max(0.01, aspect || 1))) }
 }
 
+/**
+ * How many screen pixels one millimetre of paper is, for a canvas `w` × `h`.
+ *
+ * The SVG export maps the sheet's on-screen width onto `plotWidthMm`: the
+ * paper frame when one is shown, the canvas otherwise. Without a frame the
+ * export uses the drawing's own bounds, so the canvas is only an estimate.
+ */
+export function sheetPxPerMm(p, w, h) {
+  const sheetW = p.showFrame
+    ? frameRect(w, h, paperAspect(p.framePaper ?? 'iso', !!p.frameLandscape, p.frameCustomRatio),
+      p.frameScale ?? 0.85, p.frameOffsetX ?? 0, p.frameOffsetY ?? 0).w
+    : w
+  return sheetW / Math.max(1, p.plotWidthMm ?? 297)
+}
+
+/**
+ * The on-screen line width that draws like the plot's pen tip, in CSS pixels,
+ * or null when the pen preview is off.
+ */
+export function penPreviewPx(p, w, h) {
+  if (!p.plotPenPreview) return null
+  return Math.max(0.1, (p.plotPenMm ?? 0.3) * sheetPxPerMm(p, w, h))
+}
+
 /** The guide sets the paper can show, in panel order, with their panel names. */
 export const GUIDE_SETS = [
   ['centre', 'Centre'],

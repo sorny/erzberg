@@ -3756,9 +3756,19 @@ export function Sidebar({
                 min={50} max={1200} step={1} value={view.plotWidthMm ?? 297}
                 onChange={v => sv({ plotWidthMm: Math.round(v) })} fmt={v => Math.round(v) + ' mm'} />
               <InlineSl label="Pen tip" testId="plot-pen"
-                help="The width your pen draws on paper. Recommended values reads it to set the clean-up below. The SVG keeps the plate's own stroke widths."
+                help="The width your pen draws on paper. Recommended values reads it to set the clean-up below, and Pen preview draws the lines at it. The SVG keeps the plate's own stroke widths."
                 min={0.05} max={2} step={0.05} value={view.plotPenMm ?? 0.3}
                 onChange={v => sv({ plotPenMm: v })} fmt={v => v.toFixed(2) + ' mm'} />
+              <Tog label="Pen preview" testId="plot-pen-preview" small
+                help="Draws every line on screen at the pen tip's width on paper, so you can judge how much detail the pen can show. It reads the sheet width and the paper frame, and follows the window size. Without a frame it uses the whole canvas, which is only an estimate. The SVG keeps the stroke widths set in each mode."
+                checked={!!view.plotPenPreview} onChange={v => sv({ plotPenPreview: v })} />
+              {(() => {
+                const pxPerMm = sheetPx / Math.max(1, view.plotWidthMm ?? 297)
+                const pen = view.plotPenMm ?? 0.3
+                return <div data-testid="plot-pen-px"><Note>
+                  {`Pen ${pen.toFixed(2)} mm = ${(pen * pxPerMm).toFixed(2)} px on screen · 1 px = ${(1 / pxPerMm).toFixed(2)} mm on paper${view.showFrame ? '' : ' (no frame: estimate)'}`}
+                </Note></div>
+              })()}
               <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
                 <Btn onClick={recommendPlotValues} disabled={recommending} data-testid="plot-recommend" style={{ flex: 2 }}>
                   {recommending ? 'Measuring…' : 'Recommended values'}

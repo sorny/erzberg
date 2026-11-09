@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.0] — 2026-11-09
+
+### Added
+
+- **Pen preview.** A switch in Plot draws every line on screen at the pen tip's
+  width on paper, so you can judge how much detail a pen can show before you
+  plot. The width is the pen tip times the paper frame's screen width, divided
+  by the sheet width. Without a frame, the canvas width stands in. A note under
+  it gives both directions, for example `Pen 0.40 mm = 0.81 px on screen · 1 px
+  = 0.50 mm on paper`. The preview is screen only: the SVG keeps the widths set
+  in each mode.
+
 ## [1.73.1] — 2026-11-09
 
 ### Fixed

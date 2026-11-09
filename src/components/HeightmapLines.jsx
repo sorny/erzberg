@@ -15,6 +15,7 @@ import { isDarkBackground } from '../utils/colorUtils'
 import { VectorHighlight } from './VectorHighlight'
 import { drawn } from '../automation'
 import { raisedOccludes } from '../utils/builders/lift'
+import { penPreviewPx } from '../utils/frame'
 
 /**
  * A line layer as round dots: one near-zero segment per dot, spaced `spacing`
@@ -755,6 +756,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
    * massif.
    */
   const anaglyph = !!p.anaglyph && !p.showRawTerrain
+  const penPx = penPreviewPx(p, size.width, size.height)
   /**
    * Which way the two filters combine, decided by the paper.
    *
@@ -804,7 +806,11 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
       {!p.showRawTerrain && <VectorHighlight lineGeo={lineGeo} resolution={resolution} />}
 
       {!p.showRawTerrain && Array.isArray(lineGeo) && lineGeo.flatMap((layer, i) => {
-        const { weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, halo } = layerStyle(layer.id, p)
+        const style = layerStyle(layer.id, p)
+        // Pen preview: every stroke at the pen tip's width on paper. Screen only,
+        // because the SVG takes its widths from `lineStyles`, not from here.
+        const weight = penPx ?? style.weight
+        const { opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, halo } = style
         /*
          * An anaglyph draws every layer twice, and that is the whole of it.
          *
