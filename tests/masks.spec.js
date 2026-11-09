@@ -285,6 +285,59 @@ test('a mask can be copied, pixels and all', async ({ page }) => {
   expect(after).toContain('Mask 1 copy 2')
 })
 
+test('renaming and inverting a copy leaves the original alone, also after a page load', async ({ page }) => {
+  /*
+   * Mask ids come from a counter that starts at 1 on each page load, and a
+   * project file brings its masks back with their saved ids. A copy made after
+   * that took an id a loaded mask had, and a rename or an invert by id changed
+   * both. The undo stack restores a mask list through the same store door as a
+   * project file, so a reload plus a restored list is the same case.
+   */
+  await boot(page)
+  await filter(page, 'Masks')
+  const section = page.locator('[data-section="Masks"]')
+  const names = () => section.locator('input[aria-label^="Name of"]').evaluateAll((els) => els.map((e) => e.value))
+  const pcts = async () => (await section.innerText()).match(/(\d+)%/g)
+
+  // A loaded project: masks whose ids this page's counter has not reached yet.
+  // The app's own store module, at the URL the page loaded it from: Vite can
+  // stamp it with `?t=`, and a bare path would be a second, empty store.
+  await page.evaluate(async () => {
+    const url = performance.getEntriesByType('resource').map((e) => e.name)
+      .find((n) => n.includes('/src/store/useStore.js')) ?? '/src/store/useStore.js'
+    const { useStore } = await import(url)
+    const st = useStore.getState()
+    const n = st.srcWidth * st.srcHeight
+    const data = new Uint8Array(n)
+    data.fill(1, 0, Math.floor(n / 4))
+    st.setMasks([{ id: 'mask-1', name: 'Ridge', color: '#ff4d6d', width: st.srcWidth, height: st.srcHeight, data, visible: false }])
+  })
+  await filter(page, 'Masks')
+  await expect(section.locator('[data-testid^="mask-edit-"]')).toHaveCount(1)
+  const before = await pcts()
+
+  await section.locator('[data-testid^="copy-"]').first().click()
+  await page.waitForTimeout(500)
+  expect(await names()).toEqual(['Ridge', 'Ridge copy'])
+  await section.locator('input[aria-label="Name of Ridge copy"]').fill('Ridge inverse')
+  await page.waitForTimeout(300)
+  expect(await names()).toEqual(['Ridge', 'Ridge inverse'])
+
+  await section.locator('[data-testid^="mask-edit-"]').nth(1).click()
+  await page.waitForSelector('[data-testid="mask-studio"]', { timeout: 20_000 })
+  await page.waitForTimeout(800)
+  await page.click('[data-testid="studio-invert"]')
+  await page.waitForTimeout(300)
+  await page.click('[data-testid="studio-done"]')
+  await page.waitForTimeout(600)
+  await filter(page, 'Masks')
+
+  expect(await names()).toEqual(['Ridge', 'Ridge inverse'])
+  const after = await pcts()
+  expect(after[0], 'the original keeps its coverage').toBe(before[0])
+  expect(after[1], 'the copy is inverted').not.toBe(before[0])
+})
+
 /** Drive a range input the way React sees it. */
 async function setSlider(loc, v) {
   await loc.evaluate((el, val) => {

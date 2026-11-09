@@ -65,7 +65,7 @@ import { isProjectFile, readProject, writeProject } from './utils/projectFile'
 import { ZIP_CANCELLED } from './utils/zipWrite'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, effectiveClasses, parseCover, suggestInks } from './utils/coverPlate'
-import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, uniqueMaskName } from './utils/maskLayers'
+import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, reserveMaskIds, uniqueMaskName, withUniqueMaskIds } from './utils/maskLayers'
 import { fetchImagery, findScenes, searchBboxFor } from './utils/imageryFetch'
 import { toneFor } from './utils/imageryTone'
 import { describeChange } from './utils/historyLabel'
@@ -1092,6 +1092,7 @@ export default function App() {
       showError(`A layer's mask selection holds ${MAX_MASKS}, and there are already that many.`)
       return null
     }
+    reserveMaskIds(srcMasks)
     const mask = createMask(srcWidth, srcHeight, srcMasks.length, name)
     setMasks([...srcMasks, mask])
     return mask
@@ -1129,6 +1130,7 @@ export default function App() {
     }
     const at = srcMasks.findIndex((m) => m.id === id)
     if (at < 0) return null
+    reserveMaskIds(srcMasks)
     const copy = duplicateMask(srcMasks[at], srcMasks.length,
       uniqueMaskName(`${srcMasks[at].name} copy`, srcMasks))
     setMasks([...srcMasks.slice(0, at + 1), copy, ...srcMasks.slice(at + 1)])
@@ -1162,6 +1164,7 @@ export default function App() {
         const image = ctx.getImageData(0, 0, bitmap.width, bitmap.height)
         bitmap.close?.()
 
+        reserveMaskIds(srcMasks)
         const mask = createMask(srcWidth, srcHeight, srcMasks.length,
           file.name.replace(/\.[^.]+$/, '').slice(0, 32))
         mask.data = maskFromImageData(image, srcWidth, srcHeight)
@@ -1191,6 +1194,7 @@ export default function App() {
       const { values } = await readBand(file, band, st.srcWidth, st.srcHeight)
       const label = `Band ${band + 1} of ${file.name}`
       if (target === 'mask') {
+        reserveMaskIds(srcMasks)
         const mask = createMask(st.srcWidth, st.srcHeight, srcMasks.length, uniqueMaskName(`Band ${band + 1}`, srcMasks))
         mask.data = bandMask(values)
         setMasks([...srcMasks, mask])
@@ -1867,7 +1871,7 @@ export default function App() {
     st.setHeightmap(t.srcPixels, t.srcMask ?? null, t.srcWidth, t.srcHeight, t.filename || file.name)
     // After the raster: a new raster drops the clip, the masks, the cover and the imagery.
     if (t.edit) st.setEdit(t.edit)
-    st.setMasks(d.masks ?? [])
+    st.setMasks(withUniqueMaskIds(d.masks ?? []))
     st.setCover(d.cover ?? null)
     st.setImagery(d.imagery ?? null)
     st.setVectorSources(d.vectorSources ?? [])

@@ -61,6 +61,39 @@ export const maskColorFor = (i) => MASK_COLORS[i % MASK_COLORS.length]
 
 let nextId = 1
 
+/**
+ * Moves the id counter past every id in `masks`.
+ *
+ * A project file brings its masks back with the ids they were saved with, and
+ * the counter starts at 1 on each page load. Without this, the next new mask or
+ * copy took an id a loaded mask already had, and a rename or an invert by id
+ * then changed both. The store calls it on every mask list it is given.
+ */
+export function reserveMaskIds(masks) {
+  for (const m of masks ?? []) {
+    const n = Number(/^mask-(\d+)$/.exec(m?.id ?? '')?.[1])
+    if (n >= nextId) nextId = n + 1
+  }
+}
+
+/**
+ * The list with every repeated id replaced by a fresh one.
+ *
+ * A project saved while copies could reuse a loaded mask's id can hold two
+ * masks with one id. Layers pick masks by their place in the list, not by id,
+ * so a new id changes nothing a layer reads.
+ */
+export function withUniqueMaskIds(masks) {
+  reserveMaskIds(masks)
+  const seen = new Set()
+  return (masks ?? []).map((m) => {
+    if (!seen.has(m.id)) { seen.add(m.id); return m }
+    const id = `mask-${nextId++}`
+    seen.add(id)
+    return { ...m, id }
+  })
+}
+
 /** An empty mask over a raster, ready to be painted into. */
 export function createMask(width, height, index, name) {
   return {
