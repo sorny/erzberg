@@ -250,8 +250,9 @@ export function PanelStyles() {
       /* A focus ring on everything the keyboard can reach, at zero specificity
          so a control with its own ring keeps it. In the text colour, not ore:
          ore means "on", and a ring in it read as one more lit control. The
-         panel toggle sits outside the panel and is named on its own. */
-      :where(#hm-panel, [data-testid="edit-panel"], [data-testid="mask-panel"]) :is(button, a, input[type=search], input[type=text], select):focus-visible,
+         panel toggle sits outside the panel and is named on its own. A text field
+         without a type attribute is a text field too. */
+      :where(#hm-panel, [data-testid="edit-panel"], [data-testid="mask-panel"]) :is(button, a, input[type=search], input[type=text], input:not([type]), select):focus-visible,
       [data-testid="sidebar-toggle"]:focus-visible {
         outline:2px solid var(--hm-text); outline-offset:1px; }
 
