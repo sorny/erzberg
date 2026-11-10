@@ -1,6 +1,6 @@
 /**
- * Map conventions: Bedding, Slope Classes, Runout, Glacier, and the surveyor's
- * Profile Sheet.
+ * Map conventions: Bedding, Slope Classes, Runout, Glacier, the surveyor's
+ * Profile Sheet, and the Summit Envelope.
  *
  * The first four read the ground in real metres, through the same
  * `groundMetres` the walking and looking modes use, because each answers in a
@@ -13,6 +13,7 @@ import { smoothField } from '../sunHours'
 import { computeVertexColor, hexToRgb } from '../colorUtils'
 import { groundMetres } from './ground.js'
 import { F32List, drapeEdge, hatchWhere, joinLayers, simplifyFlat, traceLevelSet } from './shared.js'
+import { lineFamily } from './lines.js'
 
 const RAD = Math.PI / 180
 
@@ -546,4 +547,164 @@ export function buildProfileSheet(terrain, p, o) {
     ProfileSheet: { positions: lines.toArray(), colors: lineColors.toArray() },
     'ProfileSheet-Rules': { positions: rules.toArray(), colors: ruleColors.toArray(), scaleAnchors: anchors.length ? anchors : null },
   }
+}
+
+// ─── Summit envelope ─────────────────────────────────────────────────────────
+
+/**
+ * min over q of f[q] + a·(x − q)², for every x of one row or column.
+ *
+ * The lower envelope of one parabola per sample (Felzenszwalb and
+ * Huttenlocher's distance transform), in one pass. `f` and `out` are read and
+ * written at `at + k·stride`. `v` and `z` are scratch of n and n + 1.
+ */
+function parabolaMin(f, out, at, stride, n, a, v, z, line) {
+  for (let q = 0; q < n; q++) line[q] = f[at + q * stride]
+  let k = 0
+  v[0] = 0; z[0] = -Infinity; z[1] = Infinity
+  for (let q = 1; q < n; q++) {
+    let s
+    for (;;) {
+      const u = v[k]
+      s = ((line[q] + a * q * q) - (line[u] + a * u * u)) / (2 * a * (q - u))
+      if (s <= z[k] && k > 0) k--
+      else break
+    }
+    k++
+    v[k] = q; z[k] = s; z[k + 1] = Infinity
+  }
+  k = 0
+  for (let q = 0; q < n; q++) {
+    while (z[k + 1] < q) k++
+    const d = q - v[k]
+    out[at + q * stride] = a * d * d + line[v[k]]
+  }
+}
+
+/** `parabolaMin` along every row, then every column: the 2D transform. */
+function parabolaMin2D(f, rows, cols, a) {
+  const tmp = new Float64Array(rows * cols), out = new Float64Array(rows * cols)
+  const n = Math.max(rows, cols), v = new Int32Array(n), z = new Float64Array(n + 1), line = new Float64Array(n)
+  for (let r = 0; r < rows; r++) parabolaMin(f, tmp, r * cols, 1, cols, a, v, z, line)
+  for (let c = 0; c < cols; c++) parabolaMin(tmp, out, c, cols, rows, a, v, z, line)
+  return out
+}
+
+/**
+ * The summit envelope as a height per cell, in the grid's own units.
+ *
+ * A closing with a paraboloid: first the highest paraboloid that any ground
+ * point holds up over each cell, then the lowest paraboloid that fits under
+ * that. The result touches the ground on crests and summits and spans the
+ * valleys between them, never bending more sharply than the paraboloid. `a` is
+ * the bend: the height the surface may gain or lose one cell from a point.
+ * NoData neither holds the surface up nor pulls it down. Nor does the ground
+ * beyond the plate, which is unknown: where the ground falls towards an edge,
+ * the surface stands a little clear of it there.
+ */
+export function summitEnvelope(grid, gridMask, rows, cols, a) {
+  const BIG = 1e9, n = rows * cols
+  const f = new Float64Array(n)
+  for (let i = 0; i < n; i++) f[i] = gridMask[i] ? -grid[i] : BIG
+  const up = parabolaMin2D(f, rows, cols, a)
+  for (let i = 0; i < n; i++) f[i] = gridMask[i] ? -up[i] : BIG
+  const env = parabolaMin2D(f, rows, cols, a)
+  const out = new Float32Array(n)
+  // Never under the ground: rounding can leave it a hair below on a crest.
+  for (let i = 0; i < n; i++) out[i] = gridMask[i] ? Math.max(grid[i], env[i]) : 0
+  return out
+}
+
+/**
+ * A net on the summit envelope, the surface that rests on the crests.
+ *
+ * Geomorphology draws the summit envelope to show the ground before the
+ * valleys were cut: a smooth surface through the summits. The depth of a
+ * valley under it is the rock that is gone. Here the surface is a closing of
+ * the ground with a paraboloid (`summitEnvelope`), so it lies on the crests
+ * and hangs across the valleys like a sheet pulled tight over the plate.
+ *
+ * `span` sets how tight. A valley whose sides stand that far apart is bridged
+ * with a sag of a quarter of the plate's height range, so a short span follows
+ * the ground into every side valley and a long one clears whole basins.
+ *
+ * The net is one or two families of lines, `spacing` apart at `angle`, in the
+ * air on the envelope. By default a line is drawn only where the envelope
+ * stands more than `clearance` of the height range above the ground, so the
+ * crests stay bare and each valley carries its own piece of net. `whole` draws
+ * the net everywhere. With `drops`, a plumb line falls from each crossing of
+ * the net to the ground under it, as a second pen: its length is the depth of
+ * the valley there.
+ */
+const MIN_RUN = 4
+
+export function buildEnvelope(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  let lo = Infinity, hi = -Infinity
+  for (let i = 0; i < grid.length; i++) if (gridMask[i]) { if (grid[i] < lo) lo = grid[i]; if (grid[i] > hi) hi = grid[i] }
+  if (!(hi > lo)) return null
+  const half = Math.max(1, (o.span ?? 200) / scl / 2)
+  const env = summitEnvelope(grid, gridMask, rows, cols, 0.25 * (hi - lo) / (half * half))
+  const tol = Math.max(0, o.clearance ?? 0.03) * (hi - lo)
+  const whole = !!o.whole
+  const angle = o.angle ?? 0
+  const families = [lineFamily(terrain, o.spacing ?? 8, 0, angle, false)]
+  if (o.cross ?? true) families.push(lineFamily(terrain, o.spacing ?? 8, 0, angle + 90, false))
+  const net = { positions: new F32List(), colors: new F32List() }
+  const yOf = (b) => (b - 0.5) * 100 * elevScale
+  const ink = (y, th) => computeVertexColor(Math.max(0, Math.min(1, (y - minElev) / ((maxElev - minElev) || 1))), 0, th, p)
+  let spanned = 0, sampled = 0
+  for (const F of families) {
+    const { dx, dz, nx, nz, t0, t1, theta } = F
+    for (const pos of F.linePos) {
+      const ox = nx * pos, oz = nz * pos
+      let prevOk = false, pc = 0, pr = 0, pe = 0, pGap = 0
+      // A piece of net shorter than `MIN_RUN` segments is a speck over a dent
+      // in a slope, not a span over a valley: it is taken back out.
+      let runAt = net.positions.length, run = 0
+      const endRun = () => {
+        if (run && run < MIN_RUN && !whole) { net.positions.n = runAt; net.colors.n = runAt }
+        runAt = net.positions.length; run = 0
+      }
+      for (let t = t0; t <= t1; t++) {
+        const fc = ox + dx * t, fr = oz + dz * t
+        let ok = fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1 && gridMask[Math.round(fr) * cols + Math.round(fc)] === 1
+        let e = 0, gap = 0
+        if (ok) {
+          e = sampleBilinear(env, sMask, rows, cols, fr, fc)
+          gap = e - sampleBilinear(grid, sMask, rows, cols, fr, fc)
+          ok = gap === gap
+          if (ok) { sampled++; if (gap > tol) spanned++ }
+        }
+        if (ok && prevOk && (whole || gap > tol || pGap > tol)) {
+          const y0 = yOf(pe), y1 = yOf(e)
+          net.positions.push6(pc * scl - halfW, y0, pr * scl - halfH, fc * scl - halfW, y1, fr * scl - halfH)
+          net.colors.pushRgb(ink(y0, theta)); net.colors.pushRgb(ink(y1, theta))
+          run++
+        } else endRun()
+        prevOk = ok; pc = fc; pr = fr; pe = e; pGap = gap
+      }
+      endRun()
+    }
+  }
+  if (!net.positions.length) return null
+  const note = { spanned: sampled ? spanned / sampled : 0 }
+  const out = { Envelope: { positions: net.positions.toArray(), colors: net.colors.toArray(), note } }
+  if (o.drops && families.length > 1) {
+    const [A, B] = families
+    const drops = { positions: new F32List(), colors: new F32List() }
+    for (const pa of A.linePos) for (const pb of B.linePos) {
+      const c = A.nx * pa + B.nx * pb, r = A.nz * pa + B.nz * pb
+      if (c < 0 || r < 0 || c > cols - 1 || r > rows - 1 || !gridMask[Math.round(r) * cols + Math.round(c)]) continue
+      const e = sampleBilinear(env, sMask, rows, cols, r, c), g = sampleBilinear(grid, sMask, rows, cols, r, c)
+      if (!(e - g > tol)) continue
+      const x = c * scl - halfW, z = r * scl - halfH
+      drops.positions.push6(x, yOf(e), z, x, yOf(g), z)
+      drops.colors.pushRgb(ink(yOf(e), 0)); drops.colors.pushRgb(ink(yOf(g), 0))
+    }
+    if (drops.positions.length) out['Envelope-Drops'] = { positions: drops.positions.toArray(), colors: drops.colors.toArray(), note }
+  }
+  return out
 }

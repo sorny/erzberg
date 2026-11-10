@@ -1,5 +1,6 @@
 /**
- * The ground read as a signal: Line Printer, Stems, Hair, Waveform.
+ * The ground read as a signal: Line Printer, Stems, Hair, Waveform, Wiggle
+ * Traces.
  *
  * Four modes after pictures that were not made from terrain at all. A SYMAP
  * line-printer map, a plot of dotted stems, a cloud of hairs and a record
@@ -8,7 +9,8 @@
  */
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
-import { F32List, mulberry32, normElev } from './shared.js'
+import { F32List, drapeEdge, mulberry32, normElev } from './shared.js'
+import { lineFamily } from './lines.js'
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
@@ -387,4 +389,76 @@ export function buildWaveform(terrain, p, o) {
     positions.push6(x + nx * from, y, z + nz * from, x + nx * to, y, z + nz * to); colors.pushRgb2(rgb)
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+// ─── Wiggle traces ───────────────────────────────────────────────────────────
+
+/**
+ * The plate as a seismic section: one wiggle trace per line, lobes filled.
+ *
+ * A seismic section plots each geophone's record as a trace that swings to
+ * either side of its own baseline, and fills the swings to one side in black,
+ * so a reflector reads as a dark band across the traces. Here the baselines
+ * are parallel lines `spacing` apart at `angle`, and the record along each is
+ * the local relief: the height less its mean within `detrend`, so the trace
+ * swings round zero on a slope as it does on a flat. The swing is sideways in
+ * the plane of the ground, and the trace is draped like any line.
+ *
+ * `gain` scales the swing. At 1, the 95th percentile of the relief swings half
+ * a spacing, so neighbouring traces touch only on the sharpest ground. `clip`
+ * limits a swing, in spacings, as a recorder's pen was limited.
+ *
+ * `lobes` fills the swings to one side ('positive': ground above its
+ * surroundings, 'negative': below) with strokes from the baseline to the
+ * trace, `pitch` apart. They are a second pen. A crest then reads as a dark
+ * band across the traces and a channel as a light one, or the reverse.
+ */
+export function buildWiggle(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const F = lineFamily(terrain, o.spacing ?? 10, 0, o.angle ?? 90, false)
+  const { dx, dz, nx, nz, t0, t1, theta } = F
+  const pitch = F.linePos.length > 1 ? Math.abs(F.linePos[1] - F.linePos[0]) : Math.max(1, (o.spacing ?? 10) / scl)
+  const mean = boxBlur(grid, cols, rows, Math.max(2, Math.round((o.detrend ?? 16) / scl)), sMask)
+  // Read one cell smooth: a trace is a signal, and raw sensor grain makes it a saw.
+  const smooth = boxBlur(grid, cols, rows, 1, sMask)
+  // The swing that counts as large: the 95th percentile of the relief.
+  const mags = []
+  for (let i = 0; i < grid.length; i += 7) if (gridMask[i]) mags.push(Math.abs(smooth[i] - mean[i]))
+  if (!mags.length) return null
+  mags.sort((a, b) => a - b)
+  const ref = mags[Math.floor(mags.length * 0.95)]
+  if (!(ref > 1e-9)) return null
+  const amp = (o.gain ?? 1) * pitch * 0.5 / ref
+  const limit = Math.max(0.1, o.clip ?? 1.5) * pitch
+  const lobes = o.lobes ?? 'positive'
+  const every = Math.max(1, Math.round((o.pitch ?? 2) / scl))
+  const trace = { positions: new F32List(), colors: new F32List() }
+  const fill = { positions: new F32List(), colors: new F32List() }
+  const inside = (c, r) => c >= 0 && c <= cols - 1 && r >= 0 && r <= rows - 1
+  for (const pos of F.linePos) {
+    const ox = nx * pos, oz = nz * pos
+    let prevOk = false, pc = 0, pr = 0
+    for (let t = t0; t <= t1; t++) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let ok = inside(fc, fr) && gridMask[Math.round(fr) * cols + Math.round(fc)] === 1
+      let wc = 0, wr = 0
+      if (ok) {
+        const d = sampleBilinear(smooth, sMask, rows, cols, fr, fc) - sampleBilinear(mean, sMask, rows, cols, fr, fc)
+        const sw = Math.max(-limit, Math.min(limit, d * amp))
+        wc = fc + nx * sw; wr = fr + nz * sw
+        // A swing off the data lifts the pen, as a line over a hole does.
+        ok = d === d && inside(wc, wr) && gridMask[Math.round(wr) * cols + Math.round(wc)] === 1
+        if (ok && lobes !== 'none' && t % every === 0 && Math.abs(sw) > 0.2 && (sw > 0) === (lobes === 'positive')) {
+          drapeEdge(fill, terrain, p, sMask, fc, fr, wc, wr, theta + Math.PI / 2)
+        }
+      }
+      if (ok && prevOk) drapeEdge(trace, terrain, p, sMask, pc, pr, wc, wr, theta)
+      prevOk = ok; pc = wc; pr = wr
+    }
+  }
+  if (!trace.positions.length) return null
+  const out = { Wiggle: { positions: trace.positions.toArray(), colors: trace.colors.toArray() } }
+  if (fill.positions.length) out['Wiggle-Lobes'] = { positions: fill.positions.toArray(), colors: fill.colors.toArray() }
+  return out
 }

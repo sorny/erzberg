@@ -92,13 +92,16 @@ export function modeOf(id) {
  * at most `samples` evenly spaced vertices.
  */
 function distinct(buf, rgb, max = Infinity, samples = Infinity) {
+  // Packed to one integer per ink while scanning. A hex string per sampled
+  // vertex cost three string builds each, on every rebuild.
   const seen = new Set()
   const n = Math.floor(buf.length / 3)
   const step = 3 * Math.max(1, Math.floor(n / samples))
+  const q = (v) => (v <= 0 ? 0 : v >= 1 ? 255 : Math.round(v * 255))
   for (let i = 0; i + 2 < buf.length && seen.size < max; i += step) {
-    seen.add(rgb(buf[i], buf[i + 1], buf[i + 2]))
+    seen.add((q(buf[i]) << 16) | (q(buf[i + 1]) << 8) | q(buf[i + 2]))
   }
-  return [...seen]
+  return [...seen].map((k) => rgb((k >> 16) / 255, ((k >> 8) & 255) / 255, (k & 255) / 255))
 }
 
 export { MAX_SWATCHES }

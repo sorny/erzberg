@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Fifty-six
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-four
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Fifty-five modes read $H$ only. [Land cover](#land-cover) reads a second
+Seventy-three modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -134,9 +134,11 @@ these points but do not name them.
 
 ## 5. Hachure
 
-The gradient $\nabla H$ from central differences. A stroke from each cell
-centre along $-\nabla H$, with length proportional to $|\nabla H|$. Cells below
-a slope threshold are skipped.
+The gradient $\nabla H$ from central differences. A stroke through each cell
+centre, with length proportional to $|\nabla H|$. Cells below a slope
+threshold are skipped. *Along: contour* lays the stroke across the gradient, as
+a piece of a contour. *Along: fall line* lays it along $-\nabla H$, with each
+end on its own ground.
 
 **Lehmann.** The second style draws downslope hachures confined to contour
 bands. Each stroke is traced from its seed uphill to the top of its band and
@@ -159,7 +161,14 @@ mask, and a seed on a claimed cell is skipped.
 
 **Termination.** A path stops at the grid edge, on flat ground
 ($|\nabla H| < \varepsilon$), or at an occupied cell. The segment count is thus
-bounded by $\text{rows} \times \text{cols}$.
+bounded by $\text{rows} \times \text{cols}$. With a *Step* shorter than a cell,
+a path can stay in its own cell for several steps.
+
+**Direction.** *Up* steps along $+\nabla H$ from the lowest seeds first, so the
+paths gather on the crests.
+
+**Min length.** A path with fewer steps is not drawn. It still claims its
+cells, so the other paths do not move.
 
 ## 7. Stream Network
 
@@ -181,8 +190,8 @@ The 4-neighbour Laplacian:
 
 $$\nabla^2 H(x, y) \approx H(x+1,y) + H(x-1,y) + H(x,y+1) + H(x,y-1) - 4\,H(x,y)$$
 
-Where $|\nabla^2 H|$ exceeds the threshold, a small mark is drawn across the
-gradient.
+Where $|\nabla^2 H|$ exceeds the threshold, a small X is drawn. *Angle* turns
+the X, and *Single stroke* draws one stroke of it.
 
 ## 9. Ridge Detection
 
@@ -650,7 +659,8 @@ diagonal, and the other along the other. The sign of
 $\partial z/\partial x \cdot \partial z/\partial y$, read across the whole tile,
 picks the diagonal. *Downhill* lays the chains along the fall line, *Across*
 along the contour, and *Random* is the classic seeded pattern. Tiles flatter
-than *Flat below* (slope against its 95th percentile) stay blank.
+than *Flat below* (slope against its 95th percentile) stay blank. *Tile:
+diagonal* draws one straight diagonal per tile along the same chain.
 
 ## 40. Viewshed
 
@@ -1073,6 +1083,50 @@ triangulated. Each facet is hatched along its fall line. The gap is *Hatch
 pitch* where the facet faces away from a sun at *Sun azimuth* and 45°, and
 grows as it turns to the sun. *Edges* draws the triangles.
 
+## 73–75. Light Shafts, Wiggle Traces, Summit Envelope
+
+Light Shafts is in the Light family (`builders/light.js`), Wiggle Traces in
+Line (`builders/signal.js`) and Summit Envelope in Relief
+(`builders/survey.js`). Lengths are in raster pixels.
+
+### Light Shafts
+
+The upper edge of each cast shadow, drawn in the air. Lines run down-sun,
+*Spacing* apart. Each line is swept once with a horizon ray that falls at the
+*Sun altitude*:
+
+$$y_{ray}(t) = \max_{t' \le t}\; \big(H(t') - (t - t')\tan\alpha\big)$$
+
+Ground under the ray is in shadow. A shaft runs from the last lit sample
+before a shadow to the point where the ray meets the ground again. A shaft
+shorter than *Min length* is left out. *Landings* draws a tick across each
+shaft where it lands, as a second pen.
+
+### Wiggle Traces
+
+A seismic section of the plate. Baselines run *Spacing* apart at *Angle*. The
+record along a baseline is the local relief: the height less its mean within
+*Detrend*. The trace swings sideways by the relief times the *Gain*. At a gain
+of 1, the 95th percentile of the relief swings half a spacing. *Clip* limits a
+swing, in spacings. *Lobes* fills the swings to one side with strokes *Lobe
+pitch* apart, as a second pen.
+
+### Summit Envelope
+
+A net on the surface that rests on the crests and spans the valleys. The
+surface is a closing of the ground with a paraboloid, by two passes of a
+separable lower-envelope transform:
+
+$$D(\mathbf{p}) = \max_{\mathbf{q}}\,\big(H(\mathbf{q}) - a\,|\mathbf{p} - \mathbf{q}|^2\big), \qquad E(\mathbf{p}) = \min_{\mathbf{q}}\,\big(D(\mathbf{q}) + a\,|\mathbf{p} - \mathbf{q}|^2\big)$$
+
+$E \ge H$ everywhere, with equality on the crests. *Span* sets $a$: a valley
+that wide is bridged with a sag of a quarter of the height range. The net is
+one or two families of lines (*Cross lines*), *Spacing* apart at *Angle*. A
+line is drawn where $E - H$ exceeds *Clearance*, as a share of the height
+range, and a piece shorter than four segments is left out. *Whole surface*
+draws the net everywhere. *Plumb lines* drops a dotted line from each crossing
+of the net to the ground, as a second pen.
+
 ## NoData and clipped edges
 
 NoData cells, transparent PNG pixels and everything outside an Edit Mode
@@ -1109,7 +1163,8 @@ pass, a hidden segment is left out, or drawn in the ghost colour and opacity.
   wall down to the floor, so lines hide lines. A mode's own *Occluder* switch
   turns its walls off. It starts off for Hachure, Rock & Scree, Truchet, Slope
   Classes, Line Printer, Hair, Waveform, Radar, Air, Flashbulb, Halation,
-  Shadow Hatch, Runout and the charts: marks and overlays, whose walls cut
+  Shadow Hatch, Runout, Light Shafts, Wiggle Traces, Summit
+  Envelope and the charts: marks and overlays, whose walls cut
   notches into the lines behind. Their strokes can float, so when their walls
   are on, a wall's top follows the ground under its stroke, and no wall stands
   in the air. The other modes lie on the ground, and their walls hang straight

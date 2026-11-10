@@ -86,7 +86,7 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 71 modes as tiles in eight families:
+- **Marks sheet.** The Marks stage shows the 74 modes as tiles in eight families:
   Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
@@ -191,7 +191,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 71 modes.
+  classes you pick. This works for all 74 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -338,6 +338,9 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Hoarfrost | Ice dendrites grown from the summits by diffusion-limited aggregation, kept to the cold ground |
 | Cross-Stitch | Half stitches and crosses in two threads by height class, with backstitch outlines |
 | TIN Facets | A triangulated irregular network, each facet hatched along its fall line by its own light |
+| Light Shafts | The upper edge of every cast shadow in the air: a ray from each crest to the point where the light lands |
+| Wiggle Traces | The plate as a seismic section: traces that swing with the local relief, with the lobes on one side filled |
+| Summit Envelope | A net on the surface that rests on the crests and spans the valleys, with plumb lines to the ground |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

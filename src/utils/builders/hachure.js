@@ -20,8 +20,12 @@ import { F32List, inElevCut, mulberry32, normElev } from './shared.js'
  *
  * Cells flatter than a small fixed epsilon emit nothing, so flats stay blank
  * instead of filling with sub-pixel ticks of arbitrary direction.
+ *
+ * `along` 'fall' turns each stroke a quarter turn, down the fall line: the
+ * downslope hachure. Such a stroke crosses heights, so each end takes the
+ * height of the ground under it and the stroke lies on the slope.
  */
-export function buildHachure(terrain, p, spacing, length) {
+export function buildHachure(terrain, p, spacing, length, along = 'contour') {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const lineStep = Math.max(1, Math.round((spacing ?? 4) / scl))
@@ -39,7 +43,20 @@ export function buildHachure(terrain, p, spacing, length) {
       const gx = (bR - bL) * 50 * elevScale, gz = (bD - bU) * 50 * elevScale, mag = Math.sqrt(gx * gx + gz * gz)
       if (mag < 0.005) continue
       const tickLen = mag * (length ?? 1) * scl, nx = -gz / mag, nz = gx / mag, wx = c * scl - halfW, wz = r * scl - halfH
-      positions.push6(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
+      if (along === 'fall') {
+        // Down the gradient, each end on its own ground. An end off the data
+        // keeps the centre's height.
+        const fx = gx / mag * tickLen * 0.5 / scl, fz = gz / mag * tickLen * 0.5 / scl
+        const end = (dc, dr) => {
+          const fc = c + dc, fr = r + dr
+          if (fc < 0 || fr < 0 || fc > cols - 1 || fr > rows - 1) return elev
+          const b = sampleBilinear(grid, terrain.hasNoData ? gridMask : null, rows, cols, fr, fc)
+          return b === b ? (b - 0.5) * 100 * elevScale + (elev - (bC - 0.5) * 100 * elevScale) : elev
+        }
+        positions.push6(wx - fx * scl, end(-fx, -fz), wz - fz * scl, wx + fx * scl, end(fx, fz), wz + fz * scl)
+      } else {
+        positions.push6(wx - nx * tickLen * 0.5, elev, wz - nz * tickLen * 0.5, wx + nx * tickLen * 0.5, elev, wz + nz * tickLen * 0.5)
+      }
       const col = computeVertexColor(normElev(elev, minElev, maxElev), gridSlopes[r * cols + c] / (maxSlope || 1), Math.atan2(gz, gx), p)
       colors.pushRgb2(col)
     }

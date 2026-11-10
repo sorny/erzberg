@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.75.0] — 2026-11-10
+
+### Added
+
+- **Light Shafts** (Light). The upper edge of every cast shadow, drawn in the
+  air: a ray from each crest that casts a shadow to the point where the light
+  lands. One horizon sweep per line. *Landings* ticks the end of each shaft as
+  a second pen.
+- **Wiggle Traces** (Line). The plate as a seismic section. Each trace swings
+  sideways with the local relief (height less its mean within *Detrend*), and
+  the swings to one side are filled with strokes as a second pen.
+- **Summit Envelope** (Relief). A net on the surface that rests on the crests
+  and spans the valleys: a closing of the ground with a paraboloid, by a
+  separable lower-envelope transform. *Plumb lines* drops a line from the net
+  to the valley floor.
+- **Flow Lines: Min length and Direction.** *Min length* drops the short stubs
+  and leaves the other lines in place. *Direction: up* climbs from the low
+  ground and gathers the lines on the crests.
+- **Pencil: Angle and Single stroke.** The mark turns, and it can be one
+  stroke, which reads as a hatch.
+- **Hachure: Along.** *Fall line* turns each tick down the slope, with each end
+  on its own ground.
+- **Truchet: Tile.** *Diagonal* draws one straight line per tile along the same
+  chain as the arcs.
+- Help texts on the Lines, Flow Lines, Hachure, Network, Pencil, Ridges and
+  Valleys sliders that had none.
+
+### Fixed
+
+- **Flow Lines drew almost nothing at a Step under 1.** The occupancy test
+  stopped a line that was still in the cell it stood in. A step shorter than a
+  cell now passes that test. At a step of 1 or more the test is unchanged, so
+  the same lines are drawn.
+- **Stems: Datum did nothing.** The *middle* and *lowest* buttons stored a
+  value that the builder did not know, so the stems stayed on the mean. The
+  buttons now store `mid` and `min`.
+- **Line Printer: Value showed no choice.** The row showed neither button as
+  chosen on a new plate.
+
+### Changed
+
+- **Faster colour upload.** Vertex colours are converted from sRGB to linear on
+  each rebuild. A 4 080-step table replaces `Math.pow` per float: 83 ms became
+  14 ms of main-thread time over 40 rebuilds of the opening plate (572 000
+  segments), in one CPU profile of the dev build. A picked hex lands on a table
+  node, so it converts as before.
+- **Faster pen list.** The pen strip packed each sampled vertex colour into a
+  hex string. It now packs an integer and builds a string per distinct ink:
+  62 ms became 10 ms in the same profile.
+- **Faster landforms.** The geomorphon scan precomputes its distances, drops a
+  solid mask and clips each line of sight to the grid once: 285 ms became
+  174 ms on a 700 × 500 grid, with the same classes.
+- **Faster first edit.** The index of each mode's parameters tested every key
+  against every mode for each mode section: 65 ms on the first edit of a
+  session, and 5 ms now. One pass serves all sections.
+
+The geometry of all bundled presets is the same before and after, byte for
+byte, on a test plate with a NoData hole.
+
 ## [1.74.2] — 2026-11-10
 
 ### Fixed

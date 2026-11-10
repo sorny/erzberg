@@ -25,6 +25,9 @@ import { F32List, U32List, drapeEdge, inElevCut, lambertDarkness, mulberry32, no
  * answers for the ground it covers. Tiles flatter than `threshold` (slope
  * against its 95th percentile) are left blank, and the landform shows as the
  * shape of what is drawn.
+ *
+ * `tile` 'diagonal' draws one straight diagonal per tile in place of the two
+ * arcs, along the same chain: the maze of the one-line BASIC program.
  */
 export function buildTruchet(terrain, p, o) {
   const { grid, gridMask, rows, cols, scl, gridSlopes } = terrain
@@ -33,6 +36,7 @@ export function buildTruchet(terrain, p, o) {
   const cell = Math.max(2, (o.spacing ?? 8) / scl)
   const ref = slopePercentile(terrain, 0.95)
   const align = o.align ?? 'fall'
+  const diagonal = o.tile === 'diagonal'
   const rng = mulberry32(((o.seed ?? 5) * 2654435761) >>> 0)
   const R = cell / 2, segs = Math.max(4, Math.min(16, Math.round(cell * 0.8)))
   const at = (fr, fc) => sampleBilinear(grid, sMask, rows, cols,
@@ -57,7 +61,13 @@ export function buildTruchet(terrain, p, o) {
       const same = gx * gz > 0
       const first = align === 'random' ? rng() < 0.5 : (align === 'contour' ? same : !same)
       if (align !== 'random') rng()
-      if (first) { arc(c0, r0, 0); arc(c0 + cell, r0 + cell, Math.PI) }
+      if (diagonal) {
+        // The arcs of a tile cut two of its corners. The diagonal joins the
+        // other two, so it runs the way the arcs' chain runs.
+        if (first) drapeEdge(out, terrain, p, sMask, c0 + cell, r0, c0, r0 + cell, Math.PI * 0.75)
+        else drapeEdge(out, terrain, p, sMask, c0, r0, c0 + cell, r0 + cell, Math.PI * 0.25)
+      }
+      else if (first) { arc(c0, r0, 0); arc(c0 + cell, r0 + cell, Math.PI) }
       else { arc(c0 + cell, r0, Math.PI / 2); arc(c0, r0 + cell, Math.PI * 1.5) }
     }
   }

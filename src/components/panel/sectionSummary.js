@@ -158,6 +158,9 @@ export const PANEL_MODES = [
   ['Mode: Cross-Stitch',   'enabledStitch',    'Cell',      (s) => num(s.cellStitch)],
   ['Mode: TIN Facets',     'enabledTin',       'Points',    (s) => num(s.countTin)],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],
+  ['Mode: Light Shafts',   'enabledShafts',    'Sun',       (s) => `${deg(s.azimuthShafts)} · ${deg(s.altitudeShafts)}`],
+  ['Mode: Wiggle Traces',  'enabledWiggle',    'Gain',      (s) => num(s.gainWiggle)],
+  ['Mode: Summit Envelope', 'enabledEnvelope', 'Span',      (s) => num(s.spanEnvelope)],
 ]
 
 /**

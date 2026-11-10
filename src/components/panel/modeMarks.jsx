@@ -530,6 +530,30 @@ const MARKS = {
       <path d="M4 11 L8 4 M6.5 12 L9.5 6 M9.5 12 L11 8.5" strokeWidth="0.5" />
     </g>
   ),
+  // Rays from a crest, down the sun's slope, to the ground beyond the valley.
+  shafts: (
+    <g {...BASE}>
+      <path d="M1 12 L5 3.5 L9 11.5 L13 6 L17 12 L21 12" strokeWidth="1" />
+      <path d="M5 3.5 L11.5 8 M4 5.6 L10.3 9.9 M3 7.7 L9.2 11.6 M13 6 L20 11.2 M12 7.4 L17.6 11.6" strokeWidth="0.6" />
+    </g>
+  ),
+  // Three traces swinging round their baselines, one side filled.
+  wiggle: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M4 1 C7 2.5 7 4 4 5 C2 6 2 7 4 8 C7.5 9.5 7.5 11 4 12.5" />
+      <path d="M11 1 C12.5 2 12.5 3 11 4 C7.5 5.5 7.5 7 11 8 C15 9.5 15 11 11 12.5" />
+      <path d="M18 1 C22 2.5 22 4.5 18 6 C16.5 7 16.5 8 18 9 C20 10 20 11.5 18 12.5" />
+      <path d="M4 2.3 L5.6 2.3 M4 3.4 L6 3.4 M4 9.4 L6.2 9.4 M4 10.6 L6.4 10.6 M11 8.9 L13.4 8.9 M11 10.1 L13.9 10.1 M11 11.3 L13.2 11.3 M18 2.2 L20.4 2.2 M18 3.4 L21 3.4 M18 4.6 L20.2 4.6 M18 10.4 L19.4 10.4" strokeWidth="0.5" />
+    </g>
+  ),
+  // A sheet across the summits, with plumb lines to the valley floors.
+  envelope: (
+    <g {...BASE}>
+      <path d="M1 12 L5 4 L8 10.5 L12 3 L16 11 L19 6 L21 9" strokeWidth="0.8" />
+      <path d="M2.5 5.2 C6 2.8 10 2.2 12 3 C15 4 17.5 5.2 19 6" strokeWidth="1.2" />
+      <path d="M8 3.2 L8 10.5 M16 4.6 L16 11" strokeWidth="0.5" strokeDasharray="1 1.2" />
+    </g>
+  ),
   // Three bands of hatch, sparse to crossed, as the ground steepens.
   slopeclass: (
     <g {...BASE} strokeWidth="0.7">
