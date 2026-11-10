@@ -84,6 +84,26 @@ test('a preset with a sheet block turns its marks and legend on', async ({ page 
   await expect(page.locator('[data-testid="legend-part-line"]')).not.toBeChecked()
 })
 
+test('a preset without a sheet block takes back the marks the last one set', async ({ page }) => {
+  await page.goto('http://localhost:5173')
+  await page.waitForSelector('text=Grid:', { state: 'attached', timeout: 30_000 })
+  await resetToDefaults(page)
+  await openStage(page, 'presets')
+  const pick = async (name) => {
+    const tile = page.locator(`[data-testid="preset-${name}"]`)
+    await tile.scrollIntoViewIfNeeded()
+    await tile.click()
+  }
+  const marks = page.locator('[data-testid="sheet-marks"]')
+  await pick('Wild Terrain')
+  await expect(marks.locator('text', { hasText: 'ELEVATION' })).toHaveCount(1)
+  await pick('Caustics')
+  await expect(marks).toHaveCount(0)
+  // And back again: the lettered look still letters the sheet.
+  await pick('Wild Terrain')
+  await expect(marks.locator('text', { hasText: 'Wild Terrain' })).toHaveCount(1)
+})
+
 test('the Layers group takes its own title, and each sample can be switched off', async ({ page }) => {
   const errors = []
   page.on('pageerror', (e) => errors.push(e.message))
