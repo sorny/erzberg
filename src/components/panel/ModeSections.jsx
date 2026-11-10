@@ -37,8 +37,8 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingLines} onChange={v => ss({ spacingLines: v })} />
-                  <InlineSl label="Shift" min={0} max={100} value={style.shiftLines} onChange={v => ss({ shiftLines: v })} />
+                  <InlineSl label="Spacing" help="The gap between lines, in raster pixels." min={1} max={100} value={style.spacingLines} onChange={v => ss({ spacingLines: v })} />
+                  <InlineSl label="Shift" help="Slides the whole set of lines across their own direction. A shift of one spacing puts them back where they began." min={0} max={100} value={style.shiftLines} onChange={v => ss({ shiftLines: v })} />
                   <InlineSl label="Angle" help="Bearing of the parallel lines. 0° runs along the X axis, 90° along Y, anything between gives diagonal ridgelines." min={0} max={180} step={1} value={style.angleLines ?? 0} onChange={v => ss({ angleLines: v })} fmt={v => Math.round(v) + '°'} />
                 </Sub>
                 <ModeStyleOverride prefix="Lines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -189,7 +189,10 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                       <InlineSl label="Gamma" help="How fast the spacing opens out as the ground gets gentler. Above 1, only the steepest ground stays dense." min={0.2} max={3} step={0.05} value={style.gammaHachure ?? 1} onChange={v => ss({ gammaHachure: v })} fmt={v => v.toFixed(2)} />
                     </>
                   ) : (
-                    <InlineSl label="Length" min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
+                    <>
+                      <InlineSl label="Length" help="The length of a tick on a given slope. Steeper ground draws longer ticks." min={0.1} max={5} step={0.1} value={style.lengthHachure} onChange={v => ss({ lengthHachure: v })} />
+                      <SegRow label="Along" help="Contour: each tick lies across the slope, as a piece of a contour. Fall line: each tick points down the slope, as a hachure does." testIdPrefix="hachure-along" options={[['contour', 'contour'], ['fall line', 'fall']]} value={style.alongHachure ?? 'contour'} onChange={v => ss({ alongHachure: v })} />
+                    </>
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Hachure" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -201,9 +204,11 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
-                  <InlineSl label="Step" min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
+                  <InlineSl label="Spacing" help="The gap between the points where lines start, in raster pixels." min={0.5} max={30} step={0.5} value={style.spacingFlow} onChange={v => ss({ spacingFlow: v })} />
+                  <InlineSl label="Step" help="The length of one step, in cells. A short step draws a smoother curve with more segments." min={0.1} max={3} step={0.1} value={style.stepFlow} onChange={v => ss({ stepFlow: v })} />
                   <InlineSl label="Max length" help="Most steps per line. A line also ends where it meets another line or reaches flat ground, so high values often change little." min={1} max={250} value={style.maxLenFlow} onChange={v => ss({ maxLenFlow: v })} />
+                  <InlineSl label="Min length" help="Fewest steps a line needs to be drawn. Raise it to drop the short stubs between longer lines. The lines that stay do not move." min={0} max={60} step={1} value={style.minLenFlow ?? 0} onChange={v => ss({ minLenFlow: Math.round(v) })} fmt={v => (v > 0 ? String(v) : 'off')} />
+                  <SegRow label="Direction" help="Down: each line runs down the fall line from high ground and gathers in the channels. Up: each line climbs from low ground and gathers on the crests." testIdPrefix="flow-direction" options={[['down', 'down'], ['up', 'up']]} value={style.directionFlow ?? 'down'} onChange={v => ss({ directionFlow: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Flow" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -214,7 +219,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Threshold" min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
+                  <InlineSl label="Threshold" help="The lowest Strahler order drawn. Raise it to drop the headwaters and keep the trunk channels." min={1} max={10} step={1} value={style.thresholdDag} onChange={v => ss({ thresholdDag: v })} />
                   <Tog label="Weight by flow" testId="dag-accum" checked={!!style.accumDag} onChange={v => ss({ accumDag: v })} />
                   {style.accumDag && (
                     <>
@@ -232,8 +237,10 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={100} value={style.spacingPencil} onChange={v => ss({ spacingPencil: v })} />
-                  <InlineSl label="Threshold" min={0.1} max={5} step={0.1} value={style.thresholdPencil} onChange={v => ss({ thresholdPencil: v })} />
+                  <InlineSl label="Spacing" help="The gap between marks, in raster pixels." min={1} max={100} value={style.spacingPencil} onChange={v => ss({ spacingPencil: v })} />
+                  <InlineSl label="Threshold" help="How sharply the ground must bend outward to take a mark. Raise it to keep only the sharpest crests." min={0.1} max={5} step={0.1} value={style.thresholdPencil} onChange={v => ss({ thresholdPencil: v })} />
+                  <InlineSl label="Angle" help="The bearing of the mark's first stroke. At 45° the mark is an upright X." min={0} max={180} step={1} value={style.anglePencil ?? 45} onChange={v => ss({ anglePencil: v })} fmt={v => `${v}°`} />
+                  <Tog label="Single stroke" help="Draws one stroke of each mark, not two, so the marks read as a hatch." testId="pencil-single" checked={!!style.singlePencil} onChange={v => ss({ singlePencil: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Pencil" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -244,9 +251,9 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={10} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
-                  <InlineSl label="Radius" min={0.2} max={2} step={0.1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
-                  <InlineSl label="Threshold" min={0.005} max={0.5} step={0.005} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
+                  <InlineSl label="Spacing" help="Tests one cell in this many, in raster pixels. Raise it to thin the lines." min={1} max={10} value={style.spacingRidge} onChange={v => ss({ spacingRidge: v })} />
+                  <InlineSl label="Radius" help="Smooths the ground before the crests are found. A small radius finds every spur, a large one only the main ridges." min={0.2} max={2} step={0.1} value={style.radiusRidge} onChange={v => ss({ radiusRidge: v })} />
+                  <InlineSl label="Threshold" help="How sharply the ground must bend to count as a crest." min={0.005} max={0.5} step={0.005} value={style.thresholdRidge} onChange={v => ss({ thresholdRidge: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Ridge" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -257,8 +264,8 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
-                  <InlineSl label="Spacing" min={1} max={10} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
-                  <InlineSl label="Radius" min={1} max={20} step={1} value={style.radiusValley} onChange={v => ss({ radiusValley: v })} />
+                  <InlineSl label="Spacing" help="The gap between ticks, in raster pixels." min={1} max={10} value={style.spacingValley} onChange={v => ss({ spacingValley: v })} />
+                  <InlineSl label="Radius" help="The size of the neighbourhood that each height is compared with. A small radius finds every gully, a large one only the main valleys." min={1} max={20} step={1} value={style.radiusValley} onChange={v => ss({ radiusValley: v })} />
                   <InlineSl label="Threshold" help="How far below its surroundings a cell must sit to count as valley, as a share of the whole relief. Lower finds shallower gullies." min={0.005} max={1} step={0.005} value={style.thresholdValley} onChange={v => ss({ thresholdValley: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Valley" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
@@ -903,7 +910,8 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                 <Sub>
                   <SegGroup label="Tile alignment" options={[['Downhill', 'fall'], ['Across', 'contour'], ['Random', 'random']]}
                     value={style.alignTruchet} onChange={(m) => ss({ alignTruchet: m })} style={{ marginBottom: 8 }} />
-                  <InlineSl label="Tile" help="Tile size. Each tile holds two quarter circles, and the tiles link into chains." min={2} max={60} step={0.5} value={style.spacingTruchet} onChange={v => ss({ spacingTruchet: v })} fmt={v => v.toFixed(1)} />
+                  <SegRow label="Tile" help="Arcs: two quarter circles in each tile. Diagonal: one straight line in each tile, along the same chain." testIdPrefix="truchet-tile" options={[['arcs', 'arcs'], ['diagonal', 'diagonal']]} value={style.tileTruchet ?? 'arcs'} onChange={v => ss({ tileTruchet: v })} />
+                  <InlineSl label="Tile size" help="The side of one tile. The tiles link into chains." min={2} max={60} step={0.5} value={style.spacingTruchet} onChange={v => ss({ spacingTruchet: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Flat below" help="Tiles on ground flatter than this stay blank, so the landform shows as the shape of what is drawn. At 0% every tile is drawn." min={0} max={1} step={0.01} value={style.thresholdTruchet} onChange={v => ss({ thresholdTruchet: v })} fmt={v => Math.round(v * 100) + '%'} />
                   {style.alignTruchet === 'random' && (
                     <InlineSl label="Seed" min={1} max={999} step={1} value={style.seedTruchet} onChange={v => ss({ seedTruchet: v })} />
@@ -1134,7 +1142,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Pitch" help="The width of one character cell, in world units. Rows are taller by the aspect, as on a line printer." min={2} max={Math.max(40, Math.round(plateSpan / 20))} step={0.5} value={style.pitchPrinter ?? 8} onChange={v => ss({ pitchPrinter: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Aspect" help="Row height over column width. A printer at 10 characters and 6 lines to the inch has 1.67." min={0.5} max={2.5} step={0.05} value={style.aspectPrinter ?? 1.25} onChange={v => ss({ aspectPrinter: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Classes" help="How many glyphs, from a dot to an overprinted block." min={2} max={8} step={1} value={style.classesPrinter ?? 6} onChange={v => ss({ classesPrinter: Math.round(v) })} />
-                  <SegRow label="Value" testIdPrefix="printer-field" options={[['elevation', 'height'], ['slope', 'slope']]} value={style.fieldPrinter ?? 'elevation'} onChange={v => ss({ fieldPrinter: v })} />
+                  <SegRow label="Value" testIdPrefix="printer-field" options={[['height', 'elevation'], ['slope', 'slope']]} value={style.fieldPrinter === 'slope' ? 'slope' : 'elevation'} onChange={v => ss({ fieldPrinter: v })} />
                   <Tog label="Equal count" help="Classes with the same number of cells each (quantiles). Off, the classes are equal steps of the value." checked={!!style.quantilePrinter} onChange={v => ss({ quantilePrinter: v })} />
                   <Tog label="Blank lowest" help="Leave the lowest class empty, so the low ground is paper." checked={!!style.blankPrinter} onChange={v => ss({ blankPrinter: v })} />
                 </Sub>
@@ -1148,7 +1156,7 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               <>
                 <Sub>
                   <InlineSl label="Spacing" help="The distance between stems, in world units." min={1} max={40} step={0.5} value={style.spacingStems ?? 6} onChange={v => ss({ spacingStems: v })} fmt={v => v.toFixed(1)} />
-                  <SegRow label="Datum" help="Where the stems start. Ground above it stands up, ground below hangs down. Look from the side to read it as a signal." testIdPrefix="stems-datum" options={[['mean', 'mean'], ['mid', 'middle'], ['min', 'lowest']]} value={style.datumStems ?? 'mean'} onChange={v => ss({ datumStems: v })} />
+                  <SegRow label="Datum" help="Where the stems start. Ground above it stands up, ground below hangs down. Look from the side to read it as a signal." testIdPrefix="stems-datum" options={[['mean', 'mean'], ['middle', 'mid'], ['lowest', 'min']]} value={['mid', 'min'].includes(style.datumStems) ? style.datumStems : 'mean'} onChange={v => ss({ datumStems: v })} />
                   <Tog label="Tips" help="A dot at the top of each stem, as its own pen." checked={!!style.tipsStems} onChange={v => ss({ tipsStems: v })} />
                   {style.tipsStems && (
                     <>
@@ -1684,6 +1692,71 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <Tog label="Backstitch" help="An outline along every cell edge where the class changes, as a third pen." testId="stitch-back" checked={!!style.backStitch} onChange={v => ss({ backStitch: v })} />
                 </Sub>
                 <ModeStyleOverride prefix="Stitch" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Light Shafts" icon={<ModeMark kind="shafts" />} open={sec.modeShafts} onToggle={() => tog('modeShafts')} enabled={style.enabledShafts} onEnabled={v => ss({ enabledShafts: v })} enableTestId="mode-shafts">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Shafts && (
+                    <div data-testid="shafts-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Shafts.shafts.toLocaleString()} shafts`}
+                    </div>
+                  )}
+                  <InlineSl label="Sun azimuth" help="The bearing of the sun. Each shaft runs away from it, from the crest that casts a shadow to the place where the light lands." min={0} max={360} step={1} value={style.azimuthShafts} onChange={v => ss({ azimuthShafts: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Sun altitude" help="The height of the sun above the horizon. A low sun casts long shafts across whole valleys. A high sun casts short ones under the steepest crests." min={1} max={80} step={1} value={style.altitudeShafts} onChange={v => ss({ altitudeShafts: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Spacing" help="The gap between shafts, in raster pixels." min={1} max={60} step={0.5} value={style.spacingShafts} onChange={v => ss({ spacingShafts: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Min length" help="The shortest shaft drawn, in raster pixels. Raise it to drop the short shafts that every bump on a rough slope casts." min={0} max={120} step={1} value={style.minLenShafts} onChange={v => ss({ minLenShafts: v })} />
+                  <Tog label="Landings" help="A short tick across each shaft where it meets the ground, as a second pen. Together the ticks trace the edge of the shadow." testId="shafts-feet" checked={!!style.feetShafts} onChange={v => ss({ feetShafts: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Shafts" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Wiggle Traces" icon={<ModeMark kind="wiggle" />} open={sec.modeWiggle} onToggle={() => tog('modeWiggle')} enabled={style.enabledWiggle} onEnabled={v => ss({ enabledWiggle: v })} enableTestId="mode-wiggle">
+            {(
+              <>
+                <Sub>
+                  <InlineSl label="Spacing" help="The gap between traces, in raster pixels." min={2} max={80} step={0.5} value={style.spacingWiggle} onChange={v => ss({ spacingWiggle: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" help="The bearing of the traces. At 90° they run down the plate, as on a seismic section." min={0} max={180} step={1} value={style.angleWiggle} onChange={v => ss({ angleWiggle: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <InlineSl label="Gain" help="How far a trace swings. At 1, the sharpest ground swings a trace half way to its neighbour." min={0.1} max={4} step={0.05} value={style.gainWiggle} onChange={v => ss({ gainWiggle: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Detrend" help="The radius of the mean that each height is measured against, in raster pixels. A trace swings where the ground stands above or below that mean. A short radius picks out small forms, a long one whole ridges." min={2} max={120} step={1} value={style.detrendWiggle} onChange={v => ss({ detrendWiggle: v })} />
+                  <InlineSl label="Clip" help="The widest swing allowed, in spacings. Under 1, no trace reaches its neighbour." min={0.2} max={4} step={0.1} value={style.clipWiggle} onChange={v => ss({ clipWiggle: v })} fmt={v => v.toFixed(1)} />
+                  <SegRow label="Lobes" help="Which swings are filled with strokes, as a second pen. Positive: ground above its surroundings. Negative: ground below. None: the traces alone." testIdPrefix="wiggle-lobes" options={[['positive', 'positive'], ['negative', 'negative'], ['none', 'none']]} value={style.lobesWiggle ?? 'positive'} onChange={v => ss({ lobesWiggle: v })} />
+                  {style.lobesWiggle !== 'none' && (
+                    <InlineSl label="Lobe pitch" help="The gap between the strokes that fill a lobe, in raster pixels. Match it to the pen width for a solid lobe." min={1} max={20} step={0.5} value={style.pitchWiggle} onChange={v => ss({ pitchWiggle: v })} fmt={v => v.toFixed(1)} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Wiggle" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Summit Envelope" icon={<ModeMark kind="envelope" />} open={sec.modeEnvelope} onToggle={() => tog('modeEnvelope')} enabled={style.enabledEnvelope} onEnabled={v => ss({ enabledEnvelope: v })} enableTestId="mode-envelope">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Envelope && (
+                    <div data-testid="envelope-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${Math.round(symbolNotes.Envelope.spanned * 100)}% of the net stands clear of the ground`}
+                    </div>
+                  )}
+                  <InlineSl label="Span" help="How tight the surface is pulled over the summits, in raster pixels. A valley this wide is bridged with a sag of a quarter of the height range. A short span follows the ground into every side valley. A long one clears whole basins." min={8} max={600} step={1} value={style.spanEnvelope} onChange={v => ss({ spanEnvelope: v })} />
+                  <InlineSl label="Spacing" help="The gap between the lines of the net, in raster pixels." min={1} max={60} step={0.5} value={style.spacingEnvelope} onChange={v => ss({ spacingEnvelope: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Angle" help="The bearing of the net's first family of lines." min={0} max={180} step={1} value={style.angleEnvelope} onChange={v => ss({ angleEnvelope: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <Tog label="Cross lines" help="A second family of lines, square to the first, so the net has meshes." testId="envelope-cross" checked={!!style.crossEnvelope} onChange={v => ss({ crossEnvelope: v })} />
+                  <Tog label="Whole surface" help="Draws the net on the crests too, where it lies on the ground. Off, each valley carries its own piece of net." testId="envelope-whole" checked={!!style.wholeEnvelope} onChange={v => ss({ wholeEnvelope: v })} />
+                  {!style.wholeEnvelope && (
+                    <InlineSl label="Clearance" help="How far the surface must stand above the ground to be drawn, as a share of the height range." min={0} max={0.3} step={0.005} value={style.clearanceEnvelope} onChange={v => ss({ clearanceEnvelope: v })} fmt={v => (v * 100).toFixed(1) + '%'} />
+                  )}
+                  {style.crossEnvelope && (
+                    <Tog label="Plumb lines" help="A dotted line from each crossing of the net down to the ground, as a second pen. Its length is the depth of the valley under the surface." testId="envelope-drops" checked={!!style.dropsEnvelope} onChange={v => ss({ dropsEnvelope: v })} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Envelope" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

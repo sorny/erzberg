@@ -13,17 +13,17 @@ import { LANDFORMS } from './landforms'
 import { buildContours, contourExtremes, buildSpines } from './builders/contours.js'
 import { buildAir, buildBerm, buildFallLine, buildRaceLine } from './builders/descent.js'
 import { buildGeodesic, buildIsochrone, buildPanorama, buildRoute, buildViewshed } from './builders/ground.js'
-import { buildBedding, buildGlacier, buildProfileSheet, buildRunout, buildSlopeClass } from './builders/survey.js'
+import { buildBedding, buildEnvelope, buildGlacier, buildProfileSheet, buildRunout, buildSlopeClass } from './builders/survey.js'
 import { buildAspectRose, buildHypsometry, buildStereonet, buildSwathProfile } from './builders/charts.js'
 import { buildCoral, buildVenation } from './builders/growth.js'
 import { buildConstellation, buildFronts, buildRain, buildTally, buildTreeLine } from './builders/symbols.js'
 import { buildHoarfrost, buildRipples } from './builders/process.js'
 import { buildStitch, buildTin } from './builders/mesh.js'
 import { buildMapGrid } from './builders/mapGrid.js'
-import { buildHair, buildPrinter, buildStems, buildWaveform } from './builders/signal.js'
+import { buildHair, buildPrinter, buildStems, buildWaveform, buildWiggle } from './builders/signal.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
-import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
+import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShafts, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
 import { buildAngleLines, buildCrosshatch, buildCurvature, buildDagThinning, buildFlowLines, buildPencilShading, buildRidgeLines, buildTpiFeatures } from './builders/lines.js'
 import { buildPillars } from './builders/pillars.js'
 import { buildBitplane } from './builders/relief.js'
@@ -80,11 +80,12 @@ export function buildLineGeometry(terrain, p) {
       } },
     { id:'Hachure', builder: (t, ctx) => p.styleHachure === 'lehmann'
         ? buildLehmannHachure(t, ctx, p.spacingHachure, p.bandsHachure, p.gammaHachure)
-        : buildHachure(t, ctx, p.spacingHachure, p.lengthHachure) },
-    { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow) },
+        : buildHachure(t, ctx, p.spacingHachure, p.lengthHachure, p.alongHachure) },
+    { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow, {
+        direction: p.directionFlow, minLen: p.minLenFlow }) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag, {
         accum: p.accumDag, passes: p.passesDag, gap: p.gapDag }) },
-    { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil) },
+    { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil, p.anglePencil, p.singlePencil) },
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
     { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter) },
@@ -174,7 +175,7 @@ export function buildLineGeometry(terrain, p) {
         cellMetres: p.cellMetresIsochrone, relief: p.reliefIsochrone,
         smoothing: p.smoothingIsochrone, radius: p.radiusIsochrone, marker: p.markerIsochrone }) },
     { id:'Truchet', builder: (t, ctx) => buildTruchet(t, ctx, {
-        spacing: p.spacingTruchet, threshold: p.thresholdTruchet, align: p.alignTruchet, seed: p.seedTruchet }) },
+        spacing: p.spacingTruchet, threshold: p.thresholdTruchet, align: p.alignTruchet, tile: p.tileTruchet, seed: p.seedTruchet }) },
     { id:'Viewshed', builder: (t, ctx) => buildViewshed(t, ctx, {
         originX: p.originXViewshed, originY: p.originYViewshed, eye: p.eyeViewshed,
         side: p.sideViewshed, spacing: p.spacingViewshed, angle: p.angleViewshed, cross: p.crossViewshed,
@@ -292,6 +293,15 @@ export function buildLineGeometry(terrain, p) {
     { id:'Rugged',  builder: (t, ctx) => buildRugged(t, ctx, {
         count: p.countRugged, gamma: p.gammaRugged, floor: p.floorRugged,
         radius: p.radiusRugged, kind: p.kindRugged, seed: p.seedRugged }) },
+    { id:'Shafts',  builder: (t, ctx) => buildShafts(t, ctx, {
+        azimuth: p.azimuthShafts, altitude: p.altitudeShafts, spacing: p.spacingShafts,
+        minLen: p.minLenShafts, feet: p.feetShafts }) },
+    { id:'Wiggle',  builder: (t, ctx) => buildWiggle(t, ctx, {
+        spacing: p.spacingWiggle, angle: p.angleWiggle, gain: p.gainWiggle, detrend: p.detrendWiggle,
+        clip: p.clipWiggle, lobes: p.lobesWiggle, pitch: p.pitchWiggle }) },
+    { id:'Envelope', builder: (t, ctx) => buildEnvelope(t, ctx, {
+        span: p.spanEnvelope, spacing: p.spacingEnvelope, angle: p.angleEnvelope, cross: p.crossEnvelope,
+        clearance: p.clearanceEnvelope, whole: p.wholeEnvelope, drops: p.dropsEnvelope }) },
   ]
 
   /*

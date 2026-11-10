@@ -413,6 +413,15 @@ function resolveLayerStyle(id, p) {
     case 'Stitch-Dark':
     case 'Stitch-Back':
       return { weight: p.weightStitch, opacity: p.opacityStitch, dash: 'solid' }
+    // A landing tick, a lobe stroke and a plumb line are never dashed by the
+    // mode's own dash: each is a short mark, and the dash belongs to the long
+    // lines beside it.
+    case 'Shafts-Feet':
+      return { weight: p.weightShafts, opacity: p.opacityShafts, dash: 'solid' }
+    case 'Wiggle-Lobes':
+      return { weight: p.weightWiggle, opacity: p.opacityWiggle, dash: 'solid' }
+    case 'Envelope-Drops':
+      return { weight: p.weightEnvelope, opacity: p.opacityEnvelope, dash: 'dotted' }
     case 'Tin-Hatch':
       return { weight: p.weightTin, opacity: p.opacityTin, dash: 'solid' }
     case 'Tin-Edges':

@@ -19,7 +19,7 @@
  * `mark` names the glyph in `panel/modeMarks.jsx` that shows what this mode puts
  * on paper. It lives here rather than in the panel because it is a fact about
  * the mode and not about one view of it — the section header draws it, and so
- * does the index that shows all seventy-one at once.
+ * does the index that shows them all at once.
  *
  * `needsData` marks a mode that draws nothing without a file the app cannot roll
  * — today only the cover plate. Such a mode carries no `pick` block and the
@@ -391,6 +391,21 @@ export const DRAW_MODES = [
     id: 'Rugged', label: 'Roughness mesh', cost: 2.5, mark: 'rugged',
     pick: { gamma: [0.6, 1.8], radius: [0, 2] },
   },
+  {
+    // One horizon sweep per line, and one segment per shadow it crosses.
+    id: 'Shafts', label: 'Light shafts', cost: 1, mark: 'shafts', walls: false,
+    pick: { azimuth: [0, 360], altitude: [10, 35], spacing: [4, 10] },
+  },
+  {
+    // One trace per line and a stroke per sample of its filled lobes.
+    id: 'Wiggle', label: 'Wiggle traces', cost: 2, mark: 'wiggle', walls: false,
+    pick: { spacing: [8, 16], gain: [0.8, 1.6], detrend: [10, 30] },
+  },
+  {
+    // Four passes of a one-dimensional transform, then two families of lines.
+    id: 'Envelope', label: 'Summit envelope', cost: 1.5, mark: 'envelope', walls: false,
+    pick: { span: [120, 360], spacing: [5, 12] },
+  },
 ]
 
 /** id → the label the panel and the plot both use. */
@@ -463,6 +478,9 @@ export const SUB_LAYER_LABEL = {
   'Stitch-Back':             'Backstitch',
   'Tin-Hatch':               'Hatch',
   'Tin-Edges':               'Edges',
+  'Shafts-Feet':             'Landings',
+  'Wiggle-Lobes':            'Lobes',
+  'Envelope-Drops':          'Plumb lines',
 }
 
 /**

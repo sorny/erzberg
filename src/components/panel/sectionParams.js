@@ -174,6 +174,30 @@ export const MODE_READS = ['gradientStops']
 const SECTION_KEYS = new WeakMap()
 
 /**
+ * key → the mode whose id it ends in, for one key list.
+ *
+ * Longest suffix wins — see the note at the top about ZeroCross. Built once
+ * per key list: asked per section, it was every key against every mode for
+ * each of the mode sections, 65 ms on the first edit of a session.
+ */
+const MODE_OWNERS = new WeakMap()
+function modeOwners(allKeys) {
+  let owner = MODE_OWNERS.get(allKeys)
+  if (owner) return owner
+  owner = new Map()
+  const ids = PANEL_MODES.map(([, enabled]) => enabled.slice(7))
+  for (const k of allKeys) {
+    let best = null
+    for (const other of ids) {
+      if (k.endsWith(other) && (!best || other.length > best.length)) best = other
+    }
+    if (best) owner.set(k, best)
+  }
+  MODE_OWNERS.set(allKeys, owner)
+  return owner
+}
+
+/**
  * Every parameter one section owns.
  *
  * The mode suffix and the table above, unioned — a mode can appear in both, and
@@ -190,15 +214,8 @@ export function paramsForSection(title, allKeys) {
   const out = new Set()
   const id = MODE_ID.get(title)
   if (id) {
-    for (const k of allKeys) {
-      // Longest suffix wins — see the note at the top about ZeroCross.
-      let best = null
-      for (const [, enabled] of PANEL_MODES) {
-        const other = enabled.slice(7)
-        if (k.endsWith(other) && (!best || other.length > best.length)) best = other
-      }
-      if (best === id) out.add(k)
-    }
+    const owner = modeOwners(allKeys)
+    for (const k of allKeys) if (owner.get(k) === id) out.add(k)
   }
   for (const rule of SECTION_PARAMS[title] ?? []) {
     if (rule instanceof RegExp) {

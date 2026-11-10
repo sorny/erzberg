@@ -8,6 +8,7 @@ import { boxBlur, sampleBilinear } from '../terrain'
 import { hexToRgb, computeVertexColor } from '../colorUtils'
 import { latitudeFor, litField, samplingFor, smoothField, sunHourLevels, sunHoursField } from '../sunHours'
 import { groundMetres } from './ground.js'
+import { lineFamily } from './lines.js'
 import { EMPTY_F32, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, hatchWhere, inElevCut, joinLayers, lambertDarkness, lightVector, mulberry32, normElev, simplifyFlat, traceLevelSet } from './shared.js'
 
 // ─── Engraving (illumination cross-hatch) ────────────────────────────────────
@@ -938,4 +939,100 @@ export function buildRadar(terrain, p, o) {
     }
   }
   return { positions: out.positions.toArray(), colors: out.colors.toArray() }
+}
+
+// ─── Light shafts ────────────────────────────────────────────────────────────
+
+/**
+ * The upper edge of every cast shadow, drawn in the air.
+ *
+ * A shadow on the ground is the foot of a volume: the air a ridge keeps the
+ * sun out of. Shadow Hatch draws the foot. This draws the volume's roof, one
+ * ray at a time: from the crest that casts the shadow, down the sun's own
+ * slope, to the point where the light reaches the ground again. Seen from
+ * above the rays are a hatch along the sun's bearing. Seen from the side they
+ * are strings from each ridge to the far side of its valley, all at one angle.
+ *
+ * Parallel lines are laid down-sun, `spacing` apart, and each is swept once
+ * with a horizon: the height of the lowest ray that still clears everything
+ * up-sun of it. Ground under that ray is in shadow. A shaft opens at the last
+ * lit sample before the shadow and closes where the ray meets the ground,
+ * found between two samples by the two clearances. A shaft that leaves the
+ * data ends in the air at the edge.
+ *
+ * `minLen` drops the short shafts that every bump on a rough slope casts.
+ * With `feet`, a short tick lies across each shaft where it lands, as a second
+ * pen. The ticks of neighbouring shafts line up as the edge of the shadow.
+ */
+export function buildShafts(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevScale } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const alt = Math.max(1, Math.min(89, o.altitude ?? 20))
+  // The way the light travels over the ground: away from the sun's bearing.
+  const [Lx, , Lz] = lightVector(o.azimuth ?? 315, 0)
+  const theta = Math.atan2(-Lz, -Lx)
+  const F = lineFamily(terrain, o.spacing ?? 6, 0, theta * 180 / Math.PI, false)
+  const { dx, dz, nx, nz, t0, t1 } = F
+  const drop = Math.tan(alt * Math.PI / 180) * scl
+  const minLen = Math.max(0, (o.minLen ?? 6) / scl)
+  const pitch = F.linePos.length > 1 ? Math.abs(F.linePos[1] - F.linePos[0]) : 1
+  const footHalf = o.feet ? Math.max(0.5, pitch * 0.35) : 0
+  const rays = { positions: new F32List(), colors: new F32List() }
+  const feet = { positions: new F32List(), colors: new F32List() }
+  const ink = (y) => computeVertexColor(normElev(y, minElev, maxElev), 0, theta, p)
+  let shafts = 0
+  const emit = (ac, ar, ay, bc, br, by) => {
+    if (Math.hypot(bc - ac, br - ar) < minLen) return false
+    rays.positions.push6(ac * scl - halfW, ay, ar * scl - halfH, bc * scl - halfW, by, br * scl - halfH)
+    rays.colors.pushRgb(ink(ay)); rays.colors.pushRgb(ink(by))
+    shafts++
+    return true
+  }
+  for (const pos of F.linePos) {
+    const ox = nx * pos, oz = nz * pos
+    // The horizon ray, the last lit sample, the open shaft's crest and the
+    // sample before this one.
+    let rayY = -Infinity
+    let litC = 0, litR = 0, litY = 0
+    let open = false, opC = 0, opR = 0, opY = 0
+    let hasPrev = false, pvC = 0, pvR = 0, pvG = 0, pvRay = 0
+    for (let t = t0; t <= t1; t++) {
+      const fc = ox + dx * t, fr = oz + dz * t
+      let b = NaN
+      if (fc >= 0 && fc <= cols - 1 && fr >= 0 && fr <= rows - 1 && gridMask[Math.round(fr) * cols + Math.round(fc)]) {
+        b = sampleBilinear(grid, sMask, rows, cols, fr, fc)
+      }
+      if (b !== b) {
+        // Off the data: an open shaft ends in the air over the last ground.
+        if (open && hasPrev) emit(opC, opR, opY, pvC, pvR, pvRay)
+        open = false; hasPrev = false; rayY = -Infinity
+        continue
+      }
+      const g = (b - 0.5) * 100 * elevScale
+      rayY -= drop
+      if (g >= rayY) {
+        if (open) {
+          // The ray was above the ground a sample ago and is under it now.
+          const before = pvRay - pvG, after = g - rayY
+          const f = before / ((before + after) || 1)
+          const lc = pvC + (fc - pvC) * f, lr = pvR + (fr - pvR) * f
+          if (emit(opC, opR, opY, lc, lr, pvRay - drop * f) && footHalf) {
+            drapeEdge(feet, terrain, p, sMask, lc - nx * footHalf, lr - nz * footHalf, lc + nx * footHalf, lr + nz * footHalf, theta + Math.PI / 2)
+          }
+          open = false
+        }
+        rayY = g; litC = fc; litR = fr; litY = g
+      } else if (!open) {
+        open = true; opC = litC; opR = litR; opY = litY
+      }
+      hasPrev = true; pvC = fc; pvR = fr; pvG = g; pvRay = rayY
+    }
+    if (open && hasPrev) emit(opC, opR, opY, pvC, pvR, pvRay)
+  }
+  if (!shafts) return null
+  const note = { shafts }
+  const out = { Shafts: { positions: rays.positions.toArray(), colors: rays.colors.toArray(), note } }
+  if (feet.positions.length) out['Shafts-Feet'] = { positions: feet.positions.toArray(), colors: feet.colors.toArray(), note }
+  return out
 }

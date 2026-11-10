@@ -68,22 +68,37 @@ export function geomorphons(heights, mask, rows, cols, cellX, cellY, search = 30
   const out = new Uint8Array(rows * cols).fill(NO_FORM)
   const reach = Math.max(2, Math.min(40, Math.round(search / Math.min(cellX, cellY))))
   const tanFlat = Math.tan(Math.max(0, flat) * Math.PI / 180)
-  const stepLen = DIRS.map(([dr, dc]) => Math.hypot(dr * cellY, dc * cellX))
+  // Per direction: the index step, and 1 / distance for each step out. A solid
+  // mask is dropped, so the inner loop reads heights alone. This loop is the
+  // whole cost of the classification: eight lines of up to 40 steps per cell.
+  let solid = true
+  if (mask) for (let i = 0; i < mask.length; i++) if (!mask[i]) { solid = false; break }
+  const m = solid ? null : mask
+  const offs = DIRS.map(([dr, dc]) => dr * cols + dc)
+  const inv = DIRS.map(([dr, dc]) => {
+    const len = Math.hypot(dr * cellY, dc * cellX), a = new Float64Array(reach + 1)
+    for (let k = 1; k <= reach; k++) a[k] = 1 / (k * len)
+    return a
+  })
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const i = r * cols + c
-      if (mask && !mask[i]) continue
+      if (m && !m[i]) continue
       const h0 = heights[i]
       let rising = 0, falling = 0
       for (let d = 0; d < 8; d++) {
-        const [dr, dc] = DIRS[d]
-        let up = -Infinity, down = Infinity
-        for (let k = 1; k <= reach; k++) {
-          const rr = r + dr * k, cc = c + dc * k
-          if (rr < 0 || cc < 0 || rr >= rows || cc >= cols) break
-          const j = rr * cols + cc
-          if (mask && !mask[j]) break
-          const s = (heights[j] - h0) / (k * stepLen[d])
+        const dr = DIRS[d][0], dc = DIRS[d][1]
+        // How far the line runs before it leaves the grid.
+        let n = reach
+        if (dr < 0) n = Math.min(n, r); else if (dr > 0) n = Math.min(n, rows - 1 - r)
+        if (dc < 0) n = Math.min(n, c); else if (dc > 0) n = Math.min(n, cols - 1 - c)
+        if (n < 1) continue
+        const off = offs[d], w = inv[d]
+        let up = -Infinity, down = Infinity, j = i
+        for (let k = 1; k <= n; k++) {
+          j += off
+          if (m && !m[j]) break
+          const s = (heights[j] - h0) * w[k]
           if (s > up) up = s
           if (s < down) down = s
         }

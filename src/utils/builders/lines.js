@@ -248,14 +248,28 @@ export function drawFamily(terrain, p, F) {
  *
  * A trace also ends at `maxLen`, at the grid edge, or where the gradient goes
  * flat and there is no longer a direction to follow.
+ *
+ * `direction` 'up' climbs the gradient instead, from the lowest seeds first, so
+ * the lines gather on the crests as the downhill ones gather in the channels.
+ * `minLen` drops a trace of fewer steps: the stubs that a crowded field leaves
+ * between longer lines. A dropped trace still claims its cells, so the lines
+ * that stay do not move.
+ *
+ * A step shorter than a cell stays in its own cell for several steps. The
+ * occupancy test lets a trace stay in the cell it stands in, but only for such
+ * a step: at a step of one cell or more the test is as it always was, so a
+ * plate made with it draws the same lines.
  */
-export function buildFlowLines(terrain, p, spacing, step, maxLen) {
+export function buildFlowLines(terrain, p, spacing, step, maxLen, opts = {}) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const seedStep = Math.max(1, (spacing ?? 10) / scl), n = rows*cols, mask = new Uint8Array(n), eps = 0.5
   const positions = new F32List(), colors = new F32List()
   // Solid raster ⇒ plain bilinear; see buildAngleLines.
   const sMask = terrain.hasNoData ? gridMask : null
+  const up = opts.direction === 'up', sign = up ? 1 : -1
+  const stepLen = step ?? 1, subCell = stepLen < 1
+  const minLen = Math.max(0, Math.round(opts.minLen ?? 0))
   const seeds = []
   for (let rf = 0; rf < rows; rf += seedStep) {
     const r = Math.min(rows - 1, Math.round(rf))
@@ -264,10 +278,12 @@ export function buildFlowLines(terrain, p, spacing, step, maxLen) {
       if (gridMask[r*cols+c]) seeds.push(r*cols+c)
     }
   }
-  seeds.sort((a, b) => grid[b] - grid[a])
+  seeds.sort(up ? (a, b) => grid[a] - grid[b] : (a, b) => grid[b] - grid[a])
   for (const idx of seeds) {
     const r = Math.floor(idx / cols), c = idx % cols
     if (mask[idx]) continue
+    const start = positions.length
+    let drawn = 0
     let fr = r, fc = c, e0 = (sampleBilinear(grid, sMask, rows, cols, fr, fc) - 0.5)*100*elevScale
     for (let s = 0; s < (maxLen ?? 100); s++) {
         if (fr < eps || fr > rows-1-eps || fc < eps || fc > cols-1-eps) break
@@ -280,17 +296,22 @@ export function buildFlowLines(terrain, p, spacing, step, maxLen) {
         const bU = sampleBilinear(grid, sMask, rows, cols, fr-eps, fc), bD = sampleBilinear(grid, sMask, rows, cols, fr+eps, fc)
         const gx = bR-bL, gz = bD-bU, mag = Math.sqrt(gx*gx+gz*gz)
         if (!(mag >= 0.0005)) break      // also ends the path on a NaN tap
-        const nfc = fc-(gx/mag)*(step??1), nfr = fr-(gz/mag)*(step??1)
-        if (mask[Math.round(nfr)*cols+Math.round(nfc)] || !gridMask[Math.round(nfr)*cols+Math.round(nfc)]) break
+        const nfc = fc+sign*(gx/mag)*stepLen, nfr = fr+sign*(gz/mag)*stepLen
+        const ni = Math.round(nfr)*cols+Math.round(nfc)
+        if (!gridMask[ni]) break
+        if (mask[ni] && !(subCell && ni === ri*cols+ci)) break
         const b1 = sampleBilinear(grid, sMask, rows, cols, nfr, nfc), e1 = (b1-0.5)*100*elevScale
         if (e1 !== e1) break
         if (inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) && inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut)) {
           positions.push6(fc*scl-halfW, e0, fr*scl-halfH, nfc*scl-halfW, e1, nfr*scl-halfH)
           const col0 = computeVertexColor(normElev(e0, minElev, maxElev), Math.min(1, mag/(maxSlope||0.02)), Math.atan2(gz, gx), p)
           colors.pushRgb2(col0)
+          drawn++
         } else if (!(inElevCut(e0, minElev, maxElev, elevMinCut, elevMaxCut) || inElevCut(e1, minElev, maxElev, elevMinCut, elevMaxCut))) break
         fr=nfr; fc=nfc; e0=e1
       }
+    // Too short to keep: take its strokes back out.
+    if (drawn < minLen) { positions.n = start; colors.n = start }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
@@ -590,13 +611,19 @@ export function buildDagThinning(terrain, p, threshold, opts = {}) {
  * Each mark is a fixed X of two diagonals in world space, not oriented to the
  * surface; its size grows with curvature up to a cap of two grid cells. The
  * regularity is the point — it reads as a pencil texture rather than as
- * structure competing with the other modes.
+ * structure competing with the other modes. `angleDeg` turns the mark, and
+ * `single` draws one stroke of it, which reads as a hatch.
  */
-export function buildPencilShading(terrain, p, spacing, threshold) {
+export function buildPencilShading(terrain, p, spacing, threshold, angleDeg = 45, single = false) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
   const { elevScale, jitterAmt, elevMinCut, elevMaxCut } = p
   const positions = new F32List(), colors = new F32List(), step = Math.max(1, Math.round((spacing ?? 4) / scl))
   const curvThreshold = threshold ?? 0.5
+  // The mark as it has always been drawn: an upright X, by the old arithmetic,
+  // so a plate made with it keeps every vertex. Any other angle, or one stroke
+  // in place of two, takes the turned path.
+  const plain = (angleDeg ?? 45) === 45 && !single
+  const ca = Math.cos((angleDeg ?? 45) * Math.PI / 180) * 0.7 * Math.SQRT2, sa = Math.sin((angleDeg ?? 45) * Math.PI / 180) * 0.7 * Math.SQRT2
   for (let r = step; r < rows - step; r += step) {
     for (let c = step; c < cols - step; c += step) {
       const i = r*cols + c
@@ -610,9 +637,16 @@ export function buildPencilShading(terrain, p, spacing, threshold) {
       const elev = cellElev(grid, r, c, cols, elevScale, jitterAmt)
       if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
       const wx = c*scl-halfW, wz = r*scl-halfH, len = Math.min(scl*2, curv*0.5), col = computeVertexColor(normElev(elev, minElev, maxElev), 0, 0, p)
-      positions.push6(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len)
-      positions.push6(wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
-      colors.pushRgb2(col); colors.pushRgb2(col)
+      if (plain) {
+        positions.push6(wx-0.7*len, elev, wz-0.7*len, wx+0.7*len, elev, wz+0.7*len)
+        positions.push6(wx-0.7*len, elev, wz+0.7*len, wx+0.7*len, elev, wz-0.7*len)
+        colors.pushRgb2(col); colors.pushRgb2(col)
+        continue
+      }
+      const ax = ca * len, az = sa * len
+      positions.push6(wx-ax, elev, wz-az, wx+ax, elev, wz+az)
+      colors.pushRgb2(col)
+      if (!single) { positions.push6(wx+az, elev, wz-ax, wx-az, elev, wz+ax); colors.pushRgb2(col) }
     }
   }
   return { positions: positions.toArray(), colors: colors.toArray() }

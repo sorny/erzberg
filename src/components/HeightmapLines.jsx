@@ -78,10 +78,31 @@ function srgbToLinear(colors) {
   const out = new Float32Array(colors.length)
   for (let i = 0; i < colors.length; i++) {
     const c = colors[i]
-    out[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+    if (!(c > 0)) { out[i] = c === c ? c / 12.92 : c; continue }
+    if (c >= 1) { out[i] = c === 1 ? 1 : Math.pow((c + 0.055) / 1.055, 2.4); continue }
+    const f = c * LIN_STEPS, k = f | 0
+    out[i] = LIN_LUT[k] + (LIN_LUT[k + 1] - LIN_LUT[k]) * (f - k)
   }
   return out
 }
+
+/*
+ * The sRGB curve as a table. A dense layer converts millions of floats on each
+ * rebuild, on the main thread, and `Math.pow` per float was the largest cost
+ * there outside React. 4 080 steps is 16 per 8-bit level, so every picked hex
+ * (k / 255) lands on a node and converts exactly. Between nodes the curve is
+ * read by linear interpolation, which is within 1e-7 of it.
+ */
+const LIN_STEPS = 4080
+const LIN_LUT = (() => {
+  const t = new Float32Array(LIN_STEPS + 2)
+  for (let k = 0; k <= LIN_STEPS; k++) {
+    const c = k / LIN_STEPS
+    t[k] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  }
+  t[LIN_STEPS + 1] = t[LIN_STEPS]
+  return t
+})()
 
 /**
  * Area colours as one anaglyph eye sees them.

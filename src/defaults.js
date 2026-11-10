@@ -87,16 +87,16 @@ export const STYLE_DEF = {
   majorIntervalContours: 10, majorWeightContours: 2, majorOffsetContours: 1, closeRingsContours: false, smoothingContours: 0,
   // Hachure
   enabledHachure: false, spacingHachure: 4, lengthHachure: 1,
-  styleHachure: 'tick', bandsHachure: 14, gammaHachure: 1, colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
+  styleHachure: 'tick', bandsHachure: 14, gammaHachure: 1, alongHachure: 'contour', colorHachure: '#000000', weightHachure: 1, opacityHachure: 1, dashHachure: 'solid',
   hypsoHachure: false, hypsoModeHachure: 'elevation', hypsoBandedHachure: false, hypsoIntervalHachure: 10,
   // Flow
-  enabledFlow: false, spacingFlow: 10, stepFlow: 1, maxLenFlow: 100, colorFlow: '#000000', weightFlow: 1, opacityFlow: 1, dashFlow: 'solid',
+  enabledFlow: false, spacingFlow: 10, stepFlow: 1, maxLenFlow: 100, minLenFlow: 0, directionFlow: 'down', colorFlow: '#000000', weightFlow: 1, opacityFlow: 1, dashFlow: 'solid',
   hypsoFlow: false, hypsoModeFlow: 'elevation', hypsoBandedFlow: false, hypsoIntervalFlow: 10,
   // Stream Network (DAG)
   enabledDag: false, thresholdDag: 2, accumDag: false, passesDag: 4, gapDag: 0.35, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
   hypsoDag: false, hypsoModeDag: 'elevation', hypsoBandedDag: false, hypsoIntervalDag: 10,
   // Pencil Shading
-  enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
+  enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, anglePencil: 45, singlePencil: false, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
   hypsoPencil: false, hypsoModePencil: 'elevation', hypsoBandedPencil: false, hypsoIntervalPencil: 10,
 
   // Ridge
@@ -299,7 +299,7 @@ export const STYLE_DEF = {
   hypsoIsochrone: false, hypsoModeIsochrone: 'elevation', hypsoBandedIsochrone: false, hypsoIntervalIsochrone: 10,
 
   // Truchet — quarter-arc tiles turned by the slope.
-  enabledTruchet: false, spacingTruchet: 8, thresholdTruchet: 0.12, alignTruchet: 'fall', seedTruchet: 5,
+  enabledTruchet: false, spacingTruchet: 8, thresholdTruchet: 0.12, alignTruchet: 'fall', seedTruchet: 5, tileTruchet: 'arcs',
   colorTruchet: '#1a1a1a', weightTruchet: 1.5, opacityTruchet: 1, dashTruchet: 'solid',
   hypsoTruchet: false, hypsoModeTruchet: 'elevation', hypsoBandedTruchet: false, hypsoIntervalTruchet: 10,
 
@@ -499,6 +499,20 @@ export const STYLE_DEF = {
   enabledTin: false, countTin: 1500, floorTin: 0.03, pitchTin: 2, azimuthTin: 315, edgesTin: true, seedTin: 1,
   colorTin: '#1a1a1a', weightTin: 0.5, opacityTin: 1, dashTin: 'solid',
   hypsoTin: false, hypsoModeTin: 'elevation', hypsoBandedTin: false, hypsoIntervalTin: 10,
+  // Light shafts — the roof of each cast shadow, a ray from crest to landing.
+  enabledShafts: false, azimuthShafts: 315, altitudeShafts: 20, spacingShafts: 6, minLenShafts: 8, feetShafts: true,
+  colorShafts: '#1a1a1a', weightShafts: 0.6, opacityShafts: 1, dashShafts: 'solid',
+  hypsoShafts: false, hypsoModeShafts: 'elevation', hypsoBandedShafts: false, hypsoIntervalShafts: 10,
+  // Wiggle traces — the plate as a seismic section, lobes filled to one side.
+  enabledWiggle: false, spacingWiggle: 10, angleWiggle: 90, gainWiggle: 1, detrendWiggle: 16, clipWiggle: 1.5,
+  lobesWiggle: 'positive', pitchWiggle: 2,
+  colorWiggle: '#1a1a1a', weightWiggle: 0.6, opacityWiggle: 1, dashWiggle: 'solid',
+  hypsoWiggle: false, hypsoModeWiggle: 'elevation', hypsoBandedWiggle: false, hypsoIntervalWiggle: 10,
+  // Summit envelope — a net on the surface that rests on the crests.
+  enabledEnvelope: false, spanEnvelope: 200, spacingEnvelope: 8, angleEnvelope: 0, crossEnvelope: true,
+  clearanceEnvelope: 0.03, wholeEnvelope: false, dropsEnvelope: false,
+  colorEnvelope: '#1a1a1a', weightEnvelope: 0.6, opacityEnvelope: 1, dashEnvelope: 'solid',
+  hypsoEnvelope: false, hypsoModeEnvelope: 'elevation', hypsoBandedEnvelope: false, hypsoIntervalEnvelope: 10,
 
   // Roughness mesh — a Delaunay or Voronoi net, dense where the ground is rugged.
   enabledRugged: false, countRugged: 3000, gammaRugged: 1, floorRugged: 0.12,
