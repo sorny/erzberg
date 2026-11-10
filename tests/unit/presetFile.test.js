@@ -13,7 +13,7 @@ import { describe, expect, it } from 'vitest'
 import {
   MIGRATED_AZIMUTHS, PRESET_FORMAT, PRESET_KEYWORD,
   buildPreset, migrateAzimuths, parsePreset, presetComment, presetToText,
-  readPngPreset, readSvgPreset,
+  readPngPreset, readSvgPreset, sheetSwap,
 } from '../../src/utils/presetFile'
 import { withTextChunks } from '../../src/utils/pngExport'
 
@@ -494,5 +494,36 @@ describe('format 10: every ink as picked', () => {
       expect('crowdCoral' in (d.style ?? {}), n).toBe(false)
       expect(d.format, n).toBe(PRESET_FORMAT)
     }
+  })
+})
+
+describe('sheetSwap', () => {
+  const wild = { legendOn: true, frameNorth: true, frameTitleText: 'Wild Terrain', bogus: 1 }
+  it('applies a sheet block and remembers what it replaced', () => {
+    const { patch, last } = sheetSwap({ legendOn: false, frameNorth: false }, null, wild)
+    expect(patch).toEqual({ legendOn: true, frameNorth: true, frameTitleText: 'Wild Terrain' })
+    expect(last.before).toEqual({ legendOn: false, frameNorth: false, frameTitleText: undefined })
+  })
+  it('puts the old values back when the next preset has no block', () => {
+    const view = { legendOn: false, frameNorth: false }
+    const a = sheetSwap(view, null, wild)
+    const b = sheetSwap({ ...view, ...a.patch }, a.last, undefined)
+    expect(b.patch).toEqual({ legendOn: false, frameNorth: false, frameTitleText: undefined })
+    expect(b.last).toBeNull()
+  })
+  it('keeps a value you changed after the preset set it', () => {
+    const a = sheetSwap({ legendOn: false, frameNorth: false }, null, wild)
+    const edited = { ...a.patch, frameNorth: false, frameTitleText: 'My sheet' }
+    const b = sheetSwap(edited, a.last, null)
+    expect(b.patch).toEqual({ legendOn: false })
+  })
+  it('does nothing when neither preset letters the sheet', () => {
+    expect(sheetSwap({ legendOn: true }, null, null)).toEqual({ patch: {}, last: null })
+  })
+  it('swaps one lettered look for another from the original values', () => {
+    const a = sheetSwap({ legendOn: false, frameNorth: false }, null, wild)
+    const b = sheetSwap({ legendOn: false, frameNorth: false, ...a.patch }, a.last, { legendOn: true })
+    expect(b.patch).toEqual({ legendOn: true, frameNorth: false, frameTitleText: undefined })
+    expect(b.last.before).toEqual({ legendOn: false })
   })
 })

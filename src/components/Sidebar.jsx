@@ -15,7 +15,7 @@ import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '..
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
 import { STYLE_DEF } from '../defaults'
 import { GROUP_OF, presetStyle } from '../params'
-import { presetSheet } from '../utils/presetFile'
+import { sheetSwap } from '../utils/presetFile'
 import { TRACK_PROJECTIONS, detectTrackBpm, getProjection } from '../utils/trackProjections'
 import { loadSingleLineManifest } from '../utils/textGeometry'
 import { GradientPicker } from './GradientPicker'
@@ -1301,6 +1301,8 @@ export function Sidebar({
    * including the opening itself, which is what makes it run once.
    */
   const openingSpent = useRef(false)
+  // What the last preset's sheet block set and replaced. See sheetSwap.
+  const sheetSet = useRef(null)
   const spendOpening = () => { openingSpent.current = true }
   // Every style or particle change that did not come from applyPreset means the
   // user has left the preset behind. applyPreset writes through setStyle/setPoints
@@ -1574,9 +1576,11 @@ export function Sidebar({
     if (preset.points) setPoints(prev => ({ ...prev, ...preset.points }))
     if (preset.gradientStops) setGradientStops(preset.gradientStops)
     if (preset.bgGradientStops) setBgGradientStops(preset.bgGradientStops)
-    // The marks and legend, for the few looks that letter the sheet. See presetSheet.
-    const sheet = presetSheet(preset.sheet)
-    if (sheet) setView(prev => ({ ...prev, ...sheet }))
+    // The marks and legend, for the few looks that letter the sheet. A look
+    // without them puts back what the last lettered look replaced. See sheetSwap.
+    const swap = sheetSwap(view, sheetSet.current, preset.sheet)
+    sheetSet.current = swap.last
+    if (Object.keys(swap.patch).length) setView(prev => ({ ...prev, ...swap.patch }))
     syncSectionsToStyle(preset.style)
     setLastPreset(name)
     setPresetEdited(false)

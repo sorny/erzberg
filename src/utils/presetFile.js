@@ -92,13 +92,40 @@ export const PRESET_FORMAT = 11
  * The sheet keys a bundled preset may carry in an optional `sheet` block: the
  * map elements and the legend. A tile applies style, particles and gradients
  * and leaves the view alone, so a look that is lettered like a survey sheet
- * states its marks here. A preset without the block leaves them as they are.
+ * states its marks here. A preset without the block puts back what the last
+ * block replaced. See `sheetSwap`.
  */
 const SHEET_KEY = /^(frame(ScaleBar|North|Mark|Magnetic|Title|Grid)|legend)/
 export function presetSheet(sheet) {
   if (!sheet || typeof sheet !== 'object' || Array.isArray(sheet)) return null
   const out = Object.fromEntries(Object.entries(sheet).filter(([k]) => SHEET_KEY.test(k)))
   return Object.keys(out).length ? out : null
+}
+
+/**
+ * The view patch for applying a preset's sheet block, and what to remember.
+ *
+ * `last` is what the previous preset's block set and what it replaced. Each
+ * key that still holds the value that block set goes back to the value before
+ * it, so a legend a preset turned on goes off with the next preset that does
+ * not letter the sheet. A key you changed since keeps your value. Then the new
+ * block, if any, applies on top, and its own `last` comes back.
+ *
+ * @param {object} view   the view as it is now
+ * @param {object|null} last  `{ set, before }` from the previous call, or null
+ * @param {object|null} sheet the new preset's `sheet` block, raw
+ * @returns {{ patch: object, last: object|null }}
+ */
+export function sheetSwap(view, last, sheet) {
+  const restore = {}
+  for (const [k, v] of Object.entries(last?.set ?? {})) {
+    if (view?.[k] === v) restore[k] = last.before[k]
+  }
+  const next = presetSheet(sheet)
+  if (!next) return { patch: restore, last: null }
+  const now = { ...view, ...restore }
+  const before = Object.fromEntries(Object.keys(next).map((k) => [k, now[k]]))
+  return { patch: { ...restore, ...next }, last: { set: next, before } }
 }
 
 /**

@@ -64,3 +64,20 @@ test('pen preview draws lines at the pen width on screen and leaves the SVG alon
   expect(a.slice(1)).toEqual(b.slice(1))
   expect(errors).toEqual([])
 })
+
+test('pen preview gives dashes round pen ends, so gaps narrower than the pen close', async ({ page }) => {
+  /*
+   * A pen rounds both ends of every dash, so each dash on paper is one pen
+   * width longer than its length, and a gap narrower than the pen fills in.
+   * LineMaterial draws dashes with flat ends at their true length, which left
+   * gaps in the preview that the pen would close.
+   */
+  test.setTimeout(240_000)
+  await page.goto('http://localhost:5173/?automation')
+  await page.waitForFunction(() => window.erzberg?.version === 1, null, { timeout: 60_000 })
+  const base = { enabledLines: true, spacingLines: 14, colorLines: '#000000', bgColor: '#ffffff',
+    showFrame: true, plotWidthMm: 297, plotPenPreview: true, plotPenMm: 2 }
+  const solid = await inkOf(page, { ...base, dashLines: 'solid' })
+  const dashed = await inkOf(page, { ...base, dashLines: 'dashed' })
+  expect(dashed / solid, `dashed ${dashed} vs solid ${solid}`).toBeGreaterThan(0.85)
+})

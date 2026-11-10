@@ -211,12 +211,52 @@ const BLEND_MODES = {
  * instead shifted them on screen in perspective, toward the centre, by about
  * two pixels at the edges of the view.
  */
+/**
+ * Pen ends, on while Pen preview is on. One uniform for every line material.
+ *
+ * A pen rounds both ends of every stroke it draws, so each mark on paper is
+ * its length plus one pen width. LineMaterial already rounds a solid stroke,
+ * but a dashed or dotted one has flat ends at its true length, and a stroke of
+ * zero length has no direction and draws nothing. On paper both grow by the pen,
+ * and gaps shorter than the pen close. With this on, each dash takes round ends
+ * of half the line width, and a zero-length stroke draws as a pen dot.
+ */
+const penCaps = { value: 0 }
+
 function patchStrokeDepth(material, lift, push) {
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uStrokeLift = lift
     shader.uniforms.uDepthPush = push
+    shader.uniforms.uPenCaps = penCaps
+    shader.fragmentShader = shader.fragmentShader
+      .replace('void main() {', 'uniform float uPenCaps;\n#ifdef USE_DASH\nvarying float vPxPerDist;\n#endif\nvoid main() {')
+      .replace(`if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
+
+				if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX`,
+      `if ( uPenCaps > 0.5 ) {
+					// How far this fragment lies outside its dash, in half widths:
+					// along the line in the gap, plus into the segment's end cap.
+					float period = dashSize + gapSize;
+					float t = mod( vLineDistance + dashOffset, period );
+					float gapDist = t > dashSize ? min( t - dashSize, period - t ) : 0.0;
+					float along = gapDist * vPxPerDist / max( 0.5 * linewidth, 1e-6 )
+						+ max( abs( vUv.y ) - 1.0, 0.0 );
+					if ( along * along + vUv.x * vUv.x > 1.0 ) discard;
+				} else {
+					if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
+					if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard;
+				}`)
     shader.vertexShader = shader.vertexShader
-      .replace('void main() {', 'uniform float uStrokeLift;\nuniform float uDepthPush;\nvoid main() {')
+      .replace('void main() {', 'uniform float uStrokeLift;\nuniform float uDepthPush;\nuniform float uPenCaps;\n#ifdef USE_DASH\nvarying float vPxPerDist;\n#endif\nvoid main() {')
+      .replace(`dir.x *= aspect;
+			dir = normalize( dir );`, `dir.x *= aspect;
+			#ifdef USE_DASH
+				// Screen pixels per unit of dash distance along this segment.
+				vPxPerDist = length( dir ) * 0.5 * resolution.y
+					/ max( abs( lineDistanceEnd - lineDistanceStart ), 1e-9 );
+			#endif
+			// A zero-length stroke has no direction. A pen still leaves a dot.
+			dir = ( uPenCaps > 0.5 && dot( dir, dir ) < 1e-14 ) ? vec2( 1.0, 0.0 ) : normalize( dir );`)
       .replace('vec4 clipEnd = projectionMatrix * end;', `vec4 clipEnd = projectionMatrix * end;
 			{
 				float perPx = 2.0 / ( resolution.y * projectionMatrix[ 1 ][ 1 ] );
@@ -243,7 +283,7 @@ function patchedLine(params, lift, push) {
   return m
 }
 
-function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false, strokeLift = 0 }) {
+function LineLayer({ layer, weight, dotWeight = weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false, strokeLift = 0 }) {
   const { positions: srcPositions, colors: srcColors, sphere } = layer
   const invalidate = useThree((s) => s.invalidate)
   // Round dots replace the stroke's own segments. Rebuilt with the weight,
@@ -254,8 +294,10 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
     [dash, srcPositions],
   )
   const dots = useMemo(() => (
-    chains ? dotsAlong(srcPositions, srcColors, layer.featureOfSegment, chains, dotSpacing(weight)) : null
-  ), [chains, srcPositions, srcColors, layer.featureOfSegment, weight])
+    // Spaced by the mode's own width, as the SVG spaces them, so Pen preview
+    // changes the dot size and not how many dots there are.
+    chains ? dotsAlong(srcPositions, srcColors, layer.featureOfSegment, chains, dotSpacing(dotWeight)) : null
+  ), [chains, srcPositions, srcColors, layer.featureOfSegment, dotWeight])
   const positions = dots ? dots.positions : srcPositions
   const colors = dots ? dots.colors : srcColors
   // Converted once per geometry.
@@ -720,7 +762,7 @@ function LineLayer({ layer, weight, opacity, dash, color, blending, fillColor, f
 }
 
 export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
-  const { size, gl } = useThree()
+  const { size, gl, invalidate } = useThree()
   // Tells `settle()` which state the canvas has committed (see `drawn`).
   useLayoutEffect(() => { drawn.mounted = true; drawn.lineGeo = lineGeo })
   useLayoutEffect(() => () => { drawn.mounted = false }, [])
@@ -757,6 +799,8 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
    */
   const anaglyph = !!p.anaglyph && !p.showRawTerrain
   const penPx = penPreviewPx(p, size.width, size.height)
+  // A uniform, so nothing tells the on-demand loop it changed.
+  useLayoutEffect(() => { penCaps.value = penPx != null ? 1 : 0; invalidate() }, [penPx, invalidate])
   /**
    * Which way the two filters combine, decided by the paper.
    *
@@ -836,6 +880,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           shift={e.shift}
           layer={layer}
           weight={weight}
+          dotWeight={style.weight}
           opacity={opacity}
           dash={dash}
           color={color}

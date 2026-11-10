@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.74.2] — 2026-11-10
+
+### Fixed
+
+- **Pen preview gives every mark the pen's round ends.** Dashed and dotted
+  lines drew flat ends at their true length, so the preview showed gaps that a
+  pen wider than the gap closes on paper. Each dash now takes
+  round ends of half the pen width, and a stroke of zero length draws as a pen
+  dot. The dots style keeps the spacing of the mode's own width, as the SVG
+  does. With a 2 mm pen over dashed lines, the screen draws 60% of a solid
+  line's ink before and over 85% now.
+- **A preset without map elements takes back the ones the last preset set.**
+  Wild Terrain turns on the legend, title and north arrow, and the next preset
+  left them on. A preset without a sheet block now puts back the values the
+  last block replaced. A value you changed since keeps your setting.
+
 ## [1.74.1] — 2026-11-09
 
 ### Fixed
