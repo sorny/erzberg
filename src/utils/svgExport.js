@@ -975,7 +975,7 @@ async function runExport({
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
-      const { weight = 1, opacity = 1, dash = 'solid', color, name } = lineStyles[id] ?? {}
+      const { weight = 1, opacity = 1, dash = 'solid', dotStep, color, name } = lineStyles[id] ?? {}
       // Opacity 0 draws nothing in the viewport, so it writes no pen layer.
       if (!(opacity > 0)) continue
       // Inside the ground, with no fill, nothing the lift answers can hide it.
@@ -1262,7 +1262,7 @@ async function runExport({
        */
       const keptSegs = suppressLines ? [] : visibleSegs
       if (keptSegs.length > 0 || ghostSegs.length > 0) {
-        svgLayers.push({ id, name, visibleSegs: keptSegs, ghostSegs, weight, opacity, dash })
+        svgLayers.push({ id, name, visibleSegs: keptSegs, ghostSegs, weight, opacity, dash, dotStep })
       }
       if (suppressLines) svgLayers.push({ id, name, isAreas: true, groups: areaGroups, weight, opacity })
     }
@@ -1783,7 +1783,7 @@ async function runExport({
        */
       if (dashSizes.dots) {
         const r = (layer.weight * 0.25).toFixed(2)
-        const step = dotSpacing(layer.weight) * 0.5
+        const step = dotSpacing(layer.weight, layer.dotStep) * 0.5
         // Walked stroke by stroke rather than in list order: builders emit
         // segments in scan order, and a phase reset at every non-neighbour
         // put a dot at the start of each one. Endpoints agree to 0.1 px.

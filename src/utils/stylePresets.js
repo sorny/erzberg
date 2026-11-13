@@ -21,9 +21,15 @@ export const DASH_CONFIGS = {
  * between them; a fixed spacing ran the dots together into a bead chain at the
  * top of the weight range. World units in the viewport, where one unit is about
  * one pixel at the opening zoom, and the same ratio in the SVG.
+ *
+ * `step` is the layer's own `dotStep<Id>`, in dot diameters. At DOT_STEP the
+ * spacing is the one every dotted line had before the control existed.
  */
-export function dotSpacing(weight) {
-  return Math.max(3, (weight || 1) * 2.2)
+export const DOT_STEP = 2.2
+
+export function dotSpacing(weight, step = DOT_STEP) {
+  const s = Number.isFinite(step) && step > 0 ? step : DOT_STEP
+  return Math.max(3, (weight || 1) * DOT_STEP) * (s / DOT_STEP)
 }
 
 /**

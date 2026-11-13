@@ -1135,7 +1135,7 @@ export function Sidebar({
     modeBitplane: false, modeFlashbulb: false, modeHalation: false,
     modeFallLine: false, modeBerm: false, modeAir: false, modeRaceLine: false,
     modeZeroCross: false,
-    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeShafts: false, modeWiggle: false, modeEnvelope: false, modeTreeLine: false, modeConstellation: false, modeFronts: false, modeTally: false, modeRain: false, modeRipples: false, modeHoarfrost: false, modeStitch: false, modeTin: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeWaveform: false, modeProfileSheet: false, modeSwathProfile: false, modeHypsometry: false, modeAspectRose: false, modeStereonet: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
+    modeSprite: false, modeRetic: false, modeTsp: false, modeShadowHatch: false, modeRugged: false, modeShafts: false, modeWiggle: false, modeEnvelope: false, modeTreeLine: false, modeConstellation: false, modeFronts: false, modeTally: false, modeRain: false, modeRipples: false, modeHoarfrost: false, modeSediment: false, modeStitch: false, modeTin: false, modeIsochrone: false, modeTruchet: false, modeViewshed: false, modeRoute: false, modePanorama: false, modeBedding: false, modeSlopeClass: false, modeWind: false, modeRunout: false, modeMapGrid: false, modePrinter: false, modeStems: false, modeHair: false, modeWaveform: false, modeProfileSheet: false, modeSwathProfile: false, modeHypsometry: false, modeAspectRose: false, modeStereonet: false, modeVenation: false, modeGeodesic: false, modeRadar: false, modeSpines: false, modeCoral: false, modeGlacier: false, modeIndex: true, modeSunHours: false,
     modeIndexed: false, modeOutrun: false, modeRiso: false,
     modeMineral: false, modeLandform: false, modeShed: false,
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
@@ -1394,7 +1394,7 @@ export function Sidebar({
   // One object for the readouts of the symbol, process and mesh modes, kept while the geometry is the
   // same so the memoised mode sections do not redraw for nothing.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const symbolNotes = useMemo(() => ({ TreeLine: noteOf('TreeLine'), Constellation: noteOf('Constellation'), Fronts: noteOf('Fronts'), Tally: noteOf('Tally'), Rain: noteOf('Rain'), Ripples: noteOf('Ripples'), Hoarfrost: noteOf('Hoarfrost'), Stitch: noteOf('Stitch'), Tin: noteOf('Tin'), Shafts: noteOf('Shafts'), Envelope: noteOf('Envelope') }), [lineGeo])
+  const symbolNotes = useMemo(() => ({ TreeLine: noteOf('TreeLine'), Constellation: noteOf('Constellation'), Fronts: noteOf('Fronts'), Tally: noteOf('Tally'), Rain: noteOf('Rain'), Ripples: noteOf('Ripples'), Hoarfrost: noteOf('Hoarfrost'), Sediment: noteOf('Sediment'), Stitch: noteOf('Stitch'), Tin: noteOf('Tin'), Shafts: noteOf('Shafts'), Envelope: noteOf('Envelope') }), [lineGeo])
   const mapGridNote = noteOf('MapGrid')
   const crsInfo     = classifyCRS(geoTiffCRS)
 
@@ -1504,6 +1504,7 @@ export function Sidebar({
       modeRain:     !!newStyle.enabledRain,
       modeRipples: !!newStyle.enabledRipples,
       modeHoarfrost: !!newStyle.enabledHoarfrost,
+      modeSediment: !!newStyle.enabledSediment,
       modeStitch: !!newStyle.enabledStitch,
       modeTin: !!newStyle.enabledTin,
       modeShafts: !!newStyle.enabledShafts,

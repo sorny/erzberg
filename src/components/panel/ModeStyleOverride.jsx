@@ -444,6 +444,12 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
         <SegGroup label="Dash" capitalize
           options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
           value={style[`dash${prefix}`]} onChange={(d) => ss({ [`dash${prefix}`]: d })} />
+        {prefix && style[`dash${prefix}`] === 'dots' && (<div style={{ marginTop: 8 }}>
+          <InlineSl label="Dot step" testId={`dot-step-${prefix}`}
+            help="The distance between the centres of two dots, in dot diameters. At 1 the dots touch. A line thinner than 1.4 px keeps a step of at least 3 px at 2.2."
+            min={1} max={12} step={0.1} value={style[`dotStep${prefix}`] ?? 2.2} onChange={(v) => ss({ [`dotStep${prefix}`]: v })}
+            fmt={(v) => `${v.toFixed(1)} × dot`} />
+        </div>)}
       </>)}
     </Fold>
     {/* Off the table for vector layers: masking thins the terrain grid a layer

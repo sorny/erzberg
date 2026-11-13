@@ -509,6 +509,15 @@ const MARKS = {
       <path d="M1 3 C6 2 10 4 21 2.5 M1 6 C6 5 9 8 14 7 C17 6.5 19 5.5 21 5.5 M1 9 C5 8.5 8 11 13 10.5 C16 10 18 9 21 8.5 M1 12 C7 11.5 12 13 21 11.5" />
     </g>
   ),
+  // Dots that left the ridge and queue in the gully.
+  sediment: (
+    <g fill="currentColor" stroke="none">
+      {[[11,2.5],[10.5,5],[11.5,7.2],[11,9.5],[9.2,11.2],[12.8,11.2],[11,11.8],[7.5,8.5],[14.5,8.5],[6,5.5],[16,5.5],
+        [3,11.5],[5.5,11.8],[16.5,11.8],[19,11.5]].map(([x, y], i) => (
+        <circle key={i} cx={x} cy={y} r="0.85" />
+      ))}
+    </g>
+  ),
   // A dendrite branching from a seed.
   hoarfrost: (
     <g {...BASE} strokeWidth="0.7">

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.76.0] — 2026-11-13
+
+### Added
+
+- **Sediment** (Tone). Dots that start on an even grid, run down the slope and
+  settle where the ground goes flat or where a settled dot blocks the way. The
+  dots gather in gullies and on valley floors. *Gap* keeps the dots apart, so
+  a wide pen tip leaves no blots. *Level ground* also draws the dots that did
+  not move. It is off by default, because on a flat margin those dots make an
+  even field that hides the drainage picture.
+- **Stipple dots: Even spacing.** A blue-noise threshold (void-and-cluster
+  tile) replaces the random draw, so the dots keep their distance at every
+  density.
+- **Stipple dots: Hillshade, Cast Shadow and Openness** as density sources.
+  Hillshade and Cast Shadow take *Sun azimuth*, and Cast Shadow also takes
+  *Sun altitude*. Openness measures how far the ground lies below its
+  surroundings within *Search*, so gullies fill.
+- **Stipple dots: Density.** The share of the dots that stay where the tone is
+  full. A cast shadow at full density is solid black.
+- **Dot step** for the dotted dash, for each mode on its own. It sets the
+  distance between dot centres in dot diameters, from 1 (dots touch) to 12.
+  The default of 2.2 is the step that every dotted line had before. The
+  viewport and the SVG both use it.
+
+A preset reopens unchanged: each new control starts at the value that draws
+the old picture, so `PRESET_FORMAT` stays the same.
+
 ## [1.75.0] — 2026-11-10
 
 ### Added

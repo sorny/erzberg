@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-four
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-five
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Seventy-three modes read $H$ only. [Land cover](#land-cover) reads a second
+Seventy-four modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -232,8 +232,15 @@ candidates can share a cell. Plates before format 9 round it to whole cells
 | Inv Slope | $1 - d_{\text{slope}}$ |
 | Elevation | $(H - H_{\min}) / (H_{\max} - H_{\min})$ |
 | Inv Elevation | $1 - d_{\text{elev}}$ |
+| Hillshade | $(D - D_0) / (1 - D_0)$, with $D = 1 - \max(0, \mathbf{n}\cdot\mathbf{l})$ for a sun at *Sun azimuth* and 45°, and $D_0 = 1 - \tfrac{1}{\sqrt 2}$ the value of level ground |
+| Cast Shadow | $1 - \text{lit}$, from the shadow sweep of §33 at *Sun azimuth* and *Sun altitude*, blurred by 1.5 cells |
+| Openness | $\max(0,\ (\bar H_r - H) + 0.6\,(\bar H_{3r} - H))$ over its 97th percentile, with $r$ = *Search* |
 
-A dot is kept with probability $d^\gamma$. Each dot is a degenerate segment that
+A dot is kept with probability $\text{density} \cdot d^\gamma$. *Density* is the
+share kept where $d = 1$. With *Even spacing* the random draw becomes a
+threshold from a 64 × 64 blue-noise tile, read once per candidate, so the kept
+dots hold their distance at every density. The jitter is halved, so no two dots
+are closer than half the spacing. The seed shifts the tile. Each dot is a degenerate segment that
 the GPU draws round at the layer `weight`. The SVG writes `<circle>`. A
 mulberry32 PRNG seeded by `seed` makes the pattern reproducible.
 
@@ -1126,6 +1133,21 @@ line is drawn where $E - H$ exceeds *Clearance*, as a share of the height
 range, and a piece shorter than four segments is left out. *Whole surface*
 draws the net everywhere. *Plumb lines* drops a dotted line from each crossing
 of the net to the ground, as a second pen.
+
+## 76. Sediment
+
+Dots that slide down the slope and settle (Tone, `builders/tone.js`).
+
+Dots start on a jittered grid of pitch *Spacing*. Each one walks down the fall
+line of the ground blurred by *Blur*, one cell a step, for at most *Travel*
+pixels. It stops where the gradient falls below *Flat below* times the 95th
+percentile of the gradient, and at the plate's edge. It settles at the last
+point of its path that is *Gap* × *Spacing* clear of every dot that settled
+before it. A dot with no such point is dropped. The dots are visited in a
+shuffled order.
+
+A dot that moved less than one gap stands on level ground. It is drawn only
+with *Level ground* on.
 
 ## NoData and clipped edges
 

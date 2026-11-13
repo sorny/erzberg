@@ -7,6 +7,8 @@
 import Delaunator from 'delaunator'
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { hexToRgb, computeVertexColor } from '../colorUtils'
+import { litField, smoothField } from '../sunHours'
+import { blueNoiseTile } from './light.js'
 import { F32List, U32List, drapeEdge, inElevCut, lambertDarkness, mulberry32, normElev, quantiseTiers } from './shared.js'
 
 // ─── Truchet ─────────────────────────────────────────────────────────────────
@@ -193,8 +195,19 @@ const STIPPLE_MAX_CANDIDATES = 8e6
  *
  * Returned as `isPoints`, so the dispatcher skips occlusion curtains for it:
  * a dot has no length to hang a curtain from.
+ *
+ * `o.even` swaps the random draw for a blue-noise threshold, read once per
+ * candidate. The dots that survive at any density then keep their distance,
+ * where a random draw lets two neighbours both survive and touch. The jitter
+ * is halved, so two dots are never closer than half the spacing.
+ *
+ * Three density sources are fields of their own (`stippleField`): `shade`,
+ * `cast` and `openness`. They take `o.azimuth`, `o.altitude` and `o.radius`.
+ *
+ * `o.amount` is the share of candidates kept where the density is full. A cast
+ * shadow is full everywhere inside it, and only this thins it.
  */
-export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
+export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter, o = {}) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   // `spacing` is in raster pixels and may fall below one grid cell. A plate
@@ -205,15 +218,22 @@ export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
     ? Math.max(1, Math.round((spacing ?? 0.5) / scl))
     : Math.max((spacing ?? 1) / scl, Math.sqrt((rows * cols) / STIPPLE_MAX_CANDIDATES))
   const eps = Math.max(0.001, scl * 0.003)
-  const jAmt = (jitter ?? 0.8) * step
+  const even = !!o.even
+  const jAmt = (jitter ?? 0.8) * step * (even ? 0.5 : 1)
   const gam  = gamma ?? 1.2
   const dm   = densityMode ?? 'slope'
+  const field = stippleField(terrain, p, dm, o)
   const positions = new F32List(), colors = new F32List()
   // Seeded so a given seed always produces the identical dot pattern.
-  const rng = mulberry32(((p.seedStipple ?? 42) * 2654435761) >>> 0)
+  const seed = p.seedStipple ?? 42
+  const rng = mulberry32((seed * 2654435761) >>> 0)
+  // The seed moves the tile, so each seed gives another even pattern.
+  const { S: tS, tile } = even ? blueNoiseTile() : { S: 1, tile: null }
+  const tR = (seed * 7) % tS, tC = (seed * 13) % tS
+  const amount = Math.max(0.01, Math.min(1, o.amount ?? 1))
 
-  for (let r = 0; r < rows; r += step) {
-    for (let c = 0; c < cols; c += step) {
+  for (let r = 0, kr = 0; r < rows; r += step, kr++) {
+    for (let c = 0, kc = 0; c < cols; c += step, kc++) {
       const jr = r + (rng() - 0.5) * jAmt
       const jc = c + (rng() - 0.5) * jAmt
       const ri = Math.max(0, Math.min(rows - 1, Math.floor(jr)))
@@ -227,7 +247,8 @@ export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
       const slope = gridSlopes[ri * cols + ci] / (maxSlope || 1)
 
       let density
-      if      (dm === 'elevation') density = normE
+      if      (field)              density = field[ri * cols + ci]
+      else if (dm === 'elevation') density = normE
       else if (dm === 'invElev')   density = 1 - normE
       else if (dm === 'invSlope')  density = 1 - slope
       else                         density = slope
@@ -237,7 +258,7 @@ export function buildStipple(terrain, p, spacing, densityMode, gamma, jitter) {
       // d^γ too; for γ < 1, d^γ ≥ d, so a draw at or below d is kept. Same
       // draw, same answer, the dot pattern unchanged; only the pow is skipped.
       const d = Math.max(0, Math.min(1, density))
-      const u = rng()
+      const u = (even ? tile[((kr + tR) % tS) * tS + ((kc + tC) % tS)] : rng()) / amount
       if (gam >= 1 ? (u > d || u > Math.pow(d, gam)) : (u > d && u > Math.pow(d, gam))) continue
 
       const wx = jc * scl - halfW
@@ -334,6 +355,166 @@ export function buildSprite(terrain, p, o) {
     ? { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray() }
     : null
   return { positions: positions.toArray(), colors: colors.toArray(), lids }
+}
+
+/**
+ * A Stipple density that is a field of its own: hillshade, cast shadow or
+ * openness, each in [0, 1]. The slope and height sources return null and are
+ * read cell by cell.
+ *
+ * `shade` is Lambert darkness with level ground taken as white, so a plain
+ * stays clear and only the faces away from the sun fill. `cast` is the shadow
+ * sweep Shadow Line contours, softened by a cell and a half so the edge of a
+ * shadow thins out. `openness` is how far the ground lies below its
+ * surroundings at `radius` and at three times `radius`, against the 97th
+ * percentile: full in a gully, zero on a ridge, whatever the light.
+ */
+function stippleField(terrain, p, mode, o) {
+  if (mode !== 'shade' && mode !== 'cast' && mode !== 'openness') return null
+  const { grid, gridMask, rows, cols } = terrain
+  const n = rows * cols, out = new Float32Array(n)
+  const sMask = terrain.hasNoData ? gridMask : null
+  const azimuth = o.azimuth ?? 315
+  if (mode === 'shade') {
+    const dark = lambertDarkness(terrain, azimuth, 1, p.elevScale, 1)
+    const flat = 1 - Math.SQRT1_2
+    for (let i = 0; i < n; i++) out[i] = Math.max(0, (dark[i] - flat) / (1 - flat))
+    return out
+  }
+  if (mode === 'cast') {
+    const lit = smoothField(
+      litField(terrain, { elevScale: p.elevScale, azimuth, altitude: o.altitude ?? 25 }), cols, rows, 1.5, sMask)
+    for (let i = 0; i < n; i++) out[i] = lit[i] < 0 ? 0 : 1 - lit[i]
+    return out
+  }
+  const radius = Math.max(1, o.radius ?? 12)
+  const near = boxBlur(grid, cols, rows, radius, sMask), far = boxBlur(grid, cols, rows, radius * 3, sMask)
+  const sample = []
+  for (let i = 0; i < n; i++) {
+    out[i] = Math.max(0, (near[i] - grid[i]) + 0.6 * (far[i] - grid[i]))
+    if (i % 7 === 0 && out[i] > 0 && gridMask[i]) sample.push(out[i])
+  }
+  sample.sort((a, b) => a - b)
+  const top = sample.length ? sample[Math.min(sample.length - 1, Math.floor(sample.length * 0.97))] : 0
+  if (top > 0) for (let i = 0; i < n; i++) out[i] = Math.min(1, out[i] / top)
+  return out
+}
+
+// ─── Sediment ────────────────────────────────────────────────────────────────
+
+const SEDIMENT_MAX_STARTS = 2.5e5
+
+/**
+ * An even field of dots that slides down the slope and settles.
+ *
+ * Each dot starts on a jittered grid of pitch `spacing` and walks down the fall
+ * line of the blurred ground, one cell a step, for at most `travel`. It stops
+ * early where the ground is level (`flat`, against the 95th percentile of the
+ * gradient) and where the ground ends. Then it settles at the last place on
+ * its own path that is `gap` clear of every dot settled before it, so the dots
+ * queue up behind each other. A dot with no free place on its path is dropped.
+ * A dot that moved less than one gap stands on level ground, and is drawn only with
+ * `still`: a plain around the relief would otherwise fill with an even field.
+ *
+ * So the picture is drainage without a traced stream: ridges empty, because
+ * every dot there leaves, and the dots collect in the gullies and at the foot
+ * of each slope. The dots come in a shuffled order, or the queue would form
+ * along the scan direction.
+ *
+ * `isPoints`, like Stipple, and seeded the same way.
+ */
+export function buildSediment(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const step = Math.max((o.spacing ?? 4) / scl, Math.sqrt(n / SEDIMENT_MAX_STARTS))
+  const maxSteps = Math.max(0, Math.round((o.travel ?? 60) / scl))
+  const gap = Math.max(0.2, Math.min(1.5, o.gap ?? 0.5)) * step
+  const rng = mulberry32(((o.seed ?? 1) * 2654435761) >>> 0)
+
+  // The fall line of the blurred ground. A masked neighbour reads as level.
+  const smooth = boxBlur(grid, cols, rows, o.radius ?? 2, sMask)
+  const gx = new Float32Array(n), gy = new Float32Array(n), mags = []
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const h = smooth[i]
+      const l = c > 0 && gridMask[i - 1] ? smooth[i - 1] : h, e = c < cols - 1 && gridMask[i + 1] ? smooth[i + 1] : h
+      const u = r > 0 && gridMask[i - cols] ? smooth[i - cols] : h, d = r < rows - 1 && gridMask[i + cols] ? smooth[i + cols] : h
+      gx[i] = (e - l) / 2; gy[i] = (d - u) / 2
+      if (i % 5 === 0) mags.push(Math.hypot(gx[i], gy[i]))
+    }
+  }
+  mags.sort((a, b) => a - b)
+  const level = (o.flat ?? 0.03) * (mags.length ? mags[Math.floor(mags.length * 0.95)] : 0)
+
+  // Starts, then a shuffled order to visit them in.
+  const nR = Math.ceil(rows / step), nC = Math.ceil(cols / step), count = nR * nC
+  const sx = new Float32Array(count), sy = new Float32Array(count), order = new Uint32Array(count)
+  for (let k = 0; k < count; k++) {
+    sy[k] = Math.floor(k / nC) * step + (rng() - 0.5) * step
+    sx[k] = (k % nC) * step + (rng() - 0.5) * step
+    order[k] = k
+  }
+  for (let k = count - 1; k > 0; k--) {
+    const j = Math.floor(rng() * (k + 1)), t = order[k]
+    order[k] = order[j]; order[j] = t
+  }
+
+  // Settled dots, at most one a bucket: a bucket is gap / √2 on a side.
+  const b = gap / Math.SQRT2, bC = Math.ceil(cols / b) + 1, bR = Math.ceil(rows / b) + 1
+  const bucket = new Int32Array(bC * bR).fill(-1)
+  const px = new Float32Array(count), py = new Float32Array(count)
+  let settled = 0
+  const isFree = (x, y) => {
+    const cx = Math.floor(x / b), cy = Math.floor(y / b)
+    for (let j = Math.max(0, cy - 2); j <= Math.min(bR - 1, cy + 2); j++) {
+      for (let i = Math.max(0, cx - 2); i <= Math.min(bC - 1, cx + 2); i++) {
+        const q = bucket[j * bC + i]
+        if (q >= 0 && (px[q] - x) ** 2 + (py[q] - y) ** 2 < gap * gap) return false
+      }
+    }
+    return true
+  }
+  const onGround = (x, y) => x >= 0 && y >= 0 && x <= cols - 1 && y <= rows - 1 &&
+    gridMask[Math.round(y) * cols + Math.round(x)]
+
+  const path = new Float32Array((maxSteps + 1) * 2)
+  const positions = new F32List(), colors = new F32List()
+  const eps = Math.max(0.001, scl * 0.003)
+  for (let k = 0; k < count; k++) {
+    let x = sx[order[k]], y = sy[order[k]]
+    if (!onGround(x, y)) continue
+    path[0] = x; path[1] = y
+    let len = 1
+    for (let s = 0; s < maxSteps; s++) {
+      const i = Math.round(y) * cols + Math.round(x)
+      const m = Math.hypot(gx[i], gy[i])
+      if (!(m > level)) break
+      const nx = x - gx[i] / m, ny = y - gy[i] / m
+      if (!onGround(nx, ny)) break
+      x = nx; y = ny
+      path[len * 2] = x; path[len * 2 + 1] = y; len++
+    }
+    // Less than one gap of travel is level ground too: the rim of a plain.
+    if (len - 1 < Math.max(1, gap) && !o.still) continue
+    for (let s = len - 1; s >= 0; s--) {
+      const qx = path[s * 2], qy = path[s * 2 + 1]
+      if (!isFree(qx, qy)) continue
+      const elev = (sampleBilinear(grid, sMask, rows, cols, qy, qx) - 0.5) * 100 * elevScale
+      if (!inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) break
+      bucket[Math.floor(qy / b) * bC + Math.floor(qx / b)] = settled
+      px[settled] = qx; py[settled] = qy; settled++
+      const wx = qx * scl - halfW, wz = qy * scl - halfH
+      positions.push6(wx - eps, elev, wz, wx + eps, elev, wz)
+      colors.pushRgb2(computeVertexColor(normElev(elev, minElev, maxElev),
+        gridSlopes[Math.round(qy) * cols + Math.round(qx)] / (maxSlope || 1), 0, p))
+      break
+    }
+  }
+  return { positions: positions.toArray(), colors: colors.toArray(), isPoints: true, note: { dots: settled } }
 }
 
 /**

@@ -33,7 +33,7 @@ import { hexToRgb } from './colorUtils'
 import { DRAW_MODES } from './drawModes'
 import { jitterNoise, sampleBilinear } from './terrain'
 import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
-import { buildReticulation, buildRugged, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
+import { buildReticulation, buildRugged, buildSediment, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
 export { F32List, U32List, haloOf, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
 export { buildSurfaceGeometry } from './builders/surface.js'
@@ -88,7 +88,9 @@ export function buildLineGeometry(terrain, p) {
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil, p.anglePencil, p.singlePencil) },
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
-    { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter) },
+    { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter, {
+        even: p.evenStipple, azimuth: p.azimuthStipple, altitude: p.altitudeStipple, radius: p.radiusStipple,
+        amount: p.amountStipple }) },
     { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave) },
     { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
@@ -286,6 +288,9 @@ export function buildLineGeometry(terrain, p) {
     { id:'Hoarfrost', builder: (t, ctx) => buildHoarfrost(t, ctx, {
         cold: p.coldHoarfrost, count: p.countHoarfrost, seeds: p.seedsHoarfrost, cell: p.cellHoarfrost,
         line: p.lineHoarfrost, seed: p.seedHoarfrost }) },
+    { id:'Sediment', builder: (t, ctx) => buildSediment(t, ctx, {
+        spacing: p.spacingSediment, travel: p.travelSediment, gap: p.gapSediment, flat: p.flatSediment,
+        radius: p.radiusSediment, seed: p.seedSediment, still: p.stillSediment }) },
     { id:'Stitch',  builder: (t, ctx) => buildStitch(t, ctx, {
         cell: p.cellStitch, bands: p.bandsStitch, back: p.backStitch, lightColor: p.lightColorStitch }) },
     { id:'Tin',     builder: (t, ctx) => buildTin(t, ctx, {

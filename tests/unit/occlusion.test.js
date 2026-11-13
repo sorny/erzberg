@@ -64,7 +64,7 @@ describe('which model builds walls', () => {
   it('starts the marks and floating overlays with walls off', () => {
     const off = DRAW_MODES.filter((m) => STYLE_DEF[`walls${m.id}`] === false).map((m) => m.id).sort()
     expect(off).toEqual(['Air', 'AspectRose', 'Constellation', 'Envelope', 'Flashbulb', 'Fronts', 'Hachure', 'Hair', 'Halation', 'Hoarfrost',
-      'Hypsometry', 'Printer', 'ProfileSheet', 'Radar', 'Rain', 'Ripples', 'Runout', 'ShadowHatch', 'Shafts', 'SlopeClass',
+      'Hypsometry', 'Printer', 'ProfileSheet', 'Radar', 'Rain', 'Ripples', 'Runout', 'Sediment', 'ShadowHatch', 'Shafts', 'SlopeClass',
       'Stereonet', 'Stitch', 'SwathProfile', 'Swiss', 'Tally', 'Tin', 'TreeLine', 'Truchet', 'Waveform', 'Wiggle'])
     expect(STYLE_DEF.wallsLines).toBe(true)
     expect(STYLE_DEF.occludeBy).toBe('lines')

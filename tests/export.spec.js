@@ -216,7 +216,7 @@ test('any fill layer makes the terrain occlude lines in SVG export', async ({ pa
   // Hillshade is a Surface section, not a mark, so it keeps the section switch —
   // and the pane has to be on screen for the header click to land.
   await openStage(page, 'surface')
-  await page.getByText('Hillshade', { exact: true }).click()
+  await page.getByTestId('section-hillshade').click()
   await page.waitForTimeout(500)
   const hillshadeTog = page.locator('[data-section="Hillshade"]')
     .locator('input[type=checkbox]').first()

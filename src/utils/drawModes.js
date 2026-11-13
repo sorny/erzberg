@@ -378,6 +378,11 @@ export const DRAW_MODES = [
     pick: { cold: [0.35, 0.65] },
   },
   {
+    // One short walk down the fall line per dot, and a bucket test where it stops.
+    id: 'Sediment', label: 'Sediment', cost: 2, mark: 'sediment', walls: false,
+    pick: { spacing: [3, 7] },
+  },
+  {
     // Two strokes a cell.
     id: 'Stitch', label: 'Cross-stitch', cost: 1, mark: 'stitch', walls: false,
     pick: { cell: [5, 14] },
