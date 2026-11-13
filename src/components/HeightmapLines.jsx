@@ -304,7 +304,7 @@ function patchedLine(params, lift, push) {
   return m
 }
 
-function LineLayer({ layer, weight, dotWeight = weight, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false, strokeLift = 0 }) {
+function LineLayer({ layer, weight, dotWeight = weight, dotStep, opacity, dash, color, blending, fillColor, fillOpacity, strokeOutside, depthOcclusion, occlusionOpacity, occlusionColor, occlusionBias, resolution, tilt, layerIndex, tint, shift, groundOccludes, halo = 0, haloDepth = 1, ghostBand = false, strokeLift = 0 }) {
   const { positions: srcPositions, colors: srcColors, sphere } = layer
   const invalidate = useThree((s) => s.invalidate)
   // Round dots replace the stroke's own segments. Rebuilt with the weight,
@@ -317,8 +317,8 @@ function LineLayer({ layer, weight, dotWeight = weight, opacity, dash, color, bl
   const dots = useMemo(() => (
     // Spaced by the mode's own width, as the SVG spaces them, so Pen preview
     // changes the dot size and not how many dots there are.
-    chains ? dotsAlong(srcPositions, srcColors, layer.featureOfSegment, chains, dotSpacing(dotWeight)) : null
-  ), [chains, srcPositions, srcColors, layer.featureOfSegment, dotWeight])
+    chains ? dotsAlong(srcPositions, srcColors, layer.featureOfSegment, chains, dotSpacing(dotWeight, dotStep)) : null
+  ), [chains, srcPositions, srcColors, layer.featureOfSegment, dotWeight, dotStep])
   const positions = dots ? dots.positions : srcPositions
   const colors = dots ? dots.colors : srcColors
   // Converted once per geometry.
@@ -902,6 +902,7 @@ export function HeightmapLines({ lineGeo, surfaceGeo, p, profileClickRef }) {
           layer={layer}
           weight={weight}
           dotWeight={style.weight}
+          dotStep={style.dotStep}
           opacity={opacity}
           dash={dash}
           color={color}

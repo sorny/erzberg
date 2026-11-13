@@ -155,6 +155,7 @@ export const PANEL_MODES = [
   ['Mode: Orographic Rain', 'enabledRain',     'Wind',      (s) => deg(s.azimuthRain)],
   ['Mode: Sand Ripples',   'enabledRipples',   'Wind',      (s) => deg(s.azimuthRipples)],
   ['Mode: Hoarfrost',      'enabledHoarfrost', 'Crystals',  (s) => num(s.countHoarfrost)],
+  ['Mode: Sediment',       'enabledSediment',  'Spacing',   (s) => num(s.spacingSediment)],
   ['Mode: Cross-Stitch',   'enabledStitch',    'Cell',      (s) => num(s.cellStitch)],
   ['Mode: TIN Facets',     'enabledTin',       'Points',    (s) => num(s.countTin)],
   ['Mode: Roughness Mesh', 'enabledRugged',    'Points',    (s) => num(s.countRugged)],

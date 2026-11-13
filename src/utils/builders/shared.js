@@ -78,7 +78,17 @@ export function layerStyle(id, p) {
   const st = resolveLayerStyle(id, p)
   const out = st.name ? st : { ...st, name: layerDisplayName(id) }
   const halo = haloOf(id, p)
-  return halo > 0 ? { ...out, halo } : out
+  const styled = out.dash === 'dots' ? { ...out, dotStep: modeValue(id, p, 'dotStep') } : out
+  return halo > 0 ? { ...styled, halo } : styled
+}
+
+/** A per-mode value (`<key><Id>`) for a layer id. A copy's layer reads the copy. */
+function modeValue(id, p, key) {
+  if (typeof id !== 'string') return undefined
+  const copy = /@(\w+)$/.exec(id)
+  const values = copy ? (p.modeCopies?.find((c) => c.uid === copy[1])?.values ?? {}) : null
+  const mode = id.replace(/@\w+$/, '').split('-')[0]
+  return values?.[`${key}${mode}`] ?? p[`${key}${mode}`]
 }
 
 /**

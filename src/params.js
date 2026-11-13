@@ -74,6 +74,9 @@ const RENDER_SIDE = [
   // for the viewport and in svgExport for the plot. Dragging a line's weight or
   // opacity must not cost a rebuild of all fifteen draw modes.
   /^(weight|opacity|dash)/,
+  // The step between the round dots of a dotted line. layerStyle hands it to
+  // the viewport and the SVG, which both place the dots themselves.
+  /^dotStep[A-Z]/,
   // A plumb line's weight and opacity, times the mode's, in layerStyle too.
   /^plumb(Weight|Opacity)[A-Z]/,
   // The occlusion *look*. `depthOcclusion` itself is deliberately absent from
@@ -177,6 +180,7 @@ const isGeometry = (k) =>
  */
 const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
+  /^dotStep[A-Z]/,
   /^plumb(Weight|Opacity)[A-Z]/,
   /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight|lineWeight|linkWeight)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,

@@ -86,7 +86,7 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 74 modes as tiles in eight families:
+- **Marks sheet.** The Marks stage shows the 75 modes as tiles in eight families:
   Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
@@ -191,7 +191,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 74 modes.
+  classes you pick. This works for all 75 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -256,7 +256,7 @@ at the cut. → [Edit Mode](docs/Edit-Mode.md)
 ## Draw modes
 
 Every mode runs independently, with its own colour, weight, line style (solid,
-dashed, short, long or round dots) and colour: the line colour, a gradient by
+dashed, short, long or round dots, with a dot step of its own) and colour: the line colour, a gradient by
 height, slope or aspect, or the land cover class. Each mode also sets whether it
 is an occluder, and a halo that breaks the lines behind it.
 → [Draw mode mathematics](docs/Draw-Modes.md) · [Occlusion](docs/Draw-Modes.md#occlusion)
@@ -277,7 +277,8 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Pencil Shading | Laplacian curvature |
 | Ridge Detection | Hessian eigenvalue crests |
 | Valley Detection | Topographic Position Index troughs |
-| Stipple Dots | Stochastic dot density from slope or elevation |
+| Stipple Dots | Dot density from slope, elevation, hillshade, cast shadow or openness, random or evenly spaced |
+| Sediment | An even field of dots that slides down the slope and settles: ridges empty, and the dots queue in the gullies |
 | Isophotes | Lines of constant illumination |
 | Shadow Line | The shadow edge at one date, time and zone |
 | Sun Hours | Isolines of hours in direct sun, over a year or one date |
@@ -393,7 +394,7 @@ terrain, its Edit Mode clip and georeference, the look and camera, the vectors,
 the text, the masks, the land cover and the imagery. Open it, or drop it, and
 the plate comes back exactly.
 
-**Seeds.** Stipple, Rock & Scree, Flashbulb, Halation, Reticulation, Single Line
+**Seeds.** Stipple, Sediment, Rock & Scree, Flashbulb, Halation, Reticulation, Single Line
 and Roughness Mesh carry a seed. The same seed gives the same pattern.
 
 ---

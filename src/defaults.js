@@ -109,6 +109,12 @@ export const STYLE_DEF = {
   // Stipple — seedStipple: same seed, same dot pattern (reproducible prints)
   enabledStipple: false, spacingStipple: 1, weightStipple: 4, opacityStipple: 0.85, colorStipple: '#1a1a1a', dashStipple: 'solid',
   stippleDensityMode: 'slope', stippleGamma: 1.2, stippleJitter: 0.8, seedStipple: 42,
+  // `evenStipple`: a blue-noise threshold in place of the random draw, so dots
+  // keep their distance. The sun is for the Hillshade and Cast shadow sources,
+  // the radius for Openness.
+  evenStipple: false, azimuthStipple: 315, altitudeStipple: 25, radiusStipple: 12,
+  // `amountStipple`: the share of candidates kept where the density is full.
+  amountStipple: 1,
   // `snapStipple`: the whole-cell candidate grid of plates before format 9.
   snapStipple: false,
   hypsoStipple: false, hypsoModeStipple: 'elevation', hypsoBandedStipple: false, hypsoIntervalStipple: 10,
@@ -490,6 +496,14 @@ export const STYLE_DEF = {
   colorHoarfrost: '#1f4f78', weightHoarfrost: 0.6, opacityHoarfrost: 1, dashHoarfrost: 'solid',
   hypsoHoarfrost: false, hypsoModeHoarfrost: 'elevation', hypsoBandedHoarfrost: false, hypsoIntervalHoarfrost: 10,
 
+  // Sediment — an even field of dots that slides down the slope and settles.
+  enabledSediment: false, spacingSediment: 4, travelSediment: 80, gapSediment: 0.5, flatSediment: 0.03,
+  radiusSediment: 2, seedSediment: 1,
+  // `stillSediment`: also draw the dots that never moved, on level ground.
+  stillSediment: false,
+  colorSediment: '#1a1a1a', weightSediment: 3, opacitySediment: 1, dashSediment: 'solid',
+  hypsoSediment: false, hypsoModeSediment: 'elevation', hypsoBandedSediment: false, hypsoIntervalSediment: 10,
+
   // Cross-stitch — half stitches and crosses by height band, with backstitch outlines.
   enabledStitch: false, cellStitch: 8, bandsStitch: 5, backStitch: true, lightColorStitch: '#c0561a',
   colorStitch: '#1a1a1a', weightStitch: 0.8, opacityStitch: 1, dashStitch: 'solid',
@@ -772,6 +786,13 @@ export const STYLE_DEF = {
    */
   ...Object.fromEntries(DRAW_MODES.map((m) => [`walls${m.id}`, m.walls !== false])),
   ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`halo${id}`, 0])),
+
+  /*
+   * `dotStep<Id>`: the distance between the centres of the round dots of a
+   * line with the dotted dash, in dot diameters. 2.2 is the step every dotted
+   * line had before the control existed.
+   */
+  ...Object.fromEntries(DRAW_MODE_IDS.map((id) => [`dotStep${id}`, 2.2])),
 
   /*
    * Copies of draw modes: one mode, several settings. Each is

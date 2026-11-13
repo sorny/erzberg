@@ -17,6 +17,7 @@ const MODES = [
   ['Rain', 'Orographic Rain', 'rain', /^[\d,.\s ]+ streaks$/],
   ['Ripples', 'Sand Ripples', 'ripples', /^\d+% sand$/],
   ['Hoarfrost', 'Hoarfrost', 'hoarfrost', /^[\d,.\s ]+ crystals$/],
+  ['Sediment', 'Sediment', 'sediment', /^[\d,.\s ]+ dots$/],
   ['Stitch', 'Cross-Stitch', 'stitch', /^[\d,.\s ]+ stitches$/],
   ['Tin', 'TIN Facets', 'tin', /^[\d,.\s ]+ facets$/],
   ['Shafts', 'Light Shafts', 'shafts', /^[\d,.\s ]+ shafts$/],

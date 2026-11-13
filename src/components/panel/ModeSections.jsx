@@ -282,11 +282,34 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Gamma" help="Density curve exponent. >1 pushes dots toward high-density areas; <1 spreads them more evenly." min={0.05} max={2} step={0.05} value={style.stippleGamma} onChange={v => ss({ stippleGamma: v })} fmt={v => v.toFixed(2)} />
                   <InlineSl label="Jitter" help="Random displacement of each dot within its grid cell. 100% = full cell, 0% = regular grid." min={0} max={1} step={0.05} value={style.stippleJitter} onChange={v => ss({ stippleJitter: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Seed" help="Randomness seed — the same seed always reproduces the identical dot pattern." min={1} max={999} step={1} value={style.seedStipple ?? 42} onChange={v => ss({ seedStipple: v })} />
-                  <div style={{ marginBottom: 4 }}>
+                  <InlineSl label="Density" testId="stipple-amount" help="The share of dots kept where the source is at its fullest. Lower it to thin a tone that is too dark, such as the inside of a cast shadow." min={0.05} max={1} step={0.05} value={style.amountStipple ?? 1} onChange={v => ss({ amountStipple: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <Tog label="Even spacing" testId="stipple-even"
+                    help="The dots keep their distance from each other, so two dots do not touch and a wide pen does not make blots. Jitter moves each dot half as far. Off, each dot is kept by a random draw and some dots touch."
+                    checked={!!style.evenStipple} onChange={v => ss({ evenStipple: v })} />
+                  <div style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Density from</span>
-                    <SegGroup label="Density from" options={[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev']]}
+                    <SegGroup label="Density from" columns={4} testIdOf={(v) => `stipple-density-${v}`}
+                      options={[['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Elevation', 'elevation'], ['Inv Elev', 'invElev'],
+                                ['Hillshade', 'shade'], ['Cast Shadow', 'cast'], ['Openness', 'openness']]}
                       value={style.stippleDensityMode} onChange={(v) => ss({ stippleDensityMode: v })} />
                   </div>
+                  {(style.stippleDensityMode === 'shade' || style.stippleDensityMode === 'cast') && (
+                    <InlineSl label="Sun azimuth" testId="stipple-azimuth"
+                      help={style.stippleDensityMode === 'shade'
+                        ? "Compass bearing of the light. Faces that look away from it get the dots. Level ground stays clear."
+                        : "Compass bearing of the sun. Dots fill the ground that a ridge hides from it."}
+                      min={0} max={360} step={1} value={style.azimuthStipple} onChange={v => ss({ azimuthStipple: v })} fmt={v => Math.round(v) + '°'} />
+                  )}
+                  {style.stippleDensityMode === 'cast' && (
+                    <InlineSl label="Sun altitude" testId="stipple-altitude"
+                      help="Degrees above the horizon. A low sun throws long shadows. At 0 or below, all ground is in shadow."
+                      min={-5} max={85} step={0.5} value={style.altitudeStipple} onChange={v => ss({ altitudeStipple: v })} fmt={v => `${+v.toFixed(1)}°`} />
+                  )}
+                  {style.stippleDensityMode === 'openness' && (
+                    <InlineSl label="Search" testId="stipple-radius"
+                      help="How far each cell looks at the ground around it, in grid cells. Ground that lies below its surroundings gets the dots, so gullies fill and ridges stay clear. A short search finds small gullies. A long search finds whole valleys."
+                      min={2} max={60} step={1} value={style.radiusStipple} onChange={v => ss({ radiusStipple: Math.round(v) })} fmt={v => `${Math.round(v)} cells`} />
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Stipple" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
               </>
@@ -1653,6 +1676,28 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
+
+          <Section title="Mode: Sediment" icon={<ModeMark kind="sediment" />} open={sec.modeSediment} onToggle={() => tog('modeSediment')} enabled={style.enabledSediment} onEnabled={v => ss({ enabledSediment: v })} enableTestId="mode-sediment">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Sediment && (
+                    <div data-testid="sediment-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Sediment.dots.toLocaleString()} dots`}
+                    </div>
+                  )}
+                  <InlineSl label="Spacing" help="Distance between the dots before they move, in raster pixels. Smaller gives more dots." min={1} max={30} step={0.25} value={style.spacingSediment} onChange={v => ss({ spacingSediment: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Travel" help="The farthest a dot slides down the slope, in raster pixels. At 0 the dots stay where they start. A long travel empties the slopes and fills the gullies." min={0} max={600} step={5} value={style.travelSediment} onChange={v => ss({ travelSediment: Math.round(v) })} />
+                  <InlineSl label="Gap" help="The clear distance a dot keeps from the dots that settled before it, as a share of Spacing. Raise it until the dots do not touch for your pen. A wide gap makes the queues longer and drops more dots." min={0.2} max={1.5} step={0.05} value={style.gapSediment} onChange={v => ss({ gapSediment: v })} fmt={v => `${v.toFixed(2)} × spacing`} />
+                  <InlineSl label="Flat below" help="A dot stops where the ground is flatter than this share of the steep slopes of the plate. Raise it and the dots settle earlier, at the foot of each slope." min={0} max={0.5} step={0.01} value={style.flatSediment} onChange={v => ss({ flatSediment: v })} fmt={v => `${Math.round(v * 100)}%`} />
+                  <InlineSl label="Blur" help="Blur on the heights before the dots move, in grid cells. More blur gives straighter paths and fewer, larger queues." min={0} max={12} step={1} value={style.radiusSediment} onChange={v => ss({ radiusSediment: Math.round(v) })} />
+                  <Tog label="Level ground" testId="sediment-still" help="Also draws the dots that never moved. Level ground then keeps an even field of dots. Off, a plain stays clear and only the dots that slid are drawn." checked={!!style.stillSediment} onChange={v => ss({ stillSediment: v })} />
+                  <InlineSl label="Seed" help="The same seed always gives the same dots." min={1} max={999} step={1} value={style.seedSediment} onChange={v => ss({ seedSediment: Math.round(v) })} />
+                </Sub>
+                <ModeStyleOverride prefix="Sediment" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} label="Dot style" showDash={false} />
+              </>
+            )}
+          </Section>
 
           <Section title="Mode: Hoarfrost" icon={<ModeMark kind="hoarfrost" />} open={sec.modeHoarfrost} onToggle={() => tog('modeHoarfrost')} enabled={style.enabledHoarfrost} onEnabled={v => ss({ enabledHoarfrost: v })} enableTestId="mode-hoarfrost">
             {(
