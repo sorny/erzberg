@@ -55,6 +55,9 @@ export const STYLE_DEF = {
   // ── DRAW MODES ───────────────────────────────────────────────────────────
   // Lines (arbitrary bearing — 0° is the old X Lines, 90° the old Y Lines)
   enabledLines: true, spacingLines: 4, shiftLines: 0, angleLines: 0, colorLines: '#000000', weightLines: 1, opacityLines: 1, dashLines: 'solid',
+  // Shade fill: lines halfway between the lines where the darkness reaches
+  // `shadeHalfLines`, and a quarter of the way where it reaches `shadeQuarterLines`.
+  shadeLines: false, sunLines: 315, shadeHalfLines: 0.45, shadeQuarterLines: 0.65,
   hypsoLines: false, hypsoModeLines: 'elevation', hypsoBandedLines: false, hypsoIntervalLines: 10,
   // Crosshatch (two perpendicular line sets at angleCross / angleCross+90)
   enabledCross: false, spacingCross: 4, angleCross: 0, colorCross: '#000000', weightCross: 1, opacityCross: 1, dashCross: 'solid',
@@ -73,6 +76,10 @@ export const STYLE_DEF = {
   hypsoPillarsAbove: false, hypsoModePillarsAbove: 'elevation', hypsoBandedPillarsAbove: false, hypsoIntervalPillarsAbove: 10,
   // Contours
   enabledContours: false, intervalContours: 4, colorContours: '#000000', weightContours: 1, opacityContours: 1, dashContours: 'solid',
+  // Auxiliary contours at half the interval where the contours lie more than
+  // `auxGapContours` pixels apart, and the crowding cut that drops a minor
+  // contour where it runs closer than `crowdGapContours` pixels to the next.
+  auxContours: false, auxGapContours: 40, auxDashContours: 'dashed', crowdContours: false, crowdGapContours: 3,
   // Contour labels. `labelSizeContours` is world units per em, like the vector
   // labels; `labelSpacingContours` is how far apart along a contour, in the same
   // units, so both read against the terrain rather than against the screen.
@@ -94,6 +101,8 @@ export const STYLE_DEF = {
   hypsoFlow: false, hypsoModeFlow: 'elevation', hypsoBandedFlow: false, hypsoIntervalFlow: 10,
   // Stream Network (DAG)
   enabledDag: false, thresholdDag: 2, accumDag: false, passesDag: 4, gapDag: 0.35, colorDag: '#000000', weightDag: 1, opacityDag: 1, dashDag: 'solid',
+  // Banks: a river wider than `bankFromDag` pixels as two lines, `bankWidthDag` × √(area in px²) apart.
+  banksDag: false, bankWidthDag: 0.05, bankFromDag: 6,
   hypsoDag: false, hypsoModeDag: 'elevation', hypsoBandedDag: false, hypsoIntervalDag: 10,
   // Pencil Shading
   enabledPencil: false, spacingPencil: 4, thresholdPencil: 0.5, anglePencil: 45, singlePencil: false, colorPencil: '#000000', weightPencil: 1, opacityPencil: 1, dashPencil: 'solid',
@@ -131,6 +140,8 @@ export const STYLE_DEF = {
   hypsoIso: false, hypsoModeIso: 'elevation', hypsoBandedIso: false, hypsoIntervalIso: 10,
 
   enabledEngrave: false, spacingEngrave: 3, angleEngrave: 45, levelsEngrave: 3, sunAzimuthEngrave: 315, gammaEngrave: 1.5,
+  // `strokesEngrave: 'form'`: the layers follow the contours and the fall lines.
+  strokesEngrave: 'straight',
   colorEngrave: '#000000', weightEngrave: 1, opacityEngrave: 1, dashEngrave: 'solid',
   hypsoEngrave: false, hypsoModeEngrave: 'elevation', hypsoBandedEngrave: false, hypsoIntervalEngrave: 10,
   // Curvature engraving — strokes trace the principal-curvature direction field
@@ -147,6 +158,8 @@ export const STYLE_DEF = {
   // them. `screenWeight` is the dither dot's radius, separate from the
   // staircase's stroke, the same way Swiss parts its scree from its hachures.
   enabledBitplane: false, tiersBitplane: 10, ditherBitplane: 1, spacingBitplane: 2, risersBitplane: true,
+  // `edgeBitplane: 'smooth'`: steps along smoothed contours, risers every `riserSpacingBitplane` pixels.
+  edgeBitplane: 'cells', riserSpacingBitplane: 6,
   colorBitplane: '#000000', weightBitplane: 1, opacityBitplane: 1, dashBitplane: 'solid',
   screenWeightBitplane: 3,
   hypsoBitplane: false, hypsoModeBitplane: 'elevation', hypsoBandedBitplane: false, hypsoIntervalBitplane: 10,
@@ -495,6 +508,31 @@ export const STYLE_DEF = {
   lineHoarfrost: true, seedHoarfrost: 1,
   colorHoarfrost: '#1f4f78', weightHoarfrost: 0.6, opacityHoarfrost: 1, dashHoarfrost: 'solid',
   hypsoHoarfrost: false, hypsoModeHoarfrost: 'elevation', hypsoBandedHoarfrost: false, hypsoIntervalHoarfrost: 10,
+
+  // Loxodromes — lines that cross every contour at one angle, or fall at one grade.
+  enabledLoxo: false, spacingLoxo: 6, angleLoxo: 60, turnLoxo: 'right', holdLoxo: 'angle', gradeLoxo: 10,
+  minSlopeLoxo: 2, radiusLoxo: 8, cellMetresLoxo: 10, reliefLoxo: 1000,
+  colorLoxo: '#1a1a1a', weightLoxo: 1, opacityLoxo: 1, dashLoxo: 'solid',
+  hypsoLoxo: false, hypsoModeLoxo: 'elevation', hypsoBandedLoxo: false, hypsoIntervalLoxo: 10,
+
+  // Breaklines — convex and concave breaks of slope. The concave pen is dotted.
+  enabledBreaks: false, keepBreaks: 0.5, minSlopeBreaks: 4, radiusBreaks: 8, minLengthBreaks: 12,
+  smoothingBreaks: 2, convexBreaks: true, concaveBreaks: true, concaveDashBreaks: 'short',
+  cellMetresBreaks: 10, reliefBreaks: 1000,
+  colorBreaks: '#1a1a1a', weightBreaks: 1, opacityBreaks: 1, dashBreaks: 'solid',
+  hypsoBreaks: false, hypsoModeBreaks: 'elevation', hypsoBandedBreaks: false, hypsoIntervalBreaks: 10,
+
+  // Surface network — cols, the ridges to their summits, the courses down. `marksMorse`: × and ▲.
+  enabledMorse: false, radiusMorse: 16, persistenceMorse: 0.02, coursesMorse: true, marksMorse: true,
+  sizeMorse: 10, courseDashMorse: 'dashed',
+  colorMorse: '#1a1a1a', weightMorse: 1, opacityMorse: 1, dashMorse: 'solid',
+  hypsoMorse: false, hypsoModeMorse: 'elevation', hypsoBandedMorse: false, hypsoIntervalMorse: 10,
+
+  // Flow time — isolines of the time water takes to reach the plain.
+  enabledFlowTime: false, levelsFlowTime: 15, radiusFlowTime: 12, speedupFlowTime: 0.32, plainFlowTime: 0.03,
+  smoothingFlowTime: 2, cellMetresFlowTime: 10, reliefFlowTime: 1000,
+  colorFlowTime: '#1a1a1a', weightFlowTime: 1, opacityFlowTime: 1, dashFlowTime: 'solid',
+  hypsoFlowTime: false, hypsoModeFlowTime: 'elevation', hypsoBandedFlowTime: false, hypsoIntervalFlowTime: 10,
 
   // Sediment — an even field of dots that slides down the slope and settles.
   enabledSediment: false, spacingSediment: 4, travelSediment: 80, gapSediment: 0.5, flatSediment: 0.03,

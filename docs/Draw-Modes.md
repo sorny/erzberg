@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-five
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-nine
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Seventy-four modes read $H$ only. [Land cover](#land-cover) reads a second
+Seventy-eight modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -49,6 +49,12 @@ $p_k = k \cdot \text{spacing} + \text{shift}$ along the normal
 $(-\sin\theta, \cos\theta)$. The builder samples each line in unit-cell steps
 along $(\cos\theta, \sin\theta)$ with bilinear elevation. At 0° and 90° the
 samples land on grid rows and columns.
+
+**Shade fill.** With a sun at *Sun azimuth* and 45°, the darkness is
+$D = 1 - \max(0, \mathbf{n}\cdot\mathbf{l})$, about 0.29 on level ground. A
+line halfway between two lines is drawn where $D \ge$ *Half from*, and the two
+lines at the quarters where $D \ge$ *Quarters from*. The darkness is read on
+the heights blurred by one cell.
 
 ## 2. Crosshatch
 
@@ -132,6 +138,19 @@ the line.
 at their own height, as their own pen (`Contours-Extremes`). The contours ring
 these points but do not name them.
 
+**Contour gap.** The distance between two contours at a point is the interval
+over the slope there, $g = \Delta / |\nabla H|$, in raster pixels, with
+$\nabla H$ read on the heights blurred by two cells.
+
+- **Auxiliary contours** are lines at half the interval, drawn only where
+  $g >$ *Gap*. They are chained and smoothed like the contours, and a run
+  shorter than three segments is dropped. They are their own pen,
+  `Contours-Aux`, dashed by default. A cell with a NoData corner gets none.
+- **Crowding cut** leaves out a minor contour segment where $g <$ *Min gap*.
+  Major contours stay whole.
+
+Tanaka contours use neither.
+
 ## 5. Hachure
 
 The gradient $\nabla H$ from central differences. A stroke through each cell
@@ -183,6 +202,14 @@ channel is drawn as $k$ parallel passes, `gap` cells apart:
 $$k = 1 + \operatorname{round}\left((k_{\max} - 1)\,\frac{\ln(A / A_{\min})}{\ln(A_{\max} / A_{\min})}\right)$$
 
 The log is necessary because $A$ grows by orders of magnitude towards the outlet.
+
+**Banks.** A river of width $w = k \sqrt{A}$, with $A$ in square raster pixels
+and $k$ the *Width*, is drawn as two banks $w$ apart once $w$ passes *Banks
+from*. The network is first chained into rivers. At a junction the river with
+the larger $A$ goes on, and the other ends, cut back to the bank it meets.
+Each river is rounded by three Chaikin passes and thinned to about one cell
+between points before the banks are offset. With Banks on, the passes by flow
+are not drawn.
 
 ## 8. Pencil Shading
 
@@ -263,6 +290,12 @@ $$D \geq \frac{k + 1}{L + 1}$$
 **Strokes.** Parallel lines of pitch `spacing` march in unit-cell steps and
 drape bilinearly. A stroke breaks when the surface becomes too bright, leaves
 the mask or leaves the elevation cut.
+
+**Form strokes.** With *Strokes: Form*, each layer is evenly spaced
+streamlines instead, one `spacing` apart. Layer 1 runs along the contours,
+layer 2 down the fall lines, layers 3 and 4 across the fall line at ±45°. The
+directions come from the heights blurred by one gap, and the tone from the
+same blur. A stroke shorter than two gaps is dropped.
 
 ## 13. Rock & Scree
 
@@ -345,6 +378,12 @@ $$\text{ink}(r,c) \iff f \cdot \text{dither} > \frac{B[r \bmod 4][c \bmod 4] + \
 
 `Bitplane-Step` and `Bitplane-Screen` are separate layers. Hypsometric tint
 reads the tier.
+
+**Smooth edge.** With *Edge: Smooth*, the step between tiers $t - 1$ and $t$
+is the level $t$ of the field $\hat{H} \cdot N$, traced with interpolation,
+chained and rounded by two Chaikin passes. It is drawn flat at the upper
+tier. With *Risers* on, a vertical drops to the lower tier every *Riser
+spacing* raster pixels along it. The screen is the same.
 
 ## 17. Flashbulb
 
@@ -1148,6 +1187,75 @@ shuffled order.
 
 A dot that moved less than one gap stands on level ground. It is drawn only
 with *Level ground* on.
+
+## 77–80. Loxodromes, Breaklines, Surface Network, Flow Time
+
+All four are in the Line family, in `builders/form.js`. Heights are true metres
+from the GeoTIFF, or from *Pixel size* and *Relief* on a PNG. Lengths are in
+raster pixels.
+
+### Loxodromes
+
+Lines that cross every contour at one angle. With $\hat{\mathbf{u}}$ the
+downhill direction and $\alpha$ the *Angle*, the line runs along
+$\hat{\mathbf{u}}$ turned by $\alpha$ to the side *Turn* names. At 0° the
+lines are fall lines, at 90° contours. Between, they wind round each summit
+and hollow, as a rhumb line winds round a pole.
+
+With *Hold: Grade*, the line keeps the grade $g$ instead. On a slope $s > g$
+it turns by $\arccos(g / s)$, so it falls by $g$. On gentler ground it runs
+down the fall line. Ground flatter than *Min slope* stops a line. The lines are
+evenly spaced (Jobard–Lefer), *Spacing* apart, on the heights blurred by
+*Blur*.
+
+### Breaklines
+
+Breaks of slope. The profile curvature is the second derivative along the
+gradient,
+
+$$k = \frac{z_{xx} z_x^2 + 2 z_{xy} z_x z_y + z_{yy} z_y^2}{z_x^2 + z_y^2}$$
+
+negative where the slope steepens downhill and positive where it eases. A
+breakline is the zero of $\nabla k \cdot \hat{\nabla} z$, the ridge of $|k|$
+along the fall line. It is kept where $|k|$ is in the strongest *Keep* share of
+the ground steeper than *Min slope*. Convex breaks (`Breaks-Convex`) mark the
+top of a face, concave breaks (`Breaks-Concave`, dotted) its foot. Chains
+shorter than *Min length* are dropped.
+
+### Surface Network
+
+The surface network of Pfaltz (1976). On the heights blurred by *Blur*, a col
+is a cell whose eight neighbours change between higher and lower at least four
+times round the ring. From each higher arc a ridge climbs by steepest ascent to
+a summit. From each lower arc a course runs down until the ground is level,
+leaves the data, or the gradient turns back. Each walk leaves the col along
+its arc for 1.5 cells first, because on the col the gradient is mostly the
+error in where the col lies.
+
+A col is dropped when its two summits are the same, or when the lower one
+stands less than *Persistence* times the height range above it. Of several
+cols between the same two summits, the highest is kept. Three pens: ridges,
+courses (dashed) and points (a cross at each col, a triangle at each summit,
+*Size* across).
+
+### Flow Time
+
+Isolines of the time water takes to reach the plain or the hollow it ends in.
+From each cell a drop walks down the gradient in half-cell steps, at speed
+
+$$v = \sqrt{\max(\tan 1.7°, \tan\beta)} \cdot A^{e}$$
+
+with $A$ the D8 upslope area in cells and $e$ the *Channel speed*. A walk
+ends below the *Plain* (a share of the height range above the lowest ground),
+where the ground is level, or off the data. The walks run on a grid of at
+most 256 cells on its longer side, lowest cell first. A walk that passes
+within a third of a cell of a cell already walked takes that cell's time and
+stops. Two passes of a 3 × 3 mean over cells with the same end smooth the
+field.
+
+No line is traced across a divide: between cells whose walks end in different
+places, or whose downhill directions run apart. *Lines* levels are evenly
+spaced up to the 95th percentile of the times.
 
 ## NoData and clipped edges
 

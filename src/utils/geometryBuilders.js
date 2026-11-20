@@ -33,6 +33,7 @@ import { hexToRgb } from './colorUtils'
 import { DRAW_MODES } from './drawModes'
 import { jitterNoise, sampleBilinear } from './terrain'
 import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
+import { buildBreaklines, buildFlowTime, buildLoxodromes, buildSurfaceNetwork } from './builders/form.js'
 import { buildReticulation, buildRugged, buildSediment, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
 export { F32List, U32List, haloOf, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
@@ -68,7 +69,8 @@ export function buildLineGeometry(terrain, p) {
   // A function of `p`, not a constant over it: a mode copy runs the same
   // builders against its own values (see the run list below).
   const modeConfigs = (p) => [
-    { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines) },
+    { id:'Lines',   builder: (t, ctx) => buildAngleLines(t, ctx, p.spacingLines, p.shiftLines, p.angleLines, false, {
+        on: p.shadeLines, azimuth: p.sunLines, half: p.shadeHalfLines, quarter: p.shadeQuarterLines }) },
     { id:'Cross',   builder: (t, ctx) => buildCrosshatch(t, ctx, {
         spacing: p.spacingCross, angle: p.angleCross, lines: p.linesCross,
         marks: p.marksCross, markSize: p.markSizeCross, markColor: p.markColorCross }) },
@@ -84,14 +86,16 @@ export function buildLineGeometry(terrain, p) {
     { id:'Flow',    builder: (t, ctx) => buildFlowLines(t, ctx, p.spacingFlow, p.stepFlow, p.maxLenFlow, {
         direction: p.directionFlow, minLen: p.minLenFlow }) },
     { id:'Dag',     builder: (t, ctx) => buildDagThinning(t, ctx, p.thresholdDag, {
-        accum: p.accumDag, passes: p.passesDag, gap: p.gapDag }) },
+        accum: p.accumDag, passes: p.passesDag, gap: p.gapDag,
+        banks: p.banksDag, bankWidth: p.bankWidthDag, bankFrom: p.bankFromDag }) },
     { id:'Pencil',  builder: (t, ctx) => buildPencilShading(t, ctx, p.spacingPencil, p.thresholdPencil, p.anglePencil, p.singlePencil) },
     { id:'Ridge',   builder: (t, ctx) => buildRidgeLines(t, ctx, p.spacingRidge, p.radiusRidge, p.thresholdRidge) },
     { id:'Valley',  builder: (t, ctx) => buildTpiFeatures(t, ctx, p.spacingValley, p.radiusValley, p.thresholdValley, false) },
     { id:'Stipple', builder: (t, ctx) => buildStipple(t, ctx, p.spacingStipple, p.stippleDensityMode, p.stippleGamma, p.stippleJitter, {
         even: p.evenStipple, azimuth: p.azimuthStipple, altitude: p.altitudeStipple, radius: p.radiusStipple,
         amount: p.amountStipple }) },
-    { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave) },
+    { id:'Engrave', builder: (t, ctx) => buildEngraving(t, ctx, p.spacingEngrave, p.angleEngrave, p.levelsEngrave, p.sunAzimuthEngrave, p.gammaEngrave, {
+        strokes: p.strokesEngrave }) },
     { id:'Curv',    builder: (t, ctx) => buildCurvature(t, ctx, p.spacingCurv, p.lengthCurv, p.thresholdCurv, p.radiusCurv, p.dirModeCurv, p.stepCurv) },
     { id:'Swiss',   builder: (t, ctx) => buildSwissRockScree(t, ctx, p.spacingSwiss, p.thresholdSwiss, p.lengthSwiss, p.screeSwiss) },
     { id:'Iso',     builder: (t, ctx) => buildIsophotes(t, ctx, p.levelsIso, p.sunAzimuthIso, p.gammaIso, p.smoothingIso, p.radiusIso) },
@@ -101,7 +105,8 @@ export function buildLineGeometry(terrain, p) {
         levels: p.levelsSunHours, period: p.periodSunHours, days: p.daysSunHours,
         perDay: p.perDaySunHours, date: p.dateSunHours,
         smoothing: p.smoothingSunHours, radius: p.radiusSunHours }) },
-    { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane) },
+    { id:'Bitplane',builder: (t, ctx) => buildBitplane(t, ctx, p.tiersBitplane, p.ditherBitplane, p.spacingBitplane, p.risersBitplane, {
+        edge: p.edgeBitplane, riserSpacing: p.riserSpacingBitplane }) },
     { id:'Sprite',  builder: (t, ctx) => buildSprite(t, ctx, {
         tiers: p.tiersSprite, spacing: p.spacingSprite, size: p.sizeSprite,
         faces: p.facesSprite, faceColor: p.faceColorSprite }) },
@@ -307,6 +312,19 @@ export function buildLineGeometry(terrain, p) {
     { id:'Envelope', builder: (t, ctx) => buildEnvelope(t, ctx, {
         span: p.spanEnvelope, spacing: p.spacingEnvelope, angle: p.angleEnvelope, cross: p.crossEnvelope,
         clearance: p.clearanceEnvelope, whole: p.wholeEnvelope, drops: p.dropsEnvelope }) },
+    { id:'Loxo',    builder: (t, ctx) => buildLoxodromes(t, ctx, {
+        spacing: p.spacingLoxo, angle: p.angleLoxo, turn: p.turnLoxo, hold: p.holdLoxo, grade: p.gradeLoxo,
+        minSlope: p.minSlopeLoxo, radius: p.radiusLoxo, cellMetres: p.cellMetresLoxo, relief: p.reliefLoxo }) },
+    { id:'Breaks',  builder: (t, ctx) => buildBreaklines(t, ctx, {
+        keep: p.keepBreaks, minSlope: p.minSlopeBreaks, radius: p.radiusBreaks, minLength: p.minLengthBreaks,
+        smoothing: p.smoothingBreaks, convex: p.convexBreaks, concave: p.concaveBreaks,
+        cellMetres: p.cellMetresBreaks, relief: p.reliefBreaks }) },
+    { id:'Morse',   builder: (t, ctx) => buildSurfaceNetwork(t, ctx, {
+        radius: p.radiusMorse, persistence: p.persistenceMorse, courses: p.coursesMorse, points: p.marksMorse,
+        size: p.sizeMorse }) },
+    { id:'FlowTime', builder: (t, ctx) => buildFlowTime(t, ctx, {
+        levels: p.levelsFlowTime, radius: p.radiusFlowTime, speedup: p.speedupFlowTime, plain: p.plainFlowTime,
+        smoothing: p.smoothingFlowTime, cellMetres: p.cellMetresFlowTime, relief: p.reliefFlowTime }) },
   ]
 
   /*

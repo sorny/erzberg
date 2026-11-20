@@ -328,6 +328,18 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
       : (majorMod === 1 ? 1 : 0)
   }
 
+  /*
+   * How far apart the contours lie at a point, in raster pixels: one interval
+   * over the slope there. Read on the heights blurred by two cells, so one
+   * steep cell does not cut a line into pieces. Built only when the crowding
+   * cut or the auxiliary contours need it.
+   */
+  const crowdGap = p.crowdContours ? Math.max(0, p.crowdGapContours ?? 3) : 0
+  const gapAt = (crowdGap > 0 || p.auxContours) && numSteps > 0
+    ? contourGap(terrain, Math.abs(lvlStep)) : null
+  const crowded = (k, x0, y0, x1, y1) =>
+    crowdGap > 0 && levelMajor[k] !== 1 && gapAt((y0 + y1) / 2, (x0 + x1) / 2) < crowdGap
+
   // When chaining is needed, raw grid-space segments are collected per level and
   // chained/smoothed/closed after the scan; otherwise they emit directly (fast path).
   //
@@ -406,6 +418,7 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
             (levelSegE[k]  ??= new I32List()).push2(eid[e0], eid[e1])
             ;(levelSegXY[k] ??= new F64List()).push4(ex[e0], ey[e0], ex[e1], ey[e1])
           } else {
+            if (crowded(k, ex[e0], ey[e0], ex[e1], ey[e1])) continue
             const isMajor = levelMajor[k] === 1
             const tp = isMajor ? majorPos : minorPos
             const tc = isMajor ? majorCol : minorCol
@@ -516,6 +529,7 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
         for (let i = 0; i < np - 1; i++) {
           const j = i * 2
           if (boxes.length && masked(pts[j], pts[j + 1], pts[j + 2], pts[j + 3])) continue
+          if (crowded(k, pts[j], pts[j + 1], pts[j + 2], pts[j + 3])) continue
           tp.push6(pts[j]     * scl - halfW, y, pts[j + 1] * scl - halfH,
                    pts[j + 2] * scl - halfW, y, pts[j + 3] * scl - halfH)
           tc.push6(cr, cg, cb, cr, cg, cb)
@@ -532,7 +546,7 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
     }
   }
 
-  return {
+  const out = {
     'Contours-Minor': { positions: minorPos.toArray(), colors: minorCol.toArray() },
     // The anchors ride with the major layer because that is what they label by
     // default. They are placements, not geometry: the main thread letters them,
@@ -540,6 +554,108 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
     'Contours-Major': { positions: majorPos.toArray(), colors: majorCol.toArray(),
                         labelAnchors: labelAnchors?.length ? labelAnchors : null },
   }
+  if (p.auxContours && gapAt) {
+    out['Contours-Aux'] = auxiliaryContours(terrain, p, { numSteps, levelElev, levelVal, levelRgb, lvlStep },
+      smooth, gapAt, Math.max(0, p.auxGapContours ?? 40))
+  }
+  return out
+}
+
+/**
+ * The distance between neighbouring contours at a grid point, in raster
+ * pixels: `levelStep` (in grid values) over the slope of the heights blurred by
+ * two cells. Infinite on level ground. Returns a reader `(fr, fc) → pixels`.
+ */
+function contourGap(terrain, levelStep) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const g = boxBlur(grid, cols, rows, 2, sMask)
+  const mag = new Float32Array(n)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const w = c > 0 && gridMask[i - 1] ? g[i - 1] : g[i], e = c < cols - 1 && gridMask[i + 1] ? g[i + 1] : g[i]
+      const u = r > 0 && gridMask[i - cols] ? g[i - cols] : g[i], d = r < rows - 1 && gridMask[i + cols] ? g[i + cols] : g[i]
+      mag[i] = Math.hypot(e - w, d - u) / 2
+    }
+  }
+  return (fr, fc) => {
+    const r = Math.max(0, Math.min(rows - 1, Math.round(fr))), c = Math.max(0, Math.min(cols - 1, Math.round(fc)))
+    const m = mag[r * cols + c]
+    return m > 0 ? (levelStep / m) * scl : Infinity
+  }
+}
+
+/**
+ * Auxiliary contours: a line half an interval above each contour, drawn only
+ * where the contours lie more than `minGap` raster pixels apart.
+ *
+ * Swiss and Austrian maps draw these, dashed, on flat ground, where the
+ * regular contours leave too wide a gap to read the form. A cell with any
+ * NoData corner is left out. The lines are chained and smoothed like the
+ * contours, cut where the gap is too narrow, and a piece shorter than three
+ * segments is dropped. They are a layer of their own, `Contours-Aux`, so they
+ * take their own dash.
+ */
+function auxiliaryContours(terrain, p, ladder, smooth, gapAt, minGap) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev } = terrain
+  const { elevMinCut, elevMaxCut } = p
+  const { numSteps, levelElev, levelVal, levelRgb, lvlStep } = ladder
+  const pos = new F32List(), col = new F32List()
+  const ex = _edgeX, ey = _edgeY, eid = _edgeId
+  const scratch = getChainScratch(rows * cols * 2)
+  const halfStep = numSteps > 1 ? (levelElev[1] - levelElev[0]) / 2 : 0
+  for (let k = 0; k < numSteps; k++) {
+    const elev = levelElev[k] + halfStep
+    if (!(elev < maxElev) || !inElevCut(elev, minElev, maxElev, elevMinCut, elevMaxCut)) continue
+    const level = levelVal[k] + lvlStep / 2
+    const segE = new I32List(), segXY = new F64List()
+    for (let r = 0; r < rows - 1; r++) {
+      const row0 = r * cols, row1 = row0 + cols
+      for (let c = 0; c < cols - 1; c++) {
+        if (!gridMask[row0 + c] || !gridMask[row0 + c + 1] || !gridMask[row1 + c] || !gridMask[row1 + c + 1]) continue
+        const v00 = grid[row0 + c], v10 = grid[row0 + c + 1], v11 = grid[row1 + c + 1], v01 = grid[row1 + c]
+        const idx = (v00 >= level ? 8 : 0) | (v10 >= level ? 4 : 0) | (v11 >= level ? 2 : 0) | (v01 >= level ? 1 : 0)
+        if (idx === 0 || idx === 15) continue
+        ex[0] = c + edgeLerp01(v00, v10, level); ey[0] = r
+        ex[1] = c + 1;                           ey[1] = r + edgeLerp01(v10, v11, level)
+        ex[2] = c + edgeLerp01(v01, v11, level); ey[2] = r + 1
+        ex[3] = c;                               ey[3] = r + edgeLerp01(v00, v01, level)
+        eid[0] = (row0 + c) * 2; eid[1] = (row0 + c + 1) * 2 + 1; eid[2] = (row1 + c) * 2; eid[3] = (row0 + c) * 2 + 1
+        const pairs = MARCHING_TABLE[idx]
+        for (let pi = 0; pi < pairs.length; pi += 2) {
+          segE.push2(eid[pairs[pi]], eid[pairs[pi + 1]])
+          segXY.push4(ex[pairs[pi]], ey[pairs[pi]], ex[pairs[pi + 1]], ey[pairs[pi + 1]])
+        }
+      }
+    }
+    if (!segE.length) continue
+    const cr = levelRgb[k * 3], cg = levelRgb[k * 3 + 1], cb = levelRgb[k * 3 + 2]
+    for (const chain of chainLevelSegments(segE.a, segXY.a, segE.length / 2, scratch)) {
+      const pts = smooth > 0
+        ? simplifyFlat(chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth), SMOOTH_SIMPLIFY_EPS)
+        : chain.pts
+      // Runs of segments where the gap is wide enough; a run under three is a crumb.
+      let run = []
+      const flush = () => {
+        if (run.length >= 3 * 4) {
+          for (let q = 0; q < run.length; q += 4) {
+            pos.push6(run[q] * scl - halfW, elev, run[q + 1] * scl - halfH, run[q + 2] * scl - halfW, elev, run[q + 3] * scl - halfH)
+            col.push6(cr, cg, cb, cr, cg, cb)
+          }
+        }
+        run = []
+      }
+      for (let j = 0; j + 3 < pts.length; j += 2) {
+        if (gapAt((pts[j + 1] + pts[j + 3]) / 2, (pts[j] + pts[j + 2]) / 2) > minGap) run.push(pts[j], pts[j + 1], pts[j + 2], pts[j + 3])
+        else flush()
+      }
+      flush()
+    }
+  }
+  return { positions: pos.toArray(), colors: col.toArray() }
 }
 
 /**

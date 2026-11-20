@@ -290,6 +290,18 @@ function resolveLayerStyle(id, p) {
       return { weight: p.weightContours, opacity: p.opacityContours, dash: p.dashContours }
     case 'Contours-Major':
       return { weight: p.majorWeightContours, opacity: p.opacityContours, dash: p.dashContours }
+    case 'Contours-Aux':
+      return { weight: p.weightContours, opacity: p.opacityContours, dash: p.auxDashContours ?? 'dashed' }
+    case 'Breaks-Convex':
+      return { weight: p.weightBreaks, opacity: p.opacityBreaks, dash: p.dashBreaks }
+    case 'Breaks-Concave':
+      return { weight: p.weightBreaks, opacity: p.opacityBreaks, dash: p.concaveDashBreaks ?? 'short' }
+    case 'Morse-Ridges':
+      return { weight: p.weightMorse, opacity: p.opacityMorse, dash: p.dashMorse }
+    case 'Morse-Courses':
+      return { weight: p.weightMorse, opacity: p.opacityMorse, dash: p.courseDashMorse ?? 'dashed' }
+    case 'Morse-Points':
+      return { weight: p.weightMorse, opacity: p.opacityMorse, dash: 'solid' }
     case 'Contours-Tanaka-Bright':
       return { weight: p.tanakaWeightBright ?? 2.5, opacity: p.opacityContours, dash: p.dashContours }
     case 'Contours-Tanaka-Dark':
@@ -1090,14 +1102,21 @@ export function lambertDarkness(terrain, sunAzimuth, gamma, elevScale, radius = 
  * −1 for "no value here". A cell with such a corner is skipped, so a level never
  * wraps the edge of the data. Chains are Chaikin-smoothed `smooth` passes and
  * draped a cell at a time: these lines cross elevations freely.
+ *
+ * `opt.skip(r, c)` leaves out the cell with (r, c) as its top-left corner, for a
+ * field whose values do not join across some border. `opt.minLen` drops a chain
+ * shorter than that many grid cells.
  */
-export function traceLevelSet(terrain, p, field, levels, smooth) {
+export function traceLevelSet(terrain, p, field, levels, smooth, opt = null) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const sMask = terrain.hasNoData ? gridMask : null
   const positions = new F32List(), colors = new F32List()
   const ex = _edgeX, ey = _edgeY, eid = _edgeId
   const scratch = getChainScratch(rows * cols * 2)
+  // `opt.skip(r, c)` leaves a cell out, `opt.minLen` drops a chain shorter than
+  // that many grid cells.
+  const skip = opt?.skip ?? null, minLen = opt?.minLen ?? 0
 
   for (const level of levels) {
     const segE = new I32List(), segXY = new F64List()
@@ -1112,6 +1131,7 @@ export function traceLevelSet(terrain, p, field, levels, smooth) {
         const idx = (d00 >= level ? 8 : 0) | (d10 >= level ? 4 : 0) |
                     (d11 >= level ? 2 : 0) | (d01 >= level ? 1 : 0)
         if (idx === 0 || idx === 15) continue
+        if (skip && skip(r, c)) continue
 
         ex[0] = c + edgeLerp01(d00, d10, level); ey[0] = r
         ex[1] = c + 1;                           ey[1] = r + edgeLerp01(d10, d11, level)
@@ -1137,6 +1157,12 @@ export function traceLevelSet(terrain, p, field, levels, smooth) {
     const chains = chainLevelSegments(segE.a, segXY.a, segE.length / 2, scratch)
 
     for (const chain of chains) {
+      if (minLen > 0) {
+        let len = 0
+        const q = chain.pts
+        for (let i = 2; i < q.length && len < minLen; i += 2) len += Math.hypot(q[i] - q[i - 2], q[i + 1] - q[i - 1])
+        if (len < minLen) continue
+      }
       const pts = smooth > 0
         ? simplifyFlat(
             chaikinSmoothFlat(chain.pts, chain.closed, smooth, SMOOTH_SIMPLIFY_EPS / smooth),

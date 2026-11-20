@@ -6,7 +6,7 @@
  */
 import { cellElev, hasData, boxBlur, jitterNoise, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
-import { F32List, drapeEdge, inElevCut, neighbour, normElev } from './shared.js'
+import { F32List, drapeEdge, inElevCut, lambertDarkness, neighbour, normElev } from './shared.js'
 
 // ─── Lines (arbitrary bearing) ───────────────────────────────────────────────
 
@@ -83,8 +83,14 @@ export function lineFamily(terrain, spacing, shift, angleDeg, fitBoundary, origi
  * At 0°/90° the sample points land exactly on grid rows/columns, so those
  * angles reproduce the old axis-aligned modes; oblique angles sample the
  * terrain bilinearly along the rotated rays.
+ *
+ * `shade` adds lines in the shade. With a sun at `shade.azimuth` and 45°, a
+ * line halfway between two lines is drawn where the darkness reaches
+ * `shade.half`, and lines a quarter of the way between where it reaches
+ * `shade.quarter`. Darkness is 1 − n·l, about 0.29 on level ground. The stack
+ * of lines then carries the light, with one pen.
  */
-export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false) {
+export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundary = false, shade = null) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut, jitterAmt } = p
   const positions = new F32List(), colors = new F32List()
@@ -94,7 +100,22 @@ export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundar
 
   const { linePos, dx, dz, nx, nz, t0, t1, theta } = lineFamily(terrain, spacing, shift, angleDeg, fitBoundary)
 
-  for (const pos of linePos) {
+  // The lines to march: each with the darkness it needs, 0 for the main ones.
+  const runs = linePos.map((pos) => [pos, 0])
+  let dark = null
+  if (shade?.on && linePos.length) {
+    dark = lambertDarkness(terrain, shade.azimuth ?? 315, 1, elevScale, 1)
+    const lineStep = linePos.length > 1 ? linePos[1] - linePos[0] : Math.max(1, (spacing ?? 4) / scl)
+    const half = shade.half ?? 0.45, quarter = Math.max(half, shade.quarter ?? 0.65)
+    for (const pos of linePos) {
+      runs.push([pos + lineStep / 2, half], [pos + lineStep / 4, quarter], [pos + 3 * lineStep / 4, quarter])
+    }
+    // One before the first line too, so the first gap fills like the others.
+    const first = linePos[0]
+    runs.push([first - lineStep / 2, half], [first - lineStep / 4, quarter], [first - 3 * lineStep / 4, quarter])
+  }
+
+  for (const [pos, need] of runs) {
     const ox = nx * pos, oz = nz * pos
     let prevOk = false, prevC = 0, prevR = 0, prevE = 0
     for (let t = t0; t <= t1; t++) {
@@ -103,7 +124,7 @@ export function buildAngleLines(terrain, p, spacing, shift, angleDeg, fitBoundar
       let elev = 0
       if (ok) {
         const ci = Math.round(fc), ri = Math.round(fr)
-        ok = hasData(gridMask, ri, ci, cols)
+        ok = hasData(gridMask, ri, ci, cols) && (need === 0 || dark[ri * cols + ci] >= need)
         if (ok) {
           // Masked bilinear: a tap straddling a clipped edge must not blend
           // against the zeros parked in NoData, or the line dives to the floor.
@@ -259,6 +280,7 @@ export function drawFamily(terrain, p, F) {
  * occupancy test lets a trace stay in the cell it stands in, but only for such
  * a step: at a step of one cell or more the test is as it always was, so a
  * plate made with it draws the same lines.
+
  */
 export function buildFlowLines(terrain, p, spacing, step, maxLen, opts = {}) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope } = terrain
@@ -535,6 +557,14 @@ export function buildCurvature(terrain, p, spacing, length, threshold, radius, d
  * `passes` on the trunk, `gap` cells apart. That is also what a plotter does to
  * lay a heavier line with one pen. The count follows log accumulation, because
  * the raw count grows by orders of magnitude towards the outlet.
+ *
+ * `banks` draws a wide river as its two banks. The width is `bankWidth` times
+ * the square root of the area that drains through a cell, in raster pixels, so
+ * it grows as a river does. Where it passes `bankFrom` pixels the line splits
+ * into two banks that far apart. The network is chained into rivers first, each
+ * tributary ending where it meets the river it feeds, and the chains are
+ * rounded, so a bank is a smooth line and not a staircase. With banks on, the
+ * passes by flow are not drawn.
  */
 export function buildDagThinning(terrain, p, threshold, opts = {}) {
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
@@ -566,8 +596,9 @@ export function buildDagThinning(terrain, p, threshold, opts = {}) {
     const o = order[i]; if (o > maxInOrder[dst]) { maxInOrder[dst] = o; countMaxOrder[dst] = 1 } else if (o === maxInOrder[dst]) countMaxOrder[dst]++
     currentInDeg[dst]--; if (currentInDeg[dst] === 0) { order[dst] = (countMaxOrder[dst] > 1) ? maxInOrder[dst]+1 : maxInOrder[dst]; queue.push(dst) }
   }
-  const positions = new F32List(), colors = new F32List()
   const strahlerThreshold = Math.max(1, Math.round(threshold ?? 2))
+  if (opts.banks) return streamBanks(terrain, p, next, order, acc, strahlerThreshold, opts)
+  const positions = new F32List(), colors = new F32List()
   const maxPasses = opts.accum ? Math.max(1, Math.min(8, Math.round(opts.passes ?? 4))) : 1
   let accMin = Infinity, accMax = 0
   if (maxPasses > 1) {
@@ -596,6 +627,87 @@ export function buildDagThinning(terrain, p, threshold, opts = {}) {
   return { positions: positions.toArray(), colors: colors.toArray() }
 }
 
+
+/** Stream Network as rivers with banks. See `buildDagThinning`. */
+function streamBanks(terrain, p, next, order, acc, threshold, opts) {
+  const { grid, gridMask, rows, cols, scl, minElev, maxElev } = terrain
+  const { elevScale, elevMinCut, elevMaxCut } = p
+  const sMask = terrain.hasNoData ? gridMask : null
+  const n = rows * cols
+  const drawn = new Uint8Array(n)
+  for (let i = 0; i < n; i++) {
+    if (next[i] === -1 || order[i] < threshold) continue
+    if (inElevCut((grid[i] - 0.5) * 100 * elevScale, minElev, maxElev, elevMinCut, elevMaxCut)) drawn[i] = 1
+  }
+  // Each cell's main stem: the drawn donor that brings the most water.
+  const main = new Int32Array(n).fill(-1), donors = new Uint8Array(n)
+  for (let i = 0; i < n; i++) {
+    if (!drawn[i]) continue
+    const d = next[i]
+    donors[d] = 1
+    if (main[d] < 0 || acc[i] > acc[main[d]]) main[d] = i
+  }
+  const k = Math.max(0, opts.bankWidth ?? 0.05), from = Math.max(0.5, opts.bankFrom ?? 6)
+  const halfOf = (a) => (k * Math.sqrt(a) * scl) / 2 / scl   // half the width, in cells
+  const splitAt = from / 2 / scl
+  const out = { positions: new F32List(), colors: new F32List() }
+  const edge = (c0, r0, c1, r1) => drapeEdge(out, terrain, p, sMask, c0, r0, c1, r1, Math.atan2(r1 - r0, c1 - c0))
+  let rivers = 0
+  for (let h = 0; h < n; h++) {
+    if (!drawn[h] || donors[h]) continue
+    // Down the main stem until a river takes it over.
+    const pts = []
+    let i = h, prev = -1
+    for (;;) {
+      if (prev >= 0 && main[i] !== prev) { pts.push([i / cols | 0, i % cols, acc[i], 1]); break }
+      pts.push([i / cols | 0, i % cols, acc[i], 0])
+      if (!drawn[i]) break
+      prev = i; i = next[i]
+    }
+    if (pts.length < 2) continue
+    rivers++
+    // A tributary stops at the bank of the river it meets.
+    const end = pts[pts.length - 1]
+    if (end[3]) {
+      const hw = halfOf(end[2])
+      if (hw >= splitAt) while (pts.length > 2 && Math.hypot(pts[pts.length - 2][0] - end[0], pts[pts.length - 2][1] - end[1]) < hw) pts.splice(pts.length - 2, 1)
+    }
+    // Rounded three times, the ends kept, then thinned to about a cell apart,
+    // so a bank does not repeat the staircase of the cells it came from.
+    let q = pts
+    for (let it = 0; it < 3 && q.length > 2; it++) {
+      const s2 = [q[0]]
+      for (let j = 0; j < q.length - 1; j++) {
+        const a = q[j], b = q[j + 1]
+        s2.push(a.map((v, m) => 0.75 * v + 0.25 * b[m]), a.map((v, m) => 0.25 * v + 0.75 * b[m]))
+      }
+      s2.push(q[q.length - 1]); q = s2
+    }
+    const thin = [q[0]]
+    for (let j = 1; j < q.length - 1; j++) {
+      const a = thin[thin.length - 1]
+      if (Math.hypot(q[j][0] - a[0], q[j][1] - a[1]) >= 1) thin.push(q[j])
+    }
+    if (q.length > 1) thin.push(q[q.length - 1])
+    q = thin
+    // Centre line while narrow, two banks once wide.
+    let pr = 0, pc = 0, pl = null, prr = null, wasWide = false
+    for (let j = 0; j < q.length; j++) {
+      const [r, c, a] = q[j]
+      const A = q[Math.max(0, j - 2)], Bq = q[Math.min(q.length - 1, j + 2)]
+      const tr = Bq[0] - A[0], tc = Bq[1] - A[1], m = Math.hypot(tr, tc) || 1
+      const hw = halfOf(a), wide = hw >= splitAt
+      const L = [r - (tc / m) * hw, c + (tr / m) * hw], Rr = [r + (tc / m) * hw, c - (tr / m) * hw]
+      if (j > 0) {
+        if (wide && wasWide) { edge(pl[1], pl[0], L[1], L[0]); edge(prr[1], prr[0], Rr[1], Rr[0]) }
+        else if (wide) { edge(pc, pr, L[1], L[0]); edge(pc, pr, Rr[1], Rr[0]) }
+        else edge(pc, pr, c, r)
+      }
+      pr = r; pc = c; pl = L; prr = Rr; wasWide = wide
+    }
+  }
+  return { positions: out.positions.toArray(), colors: out.colors.toArray(), note: { rivers } }
+}
 
 // ─── Pencil Shading ───────────────────────────────────────────────────────────
 

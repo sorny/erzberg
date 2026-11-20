@@ -9,6 +9,7 @@ import { hexToRgb, computeVertexColor } from '../colorUtils'
 import { latitudeFor, litField, samplingFor, smoothField, sunHourLevels, sunHoursField } from '../sunHours'
 import { groundMetres } from './ground.js'
 import { lineFamily } from './lines.js'
+import { drapeLines, evenStreamlines } from './form.js'
 import { EMPTY_F32, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, hatchWhere, inElevCut, joinLayers, lambertDarkness, lightVector, mulberry32, normElev, simplifyFlat, traceLevelSet } from './shared.js'
 
 // ─── Engraving (illumination cross-hatch) ────────────────────────────────────
@@ -20,8 +21,15 @@ import { EMPTY_F32, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_E
  * sparse single-direction strokes and shadows build up stacked cross-hatching.
  * Strokes are continuous polylines marched across the grid, draped on the
  * terrain, breaking wherever the surface is too bright.
+ *
+ * `strokes: 'form'` bends the strokes to the ground. The first layer runs along
+ * the contours, the second down the fall lines, the third and fourth across
+ * the fall line at 45° each way. Each layer is evenly spaced streamlines, one
+ * gap of `spacing` apart, on heights blurred by one gap, and stops where the
+ * ground is brighter than the layer's threshold, as the straight strokes do.
  */
-export function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma) {
+export function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth, gamma, opts = {}) {
+  if (opts.strokes === 'form') return engravingByForm(terrain, p, spacing, levels, sunAzimuth, gamma)
   const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, elevMinCut, elevMaxCut } = p
   const positions = new F32List(), colors = new F32List()
@@ -76,6 +84,52 @@ export function buildEngraving(terrain, p, spacing, angleDeg, levels, sunAzimuth
   }
 
   return { positions: positions.toArray(), colors: colors.toArray() }
+}
+
+/** Engraving with strokes that follow the form. See `buildEngraving`. */
+function engravingByForm(terrain, p, spacing, levels, sunAzimuth, gamma) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const nLevels = Math.max(1, Math.min(4, Math.round(levels ?? 3)))
+  const sep = Math.max(1, (spacing ?? 3) / scl)
+  // The tone on ground blurred by one gap: a stroke follows a region of shade,
+  // and on raw data the regions break into crumbs a stroke cannot follow.
+  const darkness = lambertDarkness(terrain, sunAzimuth, gamma, p.elevScale, sep)
+  const g = boxBlur(grid, cols, rows, Math.max(1, sep), sMask)
+  const gx = new Float32Array(rows * cols), gy = new Float32Array(rows * cols)
+  let top = 0
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const i = r * cols + c
+      if (!gridMask[i]) continue
+      const w = c > 0 && gridMask[i - 1] ? g[i - 1] : g[i], e = c < cols - 1 && gridMask[i + 1] ? g[i + 1] : g[i]
+      const u = r > 0 && gridMask[i - cols] ? g[i - cols] : g[i], d = r < rows - 1 && gridMask[i + cols] ? g[i + cols] : g[i]
+      gx[i] = (e - w) / 2; gy[i] = (d - u) / 2
+      top = Math.max(top, Math.hypot(gx[i], gy[i]))
+    }
+  }
+  const flat = top * 0.002
+  // Downhill turned by `turn` radians: π/2 is the contour, 0 the fall line.
+  const field = (turn) => {
+    const cs = Math.cos(turn), sn = Math.sin(turn)
+    return (fr, fc, out) => {
+      const a = sampleBilinear(gx, sMask, rows, cols, fr, fc), b = sampleBilinear(gy, sMask, rows, cols, fr, fc)
+      const m = Math.hypot(a, b)
+      if (!(m > flat)) return null
+      const ux = -a / m, uy = -b / m
+      out[0] = ux * cs - uy * sn; out[1] = ux * sn + uy * cs
+      return out
+    }
+  }
+  const TURNS = [Math.PI / 2, 0, Math.PI / 4, -Math.PI / 4]
+  const layers = []
+  for (let lvl = 0; lvl < nLevels; lvl++) {
+    const thresh = (lvl + 1) / (nLevels + 1)
+    const keep = (fr, fc) => darkness[Math.round(fr) * cols + Math.round(fc)] >= thresh
+    const lines = evenStreamlines(terrain, field(TURNS[lvl]), { sep, step: 0.5, test: 0.6, keep, minPts: Math.ceil(2 * sep / 0.5) })
+    layers.push(drapeLines(terrain, p, lines))
+  }
+  return layers.reduce((a, b) => joinLayers(a, b))
 }
 
 // ─── Isophotes (illumination contours) ───────────────────────────────────────

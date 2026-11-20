@@ -77,6 +77,9 @@ const RENDER_SIDE = [
   // The step between the round dots of a dotted line. layerStyle hands it to
   // the viewport and the SVG, which both place the dots themselves.
   /^dotStep[A-Z]/,
+  // The dash of a second pen inside a mode: Auxiliary contours, concave
+  // Breaklines, Surface Network courses. layerStyle reads them.
+  /^(auxDash|concaveDash|courseDash)[A-Z]/,
   // A plumb line's weight and opacity, times the mode's, in layerStyle too.
   /^plumb(Weight|Opacity)[A-Z]/,
   // The occlusion *look*. `depthOcclusion` itself is deliberately absent from
@@ -181,6 +184,7 @@ const isGeometry = (k) =>
 const MODE_SUFFIX_RENDER_SIDE = [
   /^(weight|opacity|dash)[A-Z]/,
   /^dotStep[A-Z]/,
+  /^(auxDash|concaveDash|courseDash)[A-Z]/,
   /^plumb(Weight|Opacity)[A-Z]/,
   /^(tanakaWeight|labelColor|labelWeight|majorWeight|screeWeight|screenWeight|glowWeight|glowOpacity|runInWeight|bestWeight|braceWeight|postWeight|leaderWeight|lineWeight|linkWeight)[A-Z]/,
   /^label(SingleLine|Font)Contours$/,

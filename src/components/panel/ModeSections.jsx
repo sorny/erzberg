@@ -40,6 +40,16 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   <InlineSl label="Spacing" help="The gap between lines, in raster pixels." min={1} max={100} value={style.spacingLines} onChange={v => ss({ spacingLines: v })} />
                   <InlineSl label="Shift" help="Slides the whole set of lines across their own direction. A shift of one spacing puts them back where they began." min={0} max={100} value={style.shiftLines} onChange={v => ss({ shiftLines: v })} />
                   <InlineSl label="Angle" help="Bearing of the parallel lines. 0° runs along the X axis, 90° along Y, anything between gives diagonal ridgelines." min={0} max={180} step={1} value={style.angleLines ?? 0} onChange={v => ss({ angleLines: v })} fmt={v => Math.round(v) + '°'} />
+                  <Tog label="Shade fill" testId="lines-shade"
+                    help="Adds lines between the lines where the ground faces away from the sun: one halfway where it is dark, and two more at the quarters where it is darker. The lines then carry the light, with one pen."
+                    checked={!!style.shadeLines} onChange={v => ss({ shadeLines: v })} />
+                  {style.shadeLines && (
+                    <>
+                      <InlineSl label="Sun azimuth" testId="lines-sun" help="Compass bearing of the light, 45° above the horizon. Slopes that face away from it fill in." min={0} max={360} step={1} value={style.sunLines ?? 315} onChange={v => ss({ sunLines: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                      <InlineSl label="Half from" help="How dark the ground must be for the line halfway between two lines. Level ground is 0.29, a face turned fully away is 1." min={0.3} max={1} step={0.01} value={style.shadeHalfLines ?? 0.45} onChange={v => ss({ shadeHalfLines: v })} fmt={v => v.toFixed(2)} />
+                      <InlineSl label="Quarters from" help="How dark the ground must be for the two lines at the quarters. Keep it above Half from." min={0.3} max={1} step={0.01} value={style.shadeQuarterLines ?? 0.65} onChange={v => ss({ shadeQuarterLines: v })} fmt={v => v.toFixed(2)} />
+                    </>
+                  )}
                 </Sub>
                 <ModeStyleOverride prefix="Lines" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
@@ -137,6 +147,26 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   {!style.tanakaContours && (
                     <InlineSl label="Smoothing" help="Chaikin corner-cutting passes. 0 = crisp marching-squares lines; higher = soft, flowing form lines." min={0} max={4} step={1} value={style.smoothingContours ?? 0} onChange={v => ss({ smoothingContours: v })} />
                   )}
+                  {!style.tanakaContours && (
+                    <>
+                      <Tog label="Auxiliary contours" testId="contour-aux"
+                        help="Dashed lines at half the interval, drawn only where two contours lie more than Gap apart, as Swiss and Austrian maps draw them on flat ground. They are their own pen layer."
+                        checked={!!style.auxContours} onChange={v => ss({ auxContours: v })} />
+                      {style.auxContours && (
+                        <>
+                          <InlineSl label="Gap" testId="contour-aux-gap" help="How far apart two contours must lie, in raster pixels, before the auxiliary line between them is drawn." min={4} max={200} step={1} value={style.auxGapContours ?? 40} onChange={v => ss({ auxGapContours: Math.round(v) })} />
+                          <SegGroup label="Auxiliary dash" capitalize options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash']]}
+                            value={style.auxDashContours ?? 'dashed'} onChange={(d) => ss({ auxDashContours: d })} style={{ marginBottom: 6 }} />
+                        </>
+                      )}
+                      <Tog label="Crowding cut" testId="contour-crowd"
+                        help="Leaves out a minor contour where it runs closer than Min gap to the next one, as maps do on cliffs, so the pen does not lay down a black band. Major contours stay."
+                        checked={!!style.crowdContours} onChange={v => ss({ crowdContours: v })} />
+                      {style.crowdContours && (
+                        <InlineSl label="Min gap" testId="contour-crowd-gap" help="The closest two contours may run, in raster pixels. Set it a little above the pen width at the size you plot." min={0.5} max={20} step={0.5} value={style.crowdGapContours ?? 3} onChange={v => ss({ crowdGapContours: v })} fmt={v => v.toFixed(1)} />
+                      )}
+                    </>
+                  )}
                   <Tog label="Summit and hollow" testId="contour-extremes" help="A plus sign on the highest point and a minus sign on the lowest, as their own pen." checked={!!style.extremesContours} onChange={v => ss({ extremesContours: v })} />
                   {style.extremesContours && (
                     <>
@@ -225,6 +255,15 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                     <>
                       <InlineSl label="Passes" help="Parallel strokes on the main channel. Each channel gets more passes as more ground drains through it, so the trunk draws heaviest." min={2} max={8} step={1} value={style.passesDag ?? 4} onChange={v => ss({ passesDag: Math.round(v) })} />
                       <InlineSl label="Pass gap" help="Distance between the passes, in cells. Match it to the pen width for a solid line." min={0.05} max={1.5} step={0.05} value={style.gapDag ?? 0.35} onChange={v => ss({ gapDag: v })} fmt={v => v.toFixed(2)} />
+                    </>
+                  )}
+                  <Tog label="Banks" testId="dag-banks"
+                    help="Draws a wide river as its two banks, as a topographic map draws large rivers. The rivers are rounded, and each tributary stops at the bank of the river it meets. With Banks on, the passes of Weight by flow are not drawn."
+                    checked={!!style.banksDag} onChange={v => ss({ banksDag: v })} />
+                  {style.banksDag && (
+                    <>
+                      <InlineSl label="Width" testId="dag-bank-width" help="River width per square root of the area that drains through it, both in raster pixels. A river that drains four times the ground is twice as wide." min={0.01} max={0.4} step={0.01} value={style.bankWidthDag ?? 0.05} onChange={v => ss({ bankWidthDag: v })} fmt={v => v.toFixed(2)} />
+                      <InlineSl label="Banks from" help="The width, in raster pixels, from which a river is drawn as two banks. A narrower river stays one line." min={0.5} max={30} step={0.5} value={style.bankFromDag ?? 6} onChange={v => ss({ bankFromDag: v })} fmt={v => v.toFixed(1)} />
                     </>
                   )}
                 </Sub>
@@ -335,8 +374,11 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             {(
               <>
                 <Sub>
+                  <SegRow label="Strokes" help="Straight: parallel strokes at the Angle and its turns. Form: the first layer runs along the contours, the second down the fall lines, the third and fourth across the fall line at 45°, so the strokes bend with the ground." testIdPrefix="engrave-strokes" options={[['straight', 'straight'], ['form', 'form']]} value={style.strokesEngrave ?? 'straight'} onChange={v => ss({ strokesEngrave: v })} />
                   <InlineSl label="Spacing" help="Pitch between hatch strokes." min={1} max={20} step={0.5} value={style.spacingEngrave} onChange={v => ss({ spacingEngrave: v })} />
-                  <InlineSl label="Angle" help="Base hatch direction. Additional levels add +90°, +45°, +135°." min={0} max={180} step={1} value={style.angleEngrave} onChange={v => ss({ angleEngrave: v })} fmt={v => Math.round(v) + '°'} />
+                  {style.strokesEngrave !== 'form' && (
+                    <InlineSl label="Angle" help="Base hatch direction. Additional levels add +90°, +45°, +135°." min={0} max={180} step={1} value={style.angleEngrave} onChange={v => ss({ angleEngrave: v })} fmt={v => Math.round(v) + '°'} />
+                  )}
                   <InlineSl label="Levels" help="Cross-hatch layers: shadows accumulate up to this many stacked directions." min={1} max={4} step={1} value={style.levelsEngrave} onChange={v => ss({ levelsEngrave: v })} />
                   <InlineSl label="Sun azimuth" help="Light azimuth driving the hatching: lit slopes stay sparse, shadows hatch densely." min={0} max={360} step={5} value={style.sunAzimuthEngrave} onChange={v => ss({ sunAzimuthEngrave: v })} fmt={v => Math.round(v) + '°'} />
                   <InlineSl label="Contrast" help="Tone curve exponent. >1 confines hatching to deep shadow; <1 spreads it." min={0.3} max={3} step={0.1} value={style.gammaEngrave} onChange={v => ss({ gammaEngrave: v })} fmt={v => v.toFixed(1)} />
@@ -386,7 +428,11 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
               <>
                 <Sub>
                   <InlineSl label="Tiers" help="How many flat plateaus the elevation range is cut into. Anchored to the terrain, so the steps stay put when Elevation Scale moves." min={2} max={40} step={1} value={style.tiersBitplane} onChange={v => ss({ tiersBitplane: v })} />
+                  <SegRow label="Edge" help="Cells: each step runs along the cell edges, a pixel staircase. Smooth: each step runs along the rounded contour where the tier changes, like a model cut from card." testIdPrefix="bitplane-edge" options={[['cells', 'cells'], ['smooth', 'smooth']]} value={style.edgeBitplane ?? 'cells'} onChange={v => ss({ edgeBitplane: v })} />
                   <Tog label="Risers" small help="Close each step with the verticals down to the plateau below — blocks rather than a flat staircase." checked={style.risersBitplane} onChange={v => ss({ risersBitplane: v })} />
+                  {style.edgeBitplane === 'smooth' && style.risersBitplane && (
+                    <InlineSl label="Riser spacing" testId="bitplane-riser-spacing" help="The distance between the verticals along a smooth step, in raster pixels." min={1} max={40} step={0.5} value={style.riserSpacingBitplane ?? 6} onChange={v => ss({ riserSpacingBitplane: v })} fmt={v => v.toFixed(1)} />
+                  )}
                   <InlineSl label="Dither" help="Strength of the 4×4 Bayer screen shading each band into the next. 0 leaves the plateaus bare." min={0} max={1} step={0.05} value={style.ditherBitplane} onChange={v => ss({ ditherBitplane: v })} fmt={v => Math.round(v * 100) + '%'} />
                   <InlineSl label="Dot pitch" help="Grid spacing of the dither dots." min={1} max={20} step={1} value={style.spacingBitplane} onChange={v => ss({ spacingBitplane: v })} fmt={v => v.toFixed(1)} />
                   <InlineSl label="Dot size" min={0.5} max={8} step={0.5} value={style.screenWeightBitplane} onChange={v => ss({ screenWeightBitplane: v })} fmt={v => v.toFixed(1)} />
@@ -1802,6 +1848,121 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="Envelope" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Loxodromes" icon={<ModeMark kind="loxo" />} open={sec.modeLoxo} onToggle={() => tog('modeLoxo')} enabled={style.enabledLoxo} onEnabled={v => ss({ enabledLoxo: v })} enableTestId="mode-loxo">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Loxo && (
+                    <div data-testid="loxo-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Loxo.lines.toLocaleString()} lines`}
+                    </div>
+                  )}
+                  <SegRow label="Hold" help="Angle: each line crosses every contour at the same angle. Grade: each line falls at the same grade, as a road line that a surveyor sets between contours. Where the ground is gentler than the grade, the line runs straight down the slope." testIdPrefix="loxo-hold" options={[['angle', 'angle'], ['grade', 'grade']]} value={style.holdLoxo ?? 'angle'} onChange={v => ss({ holdLoxo: v })} />
+                  {style.holdLoxo === 'grade' ? (
+                    <InlineSl label="Grade" testId="loxo-grade" help="The grade each line keeps, in per cent: metres of fall per hundred metres of line." min={1} max={100} step={1} value={style.gradeLoxo ?? 10} onChange={v => ss({ gradeLoxo: Math.round(v) })} fmt={v => `${Math.round(v)} %`} />
+                  ) : (
+                    <InlineSl label="Angle" testId="loxo-angle" help="The angle between each line and the fall line. At 0° the lines run straight down the slope, at 90° along the contours. Between, they wind round every summit and hollow." min={0} max={89} step={1} value={style.angleLoxo ?? 60} onChange={v => ss({ angleLoxo: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  )}
+                  <SegRow label="Turn" help="Which way the lines turn from the fall line, seen walking down it." testIdPrefix="loxo-turn" options={[['right', 'right'], ['left', 'left']]} value={style.turnLoxo ?? 'right'} onChange={v => ss({ turnLoxo: v })} />
+                  <InlineSl label="Spacing" help="The gap between lines, in raster pixels." min={1} max={40} step={0.5} value={style.spacingLoxo ?? 6} onChange={v => ss({ spacingLoxo: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Min slope" help="Ground flatter than this has no fall line, and the lines stop there." min={0} max={20} step={0.5} value={style.minSlopeLoxo ?? 2} onChange={v => ss({ minSlopeLoxo: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Blur" help="Blur on the heights before the lines read the slope, in raster pixels. More blur gives longer, calmer curves." min={0} max={60} step={1} value={style.radiusLoxo ?? 8} onChange={v => ss({ radiusLoxo: Math.round(v) })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresLoxo} onChange={v => ss({ cellMetresLoxo: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefLoxo} onChange={v => ss({ reliefLoxo: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Loxo" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Breaklines" icon={<ModeMark kind="breaks" />} open={sec.modeBreaks} onToggle={() => tog('modeBreaks')} enabled={style.enabledBreaks} onEnabled={v => ss({ enabledBreaks: v })} enableTestId="mode-breaks">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Breaks && (
+                    <div data-testid="breaks-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Breaks.segments.toLocaleString()} segments`}
+                    </div>
+                  )}
+                  <InlineSl label="Keep" testId="breaks-keep" help="The share of the sloping ground, sharpest breaks first, where a breakline may run. Lower it to keep only the sharpest breaks." min={0.05} max={1} step={0.05} value={style.keepBreaks ?? 0.5} onChange={v => ss({ keepBreaks: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Min slope" help="Ground flatter than this gets no breaklines." min={0} max={30} step={0.5} value={style.minSlopeBreaks ?? 4} onChange={v => ss({ minSlopeBreaks: v })} fmt={v => `${v}°`} />
+                  <InlineSl label="Blur" help="Blur on the heights, in raster pixels. A break of slope is a second derivative, and on raw data that is noise. More blur finds fewer, broader breaks." min={0} max={60} step={1} value={style.radiusBreaks ?? 8} onChange={v => ss({ radiusBreaks: Math.round(v) })} />
+                  <InlineSl label="Min length" help="A breakline shorter than this, in raster pixels, is left out." min={0} max={200} step={1} value={style.minLengthBreaks ?? 12} onChange={v => ss({ minLengthBreaks: Math.round(v) })} />
+                  <InlineSl label="Smoothing" help="Chaikin corner-cutting passes on each line." min={0} max={4} step={1} value={style.smoothingBreaks ?? 2} onChange={v => ss({ smoothingBreaks: Math.round(v) })} />
+                  <Tog label="Convex breaks" testId="breaks-convex" help="The top edge of a steep face, where the ground falls away. Solid by default." checked={style.convexBreaks !== false} onChange={v => ss({ convexBreaks: v })} />
+                  <Tog label="Concave breaks" testId="breaks-concave" help="The foot of a steep face, where the ground levels out. Its own pen layer, dotted by default." checked={style.concaveBreaks !== false} onChange={v => ss({ concaveBreaks: v })} />
+                  {style.concaveBreaks !== false && (
+                    <SegGroup label="Concave dash" capitalize options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash']]}
+                      value={style.concaveDashBreaks ?? 'short'} onChange={(d) => ss({ concaveDashBreaks: d })} style={{ marginBottom: 6 }} />
+                  )}
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresBreaks} onChange={v => ss({ cellMetresBreaks: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefBreaks} onChange={v => ss({ reliefBreaks: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Breaks" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Surface Network" icon={<ModeMark kind="morse" />} open={sec.modeMorse} onToggle={() => tog('modeMorse')} enabled={style.enabledMorse} onEnabled={v => ss({ enabledMorse: v })} enableTestId="mode-morse">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Morse && (
+                    <div data-testid="morse-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Morse.cols} cols · ${symbolNotes.Morse.summits} summits`}
+                    </div>
+                  )}
+                  <InlineSl label="Blur" testId="morse-blur" help="Blur on the heights before the cols are found, in raster pixels. More blur finds fewer, larger forms." min={0} max={120} step={1} value={style.radiusMorse ?? 16} onChange={v => ss({ radiusMorse: Math.round(v) })} />
+                  <InlineSl label="Persistence" testId="morse-persistence" help="How far the lower of a col's two summits must stand above the col, as a share of the height range. Raise it to keep only the main cols." min={0} max={0.3} step={0.005} value={style.persistenceMorse ?? 0.02} onChange={v => ss({ persistenceMorse: v })} fmt={v => (v * 100).toFixed(1) + '%'} />
+                  <Tog label="Courses" testId="morse-courses" help="The lines that run from each col down to the hollows, as a second pen. Dashed by default." checked={style.coursesMorse !== false} onChange={v => ss({ coursesMorse: v })} />
+                  {style.coursesMorse !== false && (
+                    <SegGroup label="Course dash" capitalize options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash']]}
+                      value={style.courseDashMorse ?? 'dashed'} onChange={(d) => ss({ courseDashMorse: d })} style={{ marginBottom: 6 }} />
+                  )}
+                  <Tog label="Cols and summits" testId="morse-marks" help="A cross on each col and a triangle on each summit, as a third pen." checked={style.marksMorse !== false} onChange={v => ss({ marksMorse: v })} />
+                  {style.marksMorse !== false && (
+                    <InlineSl label="Size" help="The width of the cross and the triangle, in raster pixels." min={2} max={60} step={1} value={style.sizeMorse ?? 10} onChange={v => ss({ sizeMorse: Math.round(v) })} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Morse" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Flow Time" icon={<ModeMark kind="flowtime" />} open={sec.modeFlowTime} onToggle={() => tog('modeFlowTime')} enabled={style.enabledFlowTime} onEnabled={v => ss({ enabledFlowTime: v })} enableTestId="mode-flowtime">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.FlowTime && (
+                    <div data-testid="flowtime-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.FlowTime.levels} lines`}
+                    </div>
+                  )}
+                  <InlineSl label="Lines" testId="flowtime-levels" help="How many lines, evenly spaced in time, up to the time that 95% of the ground is faster than." min={2} max={60} step={1} value={style.levelsFlowTime ?? 15} onChange={v => ss({ levelsFlowTime: Math.round(v) })} />
+                  <InlineSl label="Channel speed" help="How much faster water runs where more ground drains through it. At 0 the speed follows the slope alone, and the lines lie like contours of the slope's length." min={0} max={1} step={0.02} value={style.speedupFlowTime ?? 0.32} onChange={v => ss({ speedupFlowTime: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Plain" help="Ground below this share of the height range is the plain where the water arrives." min={0} max={0.5} step={0.01} value={style.plainFlowTime ?? 0.03} onChange={v => ss({ plainFlowTime: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Blur" help="Blur on the heights before the water reads them, in raster pixels." min={0} max={60} step={1} value={style.radiusFlowTime ?? 12} onChange={v => ss({ radiusFlowTime: Math.round(v) })} />
+                  <InlineSl label="Smoothing" help="Chaikin corner-cutting passes on each line." min={0} max={6} step={1} value={style.smoothingFlowTime ?? 2} onChange={v => ss({ smoothingFlowTime: Math.round(v) })} />
+                  {!geoTiffBbox && (
+                    <InlineSl label="Pixel size" help="Metres per pixel. This raster is not georeferenced, so the app cannot know its scale." min={0.5} max={200} step={0.5} value={style.cellMetresFlowTime} onChange={v => ss({ cellMetresFlowTime: v })} fmt={v => `${v} m`} />
+                  )}
+                  {!hasGeoTiff && (
+                    <InlineSl label="Relief" help="Metres from black to white in the heightmap. This file carries no heights of its own." min={10} max={9000} step={10} value={style.reliefFlowTime} onChange={v => ss({ reliefFlowTime: Math.round(v) })} fmt={v => `${Math.round(v)} m`} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="FlowTime" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

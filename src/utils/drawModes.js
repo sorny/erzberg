@@ -411,6 +411,26 @@ export const DRAW_MODES = [
     id: 'Envelope', label: 'Summit envelope', cost: 1.5, mark: 'envelope', walls: false,
     pick: { span: [120, 360], spacing: [5, 12] },
   },
+  {
+    // Evenly spaced streamlines of the fall line turned by a fixed angle.
+    id: 'Loxo', label: 'Loxodromes', cost: 2.5, mark: 'loxo',
+    pick: { spacing: [4, 10], angle: [35, 80] },
+  },
+  {
+    // Profile curvature and its derivative, traced as two level sets.
+    id: 'Breaks', label: 'Breaklines', cost: 2, mark: 'breaks',
+    pick: { radius: [6, 14] },
+  },
+  {
+    // A ring test per cell, then a walk up and down from each col.
+    id: 'Morse', label: 'Surface network', cost: 2, mark: 'morse',
+    pick: { radius: [8, 24] },
+  },
+  {
+    // One walk to the plain from every cell of a 256-cell grid.
+    id: 'FlowTime', label: 'Flow time', cost: 3, mark: 'flowtime',
+    pick: { levels: [10, 22] },
+  },
 ]
 
 /** id → the label the panel and the plot both use. */
@@ -486,6 +506,12 @@ export const SUB_LAYER_LABEL = {
   'Shafts-Feet':             'Landings',
   'Wiggle-Lobes':            'Lobes',
   'Envelope-Drops':          'Plumb lines',
+  'Contours-Aux':            'Auxiliary',
+  'Breaks-Convex':           'Convex',
+  'Breaks-Concave':          'Concave',
+  'Morse-Ridges':            'Ridges',
+  'Morse-Courses':           'Courses',
+  'Morse-Points':            'Cols and summits',
 }
 
 /**

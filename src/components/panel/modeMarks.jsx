@@ -555,6 +555,38 @@ const MARKS = {
       <path d="M4 2.3 L5.6 2.3 M4 3.4 L6 3.4 M4 9.4 L6.2 9.4 M4 10.6 L6.4 10.6 M11 8.9 L13.4 8.9 M11 10.1 L13.9 10.1 M11 11.3 L13.2 11.3 M18 2.2 L20.4 2.2 M18 3.4 L21 3.4 M18 4.6 L20.2 4.6 M18 10.4 L19.4 10.4" strokeWidth="0.5" />
     </g>
   ),
+  // Lines that cross every contour at one angle, winding into a whorl.
+  loxo: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M11 6.5 C12.5 5.5 13.5 7.5 11.5 8.5 C9 9.5 8 6 10 4.5 C12.5 2.5 16 5 15.5 8 C15 11.5 10 12.5 7.5 10.5 C5 8.5 5.5 3.5 9 2" />
+      <path d="M1 3 C3 4.5 4 7 3.5 12 M18 1.5 C20 3.5 21 7 19.5 12" />
+    </g>
+  ),
+  // The top edge of a face, solid, and its foot, dotted.
+  breaks: (
+    <g {...BASE}>
+      <path d="M1 3 L7 3 C9 3 11 10 14 10 L21 10" strokeWidth="0.5" />
+      <path d="M2 4.5 C4 4.8 6.5 4.5 8 5.5" />
+      <path d="M12.5 9 C14 8.6 17 8.8 20 8.6" strokeDasharray="0.1 1.6" strokeWidth="1.2" />
+    </g>
+  ),
+  // Two summits, the col between them, and the courses down from it.
+  morse: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M3 3 C6 5 8 7 11 7 C14 7 16 5 19 3" />
+      <path d="M11 7 C10.5 9 10 10.5 9 12.5 M11 7 C11.5 5 12 3 12.5 1" strokeDasharray="1.2 1" />
+      <path d="M10 6 L12 8 M12 6 L10 8" strokeWidth="0.6" />
+      <path d="M3 1.6 L4.2 3.6 L1.8 3.6 Z M19 1.6 L20.2 3.6 L17.8 3.6 Z" strokeWidth="0.5" />
+    </g>
+  ),
+  // Lines of equal travel time, pushed up a valley.
+  flowtime: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1 12 C5 11 8 10 11 5 C14 10 17 11 21 12" />
+      <path d="M1 9 C4 8 7 6.5 11 2 C15 6.5 18 8 21 9" />
+      <path d="M1 6 C4 5 6 3.5 8 1 M14 1 C16 3.5 18 5 21 6" />
+    </g>
+  ),
   // A sheet across the summits, with plumb lines to the valley floors.
   envelope: (
     <g {...BASE}>

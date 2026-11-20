@@ -86,7 +86,7 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 75 modes as tiles in eight families:
+- **Marks sheet.** The Marks stage shows the 79 modes as tiles in eight families:
   Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
@@ -191,7 +191,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 75 modes.
+  classes you pick. This works for all 79 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -267,13 +267,13 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 
 | Mode | Technique |
 |---|---|
-| Lines | Parallel terrain ridgelines at any bearing |
+| Lines | Parallel terrain ridgelines at any bearing, with extra lines in the shade |
 | Crosshatch | Two perpendicular line sets at a set angle, with optional plus signs at the intersections as their own pen |
 | Pillars | Vertical extrusion per cell (line, cuboid or cylinder), below and optionally above the ground, inked by land cover class |
-| Contours | Marching Squares isolines, with optional ring closing and Chaikin smoothing |
+| Contours | Marching Squares isolines, with optional ring closing, Chaikin smoothing, auxiliary contours on flat ground and a crowding cut on cliffs |
 | Hachure | Slope-directed short strokes, or Lehmann downslope strokes between contours |
 | Flow Lines | Euler-integrated drainage paths |
-| Stream Network | Strahler-order network, optionally weighted by flow accumulation |
+| Stream Network | Strahler-order network, optionally weighted by flow accumulation, with wide rivers drawn as two banks |
 | Pencil Shading | Laplacian curvature |
 | Ridge Detection | Hessian eigenvalue crests |
 | Valley Detection | Topographic Position Index troughs |
@@ -282,10 +282,10 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Isophotes | Lines of constant illumination |
 | Shadow Line | The shadow edge at one date, time and zone |
 | Sun Hours | Isolines of hours in direct sun, over a year or one date |
-| Engraving | Copperplate cross-hatch, up to 4 stacked directions |
+| Engraving | Copperplate cross-hatch, up to 4 stacked directions, straight or along the contours and fall lines |
 | Curvature | Streamlines through the principal-curvature field |
 | Rock & Scree | Swisstopo-style cliff hachures and scree dots |
-| Bitplane | Marching squares without interpolation, with a Bayer screen |
+| Bitplane | Marching squares without interpolation, with a Bayer screen, or smooth steps like a card model |
 | Sprite Blocks | The same quantiser drawn as blocks |
 | Flashbulb | A point light in the scene with 1/r² falloff and a cast shadow |
 | Halation | Blown highlights that bleed into the shadow beside them |
@@ -342,6 +342,10 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Light Shafts | The upper edge of every cast shadow in the air: a ray from each crest to the point where the light lands |
 | Wiggle Traces | The plate as a seismic section: traces that swing with the local relief, with the lobes on one side filled |
 | Summit Envelope | A net on the surface that rests on the crests and spans the valleys, with plumb lines to the ground |
+| Loxodromes | Lines that cross every contour at one angle or fall at one grade, winding round each summit |
+| Breaklines | Convex and concave breaks of slope, from the profile curvature |
+| Surface Network | Cols joined by ridges to their summits and by courses to the hollows |
+| Flow Time | Isolines of the time water takes to reach the plain |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

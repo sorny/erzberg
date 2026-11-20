@@ -22,6 +22,10 @@ const MODES = [
   ['Tin', 'TIN Facets', 'tin', /^[\d,.\s ]+ facets$/],
   ['Shafts', 'Light Shafts', 'shafts', /^[\d,.\s ]+ shafts$/],
   ['Envelope', 'Summit Envelope', 'envelope', /^\d+% of the net stands clear of the ground$/],
+  ['Loxo', 'Loxodromes', 'loxo', /^[\d,.\s ]+ lines$/],
+  ['Breaks', 'Breaklines', 'breaks', /^[\d,.\s ]+ segments$/],
+  ['Morse', 'Surface Network', 'morse', /^\d+ cols · \d+ summits$/],
+  ['FlowTime', 'Flow Time', 'flowtime', /^\d+ lines$/],
 ]
 
 for (const [id, title, kind, readout] of MODES) {

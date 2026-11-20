@@ -35,7 +35,7 @@
  */
 export const FAMILIES = [
   ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow Lines', 'Network', 'Ridges', 'Valleys', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Sand Ripples', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier', 'Wiggle Traces']],
+    ['Lines', 'Contours', 'Flow Lines', 'Network', 'Ridges', 'Valleys', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Sand Ripples', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier', 'Wiggle Traces', 'Loxodromes', 'Breaklines', 'Surface Network', 'Flow Time']],
   ['Tone',     'many small marks add up to a grey',
     ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Sediment', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'TIN Facets', 'Truchet', 'Slope Classes', 'Coral', 'Hoarfrost', 'Line Printer', 'Tally', 'Cross-Stitch', 'Hair']],
   ['Relief',   'the ground given thickness',

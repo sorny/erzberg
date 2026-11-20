@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.77.0] — 2026-11-20
+
+### Added
+
+- **Loxodromes** (Line). Evenly spaced lines that cross every contour at one
+  angle, so they wind round each summit and hollow. *Hold: Grade* keeps a
+  constant grade instead, as a road line between contours.
+- **Breaklines** (Line). Breaks of slope from the profile curvature: the top
+  of each face solid, its foot dotted, each its own pen.
+- **Surface Network** (Line). The cols, the ridges that join each col to its
+  two summits, and the courses down to the hollows, with a cross on each col
+  and a triangle on each summit. *Persistence* drops the minor cols.
+- **Flow Time** (Line). Isolines of the time water takes to reach the plain,
+  faster on steep ground and in channels. No line crosses a divide.
+- **Contours: Auxiliary contours.** Dashed lines at half the interval where
+  the contours lie more than *Gap* apart, as their own pen.
+- **Contours: Crowding cut.** Minor contours stop where they run closer than
+  *Min gap*. Major contours stay.
+- **Lines: Shade fill.** Lines halfway and at the quarters between the lines,
+  only where the ground faces away from the sun.
+- **Engraving: Form strokes.** The layers run along the contours, down the
+  fall lines and across them at 45°, instead of straight.
+- **Stream Network: Banks.** A river wider than *Banks from* is drawn as its
+  two banks, its width from the square root of the area it drains.
+- **Bitplane: Smooth edge.** Steps along rounded contours, with risers at a
+  set spacing, like a model cut from card.
+
+The ten were picked from live sketches on the sample plate. On a 512² copy of
+it, Loxodromes build in 60 ms, Breaklines in 75 ms, Surface Network in 55 ms
+and Flow Time in 110 ms. Flow Time walks a grid of at most 256² and reuses the
+time of a walk it meets, which took it from 2.4 s to 0.1 s.
+
+A preset reopens unchanged: every new control starts off, so `PRESET_FORMAT`
+stays the same.
+
 ## [1.76.0] — 2026-11-13
 
 ### Added
