@@ -18,7 +18,7 @@
 ---
 
 Load a greyscale heightmap (8-bit or 16-bit PNG), a GeoTIFF, or an audio file.
-The app renders it as 3D line art with 56 independent draw modes: surveyor's
+The app renders it as 3D line art with 80 independent draw modes: surveyor's
 marks such as hachures and contours, tone, relief, colour plates, light, wind,
 growth, and tracks that something with mass laid down a face. Contours letter their own
 heights.
@@ -86,7 +86,7 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 79 modes as tiles in eight families:
+- **Marks sheet.** The Marks stage shows the 80 modes as tiles in eight families:
   Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
@@ -191,7 +191,7 @@ as a map with a legend.
 A plate gives you four things:
 
 - **Masks.** Each layer takes a row of class swatches. It draws only on the
-  classes you pick. This works for all 79 modes.
+  classes you pick. This works for all 80 modes.
 - **Class colours.** Any mode can take the class ink or the plate colour, as
   one pen layer per class.
 - **Ink by land class.** One press gives each class its own mark, ordered by
@@ -270,7 +270,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Lines | Parallel terrain ridgelines at any bearing, with extra lines in the shade |
 | Crosshatch | Two perpendicular line sets at a set angle, with optional plus signs at the intersections as their own pen |
 | Pillars | Vertical extrusion per cell (line, cuboid or cylinder), below and optionally above the ground, inked by land cover class |
-| Contours | Marching Squares isolines, with optional ring closing, Chaikin smoothing, auxiliary contours on flat ground and a crowding cut on cliffs |
+| Contours | Marching Squares isolines, with optional ring closing, Chaikin smoothing, auxiliary contours on flat ground, a crowding cut on cliffs and ticks round hollows |
 | Hachure | Slope-directed short strokes, or Lehmann downslope strokes between contours |
 | Flow Lines | Euler-integrated drainage paths |
 | Stream Network | Strahler-order network, optionally weighted by flow accumulation, with wide rivers drawn as two banks |
@@ -346,6 +346,7 @@ sparse ones on rock. → [Copies](docs/Draw-Modes.md#copies)
 | Breaklines | Convex and concave breaks of slope, from the profile curvature |
 | Surface Network | Cols joined by ridges to their summits and by courses to the hollows |
 | Flow Time | Isolines of the time water takes to reach the plain |
+| Prominence | Each summit with the outline of the ground above its key col, nested like a family tree |
 
 Indexed, Mineral, Land cover and Watershed export as closed filled paths, one
 pen layer per ink. Set *Filled areas in the SVG* to Hatch (Output) and each

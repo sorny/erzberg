@@ -579,6 +579,16 @@ const MARKS = {
       <path d="M3 1.6 L4.2 3.6 L1.8 3.6 Z M19 1.6 L20.2 3.6 L17.8 3.6 Z" strokeWidth="0.5" />
     </g>
   ),
+  // Two summits, each in the outline of the ground above its key col.
+  prom: (
+    <g {...BASE} strokeWidth="0.8">
+      <path d="M1.5 9 C1.5 4 5 2 9 3 C11 3.5 12 4.5 13.5 4 C17 2.8 20.5 4 20.5 7.5 C20.5 11 17 12.5 11 12.5 C5 12.5 1.5 12 1.5 9 Z" />
+      <path d="M4.5 8.5 C4.5 6 6.5 5 8.5 5.5 C10.5 6 11 7.5 10.5 9 C10 10.3 8 10.8 6.5 10.5 C5.2 10.2 4.5 9.5 4.5 8.5 Z" />
+      <path d="M14 7.5 C14 6 15.5 5.4 16.8 5.8 C18.2 6.2 18.5 7.6 17.8 8.6 C17 9.6 14 9.4 14 7.5 Z" />
+      <path d="M7.6 6.6 L8.6 8.4 L6.6 8.4 Z M16 6.3 L16.8 7.7 L15.2 7.7 Z" strokeWidth="0.5" />
+      <path d="M11.8 6.6 L12.8 7.6 M12.8 6.6 L11.8 7.6" strokeWidth="0.5" />
+    </g>
+  ),
   // Lines of equal travel time, pushed up a valley.
   flowtime: (
     <g {...BASE} strokeWidth="0.8">

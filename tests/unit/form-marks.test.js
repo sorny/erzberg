@@ -1,6 +1,6 @@
 /**
- * Loxodromes, Breaklines, Surface Network and Flow Time, and the extensions to
- * Contours, Lines, Engraving, Stream Network and Bitplane, on small
+ * Loxodromes, Breaklines, Surface Network, Flow Time and Prominence, and the
+ * extensions to Contours, Lines, Engraving, Stream Network and Bitplane, on small
  * synthetic plates whose answers are known.
  */
 import { describe, it, expect } from 'vitest'
@@ -131,6 +131,65 @@ describe('Contours: auxiliary contours and the crowding cut', () => {
     const n = (ls, id) => count(ls.find((l) => l.id === id))
     expect(n(cut, 'Contours-Minor')).toBeLessThan(n(all, 'Contours-Minor') * 0.5)
     expect(n(cut, 'Contours-Major')).toBe(n(all, 'Contours-Major'))
+  })
+})
+
+describe('Contours: depression ticks', () => {
+  // A ring wall round a crater whose floor lies below the plain outside.
+  const crater = plate((x, y) => {
+    const r = Math.hypot(x - 48, y - 48)
+    return 0.3 + 0.5 * Math.exp(-((r - 26) ** 2) / 60) - 0.25 * Math.exp(-(r ** 2) / 120)
+  })
+  const base = { enabledContours: true, intervalContours: 8 }
+  // The same chained contours with the ticks spaced too far apart to appear.
+  const none = { ...base, depressionContours: true, tickSpacingContours: 1e6 }
+  const key = (q) => {
+    const a = q.slice(0, 2).map((v) => v.toFixed(3)).join(), b = q.slice(2, 4).map((v) => v.toFixed(3)).join()
+    return a < b ? a + '|' + b : b + '|' + a
+  }
+  const contourSegs = (t, p) => layers(t, p).filter((l) => l.id === 'Contours-Minor' || l.id === 'Contours-Major').flatMap((l) => segs(t, l))
+  it('ticks the rings round a hollow, pointing down into it', () => {
+    const plain = new Set(contourSegs(crater, none).map(key))
+    const ticks = contourSegs(crater, { ...base, depressionContours: true, tickLengthContours: 2, tickSpacingContours: 4 })
+      .filter((q) => !plain.has(key(q)))
+    expect(ticks.length).toBeGreaterThan(10)
+    // Inside the ring wall every ring is a depression: its ticks point at the centre.
+    const inward = ticks.filter(([c0, r0, c1, r1]) => Math.hypot(c1 - 48, r1 - 48) < Math.hypot(c0 - 48, r0 - 48))
+    expect(inward.length).toBe(ticks.length)
+    expect(Math.max(...ticks.map(([c0, r0]) => Math.hypot(c0 - 48, r0 - 48)))).toBeLessThan(26)
+  })
+
+  it('leaves the rings round a hill alone', () => {
+    expect(contourSegs(cone, { ...base, depressionContours: true }).length).toBe(contourSegs(cone, none).length)
+  })
+})
+
+describe('Prominence', () => {
+  const twin = plate((x, y) => 0.1 + 0.8 * Math.exp(-((x - 30) ** 2 + (y - 48) ** 2) / 120) + 0.5 * Math.exp(-((x - 66) ** 2 + (y - 48) ** 2) / 120))
+  it('outlines the lower summit at its key col and the higher one at the plain', () => {
+    const ls = layers(twin, { enabledProm: true, radiusProm: 0, minProminenceProm: 0.05 })
+    const out = ls.find((l) => l.id === 'Prom')
+    expect(out.note).toEqual({ summits: 2 })
+    // The key col lies on the line between the summits, where the sum dips lowest.
+    const h = (x) => 0.1 + 0.8 * Math.exp(-((x - 30) ** 2) / 120) + 0.5 * Math.exp(-((x - 66) ** 2) / 120)
+    let colX = 30
+    for (let x = 30; x <= 66; x += 0.01) if (h(x) < h(colX)) colX = x
+    // The lower summit's outline touches the col and stays east of it.
+    const s = segs(twin, out)
+    const east = s.filter((q) => q[0] > colX - 1 && q[2] > colX - 1)
+    expect(east.length).toBeGreaterThan(10)
+    expect(Math.min(...east.flatMap((q) => [q[0], q[2]]))).toBeLessThan(colX + 1.5)
+    // The higher summit's island is all the ground above the plain: it spans both.
+    const xs = s.flatMap((q) => [q[0], q[2]])
+    expect(Math.min(...xs)).toBeLessThan(20)
+    expect(Math.max(...xs)).toBeGreaterThan(76)
+    expect(count(ls.find((l) => l.id === 'Prom-Points'))).toBeGreaterThan(0)
+  })
+
+  it('drops summits below the minimum prominence', () => {
+    const one = layer(twin, { enabledProm: true, radiusProm: 0, minProminenceProm: 0.9, marksProm: false }, 'Prom')
+    expect(one.note).toEqual({ summits: 1 })
+    expect(layers(twin, { enabledProm: true, marksProm: false }).map((l) => l.id)).not.toContain('Prom-Points')
   })
 })
 

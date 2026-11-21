@@ -80,6 +80,9 @@ export const STYLE_DEF = {
   // `auxGapContours` pixels apart, and the crowding cut that drops a minor
   // contour where it runs closer than `crowdGapContours` pixels to the next.
   auxContours: false, auxGapContours: 40, auxDashContours: 'dashed', crowdContours: false, crowdGapContours: 3,
+  // Depression ticks on the inner side of a closed contour round a hollow,
+  // `tickLengthContours` long and `tickSpacingContours` apart, in pixels.
+  depressionContours: false, tickLengthContours: 8, tickSpacingContours: 20,
   // Contour labels. `labelSizeContours` is world units per em, like the vector
   // labels; `labelSpacingContours` is how far apart along a contour, in the same
   // units, so both read against the terrain rather than against the screen.
@@ -533,6 +536,13 @@ export const STYLE_DEF = {
   smoothingFlowTime: 2, cellMetresFlowTime: 10, reliefFlowTime: 1000,
   colorFlowTime: '#1a1a1a', weightFlowTime: 1, opacityFlowTime: 1, dashFlowTime: 'solid',
   hypsoFlowTime: false, hypsoModeFlowTime: 'elevation', hypsoBandedFlowTime: false, hypsoIntervalFlowTime: 10,
+
+  // Prominence — each summit with the outline of the ground above its key col.
+  // `minProminenceProm` and `plainProm` are shares of the height range; `marksProm`: ▲ and ×.
+  enabledProm: false, radiusProm: 12, minProminenceProm: 0.02, countProm: 40, plainProm: 0.03,
+  smoothingProm: 2, marksProm: true, sizeProm: 10,
+  colorProm: '#1a1a1a', weightProm: 1, opacityProm: 1, dashProm: 'solid',
+  hypsoProm: false, hypsoModeProm: 'elevation', hypsoBandedProm: false, hypsoIntervalProm: 10,
 
   // Sediment — an even field of dots that slides down the slope and settles.
   enabledSediment: false, spacingSediment: 4, travelSediment: 80, gapSediment: 0.5, flatSediment: 0.03,

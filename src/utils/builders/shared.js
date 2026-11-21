@@ -302,6 +302,8 @@ function resolveLayerStyle(id, p) {
       return { weight: p.weightMorse, opacity: p.opacityMorse, dash: p.courseDashMorse ?? 'dashed' }
     case 'Morse-Points':
       return { weight: p.weightMorse, opacity: p.opacityMorse, dash: 'solid' }
+    case 'Prom-Points':
+      return { weight: p.weightProm, opacity: p.opacityProm, dash: 'solid' }
     case 'Contours-Tanaka-Bright':
       return { weight: p.tanakaWeightBright ?? 2.5, opacity: p.opacityContours, dash: p.dashContours }
     case 'Contours-Tanaka-Dark':
@@ -1115,15 +1117,17 @@ export function traceLevelSet(terrain, p, field, levels, smooth, opt = null) {
   const ex = _edgeX, ey = _edgeY, eid = _edgeId
   const scratch = getChainScratch(rows * cols * 2)
   // `opt.skip(r, c)` leaves a cell out, `opt.minLen` drops a chain shorter than
-  // that many grid cells.
+  // that many grid cells, and `opt.box` = [r0, r1, c0, c1] scans only the
+  // cells whose corners lie inside those rows and columns.
   const skip = opt?.skip ?? null, minLen = opt?.minLen ?? 0
+  const [br0, br1, bc0, bc1] = opt?.box ?? [0, rows - 1, 0, cols - 1]
 
   for (const level of levels) {
     const segE = new I32List(), segXY = new F64List()
 
-    for (let r = 0; r < rows - 1; r++) {
+    for (let r = Math.max(0, br0); r < Math.min(rows - 1, br1); r++) {
       const row0 = r * cols, row1 = row0 + cols
-      for (let c = 0; c < cols - 1; c++) {
+      for (let c = Math.max(0, bc0); c < Math.min(cols - 1, bc1); c++) {
         const d00 = field[row0 + c],     d10 = field[row0 + c + 1]
         const d01 = field[row1 + c],     d11 = field[row1 + c + 1]
         if (d00 < 0 || d10 < 0 || d01 < 0 || d11 < 0) continue

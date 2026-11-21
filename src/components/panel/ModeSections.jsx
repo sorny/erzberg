@@ -165,6 +165,15 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                       {style.crowdContours && (
                         <InlineSl label="Min gap" testId="contour-crowd-gap" help="The closest two contours may run, in raster pixels. Set it a little above the pen width at the size you plot." min={0.5} max={20} step={0.5} value={style.crowdGapContours ?? 3} onChange={v => ss({ crowdGapContours: v })} fmt={v => v.toFixed(1)} />
                       )}
+                      <Tog label="Depression ticks" testId="contour-depression"
+                        help="Short ticks on the inner side of each closed contour round a hollow, pointing down into it, so a pit does not read as a hill. They go in the pen layer of their contour."
+                        checked={!!style.depressionContours} onChange={v => ss({ depressionContours: v })} />
+                      {style.depressionContours && (
+                        <>
+                          <InlineSl label="Tick length" testId="contour-tick-length" help="The length of each tick, in raster pixels." min={1} max={40} step={1} value={style.tickLengthContours ?? 8} onChange={v => ss({ tickLengthContours: Math.round(v) })} />
+                          <InlineSl label="Tick spacing" testId="contour-tick-spacing" help="The distance between ticks along the contour, in raster pixels." min={4} max={120} step={1} value={style.tickSpacingContours ?? 20} onChange={v => ss({ tickSpacingContours: Math.round(v) })} />
+                        </>
+                      )}
                     </>
                   )}
                   <Tog label="Summit and hollow" testId="contour-extremes" help="A plus sign on the highest point and a minus sign on the lowest, as their own pen." checked={!!style.extremesContours} onChange={v => ss({ extremesContours: v })} />
@@ -1963,6 +1972,30 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
                   )}
                 </Sub>
                 <ModeStyleOverride prefix="FlowTime" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
+          <Section title="Mode: Prominence" icon={<ModeMark kind="prom" />} open={sec.modeProm} onToggle={() => tog('modeProm')} enabled={style.enabledProm} onEnabled={v => ss({ enabledProm: v })} enableTestId="mode-prom">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Prom && (
+                    <div data-testid="prom-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Prom.summits} summits`}
+                    </div>
+                  )}
+                  <InlineSl label="Min prominence" testId="prom-min" help="How far a summit must stand above its key col to be drawn, as a share of the height range. The key col is the highest col on the way to higher ground. Each summit is drawn with the outline of the ground above its key col." min={0.002} max={0.3} step={0.002} value={style.minProminenceProm ?? 0.02} onChange={v => ss({ minProminenceProm: v })} fmt={v => (Math.round(v * 1000) / 10) + '%'} />
+                  <InlineSl label="Summits" help="The most summits drawn, the most prominent first." min={1} max={200} step={1} value={style.countProm ?? 40} onChange={v => ss({ countProm: Math.round(v) })} />
+                  <InlineSl label="Plain" help="The highest summit has no key col. Its outline is drawn at this share of the height range above the lowest ground." min={0} max={0.5} step={0.01} value={style.plainProm ?? 0.03} onChange={v => ss({ plainProm: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Blur" help="Blur on the heights before the summits and cols are found, in raster pixels. More blur finds fewer, larger forms." min={0} max={60} step={1} value={style.radiusProm ?? 12} onChange={v => ss({ radiusProm: Math.round(v) })} />
+                  <InlineSl label="Smoothing" help="Chaikin corner-cutting passes on each outline." min={0} max={4} step={1} value={style.smoothingProm ?? 2} onChange={v => ss({ smoothingProm: Math.round(v) })} />
+                  <Tog label="Summits and key cols" testId="prom-marks" help="A triangle on each summit and a cross on each key col, as a second pen." checked={style.marksProm !== false} onChange={v => ss({ marksProm: v })} />
+                  {style.marksProm !== false && (
+                    <InlineSl label="Size" help="The width of the triangle and the cross, in raster pixels." min={2} max={60} step={1} value={style.sizeProm ?? 10} onChange={v => ss({ sizeProm: Math.round(v) })} />
+                  )}
+                </Sub>
+                <ModeStyleOverride prefix="Prom" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
               </>
             )}
           </Section>

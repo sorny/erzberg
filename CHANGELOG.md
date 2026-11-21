@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.78.0] — 2026-11-20
+
+### Added
+
+- **Prominence** (Line). Each summit with the outline of its island, the
+  ground above its key col, so the islands nest like a family tree of the
+  massif. A triangle marks each summit and a cross each key col, as a second
+  pen. *Min prominence* and *Summits* set how many are drawn.
+- **Contours: Depression ticks.** A closed contour round a hollow gets short
+  ticks on its inner side, pointing down into it, so a pit no longer reads as a
+  hill. The ticks go in the pen layer of their contour.
+
+### Fixed
+
+- The README said the app had 56 draw modes. It has 80.
+
+The two were picked from live sketches on the sample plate. Prominence finds
+the key cols by a union–find over the cells from high to low. A counting sort
+on 2¹⁸ height bins and plain neighbour loops took it from 300 ms to about
+230 ms on a 1024² test plate with 41 summits, and to 90–130 ms at 512².
+Surface Network takes 150 ms on the same plate. Each island is traced only
+inside its own bounding box. Depression ticks add no measurable time to
+Contours.
+
+A preset reopens unchanged: every new control starts off, so `PRESET_FORMAT`
+stays the same.
+
 ## [1.77.0] — 2026-11-20
 
 ### Added

@@ -166,6 +166,7 @@ export const PANEL_MODES = [
   ['Mode: Breaklines',     'enabledBreaks',    'Keep',      (s) => `${Math.round((s.keepBreaks ?? 0.5) * 100)}%`],
   ['Mode: Surface Network', 'enabledMorse',    'Blur',      (s) => num(s.radiusMorse)],
   ['Mode: Flow Time',      'enabledFlowTime',  'Lines',     (s) => num(s.levelsFlowTime)],
+  ['Mode: Prominence',     'enabledProm',      'Min',       (s) => `${Math.round((s.minProminenceProm ?? 0.02) * 1000) / 10}%`],
 ]
 
 /**

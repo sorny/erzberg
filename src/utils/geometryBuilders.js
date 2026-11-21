@@ -33,7 +33,7 @@ import { hexToRgb } from './colorUtils'
 import { DRAW_MODES } from './drawModes'
 import { jitterNoise, sampleBilinear } from './terrain'
 import { CLASS_INK_SOURCES, OWN_CLASS_INK, inkByClass } from './builders/classInk.js'
-import { buildBreaklines, buildFlowTime, buildLoxodromes, buildSurfaceNetwork } from './builders/form.js'
+import { buildBreaklines, buildFlowTime, buildLoxodromes, buildProminence, buildSurfaceNetwork } from './builders/form.js'
 import { buildReticulation, buildRugged, buildSediment, buildSprite, buildStipple, buildSwissRockScree, buildTruchet, buildTsp, buildZeroCross } from './builders/tone.js'
 export { blueNoiseTile } from './builders/light.js'
 export { F32List, U32List, haloOf, hasFillLayer, layerStyle, lightVector, needsSurfaceShading, simplifyFlat } from './builders/shared.js'
@@ -325,6 +325,9 @@ export function buildLineGeometry(terrain, p) {
     { id:'FlowTime', builder: (t, ctx) => buildFlowTime(t, ctx, {
         levels: p.levelsFlowTime, radius: p.radiusFlowTime, speedup: p.speedupFlowTime, plain: p.plainFlowTime,
         smoothing: p.smoothingFlowTime, cellMetres: p.cellMetresFlowTime, relief: p.reliefFlowTime }) },
+    { id:'Prom',    builder: (t, ctx) => buildProminence(t, ctx, {
+        radius: p.radiusProm, minProminence: p.minProminenceProm, count: p.countProm, plain: p.plainProm,
+        smoothing: p.smoothingProm, points: p.marksProm, size: p.sizeProm }) },
   ]
 
   /*

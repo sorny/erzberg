@@ -4,7 +4,7 @@
  * Split out of geometryBuilders.js, which keeps the dispatcher and re-exports
  * the public API, so importers are unchanged.
  */
-import { boxBlur, cellElev } from '../terrain'
+import { boxBlur, cellElev, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
 import { EMPTY_F32, EMPTY_F64, EMPTY_U8, F32List, F64List, I32List, MARCHING_TABLE, SMOOTH_SIMPLIFY_EPS, _edgeId, _edgeX, _edgeY, chaikinSmoothFlat, chainLevelSegments, drapeEdge, edgeLerp01, getChainScratch, inElevCut, normElev, simplifyFlat } from './shared.js'
 
@@ -280,7 +280,9 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
   // Labels are placed along a *stroke*, so the raw scan-order segments have to be
   // chained first — the same reason smoothing and ring-closing need it.
   const wantLabels = !!p.labelContours
-  const needsChains = closeRings || smooth > 0 || wantLabels
+  // Depression ticks are set along a closed ring, so they need the chains too.
+  const wantTicks = !!p.depressionContours
+  const needsChains = closeRings || smooth > 0 || wantLabels || wantTicks
 
   const minorPos = new F32List(), minorCol = new F32List()
   const majorPos = new F32List(), majorCol = new F32List()
@@ -317,6 +319,10 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
    * placements, so erring tall only moves a label along the contour.
    */
   const labelHalfHeightGrid = 0.36 * labelEm + labelPadGrid
+
+  // Depression ticks: spacing along the ring and length, raster pixels to cells.
+  const tickSpacing = Math.max(1, p.tickSpacingContours ?? 20) / scl
+  const tickLength = Math.max(0.5, p.tickLengthContours ?? 8) / scl
 
   const majorMod = majorInterval ?? 0
   const offset = majorOffset ?? 1
@@ -536,6 +542,20 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
         }
       }
 
+      if (wantTicks) {
+        for (const { pts, closed } of prepared) {
+          if (!closed) continue
+          const t = depressionTicks(terrain, pts, levelVal[k], Math.sign(lvlStep), tickSpacing, tickLength)
+          for (let j = 0; j < t.length; j += 4) {
+            if (boxes.length && masked(t[j], t[j + 1], t[j], t[j + 1])) continue
+            if (crowded(k, t[j], t[j + 1], t[j], t[j + 1])) continue
+            tp.push6(t[j]     * scl - halfW, y, t[j + 1] * scl - halfH,
+                     t[j + 2] * scl - halfW, y, t[j + 3] * scl - halfH)
+            tc.push6(cr, cg, cb, cr, cg, cb)
+          }
+        }
+      }
+
       if (closeRings) {
         const bridges = borderCloseSegments(chains, rows, cols, scl, halfW, halfH, y)
         for (let j = 0; j < bridges.length; j += 6) {
@@ -557,6 +577,60 @@ export function buildContours(terrain, p, interval, majorInterval, majorOffset, 
   if (p.auxContours && gapAt) {
     out['Contours-Aux'] = auxiliaryContours(terrain, p, { numSteps, levelElev, levelVal, levelRgb, lvlStep },
       smooth, gapAt, Math.max(0, p.auxGapContours ?? 40))
+  }
+  return out
+}
+
+/**
+ * Depression ticks for one closed contour, as grid-space segments
+ * [c0, r0, c1, r1, …].
+ *
+ * The ring is a depression when the ground one cell inside it is lower than
+ * its level at more than 70% of the points tested, so a ring round a hollow
+ * passes and a ring round a hill does not. `sign` is the sign of the level
+ * step in grid values, which a negative exaggeration turns over. A tick stands
+ * every `spacing` cells along the ring, the first half a spacing in, and runs
+ * `length` cells inward, square to the ring, down into the hollow.
+ */
+function depressionTicks(terrain, pts, level, sign, spacing, length) {
+  const { grid, gridMask, rows, cols } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const np = pts.length / 2
+  if (np < 4 || !sign) return []
+  let area = 0
+  for (let i = 0; i < np; i++) {
+    const j = (i + 1) % np
+    area += pts[i * 2] * pts[j * 2 + 1] - pts[j * 2] * pts[i * 2 + 1]
+  }
+  // The left side of the direction of travel is inside for a positive area.
+  const side = area > 0 ? 1 : -1
+  const inward = (i) => {
+    const dc = pts[i * 2 + 2] - pts[i * 2], dr = pts[i * 2 + 3] - pts[i * 2 + 1], m = Math.hypot(dc, dr)
+    return m > 0 ? [(-dr / m) * side, (dc / m) * side] : null
+  }
+  let lower = 0, tested = 0
+  for (let i = 0; i < np - 1; i++) {
+    const nv = inward(i)
+    if (!nv) continue
+    const v = sampleBilinear(grid, sMask, rows, cols, pts[i * 2 + 1] + nv[1], pts[i * 2] + nv[0])
+    if (v !== v) continue
+    tested++
+    if ((v - level) * sign < 0) lower++
+  }
+  if (!tested || lower < 0.7 * tested) return []
+
+  const out = []
+  let next = spacing / 2
+  for (let i = 0; i < np - 1; i++) {
+    const c0 = pts[i * 2], r0 = pts[i * 2 + 1], c1 = pts[i * 2 + 2], r1 = pts[i * 2 + 3]
+    const m = Math.hypot(c1 - c0, r1 - r0), nv = inward(i)
+    if (!nv) continue
+    while (next <= m) {
+      const t = next / m, c = c0 + (c1 - c0) * t, r = r0 + (r1 - r0) * t
+      out.push(c, r, c + nv[0] * length, r + nv[1] * length)
+      next += spacing
+    }
+    next -= m
   }
   return out
 }

@@ -1,6 +1,6 @@
 /**
- * Form modes: Loxodromes, Breaklines, Surface Network, Flow Time, and the
- * evenly spaced streamlines that Loxodromes and Engraving share.
+ * Form modes: Loxodromes, Breaklines, Surface Network, Flow Time, Prominence,
+ * and the evenly spaced streamlines that Loxodromes and Engraving share.
  *
  * Split out like the other builder files: geometryBuilders.js keeps the
  * dispatcher and re-exports the public API.
@@ -707,3 +707,157 @@ export function buildFlowTime(terrain, p, o) {
   return { ...traced, note: { levels: levels.length } }
 }
 
+
+// ─── Prominence ──────────────────────────────────────────────────────────────
+
+/**
+ * Each summit with the outline of its island: the ground that stays above its
+ * key col, the highest col on the way to higher ground.
+ *
+ * The heights are blurred by `radius` raster pixels. Union–find runs over the
+ * cells from high to low. Each set keeps its highest cell. Where a cell joins
+ * two sets, the set with the lower summit ends there: that cell is its key
+ * col, and its prominence is the summit's height minus the col's. Summits on
+ * the edge of the raster are left out, because the raster cuts them.
+ *
+ * Summits of at least `minProminence` (a share of the height range) are
+ * drawn, at most `count`, the most prominent first. The outline of a summit is
+ * the level set at its col's height, traced only round the cells above the col
+ * that join the summit. The highest summit has no col. Its island is all the
+ * ground above the `plain`, a share of the height range above the lowest
+ * ground. With `points`, a triangle marks each summit and a cross each key col,
+ * in the layer `Prom-Points`.
+ */
+export function buildProminence(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl } = terrain
+  const n = rows * cols
+  const sMask = terrain.hasNoData ? gridMask : null
+  const radius = Math.max(0, (o.radius ?? 8) / scl)
+  const h = radius > 0 ? boxBlur(grid, cols, rows, radius, sMask) : grid
+  let lo = Infinity, hi = -Infinity
+  for (let i = 0; i < n; i++) if (gridMask[i]) { if (h[i] < lo) lo = h[i]; if (h[i] > hi) hi = h[i] }
+  if (!(hi > lo)) return null
+  const span = hi - lo
+
+  /*
+   * The cells from high to low, by a counting sort on the height in 2^18
+   * bins. Cells in one bin go in index order. Two cells that close in height
+   * can only make a summit of less than 1/262 144 of the relief, far below
+   * any Min prominence. `rank` is each cell's place in that order, so "higher"
+   * below means "higher in the order".
+   */
+  const BINS = 1 << 18
+  const bin = new Int32Array(n), start = new Int32Array(BINS + 1)
+  let m = 0
+  for (let i = 0; i < n; i++) {
+    if (!gridMask[i]) { bin[i] = -1; continue }
+    const b = BINS - 1 - Math.min(BINS - 1, Math.floor(((h[i] - lo) / span) * BINS))
+    bin[i] = b; start[b + 1]++; m++
+  }
+  for (let b = 0; b < BINS; b++) start[b + 1] += start[b]
+  const order = new Int32Array(m), rank = new Int32Array(n)
+  for (let i = 0; i < n; i++) if (bin[i] >= 0) order[start[bin[i]]++] = i
+  for (let q = 0; q < m; q++) rank[order[q]] = m - q
+
+  const parent = new Int32Array(n).fill(-1), top = new Int32Array(n)
+  const find = (i) => {
+    while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i] }
+    return i
+  }
+  const found = []
+  const DR = RING.map((d) => d[0]), DC = RING.map((d) => d[1])
+  for (let q = 0; q < m; q++) {
+    const c = order[q], r = (c / cols) | 0, cc = c % cols
+    parent[c] = c; top[c] = c
+    for (let k = 0; k < 8; k++) {
+      const rr = r + DR[k], c2 = cc + DC[k]
+      if (rr < 0 || c2 < 0 || rr >= rows || c2 >= cols) continue
+      const j = rr * cols + c2
+      if (parent[j] < 0) continue
+      const a = find(c), b = find(j)
+      if (a === b) continue
+      const [up, down] = rank[top[a]] > rank[top[b]] ? [a, b] : [b, a]
+      if (top[down] !== c) found.push({ peak: top[down], col: c, prom: (h[top[down]] - h[c]) / span })
+      parent[down] = up
+      parent[c] = up
+    }
+  }
+  const highest = order[0]
+
+  const edge = (i) => {
+    const r = (i / cols) | 0, c = i % cols
+    return r === 0 || c === 0 || r === rows - 1 || c === cols - 1
+  }
+  const minProm = Math.max(0, o.minProminence ?? 0.02)
+  const count = Math.max(1, Math.min(500, Math.round(o.count ?? 40)))
+  const kept = found.filter((s) => s.prom >= minProm && !edge(s.peak))
+    .sort((a, b) => b.prom - a.prom).slice(0, count)
+  const plain = lo + Math.max(0, Math.min(0.9, o.plain ?? 0.03)) * span
+  const islands = [{ peak: highest, level: plain, col: -1 }, ...kept.map((s) => ({ peak: s.peak, level: h[s.col], col: s.col }))]
+
+  /*
+   * One summit at a time: mark the cells above the level that join the
+   * summit, then trace the level only inside their bounding box, one cell
+   * wider. The field is -1 elsewhere, which `traceLevelSet` skips, and goes
+   * back to -1 after each trace. Heights are lifted by one above the lowest
+   * ground, so no height is negative.
+   */
+  const smooth = Math.max(0, Math.min(4, Math.round(o.smoothing ?? 2)))
+  const field = new Float32Array(n).fill(-1), mark = new Uint8Array(n), stack = []
+  const parts = []
+  for (const s of islands) {
+    let r0 = rows, r1 = -1, c0 = cols, c1 = -1
+    const filled = []
+    mark[s.peak] = 1; stack.push(s.peak)
+    while (stack.length) {
+      const c = stack.pop(), r = (c / cols) | 0, cc = c % cols
+      filled.push(c)
+      if (r < r0) r0 = r
+      if (r > r1) r1 = r
+      if (cc < c0) c0 = cc
+      if (cc > c1) c1 = cc
+      for (let k = 0; k < 8; k++) {
+        const rr = r + DR[k], c2 = cc + DC[k]
+        if (rr < 0 || c2 < 0 || rr >= rows || c2 >= cols) continue
+        const j = rr * cols + c2
+        if (!mark[j] && gridMask[j] && h[j] > s.level) { mark[j] = 1; stack.push(j) }
+      }
+    }
+    r0 = Math.max(0, r0 - 1); r1 = Math.min(rows - 1, r1 + 1)
+    c0 = Math.max(0, c0 - 1); c1 = Math.min(cols - 1, c1 + 1)
+    for (let r = r0; r <= r1; r++) {
+      for (let c = c0; c <= c1; c++) {
+        const i = r * cols + c
+        if (gridMask[i]) field[i] = 1 + (mark[i] ? h[i] : Math.min(h[i], s.level)) - lo
+      }
+    }
+    for (const c of filled) mark[c] = 0
+    parts.push(traceLevelSet(terrain, p, field, [1 + s.level - lo + span * 1e-7], smooth, { box: [r0, r1, c0, c1] }))
+    for (let r = r0; r <= r1; r++) field.fill(-1, r * cols + c0, r * cols + c1 + 1)
+  }
+  const join = (key) => {
+    const all = new Float32Array(parts.reduce((t, q) => t + q[key].length, 0))
+    let at = 0
+    for (const q of parts) { all.set(q[key], at); at += q[key].length }
+    return all
+  }
+
+  const out = { Prom: { positions: join('positions'), colors: join('colors'), note: { summits: islands.length } } }
+  if (o.points !== false) {
+    const half = Math.max(0.75, (o.size ?? 10) / scl / 2)
+    const pts = new F32List(), ptc = new F32List(), ptsOut = { positions: pts, colors: ptc }
+    for (const s of islands) {
+      const r = (s.peak / cols) | 0, c = s.peak % cols
+      const a = [c, r - half * 1.2], b = [c + half * 1.05, r + half * 0.7], q = [c - half * 1.05, r + half * 0.7]
+      drapeEdge(ptsOut, terrain, p, sMask, a[0], a[1], b[0], b[1], 0)
+      drapeEdge(ptsOut, terrain, p, sMask, b[0], b[1], q[0], q[1], 0)
+      drapeEdge(ptsOut, terrain, p, sMask, q[0], q[1], a[0], a[1], 0)
+      if (s.col < 0) continue
+      const cr = (s.col / cols) | 0, cc = s.col % cols, x = half * 0.8
+      drapeEdge(ptsOut, terrain, p, sMask, cc - x, cr - x, cc + x, cr + x, Math.PI / 4)
+      drapeEdge(ptsOut, terrain, p, sMask, cc - x, cr + x, cc + x, cr - x, -Math.PI / 4)
+    }
+    out['Prom-Points'] = { positions: pts.toArray(), colors: ptc.toArray() }
+  }
+  return out
+}

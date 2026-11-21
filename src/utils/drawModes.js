@@ -431,6 +431,11 @@ export const DRAW_MODES = [
     id: 'FlowTime', label: 'Flow time', cost: 3, mark: 'flowtime',
     pick: { levels: [10, 22] },
   },
+  {
+    // One union-find pass over the sorted cells, then one trace per summit.
+    id: 'Prom', label: 'Prominence', cost: 2.5, mark: 'prom',
+    pick: { minProminence: [0.01, 0.05] },
+  },
 ]
 
 /** id → the label the panel and the plot both use. */
@@ -512,6 +517,7 @@ export const SUB_LAYER_LABEL = {
   'Morse-Ridges':            'Ridges',
   'Morse-Courses':           'Courses',
   'Morse-Points':            'Cols and summits',
+  'Prom-Points':             'Summits and cols',
 }
 
 /**

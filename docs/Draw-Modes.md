@@ -1,10 +1,10 @@
 # Draw Modes
 
-erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Seventy-nine
+erzberg treats the heightmap as a discrete scalar field $H(x, y)$. Eighty
 independent builders extract features from it. Each mode produces its own
 `LineSegmentsGeometry`, with its own style, dash and hypsometric tint.
 
-Seventy-eight modes read $H$ only. [Land cover](#land-cover) reads a second
+Seventy-nine modes read $H$ only. [Land cover](#land-cover) reads a second
 field. Any mode can be stencilled by a land-cover class, a drawn mask, or both.
 See [Land cover](Land-Cover.md#how-masking-works) and
 [Masks](Masks.md#how-it-reaches-the-draw-modes).
@@ -149,7 +149,13 @@ $\nabla H$ read on the heights blurred by two cells.
 - **Crowding cut** leaves out a minor contour segment where $g <$ *Min gap*.
   Major contours stay whole.
 
-Tanaka contours use neither.
+**Depression ticks.** A closed contour is a depression when the ground one
+cell inside it is lower than its level at more than 70% of its points. Such a
+ring gets a tick every *Tick spacing* along it, *Tick length* long, square to
+the ring and pointing inward, down into the hollow. The ticks go in the pen
+layer of their contour, and a label or the crowding cut removes them with it.
+
+Tanaka contours use none of these.
 
 ## 5. Hachure
 
@@ -1188,9 +1194,9 @@ shuffled order.
 A dot that moved less than one gap stands on level ground. It is drawn only
 with *Level ground* on.
 
-## 77–80. Loxodromes, Breaklines, Surface Network, Flow Time
+## 77–81. Loxodromes, Breaklines, Surface Network, Flow Time, Prominence
 
-All four are in the Line family, in `builders/form.js`. Heights are true metres
+All five are in the Line family, in `builders/form.js`. Heights are true metres
 from the GeoTIFF, or from *Pixel size* and *Relief* on a PNG. Lengths are in
 raster pixels.
 
@@ -1256,6 +1262,23 @@ field.
 No line is traced across a divide: between cells whose walks end in different
 places, or whose downhill directions run apart. *Lines* levels are evenly
 spaced up to the 95th percentile of the times.
+
+### Prominence
+
+Each summit with its island: the ground above its key col. On the heights
+blurred by *Blur*, a union–find runs over the cells from high to low, after a
+counting sort on 2¹⁸ height bins. Each set keeps its highest cell. Where a cell
+joins two sets, the set with the lower summit ends: that cell is its key col,
+and its prominence is the summit's height minus the col's. Summits on the
+raster edge are left out.
+
+Summits whose prominence is at least *Min prominence* of the height range are
+drawn, at most *Summits* of them, the most prominent first. The outline is the
+level set at the col's height, traced only round the cells above the col that
+join the summit, so the islands nest. The highest summit has no key col. Its
+outline is drawn at *Plain*, a share of the height range above the lowest
+ground. A second pen, `Prom-Points`, puts a triangle on each summit and a
+cross on each key col.
 
 ## NoData and clipped edges
 

@@ -26,6 +26,7 @@ const MODES = [
   ['Breaks', 'Breaklines', 'breaks', /^[\d,.\s ]+ segments$/],
   ['Morse', 'Surface Network', 'morse', /^\d+ cols · \d+ summits$/],
   ['FlowTime', 'Flow Time', 'flowtime', /^\d+ lines$/],
+  ['Prom', 'Prominence', 'prom', /^\d+ summits$/],
 ]
 
 for (const [id, title, kind, readout] of MODES) {
