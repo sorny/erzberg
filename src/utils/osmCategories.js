@@ -67,6 +67,8 @@ const PEAK_VALUES = new Set(['peak', 'saddle', 'volcano'])
  * single selector list at every extent.
  */
 const ADMIN_LEVELS = new Set(['2', '4', '6', '8', '9', '10'])
+const RELIEF_VALUES = new Set(['cliff', 'arete', 'ridge', 'earth_bank'])
+const ROUTE_NETWORK = { iwn: 'international', nwn: 'national', rwn: 'regional', lwn: 'local' }
 
 /**
  * DETAIL TIERS — how much to ask for at what size.
@@ -400,14 +402,273 @@ export const OSM_CATEGORIES = [
     },
     style: { color: '#8a3a8a', weight: 1.5, dash: 'long-dash' },
   },
+  /*
+   * Breaks of the ground that the survey drew by hand. OpenStreetMap draws a
+   * cliff with its drop on the right of the way, so the ticks go right and hang
+   * down the face, as the rock symbol on a topographic sheet does.
+   */
+  {
+    id: 'relief',
+    label: 'Cliffs & ridges',
+    short: 'Relief',
+    geom: 'line',
+    heavy: false,
+    extra: true,
+    selectors: ['way["natural"~"^(cliff|arete|ridge|earth_bank)$"]', 'way["man_made"="embankment"]'],
+    bucketOf: (t) => pick(t.natural, RELIEF_VALUES) ?? (t.man_made === 'embankment' ? 'embankment' : null),
+    labels: { cliff: 'Cliff', arete: 'Arête', ridge: 'Ridge', earth_bank: 'Earth bank', embankment: 'Embankment' },
+    styles: {
+      cliff:      { color: '#3a3430', weight: 1.5, ticks: 'right', tickSpacing: 12, tickLength: 10 },
+      earth_bank: { color: '#6a5a40', weight: 1, ticks: 'right', tickSpacing: 10, tickLength: 6 },
+      embankment: { color: '#6a5a40', weight: 1, ticks: 'right', tickSpacing: 10, tickLength: 6 },
+      arete:      { color: '#3a3430', weight: 1.5 },
+    },
+    style: { color: '#5a4a3a', weight: 1 },
+  },
+  /*
+   * Waymarked hiking routes, from their route relations. The network tag says
+   * how far a route runs; the colour is the red of a trail blaze.
+   */
+  {
+    id: 'routes',
+    label: 'Hiking routes',
+    short: 'Route',
+    geom: 'line',
+    heavy: false,
+    extra: true,
+    selectors: ['relation["route"~"^(hiking|foot)$"]'],
+    bucketOf: (t) => (t.route === 'hiking' || t.route === 'foot') ? (ROUTE_NETWORK[t.network] ?? 'other') : null,
+    labels: { international: 'International', national: 'National', regional: 'Regional', local: 'Local', other: 'Other' },
+    style: { color: '#c0281e', weight: 3, opacity: 0.55 },
+  },
+  {
+    id: 'pois',
+    label: 'Springs & viewpoints',
+    short: '',
+    geom: 'point',
+    heavy: false,
+    extra: true,
+    selectors: [
+      'node["natural"~"^(spring|cave_entrance)$"]',
+      'node["tourism"~"^(viewpoint|wilderness_hut)$"]',
+      'node["amenity"="shelter"]',
+      'node["man_made"~"^(cross|survey_point)$"]',
+      'node["summit:cross"="yes"]',
+    ],
+    bucketOf: (t) => (t.natural === 'spring' ? 'spring' : t.natural === 'cave_entrance' ? 'cave' :
+      t.tourism === 'viewpoint' ? 'viewpoint' : t.tourism === 'wilderness_hut' ? 'hut' :
+      t.amenity === 'shelter' ? 'shelter' : (t.man_made === 'cross' || t['summit:cross'] === 'yes') ? 'cross' :
+      t.man_made === 'survey_point' ? 'survey' : null),
+    labels: {
+      spring: 'Springs', cave: 'Cave entrances', viewpoint: 'Viewpoints', hut: 'Bivouac huts',
+      shelter: 'Shelters', cross: 'Crosses', survey: 'Survey points',
+    },
+    styles: { spring: { color: '#1a5f9e' }, viewpoint: { color: '#7a2020' } },
+    style: { color: '#3a3a3a', weight: 4 },
+  },
+  {
+    id: 'power',
+    label: 'Power lines',
+    short: 'Power',
+    geom: 'line',
+    heavy: false,
+    extra: true,
+    selectors: ['way["power"~"^(line|minor_line)$"]'],
+    bucketOf: (t) => (t.power === 'line' || t.power === 'minor_line') ? t.power : null,
+    labels: { line: 'Line', minor_line: 'Minor line' },
+    style: { color: '#4a4a4a', weight: 1, marks: 'bar', markSpacing: 250, markSize: 30 },
+  },
+  /*
+   * The coastline, and the sea worked out from it (utils/coastline.js).
+   * OpenStreetMap has no sea polygons; the sea layer is built from the
+   * coastline's direction inside the extent, and draws its fill without an
+   * outline, because its outline is partly the extent's own edge.
+   */
+  {
+    id: 'coast',
+    label: 'Coastline & sea',
+    short: 'Coast',
+    geom: 'line',
+    heavy: false,
+    extra: true,
+    selectors: ['way["natural"="coastline"]'],
+    bucketOf: (t) => (t.natural === 'coastline' ? 'coastline' : null),
+    labels: { coastline: 'Coastline' },
+    style: { color: '#1a5f9e', weight: 1.5 },
+  },
 ]
 
-/** Ticked by default: everything cheap and legible on a mountain raster. */
+/** The sea layer the coastline category adds, with its own look. */
+export const SEA_BUCKET = {
+  key: 'coast:sea', label: 'Coast · Sea', geom: 'area',
+  style: { color: '#1a5f9e', weight: 1, centreLine: false, fill: true, fillColor: '#9cc3e4', fillOpacity: 0.55 },
+}
+
+/**
+ * Ticked by default: everything cheap and legible on a mountain raster. The
+ * categories marked `extra` came later and start unticked, so a default fetch
+ * asks for what it always asked for.
+ */
 export const DEFAULT_OSM_CATEGORIES = OSM_CATEGORIES
-  .filter((c) => !c.heavy && c.id !== 'boundaries')
+  .filter((c) => !c.heavy && !c.extra && c.id !== 'boundaries')
   .map((c) => c.id)
 
-export const osmCategory = (id) => OSM_CATEGORIES.find((c) => c.id === id) ?? null
+export const osmCategory = (id) =>
+  OSM_CATEGORIES.find((c) => c.id === id) ?? (isQueryId(id) ? queryCategory(id) : null)
+
+// ── Free queries ──────────────────────────────────────────────────────────────
+//
+// A query is a category the user types. `natural=cliff` asks for every node,
+// way and relation with that tag. Terms separated by spaces must all hold;
+// alternatives separated by `;` are joined. A term is `key`, `!key`,
+// `key=value`, `key=a|b`, `key!=value` or `key~regex`. An alternative may also
+// be a raw Overpass selector such as `way["natural"="cliff"](if:length()>50)`.
+//
+// The query's id is `q:` and its text, so it travels through the fetch, the
+// response cache and the count exactly as a catalogue id does.
+
+const Q = 'q:'
+export const isQueryId = (id) => typeof id === 'string' && id.startsWith(Q)
+export const queryId = (text) => `${Q}${String(text ?? '').trim()}`
+
+const TYPES = { node: 'node', way: 'way', rel: 'relation', relation: 'relation', nwr: 'nwr' }
+const quote = (v) => `"${String(v).replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+const escapeRe = (v) => String(v).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** One term → its Overpass filter and a test against an element's tags. */
+function parseTerm(raw) {
+  const t = raw.trim()
+  if (!t) return null
+  let m
+  if ((m = /^!([^=~!]+)$/.exec(t))) {
+    const k = m[1]
+    return { key: null, ql: `[!${quote(k)}]`, test: (tags) => tags[k] == null }
+  }
+  if ((m = /^([^=~!]+)!=(.*)$/.exec(t))) {
+    const [, k, v] = m
+    return { key: null, ql: `[${quote(k)}!=${quote(v)}]`, test: (tags) => tags[k] !== v }
+  }
+  if ((m = /^([^=~!]+)~(.+)$/.exec(t))) {
+    const [, k, re] = m
+    let rx
+    try { rx = new RegExp(re) } catch { return { error: `“${re}” is not a regular expression.` } }
+    return { key: k, ql: `[${quote(k)}~${quote(re)}]`, test: (tags) => tags[k] != null && rx.test(tags[k]) }
+  }
+  if ((m = /^([^=~!]+)=(.*)$/.exec(t))) {
+    const [, k, v] = m
+    if (v === '' || v === '*') return { key: k, ql: `[${quote(k)}]`, test: (tags) => tags[k] != null }
+    if (v.includes('|')) {
+      const vals = v.split('|').filter(Boolean)
+      const set = new Set(vals)
+      return { key: k, ql: `[${quote(k)}~${quote(`^(${vals.map(escapeRe).join('|')})$`)}]`, test: (tags) => set.has(tags[k]) }
+    }
+    return { key: k, ql: `[${quote(k)}=${quote(v)}]`, test: (tags) => tags[k] === v }
+  }
+  if (/^[\w:.-]+$/.test(t)) return { key: t, ql: `[${quote(t)}]`, test: (tags) => tags[t] != null }
+  return { error: `“${t}” is not a tag term.` }
+}
+
+/**
+ * Parses a free query.
+ *
+ * @returns {{ alternatives: {type, terms, raw, test, key}[], error: string|null }}
+ */
+export function parseTagQuery(text) {
+  const alternatives = []
+  for (const part of String(text ?? '').split(';')) {
+    const src = part.trim()
+    if (!src) continue
+    // A raw selector: an element type followed by a filter or a bracket.
+    const raw = /^(node|way|relation|rel|nwr)\s*[[(]/.exec(src)
+    if (raw) {
+      if (/[{}]|\bout\b/.test(src)) return { alternatives: [], error: 'A raw selector cannot hold a block or an out statement.' }
+      alternatives.push({ type: TYPES[raw[1]], raw: src.replace(/^rel\b/, 'relation'), terms: [], key: null, test: () => true })
+      continue
+    }
+    const words = src.split(/\s+/)
+    let type = 'nwr'
+    if (TYPES[words[0]]) type = TYPES[words.shift()]
+    const terms = []
+    for (const w of words) {
+      const term = parseTerm(w)
+      if (!term) continue
+      if (term.error) return { alternatives: [], error: term.error }
+      terms.push(term)
+    }
+    if (!terms.length) return { alternatives: [], error: 'A query needs at least one tag term, such as natural=cliff.' }
+    alternatives.push({
+      type, raw: null, terms,
+      key: terms.find((x) => x.key)?.key ?? null,
+      test: (tags) => terms.every((x) => x.test(tags)),
+    })
+  }
+  if (!alternatives.length) return { alternatives: [], error: 'Type a tag, such as natural=cliff.' }
+  return { alternatives, error: null }
+}
+
+/** Does an element's tag set match a parsed query? */
+export function matchesQuery(parsed, tags) {
+  return !!tags && parsed.alternatives.some((a) => a.test(tags))
+}
+
+/**
+ * Which geometry an element of a free query is drawn as.
+ *
+ * A node is a point. A closed way is an area when its tags say so, the way
+ * OpenStreetMap's own area rules read them, and a line otherwise. A
+ * multipolygon or boundary relation is an area, and any other relation is
+ * lines.
+ */
+const AREA_KEYS = new Set([
+  'building', 'landuse', 'leisure', 'amenity', 'shop', 'place', 'water', 'wetland',
+  'glacier', 'military', 'tourism', 'historic', 'man_made', 'aeroway', 'boundary',
+])
+const LINE_NATURAL = new Set(['cliff', 'arete', 'ridge', 'coastline', 'tree_row', 'earth_bank'])
+export function geomOfElement(el, tags = el.tags ?? {}) {
+  if (el.type === 'node') return 'point'
+  if (el.type === 'relation') return tags.type === 'multipolygon' || tags.type === 'boundary' ? 'area' : 'line'
+  const g = el.geometry
+  const closed = g?.length > 3 && g[0] && g[g.length - 1] &&
+    g[0].lat === g[g.length - 1].lat && g[0].lon === g[g.length - 1].lon
+  if (!closed || tags.area === 'no') return 'line'
+  if (tags.area === 'yes') return 'area'
+  if (tags.natural) return LINE_NATURAL.has(tags.natural) ? 'line' : 'area'
+  if (tags.highway || tags.barrier || tags.waterway || tags.railway || tags.power) return 'line'
+  for (const k of Object.keys(tags)) if (AREA_KEYS.has(k)) return 'area'
+  return 'line'
+}
+
+/**
+ * The category behind a query id.
+ *
+ * Its geometry is `auto`: one query can match summits, ridgelines and lakes, so
+ * each bucket is the value of the query's first key together with the
+ * geometry, for example `cliff/line`.
+ */
+const queryCache = new Map()
+function queryCategory(id) {
+  const hit = queryCache.get(id)
+  if (hit) return hit
+  const text = id.slice(Q.length)
+  const parsed = parseTagQuery(text)
+  if (parsed.error) return null
+  const selectors = parsed.alternatives.map((a) => a.raw ?? `${a.type}${a.terms.map((t) => t.ql).join('')}`)
+  const short = text.length > 24 ? `${text.slice(0, 23)}…` : text
+  const cat = {
+    id, query: text, label: text, short, geom: 'auto', heavy: false, custom: true,
+    selectors,
+    bucketOf: (tags) => {
+      const alt = parsed.alternatives.find((a) => a.test(tags))
+      if (!alt) return null
+      const v = alt.key ? tags[alt.key] : null
+      return v ? String(v).slice(0, 40) : 'match'
+    },
+    style: { color: '#7a2a5a', weight: 1.5 },
+  }
+  if (queryCache.size > 64) queryCache.clear()
+  queryCache.set(id, cat)
+  return cat
+}
 
 /**
  * The layer name for one bucket.
@@ -418,6 +679,13 @@ export const osmCategory = (id) => OSM_CATEGORIES.find((c) => c.id === id) ?? nu
  * ("Peaks", "Alpine huts") skip it rather than stuttering.
  */
 export function bucketLabel(category, value) {
+  // A free query names its layers after itself and the matched value, with the
+  // geometry when one value came back as more than one kind.
+  if (category.custom) {
+    const [v, g] = String(value).split('/')
+    const leaf = v === 'match' ? '' : ` · ${v.replace(/_/g, ' ')}`
+    return `${category.short}${leaf}${g ? ` (${g === 'point' ? 'points' : g === 'area' ? 'areas' : 'lines'})` : ''}`
+  }
   // A value with no entry in the table still has to read as a label rather than
   // as a raw tag — OSM adds values faster than any catalogue tracks them.
   const fallback = value.replace(/[_-]/g, ' ').replace(/^./, (c) => c.toUpperCase())

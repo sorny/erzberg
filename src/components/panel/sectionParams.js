@@ -114,7 +114,7 @@ export const ALSO_READS = {
   // The hatch controls show only while a mode that exports filled areas is on.
   // The pen readout says when it has no frame to measure.
   'Plot': ['enabledIndexed', 'enabledMineral', 'enabledCover', 'enabledShed', 'showFrame'],
-  'Map Elements': ['orthographic', 'plotWidthMm', 'tilt', 'legendOn'],
+  'Map Elements': ['orthographic', 'plotWidthMm', 'tilt', 'legendOn', 'zoom'],
   // The ink falls back to the marks' own.
   // The font is the sheet's one typeface, shown here too.
   'Legend': ['frameMarkColor', 'frameMarkFont', 'frameMarkLineFont'],

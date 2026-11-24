@@ -162,8 +162,20 @@ function resolveLayerStyle(id, p) {
     // layer until it is told not to; the *fill* falls back through the mark's
     // own stroke first, so colouring an icon colours the whole icon while
     // parting its fill from its outline stays possible and stays deliberate.
-    if (kind === 'icons' || kind === 'labels') {
+    // A hatch and a decoration are strokes drawn from the layer, each with its
+    // own colour, width and opacity, every one falling back to the layer's.
+    if (kind === 'hatch' || kind === 'deco') {
+      return {
+        weight: l[`${kind}Weight`] ?? l.weight,
+        opacity: l[`${kind}Opacity`] ?? l.opacity,
+        dash: 'solid',
+        color: l[`${kind}Color`] ?? l.color,
+        name: `${l.name} · ${kind === 'hatch' ? 'hatch' : 'decoration'}`,
+      }
+    }
+    if (kind === 'icons' || kind === 'labels' || kind === 'shields') {
       // `p` is the params object in this function; the prefix needs its own name.
+      // A shield's box is lettering's, so it takes the label's ink.
       const mark = kind === 'icons' ? 'icon' : 'label'
       const color = l[`${mark}Color`] ?? l.color
       const opacity = l[`${mark}Opacity`] ?? l.opacity

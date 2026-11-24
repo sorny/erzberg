@@ -315,37 +315,46 @@ function docHead({ title, attribution, sheetMm, layers, plot }) {
 // ─── Dash segment splitter ────────────────────────────────────────────────────
 
 // Splits a screen-space line segment into actual on-sub-segments according to a
-// dash pattern, starting at `dashOffset` px into the repeating cycle.  Returns
-// an array of {x0,y0,x1,y1} objects covering only the "on" portions.
-function splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx) {
+// dash pattern, starting at `dashOffset` px into the repeating cycle. `pattern`
+// is on and off lengths in turn: [dash, gap] for a plain dash, and
+// [dash, gap, dot, gap, …] for a dash-dot. Returns an array of {x0,y0,x1,y1}
+// objects covering only the "on" portions.
+export function splitDashSegment(x0, y0, x1, y1, dashOffset, pattern) {
   const len = Math.hypot(x1 - x0, y1 - y0)
   if (len < 0.1) return []
   const dx = (x1 - x0) / len
   const dy = (y1 - y0) / len
-  const cycle = dashPx + gapPx
+  let cycle = 0
+  for (const v of pattern) cycle += v
+  if (!(cycle > 0)) return [{ x0, y0, x1, y1 }]
   const result = []
-  let cp = ((dashOffset % cycle) + cycle) % cycle  // position within current cycle
+  // Which part of the pattern the segment starts in, and how far into it.
+  let cp = ((dashOffset % cycle) + cycle) % cycle
+  let k = 0
+  while (cp >= pattern[k]) { cp -= pattern[k]; k = (k + 1) % pattern.length }
   let sp = 0  // position along segment
 
   while (sp < len) {
-    if (cp < dashPx) {
-      // Currently in a dash — draw to its end (or to segment end)
-      const end = Math.min(sp + (dashPx - cp), len)
-      result.push([sp, end])
-      sp = end
-      cp = dashPx
-    } else {
-      // Currently in a gap — skip to next dash start
-      sp += cycle - cp
-      cp = 0
-      if (sp >= len) break
-    }
+    const left = pattern[k] - cp
+    const end = Math.min(sp + left, len)
+    // Even parts are dashes, odd parts are gaps.
+    if (k % 2 === 0 && end > sp) result.push([sp, end])
+    sp = end
+    cp = 0
+    k = (k + 1) % pattern.length
   }
 
   return result.map(([t0, t1]) => ({
     x0: x0 + dx * t0, y0: y0 + dy * t0,
     x1: x0 + dx * t1, y1: y0 + dy * t1,
   }))
+}
+
+/** The on and off lengths of a dash style, in pixels. */
+export function dashPattern(sizes) {
+  const out = [sizes.dashPx, sizes.gapPx]
+  for (let i = 0; i < (sizes.dotCount ?? 0); i++) out.push(sizes.dotPx, sizes.gapPx)
+  return out
 }
 
 /**
@@ -1807,9 +1816,9 @@ async function runExport({
         }
         return els
       }
-      const { dashPx, gapPx } = dashSizes
+      const pattern = dashPattern(dashSizes)
       const perSeg = await mapPaced(segs, ({ x0, y0, x1, y1, stroke, dashOffset }) =>
-        splitDashSegment(x0, y0, x1, y1, dashOffset, dashPx, gapPx).map((s) =>
+        splitDashSegment(x0, y0, x1, y1, dashOffset, pattern).map((s) =>
           `<line x1="${(s.x0-vx).toFixed(1)}" y1="${(s.y0-vy).toFixed(1)}" x2="${(s.x1-vx).toFixed(1)}" y2="${(s.y1-vy).toFixed(1)}"${one ? '' : ` stroke="${stroke}"`}/>`).join(''))
       return perSeg
     }

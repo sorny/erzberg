@@ -244,28 +244,67 @@ const BLEND_MODES = {
  */
 const penCaps = { value: 0 }
 
+/*
+ * Distance from a point on the line to the nearest dash, 0 inside one.
+ *
+ * The pattern is one dash of `dashSize`, a gap, and then `uDashDots` short
+ * dashes of `uDotSize`, each followed by a gap. With no short dashes this is
+ * the plain dash and gap that LineMaterial draws, to the bit, so every style
+ * without them renders as before.
+ */
+const DASH_PATTERN_GLSL = `
+uniform float uDashDots;
+uniform float uDotSize;
+float dashOutside( float d ) {
+	float k = uDashDots;
+	float period = dashSize + gapSize + k * ( uDotSize + gapSize );
+	float t = mod( d, period );
+	float best = t > dashSize ? min( t - dashSize, period - t ) : 0.0;
+	for ( int j = 0; j < 2; j ++ ) {
+		if ( float( j ) >= k ) break;
+		float s = dashSize + gapSize + float( j ) * ( uDotSize + gapSize );
+		best = min( best, abs( t - clamp( t, s, s + uDotSize ) ) );
+	}
+	return best;
+}
+`
+
+/** Puts a dash style on a line material: the LineMaterial fields and the short dashes. */
+function applyDash(material, d) {
+  material.dashed = !!d.dashed
+  material.dashSize = d.dashSize ?? 1
+  material.gapSize = d.gapSize ?? 1
+  const u = material.userData
+  if (u.uDashDots) {
+    u.uDashDots.value = d.dotCount ?? 0
+    u.uDotSize.value = d.dotSize ?? 0
+  }
+}
+
 function patchStrokeDepth(material, lift, push) {
+  material.userData.uDashDots = { value: 0 }
+  material.userData.uDotSize = { value: 0 }
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uStrokeLift = lift
     shader.uniforms.uDepthPush = push
     shader.uniforms.uPenCaps = penCaps
+    shader.uniforms.uDashDots = material.userData.uDashDots
+    shader.uniforms.uDotSize = material.userData.uDotSize
     shader.fragmentShader = shader.fragmentShader
-      .replace('void main() {', 'uniform float uPenCaps;\n#ifdef USE_DASH\nvarying float vPxPerDist;\n#endif\nvoid main() {')
+      .replace('void main() {', 'uniform float uPenCaps;\n#ifdef USE_DASH\nvarying float vPxPerDist;\n' + DASH_PATTERN_GLSL + '#endif\nvoid main() {')
       .replace(`if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
 
 				if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard; // todo - FIX`,
       `if ( uPenCaps > 0.5 ) {
 					// How far this fragment lies outside its dash, in half widths:
 					// along the line in the gap, plus into the segment's end cap.
-					float period = dashSize + gapSize;
-					float t = mod( vLineDistance + dashOffset, period );
-					float gapDist = t > dashSize ? min( t - dashSize, period - t ) : 0.0;
+					float gapDist = dashOutside( vLineDistance + dashOffset );
 					float along = gapDist * vPxPerDist / max( 0.5 * linewidth, 1e-6 )
 						+ max( abs( vUv.y ) - 1.0, 0.0 );
 					if ( along * along + vUv.x * vUv.x > 1.0 ) discard;
 				} else {
 					if ( vUv.y < - 1.0 || vUv.y > 1.0 ) discard; // discard endcaps
-					if ( mod( vLineDistance + dashOffset, dashSize + gapSize ) > dashSize ) discard;
+					if ( dashOutside( vLineDistance + dashOffset ) > 0.0 ) discard;
 				}`)
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', 'uniform float uStrokeLift;\nuniform float uDepthPush;\nuniform float uPenCaps;\n#ifdef USE_DASH\nvarying float vPxPerDist;\n#endif\nvoid main() {')
@@ -655,9 +694,7 @@ function LineLayer({ layer, weight, dotWeight = weight, dotStep, opacity, dash, 
     haloMaterial.linewidth = drawWeight + 2 * halo
     haloMaterial.resolution.copy(resolution)
     const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
-    haloMaterial.dashed = d.dashed
-    haloMaterial.dashSize = d.dashSize
-    haloMaterial.gapSize = d.gapSize
+    applyDash(haloMaterial, d)
     if (d.dashed && !geometry.attributes.instanceDistanceStart) haloLines.computeLineDistances()
     haloDepthU.value = haloDepth
     haloLines.renderOrder = haloOrder
@@ -711,9 +748,7 @@ function LineLayer({ layer, weight, dotWeight = weight, dotStep, opacity, dash, 
     // render state — none need a shader recompile, so no needsUpdate here. The
     // `dashed` setter flags needsUpdate itself when the USE_DASH define changes.
     const d = DASH_CONFIGS[dash ?? 'solid'] ?? DASH_CONFIGS.solid
-    material.dashed = d.dashed
-    material.dashSize = d.dashSize
-    material.gapSize = d.gapSize
+    applyDash(material, d)
 
     // Dash rendering needs per-segment cumulative distances. Computing them is
     // O(segments) on the CPU plus a fresh GPU buffer, so do it lazily and only
@@ -731,9 +766,7 @@ function LineLayer({ layer, weight, dotWeight = weight, dotStep, opacity, dash, 
       ghostMaterial.color.set(occlusionColor || '#000000')
       ghostMaterial.resolution.copy(resolution)
       ghostMaterial.alphaToCoverage = (occlusionOpacity ?? 0) >= 0.99
-      ghostMaterial.dashed = d.dashed
-      ghostMaterial.dashSize = d.dashSize
-      ghostMaterial.gapSize = d.gapSize
+      applyDash(ghostMaterial, d)
       ghostLines.renderOrder = ghostOrder
     }
   }, [lines, ghostLines, geometry, material, ghostMaterial, weight, drawWeight, opacity, dash, color, tint, blending, flat, depthOcclusion, occlusionOpacity, occlusionColor, resolution, lineOrder, ghostOrder, layer.selfOcclude])

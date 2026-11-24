@@ -3,7 +3,7 @@
  */
 import { useState, useEffect, useMemo, useRef, startTransition } from 'react'
 import { useStore } from '../store/useStore'
-import { vectorBuildSignature } from '../utils/vectorLayers'
+import { forWorker, vectorBuildSignature } from '../utils/vectorLayers'
 import { geometryKey } from '../params'
 import GeometryWorker from '../utils/geometry.worker?worker'
 
@@ -16,6 +16,9 @@ export function useTerrainGeometry(p, { stream = false } = {}) {
   const heightmapWidth  = useStore((s) => s.heightmapWidth)
   const heightmapHeight = useStore((s) => s.heightmapHeight)
   const vectorSources   = useStore((s) => s.vectorSources)
+  // The same sources without their tags, which the worker never reads. Memoised
+  // on the sources, so the worker is sent them only when they change.
+  const workerSources = useMemo(() => vectorSources?.map(forWorker) ?? vectorSources, [vectorSources])
   // The mask planes, already cropped to whatever Edit Mode is showing.
   const masks           = useStore((s) => s.masks)
 
@@ -291,7 +294,7 @@ export function useTerrainGeometry(p, { stream = false } = {}) {
       p: safeResolution !== p.resolution ? { ...p, resolution: safeResolution } : p,
       pixels: heightmapPixels, mask: nodataMask,
       w: heightmapWidth, h: heightmapHeight,
-      vectors: vectorSources,
+      vectors: workerSources,
       // The plate already laid onto this raster — App derives it, because the
       // alignment depends on the extent and the dimensions rather than on any
       // parameter. Null whenever there is no plate or it no longer fits.

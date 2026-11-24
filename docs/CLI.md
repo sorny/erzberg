@@ -122,12 +122,17 @@ tile is traced back into it, so a plate in any projection lands in place.
 
 ```
 node scripts/erzberg.js tiles <heightmap> -o tiles/ [--zoom 10-14] [options]
+node scripts/erzberg.js tiles <heightmap> -o plate.mbtiles [--zoom 10-14] [options]
 ```
 
 The folder gets `z/x/y.png` and an `index.html` that shows the tiles on a plain
 ground. Empty tiles are left out. It needs a georeferenced raster. To see the
 tiles over a base map, add the folder as an XYZ layer in QGIS, or point a
 Leaflet or MapLibre page at it.
+
+An output that ends in `.mbtiles` gets one SQLite file instead of a folder, with
+the rows counted from the south as MBTiles asks. It is written with Node's own
+`node:sqlite`.
 
 ## Python
 

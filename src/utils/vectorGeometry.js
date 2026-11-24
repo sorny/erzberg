@@ -37,7 +37,9 @@
  */
 
 import { F32List, U32List, simplifyFlat } from './geometryBuilders'
-import { classifyCRS, isProjectable, projectWgs84, sampleTerrainElev } from './geoCoords'
+import { classifyCRS, groundPixelMetres, isProjectable, projectWgs84, sampleTerrainElev } from './geoCoords'
+import { hatchLoops } from './hatchFill'
+import { marksAlong, offsetPolyline, orientRings, ticksAlong } from './lineDecor'
 
 // Small Y lift so strokes never clip into the terrain surface, and a smaller one
 // for fills so they sit under their own outline rather than z-fighting it.
@@ -363,7 +365,85 @@ function drapeContext(terrain, p, imageWidth, imageHeight) {
     // the elevation is known at, so a finer step would interpolate rather than
     // reveal anything.
     step: Math.max(1, scl),
+    // Raster pixels per metre on the ground, for the decorations, whose sizes
+    // are stated in metres. One when the extent has no measurable size.
+    pxPerM: pxPerMetre(bbox, crs, imageWidth, imageHeight),
   }
+}
+
+function pxPerMetre(bbox, crs, w, h) {
+  try {
+    const g = groundPixelMetres(bbox, crs, w, h)
+    const m = g ? (g.x + g.y) / 2 : 0
+    return m > 0 ? 1 / m : 1
+  } catch {
+    return 1
+  }
+}
+
+// ── Decorations ───────────────────────────────────────────────────────────────
+
+/** Does a line or area layer draw anything beside its own stroke? */
+export function hasDecor(layer) {
+  return !!layer && ((layer.parallel && layer.parallel !== 'off') ||
+    (layer.ticks && layer.ticks !== 'off') || (layer.marks && layer.marks !== 'off'))
+}
+
+/** Emits a flat run of points as one draped polyline. */
+function emitRun(run, ctx, list) {
+  if (run.length >= 4) emitPolyline(run, run.length / 2, false, ctx, list)
+}
+
+/**
+ * The decoration strokes of one ring: parallels, ticks and marks, draped.
+ *
+ * `ring` is in pixel space. For an area it is already turned so that its right
+ * side is the inside (see `orientRings`).
+ */
+function emitDecor(ring, n, closed, layer, ctx, list) {
+  const k = ctx.pxPerM
+  if (layer.parallel && layer.parallel !== 'off') {
+    const g = Math.max(0.05, (layer.parallelGap ?? 10) * k)
+    const sides = layer.parallel === 'both' ? [g, -g] : layer.parallel === 'left' ? [g] : [-g]
+    for (const d of sides) emitRun(offsetPolyline(ring, n, closed, d, 2), ctx, list)
+  }
+  if (layer.ticks && layer.ticks !== 'off') {
+    const t = ticksAlong(ring, n, closed, Math.max(0.5, (layer.tickSpacing ?? 40) * k),
+      Math.max(0.05, (layer.tickLength ?? 12) * k), layer.ticks)
+    for (let i = 0; i + 3 < t.length; i += 4) {
+      emitPolyline(Float64Array.of(t[i], t[i + 1], t[i + 2], t[i + 3]), 2, false, ctx, list)
+      if (list.length / 6 >= MAX_SEGMENTS) return
+    }
+  }
+  if (layer.marks && layer.marks !== 'off') {
+    const marks = marksAlong(ring, n, closed, Math.max(0.5, (layer.markSpacing ?? 80) * k),
+      Math.max(0.05, (layer.markSize ?? 20) * k), layer.marks,
+      { fixed: !!layer.markFixed, side: layer.markSide ?? 'right' })
+    for (const m of marks) {
+      emitRun(m, ctx, list)
+      if (list.length / 6 >= MAX_SEGMENTS) return
+    }
+  }
+}
+
+/**
+ * Hatch strokes inside one area, draped.
+ *
+ * The pitch is metres on the ground, so a hatch keeps its density on the
+ * ground in a tilted view. The angle is degrees anticlockwise from east, as
+ * the sheet shows it; pixel rows grow downward, hence the sign.
+ */
+function emitHatch(rings, layer, ctx, list) {
+  const pitch = Math.max(0.25, (layer.hatchPitch ?? 25) * ctx.pxPerM)
+  const angles = layer.hatchCross ? [layer.hatchAngle ?? 45, (layer.hatchAngle ?? 45) + 90] : [layer.hatchAngle ?? 45]
+  for (const a of angles) {
+    const { segs } = hatchLoops(rings, pitch, -a)
+    for (let i = 0; i + 3 < segs.length; i += 4) {
+      emitPolyline(Float64Array.of(segs[i], segs[i + 1], segs[i + 2], segs[i + 3]), 2, false, ctx, list)
+      if (list.length / 6 >= MAX_SEGMENTS) return false
+    }
+  }
+  return true
 }
 
 // Scratch for the projected rings of one polygon, and for the simplifier's
@@ -440,6 +520,16 @@ export function buildVectorGeometry(terrain, p, sources, imageWidth, imageHeight
 
     const isArea = bucket.geom === 'area'
     const isPoint = bucket.geom === 'point'
+    // Hatch strokes and decorations are pen layers of their own, so each can
+    // take its own ink. They sit beside the layer as `#hatch` and `#deco`.
+    const wantHatch = isArea && !!layer.hatch
+    const wantDecor = !isPoint && hasDecor(layer)
+    const centre = isPoint || layer.centreLine !== false
+    const hatchPos = wantHatch ? new F32List() : null
+    const hatchFeat = wantHatch ? new I32SegList() : null
+    const decoPos = wantDecor ? new F32List() : null
+    const decoFeat = wantDecor ? new I32SegList() : null
+    let hatchFull = false
 
     const positions = new F32List()
     // One entry per emitted segment, naming the feature it came from. This is
@@ -467,6 +557,9 @@ export function buildVectorGeometry(terrain, p, sources, imageWidth, imageHeight
 
       // Strokes are per ring: a polygon's holes are drawn as their own outlines,
       // which is what an island in a lake should look like.
+      // The simplified rings, kept only when a hatch or a decoration needs
+      // them after the stroke: `simplifyFlat` writes into one shared buffer.
+      const kept = (wantHatch || wantDecor) ? [] : null
       if (!truncated) {
         for (let r = 0; r < nRings; r++) {
           const from = starts[r], to = starts[r + 1]
@@ -478,8 +571,20 @@ export function buildVectorGeometry(terrain, p, sources, imageWidth, imageHeight
           if (n < 2) continue
 
           const simplified = simplifyFlat(ring, SIMPLIFY_EPS_PX, _simpBuf)
-          emitPolyline(simplified, simplified.length / 2, isArea, ctx, positions)
+          if (kept) kept.push(Float64Array.from(simplified))
+          if (centre) emitPolyline(simplified, simplified.length / 2, isArea, ctx, positions)
           if (positions.length / 6 >= MAX_SEGMENTS) { truncated = true; break }
+        }
+      }
+      if (kept?.length) {
+        if (wantHatch && !hatchFull) {
+          if (!emitHatch(kept, layer, ctx, hatchPos)) hatchFull = true
+          hatchFeat.fillTo(hatchPos.length / 6, poly)
+        }
+        if (wantDecor && decoPos.length / 6 < MAX_SEGMENTS) {
+          const rings = isArea ? orientRings(kept) : kept
+          for (const ring of rings) emitDecor(ring, ring.length / 2, isArea, layer, ctx, decoPos)
+          decoFeat.fillTo(decoPos.length / 6, poly)
         }
       }
       // Always, and on the single exit path: `featureOfSegment` has to stay
@@ -489,7 +594,25 @@ export function buildVectorGeometry(terrain, p, sources, imageWidth, imageHeight
       return !truncated
     }, hidden)
 
-    if (positions.length === 0 && !fillPos?.length) continue
+    // The hatch goes first, so it draws under the outline it fills.
+    if (hatchPos?.length) {
+      out.push({
+        id: `${layer.id}#hatch`, positions: hatchPos.toArray(), colors: null,
+        curtains: null, lids: null, isPoints: false,
+        featureOfSegment: hatchFeat.toArray(), fills: null, truncated: hatchFull,
+      })
+    }
+    const decoEntry = decoPos?.length ? {
+      id: `${layer.id}#deco`, positions: decoPos.toArray(), colors: null,
+      curtains: null, lids: null, isPoints: false,
+      featureOfSegment: decoFeat.toArray(), fills: null,
+      truncated: decoPos.length / 6 >= MAX_SEGMENTS,
+    } : null
+
+    if (positions.length === 0 && !fillPos?.length) {
+      if (decoEntry) out.push(decoEntry)
+      continue
+    }
 
     out.push({
       id: layer.id,
@@ -503,6 +626,7 @@ export function buildVectorGeometry(terrain, p, sources, imageWidth, imageHeight
       fills: fillPos?.length ? { positions: fillPos.toArray(), indices: fillIdx.toArray() } : null,
       truncated,
     })
+    if (decoEntry) out.push(decoEntry)
   }
 
   return out

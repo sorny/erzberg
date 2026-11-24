@@ -9,7 +9,8 @@ import { BandPicker } from './panel/BandPicker'
 import { SOUNDSCAPE_DEFAULTS } from '../hooks/useSoundscape'
 import { DRAW_MODES, HYPSO_LAYER_IDS } from '../utils/drawModes'
 import { randomPreset } from '../utils/presetGenetics'
-import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit } from '../utils/geoCoords'
+import { bboxToWgs84, classifyCRS, crsDisplayName, metresPerWorldUnit, wgs84ExtentKm } from '../utils/geoCoords'
+import { TILE_SOURCES } from '../utils/imageDrape'
 
 
 import { GRADIENT_PRESETS } from '../utils/gradientPresets'
@@ -325,6 +326,73 @@ function TerrainFetchPanel({ onFetched }) {
  * from here, as the draw modes take theirs. Shared by Slope Shading, Aspect Map
  * and Openness: it is one fact about the ground, not three settings.
  */
+/**
+ * A map scale typed in, as on a printed sheet: 1 : 25 000.
+ *
+ * The ratio is the ground the sheet width covers over the sheet width, and the
+ * ground on screen goes as one over the zoom, so the zoom that gives a ratio is
+ * the present zoom times the present ratio over the wanted one. In a tilted or
+ * perspective view this holds at the centre only, as the readout above says.
+ */
+/**
+ * A map for the drape instead of a satellite scene: web map tiles from a host
+ * that allows it, a tile URL of your own, or a picture with its world file.
+ * Nothing is asked of a server until Fetch is pressed.
+ */
+function MapDrape({ busy, onFetchTiles, onLoadWorldImage }) {
+  const [pick, setPick] = useState(TILE_SOURCES[0].id)
+  const [custom, setCustom] = useState('')
+  const source = pick === 'custom'
+    ? { id: 'custom', label: 'Custom tiles', url: custom.trim(), maxZoom: 19, credit: null }
+    : TILE_SOURCES.find((t) => t.id === pick)
+  const customOk = pick !== 'custom' || /^https:\/\/.+\{z\}.+\{x\}.+\{y\}|^https:\/\/.+\{z\}.+\{y\}.+\{x\}/.test(custom.trim())
+  return (
+    <div style={{ marginTop: 8 }}>
+      <SelectRow label="Map" value={pick} onChange={setPick} testId="tile-source"
+        help="Lays a published map on the ground instead of a satellite scene: the tiles over the terrain's extent, at the zoom that matches its pixels, at most 64 tiles. The host's credit goes into every export that uses it.">
+        {TILE_SOURCES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+        <option value="custom">Your own tile URL…</option>
+      </SelectRow>
+      {pick === 'custom' && (
+        <input value={custom} onChange={(e) => setCustom(e.target.value)} data-testid="tile-url"
+          placeholder="https://…/{z}/{x}/{y}.png" aria-label="Tile URL with {z}, {x} and {y}"
+          style={{ width: '100%', boxSizing: 'border-box', marginBottom: 6, padding: '3px 6px', fontSize: 10,
+                   fontFamily: MONO, background: SURF, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3 }} />
+      )}
+      <CoverRow>
+        <Btn block onClick={() => onFetchTiles(source)} disabled={busy || !customOk} data-testid="fetch-tiles">↓ Fetch map</Btn>
+        <Btn block onClick={onLoadWorldImage} disabled={busy} data-testid="load-world-image"
+          title="A PNG or JPEG with its world file (.pgw, .jgw, .wld) and its .prj">Image + world file</Btn>
+      </CoverRow>
+    </div>
+  )
+}
+
+function MapScaleSetter({ ratio, zoom, extentKm, onZoom, text, setText }) {
+  const want = Number(String(text).replace(/[^\d.]/g, ''))
+  const ok = want >= 100 && want <= 50_000_000
+  const apply = () => { if (ok && zoom > 0) onZoom((zoom * ratio) / want) }
+  const target = ok ? want : Math.round(ratio)
+  const paper = extentKm ? [extentKm.w, extentKm.h].map((km) => Math.round((km * 1e6) / target)) : null
+  return (
+    <div style={{ marginTop: 6 }}>
+      <form onSubmit={(e) => { e.preventDefault(); apply() }} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        <span style={{ fontSize: 11, color: MUTED, minWidth: 52 }}>Set 1 :</span>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="25000" inputMode="numeric"
+          aria-label="Map scale denominator" data-testid="map-scale-input"
+          style={{ flex: 1, minWidth: 0, padding: '3px 6px', fontSize: 11, fontFamily: MONO, background: SURF,
+                   color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3 }} />
+        <Btn type="submit" disabled={!ok} data-testid="map-scale-apply">Apply</Btn>
+      </form>
+      {paper && (
+        <div data-testid="map-scale-paper" style={{ marginTop: 4 }}>
+          {`At 1 : ${target.toLocaleString()} the whole terrain is ${paper[0]} × ${paper[1]} mm.`}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function GroundScale({ style, ss, geoTiffBbox, hasGeoTiff }) {
   return (
     <>
@@ -772,7 +840,7 @@ export function Sidebar({
   textLayers, setTextLayers, textOverflow,
   onUndo, onRedo, canUndo, canRedo, onPresetPicked, pendingPreset, onLookChange, plateName,
   onUndoTo, onRedoTo, historyLabels,
-  loadGpxFromPicker, loadGeoJsonFromPicker, loadShapefileFromPicker, loadKmlFromPicker,
+  loadGpxFromPicker, loadGeoJsonFromPicker, loadShapefileFromPicker, loadKmlFromPicker, loadOsmFileFromPicker,
   vectorSources, vectorLayers, vectorCoverage, vectorError,
   onPatchVectorLayer, onRemoveVectorLayer, onReorderVectorLayer, onRemoveVectorSource,
   onAdoptVectorSource, onVectorError, vectorIdentify, onVectorIdentify,
@@ -781,10 +849,10 @@ export function Sidebar({
   cover, coverError, onLoadCover, onClearCover, onInkByClass,
   // Hand-drawn masks, the Studio that paints them, and the imagery behind it.
   masks = [], onAddMask, onPatchMask, onCopyMask, onRemoveMask, onImportMask, onEditMask,
-  imagery, imageryBusy, onFetchImagery, onClearImagery,
-  onCustomIcon, iconOverflow, labelOverflow,
+  imagery, imageryBusy, onFetchImagery, onClearImagery, onFetchTiles, onLoadWorldImage,
+  onCustomIcon, iconOverflow, labelOverflow, labelDropped,
   onCameraPreset,
-  onSvg, onPng, onPngAlpha, onStl, onHeightmap, onGeoTiff, onGeoTiffBand, onGeoJson,
+  onSvg, onPng, onPngAlpha, onStl, onHeightmap, onGeoTiff, onPlateGeo, onGeoTiffBand, onGeoJson,
   onRouteProfile, onSendBand, onModel,
   onWebmToggle, webmActive,
   webmDuration, setWebmDuration,
@@ -918,6 +986,9 @@ export function Sidebar({
    * width in millimetres for its own reasons, and once that number exists this
    * one is arithmetic.
    */
+  // The typed map scale, held here: the ratio readout can blink out for a
+  // frame while the camera settles, and the field below it must keep its text.
+  const [scaleText, setScaleText] = useState('')
   const mapRatio = mapScale && (view.plotWidthMm ?? 0) > 0 && sheetPx > 0
     ? (mapScale.metresPerPixel * sheetPx * 1000) / view.plotWidthMm
     : null
@@ -2742,6 +2813,7 @@ export function Sidebar({
                 </Btn>
                 {imagery && <Btn block onClick={onClearImagery}>Clear</Btn>}
               </CoverRow>
+              {onFetchTiles && <MapDrape busy={!!imageryBusy} onFetchTiles={onFetchTiles} onLoadWorldImage={onLoadWorldImage} />}
               {imagery?.credit && (
                 <div style={{ fontSize: 10, color: DIM, lineHeight: 1.7 }}>{imagery.credit}</div>
               )}
@@ -3105,7 +3177,7 @@ export function Sidebar({
                 coverage={vectorCoverage} error={vectorError}
                 sources={vectorSources} layers={vectorLayers}
                 onLoadGpx={loadGpxFromPicker} onLoadGeoJson={loadGeoJsonFromPicker}
-                onLoadShapefile={loadShapefileFromPicker} onLoadKml={loadKmlFromPicker}
+                onLoadShapefile={loadShapefileFromPicker} onLoadKml={loadKmlFromPicker} onLoadOsmFile={loadOsmFileFromPicker}
                 onPatch={onPatchVectorLayer} onRemove={onRemoveVectorLayer}
                 onReorder={onReorderVectorLayer}
                 onRemoveSource={onRemoveVectorSource}
@@ -3113,7 +3185,7 @@ export function Sidebar({
                 onProfile={onRouteProfile}
                 identify={vectorIdentify} onIdentify={onVectorIdentify}
                 onCustomIcon={onCustomIcon} iconOverflow={iconOverflow}
-                labelOverflow={labelOverflow}
+                labelOverflow={labelOverflow} labelDropped={labelDropped}
                 viewTilt={view.tilt} viewSpin={view.rotation}
               />
             )}
@@ -3742,6 +3814,11 @@ export function Sidebar({
                         {`1 : ${Math.round(mapRatio).toLocaleString()} on a ${view.plotWidthMm} mm sheet`}
                       </div>
                     )}
+                    {mapRatio && (
+                      <MapScaleSetter ratio={mapRatio} zoom={view.zoom} text={scaleText} setText={setScaleText}
+                        extentKm={wgs84ExtentKm(bboxToWgs84(geoTiffBbox, geoTiffCRS))}
+                        onZoom={(z) => sv({ zoom: z })} />
+                    )}
                   </>)}
                 </div>
               </Sub>
@@ -3967,6 +4044,13 @@ export function Sidebar({
               <ExpBtn label="GeoTIFF" onClick={onGeoTiff} testId="export-geotiff" />
               <ExpBtn label="GeoJSON" onClick={onGeoJson} testId="export-geojson" />
               <ExpBtn label="Heightmap" onClick={onHeightmap} testId="export-heightmap" />
+            </ExportGroup>
+            {/* The plate itself, georeferenced: the picture lands on its ground
+                in QGIS or Google Earth. Drawn from straight above. */}
+            <ExportGroup title="Plate on the map">
+              <ExpBtn label="GeoTIFF" onClick={() => onPlateGeo?.('geotiff')} testId="export-plate-geotiff" />
+              <ExpBtn label="PNG + world" onClick={() => onPlateGeo?.('world')} testId="export-plate-world" />
+              <ExpBtn label="KMZ" onClick={() => onPlateGeo?.('kmz')} testId="export-plate-kmz" />
             </ExportGroup>
             <ExportGroup title="Video">
               <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} testId="export-webm" />

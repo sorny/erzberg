@@ -44,7 +44,7 @@ const HELP = `erzberg — render a plate from the command line
   erzberg render <heightmap> -o <file> [-o <file>…] [options]
   erzberg atlas <features.geojson> -o <dir/{name}.svg> [-o …] [options]
   erzberg day <heightmap> -o <dir/{hour}.png> [--date …] [--hours 5-21] [options]
-  erzberg tiles <heightmap> -o <dir> [--zoom 10-14] [options]
+  erzberg tiles <heightmap> -o <dir|file.mbtiles> [--zoom 10-14] [options]
   erzberg list modes|presets|params
 
 Render options:
@@ -145,7 +145,7 @@ export function parseCli(argv) {
   if (!tiles && v.zoom) throw new UsageError('--zoom belongs to tiles')
 
   if (tiles) {
-    if ((v.out ?? []).length !== 1) throw new UsageError('tiles writes one folder: give one -o <dir>')
+    if ((v.out ?? []).length !== 1) throw new UsageError('tiles writes one folder or one .mbtiles file: give one -o')
     const zoom = /^(\d{1,2})-(\d{1,2})$/.exec(v.zoom ?? '10-14')
     if (!zoom) throw new UsageError(`--zoom takes from-to, not "${v.zoom}"`)
     const [minZoom, maxZoom] = [+zoom[1], +zoom[2]]
@@ -645,6 +645,18 @@ async function tilesRun(run, log) {
     log(`tiles, zoom ${run.minZoom} to ${run.maxZoom}…`)
     const got = await call(([a, b]) => window.erzberg.tiles(a, b), run.minZoom, run.maxZoom)
     if (!got.tiles.length) { console.error('erzberg: nothing to draw: every tile is empty'); return EXIT.empty }
+    // One SQLite file instead of a folder, when the output says .mbtiles.
+    if (/\.mbtiles$/i.test(run.dir)) {
+      const { writeMbtiles } = await import('./mbtiles.js')
+      const file = resolve(run.dir)
+      mkdirSync(dirname(file), { recursive: true })
+      await writeMbtiles(file, got.tiles.map((t) => ({ ...t, png: Buffer.from(t.png.slice(t.png.indexOf(',') + 1), 'base64') })), {
+        name: basename(run.input).replace(/\.[^.]+$/, ''), bounds: got.bboxWgs84, minZoom: run.minZoom, maxZoom: run.maxZoom,
+      })
+      log(`  ${got.tiles.length} tiles in one MBTiles file, the plate drawn at ${got.pictureMetres.toFixed(1)} m a pixel`)
+      process.stdout.write(file + '\n')
+      return EXIT.ok
+    }
     for (const { z, x, y, png } of got.tiles) {
       const file = join(resolve(run.dir), String(z), String(x), `${y}.png`)
       mkdirSync(dirname(file), { recursive: true })

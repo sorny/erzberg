@@ -9,6 +9,11 @@ export const DASH_CONFIGS = {
   // "short". Round dots are `dots`, below.
   dotted:      { dashed: true,   dashSize: 1.5, gapSize: 4 },
   'long-dash': { dashed: true,   dashSize: 12,  gapSize: 5 },
+  // A long dash and one or two short ones, the pattern survey sheets use for
+  // boundaries. `dotCount` short dashes of `dotSize` follow each long one, each
+  // after a gap.
+  'dash-dot':     { dashed: true, dashSize: 10, gapSize: 3, dotSize: 1.5, dotCount: 1 },
+  'dash-dot-dot': { dashed: true, dashSize: 10, gapSize: 3, dotSize: 1.5, dotCount: 2 },
   // Not a dash pattern: the line is replaced by round dots, one near-zero
   // segment each, which LineMaterial caps round — the way Stipple draws.
   dots:        { dashed: false, dots: true },
@@ -41,5 +46,7 @@ export const DASH_SEGMENT_SIZES = {
   dashed:      { dashPx: 3,  gapPx: 2 },
   dotted:      { dashPx: 2,  gapPx: 5 },
   'long-dash': { dashPx: 16, gapPx: 6 },
+  'dash-dot':     { dashPx: 12, gapPx: 3, dotPx: 2, dotCount: 1 },
+  'dash-dot-dot': { dashPx: 12, gapPx: 3, dotPx: 2, dotCount: 2 },
   dots:        { dots: true },
 }

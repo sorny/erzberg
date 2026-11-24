@@ -5,7 +5,79 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.79.0] — 2026-11-24
+
+### Added
+
+- **Hatched areas.** An area layer from OpenStreetMap or a file can fill with
+  strokes: *Pitch* in metres on the ground, *Angle*, and *Cross* for a second
+  set. The strokes are their own pen layer (`Woods · hatch`), with their own
+  colour, width and opacity. The solid fill never reached the SVG; a hatch does.
+- **Line decorations.** Lines and area outlines take *Parallel* lines at an
+  offset (left, right or both; on an area, in or out), *Ticks* across the line,
+  and *Marks* repeated along it (arrow, tooth, ring, cross, bar), in metres on
+  the ground. *Centre line* off keeps only the decoration, so a cased road
+  plots as its two edges. The decoration is its own pen layer.
+- **Dash-dot and dash-dot-dot** line styles, in the viewport, the SVG and the
+  legend.
+- **More OpenStreetMap.** Five new categories, unticked by default: *Cliffs &
+  ridges* (cliffs come with ticks on their drop side), *Hiking routes* from
+  route relations, *Springs & viewpoints*, *Power lines*, and *Coastline &
+  sea*. A free query field takes any tag (`natural=cliff`, `route=hiking|foot
+  !name`) or a raw Overpass selector, and fetches it as layers of its own.
+- **Every tag kept.** A feature keeps all its tags. The feature list filters by
+  a tag (`surface=gravel`), and the selected feature lists its tags. A GeoJSON
+  file's properties count as tags.
+- **Local OpenStreetMap files.** *OSM file* reads an `.osm` XML file or an
+  `.osm.pbf` extract, cut to the terrain's extent, into the same layers a fetch
+  gives. Drag and drop takes both.
+- **The sea.** *Coastline & sea* builds a sea layer from the coastline's
+  direction inside the extent: a fill, with islands cut out, and no outline
+  along the extent's edge.
+- **Names along lines.** A line layer letters its names along the line, glyph
+  by glyph on the ground, on the straightest stretch that is long enough, and
+  reading left to right in the view. *Side*, *Spacing* and *Repeat* place them.
+  *Shield* sets a road's number in a box. An area letters its name inside
+  itself.
+- **Avoid overlaps.** A label layer can leave out labels that would overlap
+  others. Layers higher in the stack keep theirs first; inside a layer, higher
+  summits and longer lines win. The panel counts what was left out.
+- **A typed map scale.** *Map Elements* takes a ratio such as 1 : 25 000 and
+  zooms the view to it on the sheet width, and states the paper the whole
+  terrain needs at that scale.
+- **The plate on the map.** Output › *Plate on the map* writes the plate seen
+  from above as an RGBA GeoTIFF in the raster's projection, as a PNG with its
+  world file and projection in a zip, or as a KMZ for Google Earth.
+- **MBTiles.** `erzberg tiles … -o plate.mbtiles` writes the tiles into one
+  SQLite file, through Node's own `node:sqlite`.
+- **Map drapes.** Imagery takes a published map instead of a satellite scene:
+  OpenTopoMap, basemap.at, the basemap.at orthophoto, swisstopo, or a tile URL
+  of your own, at most 64 tiles, on a press of *Fetch map*. *Image + world
+  file* lays a PNG or JPEG with its `.pgw`, `.jgw` or `.wld`, and its `.prj` if
+  it has one. The host's credit goes into every export that uses it.
+
+### Changed
+
+- Label collision avoidance, declined in August, is in as an option.
+
+These come from a comparison with Maperitive 2.5.10. Its manual lists 37 of
+the about 110 commands the program registers, so the full list was read from
+the program's own string table. What erzberg lacked was its pen work on vector
+data: hatch fills, line offsets and casings, symbols along lines, text along
+lines, shields, label placement, free tag queries, local OSM files, the sea
+from the coastline, a fixed map scale, and georeferenced exports. Its terrain
+side (three hillshades, hypsometric tints, contours, SRTM) erzberg already had.
+
+Hatches and decorations are made in the raster's pixel grid before the drape,
+so they occlude, export and clean up as ordinary lines. A name along a line is
+placed on the stretch whose glyph stations turn least, at most 40° apart. The
+PBF reader decodes in three passes, relations, then ways, then nodes, and keeps
+only what a category takes: the Liechtenstein extract (3.5 MB) gives 37 692
+ways, 166 points and 522 relations in 0.33 s.
+
+A preset reopens unchanged: every new control starts off, and the dash-dot
+shader returns the old dash test exactly when a style has no short dashes, so
+`PRESET_FORMAT` stays the same.
 
 ## [1.78.0] — 2026-11-20
 

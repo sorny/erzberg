@@ -129,10 +129,43 @@ export const VECTOR_LAYER_DEF = {
   // nothing. That is a decision about what a plate is, not about a default.
   labelSingleLine: false,
   labelFont: 'ReliefPendot',
+  // ── Lettering on lines and areas, and label collisions ────────────────────
+  // A line letters its name along itself, on the straightest stretch that is
+  // long enough; `labelSide` puts it above, on or below the line, and
+  // `labelRepeat` letters it again after that many name lengths (0 is once).
+  // `labelShield` sets a road's number in a box. `labelAvoid` drops a label
+  // that would overlap one already drawn.
+  labelShield: false, labelSide: 'above', labelRepeat: 0, labelTracking: 0,
+  labelAvoid: false,
   // Only 'gpx' sources default this on: the STL plate has always been shipped
   // with a track ribbon beside it, and OSM layers have no business there.
   stlRibbon: false,
+
+  // ── Hatch (areas) ─────────────────────────────────────────────────────────
+  // Strokes across the inside of an area, so a pen can draw its tone. The
+  // solid fill above is triangles and never reaches the SVG; a hatch does. The
+  // pitch is metres on the ground and the angle is degrees anticlockwise from
+  // east. Off by default, so a plate opens as it always did.
+  hatch: false, hatchAngle: 45, hatchPitch: 25, hatchCross: false,
+  hatchColor: null, hatchWeight: null, hatchOpacity: null,
+
+  // ── Decorations (lines and areas) ─────────────────────────────────────────
+  // `centreLine` off draws the decorations without the line itself, which is
+  // how a cased road plots: two edges and nothing down the middle. Sides are
+  // left and right of the line's direction; on an area, right is the inside.
+  centreLine: true,
+  parallel: 'off', parallelGap: 6,           // 'off' | 'left' | 'right' | 'both', metres
+  ticks: 'off', tickSpacing: 40, tickLength: 12,
+  marks: 'off', markSpacing: 80, markSize: 20, markSide: 'right', markFixed: false,
+  decoColor: null, decoWeight: null, decoOpacity: null,
 }
+
+/** The fields that move a vertex of a hatch or a decoration. */
+const SHAPE_KEYS = [
+  'hatch', 'hatchAngle', 'hatchPitch', 'hatchCross',
+  'centreLine', 'parallel', 'parallelGap', 'ticks', 'tickSpacing', 'tickLength',
+  'marks', 'markSpacing', 'markSize', 'markSide', 'markFixed',
+]
 
 /**
  * Colours handed to sources that bring no palette of their own (GeoJSON, GPX).
@@ -195,11 +228,15 @@ function packBucket(key, label, geom, style, features) {
   const ids = new Float64Array(features.length)
   const names = new Map()
   const notes = new Map()
+  // Every tag of a feature, where the source had any. Main thread only: the
+  // worker is sent the bucket without it (see `forWorker`).
+  const tags = new Map()
 
   let ci = 0, ri = 0, pi = 0
   for (const f of features) {
     if (f.name) names.set(pi, f.name)
     if (f.note) notes.set(pi, f.note)
+    if (f.tags) tags.set(pi, f.tags)
     ids[pi] = f.id ?? 0
     polys[pi++] = ri
     for (const r of f.rings) {
@@ -213,8 +250,18 @@ function packBucket(key, label, geom, style, features) {
 
   return {
     key, label, geom, style: style ?? {}, count: features.length,
-    coords, rings, polys, ids, names, notes,
+    coords, rings, polys, ids, names, notes, tags,
   }
+}
+
+/**
+ * A source without its tags, for the worker. The worker drapes coordinates and
+ * never reads a tag, and a fetch of a valley holds tens of thousands of tag
+ * objects that would otherwise be cloned on every post.
+ */
+export function forWorker(source) {
+  if (!source?.buckets?.some((b) => b.tags?.size)) return source
+  return { ...source, buckets: source.buckets.map(({ tags: _t, ...b }) => b) }
 }
 
 /**
@@ -331,7 +378,8 @@ export function moveLayer(layers, id, toIndex) {
  */
 export function layerBuildKey(l) {
   return `${l.id}|${l.sourceId}|${l.bucket}|${l.visible ? 1 : 0}|${l.fill ? 1 : 0}|` +
-         `${l.hidden?.length ? l.hidden.join(',') : ''}`
+         `${l.hidden?.length ? l.hidden.join(',') : ''}|` +
+         SHAPE_KEYS.map((k) => l[k] ?? VECTOR_LAYER_DEF[k]).join(',')
 }
 
 /**

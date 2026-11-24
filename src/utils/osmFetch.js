@@ -29,7 +29,8 @@
  */
 
 import { makePacer, makeReporter, CANCELLED, STRIDE } from './pacing'
-import { bucketLabel, bucketStyle, osmCategory, selectorsFor } from './osmCategories'
+import { SEA_BUCKET, bucketLabel, bucketStyle, geomOfElement, osmCategory, selectorsFor } from './osmCategories'
+import { seaRings } from './coastline'
 import { wgs84ExtentKm } from './geoCoords'
 import { makeSource, packFeatures } from './vectorLayers'
 import { localEndpointFor } from './overpassLocal'
@@ -300,10 +301,14 @@ export async function bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
     const rings = ringsOf(el)
     if (!rings.length) { dropped++; continue }
 
-    const key = `${hit.cat.id}:${hit.value}`
+    // A free query matches any kind of element, so its geometry is read off
+    // each one and becomes part of the bucket.
+    const geom = hit.cat.geom === 'auto' ? geomOfElement(el, tags) : hit.cat.geom
+    const value = hit.cat.geom === 'auto' ? `${hit.value}/${geom}` : hit.value
+    const key = `${hit.cat.id}:${value}`
     let bucketSet = seen.get(hit.cat.id)
     if (!bucketSet) seen.set(hit.cat.id, (bucketSet = new Set()))
-    bucketSet.add(hit.value)
+    bucketSet.add(value)
 
     // A relation's outer and inner rings belong to one feature so the fill can
     // subtract the holes; a multipolygon of separate islands is a compromise
@@ -314,10 +319,13 @@ export async function bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
     // The tags were being read only to choose a bucket and then dropped, which
     // is what made a feature impossible to name or point at afterwards.
     features.push({
-      bucket: key, geom: hit.cat.geom, rings,
+      bucket: key, geom, rings,
       name: tags.name || null,
       note: noteFor(tags),
       id: el.id,
+      // Every tag, for the feature list's tag filter and its tag readout. The
+      // object is the response's own, so keeping it costs a reference.
+      tags,
     })
   }
 
@@ -328,14 +336,33 @@ export async function bucketOsmElements(elements, categoryIds, bboxWgs84, pacer,
   const order = []
   for (const cat of cats) {
     const values = [...(seen.get(cat.id) ?? [])].sort()
+    // A query value names its geometry only when one value arrived as two.
+    const plain = cat.geom === 'auto' ? new Map() : null
+    if (plain) for (const v of values) { const b = v.split('/')[0]; plain.set(b, (plain.get(b) ?? 0) + 1) }
+    // Areas first, then lines, then points: the paint order a catalogue keeps.
+    const rank = { area: 0, line: 1, point: 2 }
+    if (plain) values.sort((a, b) => (rank[a.split('/')[1]] - rank[b.split('/')[1]]) || a.localeCompare(b))
     for (const v of values) {
       const key = `${cat.id}:${v}`
       order.push(key)
+      const [base, g] = v.split('/')
       bucketMeta[key] = {
-        label: bucketLabel(cat, v),
-        geom: cat.geom,
-        style: bucketStyle(cat, v),
+        label: plain ? bucketLabel(cat, plain.get(base) > 1 ? v : base) : bucketLabel(cat, v),
+        geom: plain ? g : cat.geom,
+        style: bucketStyle(cat, plain ? base : v),
       }
+    }
+  }
+
+  // The sea, from the coastline's direction inside the extent. A file import
+  // without an extent has no edge to close the sea against, so it gets none.
+  if (bboxWgs84 && cats.some((c) => c.id === 'coast')) {
+    const coast = features.filter((f) => f.bucket === 'coast:coastline').flatMap((f) => f.rings)
+    const sea = coast.length ? seaRings(coast, bboxWgs84) : []
+    if (sea.length) {
+      features.push({ bucket: SEA_BUCKET.key, geom: 'area', rings: sea.map((r) => Float64Array.from(r)), name: 'Sea', note: null, id: 0 })
+      order.unshift(SEA_BUCKET.key)
+      bucketMeta[SEA_BUCKET.key] = { label: SEA_BUCKET.label, geom: 'area', style: SEA_BUCKET.style }
     }
   }
 

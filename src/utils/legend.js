@@ -250,7 +250,7 @@ function mix(a, b, t) {
 }
 
 /** On and off lengths of a dash style, in stroke widths. */
-const DASH = { dashed: [6, 4], dotted: [1, 3], 'long-dash': [12, 5] }
+const DASH = { dashed: [6, 4], dotted: [1, 3], 'long-dash': [12, 5], 'dash-dot': [8, 2, 1, 2], 'dash-dot-dot': [8, 2, 1, 2, 1, 2] }
 
 /**
  * The legend as shapes in screen pixels, inside `box`.
@@ -381,8 +381,11 @@ export function legendShapes(all, { box, corner = 'bl', scale = 1, upper = true,
 function dashPieces(len, dash, w) {
   const d = DASH[dash]
   if (!d) return [[0, len]]
-  const [on, off] = d.map((v) => v * w)
+  // On and off lengths in turn, in stroke widths.
+  const parts = d.map((v) => v * w)
   const out = []
-  for (let x = 0; x < len; x += on + off) out.push([x, Math.min(len, x + Math.max(on, 0.01))])
+  for (let x = 0, k = 0; x < len; x += parts[k], k = (k + 1) % parts.length) {
+    if (k % 2 === 0) out.push([x, Math.min(len, x + Math.max(parts[k], 0.01))])
+  }
   return out
 }

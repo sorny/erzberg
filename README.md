@@ -27,12 +27,13 @@ Export to SVG for a pen plotter, to STL for a printer, or to 4K PNG for the wall
 
 **Everything runs locally in your browser.** Your files never leave your
 machine. There is no server, no upload and no account, and the app makes no
-third-party request on load. Three features contact a server, and only when you
+third-party request on load. Four features contact a server, and only when you
 press their button:
 
 - *Vector Layers* asks OpenStreetMap for features inside the raster's extent.
 - *Fetch* asks a geocoder for a place, then a tile host for the ground under it.
 - *Imagery* asks an open archive for a Sentinel-2 scene over the extent.
+- *Fetch map* asks the map host you pick for the tiles over the extent.
 
 Each sends a place name or a bounding box. None sends a file or needs a key.
 
@@ -120,8 +121,9 @@ different style from the grid, then tune it.
 | **Audio** | MP3, WAV, OGG or M4A, analysed into a spectrogram that drives the terrain. See [Soundscapes](#soundscapes). |
 | **GPX / GeoJSON / KML / Shapefile** | Tracks, points, lines and polygons, draped over a georeferenced raster. A Shapefile comes as a zip. Its `.prj` is read, so a national grid is placed with the same datum shift as a raster. |
 | **Fetch** | Type a place. Nominatim resolves it, and a map lets you place and size the box before you download. The panel states the zoom, tile count, raster size and metres per pixel first. Tiles come from Terrain Tiles on AWS Open Data. |
-| **OpenStreetMap** | Roads, water, rail, landuse, buildings, lifts and peaks inside the raster's extent, through Overpass. |
-| **Imagery** | True-colour Sentinel-2 at 10 m from AWS Open Data. It drapes on the terrain and backs the Mask Studio. |
+| **OpenStreetMap** | Roads, water, rail, landuse, buildings, lifts and peaks inside the raster's extent, through Overpass. Cliffs, hiking routes, springs, power lines and the coastline on request, and any tag you type. |
+| **OSM file** | An `.osm` XML file or an `.osm.pbf` extract, cut to the raster's extent, into the same layers a fetch gives. |
+| **Imagery** | True-colour Sentinel-2 at 10 m from AWS Open Data, map tiles from OpenTopoMap, basemap.at, swisstopo or your own URL, or an image with its world file. It drapes on the terrain and backs the Mask Studio. |
 | **Mask** | A PNG, JPG or WebP stencil, a drawn mask, or a mask made from heights or features. See [Masks](#masks). |
 | **Cover plate** | A `.landcover.json` from `scripts/embed-window.js`. See [Land cover](#land-cover). |
 
@@ -134,7 +136,7 @@ always the finest that fits the 36-tile budget.
 content, not by guess:
 
 - A GeoTIFF becomes the terrain.
-- A GPX, GeoJSON, KML, KMZ or zipped Shapefile becomes an overlay.
+- A GPX, GeoJSON, KML, KMZ, zipped Shapefile, `.osm` or `.osm.pbf` becomes an overlay.
 - A cover plate becomes the land cover.
 - A preset JSON, or a PNG or SVG that this app exported, restores the look.
 
@@ -144,7 +146,19 @@ A PNG with the app's `tEXt` chunk is a preset. A PNG without it is terrain.
 example *Roads · Motorway* or *Water · Stream*. Each layer has its own colour,
 weight, opacity, dash and optional slope-following fill. The list is a stack:
 drag a row to change what covers what. Inside a layer, each feature has a
-checkbox. Rest the pointer on a feature to name it and light it up.
+checkbox. Rest the pointer on a feature to name it and light it up. The feature
+list filters by name or by a tag (`surface=gravel`), and lists the tags of the
+selected feature.
+
+The *query* field fetches any tag as its own layers, for example
+`natural=cliff` or `route=hiking|foot`. *Coastline & sea* builds a sea layer
+from the coastline, with the islands cut out.
+
+**Survey symbols.** An area can be **hatched**, with pitch and angle in metres
+and degrees, and a second set crossed. A line or an outline takes **parallel**
+lines, **ticks** and repeated **marks** (arrow, tooth, ring, cross, bar), and
+*Centre line* off keeps only them, as for a cased road. Lines also take
+dash-dot patterns. Hatches and decorations are their own pen layers.
 
 A point feature can carry its **name and height as labels**, in Space Mono or in
 one of 49 **single-line fonts** (Hershey, EMS, Relief SingleLine, ISO 3098 and
@@ -152,6 +166,11 @@ three plotter faces). A stroke face plots each letter as centre lines, so the
 label layer of the SVG is about a quarter of the size. The SVG writes real
 `<text>`. A point can also show one of sixteen **SVG icons**, or your own file,
 on a leader line.
+
+A line letters its **name along itself**, glyph by glyph on the straightest
+stretch, reading left to right, and a road can show its number in a
+**shield**. An area letters its name inside itself. **Avoid overlaps** leaves
+out labels that would collide, top layer first.
 
 Every layer is simplified to what the DEM can express and draped on the ground.
 A recolour or a restack costs a frame, not a rebuild. Each layer becomes one
@@ -471,6 +490,7 @@ grid, and **Strata**. → [Soundscapes](docs/Soundscapes.md)
 | **GeoJSON** | The ground marks as lines in the raster's projection, with layer, pen name and height in metres. Charts, pillars and the panorama are left out. |
 | **Heightmap PNG** | The processed greyscale raster. |
 | **GeoTIFF** | The raster in metres as 32-bit floats, with its projection, extent and NoData, after Edit Mode crops and erosion. It reopens in QGIS or here. |
+| **Plate on the map** | The plate seen from above, georeferenced: an RGBA GeoTIFF in the raster's projection, a PNG with its world file, or a KMZ for Google Earth. |
 | **WebM** | A recording of the live canvas. |
 | **Profile SVG** | The elevation profile as a chart. *Elevation profile* on a GPX layer, or on a layer of one line, charts the route with its length, ascent and descent. |
 
@@ -486,7 +506,8 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   opacity, dash and colour. Like the Camera's centre guides, which follow the
   free canvas as the panel opens and closes, no export draws them.
 - **Scale bar and north arrow**, measured from the raster's bounding box. With a
-  sheet width in mm, the panel prints the map ratio. *Magnetic north* turns the
+  sheet width in mm, the panel prints the map ratio, and you can type one
+  (1 : 25 000) to zoom the view to it. *Magnetic north* turns the
   arrow to where a compass points and letters the declination, from the World
   Magnetic Model 2025.
 - **Title block** with the facts the plate has: projection, contour interval,
@@ -540,7 +561,8 @@ Exports take the source file name: `graz.tif` gives `graz.svg`, `graz.png`,
   graz.svg` renders a plate without the panel, through the same app in headless
   Chrome. Draw modes, presets and any parameter are arguments. `atlas` renders
   one plate per feature of a GeoJSON file, all in one style. `day` steps the
-  real sun through a date, and `tiles` writes XYZ web map tiles. The `python/`
+  real sun through a date, and `tiles` writes XYZ web map tiles or one MBTiles
+  file. The `python/`
   folder holds a Python package that calls the command line from a notebook.
   → [Command line](docs/CLI.md)
 
@@ -596,10 +618,10 @@ Inside a text box, `⌘Z` belongs to the browser. A slider drag is one undo step
 |---|---|
 | 3D engine | React Three Fiber + Three.js |
 | State | Zustand (raster data) + React state (parameters), saved to `localStorage` |
-| GIS | GeoTIFF.js, plus in-house GeoJSON, GPX and Overpass readers |
+| GIS | GeoTIFF.js, plus in-house GeoJSON, GPX, Overpass, OSM XML and PBF readers |
 | Icons | Maki (CC0) |
 | Fonts | Space Mono for the wordmark and labels, Overpass and Overpass Mono for the panel (all SIL OFL 1.1), self-hosted. 49 stroke faces from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine), ISO 3098 and three plotter faces |
-| Map data | OpenStreetMap through Overpass and Nominatim (ODbL) |
+| Map data | OpenStreetMap through Overpass and Nominatim (ODbL). Map drapes from OpenTopoMap, basemap.at and swisstopo, with their credit |
 | Elevation | Terrain Tiles on AWS Open Data (SRTM, GMTED2010, EU-DEM, 3DEP) |
 | Solar position | NOAA polynomials, in-house |
 | UI | Custom panel + Tailwind CSS |

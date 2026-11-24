@@ -62,7 +62,7 @@ import { AUTOMATION, useAutomation } from './automation'
 const PARAM_KEYS = [...GROUP_OF.keys()]
 import { buildPreset, migrateOcclusion, migrateStrokeBias, parsePreset, readPresetFile } from './utils/presetFile'
 import { isProjectFile, readProject, writeProject } from './utils/projectFile'
-import { ZIP_CANCELLED } from './utils/zipWrite'
+import { ZIP_CANCELLED, zip } from './utils/zipWrite'
 import { classifyDrop, dragHasFiles, explainDrop } from './utils/dropRoute'
 import { alignCover, classBit, decodeCover, effectiveClasses, parseCover, suggestInks } from './utils/coverPlate'
 import { createMask, duplicateMask, MAX_MASKS, maskFromImageData, reserveMaskIds, uniqueMaskName, withUniqueMaskIds } from './utils/maskLayers'
@@ -72,6 +72,7 @@ import { describeChange } from './utils/historyLabel'
 import { paramsForSection } from './components/panel/sectionParams'
 import { parseDate, solarPosition, sunTimes } from './utils/solar'
 import { isTyping } from './utils/shortcuts'
+import { tileDrape, parseWorldFile, worldImageDrape, auxSrs } from './utils/imageDrape'
 
 // ── BgSync: keeps WebGL clear colour in sync; transparent when gradient is on ─
 // A gradient is CSS behind the canvas, except under a multiplied layer, which
@@ -1017,7 +1018,7 @@ export default function App() {
   // Shapefile, KML and KMZ: read as binary or through a library, so async,
   // and each may come back with a note that its placement is approximate.
   const importVectorFile = useCallback(async (file) => {
-    const read = vectorImporterFor(file.name)
+    const read = vectorImporterFor(file.name, { bboxWgs84: geoTiffBbox ? bboxToWgs84(geoTiffBbox, geoTiffCRS) : null })
     if (!read) return false
     setVectorError(null)
     try {
@@ -1029,7 +1030,7 @@ export default function App() {
       setVectorError(err?.message || `Could not read ${file.name}.`)
     }
     return true
-  }, [adoptVectorSource, notify])
+  }, [adoptVectorSource, notify, geoTiffBbox, geoTiffCRS])
 
   const loadVectorArchive = useCallback((accept) => {
     const input = Object.assign(document.createElement('input'), { type: 'file', accept })
@@ -1039,6 +1040,7 @@ export default function App() {
   const loadShapefileFromPicker = useCallback(() => loadVectorArchive('.zip,application/zip'), [loadVectorArchive])
   const loadKmlFromPicker = useCallback(
     () => loadVectorArchive('.kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz'), [loadVectorArchive])
+  const loadOsmFileFromPicker = useCallback(() => loadVectorArchive('.osm,.pbf'), [loadVectorArchive])
   const dismissToast = useCallback(() => setToast(null), [])
 
   /**
@@ -1259,6 +1261,73 @@ export default function App() {
       setImageryBusy(null)
     }
   }, [geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight, setImagery, notify, showError])
+
+  /**
+   * A map drape: web map tiles from a host the user picks, or a picture with
+   * its world file. Both end as the same imagery the Sentinel-2 fetch gives.
+   * See utils/imageDrape.js.
+   */
+  const drapeRaster = useCallback(() => (geoTiffBbox && geoTiffCRS && heightmapWidth
+    ? { bbox: geoTiffBbox, crs: geoTiffCRS, width: heightmapWidth, height: heightmapHeight } : null),
+  [geoTiffBbox, geoTiffCRS, heightmapWidth, heightmapHeight])
+  const takeDrape = useCallback((got, meta) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = got.width
+    canvas.height = got.height
+    canvas.getContext('2d').putImageData(new ImageData(got.rgba, got.width, got.height), 0, 0)
+    setImagery({ rgba: got.rgba, width: got.width, height: got.height, url: canvas.toDataURL('image/png'),
+                 date: null, cloud: null, ...meta })
+    setStyle((s) => (s.showImagery ? s : { ...s, showImagery: true }))
+  }, [setImagery])
+  const fetchTileDrape = useCallback(async (source) => {
+    const raster = drapeRaster()
+    const box = raster && bboxToWgs84(raster.bbox, raster.crs)
+    if (!box) { showError('Map tiles need a georeferenced raster whose extent can be turned into longitude and latitude.'); return }
+    setImageryBusy({ phase: 'fetch', progress: 0 })
+    try {
+      const got = await tileDrape(source, raster, box, { onProgress: (progress) => setImageryBusy({ phase: 'fetch', progress }) })
+      takeDrape(got, { credit: source.credit ?? null, source: `${source.label}, zoom ${got.zoom}` })
+      notify(`${source.label}: ${got.tiles - got.failed} tiles at zoom ${got.zoom}${got.failed ? `, ${got.failed} did not arrive` : ''}.`)
+    } catch (err) {
+      if (err?.name !== 'AbortError') showError(`Map tiles failed: ${reachError(err, source.label)}`)
+    } finally {
+      setImageryBusy(null)
+    }
+  }, [drapeRaster, takeDrape, notify, showError])
+  const loadWorldImage = useCallback(() => {
+    const input = Object.assign(document.createElement('input'), {
+      type: 'file', multiple: true,
+      accept: '.png,.jpg,.jpeg,.webp,.pgw,.jgw,.pngw,.jpgw,.wld,.prj,.xml',
+    })
+    input.onchange = async (e) => {
+      const files = [...e.target.files]
+      const img = files.find((f) => /\.(png|jpe?g|webp)$/i.test(f.name))
+      const wld = files.find((f) => /\.(pgw|jgw|pngw|jpgw|wld)$/i.test(f.name))
+      const prj = files.find((f) => /\.prj$/i.test(f.name))
+      const aux = files.find((f) => /\.aux\.xml$/i.test(f.name))
+      const raster = drapeRaster()
+      if (!raster) { showError('A georeferenced image needs a georeferenced raster to lie on.'); return }
+      if (!img || !wld) { showError('Pick the image together with its world file (.pgw, .jgw or .wld), and its .prj if it has one.'); return }
+      try {
+        const world = parseWorldFile(await wld.text())
+        if (!world) throw new Error(`${wld.name} is not a world file.`)
+        const srs = prj ? await prj.text() : aux ? auxSrs(await aux.text()) : null
+        const bmp = await createImageBitmap(img)
+        const c = document.createElement('canvas')
+        c.width = bmp.width; c.height = bmp.height
+        const cx = c.getContext('2d')
+        cx.drawImage(bmp, 0, 0)
+        const data = cx.getImageData(0, 0, bmp.width, bmp.height)
+        const got = worldImageDrape(data, world, srs, raster)
+        if (!(got.coverage > 0)) throw new Error(`${img.name} does not lie on this terrain${srs ? '' : ' (no .prj was given, so it was read in the terrain\'s own projection)'}.`)
+        takeDrape(got, { credit: null, source: img.name })
+        notify(`${img.name} covers ${Math.round(got.coverage * 100)}% of the terrain${srs ? '' : '. No .prj was given, so it was read in the terrain\'s own projection'}.`)
+      } catch (err) {
+        showError(`Could not lay the image: ${err?.message ?? err}`)
+      }
+    }
+    input.click()
+  }, [drapeRaster, takeDrape, notify, showError])
 
   const studioMask = studioMaskId ? srcMasks.find((m) => m.id === studioMaskId) ?? null : null
 
@@ -2417,8 +2486,8 @@ export default function App() {
   // substituted, and anchored on the worker's own dots rather than on whatever
   // the icon pass left behind, which is the only place one segment per feature
   // still exists.
-  const { lineGeo: vectorLabelled, overflowed: labelOverflow } =
-    useVectorLabels(iconGeo, workerGeo, vectorLayers, vectorSources, view.tilt, view.rotation)
+  const { lineGeo: vectorLabelled, overflowed: labelOverflow, dropped: labelDropped } =
+    useVectorLabels(iconGeo, workerGeo, vectorLayers, vectorSources, view.tilt, view.rotation, terrainData)
 
   // Contour labels are lettered here for the same reason the vector ones are:
   // the worker reserved the gaps and knows where the numbers go, but it has no
@@ -2609,6 +2678,65 @@ export default function App() {
       notify(`Could not write the GeoTIFF: ${err?.message ?? err}`)
     }
   }, [exportBaseName, notify])
+
+  /**
+   * The plate as a georeferenced picture, drawn from straight above: a GeoTIFF
+   * in the raster's projection, a PNG with its world file, or a KMZ that
+   * Google Earth lays on the ground. See utils/plateGeo.js.
+   */
+  const handlePlateGeoExport = useCallback(async (kind) => {
+    const st = useStore.getState()
+    const bbox = st.geoTiffBbox, crs = st.geoTiffCRS
+    if (!bbox || !isProjectable(crs, bbox)) { notify('A georeferenced picture needs a GeoTIFF with a known projection.'); return }
+    const cap = planCaptureRef.current?.(4096, { transparent: kind !== 'world' })
+    if (!cap) { notify('Nothing to draw yet: the plate has no surface.'); return }
+    try {
+      const geo = await import('./utils/plateGeo')
+      const a = geo.plateAffine(cap, {
+        bbox, width: p.imageWidth ?? st.heightmapWidth, height: p.imageHeight ?? st.heightmapHeight,
+        peakOff: Math.floor(terrain.gridOffsetX ?? 0), lineOff: Math.floor(terrain.gridOffsetY ?? 0),
+      })
+      const rgba = cap.canvas.getContext('2d').getImageData(0, 0, a.width, a.height).data
+      const base = plateBaseName ?? exportBaseName ?? 'plate'
+      const save = (bytes, name, type) => {
+        const url = URL.createObjectURL(new Blob([bytes], { type }))
+        const link = Object.assign(document.createElement('a'), { href: url, download: name })
+        document.body.appendChild(link); link.click(); document.body.removeChild(link)
+        setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      }
+      const png = async (canvas) => new Uint8Array(await (await new Promise((r) => canvas.toBlob(r, 'image/png'))).arrayBuffer())
+      if (kind === 'geotiff') {
+        const { buffer, codeless } = await geo.plateGeoTiff(new Uint8Array(rgba.buffer, rgba.byteOffset, rgba.byteLength), a, crs)
+        save(buffer, `${base}-plate.tif`, 'image/tiff')
+        notify(codeless
+          ? `Wrote ${base}-plate.tif. The file defined its own projection, so it carries no EPSG code.`
+          : `Wrote ${base}-plate.tif`)
+      } else if (kind === 'world') {
+        const files = [
+          { name: `${base}.png`, data: await png(cap.canvas) },
+          { name: `${base}.pgw`, data: geo.worldFile(a) },
+        ]
+        const aux = geo.auxXml(crs)
+        if (aux) files.push({ name: `${base}.png.aux.xml`, data: aux })
+        save(await zip(files), `${base}-georeferenced.zip`, 'application/zip')
+        notify(`Wrote ${base}-georeferenced.zip: the PNG, its world file${aux ? ' and its projection' : ''}.`)
+      } else {
+        const box = bboxToWgs84(bbox, crs)
+        const pic = geo.toLonLatPicture(rgba, a, crs, box, Math.min(4096, a.width))
+        const c = document.createElement('canvas')
+        c.width = pic.width; c.height = pic.height
+        c.getContext('2d').putImageData(new ImageData(pic.rgba, pic.width, pic.height), 0, 0)
+        save(await zip([
+          { name: 'doc.kml', data: geo.groundOverlayKml(base, 'plate.png', box) },
+          { name: 'plate.png', data: await png(c) },
+        ]), `${base}.kmz`, 'application/vnd.google-earth.kmz')
+        notify(`Wrote ${base}.kmz`)
+      }
+    } catch (err) {
+      console.error('[PlateGeo] Export failed:', err)
+      notify(`Could not write the picture: ${err?.message ?? err}`)
+    }
+  }, [notify, terrain.gridOffsetX, terrain.gridOffsetY, plateBaseName, exportBaseName, p.imageWidth, p.imageHeight])
 
   /**
    * The ground marks as GeoJSON, in the raster's own projection. Heights come
@@ -2975,6 +3103,7 @@ export default function App() {
         loadGeoJsonFromPicker={loadGeoJsonFromPicker}
         loadShapefileFromPicker={loadShapefileFromPicker}
         loadKmlFromPicker={loadKmlFromPicker}
+        loadOsmFileFromPicker={loadOsmFileFromPicker}
         vectorSources={vectorSources}
         vectorLayers={vectorLayers}
         textLayers={textLayers}
@@ -3000,12 +3129,14 @@ export default function App() {
         onEditMask={(id) => setStudioMaskId(id)}
         imagery={imagery} imageryBusy={imageryBusy}
         onFetchImagery={fetchSatellite} onClearImagery={() => setImagery(null)}
+        onFetchTiles={fetchTileDrape} onLoadWorldImage={loadWorldImage}
         onVectorError={setVectorError}
         vectorIdentify={vectorIdentify}
         onVectorIdentify={setVectorIdentify}
         onCustomIcon={loadIconSvg}
         iconOverflow={iconOverflow}
         labelOverflow={labelOverflow}
+        labelDropped={labelDropped}
         onCameraPreset={handleCameraPreset}
         onSvg={beginSvgExport}
         onPng={() => beginPngExport(false)}
@@ -3013,6 +3144,7 @@ export default function App() {
         onStl={handleStl}
         onHeightmap={handleHeightmapExport}
         onGeoTiff={handleGeoTiffExport}
+        onPlateGeo={handlePlateGeoExport}
         onGeoJson={handleGeoJsonExport}
         onModel={beginModelExport}
         onRouteProfile={profileRoute}

@@ -98,6 +98,7 @@ sources:
 | **GPX** | Track points, or route points as a fallback. Waypoints are ignored. |
 | **KML / KMZ** | Placemarks, through `@tmcw/togeojson`. A KMZ is read from its `doc.kml`. |
 | **Shapefile** | A zip of `.shp`, `.dbf` and `.prj`. Every layer in the zip is read. |
+| **OSM file** | An `.osm` XML file or an `.osm.pbf` extract. Cut to the extent and bucketed by every category. |
 
 KML, KMZ and Shapefile become GeoJSON in `utils/vectorImport.js` and then take
 the GeoJSON path. A Shapefile's `.prj` is read by proj4 through
@@ -136,6 +137,45 @@ bows in WGS84.
 
 The app sends one query per fetch with `out geom`, caches identical queries, and
 tries the next mirror on a 429 or 504.
+
+Five categories start unticked: *Cliffs & ridges*, *Hiking routes* (route
+relations, split by `network`), *Springs & viewpoints*, *Power lines* and
+*Coastline & sea*. A cliff arrives with ticks on its right, because
+OpenStreetMap draws a cliff with its drop on the right of the way.
+
+#### Free queries
+
+The query field takes terms separated by spaces, all of which must hold:
+`key`, `!key`, `key=value`, `key=a|b`, `key!=value` and `key~regex`. A leading
+`node`, `way` or `rel` limits the element type. Alternatives separated by `;`
+are joined, and an alternative may be a raw selector such as
+`way["natural"="cliff"](if:length()>50)`. A query has the id `q:<text>`, so it
+shares the fetch, the cache and the count with the catalogue.
+
+Its layers are split by the value of the first key and by geometry: a node is
+a point, a relation is an area when it is a multipolygon or a boundary, and a
+closed way is an area when its tags say so (`geomOfElement`).
+
+Every feature keeps its tags. They stay on the main thread: `forWorker` sends
+the worker the buckets without them.
+
+#### Local files
+
+`utils/osmFile.js` reads `.osm` XML with `DOMParser`, and `.osm.pbf` with its
+own protocol-buffer reader. A PBF file is unpacked once and read in three
+passes: relations, then the ways they and the categories need, then those
+ways' nodes. Elements outside the extent, grown by a tenth, are left out.
+Extracts over 150 MB are refused. Both readers give Overpass-shaped elements to
+the same bucketing as a fetch.
+
+#### The sea
+
+OpenStreetMap has no sea polygons. `utils/coastline.js` joins the coastline
+ways, cuts them at the extent, and walks the extent's edge clockwise from each
+exit to the next entry. With the water on the right of every coastline way,
+that ring encloses the water. Closed coastlines inside the extent are islands
+and become holes. An extent the coastline never crosses but that holds an
+island is open sea. The sea layer fills without an outline.
 
 #### Detail tiers
 
@@ -232,6 +272,19 @@ layer. Points get 20 px and win ties. At a fixed threshold of 6, a peak had a
 
 `hidden` stores source indices, so hiding a feature never renumbers the rest.
 
+### Hatch and decoration
+
+Both are built in the worker, in the raster's pixel grid, before the drape.
+`emitHatch` runs `hatchLoops` over a feature's rings, and `emitDecor` uses
+`utils/lineDecor.js`: mitred offsets with a limit of twice the offset, ticks
+and marks at stations every *Spacing* along the line. An area's rings are
+turned first so that their right side is the inside. Sizes are metres on the
+ground, through the extent's mean pixel size.
+
+The strokes go out as `vec:N#hatch` and `vec:N#deco`, draped and densified like
+any line. `layerStyle` gives each its own colour, width and opacity, falling
+back to the layer's. `layerBuildKey` holds every field that moves a vertex.
+
 **Area fills** are a lattice in pixel space, not a triangulation. Each corner
 has its own elevation, so fills follow the slope. The even-odd rule gives holes
 and multi-part polygons for free. The step is chosen per layer from its area.
@@ -284,6 +337,22 @@ the panel shows the count ("18 of 29 named").
   which is the icon plane. A second line sits 1.25 em below.
 - **Fill** draws solid type with counters cut out.
 - A layer whose labels exceed 80 000 segments draws none and says so.
+
+**Lines and areas.** A line letters its name along its longest draped run.
+`lineWindows` tries windows as long as the name and keeps the one whose seven
+glyph stations turn least, at most 40°, nearest the middle. Each glyph is laid
+flat at its own point, turned along the line, at the ground height under it.
+The run is reversed where the line runs against the view's right, so it reads
+left to right. *Repeat* lays more windows along the run. An outline face writes
+one `<text>` per glyph. A **shield** is the road's note in a box, square to the
+view, a quarter of the line from its name. An area's name stands at the middle
+of the widest span through the middle of its outline.
+
+**Collisions.** Every label is planned first, with boxes in the view plane.
+`settleCollisions` puts the labels of layers without *Avoid overlaps* into a
+grid of kept boxes, then walks the other layers in stack order, shields first
+and then by priority (summit height, line or outline length), and drops each
+label whose boxes meet a kept one.
 
 Text that the data does not supply is a **text layer** instead.
 
@@ -345,7 +414,7 @@ left out, because they are data, not look:
 
 | Export | Vector layers |
 |---|---|
-| SVG | One named Inkscape layer per vector layer. Icons in their own `· icons` layer. Area fills are omitted, outlines stay. |
+| SVG | One named Inkscape layer per vector layer. Icons, labels, shields, hatches and decorations each in their own layer. Solid area fills are omitted; hatches are strokes and stay. |
 | PNG / PNG α / WebM | Yes, as rendered. |
 | STL | Layers with **STL ribbon** on, as `<base>-vectors.stl`. Default on for GPX, off for OSM and GeoJSON. |
 | Heightmap PNG | No. |
@@ -476,6 +545,29 @@ heights (`gridValueToMetres`). On a PNG, the panel asks for both.
 
 ---
 
+## Map drapes
+
+`utils/imageDrape.js` lays a picture from elsewhere on the raster's grid, at
+most 2048 pixels a side, as the imagery the Sentinel-2 fetch gives. Each drape
+pixel is traced to longitude and latitude and on into the source.
+
+- **Map tiles** come from the host you pick, or a URL template with `{z}`,
+  `{x}` and `{y}`. The zoom matches the raster's pixel size and is coarsened
+  until the extent needs at most 64 tiles, fetched four at a time. The public
+  OpenStreetMap tile server is not offered: its policy forbids this use.
+- **A georeferenced image** comes with its world file. Its projection is read
+  from a `.prj` WKT or a GDAL `.aux.xml`. Without either, it is read in the
+  raster's own projection, and the notice says so.
+
+## The plate on the map
+
+`utils/plateGeo.js` georeferences the top-down capture that the web tiles and
+the models use. The capture is axis-aligned in the raster's grid, so its
+georeference is one affine (`plateAffine`). The GeoTIFF writes it as tie point
+and pixel scale, with an RGBA picture. The PNG gets a world file, and a GDAL
+`.aux.xml` with the EPSG code when the raster has one. The KMZ resamples the
+picture onto a longitude–latitude grid for a `GroundOverlay`.
+
 ## Scale and north
 
 `measureScale` projects the origin and both ground axes, then solves for the
@@ -490,6 +582,8 @@ for a perspective one. An edge-on view returns null.
 
 - The panel states the tilt, because a tilted plate has no single scale.
 - The **ratio** (1:25 000) needs the sheet width in mm, set in Export.
+- A **typed ratio** sets the zoom to the present zoom times the present ratio
+  over the wanted one, because the ground on screen goes as one over the zoom.
 - `sheetMarks` returns shapes (segments, rectangles, text runs) in screen
   pixels. The viewport, SVG and PNG each draw them in their own pixels.
 - The PNG compositor draws the marks into the trim mask too, or the trim would

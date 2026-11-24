@@ -441,8 +441,8 @@ export function ModeStyleOverride({ prefix, style, ss, label = 'Line style', sho
       <InlineSl label="Opacity" min={0} max={1} step={0.01} value={style[`opacity${prefix}`]} onChange={v => ss({ [`opacity${prefix}`]: v })} fmt={v => Math.round(v*100)+'%'} />
       {showDash && (<>
         {fieldLabel('Dash')}
-        <SegGroup label="Dash" capitalize
-          options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots']]}
+        <SegGroup label="Dash" capitalize columns={4}
+          options={[['solid', 'solid'], ['dashed', 'dashed'], ['short', 'dotted'], ['long', 'long-dash'], ['dotted', 'dots'], ['–·', 'dash-dot'], ['–··', 'dash-dot-dot']]}
           value={style[`dash${prefix}`]} onChange={(d) => ss({ [`dash${prefix}`]: d })} />
         {prefix && style[`dash${prefix}`] === 'dots' && (<div style={{ marginTop: 8 }}>
           <InlineSl label="Dot step" testId={`dot-step-${prefix}`}

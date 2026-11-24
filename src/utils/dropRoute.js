@@ -45,7 +45,7 @@ export function classifyDrop(name) {
   if (ext(['.json']))                     return ['cover', 'preset', 'geojson']
   if (ext(['.gpx']))                      return ['gpx']
   // A zip is a Shapefile here: the one archive this app reads.
-  if (ext(['.zip', '.kml', '.kmz']))      return ['vector']
+  if (ext(['.zip', '.kml', '.kmz', '.osm', '.pbf', '.osm.bz2'])) return ['vector']
   // Named so the caller can say where it goes rather than refusing in silence.
   if (ext(['.mp3', '.wav', '.ogg', '.flac', '.m4a', '.aac'])) return ['audio']
   return []

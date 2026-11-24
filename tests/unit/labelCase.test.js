@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-const FORMATS = new Set(['SVG', 'PNG', 'STL', 'GPX', 'DEM', 'OSM', 'SVF', 'TSP'])
+const FORMATS = new Set(['SVG', 'PNG', 'STL', 'GPX', 'DEM', 'OSM', 'SVF', 'TSP', 'KMZ'])
 
 function sources(dir) {
   return readdirSync(dir).flatMap((f) => {

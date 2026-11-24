@@ -238,7 +238,7 @@ export function converterFromWkt(wkt) {
     if (!stated && shift) def.datum_params = shift.towgs84.split(',').map(Number)
     const exact = stated || !!shift || WKT_WGS84_LIKE.test(wkt)
     const conv = proj4(name, 'WGS84')
-    return { toWgs84: (xy) => conv.forward(xy), accuracy: exact ? 'exact' : 'approx', datum: known?.name ?? null }
+    return { toWgs84: (xy) => conv.forward(xy), fromWgs84: (ll) => conv.inverse(ll), accuracy: exact ? 'exact' : 'approx', datum: known?.name ?? null }
   } catch { return null }
 }
 

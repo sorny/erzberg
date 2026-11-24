@@ -19,7 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store/useStore'
 
 import { bboxToWgs84, classifyCRS, crsDisplayName, isInvertible, wgs84ExtentKm } from '../../utils/geoCoords'
-import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES, OSM_DETAIL_LABEL, detailTierFor } from '../../utils/osmCategories'
+import { DEFAULT_OSM_CATEGORIES, OSM_CATEGORIES, OSM_DETAIL_LABEL, detailTierFor, isQueryId, matchesQuery, parseTagQuery, queryId } from '../../utils/osmCategories'
 import { OSM_ATTRIBUTION, fetchOsm } from '../../utils/osmFetch'
 import { featureLabel, toggleHidden } from '../../utils/vectorLayers'
 
@@ -31,6 +31,7 @@ import { loadSingleLineManifest } from '../../utils/textGeometry'
 import { ACCENT, ACCENT_DEEP, BORDER, Btn, Chevron, ColorRow, DIM, EyeIcon, FontSelect, GripIcon, Heading, HIDDEN_OPACITY, InlineSl, LoadBtn, MONO, MUTED, ON_ACCENT, RowBtn, SegGroup, SegRow, Sub, SUNK, SURF, TEXT, Tog, WARN } from './ui'
 
 import { useStackDrag } from './stackDrag'
+import { DecorControls, HatchControls } from './VectorDecor'
 
 const MAX_FEATURE_ROWS = 200
 
@@ -403,13 +404,14 @@ function IconPicker({ layer, onPatch, onCustom, overflowed, viewTilt, viewSpin }
  * to line geometry like everything else here — so it takes the layer's colour
  * and weight, and lands in the SVG as strokes a plotter can draw.
  */
-function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin }) {
+function LabelPicker({ layer, bucket, onPatch, overflowed, dropped = 0, viewTilt, viewSpin }) {
+  const isPoint = layer.geom === 'point', isLine = layer.geom === 'line'
   const set = (patch) => onPatch(layer.id, patch)
   // The bundled stroke faces, fetched once for the whole app and only when a
   // label section is open — the manifest is names, not glyphs.
   const [singleLineFonts, setSingleLineFonts] = useState([])
   useEffect(() => { loadSingleLineManifest().then(setSingleLineFonts) }, [])
-  const on = layer.labelName || layer.labelHeight
+  const on = layer.labelName || (isPoint && layer.labelHeight) || (isLine && layer.labelShield)
 
   const named = bucket?.names.size ?? 0
   const noted = bucket?.notes.size ?? 0
@@ -436,14 +438,26 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
           onChange={(v) => set({ labelName: v })}
           help="Draws each feature's name beside it. A feature with no name in the data is left unlabelled rather than given a number — a plot of twenty-nine summits with nine of them called “#12” is worse than nine unlabelled ones." />
       </div>
-      <div data-testid={`label-height-${layer.id}`}>
-        <Tog label="Height" small checked={layer.labelHeight}
-          onChange={(v) => set({ labelHeight: v })}
-          help="Draws the feature's elevation, as OpenStreetMap has it — the same “1910m” the feature list shows. It goes on its own line under the name, or on its own if the name is off." />
-      </div>
+      {isPoint && (
+        <div data-testid={`label-height-${layer.id}`}>
+          <Tog label="Height" small checked={layer.labelHeight}
+            onChange={(v) => set({ labelHeight: v })}
+            help="Draws the feature's elevation, as OpenStreetMap has it — the same “1910m” the feature list shows. It goes on its own line under the name, or on its own if the name is off." />
+        </div>
+      )}
+      {isLine && (
+        <div data-testid={`label-shield-${layer.id}`}>
+          <Tog label="Shield" small checked={!!layer.labelShield}
+            onChange={(v) => set({ labelShield: v })}
+            help="Sets each road's route number in a box at the middle of the road, square to the view, as road maps letter them." />
+        </div>
+      )}
 
       <div style={{ fontSize: 10, color: MUTED, margin: '4px 0 8px', lineHeight: 1.5 }}>
-        {total ? `${named} of ${total} named · ${noted} with a height` : 'Nothing to label here.'}
+        {!total ? 'Nothing to label here.'
+          : isPoint ? `${named} of ${total} named · ${noted} with a height`
+          : isLine ? `${named} of ${total} named · ${noted} with a number`
+          : `${named} of ${total} named`}
       </div>
 
       {on && (
@@ -471,16 +485,32 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
           <InlineSl label="Size" min={2} max={40} step={0.5} value={layer.labelSize}
             onChange={(v) => set({ labelSize: v })} testId={`label-size-${layer.id}`} />
-          <InlineSl label="Offset X" min={-120} max={120} step={1} value={layer.labelDx}
-            onChange={(v) => set({ labelDx: v })} testId={`label-dx-${layer.id}`}
-            help="Moves the label across its own plane, so it can sit beside a marker rather than on it." />
-          <InlineSl label="Offset Y" min={-120} max={200} step={1} value={layer.labelDy}
-            onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
-            help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
+          {isPoint && (<>
+            <InlineSl label="Offset X" min={-120} max={120} step={1} value={layer.labelDx}
+              onChange={(v) => set({ labelDx: v })} testId={`label-dx-${layer.id}`}
+              help="Moves the label across its own plane, so it can sit beside a marker rather than on it." />
+            <InlineSl label="Offset Y" min={-120} max={200} step={1} value={layer.labelDy}
+              onChange={(v) => set({ labelDy: v })} testId={`label-dy-${layer.id}`}
+              help="Moves the label up its own plane. Raise it past the icon's Lift to sit above a marker; take it negative to hang the name below the point." />
 
-          <SegRow label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
-            value={layer.labelAlign} onChange={(v) => set({ labelAlign: v })}
-            testIdOf={(v) => `label-align-${v}-${layer.id}`} />
+            <SegRow label="Align" options={[['Left', 'left'], ['Centre', 'center'], ['Right', 'right']]}
+              value={layer.labelAlign} onChange={(v) => set({ labelAlign: v })}
+              testIdOf={(v) => `label-align-${v}-${layer.id}`} />
+          </>)}
+          {isLine && layer.labelName && (<>
+            <SegRow label="Side" options={[['above', 'above'], ['on', 'on'], ['below', 'below']]}
+              value={layer.labelSide ?? 'above'} onChange={(v) => set({ labelSide: v })}
+              testIdOf={(v) => `label-side-${v}-${layer.id}`}
+              help="Where the name runs: above the line, centred on it, or below it, as seen when the name reads left to right." />
+            <InlineSl label="Spacing" min={0} max={1.5} step={0.05} value={layer.labelTracking ?? 0}
+              fmt={(v) => `${v.toFixed(2)} em`} testId={`label-tracking-${layer.id}`}
+              onChange={(v) => set({ labelTracking: v })}
+              help="Extra space between the letters, in em. Survey sheets space out the names of long rivers and ranges." />
+            <InlineSl label="Repeat" min={0} max={20} step={1} value={layer.labelRepeat ?? 0}
+              fmt={(v) => (v ? `every ${v + 1}×` : 'once')} testId={`label-repeat-${layer.id}`}
+              onChange={(v) => set({ labelRepeat: v })}
+              help="Letters a long line more than once. The number is the distance from one name to the next, in name lengths. Once letters the straightest stretch nearest the middle." />
+          </>)}
 
           <Ink layer={layer} set={set} prefix="label" noFill={!!layer.labelSingleLine} help={{
             weight: "The lettering's own line width — the stroke that draws a summit triangle well is the stroke that closes up the counters of small type.",
@@ -490,8 +520,19 @@ function LabelPicker({ layer, bucket, onPatch, overflowed, viewTilt, viewSpin })
 
           {/* Orientation lives with the icon when there is one; a layer that
               labels without a marker still needs to aim its text. */}
-          {!layer.icon && (
+          {!layer.icon && (!isLine || layer.labelShield) && (
             <Orientation layer={layer} set={set} viewTilt={viewTilt} viewSpin={viewSpin} />
+          )}
+
+          <div data-testid={`label-avoid-${layer.id}`}>
+            <Tog label="Avoid overlaps" small checked={!!layer.labelAvoid}
+              onChange={(v) => set({ labelAvoid: v })}
+              help="Leaves out a label that would overlap another one in the view. Layers higher in the stack keep their labels first; inside a layer, higher summits and longer lines win. Labels of layers without this switch always stay and are counted as obstacles." />
+          </div>
+          {layer.labelAvoid && dropped > 0 && (
+            <div style={{ fontSize: 10, color: MUTED, marginTop: 2, lineHeight: 1.5 }} data-testid={`label-dropped-${layer.id}`}>
+              {dropped} {dropped === 1 ? 'label' : 'labels'} left out to avoid overlaps.
+            </div>
           )}
 
           {overflowed && (
@@ -545,11 +586,19 @@ function FeatureList({ layer, bucket, onPatch }) {
     return idx
   }, [bucket])
 
+  // A filter with `=`, `~` or a leading `!` is a tag query, the same language the
+  // OpenStreetMap query field takes; anything else matches the name.
+  const tagQuery = useMemo(() => {
+    const q = filter.trim()
+    return q && /[=~]|^!/.test(q) && bucket.tags?.size ? parseTagQuery(q) : null
+  }, [filter, bucket])
   const matches = useMemo(() => {
     const q = filter.trim().toLowerCase()
     if (!q) return ordered
+    if (tagQuery && !tagQuery.error) return ordered.filter((i) => matchesQuery(tagQuery, bucket.tags.get(i)))
     return ordered.filter((i) => featureLabel(bucket, i).toLowerCase().includes(q))
-  }, [ordered, filter, bucket])
+  }, [ordered, filter, bucket, tagQuery])
+  const selectedTags = selected?.layerId === layer.id ? bucket.tags?.get(selected.feature) : null
 
   // A feature picked on the terrain has to be findable in a list of hundreds.
   useEffect(() => {
@@ -577,7 +626,7 @@ function FeatureList({ layer, bucket, onPatch }) {
       </div>
 
       {bucket.count > 8 && (
-        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="filter…"
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={bucket.tags?.size ? 'filter… or a tag, such as surface=gravel' : 'filter…'}
           data-testid={`feature-filter-${layer.id}`}
           style={{
             width: '100%', boxSizing: 'border-box', marginBottom: 4, padding: '2px 4px',
@@ -633,7 +682,21 @@ function FeatureList({ layer, bucket, onPatch }) {
         </div>
       )}
       {filter && matches.length === 0 && (
-        <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>Nothing matches “{filter}”.</div>
+        <div style={{ fontSize: 10, color: MUTED, marginTop: 4 }}>
+          {tagQuery?.error ?? `Nothing matches “${filter}”.`}
+        </div>
+      )}
+      {selectedTags && (
+        <div data-testid={`feature-tags-${layer.id}`} style={{
+          marginTop: 6, padding: '4px 6px', background: SUNK, border: `1px solid ${BORDER}`, borderRadius: 3,
+          fontFamily: MONO, fontSize: 10, color: DIM, lineHeight: 1.5, maxHeight: 160, overflowY: 'auto',
+        }}>
+          {Object.entries(selectedTags).slice(0, 60).map(([k, v]) => (
+            <div key={k} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${k}=${v}`}>
+              <span style={{ color: MUTED }}>{k}</span>={v}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   )
@@ -664,8 +727,8 @@ function FeatureList({ layer, bucket, onPatch }) {
 export function VectorLayersPanel({
   crs, crsName, bbox, coverage, error,
   sources, layers,
-  onLoadGpx, onLoadGeoJson, onLoadShapefile, onLoadKml, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
-  identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, viewTilt, viewSpin,
+  onLoadGpx, onLoadGeoJson, onLoadShapefile, onLoadKml, onLoadOsmFile, onPatch, onRemove, onReorder, onRemoveSource, onAdopt, onError,
+  identify, onIdentify, onCustomIcon, iconOverflow, labelOverflow, labelDropped, viewTilt, viewSpin,
   // The elevation profile along a line layer: a GPX track, or a layer of one line.
   onProfile,
 }) {
@@ -715,6 +778,17 @@ export function VectorLayersPanel({
 
   const toggleCat = (id) =>
     setPicked((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]))
+
+  // A free query joins the categories as one more id to fetch.
+  const [queryText, setQueryText] = useState('')
+  const queryCheck = useMemo(() => (queryText.trim() ? parseTagQuery(queryText) : null), [queryText])
+  const addQuery = () => {
+    if (!queryCheck || queryCheck.error) return
+    const id = queryId(queryText)
+    setPicked((prev) => (prev.includes(id) ? prev : [...prev, id]))
+    setQueryText('')
+  }
+  const queries = picked.filter(isQueryId)
 
   const runFetch = async () => {
     if (!wgs || !picked.length) return
@@ -770,6 +844,11 @@ export function VectorLayersPanel({
         <LoadBtn block={false} onClick={onLoadGpx} data-testid="load-gpx">GPX</LoadBtn>
         <LoadBtn block={false} onClick={onLoadShapefile} data-testid="load-shapefile">Shapefile</LoadBtn>
         <LoadBtn block={false} onClick={onLoadKml} data-testid="load-kml">KML</LoadBtn>
+        {onLoadOsmFile && (
+          <LoadBtn block={false} onClick={onLoadOsmFile} data-testid="load-osm-file"
+            title="An OpenStreetMap extract, .osm or .osm.pbf, cut to the terrain's extent"
+            style={{ gridColumn: '1 / -1' }}>OSM file (.osm, .pbf)</LoadBtn>
+        )}
       </div>
 
       {/* ── OpenStreetMap ───────────────────────────────────────────────── */}
@@ -795,6 +874,33 @@ export function VectorLayersPanel({
               </Btn>
             )
           })}
+        </div>
+
+        {/* Any tag, as Overpass selects it. The query is fetched with the
+            ticked categories and arrives as its own layers. */}
+        <div style={{ marginBottom: 8 }}>
+          <form onSubmit={(e) => { e.preventDefault(); addQuery() }} style={{ display: 'flex', gap: 4 }}>
+            <input value={queryText} onChange={(e) => setQueryText(e.target.value)}
+              placeholder="Any tag, such as natural=cliff" aria-label="OpenStreetMap tag query"
+              data-testid="osm-query" disabled={!canQuery || fetching}
+              style={{
+                flex: 1, minWidth: 0, boxSizing: 'border-box', padding: '3px 6px', fontSize: 10,
+                background: SURF, color: TEXT, border: `1px solid ${BORDER}`, borderRadius: 3, fontFamily: MONO,
+              }} />
+            <Btn type="submit" disabled={!queryCheck || !!queryCheck.error || fetching} data-testid="osm-query-add"
+              title="Add this query to the fetch">Add</Btn>
+          </form>
+          {queryCheck?.error && queryText.trim().length > 2 && (
+            <div style={{ fontSize: 10, color: WARN, marginTop: 4, lineHeight: 1.5 }}>{queryCheck.error}</div>
+          )}
+          {queries.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 2, marginTop: 4 }}>
+              {queries.map((id) => (
+                <Btn key={id} variant="toggle" on onClick={() => toggleCat(id)} data-testid={`osm-query-chip`}
+                  title="Remove this query" style={{ fontFamily: MONO, padding: '2px 6px' }}>{id.slice(2)} ✕</Btn>
+              ))}
+            </div>
+          )}
         </div>
 
         {autoTier !== 'full' && (
@@ -938,6 +1044,8 @@ export function VectorLayersPanel({
                     )}
                   </div>
                 )}
+                {l.geom === 'area' && <HatchControls layer={l} onPatch={onPatch} />}
+                {l.geom !== 'point' && <DecorControls layer={l} onPatch={onPatch} />}
                 {l.geom !== 'point' && (
                   <div style={{ marginTop: 8 }}>
                     <Tog label="STL ribbon" small checked={l.stlRibbon}
@@ -966,11 +1074,12 @@ export function VectorLayersPanel({
                     ?.find((src) => src.id === l.sourceId)
                     ?.buckets.find((b) => b.key === l.bucket)
                   if (!bucket) return null
-                  return l.geom === 'point' ? (
+                  return (
                     <LabelPicker layer={l} bucket={bucket} onPatch={onPatch}
                                  overflowed={labelOverflow?.has(l.id)}
+                                 dropped={labelDropped?.get(l.id) ?? 0}
                                  viewTilt={viewTilt} viewSpin={viewSpin} />
-                  ) : null
+                  )
                 })()}
 
                 {(() => {

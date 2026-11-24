@@ -129,11 +129,22 @@ export function parseGeoJson(text, label) {
   const nameOf = (props) =>
     props?.name ?? props?.Name ?? props?.NAME ?? props?.title ?? null
 
+  // The properties as tags, for the feature list's tag filter. Only the plain
+  // values: a nested object has no one string to match against.
+  const tagsOf = (props) => {
+    if (!props || typeof props !== 'object') return null
+    const t = {}
+    for (const [k, v] of Object.entries(props)) {
+      if (v != null && typeof v !== 'object') t[k] = String(v)
+    }
+    return Object.keys(t).length ? t : null
+  }
+
   const features = []
   if (doc.type === 'FeatureCollection') {
-    for (const f of doc.features ?? []) readGeometry(f?.geometry, features, { name: nameOf(f?.properties) })
+    for (const f of doc.features ?? []) readGeometry(f?.geometry, features, { name: nameOf(f?.properties), tags: tagsOf(f?.properties) })
   } else if (doc.type === 'Feature') {
-    readGeometry(doc.geometry, features, { name: nameOf(doc.properties) })
+    readGeometry(doc.geometry, features, { name: nameOf(doc.properties), tags: tagsOf(doc.properties) })
   } else {
     readGeometry(doc, features)
   }

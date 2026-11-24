@@ -265,3 +265,41 @@ export function textPolylines(text, font) {
   textCache.set(cacheKey, built)
   return built
 }
+
+/**
+ * A string as separate glyphs, for lettering that follows a line.
+ *
+ * Each glyph keeps its own polylines in em units about its own origin, with its
+ * advance and its distance from the start of the string. `tracking` adds that
+ * many em between letters, the spaced lettering a long river name takes.
+ *
+ * @returns {{ glyphs: {ch, x, adv, polylines, segments}[], width: number, segments: number } | null}
+ */
+const runCache = new Map()
+
+export function glyphRun(text, font, tracking = 0) {
+  if (!font || !text) return null
+  const cacheKey = `${font.key}\u0000${tracking}\u0000${text}`
+  const hit = runCache.get(cacheKey)
+  if (hit) return hit
+  const upm = font.unitsPerEm
+  const advanceOf = font.stroke
+    ? (ch) => (font.glyphs[ch]?.[0] ?? font.defaultAdvance ?? upm / 2) / upm
+    : () => font.advance / upm
+  const glyphs = []
+  let x = 0, segments = 0
+  for (const ch of text) {
+    const adv = advanceOf(ch)
+    const polylines = glyphPolylines(ch, font)
+    let n = 0
+    for (const p of polylines) n += p.length / 2 - 1
+    glyphs.push({ ch, x, adv, polylines, segments: n })
+    segments += n
+    x += adv + tracking
+  }
+  // The same objects every time, so the fill triangulation caches per glyph.
+  const built = { text, glyphs, width: Math.max(0, x - tracking), segments }
+  if (runCache.size > 512) runCache.clear()
+  runCache.set(cacheKey, built)
+  return built
+}

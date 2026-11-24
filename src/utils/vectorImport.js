@@ -123,9 +123,20 @@ export async function kmzToSource(buffer, label) {
   return { source: kmlTextToSource(decoder.decode(await entries.get(main).read()), label, kml), note: null }
 }
 
-/** The vector importer for a file name, or null for a format read elsewhere. */
-export function vectorImporterFor(name) {
+/**
+ * The vector importer for a file name, or null for a format read elsewhere.
+ *
+ * `ctx.bboxWgs84` is the raster's extent: a local OSM file is cut to it, so a
+ * country extract keeps only the features the plate can show.
+ */
+export function vectorImporterFor(name, ctx = {}) {
   const n = String(name ?? '').toLowerCase()
+  if (n.endsWith('.osm') || n.endsWith('.osm.pbf') || n.endsWith('.pbf') || n.endsWith('.osm.bz2')) {
+    return async (file) => {
+      const { osmFileToSource } = await import('./osmFile')
+      return osmFileToSource(file, ctx.bboxWgs84 ?? null, ctx.queries ?? [])
+    }
+  }
   if (n.endsWith('.zip')) return async (file) => shapefileToSource(await file.arrayBuffer(), file.name)
   if (n.endsWith('.kmz')) return async (file) => kmzToSource(await file.arrayBuffer(), file.name)
   if (n.endsWith('.kml')) return async (file) => kmlToSource(await file.text(), file.name)
