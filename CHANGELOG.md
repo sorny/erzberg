@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.81.0] — 2026-11-25
+
+### Changed
+
+- **Mark families.** The Marks sheet groups the 81 modes in 13 families
+  instead of 8. Five are new: Form (crests, troughs, breaks and summits),
+  Water, Glyph (one sign per grid cell), Weather and Station (measured from a
+  point you pick). Isophotes moved to Light, Map Grid to Symbol, Watershed
+  from Plate to Water, and Louvres from Tone to Glyph. Within each family the
+  most common modes come first.
+
+### Why
+
+- Line held 25 modes, nearly a third of the sheet. It mixed scan lines,
+  drainage, landform skeletons, routes from a point and weather, so the family
+  said only how the pen moves. A family now names the idea a mode draws. Where
+  a mode has two ideas, the one a reader looks for wins: Flow Time is a level
+  set, but it shows water.
+
 ## [1.80.0] — 2026-11-25
 
 ### Added

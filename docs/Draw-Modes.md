@@ -1097,9 +1097,10 @@ and each streak runs *Streak length* pixels downwind.
 
 ## 68–72. Ground textures: Sand Ripples, Tally, Hoarfrost, Cross-Stitch, TIN Facets
 
-Sand Ripples is in the Line family, the others in Tone. Heights are shares of
-the plate's height range. Tally is in `builders/symbols.js`, Sand Ripples and
-Hoarfrost in `builders/process.js`, the others in `builders/mesh.js`.
+Sand Ripples and Hoarfrost are in the Weather family, Tally and Cross-Stitch in
+Glyph, and TIN Facets in Tone. Heights are shares of the plate's height range.
+Tally is in `builders/symbols.js`, Sand Ripples and Hoarfrost in
+`builders/process.js`, the others in `builders/mesh.js`.
 
 ### Sand Ripples
 
@@ -1196,7 +1197,8 @@ with *Level ground* on.
 
 ## 77–81. Loxodromes, Breaklines, Surface Network, Flow Time, Prominence
 
-All five are in the Line family, in `builders/form.js`. Heights are true metres
+All five are in `builders/form.js`. Loxodromes is in the Line family, Flow Time
+in Water, and the other three in Form. Heights are true metres
 from the GeoTIFF, or from *Pixel size* and *Relief* on a PNG. Lengths are in
 raster pixels.
 
@@ -1282,7 +1284,7 @@ cross on each key col.
 
 ## 82. Louvres
 
-Rows of bars, each as deep as the value under it (Tone, `builders/signal.js`).
+Rows of bars, each as deep as the value under it (Glyph, `builders/signal.js`).
 
 Rows run *Pitch* apart at *Angle*. Each row is cut into cells *Cell* long,
 with *Gap* between them. *Stagger* moves every second row half a cell along.

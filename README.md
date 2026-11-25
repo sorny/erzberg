@@ -87,8 +87,9 @@ different style from the grid, then tune it.
   a time. A *Presets* slot sits above them. Each tab shows a green count of the
   sections that are on inside it. The arrow keys move along the rail, and `[`
   `]` change the stage from anywhere.
-- **Marks sheet.** The Marks stage shows the 80 modes as tiles in eight families:
-  Line, Tone, Relief, Plate, Light, Momentum, Symbol and Chart. The ring in a tile corner
+- **Marks sheet.** The Marks stage shows the 81 modes as tiles in 13 families:
+  Line, Form, Water, Tone, Glyph, Relief, Light, Weather, Momentum, Station,
+  Plate, Symbol and Chart. Hover a family name to read what it holds. The ring in a tile corner
   switches the mode on. The rest of the tile opens its controls. An open mode
   has its own switch in its header. Line style, Gradient, Masks, Occlusion and
   Copies fold to one line that shows their setting.

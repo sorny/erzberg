@@ -13,12 +13,17 @@
  * the index does not drag three.js in behind it.
  */
 /**
- * The eight families, and which marks are in each.
+ * The families, and which marks are in each.
  *
- * Thirty-four tiles in one grid is a catalogue you read by scanning. The
- * families were always there in the marks themselves and nothing on screen said
- * so: Fall Line, Berms, Air and Race Line are one idea — something with mass
- * went down this slope — and they sat among thirty-three unrelated neighbours.
+ * Eighty tiles in one grid is a catalogue you read by scanning. The families
+ * were always there in the marks themselves and nothing on screen said so:
+ * Fall Line, Berms, Air and Race Line are one idea — something with mass went
+ * down this slope — and they sat among unrelated neighbours.
+ *
+ * A family is the idea a mark draws, not how its builder works: Flow Time is
+ * a level set and sits with the water, because water is what it shows. Where
+ * a mark has two ideas, the one a reader would look for wins. Watershed is a
+ * fill, but it is found by looking for water.
  *
  * Headings only. They do not collapse and they carry no state, because the pane
  * is already one screen and a disclosure here would be a click that saves no
@@ -34,20 +39,30 @@
  * unit level rather than by quietly vanishing from the sheet.
  */
 export const FAMILIES = [
-  ['Line',     'the pen leaves the paper and comes back',
-    ['Lines', 'Contours', 'Flow Lines', 'Network', 'Ridges', 'Valleys', 'Curvature', 'Isophotes', 'Crossings', 'Isochrones', 'Route', 'Bedding', 'Wind', 'Sand Ripples', 'Map Grid', 'Venation', 'Geodesic Fan', 'Spines', 'Glacier', 'Wiggle Traces', 'Loxodromes', 'Breaklines', 'Surface Network', 'Flow Time', 'Prominence']],
+  ['Line',     'long lines laid across the ground',
+    ['Lines', 'Contours', 'Crossings', 'Wiggle Traces', 'Curvature', 'Loxodromes']],
+  ['Form',     'the skeleton of the ground: crests, troughs, breaks and summits',
+    ['Ridges', 'Valleys', 'Breaklines', 'Surface Network', 'Spines', 'Prominence', 'Bedding']],
+  ['Water',    'where the water goes',
+    ['Flow Lines', 'Network', 'Flow Time', 'Venation', 'Watershed']],
   ['Tone',     'many small marks add up to a grey',
-    ['Crosshatch', 'Hachure', 'Pencil', 'Engraving', 'Stipple Dots', 'Sediment', 'Rock & Scree', 'Reticulation', 'Single Line', 'Roughness Mesh', 'TIN Facets', 'Truchet', 'Slope Classes', 'Coral', 'Hoarfrost', 'Line Printer', 'Tally', 'Cross-Stitch', 'Hair', 'Louvres']],
+    ['Crosshatch', 'Hachure', 'Engraving', 'Pencil', 'Stipple Dots', 'Sediment', 'Rock & Scree', 'Slope Classes', 'Reticulation', 'Roughness Mesh', 'TIN Facets', 'Single Line', 'Coral', 'Hair']],
+  ['Glyph',    'one sign per cell of a grid, chosen or sized by the ground',
+    ['Louvres', 'Line Printer', 'Tally', 'Cross-Stitch', 'Truchet']],
   ['Relief',   'the ground given thickness',
     ['Pillars', 'Bitplane', 'Sprite Blocks', 'Stems', 'Summit Envelope']],
-  ['Plate',    'colour rather than mark-making',
-    ['Indexed', 'Riso', 'Mineral', 'Landforms', 'Land Cover', 'Watershed', 'Outrun']],
   ['Light',    'a lamp, a sun, or a year of one',
-    ['Flashbulb', 'Halation', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Viewshed', 'Panorama', 'Radar', 'Light Shafts']],
+    ['Isophotes', 'Shadow Line', 'Shadow Hatch', 'Sun Hours', 'Light Shafts', 'Flashbulb', 'Halation', 'Radar']],
+  ['Weather',  'wind, rain, frost and ice at work on the ground',
+    ['Wind', 'Orographic Rain', 'Sand Ripples', 'Hoarfrost', 'Glacier']],
   ['Momentum', 'something with mass went down this slope',
     ['Fall Line', 'Berms', 'Air', 'Race Line', 'Runout']],
-  ['Symbol',   'a map symbol stamped where the ground calls for it',
-    ['Tree Line', 'Constellation', 'Weather Fronts', 'Orographic Rain']],
+  ['Station',  'measured from a point you pick on the ground',
+    ['Route', 'Isochrones', 'Viewshed', 'Panorama', 'Geodesic Fan']],
+  ['Plate',    'colour rather than mark-making',
+    ['Indexed', 'Riso', 'Mineral', 'Landforms', 'Land Cover', 'Outrun']],
+  ['Symbol',   'map signs: trees, stars, fronts and the sheet grid',
+    ['Tree Line', 'Constellation', 'Weather Fronts', 'Map Grid']],
   ['Chart',    'the ground as a diagram, laid flat above it',
     ['Waveform', 'Profile Sheet', 'Swath Profile', 'Hypsometry', 'Aspect Rose', 'Stereonet']],
 ]
