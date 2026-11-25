@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.80.0] — 2026-11-25
+
+### Added
+
+- **Louvres**, a draw mode in the Tone family. Rows of bars are cut into
+  cells, and each bar is as deep as the value under it: elevation, slope,
+  hillshade or an inverse. Controls set the pitch, cell, gap, angle, stagger,
+  depth, floor, gamma, steps and blur. A bar can hang from the top of its row,
+  stand on the bottom or grow from the middle. Its free edge can be stepped,
+  sloped or traced. Solid bars are filled areas. The SVG writes them as filled
+  paths, or as hatch with *Filled areas in the SVG* set to Hatch. Lines, comb
+  and outline fills are strokes for a pen. The mode follows a reference
+  picture of red bars on grey paper, so its default ink is red.
+- The SVG export writes areas that a builder hands over as closed rings
+  (`polys`), next to the lattice areas of Indexed, Mineral and Watershed.
+
+### Why
+
+- Thin strokes cannot look solid at every zoom. The first build filled each
+  bar with strokes one and a half raster pixels apart. At normal zoom they
+  showed as stripes, because a stroke's weight is in screen pixels and its
+  pitch is in raster pixels. Filled areas look solid at every zoom, and the
+  existing hatch export still gives a pen its strokes.
+
 ## [1.79.0] — 2026-11-24
 
 ### Added

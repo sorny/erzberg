@@ -544,6 +544,15 @@ export const STYLE_DEF = {
   colorProm: '#1a1a1a', weightProm: 1, opacityProm: 1, dashProm: 'solid',
   hypsoProm: false, hypsoModeProm: 'elevation', hypsoBandedProm: false, hypsoIntervalProm: 10,
 
+  // Louvres — rows of slats cut into cells, each a bar as deep as the value
+  // under it. Lengths are raster pixels; `depthLouvre` is a share of the pitch,
+  // `floorLouvre` the value at or below which a cell stays empty.
+  enabledLouvre: false, pitchLouvre: 18, cellLouvre: 24, gapLouvre: 1, angleLouvre: 0, staggerLouvre: false,
+  sourceLouvre: 'elevation', gammaLouvre: 1, floorLouvre: 0.15, stepsLouvre: 0, blurLouvre: 2, azimuthLouvre: 315,
+  depthLouvre: 0.75, hangLouvre: 'top', edgeLouvre: 'stepped', barLouvre: 'solid', strokePitchLouvre: 1.5, outlineLouvre: true,
+  colorLouvre: '#e8231c', weightLouvre: 1, opacityLouvre: 1, dashLouvre: 'solid',
+  hypsoLouvre: false, hypsoModeLouvre: 'elevation', hypsoBandedLouvre: false, hypsoIntervalLouvre: 10,
+
   // Sediment — an even field of dots that slides down the slope and settles.
   enabledSediment: false, spacingSediment: 4, travelSediment: 80, gapSediment: 0.5, flatSediment: 0.03,
   radiusSediment: 2, seedSediment: 1,

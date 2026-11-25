@@ -9,8 +9,9 @@
  */
 import { cellElev, boxBlur, sampleBilinear } from '../terrain'
 import { computeVertexColor } from '../colorUtils'
-import { F32List, drapeEdge, mulberry32, normElev } from './shared.js'
+import { F32List, U32List, drapeEdge, mulberry32, normElev } from './shared.js'
 import { lineFamily } from './lines.js'
+import { pointDensity } from './tone.js'
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v)
 
@@ -461,4 +462,251 @@ export function buildWiggle(terrain, p, o) {
   const out = { Wiggle: { positions: trace.positions.toArray(), colors: trace.colors.toArray() } }
   if (fill.positions.length) out['Wiggle-Lobes'] = { positions: fill.positions.toArray(), colors: fill.colors.toArray() }
   return out
+}
+
+// ─── Louvres ──────────────────────────────────────────────────────────────────
+
+/** A segment in grid coordinates cut to the raster, or null when it misses. */
+function clipToGrid(rows, cols, c0, r0, c1, r1) {
+  let t0 = 0, t1 = 1
+  const dc = c1 - c0, dr = r1 - r0
+  for (const [q, s] of [[-dc, c0], [dc, cols - 1 - c0], [-dr, r0], [dr, rows - 1 - r0]]) {
+    if (Math.abs(q) < 1e-12) { if (s < 0) return null; continue }
+    const k = s / q
+    if (q < 0) { if (k > t1) return null; if (k > t0) t0 = k }
+    else { if (k < t0) return null; if (k < t1) t1 = k }
+  }
+  if (t1 - t0 < 1e-9) return null
+  return [c0 + dc * t0, r0 + dr * t0, c0 + dc * t1, r0 + dr * t1]
+}
+
+/** A piecewise-linear depth at `u`, from its nodes `us`, `ds`. */
+function depthOn(us, ds, u) {
+  let n = 0
+  while (n < us.length - 2 && us[n + 1] < u) n++
+  const t = (u - us[n]) / ((us[n + 1] - us[n]) || 1)
+  return ds[n] + (ds[n + 1] - ds[n]) * Math.max(0, Math.min(1, t))
+}
+
+/**
+ * The parts of a run where a piecewise-linear depth is at least `q`, as
+ * [u0, u1] pairs. `us` and `ds` are the nodes along the run.
+ */
+export function depthIntervals(us, ds, q) {
+  const out = []
+  let open = null
+  for (let k = 0; k < us.length - 1; k++) {
+    const ua = us[k], ub = us[k + 1], da = ds[k], db = ds[k + 1]
+    const inA = da >= q, inB = db >= q
+    if (inA && open === null) open = ua
+    if (inA && !inB) {
+      out.push([open, ua + (ub - ua) * ((da - q) / (da - db))]); open = null
+    } else if (!inA && inB) {
+      open = ua + (ub - ua) * ((q - da) / (db - da))
+    }
+  }
+  if (open !== null) out.push([open, us[us.length - 1]])
+  return out.filter(([a, b]) => b - a > 1e-6)
+}
+
+/**
+ * The ground as louvres: rows of slats, each slat cut into cells, and each cell
+ * a bar whose depth is the value under it.
+ *
+ * Rows run `pitch` apart at `angle` (0° runs east). Each row is cut into cells
+ * `cell` long, with `gap` left between them. A cell's bar hangs from the row's
+ * upper edge (`hang` 'top'), stands on its lower edge ('bottom') or swells
+ * about its middle ('centre'), and is `depth` of the pitch deep where the value
+ * is full. The value is one of the density fields (elevation, slope, shade and
+ * their inverses), blurred by `blur`, raised to `gamma`, with everything at or
+ * below `floor` left empty and, with `steps`, rounded to that many levels.
+ *
+ * `edge` sets how a bar's free edge follows the value: 'stepped' is one depth
+ * per cell, read at its middle; 'sloped' is a straight edge between the depths
+ * at its two ends; 'traced' follows the value along the cell. A bar is inked
+ * by `fill`: 'solid' as a filled area; 'lines' with strokes along the row
+ * `fillPitch` apart, which close up into a solid band at the pen's width;
+ * 'comb' with strokes across it; or 'none'. `outline` draws its edge.
+ * `stagger` moves every second row half a cell along, as bricks are laid.
+ *
+ * All lengths are in raster pixels. Strokes and areas are draped on the ground.
+ */
+export function buildLouvres(terrain, p, o) {
+  const { grid, gridMask, rows, cols, scl, halfW, halfH, minElev, maxElev, gridSlopes, maxSlope } = terrain
+  const sMask = terrain.hasNoData ? gridMask : null
+  const pitch = Math.max(0.5, (o.pitch ?? 18) / scl)
+  const cellW = Math.max(0.5, (o.cell ?? 24) / scl)
+  const gap = Math.min(cellW * 0.9, Math.max(0, (o.gap ?? 1) / scl))
+  const fp = Math.max(0.25, (o.fillPitch ?? 1.5) / scl)
+  const maxDepth = Math.max(0.02, Math.min(1, o.depth ?? 0.75)) * pitch
+  const floor = Math.max(0, Math.min(0.99, o.floor ?? 0.15))
+  const steps = Math.max(0, Math.round(o.steps ?? 0))
+  const hang = o.hang ?? 'top', edge = o.edge ?? 'stepped', fill = o.fill ?? 'solid'
+  const outline = o.outline !== false
+  if (!grid.length) return null
+
+  let field = pointDensity(terrain, p, o.source ?? 'elevation', o.gamma ?? 1, o.azimuth ?? 315)
+  const blur = Math.round((o.blur ?? 2) / scl)
+  if (blur > 0) field = boxBlur(field, cols, rows, blur, sMask)
+
+  const theta = ((o.angle ?? 0) * Math.PI) / 180
+  const dx = Math.cos(theta), dz = Math.sin(theta), nx = -dz, nz = dx
+  const cc = (cols - 1) / 2, rc = (rows - 1) / 2
+  const reach = Math.hypot(cc, rc) + Math.max(pitch, cellW)
+  const at = (u, v) => [cc + dx * u + nx * v, rc + dz * u + nz * v]
+
+  // The depth at one point of the row band, in grid cells: 0 off the data.
+  const depthAt = (u, v) => {
+    const [c, r] = at(u, v)
+    if (!(c >= 0 && r >= 0 && c <= cols - 1 && r <= rows - 1)) return 0
+    const b = sampleBilinear(field, sMask, rows, cols, r, c)
+    if (b !== b) return 0
+    let x = b <= floor ? 0 : (b - floor) / (1 - floor)
+    if (steps > 0) x = Math.round(x * steps) / steps
+    return Math.max(0, Math.min(1, x)) * maxDepth
+  }
+
+  const out = { positions: new F32List(), colors: new F32List() }
+  const stroke = (u0, v0, u1, v1, ang) => {
+    const [c0, r0] = at(u0, v0), [c1, r1] = at(u1, v1)
+    const s = clipToGrid(rows, cols, c0, r0, c1, r1)
+    if (s) drapeEdge(out, terrain, p, sMask, s[0], s[1], s[2], s[3], ang)
+  }
+  const tiny = 0.02
+  let cells = 0
+
+  /*
+   * Solid bars are areas, not strokes: a draped mesh for the screen (`lids`)
+   * and a closed ring for the SVG (`polys`), which writes it as a filled path
+   * or, with Filled areas set to Hatch, as hatch strokes. The mesh is sampled
+   * about once a grid cell each way, so it follows the ground. A point off
+   * the raster is moved onto its edge, which cuts a bar there.
+   */
+  const lidP = new F32List(), lidC = new F32List(), lidI = new U32List()
+  const ringP = new F32List(), ringStarts = [], ringInks = []
+  const elevScale = p.elevScale ?? 1
+  let lastE = minElev
+  const vertex = (u, w) => {
+    let [c, r] = at(u, w)
+    c = c < 0 ? 0 : c > cols - 1 ? cols - 1 : c
+    r = r < 0 ? 0 : r > rows - 1 ? rows - 1 : r
+    const b = sampleBilinear(grid, sMask, rows, cols, r, c)
+    if (b === b) lastE = (b - 0.5) * 100 * elevScale
+    return [c * scl - halfW, lastE, r * scl - halfH]
+  }
+  const inkOf = (u, w) => {
+    const [x, y, z] = vertex(u, w)
+    const i = Math.round((z + halfH) / scl) * cols + Math.round((x + halfW) / scl)
+    return computeVertexColor(normElev(y, minElev, maxElev), (gridSlopes?.[i] ?? 0) / (maxSlope || 1), theta, p)
+  }
+  const solidBar = (su, sd, lo, hi, rgb) => {
+    let dm = 0
+    for (const d of sd) if (d > dm) dm = d
+    const m = Math.max(1, Math.ceil(dm / 1.5))
+    const base = lidP.n / 3, nu = su.length
+    for (let a = 0; a < nu; a++) {
+      const l = lo(sd[a]), h = hi(sd[a])
+      for (let t = 0; t <= m; t++) {
+        const [x, y, z] = vertex(su[a], l + ((h - l) * t) / m)
+        lidP.push3(x, y, z); lidC.push3(rgb[0], rgb[1], rgb[2])
+      }
+    }
+    for (let a = 0; a < nu - 1; a++) {
+      for (let t = 0; t < m; t++) {
+        const i0 = base + a * (m + 1) + t, i1 = i0 + m + 1
+        lidI.push3(i0, i1, i0 + 1); lidI.push3(i0 + 1, i1, i1 + 1)
+      }
+    }
+    // The ring: along the hanging edge, then back along the free one.
+    ringStarts.push(ringP.n / 3)
+    for (let a = 0; a < nu; a++) { const [x, y, z] = vertex(su[a], lo(sd[a])); ringP.push3(x, y, z) }
+    for (let a = nu - 1; a >= 0; a--) { const [x, y, z] = vertex(su[a], hi(sd[a])); ringP.push3(x, y, z) }
+    ringInks.push(rgb[0], rgb[1], rgb[2])
+  }
+
+  const k0 = Math.floor(-reach / pitch), k1 = Math.ceil(reach / pitch)
+  for (let k = k0; k <= k1; k++) {
+    const v = k * pitch, mid = v + pitch / 2
+    // The edge a bar hangs from, and the side it grows towards, across the row.
+    const lo = hang === 'bottom' ? (d) => v + pitch - d : hang === 'centre' ? (d) => mid - d / 2 : () => v
+    const hi = hang === 'bottom' ? () => v + pitch : hang === 'centre' ? (d) => mid + d / 2 : (d) => v + d
+    const shift = o.stagger && (k & 1) ? cellW / 2 : 0
+    const j0 = Math.floor((-reach - shift) / cellW), j1 = Math.ceil((reach - shift) / cellW)
+    for (let j = j0; j <= j1; j++) {
+      const u0 = j * cellW + shift + gap / 2, u1 = (j + 1) * cellW + shift - gap / 2
+      if (u1 - u0 < 0.1) continue
+      // The nodes of the free edge along the cell.
+      let us, ds
+      if (edge === 'stepped') {
+        const d = depthAt((u0 + u1) / 2, mid)
+        us = [u0, u1]; ds = [d, d]
+      } else if (edge === 'traced') {
+        const n = Math.max(1, Math.ceil(u1 - u0))
+        us = []; ds = []
+        for (let i = 0; i <= n; i++) { const u = u0 + ((u1 - u0) * i) / n; us.push(u); ds.push(depthAt(u, mid)) }
+      } else {
+        us = [u0, u1]; ds = [depthAt(u0, mid), depthAt(u1, mid)]
+      }
+      let dmax = 0
+      for (const d of ds) if (d > dmax) dmax = d
+      if (dmax < tiny) continue
+      cells++
+
+      if (fill === 'solid') {
+        const rgb = inkOf((u0 + u1) / 2, mid)
+        for (const [a, b] of depthIntervals(us, ds, tiny)) {
+          // The edge's own nodes, with no step longer than a grid cell.
+          const knots = [a]
+          for (const u of us) if (u > a && u < b) knots.push(u)
+          knots.push(b)
+          const su = []
+          for (let i = 0; i < knots.length - 1; i++) {
+            const n = Math.max(1, Math.ceil(knots[i + 1] - knots[i]))
+            for (let q = 0; q < n; q++) su.push(knots[i] + ((knots[i + 1] - knots[i]) * q) / n)
+          }
+          su.push(b)
+          solidBar(su, su.map((u) => depthOn(us, ds, u)), lo, hi, rgb)
+        }
+      } else if (fill === 'lines') {
+        // Strokes along the row, each where the bar is deep enough to hold it.
+        const qs = []
+        if (hang === 'centre') for (let i = 0; 2 * i * fp <= dmax; i++) qs.push([2 * i * fp, i ? [mid - i * fp, mid + i * fp] : [mid]])
+        else for (let q = fp / 2; q <= dmax; q += fp) qs.push([q, [hang === 'bottom' ? v + pitch - q : v + q]])
+        for (const [q, ws] of qs) {
+          for (const [a, b] of depthIntervals(us, ds, Math.max(q, tiny))) for (const w of ws) stroke(a, w, b, w, theta)
+        }
+      } else if (fill === 'comb') {
+        // Strokes across the bar, at fixed steps along the row.
+        for (let u = u0 + fp / 2; u <= u1; u += fp) {
+          const d = depthOn(us, ds, u)
+          if (d >= tiny) stroke(u, lo(d), u, hi(d), theta + Math.PI / 2)
+        }
+      }
+
+      if (outline) {
+        // Round each part of the bar that has depth: both long edges, then the
+        // two ends. Where the edge runs out to nothing, so does the outline.
+        for (const [a, b] of depthIntervals(us, ds, tiny)) {
+          const pu = [a], pd = [depthOn(us, ds, a)]
+          for (let i = 0; i < us.length; i++) if (us[i] > a && us[i] < b) { pu.push(us[i]); pd.push(ds[i]) }
+          pu.push(b); pd.push(depthOn(us, ds, b))
+          for (let i = 0; i < pu.length - 1; i++) {
+            stroke(pu[i], lo(pd[i]), pu[i + 1], lo(pd[i + 1]), theta)
+            stroke(pu[i], hi(pd[i]), pu[i + 1], hi(pd[i + 1]), theta)
+          }
+          const dl = pd[0], dr = pd[pd.length - 1]
+          if (dl > 2 * tiny) stroke(a, lo(dl), a, hi(dl), theta + Math.PI / 2)
+          if (dr > 2 * tiny) stroke(b, lo(dr), b, hi(dr), theta + Math.PI / 2)
+        }
+      }
+    }
+  }
+  if (!out.positions.length && !lidI.n) return null
+  const res = { positions: out.positions.toArray(), colors: out.colors.toArray(), note: { cells } }
+  if (lidI.n) {
+    res.lids = { positions: lidP.toArray(), colors: lidC.toArray(), indices: lidI.toArray(), hugsSurface: true }
+    ringStarts.push(ringP.n / 3)
+    res.polys = { positions: ringP.toArray(), starts: Uint32Array.from(ringStarts), inks: Float32Array.from(ringInks) }
+  }
+  return res
 }

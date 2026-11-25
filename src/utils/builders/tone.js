@@ -832,7 +832,7 @@ function tspTour(xs, ys, n, cols, rows, budgetMs) {
  * line portrait of a mountain its modelling: the pen dwells where the slope
  * turns away from the light.
  */
-function pointDensity(terrain, p, mode, gamma, azimuth) {
+export function pointDensity(terrain, p, mode, gamma, azimuth) {
   const { grid, gridMask, rows, cols, minElev, maxElev, maxSlope, gridSlopes } = terrain
   const { elevScale, jitterAmt } = p
   const n = rows * cols, out = new Float32Array(n)

@@ -143,6 +143,7 @@ export function liftLayer(res, dy) {
     const elev = Float32Array.from(res.areas.elev, (v) => v + dy)
     out.areas = { ...res.areas, elev }
   }
+  if (res.polys?.positions) out.polys = { ...res.polys, positions: shiftY(res.polys.positions, dy) }
   const lift = (list) => list?.map((a) => (Number.isFinite(a.y) ? { ...a, y: a.y + dy } : a)) ?? list
   if (res.labelAnchors) out.labelAnchors = lift(res.labelAnchors)
   if (res.scaleAnchors) out.scaleAnchors = lift(res.scaleAnchors)

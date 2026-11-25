@@ -107,6 +107,7 @@ export const SECTION_TERMS = {
   'Mode: Breaklines': 'breaklines break of slope convex concave profile curvature scarp edge foot geomorphology',
   'Mode: Surface Network': 'surface network morse smale cols saddles passes summits peaks ridges courses thalweg skeleton topology pfaltz',
   'Mode: Flow Time': 'flow time travel time isochrones water runoff concentration hydrology catchment drainage',
+  'Mode: Louvres': 'louvres louvre slats blinds venetian bars bar chart cells grid line screen halftone width modulation scanline stripes poster',
   'Mode: Prominence': 'prominence key col saddle summit peak island parent relative height drop isolation topographic',
   'Mode: Roughness Mesh': 'delaunay voronoi triangles mesh tri terrain ruggedness index rough low poly facets net',
   'Mode: Indexed':    'palette lookup index 2d table quantise tiers slope bands bayer dither 16-bit retro gameboy arcade sky ramp swatches',

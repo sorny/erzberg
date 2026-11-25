@@ -1976,6 +1976,47 @@ export const ModeSections = memo(function ModeSections({ coralNote, cover, mapGr
             )}
           </Section>
 
+          <Section title="Mode: Louvres" icon={<ModeMark kind="louvre" />} open={sec.modeLouvre} onToggle={() => tog('modeLouvre')} enabled={style.enabledLouvre} onEnabled={v => ss({ enabledLouvre: v })} enableTestId="mode-louvre">
+            {(
+              <>
+                <Sub>
+                  {symbolNotes.Louvre && (
+                    <div data-testid="louvre-readout" style={{ fontSize:11, color: DIM, marginBottom:8, fontVariantNumeric:'tabular-nums' }}>
+                      {`${symbolNotes.Louvre.cells.toLocaleString()} bars`}
+                    </div>
+                  )}
+                  <InlineSl label="Pitch" testId="louvre-pitch" help="The distance between rows, in raster pixels. Each row holds one band of bars." min={3} max={80} step={0.5} value={style.pitchLouvre ?? 18} onChange={v => ss({ pitchLouvre: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Cell" testId="louvre-cell" help="The length of each bar along its row, in raster pixels." min={2} max={120} step={0.5} value={style.cellLouvre ?? 24} onChange={v => ss({ cellLouvre: v })} fmt={v => v.toFixed(1)} />
+                  <InlineSl label="Gap" help="The space left between two bars in a row, in raster pixels." min={0} max={20} step={0.25} value={style.gapLouvre ?? 1} onChange={v => ss({ gapLouvre: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Angle" help="The bearing of the rows. At 0° they run east." min={0} max={180} step={1} value={style.angleLouvre ?? 0} onChange={v => ss({ angleLouvre: Math.round(v) })} fmt={v => Math.round(v) + '°'} />
+                  <Tog label="Stagger" testId="louvre-stagger" help="Every second row moves half a cell along, as bricks are laid." checked={!!style.staggerLouvre} onChange={v => ss({ staggerLouvre: v })} />
+                  <div style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 10, color: MUTED, display: 'block', marginBottom: 4 }}>Depth from</span>
+                    <SegGroup label="Depth from" columns={3} testIdOf={(v) => `louvre-source-${v}`}
+                      options={[['Elevation', 'elevation'], ['Inv Elev', 'invElev'], ['Slope', 'slope'], ['Inv Slope', 'invSlope'], ['Hillshade', 'shade']]}
+                      value={style.sourceLouvre ?? 'elevation'} onChange={(v) => ss({ sourceLouvre: v })} />
+                  </div>
+                  {style.sourceLouvre === 'shade' && (
+                    <InlineSl label="Sun azimuth" help="The compass bearing of the light. Slopes that face away from it get the deepest bars." min={0} max={360} step={1} value={style.azimuthLouvre ?? 315} onChange={v => ss({ azimuthLouvre: v })} fmt={v => Math.round(v) + '°'} />
+                  )}
+                  <InlineSl label="Depth" testId="louvre-depth" help="How deep a bar is where the value is full, as a share of the pitch. Under 100%, a strip of paper stays between the rows." min={0.05} max={1} step={0.01} value={style.depthLouvre ?? 0.75} onChange={v => ss({ depthLouvre: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Floor" testId="louvre-floor" help="The value at or below which a cell stays empty, as a share of the full range. The bars grow from zero above it." min={0} max={0.95} step={0.01} value={style.floorLouvre ?? 0.15} onChange={v => ss({ floorLouvre: v })} fmt={v => Math.round(v * 100) + '%'} />
+                  <InlineSl label="Gamma" help="The curve from value to depth. Above 1, only the highest values get deep bars. Below 1, the bars deepen early." min={0.2} max={3} step={0.05} value={style.gammaLouvre ?? 1} onChange={v => ss({ gammaLouvre: v })} fmt={v => v.toFixed(2)} />
+                  <InlineSl label="Steps" help="The number of depths a bar can take. At 0, any depth." min={0} max={12} step={1} value={style.stepsLouvre ?? 0} onChange={v => ss({ stepsLouvre: Math.round(v) })} fmt={v => (v ? String(Math.round(v)) : 'any')} />
+                  <InlineSl label="Blur" help="Blur on the value before it is read, in raster pixels." min={0} max={40} step={1} value={style.blurLouvre ?? 2} onChange={v => ss({ blurLouvre: Math.round(v) })} />
+                  <SegRow label="Hang" help="Where a bar starts. Top: it hangs from the upper edge of its row. Bottom: it stands on the lower edge. Centre: it grows both ways from the middle of the row." testIdPrefix="louvre-hang" options={[['top', 'top'], ['bottom', 'bottom'], ['centre', 'centre']]} value={style.hangLouvre ?? 'top'} onChange={v => ss({ hangLouvre: v })} />
+                  <SegRow label="Edge" help="How the free edge of a bar follows the value. Stepped: one depth per bar, read at its middle. Sloped: a straight edge between the depths at its two ends. Traced: the edge follows the value along the bar." testIdPrefix="louvre-edge" options={[['stepped', 'stepped'], ['sloped', 'sloped'], ['traced', 'traced']]} value={style.edgeLouvre ?? 'stepped'} onChange={v => ss({ edgeLouvre: v })} />
+                  <SegRow label="Fill" help="How a bar is inked. Solid: a filled area. The SVG writes it as a filled path, or as hatch when Filled areas in Output is set to Hatch. Lines: strokes along the row that close into a solid band at the pen width. Comb: strokes across the bar. None: the outline alone." testIdPrefix="louvre-fill" columns={4} options={[['solid', 'solid'], ['lines', 'lines'], ['comb', 'comb'], ['none', 'none']]} value={style.barLouvre ?? 'solid'} onChange={v => ss({ barLouvre: v })} />
+                  {(style.barLouvre === 'lines' || style.barLouvre === 'comb') && (
+                    <InlineSl label="Fill pitch" testId="louvre-fill-pitch" help="The distance between fill strokes, in raster pixels. Set it to the pen width at the plotted size for a solid bar." min={0.25} max={10} step={0.25} value={style.strokePitchLouvre ?? 1.5} onChange={v => ss({ strokePitchLouvre: v })} fmt={v => v.toFixed(2)} />
+                  )}
+                  <Tog label="Outline" testId="louvre-outline" help="A stroke round each bar." checked={style.outlineLouvre !== false} onChange={v => ss({ outlineLouvre: v })} />
+                </Sub>
+                <ModeStyleOverride prefix="Louvre" style={style} ss={ss} gradientStops={gradientStops} setGradientStops={sg} />
+              </>
+            )}
+          </Section>
+
           <Section title="Mode: Prominence" icon={<ModeMark kind="prom" />} open={sec.modeProm} onToggle={() => tog('modeProm')} enabled={style.enabledProm} onEnabled={v => ss({ enabledProm: v })} enableTestId="mode-prom">
             {(
               <>

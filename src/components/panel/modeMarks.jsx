@@ -579,6 +579,24 @@ const MARKS = {
       <path d="M3 1.6 L4.2 3.6 L1.8 3.6 Z M19 1.6 L20.2 3.6 L17.8 3.6 Z" strokeWidth="0.5" />
     </g>
   ),
+  // Rows of bars, each as deep as the ground under it is high.
+  louvre: (
+    <g fill="currentColor" stroke="none">
+      <rect x="5.2" y="1.5" width="3.6" height="0.6" />
+      <rect x="9.2" y="1.5" width="3.6" height="1.4" />
+      <rect x="13.2" y="1.5" width="3.6" height="2.2" />
+      <rect x="17.2" y="1.5" width="3.6" height="2.8" />
+      <rect x="1.2" y="6" width="3.6" height="0.3" />
+      <rect x="5.2" y="6" width="3.6" height="1.2" />
+      <rect x="9.2" y="6" width="3.6" height="2.2" />
+      <rect x="13.2" y="6" width="3.6" height="3" />
+      <rect x="17.2" y="6" width="3.6" height="3.2" />
+      <rect x="5.2" y="10.5" width="3.6" height="0.5" />
+      <rect x="9.2" y="10.5" width="3.6" height="1.6" />
+      <rect x="13.2" y="10.5" width="3.6" height="2.6" />
+      <rect x="17.2" y="10.5" width="3.6" height="3" />
+    </g>
+  ),
   // Two summits, each in the outline of the ground above its key col.
   prom: (
     <g {...BASE} strokeWidth="0.8">

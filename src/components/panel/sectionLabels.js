@@ -54,6 +54,7 @@ export const SECTION_LABELS = {
   "Mode: Light Shafts": "sun azimuth altitude spacing min length landings",
   "Mode: Line Printer": "pitch aspect classes value equal count blank lowest",
   "Mode: Lines": "spacing shift angle shade fill sun azimuth half from quarters",
+  "Mode: Louvres": "pitch cell gap angle stagger depth from sun azimuth floor gamma steps blur hang edge fill outline",
   "Mode: Loxodromes": "hold grade angle turn spacing min slope blur pixel size relief",
   "Mode: Map Grid": "interval lines crosses cross size colour weight dash edge scale number pixel",
   "Mode: Mineral": "materials rock face massive scree bench summit classifier steep at broken blur grain cell size outline",

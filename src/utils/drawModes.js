@@ -436,6 +436,11 @@ export const DRAW_MODES = [
     id: 'Prom', label: 'Prominence', cost: 2.5, mark: 'prom',
     pick: { minProminence: [0.01, 0.05] },
   },
+  {
+    // One draped stroke per pen width of bar: the solid fill is the cost.
+    id: 'Louvre', label: 'Louvres', cost: 2, mark: 'louvre', walls: false,
+    pick: { pitch: [8, 20], floor: [0.05, 0.3] },
+  },
 ]
 
 /** id → the label the panel and the plot both use. */

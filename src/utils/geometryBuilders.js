@@ -20,7 +20,7 @@ import { buildConstellation, buildFronts, buildRain, buildTally, buildTreeLine }
 import { buildHoarfrost, buildRipples } from './builders/process.js'
 import { buildStitch, buildTin } from './builders/mesh.js'
 import { buildMapGrid } from './builders/mapGrid.js'
-import { buildHair, buildPrinter, buildStems, buildWaveform, buildWiggle } from './builders/signal.js'
+import { buildHair, buildLouvres, buildPrinter, buildStems, buildWaveform, buildWiggle } from './builders/signal.js'
 import { buildWind } from './builders/weather.js'
 import { buildHachure, buildLehmannHachure } from './builders/hachure.js'
 import { buildEngraving, buildFlashbulb, buildHalation, buildIsophotes, buildRadar, buildShafts, buildShadowHatch, buildShadowLine, buildSunHours } from './builders/light.js'
@@ -328,6 +328,11 @@ export function buildLineGeometry(terrain, p) {
     { id:'Prom',    builder: (t, ctx) => buildProminence(t, ctx, {
         radius: p.radiusProm, minProminence: p.minProminenceProm, count: p.countProm, plain: p.plainProm,
         smoothing: p.smoothingProm, points: p.marksProm, size: p.sizeProm }) },
+    { id:'Louvre',  builder: (t, ctx) => buildLouvres(t, ctx, {
+        pitch: p.pitchLouvre, cell: p.cellLouvre, gap: p.gapLouvre, angle: p.angleLouvre, stagger: p.staggerLouvre,
+        source: p.sourceLouvre, gamma: p.gammaLouvre, floor: p.floorLouvre, steps: p.stepsLouvre, blur: p.blurLouvre,
+        azimuth: p.azimuthLouvre, depth: p.depthLouvre, hang: p.hangLouvre, edge: p.edgeLouvre,
+        fill: p.barLouvre, fillPitch: p.strokePitchLouvre, outline: p.outlineLouvre }) },
   ]
 
   /*
@@ -634,6 +639,9 @@ export function buildLineGeometry(terrain, p) {
           // scene has no lattice of its own. A mirrored layer falls back to the
           // boundary lines, which *are* mirrored — see `traceAreaRings`.
           areas: res.areas ?? null,
+          // Closed rings in world coordinates, each with its ink, for a mode
+          // whose areas are not a lattice (Louvres). Un-mirrored only, as above.
+          polys: res.polys ?? null,
           // Placements for the main thread to letter. Not geometry, so it rides
           // the un-mirrored path only: a mirrored label reads backwards, and a
           // kaleidoscope of reversed numbers is not what the option is for.

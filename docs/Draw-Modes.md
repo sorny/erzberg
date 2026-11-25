@@ -1280,6 +1280,38 @@ outline is drawn at *Plain*, a share of the height range above the lowest
 ground. A second pen, `Prom-Points`, puts a triangle on each summit and a
 cross on each key col.
 
+## 82. Louvres
+
+Rows of bars, each as deep as the value under it (Tone, `builders/signal.js`).
+
+Rows run *Pitch* apart at *Angle*. Each row is cut into cells *Cell* long,
+with *Gap* between them. *Stagger* moves every second row half a cell along.
+All lengths are in raster pixels.
+
+The value is one of five fields: elevation, slope, hillshade from *Sun
+azimuth*, or the inverse of the first two. It is blurred by *Blur* and raised
+to *Gamma*. A value at or below *Floor* gives no bar. Above it, the depth is
+$d = D \cdot p \cdot (v - f) / (1 - f)$, with $D$ the *Depth* and $p$ the
+pitch. *Steps* rounds $d$ to that many levels. The value is read on the middle
+line of the row.
+
+*Hang* sets where a bar starts: the upper edge of its row, the lower edge, or
+the middle line, growing both ways. *Edge* sets how its free edge follows the
+value:
+
+| Edge | Free edge |
+| --- | --- |
+| Stepped | One depth per bar, read at the middle of the cell |
+| Sloped | A straight line between the depths at the two ends of the cell |
+| Traced | The value, read once per grid cell along the bar |
+
+*Fill* Solid makes each bar a closed area. The viewport draws it as a mesh
+draped on the ground. The SVG writes it as a filled path in one pen layer per
+ink, or as hatch strokes when *Filled areas in the SVG* is Hatch. *Lines*
+fills a bar with strokes along the row, *Fill pitch* apart. Set the pitch to
+the pen width for a solid bar. *Comb* draws strokes across the bar. *Outline*
+draws the edge of each bar as its own strokes.
+
 ## NoData and clipped edges
 
 NoData cells, transparent PNG pixels and everything outside an Edit Mode

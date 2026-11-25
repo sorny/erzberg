@@ -981,6 +981,42 @@ async function runExport({
     return groups
   }
 
+  /*
+   * Areas that arrive as closed rings rather than as a lattice (Louvres' bars):
+   * the same groups, one per ink. A ring is kept when most of its corners pass
+   * the depth test the segment walk applies, so a bar behind a ridge is left
+   * out whole rather than cut along the silhouette.
+   */
+  const buildPolyGroups = async (layer) => {
+    const { positions: P, starts, inks } = layer.polys
+    const byInk = new Map()
+    for (let k = 0; k < starts.length - 1; k++) {
+      if ((k & STRIDE) === 0 && pacer.due()) await pacer.yield()
+      const raw = []
+      let depth = 0, seen = 0, n = 0
+      for (let v = starts[k]; v < starts[k + 1]; v++) {
+        const [sx, sy, vz] = project(P[v * 3], P[v * 3 + 1], P[v * 3 + 2])
+        raw.push(sx, sy); depth += vz; n++
+        if (vz > nearZ) continue
+        const sz = surfViewZ ? surfViewZ(sx, sy) : -Infinity
+        if (sz === -Infinity || vz >= sz - bias) seen++
+      }
+      if (n < 3 || seen * 2 < n) continue
+      const cut = clipPolygon(raw, paperRect)
+      if (cut.length < 6 || Math.abs(loopArea2(cut)) < 0.5) continue
+      for (let i = 0; i < cut.length; i += 2) expandBB(cut[i], cut[i + 1])
+      const hex = inkRGB(inks[k * 3], inks[k * 3 + 1], inks[k * 3 + 2])
+      let g = byInk.get(hex)
+      if (!g) { g = { hex, no: byInk.size + 1, paths: [], depthSum: 0, count: 0 }; byInk.set(hex, g) }
+      g.paths.push({ loops: [cut], depth: depth / n })
+      g.depthSum += depth / n; g.count++
+    }
+    const groups = [...byInk.values()]
+    for (const g of groups) g.paths.sort((a, b) => a.depth - b.depth)
+    groups.sort((a, b) => (a.depthSum / a.count) - (b.depthSum / b.count))
+    return groups
+  }
+
   if (Array.isArray(lineGeo)) {
     for (const layer of lineGeo) {
       const { id, positions, colors, isPoints } = layer
@@ -1012,9 +1048,13 @@ async function runExport({
       // can be traced out of.
       const areaGroups = layer.areas ? await buildAreaGroups(layer) : null
       const suppressLines = !!(areaGroups && areaGroups.length > 0)
+      // Ring areas keep their lines: those are the bars' outlines, drawn on purpose.
+      const polyGroups = layer.polys ? await buildPolyGroups(layer) : null
+      const polyLayer = polyGroups?.length ? { id, name, isAreas: true, groups: polyGroups, weight, opacity } : null
 
       if (!positions || positions.length === 0) {
         if (suppressLines) svgLayers.push({ id, name, isAreas: true, groups: areaGroups, weight, opacity })
+        if (polyLayer) svgLayers.push(polyLayer)
         continue
       }
 
@@ -1274,6 +1314,7 @@ async function runExport({
         svgLayers.push({ id, name, visibleSegs: keptSegs, ghostSegs, weight, opacity, dash, dotStep })
       }
       if (suppressLines) svgLayers.push({ id, name, isAreas: true, groups: areaGroups, weight, opacity })
+      if (polyLayer) svgLayers.push(polyLayer)
     }
   }
 
