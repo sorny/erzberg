@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.82.0] — 2026-11-26
+
+### Added
+
+- **Turntable.** A new Camera slider turns the plate about the screen's
+  vertical axis. From the top view, the plate turns like an object on a
+  turntable. The SVG and PNG exports draw the turned plate.
+- **Auto-rotate axis.** Auto-rotate turns one axis: Heading, Turntable or Roll.
+  Speed and Direction apply to that axis.
+- **Point Cloud preset.** Stipple dots on a fixed grid (Jitter 0), thinned on
+  steep ground (Inverse slope, gamma 0.6), on grey. The camera looks straight
+  down, and the plate spins on the turntable, so a depth map of an object
+  turns as in a 3D scan.
+
+### Changed
+
+- The Camera section shows its four turns together: Heading (formerly
+  Rotation), Tilt, Turntable and Roll. Zoom gets its own row.
+- Top, Front, Iso and Reset set Turntable to 0.
+- The view lock also holds Roll and Turntable.
+- The sun marker turns with the plate.
+- `generate-thumbs.js` stops a preset's auto-rotate and puts back the pose that
+  the preset opens with before it takes the picture.
+
+### Why
+
+- From the top view, Rotation and Roll both turn about the line of sight
+  (gimbal lock). A turn about the screen's vertical axis was missing.
+- A trial branch added Omega, Phi and Kappa, three turns of the plate about the
+  world axes, and a spin speed for each. That gave two rotation systems with
+  nine controls. Labels that face the camera, the occluder, the scale bar, the
+  grid and anaglyph read Tilt and Rotation, and ignored the plate turn.
+- A turn of the camera around the plate and a turn of the plate in front of the
+  camera give the same picture. Only the axes differ. So Heading, Tilt and Roll
+  stay camera turns, and Turntable is the one turn of the plate.
+- Every bundled preset opens with Rotation 0 and Roll 0, so no preset changes.
+  The parameter keeps its name, `rotation`, so saved presets open unchanged.
+
 ## [1.81.0] — 2026-11-25
 
 ### Changed

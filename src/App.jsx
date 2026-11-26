@@ -2812,10 +2812,10 @@ export default function App() {
   // ── Camera presets ────────────────────────────────────────────────────────
   const handleCameraPreset = useCallback((name) => {
     const presets = {
-      top:   { tilt: 0,  rotation: 0, cameraRoll: 0 },
-      front: { tilt: 90, rotation: 0, cameraRoll: 0 },
-      iso:   { tilt: 45, rotation: -45, cameraRoll: 0 },
-      reset: { tilt: 50, rotation: 0, cameraRoll: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
+      top:   { tilt: 0,  rotation: 0, cameraRoll: 0, turntable: 0 },
+      front: { tilt: 90, rotation: 0, cameraRoll: 0, turntable: 0 },
+      iso:   { tilt: 45, rotation: -45, cameraRoll: 0, turntable: 0 },
+      reset: { tilt: 50, rotation: 0, cameraRoll: 0, turntable: 0, zoom: 0.75, fov: 60, panX: 0, panY: 0, panZ: 0 },
     }
     // The scene moves the camera on its own when it hears of a preset.
     if (useStore.getState().viewLocked) return

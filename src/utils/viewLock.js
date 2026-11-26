@@ -11,7 +11,7 @@
 /** The `view` keys that place the camera, auto-rotate included because it turns it. */
 export const CAMERA_POSE = [
   'tilt', 'rotation', 'zoom', 'fov', 'orthographic', 'planOblique', 'obliqueAngle',
-  'panX', 'panY', 'panZ', 'autoRotate',
+  'panX', 'panY', 'panZ', 'autoRotate', 'cameraRoll', 'turntable',
 ]
 
 /** `next` with the camera pose of `prev`. `next` itself when nothing would change. */

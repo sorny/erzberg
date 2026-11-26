@@ -15,7 +15,7 @@ test('rotation remains responsive during resolution change', async ({ page }) =>
   // Resolution slider is uniquely identified by min=1 max=20
   const resSlider = page.locator('input[type="range"][min="1"][max="20"]').first()
   // The Rotation slider, by its name: Roll shares its range (same as the benchmark test)
-  const rotSlider = page.locator('input[type="range"][aria-label="Rotation"]')
+  const rotSlider = page.locator('input[type="range"][aria-label="Heading"]')
 
   await expect(resSlider).toBeVisible({ timeout: 15000 })
   await resSlider.fill('1')

@@ -109,7 +109,7 @@ test('performance benchmark', async ({ page }) => {
   await openStage(page, 'frame')
 
   // Target the rotation slider by its name: Roll shares its range
-  const rotSlider = page.locator('input[type="range"][aria-label="Rotation"]')
+  const rotSlider = page.locator('input[type="range"][aria-label="Heading"]')
   await expect(rotSlider).toBeVisible({ timeout: 15000 })
 
   const rotStart = Date.now()

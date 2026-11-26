@@ -2,9 +2,11 @@
  * R3F scene.
  *
  * Rotation logic:
- * To keep the XYZ orientation gizmo in sync with the terrain, we manipulate the
- * CAMERA position/rotation rather than the terrain group.
- * Tilt and Rotation sliders drive the camera's spherical coordinates around [0,0,0].
+ * To keep the XYZ orientation gizmo in sync with the terrain, Heading and Tilt
+ * move the CAMERA rather than the terrain group: they are the camera's
+ * spherical coordinates around the orbit target. Roll turns the camera about
+ * its line of sight. Turntable is the one turn of the terrain group, about the
+ * screen's vertical axis (see the pose frame below).
  */
 import { GizmoHelper, GizmoViewport, OrbitControls, OrthographicCamera, PerspectiveCamera } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
@@ -274,12 +276,14 @@ export function Scene({
   // the effect above then finds the camera already where state puts it.
   const moveCamera = useRef(null)
   const liveRoll = useRef(null)
+  const liveTurn = useRef(null)
   moveCamera.current = (live) => {
     const pc = pRef.current
     updateCameraFromSliders(live.tilt ?? pc.tilt, live.rotation ?? pc.rotation, live.zoom ?? pc.zoom,
       live.panX ?? pc.panX, live.panY ?? pc.panY, live.panZ ?? pc.panZ)
     if (live.rotation != null) autoRotRef.current = live.rotation
     if (live.cameraRoll != null) liveRoll.current = live.cameraRoll
+    if (live.turntable != null) liveTurn.current = live.turntable
     invalidate()
   }
   useEffect(() => useStore.subscribe((s, prev) => {
@@ -299,40 +303,87 @@ export function Scene({
     invalidate()
   }, [activeCamera, p.planOblique, p.obliqueAngle, invalidate, orbitRef])
 
+  /*
+   * Auto-rotate turns one axis: Heading (the orbit), Turntable or Roll.
+   *
+   * Heading drives the camera directly. Routing it through setParams would
+   * re-render the whole app every frame, and the orbit controls' change event
+   * (fired by updateCameraFromSliders → orbit.update()) keeps React state
+   * following at the throttled sync rate. Turntable and Roll keep their exact
+   * angle in a ref and write a rounded copy to state at the same rate.
+   *
+   * Clamped, because this is the first frame after an idle scene: on-demand
+   * rendering means the clock has been running while nothing drew, so turning
+   * auto-rotate on used to spend the whole idle in one step — 96° after nine
+   * seconds of stillness. See frameClock.
+   */
+  const spin = useRef({ turntable: p.turntable ?? 0, cameraRoll: p.cameraRoll ?? 0, sync: 0 })
+  const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180
+  useEffect(() => {
+    // A spin writes a rounded copy of its own angle: keep the exact one.
+    const now = { turntable: p.turntable ?? 0, cameraRoll: p.cameraRoll ?? 0 }
+    for (const key of ['turntable', 'cameraRoll']) {
+      if (Math.abs(spin.current[key] - now[key]) > 0.06) spin.current[key] = now[key]
+    }
+  }, [p.turntable, p.cameraRoll])
   useFrame(({ invalidate }, delta) => {
     if (!p.autoRotate) return
-    // Drive the camera directly — routing the rotation through setParams would
-    // re-render the whole app every frame. The orbit controls' change event
-    // (fired by updateCameraFromSliders → orbit.update()) keeps React state
-    // following at the throttled sync rate.
-    //
-    // Clamped, because this is the first frame after an idle scene: on-demand
-    // rendering means the clock has been running while nothing drew, so turning
-    // auto-rotate on used to spend the whole idle in one step — 96° after nine
-    // seconds of stillness. See frameClock.
-    autoRotRef.current += (p.autoRotateSpeed ?? 0.5) * frameDelta(delta) * 40 * (p.autoRotateDir ?? 1)
-    const zoom = wheelZoom.current.now || heldZoom.current || p.zoom
-    updateCameraFromSliders(p.tilt, autoRotRef.current, zoom, p.panX, p.panY, p.panZ)
+    const dt = frameDelta(delta)
+    const step = (p.autoRotateSpeed ?? 0.5) * dt * 40 * (p.autoRotateDir ?? 1)
+    const axis = p.autoRotateAxis === 'turntable' || p.autoRotateAxis === 'roll' ? p.autoRotateAxis : 'heading'
+    if (axis === 'heading') {
+      autoRotRef.current += step
+      const zoom = wheelZoom.current.now || heldZoom.current || p.zoom
+      updateCameraFromSliders(p.tilt, autoRotRef.current, zoom, p.panX, p.panY, p.panZ)
+    } else {
+      const key = axis === 'roll' ? 'cameraRoll' : 'turntable'
+      spin.current[key] = wrap(spin.current[key] + step)
+      if (key === 'cameraRoll') liveRoll.current = spin.current.cameraRoll
+      else liveTurn.current = spin.current.turntable
+      spin.current.sync += dt * 1000
+      if (spin.current.sync >= ORBIT_SYNC_MS) {
+        spin.current.sync = 0
+        setParams({ [key]: Math.round(spin.current[key] * 10) / 10 })
+      }
+    }
     invalidate()  // keep the on-demand loop running while auto-rotating
   })
 
   /*
-   * Roll: a turn of the camera about its own line of sight.
+   * Turntable and Roll, put on after the orbit controls.
    *
-   * OrbitControls aims the camera with lookAt on every update, which levels the
-   * horizon again, and it reads the up vector only when it is built. So the roll
-   * is put on here, after the controls (drei updates them at priority -1) and
-   * before the frame is drawn or measured. Aimed again first, so a still camera
-   * with the controls locked does not roll further each frame.
+   * Roll is a turn of the camera about its own line of sight. OrbitControls
+   * aims the camera with lookAt on every update, which levels the horizon
+   * again, and it reads the up vector only when it is built. So the roll is put
+   * on here, after the controls (drei updates them at priority -1) and before
+   * the frame is drawn or measured. Aimed again first, so a still camera with
+   * the controls locked does not roll further each frame.
+   *
+   * Turntable turns the terrain group about the screen's vertical axis through
+   * the orbit target. From the top view that is the one turn Heading and Roll
+   * cannot give: there, both turn about the line of sight. The axis is the
+   * levelled camera's up, so it follows every orbit, and the turn comes before
+   * the roll. The exporters read the group's matrix, so they draw it too.
    */
   const rolled = useRef(false)
+  const turned = useRef(false)
   useEffect(() => { liveRoll.current = null; invalidate() }, [p.cameraRoll, invalidate])
+  useEffect(() => { liveTurn.current = null; invalidate() }, [p.turntable, invalidate])
   useFrame(() => {
     const cam = activeCamera
     const orbit = orbitRef.current
     const deg = liveRoll.current ?? p.cameraRoll ?? 0
-    if (!cam || !orbit || (!deg && !rolled.current)) return
+    const turn = liveTurn.current ?? p.turntable ?? 0
+    if (!cam || !orbit || (!deg && !rolled.current && !turn && !turned.current)) return
     cam.lookAt(orbit.target)
+    const g = groupRef.current
+    if (g && (turn || turned.current)) {
+      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion)
+      g.quaternion.setFromAxisAngle(up, THREE.MathUtils.degToRad(turn))
+      g.position.copy(orbit.target).sub(orbit.target.clone().applyQuaternion(g.quaternion))
+      g.updateMatrixWorld(true)
+      turned.current = !!turn
+    }
     if (deg) cam.rotateZ(THREE.MathUtils.degToRad(deg))
     cam.updateMatrixWorld()
     rolled.current = !!deg
@@ -1042,9 +1093,10 @@ export function Scene({
             reaches an exporter. */}
         {!webmRecording && <ProfileOverlay terrain={terrain} anchors={profileAnchors} />}
         {!webmRecording && guide === 'Waveform' && <WaveformGuide terrain={terrain} p={p} />}
+        {/* The sun marks where hillshade is lit from, and raw view is unlit.
+            In the group, because the light turns with the plate. */}
+        {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}
       </group>
-      {/* The sun marks where hillshade is lit from, and raw view is unlit. */}
-      {p.showHillshade && p.showSun && !p.showRawTerrain && <SunIndicator p={p} terrain={terrain} />}
       {/* Renders nothing — it reads the scene graph and listens on the canvas,
           so it sits outside the terrain group it has no transform to inherit.
           Off during profile picking, where a click already means something

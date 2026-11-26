@@ -74,7 +74,7 @@ export const SECTION_PARAMS = {
   // `View` split in two. Everything that aims the camera is Camera's, and
   // everything that describes the sheet is Paper's — the two subjects the one
   // section used to carry between them.
-  'Camera': ['tilt', 'rotation', 'cameraRoll', 'zoom', 'renderScale', 'showGuides', /^guide[A-Z]/, /^autoRotate/,
+  'Camera': ['tilt', 'rotation', 'cameraRoll', 'turntable', 'zoom', 'renderScale', 'showGuides', /^guide[A-Z]/, /^autoRotate/,
     'fov', 'orthographic', 'planOblique', 'obliqueAngle', 'explode', 'panX', 'panY', 'panZ'],
   'Paper': ['showFrame', 'framePaper', 'frameLandscape', 'frameCustomRatio',
     'frameScale', 'frameOffsetX', 'frameOffsetY', 'frameMargin', 'framePrintDpi', /^frameGuide/],
@@ -135,7 +135,7 @@ export const ALSO_READS = {
  * the source check below cannot find them in a section's JSX because they are
  * not in anyone's JSX.
  */
-export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY', 'autoRotateAxis',
+export const UNEXPOSED = ['gridOffsetX', 'gridOffsetY',
   // Drawn, but by no section's own JSX: `Section` adds the copies block under
   // every mode through a context (panel/ModeCopies.jsx). Draw Modes owns it,
   // so a reset there removes every copy.

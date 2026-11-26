@@ -943,7 +943,10 @@ export const VIEW_DEF = {
   // Orbit-target offset. X and Y are the two ground-plane axes (world X and
   // Z); Z raises the target off the ground (world Y).
   panX: 0, panY: 0, panZ: 0,
+  // Auto-rotate turns one axis: 'Y' (Heading), 'turntable' or 'roll'.
   autoRotate: false, autoRotateSpeed: 0.2, autoRotateAxis: 'Y', autoRotateDir: 1,
+  // A turn of the plate about the screen's vertical axis, in degrees.
+  turntable: 0,
   showGuides: false, showRawTerrain: false,
   // The centre guides' line: width in pixels, opacity, colour ('' takes black
   // or white against the background) and dash ('solid', 'dashed', 'dotted').

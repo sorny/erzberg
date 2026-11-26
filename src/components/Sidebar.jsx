@@ -3491,21 +3491,31 @@ export function Sidebar({
                   style={{ padding:'2px 0' }}>{label}</Btn>
               ))}
             </div>
+            {/* One set of turns, each about a fixed axis. Heading and Tilt are the
+                orbit that a drag also moves. From the top view Heading and Roll
+                both turn about the line of sight, so Turntable gives the third
+                axis there. */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Tilt" min={0} max={180} step={0.1} value={view.tilt} onChange={v => camCommit({ tilt: v })} onLive={v => camLive({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => camCommit({ zoom: (v / 100) * baseZoom })} onLive={v => camLive({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
+              <Sl label="Heading" testId="camera-heading" help="Turns the plate about its own up axis, like a map turned on a table. A drag to the left or right changes it." min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Tilt" testId="camera-tilt" help="Tips the plate about the screen's horizontal axis. 0 looks straight down, 90 looks from the side and past 90 looks from below. A drag up or down changes it." min={0} max={180} step={0.1} value={view.tilt} onChange={v => camCommit({ tilt: v })} onLive={v => camLive({ tilt: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Turntable" testId="camera-turntable" help="Turns the plate about the screen's vertical axis. Positive turns the side that faces you to the right. From the top view, the plate turns like an object on a turntable, so a depth map shows its sides." min={-180} max={180} step={0.1} value={view.turntable ?? 0} onChange={v => camCommit({ turntable: v })} onLive={v => camLive({ turntable: v })} fmt={v => v.toFixed(1)+'°'} />
+              <Sl label="Roll" testId="camera-roll" help="Turns the picture about the line of sight, so the horizon slants. Positive turns it clockwise." min={-180} max={180} step={0.1} value={view.cameraRoll ?? 0} onChange={v => camCommit({ cameraRoll: v })} onLive={v => camLive({ cameraRoll: v })} fmt={v => v.toFixed(1)+'°'} />
             </div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0 8px' }}>
-              <Sl label="Rotation" min={-180} max={180} step={0.1} value={view.rotation} onChange={v => camCommit({ rotation: v })} onLive={v => camLive({ rotation: v })} fmt={v => v.toFixed(1)+'°'} />
-              <Sl label="Roll" testId="camera-roll" help="Turns the camera about its line of sight, so the horizon slants. Positive turns the picture clockwise. An orbit drag keeps it, and Top, Front, Iso and Reset set it to 0." min={-180} max={180} step={0.1} value={view.cameraRoll ?? 0} onChange={v => camCommit({ cameraRoll: v })} onLive={v => camLive({ cameraRoll: v })} fmt={v => v.toFixed(1)+'°'} />
-            </div>
+            <Sl label="Zoom" min={10} max={400} value={Math.round((view.zoom / baseZoom) * 100)} onChange={v => camCommit({ zoom: (v / 100) * baseZoom })} onLive={v => camLive({ zoom: (v / 100) * baseZoom })} fmt={v => v+'%'} />
             </CamLock>
             <Sl label="Supersampling" help="Renders internally at a higher resolution to calm the shimmering of dense lines while panning/rotating. 2× costs roughly 4× GPU fill rate." min={1} max={2} step={0.5} value={view.renderScale ?? 1} onChange={v => sv({ renderScale: v })} fmt={v => v.toFixed(1)+'×'} />
             <CamLock on={viewLocked}>
             <Tog label="Auto-rotate" hint={<Key>Q</Key>} checked={view.autoRotate} onChange={v => sv({ autoRotate: v })} />
             {view.autoRotate && (
               <Sub>
-                <InlineSl label="Speed" min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
+                <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                  <span style={{ fontSize:10, color:MUTED, flex:1 }}>Axis</span>
+                  <SegGroup label="Axis"
+                    options={[['Heading', 'Y'], ['Turntable', 'turntable'], ['Roll', 'roll']]}
+                    value={view.autoRotateAxis === 'turntable' || view.autoRotateAxis === 'roll' ? view.autoRotateAxis : 'Y'}
+                    onChange={(axis) => sv({ autoRotateAxis: axis })} />
+                </div>
+                <InlineSl label="Speed" testId="auto-rotate-speed" help="How fast the axis above turns. 1 is 40° a second." min={0.01} max={2} step={0.01} value={view.autoRotateSpeed} onChange={v => sv({ autoRotateSpeed: v })} />
                 <div style={{ display:'flex', gap:8, alignItems:'center' }}>
                   <span style={{ fontSize:10, color:MUTED, flex:1 }}>Direction</span>
                   <SegGroup label="Direction" options={[['CW', 1], ['CCW', -1]]}

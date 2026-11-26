@@ -103,7 +103,7 @@ test('auto-rotate starts turning rather than jumping', async ({ page }) => {
   // 96° before the second frame ever ran, against a steady 7.8°/s.
   await openApp(page)
 
-  const rotation = page.locator('input.hmr[aria-label="Rotation"]')
+  const rotation = page.locator('input.hmr[aria-label="Heading"]')
   // Long enough that an unclamped delta would be unmistakable.
   await page.waitForTimeout(6000)
 
@@ -123,6 +123,32 @@ test('auto-rotate starts turning rather than jumping', async ({ page }) => {
   expect(firstStep,
     `first step ${firstStep}° must be in scale with the steady ${perSecond}°/s`)
     .toBeLessThan(perSecond)
+})
+
+test('auto-rotate turns only the axis it is set to', async ({ page }) => {
+  // Heading is the orbit. Turntable and Roll write their own slider, and the
+  // other two stay where they are.
+  await openApp(page)
+  await page.locator('input[type=checkbox][aria-label="Auto-rotate"]').click()
+  const speed = page.locator('[data-testid="auto-rotate-speed"]')
+  await speed.fill('1')
+  await speed.blur()
+  const ids = { Heading: 'camera-heading', Turntable: 'camera-turntable', Roll: 'camera-roll' }
+  const read = async () => Object.fromEntries(await Promise.all(Object.entries(ids)
+    .map(async ([k, id]) => [k, Number(await page.locator(`[data-testid="${id}"]`).inputValue())])))
+  for (const axis of Object.keys(ids)) {
+    await page.locator('[role=group][aria-label="Axis"]').getByRole('button', { name: axis }).click()
+    await page.waitForTimeout(300)
+    const before = await read()
+    await page.waitForTimeout(600)
+    const after = await read()
+    for (const k of Object.keys(ids)) {
+      const moved = Math.abs(((after[k] - before[k] + 540) % 360) - 180)
+      // About 40°/s on the turning axis.
+      if (k === axis) expect(moved, `${axis} turns`).toBeGreaterThan(5)
+      else expect(moved, `${k} holds while ${axis} turns`).toBeLessThan(0.5)
+    }
+  }
 })
 
 test('the wheel zooms by how far it turns', async ({ page }) => {

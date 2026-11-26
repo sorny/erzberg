@@ -9,7 +9,7 @@ export const SECTION_LABELS = {
   "Aerial Perspective": "strength falloff haze",
   "Anaglyph": "enabled separation left right",
   "Aspect Map": "opacity fade on flat ground full at",
-  "Camera": "lock view tilt zoom rotation roll supersampling auto-rotate speed direction centre guides projection inclination explode focal length pan reset",
+  "Camera": "lock view heading tilt turntable roll zoom supersampling auto-rotate axis speed direction centre guides projection inclination explode focal length pan reset",
   "Curvature Shading": "scale gain opacity convex concave",
   "Export": "png stl gltf 3mf geotiff geojson heightmap world kmz webm length",
   "Hillshade": "multi-direction local light scale turn up to sun azimuth altitude date time zone latitude longitude intensity opacity exaggeration highlight shadow show cast shadows darkness softness quality sky-view factor strength rays",
