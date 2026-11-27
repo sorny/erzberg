@@ -1212,7 +1212,7 @@ export function Sidebar({
     hillshade: false, slopeShade: false, vectorLayers: false, text: false,
     waterFill: false, aspectMap: false, analysis: false,
     localRelief: false, curvShade: false, openness: false, texShade: false, aerial: false, wetness: false, sunTint: false,
-    points: false, texture: false, mirror: false, erosion: false, plot: true, export: true,
+    points: false, texture: false, mirror: false, erosion: false, plot: false, export: true,
     sheetMarks: false, legend: false, fetchTerrain: false, extent: false, modeShadowLine: false, anaglyph: false,
     soundscapes: false, landCover: false, modeCover: false,
     satellite: false, masks: false,
@@ -3840,6 +3840,105 @@ export function Sidebar({
 
           <Stage n={6} title="Output">
 
+          <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
+            {/* ── The file ─────────────────────────────────────────────────
+                SVG is the product, so it is the one primary action here, with
+                what it will hold said under it. Pens are counted by Preflight,
+                which builds the file; before that the line says what is known. */}
+            <div>
+              <Btn size="lg" variant="primary" block onClick={onSvg} data-testid="export-svg" style={{ width:'100%' }}>
+                SVG<Key>1</Key>
+              </Btn>
+              <div data-testid="export-svg-summary" style={{ marginTop:6, fontSize:11, color: DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
+                {plotStats
+                  ? `${plotStats.pens} pen layer${plotStats.pens === 1 ? '' : 's'} · ${view.plotWidthMm ?? 297} mm · ${plotStats.strokes.toLocaleString()} strokes`
+                  : `${view.plotWidthMm ?? 297} mm · ${segs} segments`}
+              </div>
+              {/* The name it lands under, before it lands: the look is in it, so
+                  two looks of one terrain are two files. */}
+              <div data-testid="export-name" title="SVG, PNG and WebM take the preset's name. STL and the raster keep the source's. Every PNG and SVG holds the whole parameter set, so it opens again under Presets."
+                style={{ marginTop:2, fontSize:11, color: MUTED, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                Saves as <span style={{ color: DIM, fontFamily: MONO }}>{plateName ?? 'heightmap'}.svg</span>
+                <span data-testid="export-carries"> · carries the preset</span>
+              </div>
+              {/* What the SVG will contain, said as a sentence.
+                  It *cuts* at the paper frame rather than hiding what falls
+                  outside it, so a switch two stages away in Frame decides what
+                  you get — and nothing else in the panel says so. */}
+              {/* And the sheet it cuts at, as a way there: the paper's shape
+                  lives in Frame and its width up here, and a plot is one
+                  decision about both. */}
+              <button type="button" data-testid="export-extent"
+                onClick={() => {
+                  goStage(5)
+                  setSec(prev => ({ ...prev, paper: true }))
+                  requestAnimationFrame(() => {
+                    document.querySelector('[data-testid="section-paper"]')
+                      ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+                  })
+                }}
+                title="Open Frame › Paper"
+                style={{ display:'block', marginTop:2, background:'none', border:'none', padding:0, cursor:'pointer',
+                         fontFamily:'inherit', fontSize:11, color: MUTED, textAlign:'left' }}>
+                {view.showFrame
+                  ? `Cuts at the frame: ${PAPERS[view.framePaper ?? 'iso']?.label ?? 'custom'}, ${view.frameLandscape ? 'landscape' : 'portrait'}.`
+                  : 'Writes the full canvas (no paper frame).'}
+                {/* Said as the action it is, in the text colour and underlined,
+                    so it reads as a way somewhere and not as the caption's end. */}
+                <span style={{ color: TEXT, textDecoration:'underline', textUnderlineOffset:3,
+                  textDecorationColor: MUTED, marginLeft:6, whiteSpace:'nowrap' }}>Frame › Paper</span>
+              </button>
+              <PenStrip pens={pens} style={style}
+                onOneInk={(mode) => ss({ [`hypso${mode}`]: false })}
+                onOpenMark={(mode) => {
+                  const row = PANEL_MODES.find((r) => r[1] === `enabled${mode}`)
+                  if (!row) return
+                  goStage(3); setDrill(row[0])
+                }} />
+            </div>
+
+            {/* The other files, second to the plot and grouped by what each
+                is for: a picture, a solid to print, map data for a GIS, and a
+                recording with its length beside it. Only SVG keeps a key. */}
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
+            <ExportGroup title="Images">
+              <ExpBtn label="PNG" onClick={onPng} testId="export-png" />
+              <ExpBtn label="PNG α" onClick={onPngAlpha} testId="export-png-alpha" />
+            </ExportGroup>
+            <ExportGroup title="3D models">
+              <ExpBtn label="STL" onClick={onStl} testId="export-stl" />
+              <ExpBtn label="glTF" onClick={() => onModel?.('glb')} testId="export-glb" />
+              <ExpBtn label="3MF" onClick={() => onModel?.('3mf')} testId="export-3mf" />
+            </ExportGroup>
+            <ExportGroup title="Map data">
+              <ExpBtn label="GeoTIFF" onClick={onGeoTiff} testId="export-geotiff" />
+              <ExpBtn label="GeoJSON" onClick={onGeoJson} testId="export-geojson" />
+              <ExpBtn label="Heightmap" onClick={onHeightmap} testId="export-heightmap" />
+            </ExportGroup>
+            {/* The plate itself, georeferenced: the picture lands on its ground
+                in QGIS or Google Earth. Drawn from straight above. */}
+            <ExportGroup title="Plate on the map">
+              <ExpBtn label="GeoTIFF" onClick={() => onPlateGeo?.('geotiff')} testId="export-plate-geotiff" />
+              <ExpBtn label="PNG + world" onClick={() => onPlateGeo?.('world')} testId="export-plate-world" />
+              <ExpBtn label="KMZ" onClick={() => onPlateGeo?.('kmz')} testId="export-plate-kmz" />
+            </ExportGroup>
+            <ExportGroup title="Video">
+              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} testId="export-webm" />
+            </ExportGroup>
+            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
+            {/* The whole plate as one file, last because it is not a picture of
+                it: the terrain, the look and every layer, to open again here. */}
+            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Project</div>
+            <div style={{ display:'flex', gap:4 }}>
+              <Btn block onClick={onSaveProject} data-testid="project-save"
+                title="One .erzberg file with the terrain, the look, the camera, the vectors, the text and the masks">Save project ⬇</Btn>
+              <Btn block onClick={() => { spendOpening(); onOpenProject?.() }} data-testid="project-open">Open project ⬆</Btn>
+            </div>
+            <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
+              A project reopens the plate exactly, with its terrain. A preset carries the look only.
+            </div>
+          </Section>
+
           <Section title="Plot" open={sec.plot} onToggle={() => tog('plot')}>
             {/* ── The plot ─────────────────────────────────────────────────
                 The stated audience of this whole tool is a pen plotter, and
@@ -3848,9 +3947,9 @@ export function Sidebar({
                 down, which the drawing fixes, and the distance the carriage
                 covers between strokes with the pen in the air, which is an
                 ordering problem nobody had looked at. See utils/penRoute.js. */}
-            {/* The plot first, because it decides the file: the sheet, the order
-                and how areas are filled are all SVG choices, and Preflight
-                measures the result before anything is written. */}
+            {/* Under Export and shut by default: the sheet, the order and the
+                clean-up are SVG choices that only a plot needs. Its header says
+                the sheet and the pen while it is shut. */}
             <div>
               <InlineSl label="Sheet width" testId="plot-width"
                 help="How wide the plot is on paper. The SVG page is this wide in millimetres, and its height follows the drawing, so an A4 portrait page is 210 mm. Everything physical reads it: the pen widths in the layer names, the time below, and the map ratio in Map Elements."
@@ -3973,110 +4072,6 @@ export function Sidebar({
                   </>)
                 })()}
               </div>
-            </div>
-          </Section>
-
-          <Section title="Export" open={sec.export} onToggle={() => tog('export')}>
-            {/* ── The file ─────────────────────────────────────────────────
-                SVG is the product, so it is the one primary action here, with
-                what it will hold said under it. Pens are counted by Preflight,
-                which builds the file; before that the line says what is known. */}
-            <div>
-              <Btn size="lg" variant="primary" block onClick={onSvg} data-testid="export-svg" style={{ width:'100%' }}>
-                SVG<Key>1</Key>
-              </Btn>
-              <div data-testid="export-svg-summary" style={{ marginTop:6, fontSize:11, color: DIM, fontFamily: MONO, fontVariantNumeric:'tabular-nums' }}>
-                {plotStats
-                  ? `${plotStats.pens} pen layer${plotStats.pens === 1 ? '' : 's'} · ${view.plotWidthMm ?? 297} mm · ${plotStats.strokes.toLocaleString()} strokes`
-                  : `${view.plotWidthMm ?? 297} mm · ${segs} segments`}
-              </div>
-              {/* The name it lands under, before it lands: the look is in it, so
-                  two looks of one terrain are two files. */}
-              <div data-testid="export-name" title="SVG, PNG and WebM take the preset's name. STL and the raster keep the source's."
-                style={{ marginTop:2, fontSize:11, color: MUTED, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                Saves as <span style={{ color: DIM, fontFamily: MONO }}>{plateName ?? 'heightmap'}.svg</span>
-              </div>
-              {/* What the SVG will contain, said as a sentence.
-                  It *cuts* at the paper frame rather than hiding what falls
-                  outside it, so a switch two stages away in Frame decides what
-                  you get — and nothing else in the panel says so. */}
-              {/* And the sheet it cuts at, as a way there: the paper's shape
-                  lives in Frame and its width up here, and a plot is one
-                  decision about both. */}
-              <button type="button" data-testid="export-extent"
-                onClick={() => {
-                  goStage(5)
-                  setSec(prev => ({ ...prev, paper: true }))
-                  requestAnimationFrame(() => {
-                    document.querySelector('[data-testid="section-paper"]')
-                      ?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-                  })
-                }}
-                title="Open Frame › Paper"
-                style={{ display:'block', marginTop:2, background:'none', border:'none', padding:0, cursor:'pointer',
-                         fontFamily:'inherit', fontSize:11, color: MUTED, textAlign:'left' }}>
-                {view.showFrame
-                  ? `Cuts at the frame: ${PAPERS[view.framePaper ?? 'iso']?.label ?? 'custom'}, ${view.frameLandscape ? 'landscape' : 'portrait'}.`
-                  : 'Writes the full canvas (no paper frame).'}
-                {/* Said as the action it is, in the text colour and underlined,
-                    so it reads as a way somewhere and not as the caption's end. */}
-                <span style={{ color: TEXT, textDecoration:'underline', textUnderlineOffset:3,
-                  textDecorationColor: MUTED, marginLeft:6, whiteSpace:'nowrap' }}>Frame › Paper</span>
-              </button>
-              {/* The second thing a plate carries, and the one nobody would
-                  guess at: every PNG and SVG holds the whole parameter set, so
-                  the picture opens again under Presets. */}
-              <div data-testid="export-carries" style={{ marginTop:2, fontSize:11, color: MUTED }}>
-                PNG and SVG carry the preset
-              </div>
-              <PenStrip pens={pens} style={style}
-                onOneInk={(mode) => ss({ [`hypso${mode}`]: false })}
-                onOpenMark={(mode) => {
-                  const row = PANEL_MODES.find((r) => r[1] === `enabled${mode}`)
-                  if (!row) return
-                  goStage(3); setDrill(row[0])
-                }} />
-            </div>
-
-            {/* The other files, second to the plot and grouped by what each
-                is for: a picture, a solid to print, map data for a GIS, and a
-                recording with its length beside it. Only SVG keeps a key. */}
-            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Other files</div>
-            <ExportGroup title="Images">
-              <ExpBtn label="PNG" onClick={onPng} testId="export-png" />
-              <ExpBtn label="PNG α" onClick={onPngAlpha} testId="export-png-alpha" />
-            </ExportGroup>
-            <ExportGroup title="3D models">
-              <ExpBtn label="STL" onClick={onStl} testId="export-stl" />
-              <ExpBtn label="glTF" onClick={() => onModel?.('glb')} testId="export-glb" />
-              <ExpBtn label="3MF" onClick={() => onModel?.('3mf')} testId="export-3mf" />
-            </ExportGroup>
-            <ExportGroup title="Map data">
-              <ExpBtn label="GeoTIFF" onClick={onGeoTiff} testId="export-geotiff" />
-              <ExpBtn label="GeoJSON" onClick={onGeoJson} testId="export-geojson" />
-              <ExpBtn label="Heightmap" onClick={onHeightmap} testId="export-heightmap" />
-            </ExportGroup>
-            {/* The plate itself, georeferenced: the picture lands on its ground
-                in QGIS or Google Earth. Drawn from straight above. */}
-            <ExportGroup title="Plate on the map">
-              <ExpBtn label="GeoTIFF" onClick={() => onPlateGeo?.('geotiff')} testId="export-plate-geotiff" />
-              <ExpBtn label="PNG + world" onClick={() => onPlateGeo?.('world')} testId="export-plate-world" />
-              <ExpBtn label="KMZ" onClick={() => onPlateGeo?.('kmz')} testId="export-plate-kmz" />
-            </ExportGroup>
-            <ExportGroup title="Video">
-              <ExpBtn label={webmActive ? '⏹ Stop' : 'WebM'} onClick={onWebmToggle} active={webmActive} testId="export-webm" />
-            </ExportGroup>
-            <InlineSl label="WebM length" min={1} max={60} value={webmDuration} onChange={setWebmDuration} fmt={v => v + ' s'} />
-            {/* The whole plate as one file, last because it is not a picture of
-                it: the terrain, the look and every layer, to open again here. */}
-            <div style={{ fontSize:11, color: DIM, fontWeight:600, margin:'12px 0 4px' }}>Project</div>
-            <div style={{ display:'flex', gap:4 }}>
-              <Btn block onClick={onSaveProject} data-testid="project-save"
-                title="One .erzberg file with the terrain, the look, the camera, the vectors, the text and the masks">Save project ⬇</Btn>
-              <Btn block onClick={() => { spendOpening(); onOpenProject?.() }} data-testid="project-open">Open project ⬆</Btn>
-            </div>
-            <div style={{ marginTop:6, fontSize:10, color: MUTED, lineHeight:1.45 }}>
-              A project reopens the plate exactly, with its terrain. A preset carries the look only.
             </div>
           </Section>
 

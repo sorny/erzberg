@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.84.0] — 2026-11-27
+
+### Changed
+
+- Output opens on Export. Plot moves below it and starts shut, with the sheet
+  width and the pen tip in its header.
+- The file name and the note that a PNG or SVG carries the preset share one
+  line under the SVG button.
+
+### Why
+
+- Most plates go to a screen or a PNG. The 15 plotter controls stood above
+  the SVG button and pushed every export below the fold.
+
 ## [1.83.0] — 2026-11-27
 
 ### Added
