@@ -4,7 +4,7 @@
  * Usage:
  *   node scripts/build-single-line-fonts.js
  *
- * Source: https://gitlab.com/oskay/svg-fonts — Evil Mad Scientist's collection
+ * Sources: https://gitlab.com/oskay/svg-fonts — Evil Mad Scientist's collection
  * of SVG fonts for Hershey Text v3, which is the canonical modern home for the
  * Hershey originals plus the "EMS" faces converted from openly-licensed
  * typefaces. Licences travel with the data; see LICENSE.txt in the output
@@ -120,6 +120,71 @@ const EXTRA = [
   { group: 'Plotter', id: 'Apple410', family: 'Apple 410',
     url: `${LEVIN}apple_410_font/Apple410.svg` },
 ]
+
+/*
+ * SLF63 — David Bollinger's single-line fonts, MIT.
+ *
+ * Unlike every source above, these were never SVG fonts: they ship as JSON,
+ * each glyph a list of polylines on a 7×9 grid with y down and the baseline on
+ * row 6. Thus they skip the path parser and go through `slf63Face` instead.
+ * The source is pinned to one commit, so a rebuild gives the same strokes.
+ *
+ * SANSi18n is not a face. It is a patch of 31 accented letters for SANS, and
+ * the upstream sample merges it in the same way.
+ */
+const SLF63_RAW = 'https://raw.githubusercontent.com/davebollinger/SLF63/5e29f19deefda5293adf7eaa13cfbe99aa9a0009/sketch/'
+const SLF63 = [
+  { name: 'SANS', family: 'SLF63 Sans', patch: 'SANSi18n' },
+  { name: 'SMCAP', family: 'SLF63 Small Caps' },
+  { name: 'SERIF', family: 'SLF63 Serif' },
+  { name: 'COMIC', family: 'SLF63 Comic' },
+  { name: 'HANDY', family: 'SLF63 Handy' },
+  { name: 'CURVY', family: 'SLF63 Curvy' },
+  { name: 'OCRY', family: 'SLF63 OCRy' },
+  { name: 'GEOMY', family: 'SLF63 Geomy' },
+]
+
+/** SLF63 grid units → font units. The cap height of 6 units lands at 700. */
+const SLF63_CAP = 700
+
+/**
+ * One SLF63 face in this app's stroke format.
+ *
+ * The y axis flips, because SLF63 counts rows down from the top and the app
+ * counts up from the baseline. Each glyph moves left by its own `xspan[0]`, and
+ * its advance is the span plus two grid units. That is the letter spacing the
+ * upstream layout engine uses by default, so text sets as its author set it.
+ */
+function slf63Face(json, family) {
+  const k = SLF63_CAP / json.capheight
+  const glyphs = {}
+  let strokeCount = 0
+  for (const [ch, g] of Object.entries(json.glyphs)) {
+    if ([...ch].length !== 1) continue
+    const [lo, hi] = g.xspan
+    const runs = []
+    for (const line of g.strokes ?? []) {
+      if (line.length < 2) continue
+      const run = []
+      for (const [x, y] of line) run.push(+((x - lo) * k).toFixed(DP), +((json.baserow - y) * k).toFixed(DP))
+      runs.push(run)
+    }
+    const s = dropRedundantDots(runs)
+    strokeCount += s.length
+    glyphs[ch] = [+((hi - lo + 2) * k).toFixed(DP), s]
+  }
+  return {
+    face: {
+      family, group: 'SLF63',
+      unitsPerEm: 1000,
+      ascender: SLF63_CAP,
+      descender: -+((json.rows - 1 - json.baserow) * k).toFixed(DP),
+      defaultAdvance: +((json.cols - 1 + 2) * k).toFixed(DP),
+      glyphs,
+    },
+    strokeCount,
+  }
+}
 
 /** Points per cubic. Glyphs are ~1000 units tall and curves here are gentle. */
 const CURVE_STEPS = 8
@@ -451,6 +516,19 @@ async function main() {
     manifest.push({ id, family, group })
     const kb = (JSON.stringify(out).length / 1024).toFixed(1)
     console.log(`${group}/${id}`.padEnd(34), `${Object.keys(glyphs).length} glyphs`.padEnd(12),
+                `${strokeCount} strokes`.padEnd(14), `${kb} kB`)
+  }
+
+  for (const { name, family, patch } of SLF63) {
+    const json = JSON.parse(await get(`${SLF63_RAW}SLF63_${name}.json`))
+    if (patch) Object.assign(json.glyphs, JSON.parse(await get(`${SLF63_RAW}SLF63_${patch}.json`)).glyphs)
+    const id = family.replace(/\s+/g, '')
+    const { face, strokeCount } = slf63Face(json, family)
+    const out = { id, ...face }
+    writeFileSync(resolve(OUT_DIR, `${id}.json`), JSON.stringify(out))
+    manifest.push({ id, family, group: face.group })
+    const kb = (JSON.stringify(out).length / 1024).toFixed(1)
+    console.log(`SLF63/${id}`.padEnd(34), `${Object.keys(face.glyphs).length} glyphs`.padEnd(12),
                 `${strokeCount} strokes`.padEnd(14), `${kb} kB`)
   }
 

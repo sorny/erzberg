@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.85.0] — 2026-11-27
+
+### Added
+
+- **SLF63 single-line fonts.** Eight faces by David Bollinger (MIT): Sans,
+  Small Caps, Serif, Comic, Handy, Curvy, OCRy and the dingbat face Geomy. They
+  sit in their own SLF63 group of the font picker, which now holds 57 faces.
+  Sans carries the upstream patch of 31 accented letters, such as ä, ö, ü and ß.
+- `scripts/build-single-line-fonts.js` reads the SLF63 JSON format, pinned to
+  upstream commit 5e29f19. `public/fonts/single-line/LICENSE.txt` carries the
+  full MIT notice.
+
+### Why
+
+- SLF63 is drawn for small plotter text. Each glyph is a few straight strokes
+  on a 7×9 grid, with no curves to flatten. The other 49 faces rebuild
+  byte for byte unchanged.
+
 ## [1.84.0] — 2026-11-27
 
 ### Changed

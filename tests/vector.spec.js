@@ -807,8 +807,8 @@ test.describe('vector layers', () => {
     })
 
     expect(r.bad).toEqual([])
-    expect(r.count, 'the manifest must carry every built face').toBe(49)
-    expect(r.groups).toEqual(['EMS', 'Hershey', 'ISO 3098', 'Plotter', 'Relief'])
+    expect(r.count, 'the manifest must carry every built face').toBe(57)
+    expect(r.groups).toEqual(['EMS', 'Hershey', 'ISO 3098', 'Plotter', 'Relief', 'SLF63'])
   })
 
   /** Opens a point layer's icon picker and returns its layer id. */

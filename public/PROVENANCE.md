@@ -48,7 +48,7 @@ SIL Open Font License 1.1 too. See `fonts/Overpass-OFL.txt`.
 `overpass-latin.woff2` is modified in one value. Its GDEF table classed
 `periodcentered` (·) as a combining mark, so browsers drew the dot with zero
 width and it covered the space after it. The patch classes it as a base glyph.
-Overpass names no Reserved Font Name, so the face keeps its name. The 49
+Overpass names no Reserved Font Name, so the face keeps its name. The 57
 single-line faces are under the OFL, the Hershey licence, the public domain, the
 WTFPL or MIT. The licence depends on the face. See
 `fonts/single-line/LICENSE.txt`, which carries the full OFL text as the OFL

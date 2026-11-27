@@ -162,8 +162,8 @@ lines, **ticks** and repeated **marks** (arrow, tooth, ring, cross, bar), and
 dash-dot patterns. Hatches and decorations are their own pen layers.
 
 A point feature can carry its **name and height as labels**, in Space Mono or in
-one of 49 **single-line fonts** (Hershey, EMS, Relief SingleLine, ISO 3098 and
-three plotter faces). A stroke face plots each letter as centre lines, so the
+one of 57 **single-line fonts** (Hershey, EMS, Relief SingleLine, ISO 3098,
+SLF63 and three plotter faces). A stroke face plots each letter as centre lines, so the
 label layer of the SVG is about a quarter of the size. The SVG writes real
 `<text>`. A point can also show one of sixteen **SVG icons**, or your own file,
 on a leader line.
@@ -622,7 +622,7 @@ Inside a text box, `⌘Z` belongs to the browser. A slider drag is one undo step
 | State | Zustand (raster data) + React state (parameters), saved to `localStorage` |
 | GIS | GeoTIFF.js, plus in-house GeoJSON, GPX, Overpass, OSM XML and PBF readers |
 | Icons | Maki (CC0) |
-| Fonts | Space Mono for the wordmark and labels, Overpass and Overpass Mono for the panel (all SIL OFL 1.1), self-hosted. 49 stroke faces from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine), ISO 3098 and three plotter faces |
+| Fonts | Space Mono for the wordmark and labels, Overpass and Overpass Mono for the panel (all SIL OFL 1.1), self-hosted. 57 stroke faces from [oskay/svg-fonts](https://gitlab.com/oskay/svg-fonts), [Relief SingleLine](https://github.com/isdat-type/Relief-SingleLine), ISO 3098, [SLF63](https://github.com/davebollinger/SLF63) by David Bollinger (MIT) and three plotter faces |
 | Map data | OpenStreetMap through Overpass and Nominatim (ODbL). Map drapes from OpenTopoMap, basemap.at and swisstopo, with their credit |
 | Elevation | Terrain Tiles on AWS Open Data (SRTM, GMTED2010, EU-DEM, 3DEP) |
 | Solar position | NOAA polynomials, in-house |

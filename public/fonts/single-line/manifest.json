@@ -243,5 +243,45 @@
     "id": "ReliefPendot",
     "family": "Relief SingleLine Pendot",
     "group": "Relief"
+  },
+  {
+    "id": "SLF63Comic",
+    "family": "SLF63 Comic",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63Curvy",
+    "family": "SLF63 Curvy",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63Geomy",
+    "family": "SLF63 Geomy",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63Handy",
+    "family": "SLF63 Handy",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63OCRy",
+    "family": "SLF63 OCRy",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63Sans",
+    "family": "SLF63 Sans",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63Serif",
+    "family": "SLF63 Serif",
+    "group": "SLF63"
+  },
+  {
+    "id": "SLF63SmallCaps",
+    "family": "SLF63 Small Caps",
+    "group": "SLF63"
   }
 ]
