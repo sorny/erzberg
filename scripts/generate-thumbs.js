@@ -64,14 +64,6 @@ async function shoot(page, name) {
     return !!tile
   }, name)
   if (!found) throw new Error('no such style tile')
-  // A turning plate never settles: the tile shows the pose it opens with.
-  const view = JSON.parse(readFileSync(resolve(PRESETS_DIR, `${name}.json`), 'utf8')).view ?? {}
-  if (view.autoRotate) {
-    await page.evaluate((v) => window.erzberg.setParams({
-      autoRotate: 'false', tilt: String(v.tilt ?? 50), rotation: String(v.rotation ?? 0),
-      cameraRoll: String(v.cameraRoll ?? 0), turntable: String(v.turntable ?? 0),
-    }), view)
-  }
   await page.evaluate(() => window.erzberg.settle())
 
   const [download, status] = await Promise.all([

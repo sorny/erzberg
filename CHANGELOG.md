@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.85.1] — 2026-11-27
+
+### Changed
+
+- The Point Cloud preset no longer spins. Auto-rotate is off in the preset.
+  Its thumbnail shows the plate as a click on its tile draws it.
+
+### Why
+
+- A preset tile applies only the style, so the spin and the top view never
+  reached a plate from a tile click. Only the thumbnail showed them.
+
 ## [1.85.0] — 2026-11-27
 
 ### Added

@@ -49,12 +49,9 @@
     "zoom": 0.75,
     "fov": 30,
     "orthographic": false,
-    "autoRotate": true,
-    "autoRotateSpeed": 0.25,
-    "autoRotateDir": -1,
+    "autoRotate": false,
     "showGuides": false,
-    "turntable": 30,
-    "autoRotateAxis": "turntable"
+    "turntable": 30
   },
   "gradientStops": [
     {
