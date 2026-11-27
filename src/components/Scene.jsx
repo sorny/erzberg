@@ -317,12 +317,18 @@ export function Scene({
    * auto-rotate on used to spend the whole idle in one step — 96° after nine
    * seconds of stillness. See frameClock.
    */
-  const spin = useRef({ turntable: p.turntable ?? 0, cameraRoll: p.cameraRoll ?? 0, sync: 0 })
+  const spin = useRef({ turntable: p.turntable ?? 0, cameraRoll: p.cameraRoll ?? 0, sync: 0, wrote: {} })
   const wrap = (a) => ((a + 180) % 360 + 360) % 360 - 180
   useEffect(() => {
-    // A spin writes a rounded copy of its own angle: keep the exact one.
+    // A spin writes a rounded copy of its own angle, and this effect runs a
+    // frame or more later, when the spin has moved on. Taking that copy back
+    // stepped the plate backwards at every sync. So the copy is skipped, as the
+    // orbit's echo is, and only a value from somewhere else is taken.
     const now = { turntable: p.turntable ?? 0, cameraRoll: p.cameraRoll ?? 0 }
+    const wrote = spin.current.wrote
     for (const key of ['turntable', 'cameraRoll']) {
+      if (wrote[key] === now[key]) { delete wrote[key]; continue }
+      delete wrote[key]
       if (Math.abs(spin.current[key] - now[key]) > 0.06) spin.current[key] = now[key]
     }
   }, [p.turntable, p.cameraRoll])
@@ -343,7 +349,9 @@ export function Scene({
       spin.current.sync += dt * 1000
       if (spin.current.sync >= ORBIT_SYNC_MS) {
         spin.current.sync = 0
-        setParams({ [key]: Math.round(spin.current[key] * 10) / 10 })
+        const value = Math.round(spin.current[key] * 10) / 10
+        spin.current.wrote[key] = value
+        setParams({ [key]: value })
       }
     }
     invalidate()  // keep the on-demand loop running while auto-rotating
@@ -367,6 +375,8 @@ export function Scene({
    */
   const rolled = useRef(false)
   const turned = useRef(false)
+  // A new value from state ends a slider's live drag. While auto-rotate turns
+  // the axis, its frame sets the live value again before the next draw.
   useEffect(() => { liveRoll.current = null; invalidate() }, [p.cameraRoll, invalidate])
   useEffect(() => { liveTurn.current = null; invalidate() }, [p.turntable, invalidate])
   useFrame(() => {

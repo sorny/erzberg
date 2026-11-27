@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.82.1] — 2026-11-27
+
+### Fixed
+
+- Auto-rotate on Turntable or Roll turns smoothly. Before, the plate stepped
+  back at every write to state, about six times a second.
+
+### Why
+
+- The spin writes a rounded copy of its angle to state every 150 ms. The effect
+  that reads state runs a frame or more later, after the spin moved on, and it
+  took the older copy back. Over 3 seconds, 17 frames stepped back by up to
+  0.4°. The effect now skips the spin's own copy, as it does for the orbit, and
+  no frame steps back.
+
 ## [1.82.0] — 2026-11-26
 
 ### Added
