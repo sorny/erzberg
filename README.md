@@ -60,7 +60,7 @@ Each sends a place name or a bounding box. None sends a file or needs a key.
   </tr>
 </table>
 
-<sub>Six of the 88 bundled presets, rendered by the app's own PNG exporter from
+<sub>Six of the 92 bundled presets, rendered by the app's own PNG exporter from
 the sample heightmap.</sub>
 
 ---

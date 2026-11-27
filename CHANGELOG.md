@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.83.0] — 2026-11-27
+
+### Added
+
+- **Etagen preset.** Bitplane benches on an iron-oxide red ground, nine tiers
+  with risers and a full Bayer screen on each bench floor. The banded colors
+  run from spoil gray at the foot through oxide orange to pale ore at the top.
+  The flat ground around the hills turns into a gray spoil floor. The library
+  holds 92 presets.
+
+### Why
+
+- Etagen is the local word for the benches of an open-pit mine, such as the
+  Erzberg that the app takes its name from. No other preset used Bitplane as
+  its main mode.
+
 ## [1.82.1] — 2026-11-27
 
 ### Fixed

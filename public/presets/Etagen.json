@@ -1,0 +1,57 @@
+{
+  "format": 11,
+  "style": {
+    "bgColor": "#5a2412",
+    "enabledLines": false,
+    "enabledBitplane": true,
+    "tiersBitplane": 9,
+    "ditherBitplane": 1,
+    "edgeBitplane": "cells",
+    "riserSpacingBitplane": 2,
+    "risersBitplane": true,
+    "wallsBitplane": true,
+    "colorBitplane": "#e9d9c2",
+    "weightBitplane": 1.4,
+    "opacityBitplane": 1,
+    "hypsoBitplane": true,
+    "hypsoModeBitplane": "elevation",
+    "hypsoBandedBitplane": true,
+    "hypsoIntervalBitplane": 9,
+    "depthOcclusion": true,
+    "occludeBy": "ground",
+    "spacingBitplane": 4,
+    "screenWeightBitplane": 2
+  },
+  "gradientStops": [
+    {
+      "pos": 0,
+      "color": "#7d8a90"
+    },
+    {
+      "pos": 0.1,
+      "color": "#9a6a4a"
+    },
+    {
+      "pos": 0.35,
+      "color": "#c0622a"
+    },
+    {
+      "pos": 0.7,
+      "color": "#e9954a"
+    },
+    {
+      "pos": 1,
+      "color": "#f6e4c8"
+    }
+  ],
+  "bgGradientStops": [
+    {
+      "pos": 0,
+      "color": "#5a2412"
+    },
+    {
+      "pos": 1,
+      "color": "#5a2412"
+    }
+  ]
+}
